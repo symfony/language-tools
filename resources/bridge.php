@@ -5,7 +5,7 @@ if (PHP_VERSION_ID < 80100) {
     exit(1);
 }
 
-$options = getopt('', ['project:', 'environment::', 'debug::']);
+$options = getopt('', ['project:', 'environment::', 'debug::', 'sections::']);
 $project = $options['project'] ?? null;
 if (!is_string($project) || '' === $project) {
     fwrite(STDERR, "The --project option is required.\n");
@@ -38,9 +38,81 @@ if (!preg_match('/^(?:v)?(6\.4|7\.4|8\.0|8\.1)(?:\.|$)/', $version, $matches)) {
 
 $environment = $options['environment'] ?? 'dev';
 $debug = $options['debug'] ?? '1';
+$requestedSections = $options['sections'] ?? '';
+$requestedSections = is_string($requestedSections)
+    ? array_values(array_filter(explode(',', $requestedSections)))
+    : [];
+
+$sections = [];
+$errors = [];
+if (in_array('routes', $requestedSections, true)) {
+    if (!class_exists(Symfony\Component\Console\Input\ArrayInput::class)
+        || !class_exists(Symfony\Component\Console\Output\BufferedOutput::class)
+    ) {
+        $errors[] = ['section' => 'routes', 'message' => 'Symfony Console is unavailable.'];
+    } else {
+        try {
+            $application = require $project.'/bin/console';
+            if (!is_object($application) || !method_exists($application, 'run')) {
+                throw new RuntimeException('bin/console did not return a console application.');
+            }
+
+            $input = new Symfony\Component\Console\Input\ArrayInput([
+                'command' => 'debug:router',
+                '--format' => 'json',
+                '--show-aliases' => true,
+                '--env' => is_string($environment) ? $environment : 'dev',
+                '--no-debug' => in_array($debug, ['0', 'false'], true),
+                '--no-interaction' => true,
+            ]);
+            $output = new Symfony\Component\Console\Output\BufferedOutput();
+            $exitCode = $application->run($input, $output);
+            if (0 !== $exitCode) {
+                throw new RuntimeException(sprintf('debug:router exited with status %d.', $exitCode));
+            }
+
+            $routes = json_decode($output->fetch(), true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($routes)) {
+                throw new RuntimeException('debug:router did not return a JSON object or array.');
+            }
+
+            $items = [];
+            foreach ($routes as $name => $route) {
+                if (!is_string($name) || !is_array($route)) {
+                    continue;
+                }
+
+                $items[] = [
+                    'name' => $name,
+                    'path' => is_string($route['path'] ?? null) ? $route['path'] : null,
+                    'methods' => is_array($route['methods'] ?? null) ? array_values($route['methods']) : [],
+                    'schemes' => is_array($route['schemes'] ?? null) ? array_values($route['schemes']) : [],
+                    'host' => is_string($route['host'] ?? null) && '' !== $route['host']
+                        ? $route['host']
+                        : null,
+                    'controller' => is_string($route['defaults']['_controller'] ?? null)
+                        ? $route['defaults']['_controller']
+                        : null,
+                ];
+            }
+
+            usort($items, static fn (array $a, array $b): int => $a['name'] <=> $b['name']);
+            $sections['routes'] = [
+                'complete' => true,
+                'generation' => hash('sha256', json_encode($items, JSON_THROW_ON_ERROR)),
+                'items' => $items,
+                'resources' => [],
+                'warnings' => [],
+            ];
+        } catch (Throwable $error) {
+            $errors[] = ['section' => 'routes', 'message' => $error->getMessage()];
+        }
+    }
+}
 
 $result = [
     'schemaVersion' => 1,
+    'generation' => hash('sha256', json_encode($sections, JSON_THROW_ON_ERROR)),
     'project' => [
         'root' => realpath($project) ?: $project,
         'symfonyVersion' => $version,
@@ -49,8 +121,8 @@ $result = [
         'environment' => is_string($environment) ? $environment : 'dev',
         'debug' => !in_array($debug, ['0', 'false'], true),
     ],
-    'sections' => [],
-    'errors' => [],
+    'sections' => $sections,
+    'errors' => $errors,
 ];
 
 fwrite(STDOUT, json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n");
