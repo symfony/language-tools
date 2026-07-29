@@ -14,42 +14,48 @@ cache files directly.
 
 The initial bridge can obtain high-quality machine-readable data for routes,
 services, autowiring types, effective configuration, events, Twig metadata, and
-forms across all currently supported stable Symfony branches. Translation
+forms across all branches in Symfony's `supported_versions`. Translation
 catalogues also have a suitable public runtime API. Source locations for
 individual routes, service declarations, translation entries, and configuration
-nodes are not consistently preserved by these runtime APIs. The source index
-must provide those locations, and Symfony should gain focused public export APIs
-where runtime-to-source reconciliation is otherwise ambiguous.
+nodes are not consistently preserved by runtime metadata, so the static source
+index must provide those locations.
 
 The recommended implementation choices are:
 
-* support the branches returned by `https://symfony.com/releases.json` rather
-  than hard-coding a version list;
+* support exactly the branches in `supported_versions` from
+  `https://symfony.com/releases.json`, excluding security-only and unreleased
+  branches;
 * ship a self-contained server and a small bridge compatible with the minimum
   PHP requirement of every supported Symfony branch;
 * invoke a bundled bridge entry point through the configured project PHP command
   instead of requiring a project package;
-* boot the selected environment's cached kernel for public runtime APIs and use
-  official JSON debug output where it is already complete;
+* boot one kernel per snapshot, prefer official structured debug commands, and
+  use public runtime collectors where supported branches lack structured output;
 * run `cache:clear` when relevant saved resources change, and `cache:warmup` only
   when an existing built container merely needs optional warmers;
-* use Phpactor's tolerant PHP parser fork after upstreaming or pinning a stable
-  release suitable for Symfony;
-* use a bundled native Tree-sitter runtime and only the PHP, Twig, and YAML
-  grammars for error-tolerant Twig and YAML parsing;
+* create and maintain a Symfony fork of the tolerant PHP parser with tagged
+  releases and current PHP syntax support;
+* use a bundled native Tree-sitter runtime and technically strong Twig and YAML
+  grammars, creating an official Twig grammar if existing ones are inadequate;
 * parse dotenv files with a small position-aware lexer, using Symfony Dotenv only
   for semantic validation;
 * model a runtime snapshot and per-document overlays as immutable generations;
 * represent incomplete rename coverage with annotated edits requiring
   confirmation when the client supports them, and otherwise ask for
   confirmation before returning the edit;
+* persist the application-owned static index under `var/symfony-lsp/` and avoid
+  recursively scanning `vendor/`;
+* support source-aware translation features initially for YAML, XLIFF, PHP, and
+  JSON while using runtime catalogues for all loader formats;
 * build standalone binaries with `static-php-cli`, following the proven Laravel
-  LSP approach.
+  LSP approach;
+* add generic content-length stream framing to `fabpot/json-rpc-peer` while
+  keeping the library protocol-neutral.
 
-The first upstream Symfony work should be a public, versioned metadata export
-command or service. It should consolidate safe LSP metadata without exposing
-parameter or environment values and without making the LSP depend on internal
-debug command classes.
+New JSON output should still be added to Symfony commands such as Messenger and
+Security for long-term convergence. The initial LSP cannot depend on additions
+available only in future Symfony versions, so public runtime collectors remain
+necessary while older branches stay supported.
 
 ## Research method
 
@@ -90,9 +96,10 @@ At the time of research it reports these supported stable branches:
 | 8.1 | 8.4 |
 
 The endpoint also distinguishes supported, maintained development, and
-security-only branches. The LSP should consume this endpoint during its own
-release process to generate a tested compatibility matrix. Runtime operation
-must remain offline and use the matrix embedded in the binary.
+security-only branches. Only `supported_versions` defines the compatibility
+promise. The LSP should consume it during its own release process to generate a
+tested matrix. Runtime operation must remain offline and use the matrix embedded
+in the binary.
 
 ### Recommendation
 
@@ -104,9 +111,13 @@ and continue in static-only mode.
 The bridge should inspect `Composer\InstalledVersions` after loading the
 project autoloader. It should validate `symfony/framework-bundle`, not only a
 single component, because FrameworkBundle is an explicit product requirement.
+The selected runtime defaults to `dev` with debug enabled; both remain
+configurable and should appear in index status.
 
-Support removal should be an ordinary minor release of Symfony LSP coordinated
-with Symfony's maintenance lifecycle. CI fixtures should be generated from the
+Security-only branches are not supported. Unreleased development branches may
+be exercised in CI without becoming part of the compatibility promise. Support
+removal should be an ordinary minor release of Symfony LSP coordinated with
+changes to `supported_versions`. CI fixtures should be generated from the
 embedded matrix, not maintained as a separate policy.
 
 ## Effective metadata available today
@@ -136,14 +147,20 @@ Real applications need separate benchmarks.
 
 ### Safe access rule
 
-The bridge should:
+One bridge process should:
 
 1. load the project autoloader;
-2. boot the selected FrameworkBundle kernel;
+2. boot one selected FrameworkBundle kernel in `dev` with debug enabled by
+   default;
 3. let Symfony reuse or build the selected environment's normal cache;
-4. query public runtime APIs or execute public console behavior;
-5. normalize the result to a versioned snapshot;
-6. shut down the kernel.
+4. execute official structured commands in-process with isolated stdout and
+   stderr capture;
+5. use public runtime collectors where no suitable structured command exists;
+6. normalize each independent section to a versioned snapshot;
+7. shut down the kernel.
+
+A failed optional section must not erase successful sections. Version-specific
+normalizers are acceptable because the server tracks `supported_versions`.
 
 It should not include generated route files, translation catalogue PHP, dumped
 container PHP, debug container XML or serialized data itself. Symfony may use
@@ -155,9 +172,9 @@ LSP independent from cache formats.
 | Area | Available effective data | Main gap |
 | --- | --- | --- |
 | Routes | Names, paths, methods, defaults | Declaration origin |
-| Services | Definitions, aliases, tags, arguments | Public export and declaration origin |
-| Autowiring | Available types and aliases | Stable export contract |
-| Parameters | Names, values, deprecations | Values must not cross the bridge |
+| Services | Definitions, aliases, tags, arguments | Declaration origin |
+| Autowiring | Available types and aliases | Version-specific normalization |
+| Parameters | Names, values, deprecations | Raw values must not cross the bridge |
 | Environment | Processors, result types, names | Output that omits real values |
 | Effective config | Processed configuration | Schema, origin, and constraints |
 | Config schema | Children, types, defaults, docs, enums | Serializer for every extension style |
@@ -190,12 +207,12 @@ individual route to its declaration.
 
 Recommendation:
 
-* obtain effective routes through `RouterInterface` in the bridge;
+* obtain effective routes through `debug:router --format=json --show-aliases`;
+* use `RouterInterface` only when a supported branch needs additional metadata;
 * keep route source locations in the static PHP and YAML indexes;
 * reconcile by route name and effective semantics;
-* add an optional public route origin to Symfony's route metadata or a dedicated
-  metadata export if imported prefixes, generated routes, or duplicate source
-  names make reconciliation ambiguous.
+* treat ambiguous runtime-to-source reconciliation as incomplete provenance
+  rather than blocking the provider.
 
 ### Dependency injection
 
@@ -224,10 +241,11 @@ output includes real environment values. The LSP must never execute it.
 
 Recommendation:
 
-* use the official JSON command as a prototype extraction path;
-* introduce a public safe metadata exporter in Symfony before declaring the
-  service provider stable;
-* export parameter names and deprecations, never values;
+* use `debug:container --format=json --show-hidden` as the runtime boundary;
+* use `debug:container --types --format=json` for autowiring types;
+* allow version-specific normalizers across supported branches;
+* run `debug:container --parameters --format=json` only inside the trusted
+  bridge, discard values immediately, and retain only names and deprecations;
 * export referenced environment names, processor chains, defaults-present
   flags, and provided types, never resolved values;
 * source-index service and parameter declarations because runtime metadata does
@@ -247,9 +265,13 @@ schema:
 * enum values;
 * extra-key and merge behavior where exposed.
 
-`debug:config <alias> --format=json` returns effective processed values, not the
-schema needed for completion. `config:dump-reference` is human-oriented and its
-JSON availability varies by branch and output purpose.
+`debug:config <alias> --format=json` returns effective processed values. The
+bridge may use this output and normalize fields required by enabled providers.
+It must remain workspace-local and out of telemetry and raw protocol logs. The
+command does not provide the schema needed for completion.
+
+`config:dump-reference` is human-oriented and its JSON availability varies by
+branch and output purpose.
 
 A bridge exporter can obtain each bundle extension's `ConfigurationInterface`
 and walk its `TreeBuilder`. Modern `AbstractBundle` configurations and classic
@@ -258,9 +280,10 @@ validation is implemented in closures and cannot be serialized. The schema
 should mark these constraints as runtime-only rather than attempting to encode
 arbitrary PHP.
 
-Recommendation: add a public Config schema normalizer that returns JSON-safe
-node metadata. This is reusable beyond LSP and avoids coupling the bridge to
-bundle implementation styles.
+Recommendation: walk public Config tree APIs in the bridge and normalize classic
+extensions and modern bundles behind an internal adapter. A future Symfony
+schema exporter would be useful, but cannot be an initial dependency because it
+would not exist across supported branches.
 
 ### Twig
 
@@ -300,10 +323,15 @@ message-level navigation.
 
 Recommendation:
 
+* use Symfony's runtime catalogue for effective completion and existence across
+  every installed translation loader;
+* initially source-index YAML, XLIFF, PHP, and JSON translation resources for
+  navigation, references, rename, placeholders, and edits;
+* support XLIFF specifically as a translation format while generic Symfony XML
+  configuration remains out of scope;
 * runtime snapshot: effective key, domain, locale, message, and fallback chain;
 * source index: resource file, key range, message range, and placeholders;
 * reconcile by locale, domain, and key;
-* use the runtime catalogue only to decide effective existence;
 * keep missing-key diagnostics opt-in as already decided.
 
 The snapshot may carry message text because hover and placeholder completion
@@ -318,8 +346,9 @@ parser with editable ranges. Static indexing should lex `.env`, `.env.local`,
 
 The bridge can obtain processor names and result types through
 `EnvVarProcessorInterface::getProvidedTypes()` and safe container metadata. It
-must never run `debug:container --env-vars`, `debug:dotenv`, or a secrets command
-because these may reveal real values.
+must never run `debug:container --env-vars` or a secrets command because these
+may reveal real values. Dotenv command use requires the same explicit output
+review before adoption.
 
 The snapshot should contain only:
 
@@ -337,65 +366,47 @@ machine-readable across the tested branches. They are strong P1 candidates.
 
 `debug:messenger` and `debug:firewall` are text-only. Their internal command
 inputs are structured, but parsing their text output would create an unstable
-contract. Add public JSON exporters before implementing stable providers.
+contract. Use public runtime collectors on currently supported branches. Add JSON
+output to future Symfony commands for long-term convergence, then adopt it only
+when it is present across all supported branches.
 
 Validator and serializer have public metadata factories. They can be queried by
 the bridge without parsing cache files, although source provenance remains a
 static-index concern.
 
-## Public Symfony APIs to add
+## Runtime integration policy
 
-### One versioned metadata exporter
+Official structured debug commands are the preferred runtime boundary because
+they reuse Symfony's cache, isolate project behavior, and already work on the
+supported branches. Direct public runtime APIs remain necessary where structured
+output is absent or incomplete.
 
-Rather than add an LSP-only API to every component immediately, introduce a
-small public metadata export facility in FrameworkBundle. A command such as:
+Initial command sources are:
 
-```text
-bin/console debug:metadata --format=json --sections=container,routes,config,twig,translations
-```
+* `debug:container --format=json --show-hidden`;
+* `debug:container --types --format=json`;
+* `debug:router --format=json --show-aliases`;
+* `debug:config <alias> --format=json`;
+* `debug:twig --format=json`;
+* `debug:event-dispatcher --format=json`;
+* `debug:form --format=json`.
 
-would provide a versioned, safe schema. The precise command name should be
-decided in Symfony, but the contract should have these properties:
-
-* public and covered by backward-compatibility rules;
-* additive within a schema version;
-* sections can be requested independently;
-* no service instantiation beyond what each section requires;
-* no parameter values, environment values, secrets, or credentials;
-* absolute source paths only when Symfony knows their exact origin;
-* resources and completeness flags for every section;
-* errors isolated by section so one optional bundle cannot invalidate the whole
-  snapshot;
-* JSON written to stdout and diagnostics to stderr.
-
-A dedicated bridge script may call the corresponding service directly, but the
-console command makes the contract independently testable and useful to other
-tools.
-
-### Proposed initial schema additions
-
-1. **Container metadata:** safe definition graph, aliases, autowiring types,
-   tags, deprecations, decorators, parameter names, and environment reference
-   metadata.
-2. **Route origins:** declaration resource and line or source token when known.
-3. **Config schema:** normalized Config node trees for installed extensions.
-4. **Template names:** iterable effective template names and exact source paths
-   without relying on internal `TemplateIterator`.
-5. **Translation origins:** message-level resource provenance where loaders can
-   supply it.
-
-Events and forms can initially reuse existing JSON commands. Messenger and
-Security should gain JSON output before their LSP providers are stabilized.
+The bridge should normalize version differences internally. A generic new
+metadata command is not required for the initial LSP. New JSON formats for
+Messenger, Security, translations, and other areas should still be contributed
+to future Symfony versions because they are useful beyond the LSP. They cannot
+become required until every supported branch provides them.
 
 ## Bridge design
 
 ### Invocation
 
-The standalone server should extract its bundled bridge script to its own
-versioned application-data directory. It then invokes an argument array such as:
+After workspace trust is granted, the standalone server should write its bundled
+bridge atomically to `var/symfony-lsp/<version>/bridge.php`. It should not modify
+`.gitignore`. It then invokes an argument array such as:
 
 ```text
-<phpCommand...> /path/to/bridge.php snapshot \
+<phpCommand...> var/symfony-lsp/<version>/bridge.php snapshot \
     --project=/workspace/app \
     --environment=dev \
     --debug=1 \
@@ -404,24 +415,17 @@ versioned application-data directory. It then invokes an argument array such as:
 
 The bridge loads `<project>/vendor/autoload.php`, discovers the FrameworkBundle
 kernel using the same public runtime convention as `bin/console`, validates the
-Symfony branch, boots it, collects requested sections, emits one JSON document,
-and shuts down.
+Symfony branch, and boots one kernel. It executes official commands in-process
+with isolated output capture, runs public collectors for missing sections,
+emits one JSON document with independent section errors, and shuts down.
 
 Do not pass PHP code through `bin/console` or require PsySH. A fixed bridge entry
 point is safer, easier to test, and works in minimal Symfony applications.
 
-For wrappers such as DDEV, the host bridge path may not exist inside the
-container. The bridge runner therefore needs one of these deployment modes:
-
-1. execute a project-relative copy under `var/symfony-lsp/<version>/bridge.php`;
-2. stream the fixed script to the configured PHP command through stdin;
-3. allow an explicit path mapping in advanced configuration.
-
-Recommendation: copy the bridge under the project `var/` directory after trust
-is granted. This is not a Composer dependency, survives arbitrary PHP command
-prefixes, and can be versioned and replaced atomically. Add the path to the
-project's ignore file only on explicit user request; the LSP itself should not
-edit ignore files automatically.
+The project-relative path works through wrappers such as DDEV and Docker because
+the project is normally mounted in the PHP environment. The copy is not a
+Composer dependency, is disposable, and is replaced atomically when the LSP
+version changes. Advanced path mapping can be added for unusual mount layouts.
 
 ### Refresh behavior
 
@@ -438,11 +442,12 @@ The server should debounce saves, serialize refreshes per application root, and
 retain the last valid snapshot. It should never delete cache directories
 itself. Symfony's command owns atomic cache replacement and locking behavior.
 
-The first implementation can conservatively run `cache:clear` after any saved
-PHP file or Symfony configuration resource and optimize later using the
-container and router resource sets. Template, translation, and dotenv saves can
-refresh only their relevant static indexes first; runtime refresh policy should
-be measured because Symfony may already invalidate their dedicated caches.
+Automatic refresh is allowed to run `cache:clear` after relevant saved changes.
+The first implementation can conservatively run it after any saved PHP file or
+Symfony configuration resource and optimize later using container and router
+resource sets. Template, translation, and dotenv saves can refresh only their
+relevant static indexes first; runtime refresh policy should be measured because
+Symfony may already invalidate their dedicated caches.
 
 ### Snapshot envelope
 
@@ -483,7 +488,18 @@ Use associative maps keyed by canonical identity in the internal model for fast
 lookup. Serialize deterministic arrays sorted by identity so hashes and tests
 remain stable.
 
-### Live overlays
+### Persistent static index and live overlays
+
+After initialization, asynchronously scan application-owned PHP, Twig, YAML,
+XLIFF, JSON translation, and dotenv files. Open documents take priority and
+standard LSP progress notifications report the scan. Exclude recursive scans of
+`vendor/`, `var/`, generated files, and configured ignored paths. Parse Symfony-
+registered dependency resources and individual dependency files on demand.
+
+Persist the static index under `var/symfony-lsp/<server-version>/index/`. Use a
+versioned format, atomic writes, file path, size and modification time for the
+fast path, and a content hash when metadata changes. Corruption or an incompatible
+format must trigger a transparent rebuild.
 
 Keep runtime snapshots immutable. Each open document produces an immutable
 `DocumentOverlay` keyed by URI and document version. It contains declarations,
@@ -517,18 +533,18 @@ suppressed until refresh rather than reported against stale data.
 Laravel LSP uses `microsoft/tolerant-php-parser`. The upstream Microsoft
 repository is MIT licensed and designed for IDE scenarios, but its last parser
 change was in 2024. Phpactor's fork added PHP 8.4 property hooks, asymmetric
-visibility, typed constants, and related fixes in 2025. Phpactor itself depends
-on a development branch of this fork because no stable Packagist release is
-available.
+visibility, typed constants, and related fixes in 2025, but has no stable
+Packagist release.
 
 Recommendation:
 
-* use the Phpactor fork, not the older Microsoft release;
-* ask Phpactor to tag a stable release or maintain a small Symfony fork until it
-  does;
-* pin an exact commit in early prototypes;
-* contribute parser fixes upstream;
-* use only parser and position APIs, not Phpactor's language server or full
+* create an official Symfony-maintained fork, likely
+  `symfony/tolerant-php-parser`;
+* preserve the `Microsoft\PhpParser` namespace initially to avoid unnecessary
+  churn;
+* merge the technically relevant Phpactor fixes;
+* publish tagged releases and maintain current PHP syntax support;
+* use only parser and position APIs, not another language server or full
   indexer.
 
 The parser gives a round-trippable AST, parent links, byte offsets, missing
@@ -562,10 +578,12 @@ Recommendation:
 * add incremental parsing only after profiling shows whole-document parsing is
   a bottleneck.
 
-The currently packaged Twig grammar comes from `gbprod/tree-sitter-twig` and is
-actively maintained, but its WTFPL license should receive explicit legal review.
-`kaermorchen/tree-sitter-twig` is MPL-2.0 and also active, but less established.
-Both require Symfony-specific fixture evaluation before selection.
+The currently packaged Twig grammar comes from `gbprod/tree-sitter-twig`.
+`kaermorchen/tree-sitter-twig` is another active candidate. Selection should be
+based primarily on technical quality against Symfony and Twig fixtures. Because
+Twig is a Symfony project, creating and maintaining an official Tree-sitter Twig
+grammar is also a valid option and may be preferable if existing grammars are
+incomplete or difficult to evolve.
 
 Symfony YAML custom tags such as `!tagged_iterator`, `!service`, and
 `!php/const` need dedicated parser fixtures. The grammar need not assign their
@@ -635,6 +653,35 @@ standard behavior available.
 A Symfony-specific code action can provide a richer alternative, such as
 "Rename route and show coverage", but the actual edits should still be a
 standard `WorkspaceEdit`.
+
+## Code action destinations
+
+A direct `WorkspaceEdit` should be returned only when one unambiguous,
+application-owned target exists. For example, one existing domain and locale
+translation file or one canonical application template directory can be edited
+directly.
+
+When several targets are valid, return a command rather than silently choosing
+the first loader path. The command asks the user to select a destination through
+`window/showMessageRequest`, computes the edit against current document
+versions, and sends `workspace/applyEdit`. If the user declines, no file is
+changed.
+
+## JSON-RPC peer changes
+
+`fabpot/json-rpc-peer` is owned alongside this project and may be changed. It
+must remain a generic JSON-RPC library. Add only reusable transport behavior:
+
+* content-length framed byte streams;
+* strict case-insensitive header parsing;
+* configurable header and message size limits;
+* deterministic clean EOF, truncated body, malformed header, and duplicate
+  length behavior;
+* transport-level tests with concurrent JSON-RPC traffic.
+
+LSP lifecycle, capabilities, methods, types, and workspace behavior remain in
+`symfony/lsp`. Existing configurable cancellation support handles the LSP
+`$/cancelRequest` convention.
 
 ## Standalone binary research
 
@@ -706,14 +753,23 @@ large regressions after measurements stabilize.
 
 The research found one concrete trap: `debug:container --env-vars` displays real
 environment values. It must be explicitly forbidden and covered by a test.
-Parameter debug output also contains values and must not cross the bridge.
+Parameter debug output also contains values. The trusted bridge may read it in
+memory to extract complete parameter names and deprecations, but raw values must
+not cross the bridge, be logged, or be persisted. Canary-secret tests must
+enforce this boundary.
+
+Effective `debug:config` values are allowed because application secrets should
+be represented through environment variables or Symfony secret stores. The
+normalized data remains workspace-local, is limited to enabled providers, and
+must not enter telemetry or raw protocol logs.
 
 Additional requirements:
 
 * bridge stdout is one JSON document and nothing else;
 * application output is captured and reported only as redacted stderr details;
-* environment, parameter, translation message, and configuration scalar values
-  are omitted from traffic logs;
+* environment and parameter values are omitted from snapshots and all logs;
+* translation messages and configuration scalar values are omitted from traffic
+  logs;
 * subprocess argument arrays are used without a shell;
 * bridge copies are content-addressed and written atomically after trust;
 * bridge execution has time, memory, and output limits;
@@ -724,21 +780,26 @@ Additional requirements:
 
 ### Research closure
 
-- [ ] Prototype a public safe metadata exporter in the Symfony monorepo.
-- [ ] Validate the exporter on every branch in the generated support matrix.
-- [ ] Evaluate the two Twig grammars against Symfony fixtures and licenses.
+- [ ] Validate command output normalizers and public collectors on every branch
+  in `supported_versions`.
+- [ ] Add JSON output to future Symfony Messenger and Security commands without
+  making it an initial LSP dependency.
+- [ ] Create the Symfony-maintained tolerant PHP parser fork and first tagged
+  release.
+- [ ] Evaluate existing Twig grammars for technical quality and decide whether
+  to create an official Twig grammar.
 - [ ] Prove a minimal Tree-sitter extension can be included in all standalone
   binaries.
-- [ ] Ask Phpactor for a tagged tolerant-parser release or create a temporary
-  pinned fork.
 - [ ] Build the small, medium, and large benchmark fixtures.
 
 ### First vertical slice
 
-- [ ] Implement standalone LSP framing and lifecycle.
+- [ ] Add generic content-length framing to `fabpot/json-rpc-peer`.
+- [ ] Implement standalone LSP lifecycle on that transport.
 - [ ] Implement trust, project discovery, bridge deployment, and version checks.
 - [ ] Implement cache freshness, clear, warmup, snapshot, and stale fallback.
-- [ ] Implement the immutable snapshot and live-overlay stores.
+- [ ] Implement the persistent static index, immutable snapshot, and live-overlay
+  stores.
 - [ ] Implement tolerant PHP parsing and high-confidence receiver inference.
 - [ ] Implement the route provider end to end.
 - [ ] Add route completion, hover, definition, references, diagnostics, and
