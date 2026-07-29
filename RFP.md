@@ -155,10 +155,11 @@ entry rather than only to generated cache files.
 
 Booting a Symfony application executes project code. Runtime indexing must run
 in a separate process and never leak output into the LSP stream. The server
-should honor an editor-provided workspace trust decision. If the client does
-not provide one, it should ask through `window/showMessageRequest` before
-booting the application. The decision should be remembered per application
-root, and static-only mode should remain active until trust is granted.
+should honor a workspace trust decision supplied in initialization options.
+LSP does not define a standard workspace trust field, so a client that does not
+supply one must be asked through `window/showMessageRequest` before the
+application is booted. The decision should be remembered per application root,
+and static-only mode should remain active until trust is granted.
 
 ## Proposed capabilities
 
@@ -942,22 +943,23 @@ LSP client:
 
 ## Implementation research
 
-The product and architecture decisions above leave these implementation topics
-to investigate:
+The initial implementation research is documented in
+[`RESEARCH.md`](RESEARCH.md). Its main conclusions are:
 
-1. Inventory the exact public metadata available from every maintained Symfony
-   version and its warmed application cache.
-2. Identify reusable public introspection APIs that need to be added to Symfony.
-3. Select tolerant parsers with accurate ranges and acceptable licensing for
-   PHP, Twig, YAML, and dotenv.
-4. Define the versioned normalized snapshot and live-overlay data models.
-5. Determine how best-effort rename communicates incomplete coverage across LSP
-   clients while remaining standard LSP behavior.
-6. Select and secure a reproducible standalone binary build system and platform
-   matrix.
-7. Measure how much Twig variable inference can be offered without duplicating
-   Twig or PHP language servers.
-8. Benchmark normal-cache refresh, indexing, completion latency, and memory use.
+1. Boot the cached kernel and use public runtime APIs or official JSON debug
+   output; do not parse generated cache files.
+2. Add a public, versioned, and secret-safe Symfony metadata exporter before
+   stabilizing providers that currently depend on internal debug tooling.
+3. Use Phpactor's tolerant PHP parser fork and evaluate pinned Tree-sitter Twig
+   and YAML grammars in the standalone binaries.
+4. Keep runtime snapshots and open-document overlays as separate immutable
+   generations.
+5. Use LSP change annotations and confirmation to communicate incomplete rename
+   coverage.
+6. Build cross-platform binaries with `static-php-cli` and bundle every parser
+   needed for offline operation.
+7. Start permanent small, medium, and large benchmark fixtures before setting
+   hard refresh and memory budgets.
 
 ## Recommendation
 
