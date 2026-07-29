@@ -20,6 +20,7 @@ use Symfony\Lsp\Protocol\ContentLengthMessageReader;
 use Symfony\Lsp\Protocol\ContentLengthMessageWriter;
 use Symfony\Lsp\Protocol\ContentLengthReadableStream;
 use Symfony\Lsp\Protocol\ContentLengthWritableStream;
+use Symfony\Lsp\Runtime\BridgeInstaller;
 
 final class LanguageServerFactory
 {
@@ -32,7 +33,11 @@ final class LanguageServerFactory
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
             new ProjectRegistry(),
-            new WorkspaceTrustManager(new JsonRpcClient($peer), new WorkspaceTrust()),
+            new WorkspaceTrustManager(
+                new JsonRpcClient($peer),
+                new WorkspaceTrust(),
+                new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', 'dev'),
+            ),
         );
 
         return new LanguageServer(

@@ -4,12 +4,14 @@ namespace Symfony\Lsp\Tests\Project;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Client\ClientInterface;
+use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Project\WorkspaceTrustManager;
+use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 
 final class WorkspaceConfigurationTest extends TestCase
 {
@@ -36,7 +38,7 @@ final class WorkspaceConfigurationTest extends TestCase
         $configuration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
             $registry,
-            new WorkspaceTrustManager($this->client(), new WorkspaceTrust()),
+            new WorkspaceTrustManager($this->client(), new WorkspaceTrust(), $this->runtimeInitializer()),
         );
 
         $configuration->initialize(['rootUri' => 'file://'.$this->temporaryDirectory]);
@@ -51,6 +53,15 @@ final class WorkspaceConfigurationTest extends TestCase
             public function request(string $method, array $params): mixed
             {
                 return null;
+            }
+        };
+    }
+
+    private function runtimeInitializer(): RuntimeInitializerInterface
+    {
+        return new class implements RuntimeInitializerInterface {
+            public function initialize(Project $project): void
+            {
             }
         };
     }

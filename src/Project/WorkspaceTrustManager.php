@@ -3,12 +3,14 @@
 namespace Symfony\Lsp\Project;
 
 use Symfony\Lsp\Client\ClientInterface;
+use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 
 final class WorkspaceTrustManager
 {
     public function __construct(
         private readonly ClientInterface $client,
         private readonly WorkspaceTrust $workspaceTrust,
+        private readonly RuntimeInitializerInterface $runtimeInitializer,
     ) {
     }
 
@@ -29,7 +31,7 @@ final class WorkspaceTrustManager
             : TrustStatus::Untrusted;
 
         foreach ($projects->all() as $project) {
-            $this->workspaceTrust->set($project, $status);
+            $this->setStatus($project, $status);
         }
     }
 
@@ -54,10 +56,18 @@ final class WorkspaceTrustManager
 
             $trusted = \is_array($response)
                 && 'Trust and enable runtime indexing' === ($response['title'] ?? null);
-            $this->workspaceTrust->set(
+            $this->setStatus(
                 $project,
                 $trusted ? TrustStatus::Trusted : TrustStatus::Untrusted,
             );
+        }
+    }
+
+    private function setStatus(Project $project, TrustStatus $status): void
+    {
+        $this->workspaceTrust->set($project, $status);
+        if (TrustStatus::Trusted === $status) {
+            $this->runtimeInitializer->initialize($project);
         }
     }
 }

@@ -9,6 +9,7 @@ use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\TrustStatus;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Project\WorkspaceTrustManager;
+use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 
 final class WorkspaceTrustManagerTest extends TestCase
 {
@@ -16,8 +17,9 @@ final class WorkspaceTrustManagerTest extends TestCase
     {
         $client = new CapturingClient(null);
         $trust = new WorkspaceTrust();
+        $runtimeInitializer = new CapturingRuntimeInitializer();
         $registry = $this->registry($project = new Project('/workspace', 'file:///workspace', '^8.0'));
-        $manager = new WorkspaceTrustManager($client, $trust);
+        $manager = new WorkspaceTrustManager($client, $trust, $runtimeInitializer);
 
         $manager->applyInitializationOptions([
             'initializationOptions' => ['workspaceTrust' => true],
@@ -26,14 +28,16 @@ final class WorkspaceTrustManagerTest extends TestCase
 
         self::assertSame(TrustStatus::Trusted, $trust->status($project));
         self::assertSame([], $client->requests);
+        self::assertSame(['/workspace'], $runtimeInitializer->projects);
     }
 
     public function testPromptsForUnknownTrustAndEnablesRuntimeIndexing(): void
     {
         $client = new CapturingClient(['title' => 'Trust and enable runtime indexing']);
         $trust = new WorkspaceTrust();
+        $runtimeInitializer = new CapturingRuntimeInitializer();
         $registry = $this->registry($project = new Project('/workspace', 'file:///workspace', '^8.0'));
-        $manager = new WorkspaceTrustManager($client, $trust);
+        $manager = new WorkspaceTrustManager($client, $trust, $runtimeInitializer);
 
         $manager->requestUnknownDecisions($registry);
 
@@ -43,17 +47,20 @@ final class WorkspaceTrustManagerTest extends TestCase
             'Symfony LSP must execute application code to index runtime metadata for "/workspace".',
             $client->requests[0]['params']['message'],
         );
+        self::assertSame(['/workspace'], $runtimeInitializer->projects);
     }
 
     public function testKeepsStaticOnlyModeWhenTrustIsDeclined(): void
     {
         $trust = new WorkspaceTrust();
+        $runtimeInitializer = new CapturingRuntimeInitializer();
         $registry = $this->registry($project = new Project('/workspace', 'file:///workspace', '^8.0'));
-        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust);
+        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer);
 
         $manager->requestUnknownDecisions($registry);
 
         self::assertSame(TrustStatus::Untrusted, $trust->status($project));
+        self::assertSame([], $runtimeInitializer->projects);
     }
 
     private function registry(Project $project): ProjectRegistry
@@ -62,6 +69,17 @@ final class WorkspaceTrustManagerTest extends TestCase
         $registry->replace([$project]);
 
         return $registry;
+    }
+}
+
+final class CapturingRuntimeInitializer implements RuntimeInitializerInterface
+{
+    /** @var list<string> */
+    public array $projects = [];
+
+    public function initialize(Project $project): void
+    {
+        $this->projects[] = $project->rootPath();
     }
 }
 
