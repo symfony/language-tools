@@ -1,0 +1,11 @@
+#!/usr/bin/env php
+<?php
+
+use Symfony\Lsp\Server\LanguageServerFactory;
+
+use function Amp\ByteStream\getStdin;
+use function Amp\ByteStream\getStdout;
+
+require dirname(__DIR__).'/vendor/autoload.php';
+
+exit((new LanguageServerFactory())->create(getStdin(), getStdout())->run());
