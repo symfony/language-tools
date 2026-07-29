@@ -6,6 +6,7 @@ use Fabpot\JsonRpc\Exception\JsonRpcException;
 use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcError;
 use Fabpot\JsonRpc\JsonRpcPeer;
+use Symfony\Lsp\Project\WorkspaceConfiguration;
 
 final class LanguageServer
 {
@@ -13,6 +14,7 @@ final class LanguageServer
         private readonly JsonRpcPeer $peer,
         private readonly JsonRpcDispatcher $dispatcher,
         private readonly ServerState $state,
+        private readonly WorkspaceConfiguration $workspaceConfiguration,
     ) {
         $this->registerHandlers();
     }
@@ -44,6 +46,7 @@ final class LanguageServer
             throw new JsonRpcException(JsonRpcError::INVALID_REQUEST, 'The server is already initialized.');
         }
 
+        $this->workspaceConfiguration->initialize($params);
         $this->state->markInitialized();
 
         return [
