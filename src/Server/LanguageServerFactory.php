@@ -6,6 +6,9 @@ use Amp\ByteStream\ReadableStream;
 use Amp\ByteStream\WritableStream;
 use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcPeer;
+use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\DocumentSynchronizer;
+use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -33,6 +36,7 @@ final class LanguageServerFactory
             new JsonRpcDispatcher($peer),
             new ServerState(),
             $workspaceConfiguration,
+            new DocumentSynchronizer(new DocumentStore(), new PositionConverter()),
         );
     }
 }

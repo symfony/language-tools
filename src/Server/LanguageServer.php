@@ -6,6 +6,7 @@ use Fabpot\JsonRpc\Exception\JsonRpcException;
 use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcError;
 use Fabpot\JsonRpc\JsonRpcPeer;
+use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
 
 final class LanguageServer
@@ -15,6 +16,7 @@ final class LanguageServer
         private readonly JsonRpcDispatcher $dispatcher,
         private readonly ServerState $state,
         private readonly WorkspaceConfiguration $workspaceConfiguration,
+        private readonly DocumentSynchronizer $documentSynchronizer,
     ) {
         $this->registerHandlers();
     }
@@ -30,6 +32,9 @@ final class LanguageServer
     {
         $this->dispatcher->onRequest('initialize', $this->initialize(...));
         $this->dispatcher->onNotification('initialized', $this->initialized(...));
+        $this->dispatcher->onNotification('textDocument/didOpen', $this->documentSynchronizer->open(...));
+        $this->dispatcher->onNotification('textDocument/didChange', $this->documentSynchronizer->change(...));
+        $this->dispatcher->onNotification('textDocument/didClose', $this->documentSynchronizer->close(...));
         $this->dispatcher->onRequest('shutdown', $this->shutdown(...));
         $this->dispatcher->onNotification('exit', $this->exit(...));
         $this->dispatcher->onCancel('$/cancelRequest', 'id');

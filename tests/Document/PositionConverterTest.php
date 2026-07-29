@@ -1,0 +1,42 @@
+<?php
+
+namespace Symfony\Lsp\Tests\Document;
+
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Document\Position;
+use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
+
+final class PositionConverterTest extends TestCase
+{
+    #[DataProvider('positionProvider')]
+    public function testConvertsUtf16PositionsToByteOffsets(Position $position, int $expected): void
+    {
+        self::assertSame($expected, (new PositionConverter())->toByteOffset("a😀b\néx", $position));
+    }
+
+    /**
+     * @return iterable<string, array{Position, int}>
+     */
+    public static function positionProvider(): iterable
+    {
+        yield 'ASCII character' => [new Position(0, 1), 1];
+        yield 'before astral character' => [new Position(0, 1), 1];
+        yield 'inside astral character clamps before it' => [new Position(0, 2), 1];
+        yield 'after astral character' => [new Position(0, 3), 5];
+        yield 'second line' => [new Position(1, 1), 9];
+        yield 'past document' => [new Position(9, 0), 10];
+    }
+
+    public function testAppliesIncrementalChangesWithUtf16Ranges(): void
+    {
+        $converter = new PositionConverter();
+
+        self::assertSame('aXb', $converter->applyChange(
+            'a😀b',
+            new Range(new Position(0, 1), new Position(0, 3)),
+            'X',
+        ));
+    }
+}
