@@ -7,6 +7,7 @@ final class WorkspaceConfiguration
     public function __construct(
         private readonly ProjectDiscovery $projectDiscovery,
         private readonly ProjectRegistry $projectRegistry,
+        private readonly WorkspaceTrustManager $workspaceTrustManager,
     ) {
     }
 
@@ -17,6 +18,12 @@ final class WorkspaceConfiguration
     {
         $workspaceFolders = $this->workspaceFolders($params);
         $this->projectRegistry->replace($this->projectDiscovery->discover($workspaceFolders));
+        $this->workspaceTrustManager->applyInitializationOptions($params, $this->projectRegistry);
+    }
+
+    public function requestWorkspaceTrust(): void
+    {
+        $this->workspaceTrustManager->requestUnknownDecisions($this->projectRegistry);
     }
 
     /**

@@ -6,6 +6,7 @@ use Amp\ByteStream\ReadableStream;
 use Amp\ByteStream\WritableStream;
 use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcPeer;
+use Symfony\Lsp\Client\JsonRpcClient;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Document\PositionConverter;
@@ -13,6 +14,8 @@ use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
+use Symfony\Lsp\Project\WorkspaceTrust;
+use Symfony\Lsp\Project\WorkspaceTrustManager;
 use Symfony\Lsp\Protocol\ContentLengthMessageReader;
 use Symfony\Lsp\Protocol\ContentLengthMessageWriter;
 use Symfony\Lsp\Protocol\ContentLengthReadableStream;
@@ -29,6 +32,7 @@ final class LanguageServerFactory
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
             new ProjectRegistry(),
+            new WorkspaceTrustManager(new JsonRpcClient($peer), new WorkspaceTrust()),
         );
 
         return new LanguageServer(

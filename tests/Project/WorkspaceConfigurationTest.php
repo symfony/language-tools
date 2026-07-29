@@ -3,10 +3,13 @@
 namespace Symfony\Lsp\Tests\Project;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
+use Symfony\Lsp\Project\WorkspaceTrust;
+use Symfony\Lsp\Project\WorkspaceTrustManager;
 
 final class WorkspaceConfigurationTest extends TestCase
 {
@@ -33,11 +36,22 @@ final class WorkspaceConfigurationTest extends TestCase
         $configuration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
             $registry,
+            new WorkspaceTrustManager($this->client(), new WorkspaceTrust()),
         );
 
         $configuration->initialize(['rootUri' => 'file://'.$this->temporaryDirectory]);
 
         self::assertCount(1, $registry->all());
         self::assertSame('^8.0', $registry->all()[0]->frameworkBundleConstraint());
+    }
+
+    private function client(): ClientInterface
+    {
+        return new class implements ClientInterface {
+            public function request(string $method, array $params): mixed
+            {
+                return null;
+            }
+        };
     }
 }

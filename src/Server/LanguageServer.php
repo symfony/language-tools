@@ -9,6 +9,8 @@ use Fabpot\JsonRpc\JsonRpcPeer;
 use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
 
+use function Amp\async;
+
 final class LanguageServer
 {
     public function __construct(
@@ -71,6 +73,7 @@ final class LanguageServer
      */
     private function initialized(array $params): void
     {
+        async($this->workspaceConfiguration->requestWorkspaceTrust(...))->ignore();
     }
 
     /**
