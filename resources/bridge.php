@@ -51,12 +51,19 @@ if (in_array('routes', $requestedSections, true)) {
     ) {
         $errors[] = ['section' => 'routes', 'message' => 'Symfony Console is unavailable.'];
     } else {
+        $kernel = null;
         try {
-            $application = require $project.'/bin/console';
-            if (!is_object($application) || !method_exists($application, 'run')) {
-                throw new RuntimeException('bin/console did not return a console application.');
+            $kernelClass = 'App\\Kernel';
+            if (!class_exists($kernelClass)) {
+                throw new RuntimeException('The default App\\Kernel class was not found.');
             }
 
+            $kernel = new $kernelClass(
+                is_string($environment) ? $environment : 'dev',
+                !in_array($debug, ['0', 'false'], true),
+            );
+            $application = new Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
+            $application->setAutoExit(false);
             $input = new Symfony\Component\Console\Input\ArrayInput([
                 'command' => 'debug:router',
                 '--format' => 'json',
@@ -106,6 +113,10 @@ if (in_array('routes', $requestedSections, true)) {
             ];
         } catch (Throwable $error) {
             $errors[] = ['section' => 'routes', 'message' => $error->getMessage()];
+        } finally {
+            if (is_object($kernel) && method_exists($kernel, 'shutdown')) {
+                $kernel->shutdown();
+            }
         }
     }
 }

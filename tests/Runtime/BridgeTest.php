@@ -134,11 +134,17 @@ final class BridgeTest extends TestCase
                 public function write(string $contents): void { $this->contents .= $contents; }
                 public function fetch(): string { return $this->contents; }
             }
-            PHP);
-        mkdir($this->temporaryDirectory.'/bin');
-        file_put_contents($this->temporaryDirectory.'/bin/console', <<<'PHP'
-            <?php
-            return new class {
+            namespace App;
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function shutdown(): void {}
+            }
+            namespace Symfony\Bundle\FrameworkBundle\Console;
+            final class Application
+            {
+                public function __construct(object $kernel) {}
+                public function setAutoExit(bool $autoExit): void {}
                 public function run(object $input, object $output): int
                 {
                     $output->write(json_encode([
@@ -160,7 +166,7 @@ final class BridgeTest extends TestCase
 
                     return 0;
                 }
-            };
+            }
             PHP);
     }
 
