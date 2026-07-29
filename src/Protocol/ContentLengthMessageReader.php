@@ -69,25 +69,16 @@ final class ContentLengthMessageReader implements MessageReaderInterface
      */
     private function findHeaderEnd(): ?array
     {
-        $crlfOffset = strpos($this->buffer, "\r\n\r\n");
-        $lfOffset = strpos($this->buffer, "\n\n");
+        $offset = strpos($this->buffer, "\r\n\r\n");
 
-        if (false === $crlfOffset && false === $lfOffset) {
-            return null;
-        }
-
-        if (false === $lfOffset || false !== $crlfOffset && $crlfOffset <= $lfOffset) {
-            return ['offset' => $crlfOffset, 'separatorLength' => 4];
-        }
-
-        return ['offset' => $lfOffset, 'separatorLength' => 2];
+        return false === $offset ? null : ['offset' => $offset, 'separatorLength' => 4];
     }
 
     private function parseContentLength(string $headerBlock): int
     {
         $contentLength = null;
 
-        foreach (preg_split('/\r?\n/', $headerBlock) ?: [] as $header) {
+        foreach (explode("\r\n", $headerBlock) as $header) {
             if (!str_contains($header, ':')) {
                 throw new FramingException('A message header is malformed.');
             }

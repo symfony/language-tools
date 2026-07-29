@@ -15,7 +15,7 @@ final class ContentLengthMessageReaderTest extends TestCase
         $stream = new ReadableBuffer(
             "content-type: application/vscode-jsonrpc; charset=utf-8\r\n".
             "content-length: 2\r\n\r\n{}".
-            "Content-Length: 4\n\nnull"
+            "Content-Length: 4\r\n\r\nnull"
         );
         $reader = new ContentLengthMessageReader($stream);
 
@@ -43,6 +43,7 @@ final class ContentLengthMessageReaderTest extends TestCase
         yield 'missing length' => ["Content-Type: application/json\r\n\r\n{}", 'missing'];
         yield 'duplicate length' => ["Content-Length: 2\r\nContent-Length: 2\r\n\r\n{}", 'duplicate'];
         yield 'negative length' => ["Content-Length: -1\r\n\r\n", 'invalid'];
+        yield 'line-feed headers' => ["Content-Length: 2\n\n{}", 'headers'];
         yield 'truncated headers' => ["Content-Length: 2\r\n", 'headers'];
         yield 'truncated body' => ["Content-Length: 3\r\n\r\n{}", 'body'];
     }
