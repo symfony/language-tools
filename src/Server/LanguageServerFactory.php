@@ -7,10 +7,12 @@ use Amp\ByteStream\WritableStream;
 use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcPeer;
 use Symfony\Lsp\Client\JsonRpcClient;
+use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
+use Symfony\Lsp\Feature\Route\RouteHoverHandler;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -39,6 +41,7 @@ final class LanguageServerFactory
         $projects = new ProjectRegistry();
         $routeIndexes = new RouteIndexRegistry();
         $bridgeInstaller = new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', 'dev');
+        $documentContextResolver = new DocumentContextResolver($documents, $projects);
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
             $projects,
@@ -59,7 +62,8 @@ final class LanguageServerFactory
             new ServerState(),
             $workspaceConfiguration,
             new DocumentSynchronizer($documents, $positionConverter),
-            new RouteCompletionHandler($documents, $positionConverter, $projects, $routeIndexes),
+            new RouteCompletionHandler($documentContextResolver, $positionConverter, $routeIndexes),
+            new RouteHoverHandler($documentContextResolver, $positionConverter, $routeIndexes),
         );
     }
 }

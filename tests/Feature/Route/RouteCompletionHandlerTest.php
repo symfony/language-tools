@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Feature\Route;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
+use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Route\Route;
@@ -38,7 +39,11 @@ final class RouteCompletionHandlerTest extends TestCase
         $converter = new PositionConverter();
         $cursor = strpos($text, "'s']") + 2;
         $position = $converter->toPosition($text, $cursor);
-        $handler = new RouteCompletionHandler($documents, $converter, $projects, $indexes);
+        $handler = new RouteCompletionHandler(
+            new DocumentContextResolver($documents, $projects),
+            $converter,
+            $indexes,
+        );
 
         self::assertSame(['section', 'slug'], array_column($handler->complete([
             'textDocument' => ['uri' => $uri],
@@ -72,7 +77,11 @@ final class RouteCompletionHandlerTest extends TestCase
         $converter = new PositionConverter();
         $cursor = strpos($text, 'article_') + \strlen('article_');
         $position = $converter->toPosition($text, $cursor);
-        $handler = new RouteCompletionHandler($documents, $converter, $projects, $indexes);
+        $handler = new RouteCompletionHandler(
+            new DocumentContextResolver($documents, $projects),
+            $converter,
+            $indexes,
+        );
 
         self::assertSame([[
             'label' => 'article_edit',

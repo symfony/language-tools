@@ -34,6 +34,7 @@ final class LanguageServerTest extends TestCase
                         'completionProvider' => [
                             'triggerCharacters' => ["'", '"'],
                         ],
+                        'hoverProvider' => true,
                     ],
                     'serverInfo' => [
                         'name' => 'Symfony LSP',

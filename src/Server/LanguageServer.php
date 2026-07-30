@@ -8,6 +8,7 @@ use Fabpot\JsonRpc\JsonRpcError;
 use Fabpot\JsonRpc\JsonRpcPeer;
 use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
+use Symfony\Lsp\Feature\Route\RouteHoverHandler;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
 
 use function Amp\async;
@@ -21,6 +22,7 @@ final class LanguageServer
         private readonly WorkspaceConfiguration $workspaceConfiguration,
         private readonly DocumentSynchronizer $documentSynchronizer,
         private readonly RouteCompletionHandler $routeCompletionHandler,
+        private readonly RouteHoverHandler $routeHoverHandler,
     ) {
         $this->registerHandlers();
     }
@@ -40,6 +42,7 @@ final class LanguageServer
         $this->dispatcher->onNotification('textDocument/didChange', $this->documentSynchronizer->change(...));
         $this->dispatcher->onNotification('textDocument/didClose', $this->documentSynchronizer->close(...));
         $this->dispatcher->onRequest('textDocument/completion', $this->routeCompletionHandler->complete(...));
+        $this->dispatcher->onRequest('textDocument/hover', $this->routeHoverHandler->hover(...));
         $this->dispatcher->onRequest('shutdown', $this->shutdown(...));
         $this->dispatcher->onNotification('exit', $this->exit(...));
         $this->dispatcher->onCancel('$/cancelRequest', 'id');
@@ -66,6 +69,7 @@ final class LanguageServer
                 'completionProvider' => [
                     'triggerCharacters' => ["'", '"'],
                 ],
+                'hoverProvider' => true,
             ],
             'serverInfo' => [
                 'name' => 'Symfony LSP',
