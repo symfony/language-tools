@@ -1,0 +1,58 @@
+{
+  "name": "symfony-lsp",
+  "displayName": "Symfony LSP",
+  "description": "Early access VS Code client for Symfony LSP",
+  "version": "0.0.1",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/symfony/lsp.git"
+  },
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onLanguage:php",
+    "workspaceContains:composer.json"
+  ],
+  "main": "./out/extension.js",
+  "scripts": {
+    "check": "tsc -p ./ --noEmit",
+    "compile": "npm run check && esbuild src/extension.ts --bundle --platform=node --format=cjs --outfile=out/extension.js --external:vscode",
+    "package": "npm run compile && vsce package"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^10.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/vscode": "^1.91.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.25.12",
+    "typescript": "^5.9.3"
+  },
+  "contributes": {
+    "configuration": {
+      "title": "Symfony LSP",
+      "properties": {
+        "symfonyLsp.serverPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to bin/symfony-lsp in the Symfony LSP checkout."
+        },
+        "symfonyLsp.trustWorkspace": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow Symfony LSP to execute application code for runtime indexing."
+        }
+      }
+    }
+  }
+}
