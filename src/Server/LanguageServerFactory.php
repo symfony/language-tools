@@ -11,7 +11,11 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
+use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
 use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
+use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
+use Symfony\Lsp\Feature\Route\RouteDefinitionHandler;
 use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteHoverHandler;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
@@ -43,6 +47,7 @@ final class LanguageServerFactory
         $positionConverter = new PositionConverter();
         $projects = new ProjectRegistry();
         $routeIndexes = new RouteIndexRegistry();
+        $routeDeclarationIndexes = new RouteDeclarationIndexRegistry();
         $client = new JsonRpcClient($peer);
         $bridgeInstaller = new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', 'dev');
         $runtimeInitializer = new ProjectRuntimeInitializer(
@@ -52,6 +57,11 @@ final class LanguageServerFactory
         );
         $workspaceTrust = new WorkspaceTrust();
         $documentContextResolver = new DocumentContextResolver($documents, $projects);
+        $routeSourceIndexer = new ProjectRouteSourceIndexer(
+            $projects,
+            $routeDeclarationIndexes,
+            new PhpRouteDeclarationExtractor($positionConverter),
+        );
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
             $projects,
@@ -77,7 +87,13 @@ final class LanguageServerFactory
                 $routeIndexes,
                 new RouteReferenceExtractor($positionConverter),
             ),
+            new RouteDefinitionHandler(
+                $documentContextResolver,
+                $positionConverter,
+                $routeDeclarationIndexes,
+            ),
             new ProjectRuntimeRefresher($projects, $workspaceTrust, $runtimeInitializer),
+            $routeSourceIndexer,
         );
     }
 }

@@ -7,7 +7,9 @@ use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcError;
 use Fabpot\JsonRpc\JsonRpcPeer;
 use Symfony\Lsp\Document\DocumentSynchronizer;
+use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
 use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
+use Symfony\Lsp\Feature\Route\RouteDefinitionHandler;
 use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteHoverHandler;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
@@ -26,7 +28,9 @@ final class LanguageServer
         private readonly RouteCompletionHandler $routeCompletionHandler,
         private readonly RouteHoverHandler $routeHoverHandler,
         private readonly RouteDiagnosticPublisher $routeDiagnosticPublisher,
+        private readonly RouteDefinitionHandler $routeDefinitionHandler,
         private readonly ProjectRuntimeRefresher $projectRuntimeRefresher,
+        private readonly ProjectRouteSourceIndexer $routeSourceIndexer,
     ) {
         $this->registerHandlers();
     }
@@ -48,6 +52,7 @@ final class LanguageServer
         $this->dispatcher->onNotification('textDocument/didSave', $this->saveDocument(...));
         $this->dispatcher->onRequest('textDocument/completion', $this->routeCompletionHandler->complete(...));
         $this->dispatcher->onRequest('textDocument/hover', $this->routeHoverHandler->hover(...));
+        $this->dispatcher->onRequest('textDocument/definition', $this->routeDefinitionHandler->definition(...));
         $this->dispatcher->onRequest('shutdown', $this->shutdown(...));
         $this->dispatcher->onNotification('exit', $this->exit(...));
         $this->dispatcher->onCancel('$/cancelRequest', 'id');
@@ -75,6 +80,7 @@ final class LanguageServer
                     'triggerCharacters' => ["'", '"'],
                 ],
                 'hoverProvider' => true,
+                'definitionProvider' => true,
             ],
             'serverInfo' => [
                 'name' => 'Symfony LSP',
@@ -106,6 +112,7 @@ final class LanguageServer
      */
     private function saveDocument(array $params): void
     {
+        $this->routeSourceIndexer->refreshAfterSave($params);
         $this->projectRuntimeRefresher->refreshAfterSave($params);
         $this->routeDiagnosticPublisher->publish($params);
     }
@@ -124,7 +131,10 @@ final class LanguageServer
      */
     private function initialized(array $params): void
     {
-        async($this->workspaceConfiguration->requestWorkspaceTrust(...))->ignore();
+        async(function (): void {
+            $this->routeSourceIndexer->indexAll();
+            $this->workspaceConfiguration->requestWorkspaceTrust();
+        })->ignore();
     }
 
     /**
