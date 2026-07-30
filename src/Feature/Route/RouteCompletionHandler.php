@@ -34,6 +34,27 @@ final class RouteCompletionHandler
 
         $routeIndex = $this->routeIndexes->forProject($project);
         if ('twig' === $document->languageId()) {
+            $parameterContext = TwigRouteParameterCompletionContext::fromTwig(
+                $document->text(),
+                $position,
+                $this->positionConverter,
+            );
+            if (null !== $parameterContext) {
+                $route = $routeIndex->get($parameterContext->routeName());
+                if (null === $route) {
+                    return [];
+                }
+
+                return $this->withTextEdits(
+                    $this->completeParameters(
+                        $route,
+                        $parameterContext->prefix(),
+                        $parameterContext->existingParameters(),
+                    ),
+                    $parameterContext->replacementRange(),
+                );
+            }
+
             $routeContext = TwigRouteCompletionContext::fromTwig(
                 $document->text(),
                 $position,
@@ -59,20 +80,14 @@ final class RouteCompletionHandler
                 return [];
             }
 
-            $items = array_map(
-                static fn (string $parameter): array => [
-                    'label' => $parameter,
-                    'kind' => 10,
-                    'detail' => \sprintf('Parameter of route %s', $route->name()),
-                ],
-                array_values(array_filter(
-                    $route->parameters(),
-                    static fn (string $parameter): bool => str_starts_with($parameter, $parameterContext->prefix())
-                        && !\in_array($parameter, $parameterContext->existingParameters(), true),
-                )),
+            return $this->withTextEdits(
+                $this->completeParameters(
+                    $route,
+                    $parameterContext->prefix(),
+                    $parameterContext->existingParameters(),
+                ),
+                $parameterContext->replacementRange(),
             );
-
-            return $this->withTextEdits($items, $parameterContext->replacementRange());
         }
 
         $routeContext = RouteCompletionContext::fromPhp(
@@ -87,6 +102,27 @@ final class RouteCompletionHandler
         return $this->withTextEdits(
             (new RouteCompletionProvider($routeIndex))->complete($routeContext->prefix()),
             $routeContext->replacementRange(),
+        );
+    }
+
+    /**
+     * @param list<string> $existingParameters
+     *
+     * @return list<array{label: string, kind: int, detail: string}>
+     */
+    private function completeParameters(Route $route, string $prefix, array $existingParameters): array
+    {
+        return array_map(
+            static fn (string $parameter): array => [
+                'label' => $parameter,
+                'kind' => 10,
+                'detail' => \sprintf('Parameter of route %s', $route->name()),
+            ],
+            array_values(array_filter(
+                $route->parameters(),
+                static fn (string $parameter): bool => str_starts_with($parameter, $prefix)
+                    && !\in_array($parameter, $existingParameters, true),
+            )),
         );
     }
 
