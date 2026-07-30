@@ -12,6 +12,7 @@ use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
 use Symfony\Lsp\Feature\Route\RouteDefinitionHandler;
 use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteHoverHandler;
+use Symfony\Lsp\Feature\Route\RouteReferencesHandler;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
 use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
 
@@ -29,6 +30,7 @@ final class LanguageServer
         private readonly RouteHoverHandler $routeHoverHandler,
         private readonly RouteDiagnosticPublisher $routeDiagnosticPublisher,
         private readonly RouteDefinitionHandler $routeDefinitionHandler,
+        private readonly RouteReferencesHandler $routeReferencesHandler,
         private readonly ProjectRuntimeRefresher $projectRuntimeRefresher,
         private readonly ProjectRouteSourceIndexer $routeSourceIndexer,
     ) {
@@ -53,6 +55,7 @@ final class LanguageServer
         $this->dispatcher->onRequest('textDocument/completion', $this->routeCompletionHandler->complete(...));
         $this->dispatcher->onRequest('textDocument/hover', $this->routeHoverHandler->hover(...));
         $this->dispatcher->onRequest('textDocument/definition', $this->routeDefinitionHandler->definition(...));
+        $this->dispatcher->onRequest('textDocument/references', $this->routeReferencesHandler->references(...));
         $this->dispatcher->onRequest('shutdown', $this->shutdown(...));
         $this->dispatcher->onNotification('exit', $this->exit(...));
         $this->dispatcher->onCancel('$/cancelRequest', 'id');
@@ -81,6 +84,7 @@ final class LanguageServer
                 ],
                 'hoverProvider' => true,
                 'definitionProvider' => true,
+                'referencesProvider' => true,
             ],
             'serverInfo' => [
                 'name' => 'Symfony LSP',

@@ -36,6 +36,7 @@ final class LanguageServerTest extends TestCase
                         ],
                         'hoverProvider' => true,
                         'definitionProvider' => true,
+                        'referencesProvider' => true,
                     ],
                     'serverInfo' => [
                         'name' => 'Symfony LSP',

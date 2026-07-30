@@ -7,6 +7,8 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
 use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
+use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
+use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -49,10 +51,14 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             '^8.0',
         )]);
         $indexes = new RouteDeclarationIndexRegistry();
+        $referenceIndexes = new RouteReferenceIndexRegistry();
+        $positionConverter = new PositionConverter();
         $indexer = new ProjectRouteSourceIndexer(
             $projects,
             $indexes,
-            new PhpRouteDeclarationExtractor(new PositionConverter()),
+            $referenceIndexes,
+            new PhpRouteDeclarationExtractor($positionConverter),
+            new RouteReferenceExtractor($positionConverter),
         );
 
         $indexer->indexAll();

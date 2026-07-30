@@ -17,7 +17,9 @@ final class ProjectRouteSourceIndexer
     public function __construct(
         private readonly ProjectRegistry $projects,
         private readonly RouteDeclarationIndexRegistry $declarationIndexes,
-        private readonly PhpRouteDeclarationExtractor $extractor,
+        private readonly RouteReferenceIndexRegistry $referenceIndexes,
+        private readonly PhpRouteDeclarationExtractor $declarationExtractor,
+        private readonly RouteReferenceExtractor $referenceExtractor,
     ) {
     }
 
@@ -48,16 +50,26 @@ final class ProjectRouteSourceIndexer
     private function index(Project $project): void
     {
         $declarations = [];
+        $references = [];
         foreach ($this->phpFiles($project->rootPath()) as $path) {
             $text = file_get_contents($path);
             if (false === $text) {
                 continue;
             }
 
-            array_push($declarations, ...$this->extractor->extract($this->uri($project, $path), $text));
+            $uri = $this->uri($project, $path);
+            array_push($declarations, ...$this->declarationExtractor->extract($uri, $text));
+            foreach ($this->referenceExtractor->extract($text) as $reference) {
+                $references[] = new RouteReferenceLocation(
+                    $reference->name(),
+                    $uri,
+                    $reference->range(),
+                );
+            }
         }
 
         $this->declarationIndexes->forProject($project)->replace(...$declarations);
+        $this->referenceIndexes->forProject($project)->replace(...$references);
     }
 
     /**

@@ -20,6 +20,9 @@ use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteHoverHandler;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
+use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
+use Symfony\Lsp\Feature\Route\RouteReferencesHandler;
+use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -48,6 +51,7 @@ final class LanguageServerFactory
         $projects = new ProjectRegistry();
         $routeIndexes = new RouteIndexRegistry();
         $routeDeclarationIndexes = new RouteDeclarationIndexRegistry();
+        $routeReferenceIndexes = new RouteReferenceIndexRegistry();
         $client = new JsonRpcClient($peer);
         $bridgeInstaller = new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', 'dev');
         $runtimeInitializer = new ProjectRuntimeInitializer(
@@ -57,10 +61,14 @@ final class LanguageServerFactory
         );
         $workspaceTrust = new WorkspaceTrust();
         $documentContextResolver = new DocumentContextResolver($documents, $projects);
+        $routeReferenceExtractor = new RouteReferenceExtractor($positionConverter);
+        $routeDeclarationExtractor = new PhpRouteDeclarationExtractor($positionConverter);
         $routeSourceIndexer = new ProjectRouteSourceIndexer(
             $projects,
             $routeDeclarationIndexes,
-            new PhpRouteDeclarationExtractor($positionConverter),
+            $routeReferenceIndexes,
+            $routeDeclarationExtractor,
+            $routeReferenceExtractor,
         );
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
@@ -85,11 +93,21 @@ final class LanguageServerFactory
                 $documents,
                 $projects,
                 $routeIndexes,
-                new RouteReferenceExtractor($positionConverter),
+                $routeReferenceExtractor,
             ),
             new RouteDefinitionHandler(
                 $documentContextResolver,
                 $positionConverter,
+                $routeDeclarationIndexes,
+            ),
+            new RouteReferencesHandler(
+                $documentContextResolver,
+                new RouteSymbolResolver(
+                    $positionConverter,
+                    $routeReferenceExtractor,
+                    $routeDeclarationExtractor,
+                ),
+                $routeReferenceIndexes,
                 $routeDeclarationIndexes,
             ),
             new ProjectRuntimeRefresher($projects, $workspaceTrust, $runtimeInitializer),
