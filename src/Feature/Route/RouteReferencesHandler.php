@@ -4,8 +4,9 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\ReferencesProviderInterface;
 
-final class RouteReferencesHandler
+final class RouteReferencesHandler implements ReferencesProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documentContextResolver,

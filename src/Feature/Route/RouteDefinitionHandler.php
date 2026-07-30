@@ -3,8 +3,9 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
+use Symfony\Lsp\Feature\DefinitionProviderInterface;
 
-final class RouteDefinitionHandler
+final class RouteDefinitionHandler implements DefinitionProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documentContextResolver,

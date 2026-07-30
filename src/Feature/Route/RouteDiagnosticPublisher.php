@@ -2,16 +2,13 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
-use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Runtime\RuntimeRefreshObserverInterface;
 
-final class RouteDiagnosticPublisher implements RuntimeRefreshObserverInterface
+final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
 {
     public function __construct(
-        private readonly ClientInterface $client,
         private readonly DocumentStore $documents,
         private readonly ProjectRegistry $projects,
         private readonly RouteIndexRegistry $routeIndexes,
@@ -22,24 +19,25 @@ final class RouteDiagnosticPublisher implements RuntimeRefreshObserverInterface
 
     /**
      * @param array<array-key, mixed> $params
+     *
+     * @return list<array<array-key, mixed>>|null
      */
-    public function publish(array $params): void
+    public function diagnostics(array $params): ?array
     {
         $textDocument = $params['textDocument'] ?? null;
         if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
-            return;
+            return null;
         }
 
-        $uri = $textDocument['uri'];
-        $document = $this->documents->get($uri);
-        $project = $this->projects->forDocumentUri($uri);
+        $document = $this->documents->get($textDocument['uri']);
+        $project = $this->projects->forDocumentUri($textDocument['uri']);
         if (null === $document || null === $project || !\in_array($document->languageId(), ['php', 'twig'], true)) {
-            return;
+            return null;
         }
 
         $routeIndex = $this->routeIndexes->forProject($project);
         if (!$routeIndex->isComplete()) {
-            return;
+            return null;
         }
 
         $diagnostics = [];
@@ -94,36 +92,6 @@ final class RouteDiagnosticPublisher implements RuntimeRefreshObserverInterface
             }
         }
 
-        $this->client->notify('textDocument/publishDiagnostics', [
-            'uri' => $uri,
-            'version' => $document->version(),
-            'diagnostics' => $diagnostics,
-        ]);
-    }
-
-    public function refreshed(Project $project): void
-    {
-        foreach ($this->documents->all() as $document) {
-            $documentProject = $this->projects->forDocumentUri($document->uri());
-            if (null !== $documentProject && $documentProject->rootPath() === $project->rootPath()) {
-                $this->publish(['textDocument' => ['uri' => $document->uri()]]);
-            }
-        }
-    }
-
-    /**
-     * @param array<array-key, mixed> $params
-     */
-    public function clear(array $params): void
-    {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
-            return;
-        }
-
-        $this->client->notify('textDocument/publishDiagnostics', [
-            'uri' => $textDocument['uri'],
-            'diagnostics' => [],
-        ]);
+        return $diagnostics;
     }
 }

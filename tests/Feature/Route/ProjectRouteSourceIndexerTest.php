@@ -13,6 +13,8 @@ use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
+use Symfony\Lsp\Index\ApplicationSourceScanner;
+use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -75,8 +77,6 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         $positionConverter = new PositionConverter();
         $documents = new DocumentStore();
         $indexer = new ProjectRouteSourceIndexer(
-            $projects,
-            $documents,
             $indexes,
             $referenceIndexes,
             new PhpRouteDeclarationExtractor($positionConverter),
@@ -84,8 +84,14 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new RouteReferenceExtractor($positionConverter),
             new TwigRouteReferenceExtractor($positionConverter),
         );
+        $scanner = new ApplicationSourceScanner(
+            $projects,
+            $documents,
+            new ProjectIndexStatusRegistry(),
+            $indexer,
+        );
 
-        $indexer->indexAll();
+        $scanner->indexAll();
 
         self::assertCount(1, $indexes->forProject($project)->find('article_list'));
         self::assertCount(1, $indexes->forProject($project)->find('admin_dashboard'));
@@ -98,17 +104,23 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             #[Route('/article', name: 'article_new')]
             final class Controller {}
             PHP));
-        $indexer->updateOpenDocument(['textDocument' => ['uri' => $uri]]);
+        $scanner->updateOpenDocument(['textDocument' => ['uri' => $uri]]);
 
         self::assertSame([], $indexes->forProject($project)->find('article_list'));
         self::assertCount(1, $indexes->forProject($project)->find('article_new'));
+
+        $documents->close($uri);
+        $scanner->restoreClosedDocument(['textDocument' => ['uri' => $uri]]);
+
+        self::assertCount(1, $indexes->forProject($project)->find('article_list'));
+        self::assertSame([], $indexes->forProject($project)->find('article_new'));
 
         $packageUri = 'file://'.$this->temporaryDirectory.'/config/packages/framework.yaml';
         $documents->open(new Document($packageUri, 'yaml', 1, <<<'YAML'
             fake_route:
                 path: /not-a-route
             YAML));
-        $indexer->updateOpenDocument(['textDocument' => ['uri' => $packageUri]]);
+        $scanner->updateOpenDocument(['textDocument' => ['uri' => $packageUri]]);
 
         self::assertSame([], $indexes->forProject($project)->find('fake_route'));
     }

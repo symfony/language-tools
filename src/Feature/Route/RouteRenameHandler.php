@@ -4,8 +4,9 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\RenameProviderInterface;
 
-final class RouteRenameHandler
+final class RouteRenameHandler implements RenameProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documentContextResolver,

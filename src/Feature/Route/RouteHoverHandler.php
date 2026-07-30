@@ -4,8 +4,9 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\HoverProviderInterface;
 
-final class RouteHoverHandler
+final class RouteHoverHandler implements HoverProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documentContextResolver,

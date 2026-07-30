@@ -4,29 +4,25 @@ namespace Symfony\Lsp\Feature\Route;
 
 final class RouteReferenceIndex
 {
-    /** @var array<string, list<RouteReferenceLocation>> */
+    /** @var list<RouteReferenceLocation> */
     private array $references = [];
+
+    /** @var array<string, list<RouteReferenceLocation>> */
+    private array $overlays = [];
 
     public function replace(RouteReferenceLocation ...$references): void
     {
-        $this->references = [];
-        foreach ($references as $reference) {
-            $this->references[$reference->name()][] = $reference;
-        }
+        $this->references = array_values($references);
     }
 
     public function replaceForUri(string $uri, RouteReferenceLocation ...$references): void
     {
-        $remaining = [];
-        foreach ($this->references as $indexedReferences) {
-            foreach ($indexedReferences as $reference) {
-                if ($reference->uri() !== $uri) {
-                    $remaining[] = $reference;
-                }
-            }
-        }
+        $this->overlays[$uri] = array_values($references);
+    }
 
-        $this->replace(...$remaining, ...$references);
+    public function removeOverlay(string $uri): void
+    {
+        unset($this->overlays[$uri]);
     }
 
     /**
@@ -34,6 +30,20 @@ final class RouteReferenceIndex
      */
     public function find(string $name): array
     {
-        return $this->references[$name] ?? [];
+        $references = [];
+        foreach ($this->references as $reference) {
+            if ($reference->name() === $name && !isset($this->overlays[$reference->uri()])) {
+                $references[] = $reference;
+            }
+        }
+        foreach ($this->overlays as $overlayReferences) {
+            foreach ($overlayReferences as $reference) {
+                if ($reference->name() === $name) {
+                    $references[] = $reference;
+                }
+            }
+        }
+
+        return $references;
     }
 }

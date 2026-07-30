@@ -3,22 +3,19 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
 
-final class ProjectRouteSourceIndexer
+final class ProjectRouteSourceIndexer implements SourceIndexProviderInterface
 {
-    private const EXCLUDED_DIRECTORIES = [
-        '.git',
-        'node_modules',
-        'var',
-        'vendor',
-    ];
+    /** @var array<string, list<RouteDeclaration>> */
+    private array $declarations = [];
+
+    /** @var array<string, list<RouteReferenceLocation>> */
+    private array $references = [];
 
     public function __construct(
-        private readonly ProjectRegistry $projects,
-        private readonly DocumentStore $documents,
         private readonly RouteDeclarationIndexRegistry $declarationIndexes,
         private readonly RouteReferenceIndexRegistry $referenceIndexes,
         private readonly PhpRouteDeclarationExtractor $phpDeclarationExtractor,
@@ -28,122 +25,68 @@ final class ProjectRouteSourceIndexer
     ) {
     }
 
-    public function indexAll(): void
+    public function begin(Project $project): void
     {
-        foreach ($this->projects->all() as $project) {
-            $this->index($project);
-        }
+        $this->declarations[$project->rootPath()] = [];
+        $this->references[$project->rootPath()] = [];
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     */
-    public function updateOpenDocument(array $params): void
+    public function index(Project $project, SourceDocument $document): void
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
+        if ('yaml' === $document->languageId() && !$this->isRouteYaml($project, $document->uri())) {
             return;
         }
 
-        $document = $this->documents->get($textDocument['uri']);
-        $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $document || null === $project) {
+        [$declarations, $references] = $this->extract(
+            $document->uri(),
+            $document->languageId(),
+            $document->text(),
+        );
+        array_push($this->declarations[$project->rootPath()], ...$declarations);
+        array_push($this->references[$project->rootPath()], ...$references);
+    }
+
+    public function finish(Project $project): void
+    {
+        $key = $project->rootPath();
+        $this->declarationIndexes->forProject($project)->replace(...$this->declarations[$key]);
+        $this->referenceIndexes->forProject($project)->replace(...$this->references[$key]);
+        unset($this->declarations[$key], $this->references[$key]);
+    }
+
+    public function overlay(Project $project, Document $document): void
+    {
+        if ('yaml' === $document->languageId() && !$this->isRouteYaml($project, $document->uri())) {
             return;
         }
 
-        $extension = strtolower(pathinfo((string) parse_url($document->uri(), \PHP_URL_PATH), \PATHINFO_EXTENSION));
-        if (\in_array($extension, ['yaml', 'yml'], true) && !$this->isRouteYaml($project, $document->uri())) {
-            return;
-        }
-
-        [$declarations, $references] = $this->extractDocument($document);
+        [$declarations, $references] = $this->extract(
+            $document->uri(),
+            $document->languageId(),
+            $document->text(),
+        );
         $this->declarationIndexes->forProject($project)->replaceForUri($document->uri(), ...$declarations);
         $this->referenceIndexes->forProject($project)->replaceForUri($document->uri(), ...$references);
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     */
-    public function restoreClosedDocument(array $params): void
+    public function removeOverlay(Project $project, string $uri): void
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
-            return;
-        }
-
-        $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null !== $project) {
-            $this->index($project);
-        }
-    }
-
-    /**
-     * @param array<array-key, mixed> $params
-     */
-    public function refreshAfterSave(array $params): void
-    {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
-            return;
-        }
-
-        $path = parse_url($textDocument['uri'], \PHP_URL_PATH);
-        $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $project || !\is_string($path)) {
-            return;
-        }
-
-        $extension = strtolower(pathinfo($path, \PATHINFO_EXTENSION));
-        if (\in_array($extension, ['php', 'twig', 'yaml', 'yml'], true)) {
-            $this->index($project);
-        }
-    }
-
-    private function index(Project $project): void
-    {
-        $declarations = [];
-        $references = [];
-        foreach ($this->sourceFiles($project) as $path) {
-            $text = file_get_contents($path);
-            if (false === $text) {
-                continue;
-            }
-
-            [$fileDeclarations, $fileReferences] = $this->extract(
-                $this->uri($project, $path),
-                strtolower(pathinfo($path, \PATHINFO_EXTENSION)),
-                $text,
-            );
-            array_push($declarations, ...$fileDeclarations);
-            array_push($references, ...$fileReferences);
-        }
-
-        $this->declarationIndexes->forProject($project)->replace(...$declarations);
-        $this->referenceIndexes->forProject($project)->replace(...$references);
+        $this->declarationIndexes->forProject($project)->removeOverlay($uri);
+        $this->referenceIndexes->forProject($project)->removeOverlay($uri);
     }
 
     /**
      * @return array{list<RouteDeclaration>, list<RouteReferenceLocation>}
      */
-    private function extractDocument(Document $document): array
-    {
-        $extension = strtolower(pathinfo((string) parse_url($document->uri(), \PHP_URL_PATH), \PATHINFO_EXTENSION));
-
-        return $this->extract($document->uri(), $extension, $document->text());
-    }
-
-    /**
-     * @return array{list<RouteDeclaration>, list<RouteReferenceLocation>}
-     */
-    private function extract(string $uri, string $extension, string $text): array
+    private function extract(string $uri, string $languageId, string $text): array
     {
         $declarations = [];
-        if ('php' === $extension) {
+        if ('php' === $languageId) {
             $declarations = $this->phpDeclarationExtractor->extract($uri, $text);
             $references = $this->phpReferenceExtractor->extract($text);
-        } elseif ('twig' === $extension) {
+        } elseif ('twig' === $languageId) {
             $references = $this->twigReferenceExtractor->extract($text);
-        } elseif (\in_array($extension, ['yaml', 'yml'], true)) {
+        } elseif ('yaml' === $languageId) {
             $declarations = $this->yamlDeclarationExtractor->extract($uri, $text);
             $references = [];
         } else {
@@ -160,73 +103,6 @@ final class ProjectRouteSourceIndexer
         )];
     }
 
-    /**
-     * @return \Generator<int, string>
-     */
-    private function sourceFiles(Project $project): \Generator
-    {
-        yield from $this->ownedSourceFiles($project->rootPath());
-
-        $configDirectory = $project->rootPath().'/config';
-        if (is_dir($configDirectory)) {
-            yield from $this->routeYamlFiles($configDirectory, true);
-        }
-    }
-
-    /**
-     * @return \Generator<int, string>
-     */
-    private function ownedSourceFiles(string $directory): \Generator
-    {
-        $iterator = new \FilesystemIterator($directory, \FilesystemIterator::SKIP_DOTS);
-        foreach ($iterator as $file) {
-            if (!$file instanceof \SplFileInfo) {
-                continue;
-            }
-
-            if ($file->isDir()) {
-                if (!$file->isLink() && !\in_array($file->getFilename(), self::EXCLUDED_DIRECTORIES, true)) {
-                    yield from $this->ownedSourceFiles($file->getPathname());
-                }
-
-                continue;
-            }
-
-            if ($file->isFile() && \in_array(strtolower($file->getExtension()), ['php', 'twig'], true)) {
-                yield $file->getPathname();
-            }
-        }
-    }
-
-    /**
-     * @return \Generator<int, string>
-     */
-    private function routeYamlFiles(string $directory, bool $root = false): \Generator
-    {
-        $iterator = new \FilesystemIterator($directory, \FilesystemIterator::SKIP_DOTS);
-        foreach ($iterator as $file) {
-            if (!$file instanceof \SplFileInfo) {
-                continue;
-            }
-
-            if ($file->isDir()) {
-                if (!$file->isLink() && (!$root || 'routes' === $file->getFilename())) {
-                    yield from $this->routeYamlFiles($file->getPathname());
-                }
-
-                continue;
-            }
-
-            $extension = strtolower($file->getExtension());
-            if ($file->isFile()
-                && \in_array($extension, ['yaml', 'yml'], true)
-                && (!$root || str_starts_with($file->getBasename('.'.$extension), 'routes'))
-            ) {
-                yield $file->getPathname();
-            }
-        }
-    }
-
     private function isRouteYaml(Project $project, string $uri): bool
     {
         $path = parse_url($uri, \PHP_URL_PATH);
@@ -240,13 +116,5 @@ final class ProjectRouteSourceIndexer
         return str_starts_with($relativePath, 'config/routes/')
             || (str_starts_with($relativePath, 'config/routes.')
                 && \in_array(strtolower(pathinfo($relativePath, \PATHINFO_EXTENSION)), ['yaml', 'yml'], true));
-    }
-
-    private function uri(Project $project, string $path): string
-    {
-        $relativePath = substr(str_replace('\\', '/', $path), \strlen(rtrim(str_replace('\\', '/', $project->rootPath()), '/')) + 1);
-        $encodedPath = implode('/', array_map('rawurlencode', explode('/', $relativePath)));
-
-        return rtrim($project->rootUri(), '/').'/'.$encodedPath;
     }
 }

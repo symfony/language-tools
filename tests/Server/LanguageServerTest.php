@@ -43,6 +43,12 @@ final class LanguageServerTest extends TestCase
                         'renameProvider' => [
                             'prepareProvider' => true,
                         ],
+                        'executeCommandProvider' => [
+                            'commands' => [
+                                'symfony.refreshIndex',
+                                'symfony.indexStatus',
+                            ],
+                        ],
                     ],
                     'serverInfo' => [
                         'name' => 'Symfony LSP',

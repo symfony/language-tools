@@ -12,6 +12,12 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\CompletionProviderRegistry;
+use Symfony\Lsp\Feature\DefinitionProviderRegistry;
+use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
+use Symfony\Lsp\Feature\HoverProviderRegistry;
+use Symfony\Lsp\Feature\ReferencesProviderRegistry;
+use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
 use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
@@ -28,6 +34,9 @@ use Symfony\Lsp\Feature\Route\RouteRenameHandler;
 use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
+use Symfony\Lsp\Index\ApplicationSourceScanner;
+use Symfony\Lsp\Index\IndexCommandHandler;
+use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -42,6 +51,7 @@ use Symfony\Lsp\Runtime\ProjectRuntimeInitializer;
 use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
 use Symfony\Lsp\Runtime\ReportingRuntimeInitializer;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Runtime\StatusRuntimeInitializer;
 
 final class LanguageServerFactory
 {
@@ -52,6 +62,7 @@ final class LanguageServerFactory
         $documents = new DocumentStore();
         $positionConverter = new PositionConverter();
         $projects = new ProjectRegistry();
+        $statuses = new ProjectIndexStatusRegistry();
         $routeIndexes = new RouteIndexRegistry();
         $routeDeclarationIndexes = new RouteDeclarationIndexRegistry();
         $routeReferenceIndexes = new RouteReferenceIndexRegistry();
@@ -62,26 +73,34 @@ final class LanguageServerFactory
         $twigRouteReferenceExtractor = new TwigRouteReferenceExtractor($positionConverter);
         $phpRouteDeclarationExtractor = new PhpRouteDeclarationExtractor($positionConverter);
         $yamlRouteDeclarationExtractor = new YamlRouteDeclarationExtractor($positionConverter);
-        $routeDiagnosticPublisher = new RouteDiagnosticPublisher(
-            $client,
+        $routeDiagnostics = new RouteDiagnosticPublisher(
             $documents,
             $projects,
             $routeIndexes,
             $routeReferenceExtractor,
             $twigRouteReferenceExtractor,
         );
+        $diagnosticProviders = new DiagnosticProviderRegistry(
+            $client,
+            $documents,
+            $projects,
+            $routeDiagnostics,
+        );
         $runtimeConfiguration = new RuntimeConfiguration();
         $runtimeInitializer = new ObservedRuntimeInitializer(
             new ReportingRuntimeInitializer(
-                new ProjectRuntimeInitializer(
-                    new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', 'dev'),
-                    new NativeProcessRunner(),
-                    $routeIndexes,
-                    $runtimeConfiguration,
+                new StatusRuntimeInitializer(
+                    new ProjectRuntimeInitializer(
+                        new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', 'dev'),
+                        new NativeProcessRunner(),
+                        $routeIndexes,
+                        $runtimeConfiguration,
+                    ),
+                    $statuses,
                 ),
                 $client,
             ),
-            $routeDiagnosticPublisher,
+            $diagnosticProviders,
         );
         $routeSymbolResolver = new RouteSymbolResolver(
             $positionConverter,
@@ -91,8 +110,6 @@ final class LanguageServerFactory
             $yamlRouteDeclarationExtractor,
         );
         $routeSourceIndexer = new ProjectRouteSourceIndexer(
-            $projects,
-            $documents,
             $routeDeclarationIndexes,
             $routeReferenceIndexes,
             $phpRouteDeclarationExtractor,
@@ -100,11 +117,42 @@ final class LanguageServerFactory
             $routeReferenceExtractor,
             $twigRouteReferenceExtractor,
         );
+        $sourceScanner = new ApplicationSourceScanner(
+            $projects,
+            $documents,
+            $statuses,
+            $routeSourceIndexer,
+        );
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
             $projects,
             new WorkspaceTrustManager($client, $workspaceTrust, $runtimeInitializer),
             $runtimeConfiguration,
+        );
+        $routeCompletion = new RouteCompletionHandler($documentContextResolver, $positionConverter, $routeIndexes);
+        $routeHover = new RouteHoverHandler(
+            $documentContextResolver,
+            $positionConverter,
+            $routeIndexes,
+            $twigRouteReferenceExtractor,
+        );
+        $routeDefinition = new RouteDefinitionHandler(
+            $documentContextResolver,
+            $routeSymbolResolver,
+            $routeDeclarationIndexes,
+        );
+        $routeReferences = new RouteReferencesHandler(
+            $documentContextResolver,
+            $routeSymbolResolver,
+            $routeReferenceIndexes,
+            $routeDeclarationIndexes,
+        );
+        $routeRename = new RouteRenameHandler(
+            $documentContextResolver,
+            $routeSymbolResolver,
+            $routeReferenceIndexes,
+            $routeDeclarationIndexes,
+            $routeIndexes,
         );
 
         return new LanguageServer(
@@ -113,19 +161,10 @@ final class LanguageServerFactory
             new ServerState(),
             $workspaceConfiguration,
             new DocumentSynchronizer($documents, $positionConverter),
-            new RouteCompletionHandler($documentContextResolver, $positionConverter, $routeIndexes),
-            new RouteHoverHandler(
-                $documentContextResolver,
-                $positionConverter,
-                $routeIndexes,
-                $twigRouteReferenceExtractor,
-            ),
-            $routeDiagnosticPublisher,
-            new RouteDefinitionHandler(
-                $documentContextResolver,
-                $routeSymbolResolver,
-                $routeDeclarationIndexes,
-            ),
+            new CompletionProviderRegistry($routeCompletion),
+            new HoverProviderRegistry($routeHover),
+            $diagnosticProviders,
+            new DefinitionProviderRegistry($routeDefinition),
             new RouteDocumentLinkHandler(
                 $documents,
                 $projects,
@@ -133,25 +172,22 @@ final class LanguageServerFactory
                 $routeReferenceExtractor,
                 $twigRouteReferenceExtractor,
             ),
-            new RouteReferencesHandler(
-                $documentContextResolver,
-                $routeSymbolResolver,
-                $routeReferenceIndexes,
-                $routeDeclarationIndexes,
-            ),
-            new RouteRenameHandler(
-                $documentContextResolver,
-                $routeSymbolResolver,
-                $routeReferenceIndexes,
-                $routeDeclarationIndexes,
-                $routeIndexes,
-            ),
+            new ReferencesProviderRegistry($routeReferences),
+            new RenameProviderRegistry($routeRename),
             new ProjectRuntimeRefresher(
                 $projects,
                 $workspaceTrust,
                 new DebouncedRuntimeRefreshScheduler($runtimeInitializer),
+                $statuses,
             ),
-            $routeSourceIndexer,
+            $sourceScanner,
+            new IndexCommandHandler(
+                $projects,
+                $workspaceTrust,
+                $sourceScanner,
+                $runtimeInitializer,
+                $statuses,
+            ),
         );
     }
 }

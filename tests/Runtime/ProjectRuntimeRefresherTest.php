@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Runtime;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\TrustStatus;
@@ -66,7 +67,15 @@ final class ProjectRuntimeRefresherTest extends TestCase
         $workspaceTrust->set($project, $status);
         $scheduler = new RefreshScheduler();
 
-        return [new ProjectRuntimeRefresher($projects, $workspaceTrust, $scheduler), $scheduler];
+        return [
+            new ProjectRuntimeRefresher(
+                $projects,
+                $workspaceTrust,
+                $scheduler,
+                new ProjectIndexStatusRegistry(),
+            ),
+            $scheduler,
+        ];
     }
 }
 

@@ -7,6 +7,7 @@ use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
@@ -139,13 +140,17 @@ final class RouteDiagnosticPublisherTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([new Project('/workspace', 'file:///workspace', '^8.0')]);
         $positionConverter = new PositionConverter();
-        $publisher = new RouteDiagnosticPublisher(
+        $publisher = new DiagnosticProviderRegistry(
             $client,
             $documents,
             $projects,
-            new RouteIndexRegistry(),
-            new RouteReferenceExtractor($positionConverter),
-            new TwigRouteReferenceExtractor($positionConverter),
+            new RouteDiagnosticPublisher(
+                $documents,
+                $projects,
+                new RouteIndexRegistry(),
+                new RouteReferenceExtractor($positionConverter),
+                new TwigRouteReferenceExtractor($positionConverter),
+            ),
         );
 
         $publisher->publish(['textDocument' => ['uri' => $uri]]);
@@ -187,7 +192,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
     }
 
     /**
-     * @return array{RouteDiagnosticPublisher, DiagnosticClient, Project}
+     * @return array{DiagnosticProviderRegistry, DiagnosticClient, Project}
      */
     private function publisher(
         string $uri,
@@ -207,13 +212,17 @@ final class RouteDiagnosticPublisherTest extends TestCase
         $positionConverter = new PositionConverter();
 
         return [
-            new RouteDiagnosticPublisher(
+            new DiagnosticProviderRegistry(
                 $client,
                 $documents,
                 $projects,
-                $routeIndexes,
-                new RouteReferenceExtractor($positionConverter),
-                new TwigRouteReferenceExtractor($positionConverter),
+                new RouteDiagnosticPublisher(
+                    $documents,
+                    $projects,
+                    $routeIndexes,
+                    new RouteReferenceExtractor($positionConverter),
+                    new TwigRouteReferenceExtractor($positionConverter),
+                ),
             ),
             $client,
             $project,

@@ -4,29 +4,25 @@ namespace Symfony\Lsp\Feature\Route;
 
 final class RouteDeclarationIndex
 {
-    /** @var array<string, list<RouteDeclaration>> */
+    /** @var list<RouteDeclaration> */
     private array $declarations = [];
+
+    /** @var array<string, list<RouteDeclaration>> */
+    private array $overlays = [];
 
     public function replace(RouteDeclaration ...$declarations): void
     {
-        $this->declarations = [];
-        foreach ($declarations as $declaration) {
-            $this->declarations[$declaration->name()][] = $declaration;
-        }
+        $this->declarations = array_values($declarations);
     }
 
     public function replaceForUri(string $uri, RouteDeclaration ...$declarations): void
     {
-        $remaining = [];
-        foreach ($this->declarations as $indexedDeclarations) {
-            foreach ($indexedDeclarations as $declaration) {
-                if ($declaration->uri() !== $uri) {
-                    $remaining[] = $declaration;
-                }
-            }
-        }
+        $this->overlays[$uri] = array_values($declarations);
+    }
 
-        $this->replace(...$remaining, ...$declarations);
+    public function removeOverlay(string $uri): void
+    {
+        unset($this->overlays[$uri]);
     }
 
     /**
@@ -34,6 +30,20 @@ final class RouteDeclarationIndex
      */
     public function find(string $name): array
     {
-        return $this->declarations[$name] ?? [];
+        $declarations = [];
+        foreach ($this->declarations as $declaration) {
+            if ($declaration->name() === $name && !isset($this->overlays[$declaration->uri()])) {
+                $declarations[] = $declaration;
+            }
+        }
+        foreach ($this->overlays as $overlayDeclarations) {
+            foreach ($overlayDeclarations as $declaration) {
+                if ($declaration->name() === $name) {
+                    $declarations[] = $declaration;
+                }
+            }
+        }
+
+        return $declarations;
     }
 }

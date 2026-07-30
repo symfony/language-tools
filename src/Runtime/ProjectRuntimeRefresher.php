@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Runtime;
 
+use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\TrustStatus;
@@ -13,6 +14,7 @@ final class ProjectRuntimeRefresher
         private readonly ProjectRegistry $projects,
         private readonly WorkspaceTrust $workspaceTrust,
         private readonly RuntimeRefreshSchedulerInterface $refreshScheduler,
+        private readonly ProjectIndexStatusRegistry $statuses,
     ) {
     }
 
@@ -34,6 +36,7 @@ final class ProjectRuntimeRefresher
             return;
         }
 
+        $this->statuses->runtimeStale($project);
         $this->refreshScheduler->schedule($project);
     }
 
