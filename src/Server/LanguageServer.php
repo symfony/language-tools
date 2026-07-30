@@ -11,6 +11,7 @@ use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
 use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteHoverHandler;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
+use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
 
 use function Amp\async;
 
@@ -25,6 +26,7 @@ final class LanguageServer
         private readonly RouteCompletionHandler $routeCompletionHandler,
         private readonly RouteHoverHandler $routeHoverHandler,
         private readonly RouteDiagnosticPublisher $routeDiagnosticPublisher,
+        private readonly ProjectRuntimeRefresher $projectRuntimeRefresher,
     ) {
         $this->registerHandlers();
     }
@@ -43,6 +45,7 @@ final class LanguageServer
         $this->dispatcher->onNotification('textDocument/didOpen', $this->openDocument(...));
         $this->dispatcher->onNotification('textDocument/didChange', $this->changeDocument(...));
         $this->dispatcher->onNotification('textDocument/didClose', $this->closeDocument(...));
+        $this->dispatcher->onNotification('textDocument/didSave', $this->saveDocument(...));
         $this->dispatcher->onRequest('textDocument/completion', $this->routeCompletionHandler->complete(...));
         $this->dispatcher->onRequest('textDocument/hover', $this->routeHoverHandler->hover(...));
         $this->dispatcher->onRequest('shutdown', $this->shutdown(...));
@@ -95,6 +98,15 @@ final class LanguageServer
     private function changeDocument(array $params): void
     {
         $this->documentSynchronizer->change($params);
+        $this->routeDiagnosticPublisher->publish($params);
+    }
+
+    /**
+     * @param array<array-key, mixed> $params
+     */
+    private function saveDocument(array $params): void
+    {
+        $this->projectRuntimeRefresher->refreshAfterSave($params);
         $this->routeDiagnosticPublisher->publish($params);
     }
 
