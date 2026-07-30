@@ -15,6 +15,20 @@ final class RouteReferenceIndex
         }
     }
 
+    public function replaceForUri(string $uri, RouteReferenceLocation ...$references): void
+    {
+        $remaining = [];
+        foreach ($this->references as $indexedReferences) {
+            foreach ($indexedReferences as $reference) {
+                if ($reference->uri() !== $uri) {
+                    $remaining[] = $reference;
+                }
+            }
+        }
+
+        $this->replace(...$remaining, ...$references);
+    }
+
     /**
      * @return list<RouteReferenceLocation>
      */

@@ -112,6 +112,7 @@ final class LanguageServer
     private function openDocument(array $params): void
     {
         $this->documentSynchronizer->open($params);
+        $this->routeSourceIndexer->updateOpenDocument($params);
         $this->routeDiagnosticPublisher->publish($params);
     }
 
@@ -121,6 +122,7 @@ final class LanguageServer
     private function changeDocument(array $params): void
     {
         $this->documentSynchronizer->change($params);
+        $this->routeSourceIndexer->updateOpenDocument($params);
         $this->routeDiagnosticPublisher->publish($params);
     }
 
@@ -140,6 +142,7 @@ final class LanguageServer
     private function closeDocument(array $params): void
     {
         $this->documentSynchronizer->close($params);
+        $this->routeSourceIndexer->restoreClosedDocument($params);
         $this->routeDiagnosticPublisher->clear($params);
     }
 

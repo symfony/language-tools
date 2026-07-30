@@ -3,6 +3,8 @@
 namespace Symfony\Lsp\Tests\Feature\Route;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Document\Document;
+use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
@@ -71,8 +73,10 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         $indexes = new RouteDeclarationIndexRegistry();
         $referenceIndexes = new RouteReferenceIndexRegistry();
         $positionConverter = new PositionConverter();
+        $documents = new DocumentStore();
         $indexer = new ProjectRouteSourceIndexer(
             $projects,
+            $documents,
             $indexes,
             $referenceIndexes,
             new PhpRouteDeclarationExtractor($positionConverter),
@@ -87,5 +91,16 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         self::assertCount(1, $indexes->forProject($project)->find('admin_dashboard'));
         self::assertCount(1, $referenceIndexes->forProject($project)->find('article_list'));
         self::assertSame([], $indexes->forProject($project)->find('ignored_route'));
+
+        $uri = 'file://'.$this->temporaryDirectory.'/src/Controller.php';
+        $documents->open(new Document($uri, 'php', 2, <<<'PHP'
+            <?php
+            #[Route('/article', name: 'article_new')]
+            final class Controller {}
+            PHP));
+        $indexer->updateOpenDocument(['textDocument' => ['uri' => $uri]]);
+
+        self::assertSame([], $indexes->forProject($project)->find('article_list'));
+        self::assertCount(1, $indexes->forProject($project)->find('article_new'));
     }
 }

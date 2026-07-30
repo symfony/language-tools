@@ -15,6 +15,20 @@ final class RouteDeclarationIndex
         }
     }
 
+    public function replaceForUri(string $uri, RouteDeclaration ...$declarations): void
+    {
+        $remaining = [];
+        foreach ($this->declarations as $indexedDeclarations) {
+            foreach ($indexedDeclarations as $declaration) {
+                if ($declaration->uri() !== $uri) {
+                    $remaining[] = $declaration;
+                }
+            }
+        }
+
+        $this->replace(...$remaining, ...$declarations);
+    }
+
     /**
      * @return list<RouteDeclaration>
      */

@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
+use Symfony\Lsp\Document\Document;
+use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -16,6 +18,7 @@ final class ProjectRouteSourceIndexer
 
     public function __construct(
         private readonly ProjectRegistry $projects,
+        private readonly DocumentStore $documents,
         private readonly RouteDeclarationIndexRegistry $declarationIndexes,
         private readonly RouteReferenceIndexRegistry $referenceIndexes,
         private readonly PhpRouteDeclarationExtractor $phpDeclarationExtractor,
@@ -28,6 +31,43 @@ final class ProjectRouteSourceIndexer
     public function indexAll(): void
     {
         foreach ($this->projects->all() as $project) {
+            $this->index($project);
+        }
+    }
+
+    /**
+     * @param array<array-key, mixed> $params
+     */
+    public function updateOpenDocument(array $params): void
+    {
+        $textDocument = $params['textDocument'] ?? null;
+        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
+            return;
+        }
+
+        $document = $this->documents->get($textDocument['uri']);
+        $project = $this->projects->forDocumentUri($textDocument['uri']);
+        if (null === $document || null === $project) {
+            return;
+        }
+
+        [$declarations, $references] = $this->extractDocument($document);
+        $this->declarationIndexes->forProject($project)->replaceForUri($document->uri(), ...$declarations);
+        $this->referenceIndexes->forProject($project)->replaceForUri($document->uri(), ...$references);
+    }
+
+    /**
+     * @param array<array-key, mixed> $params
+     */
+    public function restoreClosedDocument(array $params): void
+    {
+        $textDocument = $params['textDocument'] ?? null;
+        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
+            return;
+        }
+
+        $project = $this->projects->forDocumentUri($textDocument['uri']);
+        if (null !== $project) {
             $this->index($project);
         }
     }
@@ -64,29 +104,55 @@ final class ProjectRouteSourceIndexer
                 continue;
             }
 
-            $uri = $this->uri($project, $path);
-            $extension = strtolower(pathinfo($path, \PATHINFO_EXTENSION));
-            if ('php' === $extension) {
-                array_push($declarations, ...$this->phpDeclarationExtractor->extract($uri, $text));
-                $fileReferences = $this->phpReferenceExtractor->extract($text);
-            } elseif ('twig' === $extension) {
-                $fileReferences = $this->twigReferenceExtractor->extract($text);
-            } else {
-                $fileReferences = [];
-                array_push($declarations, ...$this->yamlDeclarationExtractor->extract($uri, $text));
-            }
-
-            foreach ($fileReferences as $reference) {
-                $references[] = new RouteReferenceLocation(
-                    $reference->name(),
-                    $uri,
-                    $reference->range(),
-                );
-            }
+            [$fileDeclarations, $fileReferences] = $this->extract(
+                $this->uri($project, $path),
+                strtolower(pathinfo($path, \PATHINFO_EXTENSION)),
+                $text,
+            );
+            array_push($declarations, ...$fileDeclarations);
+            array_push($references, ...$fileReferences);
         }
 
         $this->declarationIndexes->forProject($project)->replace(...$declarations);
         $this->referenceIndexes->forProject($project)->replace(...$references);
+    }
+
+    /**
+     * @return array{list<RouteDeclaration>, list<RouteReferenceLocation>}
+     */
+    private function extractDocument(Document $document): array
+    {
+        $extension = strtolower(pathinfo((string) parse_url($document->uri(), \PHP_URL_PATH), \PATHINFO_EXTENSION));
+
+        return $this->extract($document->uri(), $extension, $document->text());
+    }
+
+    /**
+     * @return array{list<RouteDeclaration>, list<RouteReferenceLocation>}
+     */
+    private function extract(string $uri, string $extension, string $text): array
+    {
+        $declarations = [];
+        if ('php' === $extension) {
+            $declarations = $this->phpDeclarationExtractor->extract($uri, $text);
+            $references = $this->phpReferenceExtractor->extract($text);
+        } elseif ('twig' === $extension) {
+            $references = $this->twigReferenceExtractor->extract($text);
+        } elseif (\in_array($extension, ['yaml', 'yml'], true)) {
+            $declarations = $this->yamlDeclarationExtractor->extract($uri, $text);
+            $references = [];
+        } else {
+            return [[], []];
+        }
+
+        return [$declarations, array_map(
+            static fn (RouteReference $reference): RouteReferenceLocation => new RouteReferenceLocation(
+                $reference->name(),
+                $uri,
+                $reference->range(),
+            ),
+            $references,
+        )];
     }
 
     /**

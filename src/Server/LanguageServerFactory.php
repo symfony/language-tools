@@ -97,6 +97,7 @@ final class LanguageServerFactory
         );
         $routeSourceIndexer = new ProjectRouteSourceIndexer(
             $projects,
+            $documents,
             $routeDeclarationIndexes,
             $routeReferenceIndexes,
             $phpRouteDeclarationExtractor,
