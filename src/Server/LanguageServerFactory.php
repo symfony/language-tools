@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Server;
 
 use Amp\ByteStream\ReadableStream;
 use Amp\ByteStream\WritableStream;
+use Fabpot\JsonRpc\ContentLengthJsonRpcTransport;
 use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcPeer;
 use Symfony\Lsp\Client\JsonRpcClient;
@@ -33,10 +34,6 @@ use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Project\WorkspaceTrustManager;
-use Symfony\Lsp\Protocol\ContentLengthMessageReader;
-use Symfony\Lsp\Protocol\ContentLengthMessageWriter;
-use Symfony\Lsp\Protocol\ContentLengthReadableStream;
-use Symfony\Lsp\Protocol\ContentLengthWritableStream;
 use Symfony\Lsp\Runtime\BridgeInstaller;
 use Symfony\Lsp\Runtime\DebouncedRuntimeRefreshScheduler;
 use Symfony\Lsp\Runtime\NativeProcessRunner;
@@ -50,9 +47,7 @@ final class LanguageServerFactory
 {
     public function create(ReadableStream $input, WritableStream $output): LanguageServer
     {
-        $input = new ContentLengthReadableStream($input, new ContentLengthMessageReader($input));
-        $output = new ContentLengthWritableStream($output, new ContentLengthMessageWriter($output));
-        $peer = new JsonRpcPeer($input, $output);
+        $peer = new JsonRpcPeer(new ContentLengthJsonRpcTransport($input, $output));
 
         $documents = new DocumentStore();
         $positionConverter = new PositionConverter();

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "916b4c003932023b7f1bad4779d7a4d1",
+    "content-hash": "0ccc8607320f49137084efea27668772",
     "packages": [
         {
             "name": "amphp/amp",
@@ -435,16 +435,16 @@
         },
         {
             "name": "fabpot/json-rpc-peer",
-            "version": "v0.4",
+            "version": "dev-main",
             "source": {
                 "type": "git",
                 "url": "https://github.com/fabpot/json-rpc-peer.git",
-                "reference": "4a1ad9f11e5317d0b304b4d36c11875bf91a5aab"
+                "reference": "1b133b893f28b07e1ce3c90789d041e1edfdcec5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/fabpot/json-rpc-peer/zipball/4a1ad9f11e5317d0b304b4d36c11875bf91a5aab",
-                "reference": "4a1ad9f11e5317d0b304b4d36c11875bf91a5aab",
+                "url": "https://api.github.com/repos/fabpot/json-rpc-peer/zipball/1b133b893f28b07e1ce3c90789d041e1edfdcec5",
+                "reference": "1b133b893f28b07e1ce3c90789d041e1edfdcec5",
                 "shasum": ""
             },
             "require": {
@@ -452,14 +452,17 @@
                 "php": ">=8.4"
             },
             "require-dev": {
+                "amphp/websocket": "^2",
                 "php-cs-fixer/shim": "^3.93",
                 "phpstan/phpstan": "^2.1",
                 "phpunit/phpunit": "^12",
                 "psr/log": "^1.1|^2|^3"
             },
             "suggest": {
+                "amphp/websocket": "To exchange JSON-RPC messages over WebSocket connections.",
                 "psr/log": "To forward JSON-RPC traffic to a PSR-3 logger."
             },
+            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -476,7 +479,7 @@
                     "email": "fabien@symfony.com"
                 }
             ],
-            "description": "An asynchronous, bidirectional JSON-RPC 2.0 peer over line-delimited streams, built on amphp",
+            "description": "An asynchronous, bidirectional JSON-RPC 2.0 peer over message-oriented transports, built on amphp",
             "keywords": [
                 "LSP",
                 "amphp",
@@ -488,7 +491,7 @@
             ],
             "support": {
                 "issues": "https://github.com/fabpot/json-rpc-peer/issues",
-                "source": "https://github.com/fabpot/json-rpc-peer/tree/v0.4"
+                "source": "https://github.com/fabpot/json-rpc-peer/tree/main"
             },
             "funding": [
                 {
@@ -496,7 +499,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-07-22T10:05:10+00:00"
+            "time": "2026-07-30T14:41:03+00:00"
         },
         {
             "name": "revolt/event-loop",
@@ -2540,7 +2543,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "fabpot/json-rpc-peer": 20
+    },
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {

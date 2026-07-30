@@ -3,8 +3,8 @@
 namespace Symfony\Lsp\Tests\Server;
 
 use Amp\ByteStream\ReadableBuffer;
+use Fabpot\JsonRpc\ContentLengthJsonRpcTransport;
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Protocol\ContentLengthMessageReader;
 use Symfony\Lsp\Server\LanguageServerFactory;
 use Symfony\Lsp\Tests\Support\CapturingWritableStream;
 
@@ -85,10 +85,13 @@ final class LanguageServerTest extends TestCase
      */
     private function decodeFrames(string $frames): array
     {
-        $reader = new ContentLengthMessageReader(new ReadableBuffer($frames));
+        $transport = new ContentLengthJsonRpcTransport(
+            new ReadableBuffer($frames),
+            new CapturingWritableStream(),
+        );
         $messages = [];
 
-        while (null !== $message = $reader->read()) {
+        while (null !== $message = $transport->receive()) {
             $decoded = json_decode($message, true, 512, \JSON_THROW_ON_ERROR);
             self::assertIsArray($decoded);
             $messages[] = $decoded;
