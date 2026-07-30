@@ -49,4 +49,14 @@ final class Route
     {
         return $this->controller;
     }
+
+    /**
+     * @return list<string>
+     */
+    public function parameters(): array
+    {
+        preg_match_all('/\{([A-Za-z_][A-Za-z0-9_]*)/', ($this->host ?? '').($this->path ?? ''), $matches);
+
+        return array_values(array_unique($matches[1]));
+    }
 }

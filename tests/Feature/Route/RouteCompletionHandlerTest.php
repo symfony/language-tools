@@ -14,6 +14,38 @@ use Symfony\Lsp\Project\ProjectRegistry;
 
 final class RouteCompletionHandlerTest extends TestCase
 {
+    public function testCompletesRouteParameters(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = <<<'PHP'
+            <?php
+            class DemoController extends AbstractController
+            {
+                public function index(): void
+                {
+                    $this->generateUrl('article_show', ['s']);
+                }
+            }
+            PHP;
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $indexes = new RouteIndexRegistry();
+        $indexes->forProject($project)->replace(
+            new Route('article_show', '/{section}/article/{slug}', [], [], null, null),
+        );
+        $converter = new PositionConverter();
+        $cursor = strpos($text, "'s']") + 2;
+        $position = $converter->toPosition($text, $cursor);
+        $handler = new RouteCompletionHandler($documents, $converter, $projects, $indexes);
+
+        self::assertSame(['section', 'slug'], array_column($handler->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line(), 'character' => $position->character()],
+        ]) ?? [], 'label'));
+    }
+
     public function testReturnsRouteCompletionWithUtf16TextEdit(): void
     {
         $uri = 'file:///workspace/src/Controller.php';

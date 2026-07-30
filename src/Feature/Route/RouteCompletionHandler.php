@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Route;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Project\ProjectRegistry;
 
 final class RouteCompletionHandler
@@ -43,17 +44,56 @@ final class RouteCompletionHandler
             return null;
         }
 
-        $context = RouteCompletionContext::fromPhp(
+        $position = new Position($position['line'], $position['character']);
+        $routeIndex = $this->routeIndexes->forProject($project);
+        $parameterContext = RouteParameterCompletionContext::fromPhp(
             $document->text(),
-            new Position($position['line'], $position['character']),
+            $position,
             $this->positionConverter,
         );
-        if (null === $context) {
+        if (null !== $parameterContext) {
+            $route = $routeIndex->get($parameterContext->routeName());
+            if (null === $route) {
+                return [];
+            }
+
+            $items = array_map(
+                static fn (string $parameter): array => [
+                    'label' => $parameter,
+                    'kind' => 10,
+                    'detail' => \sprintf('Parameter of route %s', $route->name()),
+                ],
+                array_values(array_filter(
+                    $route->parameters(),
+                    static fn (string $parameter): bool => str_starts_with($parameter, $parameterContext->prefix()),
+                )),
+            );
+
+            return $this->withTextEdits($items, $parameterContext->replacementRange());
+        }
+
+        $routeContext = RouteCompletionContext::fromPhp(
+            $document->text(),
+            $position,
+            $this->positionConverter,
+        );
+        if (null === $routeContext) {
             return null;
         }
 
-        $range = $context->replacementRange();
+        return $this->withTextEdits(
+            (new RouteCompletionProvider($routeIndex))->complete($routeContext->prefix()),
+            $routeContext->replacementRange(),
+        );
+    }
 
+    /**
+     * @param list<array{label: string, kind: int, detail: string}> $items
+     *
+     * @return list<array{label: string, kind: int, detail: string, textEdit: array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, newText: string}}>
+     */
+    private function withTextEdits(array $items, Range $range): array
+    {
         return array_map(
             static fn (array $item): array => [
                 ...$item,
@@ -71,7 +111,7 @@ final class RouteCompletionHandler
                     'newText' => $item['label'],
                 ],
             ],
-            (new RouteCompletionProvider($this->routeIndexes->forProject($project)))->complete($context->prefix()),
+            $items,
         );
     }
 }
