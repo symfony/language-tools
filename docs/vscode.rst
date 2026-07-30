@@ -141,16 +141,22 @@ receiver is Symfony's controller or router API. A call such as
 Route Parameter Completion
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For a statically known route name in a PHP call, completion is available for
-string keys in the second argument array. Suggestions come from placeholders in
-the effective route path and host:
+For a statically known route name in a PHP or Twig call, completion is available
+for string keys in the parameter map. Suggestions come from placeholders in the
+effective route path and host:
 
 .. code-block:: php
 
     $this->generateUrl('article_show', ['sl']);
 
+The equivalent Twig context is:
+
+.. code-block:: twig
+
+    {{ path('article_show', {'sl'}) }}
+
 If ``article_show`` has the path ``/article/{slug}``, completion suggests
-``slug``.
+``slug``. Parameters already present in the map aren't suggested again.
 
 Route Hover
 ~~~~~~~~~~~
@@ -208,7 +214,6 @@ Current Limitations
 This early build has intentional limitations:
 
 * only ``App\\Kernel`` is discovered;
-* Twig route parameter completion isn't implemented yet;
 * route metadata refreshes aren't debounced yet;
 * references and rename cover only statically resolved PHP and Twig strings;
 * PHP routing configurator files aren't indexed yet;
