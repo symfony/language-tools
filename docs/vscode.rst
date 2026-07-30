@@ -103,8 +103,8 @@ What to Test
 ------------
 
 The current prototype provides route completion, hover, definition, references,
-rename and diagnostics in open PHP files. It gets effective route metadata from
-the configured Symfony environment.
+rename and diagnostics in open PHP and Twig files. It gets effective route
+metadata from the configured Symfony environment.
 
 Route Name Completion
 ~~~~~~~~~~~~~~~~~~~~~
@@ -114,7 +114,8 @@ Completion is available for the first string argument in these contexts:
 * ``AbstractController::generateUrl()``;
 * ``AbstractController::redirectToRoute()``;
 * ``RouterInterface::generate()``;
-* ``UrlGeneratorInterface::generate()``.
+* ``UrlGeneratorInterface::generate()``;
+* Twig's ``path()`` and ``url()`` functions.
 
 For example, place the cursor after ``article_`` and invoke completion:
 
@@ -140,9 +141,9 @@ receiver is Symfony's controller or router API. A call such as
 Route Parameter Completion
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For a statically known route name, completion is available for string keys in
-the second argument array. Suggestions come from placeholders in the effective
-route path and host:
+For a statically known route name in a PHP call, completion is available for
+string keys in the second argument array. Suggestions come from placeholders in
+the effective route path and host:
 
 .. code-block:: php
 
@@ -174,8 +175,8 @@ Route References and Rename
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Use ``Find All References`` from a route reference, named PHP ``#[Route]``
-attribute or YAML route declaration to list statically resolved PHP usages.
-Rename updates those PHP references and PHP or YAML declarations across
+attribute or YAML route declaration to list statically resolved PHP and Twig
+usages. Rename updates those references and PHP or YAML declarations across
 application-owned files.
 
 The rename preview requires confirmation because dynamic route references may
@@ -191,8 +192,8 @@ parameter map also reports required path or host parameters that are missing.
 Parameters with route defaults are treated as optional, while dynamic parameter
 arrays aren't diagnosed.
 
-Diagnostics are limited to open PHP files and high-confidence Symfony
-receivers. They update while typing and are cleared when the file closes.
+Diagnostics are limited to open PHP and Twig files and high-confidence Symfony
+contexts. They update while typing and are cleared when the file closes.
 
 Route Metadata Refresh
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -206,10 +207,10 @@ Current Limitations
 
 This early build has intentional limitations:
 
-* only PHP route calls are supported;
 * only ``App\\Kernel`` is discovered;
+* Twig route parameter completion isn't implemented yet;
 * route metadata refreshes aren't debounced yet;
-* references and rename cover only statically resolved PHP strings;
+* references and rename cover only statically resolved PHP and Twig strings;
 * PHP routing configurator files aren't indexed yet;
 * no standalone binary is available;
 * bridge failures aren't shown through a dedicated status UI yet.
