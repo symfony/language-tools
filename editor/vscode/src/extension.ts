@@ -39,6 +39,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         traceOutputChannel: outputChannel,
         initializationOptions: {
             workspaceTrust: configuration.get<boolean>('trustWorkspace', false),
+            phpCommand: configuration.get<string[]>('phpCommand', ['php']),
+            environment: configuration.get<string>('environment', 'dev'),
+            debug: configuration.get<boolean>('debug', true),
         },
         synchronize: {
             fileEvents: vscode.workspace.createFileSystemWatcher('**/composer.{json,lock}'),

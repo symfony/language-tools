@@ -51,6 +51,26 @@
           "type": "boolean",
           "default": false,
           "description": "Allow Symfony LSP to execute application code for runtime indexing."
+        },
+        "symfonyLsp.phpCommand": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "php"
+          ],
+          "description": "Command and arguments used to run the project bridge."
+        },
+        "symfonyLsp.environment": {
+          "type": "string",
+          "default": "dev",
+          "description": "Symfony environment used for runtime indexing."
+        },
+        "symfonyLsp.debug": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable kernel debug mode during runtime indexing."
         }
       }
     }

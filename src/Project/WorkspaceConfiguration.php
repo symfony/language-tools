@@ -2,12 +2,15 @@
 
 namespace Symfony\Lsp\Project;
 
+use Symfony\Lsp\Runtime\RuntimeConfiguration;
+
 final class WorkspaceConfiguration
 {
     public function __construct(
         private readonly ProjectDiscovery $projectDiscovery,
         private readonly ProjectRegistry $projectRegistry,
         private readonly WorkspaceTrustManager $workspaceTrustManager,
+        private readonly RuntimeConfiguration $runtimeConfiguration,
     ) {
     }
 
@@ -16,6 +19,11 @@ final class WorkspaceConfiguration
      */
     public function initialize(array $params): void
     {
+        $initializationOptions = $params['initializationOptions'] ?? null;
+        if (\is_array($initializationOptions)) {
+            $this->runtimeConfiguration->configure($initializationOptions);
+        }
+
         $workspaceFolders = $this->workspaceFolders($params);
         $this->projectRegistry->replace($this->projectDiscovery->discover($workspaceFolders));
         $this->workspaceTrustManager->applyInitializationOptions($params, $this->projectRegistry);

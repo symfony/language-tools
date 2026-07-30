@@ -9,6 +9,7 @@ use Symfony\Lsp\Runtime\BridgeInstaller;
 use Symfony\Lsp\Runtime\ProcessResult;
 use Symfony\Lsp\Runtime\ProcessRunnerInterface;
 use Symfony\Lsp\Runtime\ProjectRuntimeInitializer;
+use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 final class ProjectRuntimeInitializerTest extends TestCase
 {
@@ -46,18 +47,27 @@ final class ProjectRuntimeInitializerTest extends TestCase
         ], \JSON_THROW_ON_ERROR), ''));
         $indexes = new RouteIndexRegistry();
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $configuration = new RuntimeConfiguration();
+        $configuration->configure([
+            'phpCommand' => ['project-php', '--flag'],
+            'environment' => 'test',
+            'debug' => false,
+        ]);
         $initializer = new ProjectRuntimeInitializer(
             new BridgeInstaller($source, 'test'),
             $processRunner,
             $indexes,
-            ['project-php'],
+            $configuration,
         );
 
         $initializer->initialize($project);
 
         self::assertSame('homepage', $indexes->forProject($project)->get('homepage')?->name());
         self::assertSame('project-php', $processRunner->command[0]);
-        self::assertSame('--sections=routes', $processRunner->command[5]);
+        self::assertSame('--flag', $processRunner->command[1]);
+        self::assertSame('--environment=test', $processRunner->command[4]);
+        self::assertSame('--debug=0', $processRunner->command[5]);
+        self::assertSame('--sections=routes', $processRunner->command[6]);
         self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
     }
 
@@ -72,6 +82,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 'errors' => [['section' => 'routes', 'message' => 'missing environment']],
             ], \JSON_THROW_ON_ERROR), '')),
             new RouteIndexRegistry(),
+            new RuntimeConfiguration(),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -92,6 +103,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             new BridgeInstaller($source, 'test'),
             new CapturingProcessRunner(new ProcessResult(1, '', 'broken container')),
             new RouteIndexRegistry(),
+            new RuntimeConfiguration(),
         );
 
         $this->expectException(\RuntimeException::class);

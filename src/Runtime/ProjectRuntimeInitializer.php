@@ -8,14 +8,11 @@ use Symfony\Lsp\Project\Project;
 
 final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
 {
-    /**
-     * @param non-empty-list<string> $phpCommand
-     */
     public function __construct(
         private readonly BridgeInstaller $bridgeInstaller,
         private readonly ProcessRunnerInterface $processRunner,
         private readonly RouteIndexRegistry $routeIndexes,
-        private readonly array $phpCommand = ['php'],
+        private readonly RuntimeConfiguration $configuration,
     ) {
     }
 
@@ -23,11 +20,11 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
     {
         $bridge = $this->bridgeInstaller->install($project);
         $result = $this->processRunner->run([
-            ...$this->phpCommand,
+            ...$this->configuration->phpCommand(),
             $bridge,
             '--project='.$project->rootPath(),
-            '--environment=dev',
-            '--debug=1',
+            '--environment='.$this->configuration->environment(),
+            '--debug='.($this->configuration->debug() ? '1' : '0'),
             '--sections=routes',
         ], $project->rootPath());
 

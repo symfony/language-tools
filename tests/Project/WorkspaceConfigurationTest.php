@@ -11,6 +11,7 @@ use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Project\WorkspaceTrustManager;
+use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 
 final class WorkspaceConfigurationTest extends TestCase
@@ -35,16 +36,28 @@ final class WorkspaceConfigurationTest extends TestCase
     public function testUsesRootUriWhenWorkspaceFoldersAreAbsent(): void
     {
         $registry = new ProjectRegistry();
+        $runtimeConfiguration = new RuntimeConfiguration();
         $configuration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
             $registry,
             new WorkspaceTrustManager($this->client(), new WorkspaceTrust(), $this->runtimeInitializer()),
+            $runtimeConfiguration,
         );
 
-        $configuration->initialize(['rootUri' => 'file://'.$this->temporaryDirectory]);
+        $configuration->initialize([
+            'rootUri' => 'file://'.$this->temporaryDirectory,
+            'initializationOptions' => [
+                'phpCommand' => ['symfony', 'php'],
+                'environment' => 'test',
+                'debug' => false,
+            ],
+        ]);
 
         self::assertCount(1, $registry->all());
         self::assertSame('^8.0', $registry->all()[0]->frameworkBundleConstraint());
+        self::assertSame(['symfony', 'php'], $runtimeConfiguration->phpCommand());
+        self::assertSame('test', $runtimeConfiguration->environment());
+        self::assertFalse($runtimeConfiguration->debug());
     }
 
     private function client(): ClientInterface
