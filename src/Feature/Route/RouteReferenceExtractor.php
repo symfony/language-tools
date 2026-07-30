@@ -45,6 +45,7 @@ final class RouteReferenceExtractor
                     $this->positionConverter->toPosition($text, $offset),
                     $this->positionConverter->toPosition($text, $offset + \strlen($name)),
                 ),
+                $this->providedParameters(substr($text, $match[0][1] + \strlen($match[0][0]))),
             );
         }
 
@@ -62,5 +63,23 @@ final class RouteReferenceExtractor
         }
 
         return null;
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function providedParameters(string $afterRouteName): ?array
+    {
+        if (preg_match('/^\s*\)/', $afterRouteName)) {
+            return [];
+        }
+
+        if (!preg_match('/^\s*,\s*\[([^\[\]]*)\]\s*[,)]/s', $afterRouteName, $parameters)) {
+            return null;
+        }
+
+        preg_match_all('/([\'\"])([^\'\"]+)\1\s*=>/', $parameters[1], $keys);
+
+        return array_values(array_unique($keys[2]));
     }
 }

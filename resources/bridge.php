@@ -111,15 +111,20 @@ if (in_array('routes', $requestedSections, true)) {
                 $host = is_string($route['host'] ?? null) && !in_array($route['host'], ['', 'ANY'], true)
                     ? $route['host']
                     : null;
+                $defaults = is_array($route['defaults'] ?? null) ? $route['defaults'] : [];
                 $items[] = [
                     'name' => $name,
                     'path' => is_string($route['path'] ?? null) ? $route['path'] : null,
                     'methods' => $methods,
                     'schemes' => $schemes,
                     'host' => $host,
-                    'controller' => is_string($route['defaults']['_controller'] ?? null)
-                        ? $route['defaults']['_controller']
+                    'controller' => is_string($defaults['_controller'] ?? null)
+                        ? $defaults['_controller']
                         : null,
+                    'defaults' => array_values(array_filter(
+                        array_keys($defaults),
+                        static fn (mixed $key): bool => is_string($key),
+                    )),
                 ];
             }
 

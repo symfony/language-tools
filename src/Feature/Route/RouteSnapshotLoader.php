@@ -34,6 +34,7 @@ final class RouteSnapshotLoader
                 $this->strings($item['schemes'] ?? null),
                 \is_string($item['host'] ?? null) ? $item['host'] : null,
                 \is_string($item['controller'] ?? null) ? $item['controller'] : null,
+                $this->strings($item['defaults'] ?? null),
             );
         }
 

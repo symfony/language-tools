@@ -48,6 +48,61 @@ final class RouteDiagnosticPublisherTest extends TestCase
         ]], $client->notifications[0]['params']['diagnostics']);
     }
 
+    public function testDiagnosesMissingRequiredRouteParameters(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = <<<'PHP'
+            <?php
+            class ArticleController extends AbstractController
+            {
+                public function show(): void
+                {
+                    $this->generateUrl('article_show');
+                }
+            }
+            PHP;
+        [$publisher, $client] = $this->publisher($uri, $text, new Route(
+            'article_show',
+            '/{locale}/article/{id}',
+            ['GET'],
+            [],
+            null,
+            null,
+            ['locale'],
+        ));
+
+        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+
+        $diagnostics = $client->notifications[0]['params']['diagnostics'];
+        self::assertIsArray($diagnostics);
+        self::assertIsArray($diagnostics[0]);
+        self::assertSame('route.missing_parameters', $diagnostics[0]['code']);
+        self::assertSame(
+            'Route "article_show" requires parameter "id".',
+            $diagnostics[0]['message'],
+        );
+    }
+
+    public function testDoesNotDiagnoseDynamicRouteParameters(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = <<<'PHP'
+            <?php
+            class ArticleController extends AbstractController
+            {
+                public function show(array $parameters): void
+                {
+                    $this->generateUrl('article_show', $parameters);
+                }
+            }
+            PHP;
+        [$publisher, $client] = $this->publisher($uri, $text);
+
+        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+
+        self::assertSame([], $client->notifications[0]['params']['diagnostics']);
+    }
+
     public function testDoesNotDiagnoseBeforeCompleteRuntimeMetadataIsAvailable(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
@@ -95,7 +150,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
     /**
      * @return array{RouteDiagnosticPublisher, DiagnosticClient}
      */
-    private function publisher(string $uri, string $text): array
+    private function publisher(string $uri, string $text, ?Route $route = null): array
     {
         $client = new DiagnosticClient();
         $documents = new DocumentStore();
@@ -104,7 +159,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $routeIndexes = new RouteIndexRegistry();
         $routeIndexes->forProject($project)->replace(
-            new Route('article_show', '/article/{id}', ['GET'], [], null, null),
+            $route ?? new Route('article_show', '/article', ['GET'], [], null, null),
         );
         $positionConverter = new PositionConverter();
 

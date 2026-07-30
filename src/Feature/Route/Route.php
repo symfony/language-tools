@@ -7,6 +7,7 @@ final class Route
     /**
      * @param list<string> $methods
      * @param list<string> $schemes
+     * @param list<string> $defaults
      */
     public function __construct(
         private readonly string $name,
@@ -15,6 +16,7 @@ final class Route
         private readonly array $schemes,
         private readonly ?string $host,
         private readonly ?string $controller,
+        private readonly array $defaults = [],
     ) {
     }
 
@@ -58,5 +60,13 @@ final class Route
         preg_match_all('/\{([A-Za-z_][A-Za-z0-9_]*)/', ($this->host ?? '').($this->path ?? ''), $matches);
 
         return array_values(array_unique($matches[1]));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function requiredParameters(): array
+    {
+        return array_values(array_diff($this->parameters(), $this->defaults));
     }
 }

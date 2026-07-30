@@ -8,10 +8,14 @@ use Symfony\Lsp\Document\Range;
 
 final class RouteParameterCompletionContext
 {
+    /**
+     * @param list<string> $existingParameters
+     */
     public function __construct(
         private readonly string $routeName,
         private readonly string $prefix,
         private readonly Range $replacementRange,
+        private readonly array $existingParameters,
     ) {
     }
 
@@ -30,12 +34,20 @@ final class RouteParameterCompletionContext
         return $this->replacementRange;
     }
 
+    /**
+     * @return list<string>
+     */
+    public function existingParameters(): array
+    {
+        return $this->existingParameters;
+    }
+
     public static function fromPhp(string $text, Position $position, PositionConverter $positionConverter): ?self
     {
         $cursor = $positionConverter->toByteOffset($text, $position);
         $beforeCursor = substr($text, 0, $cursor);
         if (!preg_match(
-            '/(?:->|::)(?:generate|generateUrl|redirectToRoute)\s*\(\s*([\'\"])([^\'\"]+)\1\s*,\s*\[[^\]]*?([\'\"])([^\'\"]*)$/s',
+            '/(?:->|::)(?:generate|generateUrl|redirectToRoute)\s*\(\s*([\'\"])([^\'\"]+)\1\s*,\s*\[([^\]]*?)([\'\"])([^\'\"]*)$/s',
             $beforeCursor,
             $matches,
             \PREG_OFFSET_CAPTURE,
@@ -43,13 +55,15 @@ final class RouteParameterCompletionContext
             return null;
         }
 
-        $prefix = $matches[4][0];
-        $prefixOffset = $matches[4][1];
+        $prefix = $matches[5][0];
+        $prefixOffset = $matches[5][1];
+        preg_match_all('/([\'\"])([^\'\"]+)\1\s*=>/', $matches[3][0], $keys);
 
         return new self(
             $matches[2][0],
             $prefix,
             new Range($positionConverter->toPosition($text, $prefixOffset), $position),
+            array_values(array_unique($keys[2])),
         );
     }
 }

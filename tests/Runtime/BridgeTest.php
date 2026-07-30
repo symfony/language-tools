@@ -82,6 +82,7 @@ final class BridgeTest extends TestCase
                 'schemes' => [],
                 'host' => null,
                 'controller' => 'App\\Controller\\ArticleController::show',
+                'defaults' => ['_controller'],
             ],
             [
                 'name' => 'homepage',
@@ -90,6 +91,7 @@ final class BridgeTest extends TestCase
                 'schemes' => ['https'],
                 'host' => 'example.com',
                 'controller' => null,
+                'defaults' => [],
             ],
         ], $result['sections']['routes']['items']);
         self::assertTrue($result['sections']['routes']['complete']);

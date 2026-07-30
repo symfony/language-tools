@@ -52,7 +52,8 @@ final class RouteCompletionHandler
                 ],
                 array_values(array_filter(
                     $route->parameters(),
-                    static fn (string $parameter): bool => str_starts_with($parameter, $parameterContext->prefix()),
+                    static fn (string $parameter): bool => str_starts_with($parameter, $parameterContext->prefix())
+                        && !\in_array($parameter, $parameterContext->existingParameters(), true),
                 )),
             );
 

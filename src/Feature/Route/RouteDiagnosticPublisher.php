@@ -41,26 +41,51 @@ final class RouteDiagnosticPublisher
 
         $diagnostics = [];
         foreach ($this->referenceExtractor->extract($document->text()) as $reference) {
-            if (null !== $routeIndex->get($reference->name())) {
+            $range = [
+                'start' => [
+                    'line' => $reference->range()->start()->line(),
+                    'character' => $reference->range()->start()->character(),
+                ],
+                'end' => [
+                    'line' => $reference->range()->end()->line(),
+                    'character' => $reference->range()->end()->character(),
+                ],
+            ];
+            $route = $routeIndex->get($reference->name());
+            if (null === $route) {
+                $diagnostics[] = [
+                    'range' => $range,
+                    'severity' => 1,
+                    'source' => 'symfony',
+                    'code' => 'route.not_found',
+                    'message' => \sprintf('Route "%s" does not exist in the selected environment.', $reference->name()),
+                ];
+
                 continue;
             }
 
-            $diagnostics[] = [
-                'range' => [
-                    'start' => [
-                        'line' => $reference->range()->start()->line(),
-                        'character' => $reference->range()->start()->character(),
-                    ],
-                    'end' => [
-                        'line' => $reference->range()->end()->line(),
-                        'character' => $reference->range()->end()->character(),
-                    ],
-                ],
-                'severity' => 1,
-                'source' => 'symfony',
-                'code' => 'route.not_found',
-                'message' => \sprintf('Route "%s" does not exist in the selected environment.', $reference->name()),
-            ];
+            if (null === $reference->providedParameters()) {
+                continue;
+            }
+
+            $missingParameters = array_values(array_diff(
+                $route->requiredParameters(),
+                $reference->providedParameters(),
+            ));
+            if ([] !== $missingParameters) {
+                $diagnostics[] = [
+                    'range' => $range,
+                    'severity' => 1,
+                    'source' => 'symfony',
+                    'code' => 'route.missing_parameters',
+                    'message' => \sprintf(
+                        'Route "%s" requires parameter%s "%s".',
+                        $reference->name(),
+                        1 === \count($missingParameters) ? '' : 's',
+                        implode('", "', $missingParameters),
+                    ),
+                ];
+            }
         }
 
         $this->client->notify('textDocument/publishDiagnostics', [

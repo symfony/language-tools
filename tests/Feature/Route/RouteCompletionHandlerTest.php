@@ -24,7 +24,7 @@ final class RouteCompletionHandlerTest extends TestCase
             {
                 public function index(): void
                 {
-                    $this->generateUrl('article_show', ['s']);
+                    $this->generateUrl('article_show', ['section' => 'news', 's']);
                 }
             }
             PHP;
@@ -45,7 +45,7 @@ final class RouteCompletionHandlerTest extends TestCase
             $indexes,
         );
 
-        self::assertSame(['section', 'slug'], array_column($handler->complete([
+        self::assertSame(['slug'], array_column($handler->complete([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line(), 'character' => $position->character()],
         ]) ?? [], 'label'));
