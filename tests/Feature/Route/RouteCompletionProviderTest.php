@@ -15,6 +15,7 @@ final class RouteCompletionProviderTest extends TestCase
         (new RouteSnapshotLoader($index))->load([
             'sections' => [
                 'routes' => [
+                    'complete' => true,
                     'items' => [
                         ['name' => 'admin_user', 'path' => '/admin/user'],
                         ['name' => 'article_show', 'path' => '/article/{id}', 'methods' => ['GET']],
@@ -34,7 +35,7 @@ final class RouteCompletionProviderTest extends TestCase
     {
         $index = new RouteIndex();
         (new RouteSnapshotLoader($index))->load([
-            'sections' => ['routes' => ['items' => [null, ['path' => '/']]]],
+            'sections' => ['routes' => ['complete' => true, 'items' => [null, ['path' => '/']]]],
         ]);
 
         self::assertSame([], (new RouteCompletionProvider($index))->complete(''));

@@ -17,7 +17,7 @@ final class RouteSnapshotLoader
         $sections = $snapshot['sections'] ?? null;
         $routesSection = \is_array($sections) ? ($sections['routes'] ?? null) : null;
         $items = \is_array($routesSection) ? ($routesSection['items'] ?? null) : null;
-        if (!\is_array($items)) {
+        if (!\is_array($items) || true !== ($routesSection['complete'] ?? null)) {
             return;
         }
 

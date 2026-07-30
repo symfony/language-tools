@@ -35,6 +35,10 @@ final class RouteDiagnosticPublisher
         }
 
         $routeIndex = $this->routeIndexes->forProject($project);
+        if (!$routeIndex->isComplete()) {
+            return;
+        }
+
         $diagnostics = [];
         foreach ($this->referenceExtractor->extract($document->text()) as $reference) {
             if (null !== $routeIndex->get($reference->name())) {

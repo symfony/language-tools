@@ -37,9 +37,12 @@ final class ProjectRuntimeInitializerTest extends TestCase
         file_put_contents($source, '<?php');
         $processRunner = new CapturingProcessRunner(new ProcessResult(0, json_encode([
             'schemaVersion' => 1,
-            'sections' => ['routes' => ['items' => [
-                ['name' => 'homepage', 'path' => '/'],
-            ]]],
+            'sections' => ['routes' => [
+                'complete' => true,
+                'items' => [
+                    ['name' => 'homepage', 'path' => '/'],
+                ],
+            ]],
         ], \JSON_THROW_ON_ERROR), ''));
         $indexes = new RouteIndexRegistry();
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');

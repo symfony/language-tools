@@ -48,6 +48,37 @@ final class RouteDiagnosticPublisherTest extends TestCase
         ]], $client->notifications[0]['params']['diagnostics']);
     }
 
+    public function testDoesNotDiagnoseBeforeCompleteRuntimeMetadataIsAvailable(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $client = new DiagnosticClient();
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, <<<'PHP'
+            <?php
+            class ArticleController extends AbstractController
+            {
+                public function show(): void
+                {
+                    $this->generateUrl('missing_route');
+                }
+            }
+            PHP));
+        $projects = new ProjectRegistry();
+        $projects->replace([new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $positionConverter = new PositionConverter();
+        $publisher = new RouteDiagnosticPublisher(
+            $client,
+            $documents,
+            $projects,
+            new RouteIndexRegistry(),
+            new RouteReferenceExtractor($positionConverter),
+        );
+
+        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+
+        self::assertSame([], $client->notifications);
+    }
+
     public function testClearsDiagnosticsWhenDocumentCloses(): void
     {
         $uri = 'file:///workspace/src/Controller.php';

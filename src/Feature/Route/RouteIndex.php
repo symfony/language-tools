@@ -6,6 +6,7 @@ final class RouteIndex
 {
     /** @var array<string, Route> */
     private array $routes = [];
+    private bool $complete = false;
 
     public function replace(Route ...$routes): void
     {
@@ -14,6 +15,12 @@ final class RouteIndex
             $this->routes[$route->name()] = $route;
         }
         ksort($this->routes);
+        $this->complete = true;
+    }
+
+    public function isComplete(): bool
+    {
+        return $this->complete;
     }
 
     /**
