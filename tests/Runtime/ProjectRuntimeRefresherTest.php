@@ -9,18 +9,18 @@ use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\TrustStatus;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
-use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
+use Symfony\Lsp\Runtime\RuntimeRefreshSchedulerInterface;
 
 final class ProjectRuntimeRefresherTest extends TestCase
 {
     #[DataProvider('routeResourceProvider')]
     public function testRefreshesTrustedProjectsAfterRouteResourceSaves(string $uri): void
     {
-        [$refresher, $initializer] = $this->refresher(TrustStatus::Trusted);
+        [$refresher, $scheduler] = $this->refresher(TrustStatus::Trusted);
 
         $refresher->refreshAfterSave(['textDocument' => ['uri' => $uri]]);
 
-        self::assertSame(['/workspace'], $initializer->projects);
+        self::assertSame(['/workspace'], $scheduler->projects);
     }
 
     /**
@@ -35,28 +35,28 @@ final class ProjectRuntimeRefresherTest extends TestCase
 
     public function testDoesNotRefreshUntrustedProjects(): void
     {
-        [$refresher, $initializer] = $this->refresher(TrustStatus::Untrusted);
+        [$refresher, $scheduler] = $this->refresher(TrustStatus::Untrusted);
 
         $refresher->refreshAfterSave([
             'textDocument' => ['uri' => 'file:///workspace/src/Controller.php'],
         ]);
 
-        self::assertSame([], $initializer->projects);
+        self::assertSame([], $scheduler->projects);
     }
 
     public function testDoesNotRefreshUnrelatedResources(): void
     {
-        [$refresher, $initializer] = $this->refresher(TrustStatus::Trusted);
+        [$refresher, $scheduler] = $this->refresher(TrustStatus::Trusted);
 
         $refresher->refreshAfterSave([
             'textDocument' => ['uri' => 'file:///workspace/templates/article.html.twig'],
         ]);
 
-        self::assertSame([], $initializer->projects);
+        self::assertSame([], $scheduler->projects);
     }
 
     /**
-     * @return array{ProjectRuntimeRefresher, RefreshRuntimeInitializer}
+     * @return array{ProjectRuntimeRefresher, RefreshScheduler}
      */
     private function refresher(TrustStatus $status): array
     {
@@ -64,18 +64,18 @@ final class ProjectRuntimeRefresherTest extends TestCase
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $workspaceTrust = new WorkspaceTrust();
         $workspaceTrust->set($project, $status);
-        $initializer = new RefreshRuntimeInitializer();
+        $scheduler = new RefreshScheduler();
 
-        return [new ProjectRuntimeRefresher($projects, $workspaceTrust, $initializer), $initializer];
+        return [new ProjectRuntimeRefresher($projects, $workspaceTrust, $scheduler), $scheduler];
     }
 }
 
-final class RefreshRuntimeInitializer implements RuntimeInitializerInterface
+final class RefreshScheduler implements RuntimeRefreshSchedulerInterface
 {
     /** @var list<string> */
     public array $projects = [];
 
-    public function initialize(Project $project): void
+    public function schedule(Project $project): void
     {
         $this->projects[] = $project->rootPath();
     }

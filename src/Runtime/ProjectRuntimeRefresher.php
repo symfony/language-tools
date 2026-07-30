@@ -12,7 +12,7 @@ final class ProjectRuntimeRefresher
     public function __construct(
         private readonly ProjectRegistry $projects,
         private readonly WorkspaceTrust $workspaceTrust,
-        private readonly RuntimeInitializerInterface $runtimeInitializer,
+        private readonly RuntimeRefreshSchedulerInterface $refreshScheduler,
     ) {
     }
 
@@ -34,7 +34,7 @@ final class ProjectRuntimeRefresher
             return;
         }
 
-        $this->runtimeInitializer->initialize($project);
+        $this->refreshScheduler->schedule($project);
     }
 
     private function affectsRoutes(Project $project, string $uri): bool

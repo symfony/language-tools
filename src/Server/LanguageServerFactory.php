@@ -38,6 +38,7 @@ use Symfony\Lsp\Protocol\ContentLengthMessageWriter;
 use Symfony\Lsp\Protocol\ContentLengthReadableStream;
 use Symfony\Lsp\Protocol\ContentLengthWritableStream;
 use Symfony\Lsp\Runtime\BridgeInstaller;
+use Symfony\Lsp\Runtime\DebouncedRuntimeRefreshScheduler;
 use Symfony\Lsp\Runtime\NativeProcessRunner;
 use Symfony\Lsp\Runtime\ProjectRuntimeInitializer;
 use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
@@ -149,7 +150,11 @@ final class LanguageServerFactory
                 $routeDeclarationIndexes,
                 $routeIndexes,
             ),
-            new ProjectRuntimeRefresher($projects, $workspaceTrust, $runtimeInitializer),
+            new ProjectRuntimeRefresher(
+                $projects,
+                $workspaceTrust,
+                new DebouncedRuntimeRefreshScheduler($runtimeInitializer),
+            ),
             $routeSourceIndexer,
         );
     }
