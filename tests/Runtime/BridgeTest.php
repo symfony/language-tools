@@ -78,7 +78,7 @@ final class BridgeTest extends TestCase
             [
                 'name' => 'article_show',
                 'path' => '/article/{id}',
-                'methods' => ['GET'],
+                'methods' => ['GET', 'HEAD'],
                 'schemes' => [],
                 'host' => null,
                 'controller' => 'App\\Controller\\ArticleController::show',
@@ -150,16 +150,16 @@ final class BridgeTest extends TestCase
                     $output->write(json_encode([
                         'homepage' => [
                             'path' => '/',
-                            'methods' => [],
-                            'schemes' => ['https'],
+                            'method' => 'ANY',
+                            'scheme' => 'https',
                             'host' => 'example.com',
                             'defaults' => [],
                         ],
                         'article_show' => [
                             'path' => '/article/{id}',
-                            'methods' => ['GET'],
-                            'schemes' => [],
-                            'host' => '',
+                            'method' => 'GET|HEAD',
+                            'scheme' => 'ANY',
+                            'host' => 'ANY',
                             'defaults' => ['_controller' => 'App\\Controller\\ArticleController::show'],
                         ],
                     ], JSON_THROW_ON_ERROR));

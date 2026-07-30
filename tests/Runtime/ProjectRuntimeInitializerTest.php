@@ -58,6 +58,29 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
     }
 
+    public function testRejectsSnapshotSectionErrors(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $initializer = new ProjectRuntimeInitializer(
+            new BridgeInstaller($source, 'test'),
+            new CapturingProcessRunner(new ProcessResult(0, json_encode([
+                'schemaVersion' => 1,
+                'errors' => [['section' => 'routes', 'message' => 'missing environment']],
+            ], \JSON_THROW_ON_ERROR), '')),
+            new RouteIndexRegistry(),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('missing environment');
+
+        $initializer->initialize(new Project(
+            $this->temporaryDirectory,
+            'file://'.$this->temporaryDirectory,
+            '^8.0',
+        ));
+    }
+
     public function testRejectsFailedBridgeExecution(): void
     {
         $source = $this->temporaryDirectory.'/source.php';

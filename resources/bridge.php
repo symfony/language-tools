@@ -43,6 +43,19 @@ $requestedSections = is_string($requestedSections)
     ? array_values(array_filter(explode(',', $requestedSections)))
     : [];
 
+if (class_exists(Symfony\Component\Runtime\SymfonyRuntime::class)) {
+    new Symfony\Component\Runtime\SymfonyRuntime([
+        'project_dir' => $project,
+        'env' => is_string($environment) ? $environment : 'dev',
+        'debug' => !in_array($debug, ['0', 'false'], true),
+    ]);
+} elseif (class_exists(Symfony\Component\Dotenv\Dotenv::class)) {
+    (new Symfony\Component\Dotenv\Dotenv())->bootEnv(
+        rtrim($project, '/\\').'/.env',
+        is_string($environment) ? $environment : 'dev',
+    );
+}
+
 $sections = [];
 $errors = [];
 if (in_array('routes', $requestedSections, true)) {
@@ -89,14 +102,21 @@ if (in_array('routes', $requestedSections, true)) {
                     continue;
                 }
 
+                $methods = is_array($route['methods'] ?? null)
+                    ? array_values($route['methods'])
+                    : splitDebugValues($route['method'] ?? null);
+                $schemes = is_array($route['schemes'] ?? null)
+                    ? array_values($route['schemes'])
+                    : splitDebugValues($route['scheme'] ?? null);
+                $host = is_string($route['host'] ?? null) && !in_array($route['host'], ['', 'ANY'], true)
+                    ? $route['host']
+                    : null;
                 $items[] = [
                     'name' => $name,
                     'path' => is_string($route['path'] ?? null) ? $route['path'] : null,
-                    'methods' => is_array($route['methods'] ?? null) ? array_values($route['methods']) : [],
-                    'schemes' => is_array($route['schemes'] ?? null) ? array_values($route['schemes']) : [],
-                    'host' => is_string($route['host'] ?? null) && '' !== $route['host']
-                        ? $route['host']
-                        : null,
+                    'methods' => $methods,
+                    'schemes' => $schemes,
+                    'host' => $host,
                     'controller' => is_string($route['defaults']['_controller'] ?? null)
                         ? $route['defaults']['_controller']
                         : null,
@@ -137,3 +157,12 @@ $result = [
 ];
 
 fwrite(STDOUT, json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n");
+
+function splitDebugValues(mixed $value): array
+{
+    if (!is_string($value) || '' === $value || 'ANY' === $value) {
+        return [];
+    }
+
+    return preg_split('/[|, ]+/', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+}
