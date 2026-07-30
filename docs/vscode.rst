@@ -94,9 +94,9 @@ from the VS Code command palette.
 What to Test
 ------------
 
-The current prototype provides route completion and hover in open PHP files.
-It gets effective route metadata from the selected application's ``dev``
-environment with debug mode enabled.
+The current prototype provides route completion, hover and diagnostics in open
+PHP files. It gets effective route metadata from the selected application's
+``dev`` environment with debug mode enabled.
 
 Route Name Completion
 ~~~~~~~~~~~~~~~~~~~~~
@@ -154,6 +154,21 @@ available runtime metadata:
 * allowed methods;
 * controller.
 
+Unknown Route Diagnostics
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A statically known route name that doesn't exist in the effective route
+collection is reported as an error. Diagnostics are limited to open PHP files
+and high-confidence Symfony receivers. They update while typing and are cleared
+when the file closes.
+
+Route Metadata Refresh
+~~~~~~~~~~~~~~~~~~~~~~
+
+Saving a PHP file or a ``.yaml`` file under ``config/`` reloads the effective
+route collection. Completion, hover and diagnostics then use the refreshed
+metadata. A failed refresh keeps the previous route collection available.
+
 Current Limitations
 -------------------
 
@@ -163,15 +178,11 @@ This early build has intentional limitations:
 * only ``App\\Kernel`` is discovered;
 * indexing always uses ``dev`` with debug mode enabled;
 * the project PHP command can't be configured yet;
-* route data is loaded only when the extension starts;
-* file saves don't refresh runtime metadata yet;
-* route definition, references, diagnostics and rename aren't implemented;
+* route metadata refreshes aren't debounced yet;
+* route definition, references and rename aren't implemented;
 * source route declarations aren't indexed yet;
 * no standalone binary is available;
 * bridge failures aren't shown through a dedicated status UI yet.
-
-When routes change, run ``Developer: Reload Window`` to restart the server and
-reload the route snapshot.
 
 Troubleshooting
 ---------------
