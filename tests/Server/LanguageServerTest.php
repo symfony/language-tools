@@ -31,6 +31,9 @@ final class LanguageServerTest extends TestCase
                     'capabilities' => [
                         'positionEncoding' => 'utf-16',
                         'textDocumentSync' => 2,
+                        'completionProvider' => [
+                            'triggerCharacters' => ["'", '"'],
+                        ],
                     ],
                     'serverInfo' => [
                         'name' => 'Symfony LSP',

@@ -29,6 +29,16 @@ final class PositionConverterTest extends TestCase
         yield 'past document' => [new Position(9, 0), 10];
     }
 
+    public function testConvertsByteOffsetsToUtf16Positions(): void
+    {
+        $converter = new PositionConverter();
+
+        $position = $converter->toPosition("a😀b\néx", 5);
+
+        self::assertSame(0, $position->line());
+        self::assertSame(3, $position->character());
+    }
+
     public function testAppliesIncrementalChangesWithUtf16Ranges(): void
     {
         $converter = new PositionConverter();

@@ -1,0 +1,61 @@
+<?php
+
+namespace Symfony\Lsp\Tests\Feature\Route;
+
+use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Document\Document;
+use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Route\Route;
+use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
+use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
+use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectRegistry;
+
+final class RouteCompletionHandlerTest extends TestCase
+{
+    public function testReturnsRouteCompletionWithUtf16TextEdit(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = <<<'PHP'
+            <?php
+            class DemoController extends AbstractController
+            {
+                public function index(): void
+                {
+                    $label = '😀';
+                    $this->generateUrl('article_');
+                }
+            }
+            PHP;
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $indexes = new RouteIndexRegistry();
+        $indexes->forProject($project)->replace(
+            new Route('article_edit', '/article/{id}/edit', [], [], null, null),
+            new Route('homepage', '/', [], [], null, null),
+        );
+        $converter = new PositionConverter();
+        $cursor = strpos($text, 'article_') + \strlen('article_');
+        $position = $converter->toPosition($text, $cursor);
+        $handler = new RouteCompletionHandler($documents, $converter, $projects, $indexes);
+
+        self::assertSame([[
+            'label' => 'article_edit',
+            'kind' => 12,
+            'detail' => '/article/{id}/edit',
+            'textEdit' => [
+                'range' => [
+                    'start' => ['line' => 6, 'character' => 28],
+                    'end' => ['line' => 6, 'character' => 36],
+                ],
+                'newText' => 'article_edit',
+            ],
+        ]], $handler->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line(), 'character' => $position->character()],
+        ]));
+    }
+}

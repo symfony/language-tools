@@ -10,6 +10,8 @@ use Symfony\Lsp\Client\JsonRpcClient;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
+use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -21,6 +23,8 @@ use Symfony\Lsp\Protocol\ContentLengthMessageWriter;
 use Symfony\Lsp\Protocol\ContentLengthReadableStream;
 use Symfony\Lsp\Protocol\ContentLengthWritableStream;
 use Symfony\Lsp\Runtime\BridgeInstaller;
+use Symfony\Lsp\Runtime\NativeProcessRunner;
+use Symfony\Lsp\Runtime\ProjectRuntimeInitializer;
 
 final class LanguageServerFactory
 {
@@ -30,13 +34,22 @@ final class LanguageServerFactory
         $output = new ContentLengthWritableStream($output, new ContentLengthMessageWriter($output));
         $peer = new JsonRpcPeer($input, $output);
 
+        $documents = new DocumentStore();
+        $positionConverter = new PositionConverter();
+        $projects = new ProjectRegistry();
+        $routeIndexes = new RouteIndexRegistry();
+        $bridgeInstaller = new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', 'dev');
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
-            new ProjectRegistry(),
+            $projects,
             new WorkspaceTrustManager(
                 new JsonRpcClient($peer),
                 new WorkspaceTrust(),
-                new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', 'dev'),
+                new ProjectRuntimeInitializer(
+                    $bridgeInstaller,
+                    new NativeProcessRunner(),
+                    $routeIndexes,
+                ),
             ),
         );
 
@@ -45,7 +58,8 @@ final class LanguageServerFactory
             new JsonRpcDispatcher($peer),
             new ServerState(),
             $workspaceConfiguration,
-            new DocumentSynchronizer(new DocumentStore(), new PositionConverter()),
+            new DocumentSynchronizer($documents, $positionConverter),
+            new RouteCompletionHandler($documents, $positionConverter, $projects, $routeIndexes),
         );
     }
 }

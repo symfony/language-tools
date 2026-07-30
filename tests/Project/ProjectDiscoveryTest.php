@@ -3,7 +3,9 @@
 namespace Symfony\Lsp\Tests\Project;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectDiscovery;
+use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 
 final class ProjectDiscoveryTest extends TestCase
@@ -37,6 +39,18 @@ final class ProjectDiscoveryTest extends TestCase
         self::assertSame($this->temporaryDirectory, $projects[0]->rootPath());
         self::assertSame($uri, $projects[0]->rootUri());
         self::assertSame('^7.4', $projects[0]->frameworkBundleConstraint());
+    }
+
+    public function testSelectsMostSpecificProjectForDocument(): void
+    {
+        $parent = new Project('/workspace', 'file:///workspace', '^8.0');
+        $child = new Project('/workspace/app', 'file:///workspace/app', '^8.0');
+        $registry = new ProjectRegistry();
+        $registry->replace([$parent, $child]);
+
+        self::assertSame($child, $registry->forDocumentUri('file:///workspace/app/src/Controller.php'));
+        self::assertSame($parent, $registry->forDocumentUri('file:///workspace/src/Service.php'));
+        self::assertNull($registry->forDocumentUri('file:///other/src/Service.php'));
     }
 
     public function testIgnoresNonFrameworkProjectsAndInvalidComposerFiles(): void
