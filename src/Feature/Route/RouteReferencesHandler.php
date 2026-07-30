@@ -32,8 +32,8 @@ final class RouteReferencesHandler
             return null;
         }
 
-        $name = $this->symbolResolver->resolve($document->uri(), $document->text(), $position);
-        if (null === $name) {
+        $symbol = $this->symbolResolver->resolve($document->uri(), $document->text(), $position);
+        if (null === $symbol) {
             return null;
         }
 
@@ -42,11 +42,11 @@ final class RouteReferencesHandler
                 $reference->uri(),
                 $reference->range(),
             ),
-            $this->referenceIndexes->forProject($project)->find($name),
+            $this->referenceIndexes->forProject($project)->find($symbol->name()),
         );
         $context = $params['context'] ?? null;
         if (\is_array($context) && true === ($context['includeDeclaration'] ?? null)) {
-            foreach ($this->declarationIndexes->forProject($project)->find($name) as $declaration) {
+            foreach ($this->declarationIndexes->forProject($project)->find($symbol->name()) as $declaration) {
                 $locations[] = self::location($declaration->uri(), $declaration->range());
             }
         }

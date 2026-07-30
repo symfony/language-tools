@@ -22,6 +22,7 @@ use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferencesHandler;
+use Symfony\Lsp\Feature\Route\RouteRenameHandler;
 use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -63,6 +64,11 @@ final class LanguageServerFactory
         $documentContextResolver = new DocumentContextResolver($documents, $projects);
         $routeReferenceExtractor = new RouteReferenceExtractor($positionConverter);
         $routeDeclarationExtractor = new PhpRouteDeclarationExtractor($positionConverter);
+        $routeSymbolResolver = new RouteSymbolResolver(
+            $positionConverter,
+            $routeReferenceExtractor,
+            $routeDeclarationExtractor,
+        );
         $routeSourceIndexer = new ProjectRouteSourceIndexer(
             $projects,
             $routeDeclarationIndexes,
@@ -102,13 +108,16 @@ final class LanguageServerFactory
             ),
             new RouteReferencesHandler(
                 $documentContextResolver,
-                new RouteSymbolResolver(
-                    $positionConverter,
-                    $routeReferenceExtractor,
-                    $routeDeclarationExtractor,
-                ),
+                $routeSymbolResolver,
                 $routeReferenceIndexes,
                 $routeDeclarationIndexes,
+            ),
+            new RouteRenameHandler(
+                $documentContextResolver,
+                $routeSymbolResolver,
+                $routeReferenceIndexes,
+                $routeDeclarationIndexes,
+                $routeIndexes,
             ),
             new ProjectRuntimeRefresher($projects, $workspaceTrust, $runtimeInitializer),
             $routeSourceIndexer,

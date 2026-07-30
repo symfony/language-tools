@@ -14,19 +14,19 @@ final class RouteSymbolResolver
     ) {
     }
 
-    public function resolve(string $uri, string $text, Position $position): ?string
+    public function resolve(string $uri, string $text, Position $position): ?RouteSymbol
     {
         $offset = $this->positionConverter->toByteOffset($text, $position);
         $reference = $this->referenceExtractor->at($text, $offset);
         if (null !== $reference) {
-            return $reference->name();
+            return new RouteSymbol($reference->name(), $reference->range());
         }
 
         foreach ($this->declarationExtractor->extract($uri, $text) as $declaration) {
             $start = $this->positionConverter->toByteOffset($text, $declaration->range()->start());
             $end = $this->positionConverter->toByteOffset($text, $declaration->range()->end());
             if ($offset >= $start && $offset <= $end) {
-                return $declaration->name();
+                return new RouteSymbol($declaration->name(), $declaration->range());
             }
         }
 
