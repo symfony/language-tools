@@ -158,16 +158,17 @@ Route Definition
 ~~~~~~~~~~~~~~~~
 
 Use ``Go to Definition`` on a route name to navigate to the matching named PHP
-``#[Route]`` attribute. The source index scans application-owned PHP files and
-excludes ``vendor/`` and generated files. YAML route declarations aren't
-indexed yet.
+``#[Route]`` attribute or YAML route declaration. The source index scans
+application-owned PHP files, ``config/routes.yaml`` and YAML files under
+``config/routes/``. It excludes ``vendor/`` and generated files.
 
 Route References and Rename
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Use ``Find All References`` from a route reference or named PHP ``#[Route]``
-attribute to list statically resolved PHP usages. Rename updates those PHP
-references and declarations across application-owned files.
+Use ``Find All References`` from a route reference, named PHP ``#[Route]``
+attribute or YAML route declaration to list statically resolved PHP usages.
+Rename updates those PHP references and PHP or YAML declarations across
+application-owned files.
 
 The rename preview requires confirmation because dynamic route references may
 remain unchanged. It never edits ``vendor/`` or generated files. Renaming to an
@@ -177,9 +178,13 @@ Unknown Route Diagnostics
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A statically known route name that doesn't exist in the effective route
-collection is reported as an error. Diagnostics are limited to open PHP files
-and high-confidence Symfony receivers. They update while typing and are cleared
-when the file closes.
+collection is reported as an error. A route call with a complete literal
+parameter map also reports required path or host parameters that are missing.
+Parameters with route defaults are treated as optional, while dynamic parameter
+arrays aren't diagnosed.
+
+Diagnostics are limited to open PHP files and high-confidence Symfony
+receivers. They update while typing and are cleared when the file closes.
 
 Route Metadata Refresh
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -199,7 +204,7 @@ This early build has intentional limitations:
 * the project PHP command can't be configured yet;
 * route metadata refreshes aren't debounced yet;
 * references and rename cover only statically resolved PHP strings;
-* only PHP attribute route declarations are indexed;
+* PHP routing configurator files aren't indexed yet;
 * no standalone binary is available;
 * bridge failures aren't shown through a dedicated status UI yet.
 
