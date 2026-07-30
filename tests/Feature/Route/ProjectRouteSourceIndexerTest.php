@@ -102,5 +102,14 @@ final class ProjectRouteSourceIndexerTest extends TestCase
 
         self::assertSame([], $indexes->forProject($project)->find('article_list'));
         self::assertCount(1, $indexes->forProject($project)->find('article_new'));
+
+        $packageUri = 'file://'.$this->temporaryDirectory.'/config/packages/framework.yaml';
+        $documents->open(new Document($packageUri, 'yaml', 1, <<<'YAML'
+            fake_route:
+                path: /not-a-route
+            YAML));
+        $indexer->updateOpenDocument(['textDocument' => ['uri' => $packageUri]]);
+
+        self::assertSame([], $indexes->forProject($project)->find('fake_route'));
     }
 }

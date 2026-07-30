@@ -51,6 +51,11 @@ final class ProjectRouteSourceIndexer
             return;
         }
 
+        $extension = strtolower(pathinfo((string) parse_url($document->uri(), \PHP_URL_PATH), \PATHINFO_EXTENSION));
+        if (\in_array($extension, ['yaml', 'yml'], true) && !$this->isRouteYaml($project, $document->uri())) {
+            return;
+        }
+
         [$declarations, $references] = $this->extractDocument($document);
         $this->declarationIndexes->forProject($project)->replaceForUri($document->uri(), ...$declarations);
         $this->referenceIndexes->forProject($project)->replaceForUri($document->uri(), ...$references);
@@ -220,6 +225,21 @@ final class ProjectRouteSourceIndexer
                 yield $file->getPathname();
             }
         }
+    }
+
+    private function isRouteYaml(Project $project, string $uri): bool
+    {
+        $path = parse_url($uri, \PHP_URL_PATH);
+        if (!\is_string($path)) {
+            return false;
+        }
+
+        $root = rtrim(str_replace('\\', '/', $project->rootPath()), '/');
+        $relativePath = ltrim(substr(str_replace('\\', '/', rawurldecode($path)), \strlen($root)), '/');
+
+        return str_starts_with($relativePath, 'config/routes/')
+            || (str_starts_with($relativePath, 'config/routes.')
+                && \in_array(strtolower(pathinfo($relativePath, \PATHINFO_EXTENSION)), ['yaml', 'yml'], true));
     }
 
     private function uri(Project $project, string $path): string
