@@ -94,9 +94,9 @@ from the VS Code command palette.
 What to Test
 ------------
 
-The current prototype provides route completion, hover and diagnostics in open
-PHP files. It gets effective route metadata from the selected application's
-``dev`` environment with debug mode enabled.
+The current prototype provides route completion, hover, definition and
+diagnostics in open PHP files. It gets effective route metadata from the
+selected application's ``dev`` environment with debug mode enabled.
 
 Route Name Completion
 ~~~~~~~~~~~~~~~~~~~~~
@@ -154,6 +154,14 @@ available runtime metadata:
 * allowed methods;
 * controller.
 
+Route Definition
+~~~~~~~~~~~~~~~~
+
+Use ``Go to Definition`` on a route name to navigate to the matching named PHP
+``#[Route]`` attribute. The source index scans application-owned PHP files and
+excludes ``vendor/`` and generated files. YAML route declarations aren't
+indexed yet.
+
 Unknown Route Diagnostics
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -179,8 +187,8 @@ This early build has intentional limitations:
 * indexing always uses ``dev`` with debug mode enabled;
 * the project PHP command can't be configured yet;
 * route metadata refreshes aren't debounced yet;
-* route definition, references and rename aren't implemented;
-* source route declarations aren't indexed yet;
+* route references and rename aren't implemented;
+* only PHP attribute route declarations are indexed;
 * no standalone binary is available;
 * bridge failures aren't shown through a dedicated status UI yet.
 
