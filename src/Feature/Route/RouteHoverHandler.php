@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 
 final class RouteHoverHandler
@@ -32,8 +31,11 @@ final class RouteHoverHandler
             return null;
         }
 
-        $routeName = $this->routeNameAt($document->text(), $position);
-        if (null === $routeName || null === $route = $this->routeIndexes->forProject($project)->get($routeName)) {
+        $reference = (new RouteReferenceExtractor($this->positionConverter))->at(
+            $document->text(),
+            $this->positionConverter->toByteOffset($document->text(), $position),
+        );
+        if (null === $reference || null === $route = $this->routeIndexes->forProject($project)->get($reference->name())) {
             return null;
         }
 
@@ -49,19 +51,5 @@ final class RouteHoverHandler
         }
 
         return ['contents' => ['kind' => 'markdown', 'value' => implode("\n\n", $details)]];
-    }
-
-    private function routeNameAt(string $text, Position $position): ?string
-    {
-        $offset = $this->positionConverter->toByteOffset($text, $position);
-        $before = substr($text, 0, $offset);
-        $after = substr($text, $offset);
-        if (!preg_match('/(?:->|::)(?:generate|generateUrl|redirectToRoute)\s*\(\s*([\'\"])([^\'\"]*)$/s', $before, $left)
-            || !preg_match('/^([^\'\"]*)/', $after, $right)
-        ) {
-            return null;
-        }
-
-        return $left[2].$right[1];
     }
 }

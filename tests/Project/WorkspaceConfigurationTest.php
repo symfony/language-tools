@@ -54,6 +54,10 @@ final class WorkspaceConfigurationTest extends TestCase
             {
                 return null;
             }
+
+            public function notify(string $method, array $params): void
+            {
+            }
         };
     }
 

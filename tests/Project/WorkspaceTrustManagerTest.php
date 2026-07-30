@@ -99,4 +99,8 @@ final class CapturingClient implements ClientInterface
 
         return $this->response;
     }
+
+    public function notify(string $method, array $params): void
+    {
+    }
 }

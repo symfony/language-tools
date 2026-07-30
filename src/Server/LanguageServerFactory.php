@@ -12,8 +12,10 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
+use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteHoverHandler;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
+use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -40,13 +42,14 @@ final class LanguageServerFactory
         $positionConverter = new PositionConverter();
         $projects = new ProjectRegistry();
         $routeIndexes = new RouteIndexRegistry();
+        $client = new JsonRpcClient($peer);
         $bridgeInstaller = new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', 'dev');
         $documentContextResolver = new DocumentContextResolver($documents, $projects);
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
             $projects,
             new WorkspaceTrustManager(
-                new JsonRpcClient($peer),
+                $client,
                 new WorkspaceTrust(),
                 new ProjectRuntimeInitializer(
                     $bridgeInstaller,
@@ -64,6 +67,13 @@ final class LanguageServerFactory
             new DocumentSynchronizer($documents, $positionConverter),
             new RouteCompletionHandler($documentContextResolver, $positionConverter, $routeIndexes),
             new RouteHoverHandler($documentContextResolver, $positionConverter, $routeIndexes),
+            new RouteDiagnosticPublisher(
+                $client,
+                $documents,
+                $projects,
+                $routeIndexes,
+                new RouteReferenceExtractor($positionConverter),
+            ),
         );
     }
 }

@@ -45,7 +45,7 @@ final class RouteCompletionContext
 
         $methodOffset = $matches[1][1];
         $operatorLength = 2;
-        if (!self::hasSymfonyReceiver(substr($beforeCursor, 0, $methodOffset - $operatorLength))) {
+        if (!RoutePhpReceiver::isSymfony(substr($beforeCursor, 0, $methodOffset - $operatorLength))) {
             return null;
         }
 
@@ -58,24 +58,6 @@ final class RouteCompletionContext
                 $positionConverter->toPosition($text, $prefixOffset),
                 $position,
             ),
-        );
-    }
-
-    private static function hasSymfonyReceiver(string $beforeMethod): bool
-    {
-        $receiverSource = rtrim($beforeMethod);
-
-        if (preg_match('/\$this\s*$/', $receiverSource)) {
-            return (bool) preg_match('/class\s+\w+\s+extends\s+(?:AbstractController|[^\s{]*\\\\AbstractController)\b/s', $receiverSource);
-        }
-
-        if (!preg_match('/\$(\w+)\s*$/', $receiverSource, $receiver)) {
-            return false;
-        }
-
-        return (bool) preg_match(
-            '/(?:RouterInterface|UrlGeneratorInterface)\s+\$'.preg_quote($receiver[1], '/').'\b/s',
-            $receiverSource,
         );
     }
 }

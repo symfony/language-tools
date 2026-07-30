@@ -8,6 +8,7 @@ use Fabpot\JsonRpc\JsonRpcError;
 use Fabpot\JsonRpc\JsonRpcPeer;
 use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
+use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteHoverHandler;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
 
@@ -23,6 +24,7 @@ final class LanguageServer
         private readonly DocumentSynchronizer $documentSynchronizer,
         private readonly RouteCompletionHandler $routeCompletionHandler,
         private readonly RouteHoverHandler $routeHoverHandler,
+        private readonly RouteDiagnosticPublisher $routeDiagnosticPublisher,
     ) {
         $this->registerHandlers();
     }
@@ -38,9 +40,9 @@ final class LanguageServer
     {
         $this->dispatcher->onRequest('initialize', $this->initialize(...));
         $this->dispatcher->onNotification('initialized', $this->initialized(...));
-        $this->dispatcher->onNotification('textDocument/didOpen', $this->documentSynchronizer->open(...));
-        $this->dispatcher->onNotification('textDocument/didChange', $this->documentSynchronizer->change(...));
-        $this->dispatcher->onNotification('textDocument/didClose', $this->documentSynchronizer->close(...));
+        $this->dispatcher->onNotification('textDocument/didOpen', $this->openDocument(...));
+        $this->dispatcher->onNotification('textDocument/didChange', $this->changeDocument(...));
+        $this->dispatcher->onNotification('textDocument/didClose', $this->closeDocument(...));
         $this->dispatcher->onRequest('textDocument/completion', $this->routeCompletionHandler->complete(...));
         $this->dispatcher->onRequest('textDocument/hover', $this->routeHoverHandler->hover(...));
         $this->dispatcher->onRequest('shutdown', $this->shutdown(...));
@@ -76,6 +78,33 @@ final class LanguageServer
                 'version' => 'dev',
             ],
         ];
+    }
+
+    /**
+     * @param array<array-key, mixed> $params
+     */
+    private function openDocument(array $params): void
+    {
+        $this->documentSynchronizer->open($params);
+        $this->routeDiagnosticPublisher->publish($params);
+    }
+
+    /**
+     * @param array<array-key, mixed> $params
+     */
+    private function changeDocument(array $params): void
+    {
+        $this->documentSynchronizer->change($params);
+        $this->routeDiagnosticPublisher->publish($params);
+    }
+
+    /**
+     * @param array<array-key, mixed> $params
+     */
+    private function closeDocument(array $params): void
+    {
+        $this->documentSynchronizer->close($params);
+        $this->routeDiagnosticPublisher->clear($params);
     }
 
     /**

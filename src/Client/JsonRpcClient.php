@@ -15,4 +15,9 @@ final class JsonRpcClient implements ClientInterface
     {
         return $this->peer->request($method, $params)->await();
     }
+
+    public function notify(string $method, array $params): void
+    {
+        $this->peer->notify($method, $params);
+    }
 }
