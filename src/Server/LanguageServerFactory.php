@@ -40,6 +40,7 @@ use Symfony\Lsp\Protocol\ContentLengthWritableStream;
 use Symfony\Lsp\Runtime\BridgeInstaller;
 use Symfony\Lsp\Runtime\DebouncedRuntimeRefreshScheduler;
 use Symfony\Lsp\Runtime\NativeProcessRunner;
+use Symfony\Lsp\Runtime\ObservedRuntimeInitializer;
 use Symfony\Lsp\Runtime\ProjectRuntimeInitializer;
 use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
 use Symfony\Lsp\Runtime\ReportingRuntimeInitializer;
@@ -60,23 +61,33 @@ final class LanguageServerFactory
         $routeDeclarationIndexes = new RouteDeclarationIndexRegistry();
         $routeReferenceIndexes = new RouteReferenceIndexRegistry();
         $client = new JsonRpcClient($peer);
-        $bridgeInstaller = new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', 'dev');
-        $runtimeConfiguration = new RuntimeConfiguration();
-        $runtimeInitializer = new ReportingRuntimeInitializer(
-            new ProjectRuntimeInitializer(
-                $bridgeInstaller,
-                new NativeProcessRunner(),
-                $routeIndexes,
-                $runtimeConfiguration,
-            ),
-            $client,
-        );
         $workspaceTrust = new WorkspaceTrust();
         $documentContextResolver = new DocumentContextResolver($documents, $projects);
         $routeReferenceExtractor = new RouteReferenceExtractor($positionConverter);
         $twigRouteReferenceExtractor = new TwigRouteReferenceExtractor($positionConverter);
         $phpRouteDeclarationExtractor = new PhpRouteDeclarationExtractor($positionConverter);
         $yamlRouteDeclarationExtractor = new YamlRouteDeclarationExtractor($positionConverter);
+        $routeDiagnosticPublisher = new RouteDiagnosticPublisher(
+            $client,
+            $documents,
+            $projects,
+            $routeIndexes,
+            $routeReferenceExtractor,
+            $twigRouteReferenceExtractor,
+        );
+        $runtimeConfiguration = new RuntimeConfiguration();
+        $runtimeInitializer = new ObservedRuntimeInitializer(
+            new ReportingRuntimeInitializer(
+                new ProjectRuntimeInitializer(
+                    new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', 'dev'),
+                    new NativeProcessRunner(),
+                    $routeIndexes,
+                    $runtimeConfiguration,
+                ),
+                $client,
+            ),
+            $routeDiagnosticPublisher,
+        );
         $routeSymbolResolver = new RouteSymbolResolver(
             $positionConverter,
             $routeReferenceExtractor,
@@ -96,11 +107,7 @@ final class LanguageServerFactory
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
             $projects,
-            new WorkspaceTrustManager(
-                $client,
-                $workspaceTrust,
-                $runtimeInitializer,
-            ),
+            new WorkspaceTrustManager($client, $workspaceTrust, $runtimeInitializer),
             $runtimeConfiguration,
         );
 
@@ -117,14 +124,7 @@ final class LanguageServerFactory
                 $routeIndexes,
                 $twigRouteReferenceExtractor,
             ),
-            new RouteDiagnosticPublisher(
-                $client,
-                $documents,
-                $projects,
-                $routeIndexes,
-                $routeReferenceExtractor,
-                $twigRouteReferenceExtractor,
-            ),
+            $routeDiagnosticPublisher,
             new RouteDefinitionHandler(
                 $documentContextResolver,
                 $routeSymbolResolver,

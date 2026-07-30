@@ -153,6 +153,26 @@ final class RouteDiagnosticPublisherTest extends TestCase
         self::assertSame([], $client->notifications);
     }
 
+    public function testRepublishesOpenDocumentDiagnosticsAfterRuntimeRefresh(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        [$publisher, $client, $project] = $this->publisher($uri, <<<'PHP'
+            <?php
+            class ArticleController extends AbstractController
+            {
+                public function show(): void
+                {
+                    $this->generateUrl('missing_route');
+                }
+            }
+            PHP);
+
+        $publisher->refreshed($project);
+
+        self::assertCount(1, $client->notifications);
+        self::assertSame('textDocument/publishDiagnostics', $client->notifications[0]['method']);
+    }
+
     public function testClearsDiagnosticsWhenDocumentCloses(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
@@ -167,7 +187,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
     }
 
     /**
-     * @return array{RouteDiagnosticPublisher, DiagnosticClient}
+     * @return array{RouteDiagnosticPublisher, DiagnosticClient, Project}
      */
     private function publisher(
         string $uri,
@@ -196,6 +216,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 new TwigRouteReferenceExtractor($positionConverter),
             ),
             $client,
+            $project,
         ];
     }
 }

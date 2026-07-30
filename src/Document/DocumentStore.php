@@ -31,4 +31,12 @@ final class DocumentStore
     {
         return $this->documents[$uri] ?? null;
     }
+
+    /**
+     * @return list<Document>
+     */
+    public function all(): array
+    {
+        return array_values($this->documents);
+    }
 }

@@ -4,9 +4,11 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Runtime\RuntimeRefreshObserverInterface;
 
-final class RouteDiagnosticPublisher
+final class RouteDiagnosticPublisher implements RuntimeRefreshObserverInterface
 {
     public function __construct(
         private readonly ClientInterface $client,
@@ -97,6 +99,16 @@ final class RouteDiagnosticPublisher
             'version' => $document->version(),
             'diagnostics' => $diagnostics,
         ]);
+    }
+
+    public function refreshed(Project $project): void
+    {
+        foreach ($this->documents->all() as $document) {
+            $documentProject = $this->projects->forDocumentUri($document->uri());
+            if (null !== $documentProject && $documentProject->rootPath() === $project->rootPath()) {
+                $this->publish(['textDocument' => ['uri' => $document->uri()]]);
+            }
+        }
     }
 
     /**
