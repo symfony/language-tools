@@ -112,6 +112,55 @@ final class BridgeTest extends TestCase
         self::assertTrue($result['sections']['routes']['complete']);
     }
 
+    public function testNormalizesContainerMetadataWithoutExportingParameterValues(): void
+    {
+        $this->writeContainerApplication();
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=container 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $snapshot = implode("\n", $output);
+        self::assertSame(0, $exitCode, $snapshot);
+        self::assertStringNotContainsString('CANARY_SECRET_VALUE', $snapshot);
+        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors']);
+        self::assertIsArray($result['sections']);
+        self::assertIsArray($result['sections']['container']);
+        self::assertSame([
+            [
+                'id' => 'app.mailer',
+                'class' => 'App\\Mailer',
+                'alias' => null,
+                'public' => false,
+                'lazy' => true,
+                'deprecation' => 'Use app.new_mailer instead.',
+                'tags' => ['kernel.reset', 'monolog.logger'],
+                'decorates' => 'mailer',
+                'autowiringTypes' => ['App\\MailerInterface'],
+            ],
+            [
+                'id' => 'mailer',
+                'class' => null,
+                'alias' => 'app.mailer',
+                'public' => true,
+                'lazy' => null,
+                'deprecation' => null,
+                'tags' => [],
+                'decorates' => null,
+                'autowiringTypes' => [],
+            ],
+        ], $result['sections']['container']['items']);
+        self::assertSame([
+            ['name' => 'app.api_key', 'deprecation' => null],
+            ['name' => 'app.storage_dir', 'deprecation' => null],
+        ], $result['sections']['container']['parameters']);
+    }
+
     public function testRejectsUnsupportedSymfonyBranches(): void
     {
         $this->writeAutoloader('7.3.9');
@@ -188,6 +237,79 @@ final class BridgeTest extends TestCase
                             'requirements' => ['id' => '\\d+'],
                         ],
                     ], JSON_THROW_ON_ERROR));
+
+                    return 0;
+                }
+            }
+            PHP);
+    }
+
+    private function writeContainerApplication(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/vendor/autoload.php', <<<'PHP'
+            <?php
+            namespace Composer;
+            final class InstalledVersions
+            {
+                public static function getPrettyVersion(string $package): ?string
+                {
+                    return '8.0.6';
+                }
+            }
+            namespace Symfony\Component\Console\Input;
+            final class ArrayInput
+            {
+                public function __construct(public array $arguments) {}
+            }
+            namespace Symfony\Component\Console\Output;
+            final class BufferedOutput
+            {
+                private string $contents = '';
+                public function write(string $contents): void { $this->contents .= $contents; }
+                public function fetch(): string { return $this->contents; }
+            }
+            namespace App;
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function shutdown(): void {}
+            }
+            namespace Symfony\Bundle\FrameworkBundle\Console;
+            final class Application
+            {
+                public function __construct(object $kernel) {}
+                public function setAutoExit(bool $autoExit): void {}
+                public function run(object $input, object $output): int
+                {
+                    if (isset($input->arguments['--show-hidden'])) {
+                        $result = [
+                            'definitions' => [
+                                'app.mailer' => [
+                                    'class' => 'App\\Mailer',
+                                    'public' => false,
+                                    'lazy' => true,
+                                    'deprecated' => ['message' => 'Use app.new_mailer instead.'],
+                                    'tags' => [
+                                        'monolog.logger' => [['channel' => 'mail']],
+                                        ['name' => 'kernel.reset'],
+                                    ],
+                                    'decorates' => 'mailer',
+                                    'arguments' => ['CANARY_SECRET_VALUE'],
+                                ],
+                            ],
+                            'aliases' => [
+                                'mailer' => ['service' => 'app.mailer', 'public' => true],
+                            ],
+                        ];
+                    } elseif (isset($input->arguments['--types'])) {
+                        $result = ['types' => ['App\\MailerInterface' => ['app.mailer']]];
+                    } else {
+                        $result = ['parameters' => [
+                            'app.api_key' => 'CANARY_SECRET_VALUE',
+                            'app.storage_dir' => '/private/storage',
+                        ]];
+                    }
+                    $output->write(json_encode($result, JSON_THROW_ON_ERROR));
 
                     return 0;
                 }

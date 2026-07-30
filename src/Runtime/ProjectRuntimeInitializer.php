@@ -2,8 +2,6 @@
 
 namespace Symfony\Lsp\Runtime;
 
-use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
-use Symfony\Lsp\Feature\Route\RouteSnapshotLoader;
 use Symfony\Lsp\Project\Project;
 
 final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
@@ -11,7 +9,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
     public function __construct(
         private readonly BridgeInstaller $bridgeInstaller,
         private readonly ProcessRunnerInterface $processRunner,
-        private readonly RouteIndexRegistry $routeIndexes,
+        private readonly RuntimeSnapshotLoaderRegistry $snapshotLoaders,
         private readonly RuntimeConfiguration $configuration,
     ) {
     }
@@ -25,7 +23,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             '--project='.$project->rootPath(),
             '--environment='.$this->configuration->environment(),
             '--debug='.($this->configuration->debug() ? '1' : '0'),
-            '--sections=routes',
+            '--sections='.implode(',', $this->snapshotLoaders->sections()),
         ], $project->rootPath());
 
         if (0 !== $result->exitCode()) {
@@ -51,9 +49,9 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                 }
             }
 
-            throw new \RuntimeException('The project bridge could not load route metadata: '.implode('; ', $messages));
+            throw new \RuntimeException('The project bridge could not load runtime metadata: '.implode('; ', $messages));
         }
 
-        (new RouteSnapshotLoader($this->routeIndexes->forProject($project)))->load($snapshot);
+        $this->snapshotLoaders->load($project, $snapshot);
     }
 }

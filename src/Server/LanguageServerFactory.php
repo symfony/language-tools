@@ -14,11 +14,15 @@ use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderRegistry;
 use Symfony\Lsp\Feature\DefinitionProviderRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\ProjectServiceSnapshotLoader;
+use Symfony\Lsp\Feature\DependencyInjection\ServiceCompletionHandler;
+use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\HoverProviderRegistry;
 use Symfony\Lsp\Feature\ReferencesProviderRegistry;
 use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
+use Symfony\Lsp\Feature\Route\ProjectRouteSnapshotLoader;
 use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
 use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
 use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
@@ -51,6 +55,7 @@ use Symfony\Lsp\Runtime\ProjectRuntimeInitializer;
 use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
 use Symfony\Lsp\Runtime\ReportingRuntimeInitializer;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 use Symfony\Lsp\Runtime\StatusRuntimeInitializer;
 
 final class LanguageServerFactory
@@ -64,6 +69,7 @@ final class LanguageServerFactory
         $projects = new ProjectRegistry();
         $statuses = new ProjectIndexStatusRegistry();
         $routeIndexes = new RouteIndexRegistry();
+        $serviceIndexes = new ServiceIndexRegistry();
         $routeDeclarationIndexes = new RouteDeclarationIndexRegistry();
         $routeReferenceIndexes = new RouteReferenceIndexRegistry();
         $client = new JsonRpcClient($peer);
@@ -93,7 +99,10 @@ final class LanguageServerFactory
                     new ProjectRuntimeInitializer(
                         new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', 'dev'),
                         new NativeProcessRunner(),
-                        $routeIndexes,
+                        new RuntimeSnapshotLoaderRegistry(
+                            new ProjectRouteSnapshotLoader($routeIndexes),
+                            new ProjectServiceSnapshotLoader($serviceIndexes),
+                        ),
                         $runtimeConfiguration,
                     ),
                     $statuses,
@@ -161,7 +170,14 @@ final class LanguageServerFactory
             new ServerState(),
             $workspaceConfiguration,
             new DocumentSynchronizer($documents, $positionConverter),
-            new CompletionProviderRegistry($routeCompletion),
+            new CompletionProviderRegistry(
+                $routeCompletion,
+                new ServiceCompletionHandler(
+                    $documentContextResolver,
+                    $positionConverter,
+                    $serviceIndexes,
+                ),
+            ),
             new HoverProviderRegistry($routeHover),
             $diagnosticProviders,
             new DefinitionProviderRegistry($routeDefinition),

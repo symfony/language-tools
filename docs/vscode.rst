@@ -83,9 +83,11 @@ automatically only when running the extension directly from this repository.
 
 ``symfonyLsp.trustWorkspace`` allows the server to execute application code.
 Runtime indexing needs this permission because it boots ``App\\Kernel`` and
-runs Symfony's structured ``debug:router`` command. Keep it disabled for code
-that you don't trust. With trust disabled, runtime route metadata isn't loaded;
-source-backed navigation remains available.
+runs Symfony's structured ``debug:router`` and ``debug:container`` commands.
+Keep it disabled for code that you don't trust. With trust disabled, runtime
+route and service metadata isn't loaded; source-backed navigation remains
+available. Parameter values are discarded inside the runtime bridge and never
+sent to the editor.
 
 ``symfonyLsp.phpCommand`` is an argument array used to run the bridge with the
 project's PHP runtime. For example, use ``["symfony", "php"]`` for Symfony CLI
@@ -103,8 +105,25 @@ What to Test
 ------------
 
 The current prototype provides route completion, hover, definition, references,
-rename and diagnostics in open PHP and Twig files. It gets effective route
-metadata from the configured Symfony environment.
+rename and diagnostics in open PHP and Twig files. It also completes effective
+service IDs in YAML service references. Runtime metadata comes from the
+configured Symfony environment.
+
+Service ID Completion
+~~~~~~~~~~~~~~~~~~~~~
+
+In a YAML service configuration value, type ``@`` followed by a service ID
+prefix and invoke completion:
+
+.. code-block:: yaml
+
+    services:
+        App\\Controller\\DemoController:
+            arguments: ['@app.ma']
+
+Completion includes private and hidden services from the effective container,
+along with aliases. The completion detail displays the service class or alias
+target. Parameter names and values aren't included in service completion.
 
 Route Name Completion
 ~~~~~~~~~~~~~~~~~~~~~
@@ -207,14 +226,18 @@ arrays aren't diagnosed.
 Diagnostics are limited to open PHP and Twig files and high-confidence Symfony
 contexts. They update while typing and are cleared when the file closes.
 
-Route Metadata Refresh
-~~~~~~~~~~~~~~~~~~~~~~
+Runtime Metadata Refresh
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Saving a PHP file or a ``.yaml`` file under ``config/`` schedules a debounced
-reload of the effective route collection. Completion, hover and diagnostics
-then use the refreshed metadata. Open-document diagnostics are republished
-afterward. A failed refresh keeps the previous route collection available and
-shows an error without exposing application output.
+reload of effective runtime metadata. Completion, hover and diagnostics then
+use the refreshed metadata. Open-document diagnostics are republished
+afterward. A failed refresh keeps the previous metadata available and shows an
+error without exposing application output.
+
+Clients can execute ``symfony.refreshIndex`` for an immediate source and runtime
+refresh. ``symfony.indexStatus`` returns source and runtime status for each
+project.
 
 Current Limitations
 -------------------

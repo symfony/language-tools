@@ -90,7 +90,7 @@ final class LanguageServer
                 'positionEncoding' => 'utf-16',
                 'textDocumentSync' => 2,
                 'completionProvider' => [
-                    'triggerCharacters' => ["'", '"'],
+                    'triggerCharacters' => ["'", '"', '@'],
                 ],
                 'hoverProvider' => true,
                 'definitionProvider' => true,

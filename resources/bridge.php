@@ -157,6 +157,69 @@ if (in_array('routes', $requestedSections, true)) {
     }
 }
 
+if (in_array('container', $requestedSections, true)) {
+    if (!class_exists(Symfony\Component\Console\Input\ArrayInput::class)
+        || !class_exists(Symfony\Component\Console\Output\BufferedOutput::class)
+    ) {
+        $errors[] = ['section' => 'container', 'message' => 'Symfony Console is unavailable.'];
+    } else {
+        $kernel = null;
+        try {
+            $kernelClass = 'App\\Kernel';
+            if (!class_exists($kernelClass)) {
+                throw new RuntimeException('The default App\\Kernel class was not found.');
+            }
+
+            $kernel = new $kernelClass(
+                is_string($environment) ? $environment : 'dev',
+                !in_array($debug, ['0', 'false'], true),
+            );
+            $application = new Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
+            $application->setAutoExit(false);
+            $commandOptions = [
+                '--env' => is_string($environment) ? $environment : 'dev',
+                '--no-debug' => in_array($debug, ['0', 'false'], true),
+                '--no-interaction' => true,
+            ];
+            $container = runJsonCommand($application, [
+                'command' => 'debug:container',
+                '--format' => 'json',
+                '--show-hidden' => true,
+                ...$commandOptions,
+            ]);
+            $types = runJsonCommand($application, [
+                'command' => 'debug:container',
+                '--types' => true,
+                '--format' => 'json',
+                ...$commandOptions,
+            ]);
+            $parameterItems = normalizeParameters(runJsonCommand($application, [
+                'command' => 'debug:container',
+                '--parameters' => true,
+                '--format' => 'json',
+                ...$commandOptions,
+            ]));
+
+            $items = normalizeServices($container, $types);
+            $safeContainer = [
+                'complete' => true,
+                'items' => $items,
+                'parameters' => $parameterItems,
+                'resources' => [],
+                'warnings' => [],
+            ];
+            $safeContainer['generation'] = hash('sha256', json_encode($safeContainer, JSON_THROW_ON_ERROR));
+            $sections['container'] = $safeContainer;
+        } catch (Throwable $error) {
+            $errors[] = ['section' => 'container', 'message' => $error->getMessage()];
+        } finally {
+            if (is_object($kernel) && method_exists($kernel, 'shutdown')) {
+                $kernel->shutdown();
+            }
+        }
+    }
+}
+
 $result = [
     'schemaVersion' => 1,
     'generation' => hash('sha256', json_encode($sections, JSON_THROW_ON_ERROR)),
@@ -173,6 +236,198 @@ $result = [
 ];
 
 fwrite(STDOUT, json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n");
+
+function runJsonCommand(object $application, array $arguments): array
+{
+    $output = new Symfony\Component\Console\Output\BufferedOutput();
+    $exitCode = $application->run(new Symfony\Component\Console\Input\ArrayInput($arguments), $output);
+    if (0 !== $exitCode) {
+        throw new RuntimeException(sprintf('%s exited with status %d.', $arguments['command'], $exitCode));
+    }
+
+    $result = json_decode($output->fetch(), true, 512, JSON_THROW_ON_ERROR);
+    if (!is_array($result)) {
+        throw new RuntimeException(sprintf('%s did not return a JSON object or array.', $arguments['command']));
+    }
+
+    return $result;
+}
+
+function normalizeServices(array $container, array $types): array
+{
+    $services = [];
+    $definitions = $container['definitions'] ?? $container['services'] ?? $container;
+    foreach (is_array($definitions) ? $definitions : [] as $key => $definition) {
+        if (!is_array($definition)) {
+            continue;
+        }
+
+        $id = is_string($definition['id'] ?? null)
+            ? $definition['id']
+            : (is_string($definition['name'] ?? null)
+                ? $definition['name']
+                : (is_string($key) ? $key : null));
+        if (null === $id || in_array($id, ['aliases', 'definitions', 'services'], true)) {
+            continue;
+        }
+
+        $alias = is_string($definition['alias'] ?? null)
+            ? $definition['alias']
+            : null;
+        $services[$id] = normalizeService($id, $definition, $alias);
+    }
+
+    foreach (is_array($container['aliases'] ?? null) ? $container['aliases'] : [] as $key => $alias) {
+        $metadata = is_array($alias) ? $alias : [];
+        $id = is_string($metadata['id'] ?? null)
+            ? $metadata['id']
+            : (is_string($metadata['name'] ?? null)
+                ? $metadata['name']
+                : (is_string($key) ? $key : null));
+        $target = is_string($alias)
+            ? $alias
+            : (is_string($metadata['service'] ?? null)
+                ? $metadata['service']
+                : (is_string($metadata['target'] ?? null) ? $metadata['target'] : null));
+        if (null !== $id) {
+            $services[$id] = normalizeService($id, $metadata, $target);
+        }
+    }
+
+    $typesByService = normalizeAutowiringTypes($types);
+    foreach ($services as $id => $service) {
+        $service['autowiringTypes'] = $typesByService[$id] ?? [];
+        $services[$id] = $service;
+    }
+
+    ksort($services);
+
+    return array_values($services);
+}
+
+function normalizeService(string $id, array $metadata, ?string $alias): array
+{
+    $tags = [];
+    foreach (is_array($metadata['tags'] ?? null) ? $metadata['tags'] : [] as $key => $tag) {
+        $name = is_string($key)
+            ? $key
+            : (is_string($tag) ? $tag : (is_array($tag) && is_string($tag['name'] ?? null) ? $tag['name'] : null));
+        if (null !== $name) {
+            $tags[] = $name;
+        }
+    }
+    $tags = array_values(array_unique($tags));
+    sort($tags);
+
+    $decorates = is_string($metadata['decorates'] ?? null)
+        ? $metadata['decorates']
+        : (is_array($metadata['decoration'] ?? null) && is_string($metadata['decoration']['service'] ?? null)
+            ? $metadata['decoration']['service']
+            : null);
+
+    return [
+        'id' => $id,
+        'class' => is_string($metadata['class'] ?? null) ? $metadata['class'] : null,
+        'alias' => $alias,
+        'public' => is_bool($metadata['public'] ?? null) ? $metadata['public'] : null,
+        'lazy' => is_bool($metadata['lazy'] ?? null) ? $metadata['lazy'] : null,
+        'deprecation' => normalizeDeprecation($metadata['deprecated'] ?? $metadata['deprecation'] ?? null),
+        'tags' => $tags,
+        'decorates' => $decorates,
+        'autowiringTypes' => [],
+    ];
+}
+
+function normalizeAutowiringTypes(array $output): array
+{
+    $typesByService = [];
+    $types = is_array($output['types'] ?? null) ? $output['types'] : $output;
+    foreach ($types as $key => $services) {
+        $type = is_string($key)
+            ? $key
+            : (is_array($services) && is_string($services['type'] ?? null) ? $services['type'] : null);
+        if (null === $type) {
+            continue;
+        }
+
+        $serviceIds = is_array($services) && array_key_exists('services', $services)
+            ? $services['services']
+            : $services;
+        foreach (serviceIds($serviceIds) as $serviceId) {
+            $typesByService[$serviceId][] = $type;
+        }
+    }
+
+    foreach ($typesByService as $serviceId => $serviceTypes) {
+        $serviceTypes = array_values(array_unique($serviceTypes));
+        sort($serviceTypes);
+        $typesByService[$serviceId] = $serviceTypes;
+    }
+
+    return $typesByService;
+}
+
+function serviceIds(mixed $services): array
+{
+    if (is_string($services)) {
+        return [$services];
+    }
+    if (!is_array($services)) {
+        return [];
+    }
+    if (is_string($services['id'] ?? null)) {
+        return [$services['id']];
+    }
+    if (is_string($services['service'] ?? null)) {
+        return [$services['service']];
+    }
+
+    $ids = [];
+    foreach ($services as $service) {
+        array_push($ids, ...serviceIds($service));
+    }
+
+    return array_values(array_unique($ids));
+}
+
+function normalizeParameters(array $output): array
+{
+    $parameters = $output['parameters'] ?? $output;
+    $items = [];
+    foreach (is_array($parameters) ? $parameters : [] as $key => $parameter) {
+        $name = is_array($parameter) && is_string($parameter['name'] ?? null)
+            ? $parameter['name']
+            : (is_string($key) ? $key : null);
+        if (null === $name) {
+            continue;
+        }
+
+        $items[$name] = [
+            'name' => $name,
+            'deprecation' => is_array($parameter)
+                ? normalizeDeprecation($parameter['deprecated'] ?? $parameter['deprecation'] ?? null)
+                : null,
+        ];
+    }
+    ksort($items);
+
+    return array_values($items);
+}
+
+function normalizeDeprecation(mixed $deprecation): ?string
+{
+    if (is_string($deprecation)) {
+        return '' !== $deprecation ? $deprecation : null;
+    }
+    if (true === $deprecation) {
+        return 'Deprecated';
+    }
+    if (is_array($deprecation) && is_string($deprecation['message'] ?? null)) {
+        return $deprecation['message'];
+    }
+
+    return null;
+}
 
 function splitDebugValues(mixed $value): array
 {

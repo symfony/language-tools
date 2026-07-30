@@ -3,6 +3,9 @@
 namespace Symfony\Lsp\Tests\Runtime;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Feature\DependencyInjection\ProjectServiceSnapshotLoader;
+use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
+use Symfony\Lsp\Feature\Route\ProjectRouteSnapshotLoader;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\BridgeInstaller;
@@ -10,6 +13,7 @@ use Symfony\Lsp\Runtime\ProcessResult;
 use Symfony\Lsp\Runtime\ProcessRunnerInterface;
 use Symfony\Lsp\Runtime\ProjectRuntimeInitializer;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 
 final class ProjectRuntimeInitializerTest extends TestCase
 {
@@ -38,14 +42,23 @@ final class ProjectRuntimeInitializerTest extends TestCase
         file_put_contents($source, '<?php');
         $processRunner = new CapturingProcessRunner(new ProcessResult(0, json_encode([
             'schemaVersion' => 1,
-            'sections' => ['routes' => [
-                'complete' => true,
-                'items' => [
-                    ['name' => 'homepage', 'path' => '/'],
+            'sections' => [
+                'routes' => [
+                    'complete' => true,
+                    'items' => [
+                        ['name' => 'homepage', 'path' => '/'],
+                    ],
                 ],
-            ]],
+                'container' => [
+                    'complete' => true,
+                    'items' => [
+                        ['id' => 'app.mailer', 'class' => 'App\\Mailer'],
+                    ],
+                ],
+            ],
         ], \JSON_THROW_ON_ERROR), ''));
         $indexes = new RouteIndexRegistry();
+        $serviceIndexes = new ServiceIndexRegistry();
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
         $configuration = new RuntimeConfiguration();
         $configuration->configure([
@@ -56,18 +69,22 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $initializer = new ProjectRuntimeInitializer(
             new BridgeInstaller($source, 'test'),
             $processRunner,
-            $indexes,
+            new RuntimeSnapshotLoaderRegistry(
+                new ProjectRouteSnapshotLoader($indexes),
+                new ProjectServiceSnapshotLoader($serviceIndexes),
+            ),
             $configuration,
         );
 
         $initializer->initialize($project);
 
         self::assertSame('homepage', $indexes->forProject($project)->get('homepage')?->name());
+        self::assertSame('app.mailer', $serviceIndexes->forProject($project)->get('app.mailer')?->id());
         self::assertSame('project-php', $processRunner->command[0]);
         self::assertSame('--flag', $processRunner->command[1]);
         self::assertSame('--environment=test', $processRunner->command[4]);
         self::assertSame('--debug=0', $processRunner->command[5]);
-        self::assertSame('--sections=routes', $processRunner->command[6]);
+        self::assertSame('--sections=routes,container', $processRunner->command[6]);
         self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
     }
 
@@ -81,7 +98,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 'schemaVersion' => 1,
                 'errors' => [['section' => 'routes', 'message' => 'missing environment']],
             ], \JSON_THROW_ON_ERROR), '')),
-            new RouteIndexRegistry(),
+            new RuntimeSnapshotLoaderRegistry(
+                new ProjectRouteSnapshotLoader(new RouteIndexRegistry()),
+            ),
             new RuntimeConfiguration(),
         );
 
@@ -102,7 +121,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $initializer = new ProjectRuntimeInitializer(
             new BridgeInstaller($source, 'test'),
             new CapturingProcessRunner(new ProcessResult(1, '', 'broken container')),
-            new RouteIndexRegistry(),
+            new RuntimeSnapshotLoaderRegistry(
+                new ProjectRouteSnapshotLoader(new RouteIndexRegistry()),
+            ),
             new RuntimeConfiguration(),
         );
 
