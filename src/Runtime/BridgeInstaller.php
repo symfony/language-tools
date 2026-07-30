@@ -14,6 +14,11 @@ final class BridgeInstaller implements RuntimeInitializerInterface
 
     public function initialize(Project $project): void
     {
+        $this->install($project);
+    }
+
+    public function install(Project $project): string
+    {
         $contents = file_get_contents($this->bridgeSource);
         if (false === $contents) {
             throw new \RuntimeException('Unable to read the bundled project bridge.');
@@ -27,7 +32,7 @@ final class BridgeInstaller implements RuntimeInitializerInterface
         $destination = $directory.'/bridge.php';
         $destinationHash = is_file($destination) ? hash_file('sha256', $destination) : false;
         if (false !== $destinationHash && hash_equals(hash('sha256', $contents), $destinationHash)) {
-            return;
+            return $destination;
         }
 
         $temporary = tempnam($directory, 'bridge-');
@@ -44,5 +49,7 @@ final class BridgeInstaller implements RuntimeInitializerInterface
                 @unlink($temporary);
             }
         }
+
+        return $destination;
     }
 }
