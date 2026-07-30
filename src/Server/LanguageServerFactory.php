@@ -24,6 +24,7 @@ use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferencesHandler;
 use Symfony\Lsp\Feature\Route\RouteRenameHandler;
 use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
+use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -71,11 +72,13 @@ final class LanguageServerFactory
         $workspaceTrust = new WorkspaceTrust();
         $documentContextResolver = new DocumentContextResolver($documents, $projects);
         $routeReferenceExtractor = new RouteReferenceExtractor($positionConverter);
+        $twigRouteReferenceExtractor = new TwigRouteReferenceExtractor($positionConverter);
         $phpRouteDeclarationExtractor = new PhpRouteDeclarationExtractor($positionConverter);
         $yamlRouteDeclarationExtractor = new YamlRouteDeclarationExtractor($positionConverter);
         $routeSymbolResolver = new RouteSymbolResolver(
             $positionConverter,
             $routeReferenceExtractor,
+            $twigRouteReferenceExtractor,
             $phpRouteDeclarationExtractor,
             $yamlRouteDeclarationExtractor,
         );
@@ -86,6 +89,7 @@ final class LanguageServerFactory
             $phpRouteDeclarationExtractor,
             $yamlRouteDeclarationExtractor,
             $routeReferenceExtractor,
+            $twigRouteReferenceExtractor,
         );
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
@@ -105,17 +109,23 @@ final class LanguageServerFactory
             $workspaceConfiguration,
             new DocumentSynchronizer($documents, $positionConverter),
             new RouteCompletionHandler($documentContextResolver, $positionConverter, $routeIndexes),
-            new RouteHoverHandler($documentContextResolver, $positionConverter, $routeIndexes),
+            new RouteHoverHandler(
+                $documentContextResolver,
+                $positionConverter,
+                $routeIndexes,
+                $twigRouteReferenceExtractor,
+            ),
             new RouteDiagnosticPublisher(
                 $client,
                 $documents,
                 $projects,
                 $routeIndexes,
                 $routeReferenceExtractor,
+                $twigRouteReferenceExtractor,
             ),
             new RouteDefinitionHandler(
                 $documentContextResolver,
-                $positionConverter,
+                $routeSymbolResolver,
                 $routeDeclarationIndexes,
             ),
             new RouteReferencesHandler(

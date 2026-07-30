@@ -19,6 +19,7 @@ use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceLocation;
 use Symfony\Lsp\Feature\Route\RouteRenameHandler;
 use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
+use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -110,6 +111,7 @@ final class RouteRenameHandlerTest extends TestCase
             new RouteSymbolResolver(
                 $positionConverter,
                 new RouteReferenceExtractor($positionConverter),
+                new TwigRouteReferenceExtractor($positionConverter),
                 new PhpRouteDeclarationExtractor($positionConverter),
                 new YamlRouteDeclarationExtractor($positionConverter),
             ),
@@ -186,6 +188,7 @@ final class RouteRenameHandlerTest extends TestCase
             new RouteSymbolResolver(
                 $positionConverter,
                 new RouteReferenceExtractor($positionConverter),
+                new TwigRouteReferenceExtractor($positionConverter),
                 new PhpRouteDeclarationExtractor($positionConverter),
                 new YamlRouteDeclarationExtractor($positionConverter),
             ),

@@ -51,6 +51,34 @@ final class RouteCompletionHandlerTest extends TestCase
         ]) ?? [], 'label'));
     }
 
+    public function testCompletesRouteNamesInTwigFunctions(): void
+    {
+        $uri = 'file:///workspace/templates/article.html.twig';
+        $text = "{{ path('article_') }}";
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'twig', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $indexes = new RouteIndexRegistry();
+        $indexes->forProject($project)->replace(
+            new Route('article_show', '/article/{id}', [], [], null, null),
+            new Route('homepage', '/', [], [], null, null),
+        );
+        $converter = new PositionConverter();
+        $cursor = strpos($text, 'article_') + \strlen('article_');
+        $position = $converter->toPosition($text, $cursor);
+        $handler = new RouteCompletionHandler(
+            new DocumentContextResolver($documents, $projects),
+            $converter,
+            $indexes,
+        );
+
+        self::assertSame(['article_show'], array_column($handler->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line(), 'character' => $position->character()],
+        ]) ?? [], 'label'));
+    }
+
     public function testReturnsRouteCompletionWithUtf16TextEdit(): void
     {
         $uri = 'file:///workspace/src/Controller.php';

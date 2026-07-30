@@ -11,6 +11,7 @@ final class RouteHoverHandler
         private readonly DocumentContextResolver $documentContextResolver,
         private readonly PositionConverter $positionConverter,
         private readonly RouteIndexRegistry $routeIndexes,
+        private readonly TwigRouteReferenceExtractor $twigReferenceExtractor,
     ) {
     }
 
@@ -27,14 +28,14 @@ final class RouteHoverHandler
         }
 
         [$document, $project, $position] = $request;
-        if ('php' !== $document->languageId()) {
+        if (!\in_array($document->languageId(), ['php', 'twig'], true)) {
             return null;
         }
 
-        $reference = (new RouteReferenceExtractor($this->positionConverter))->at(
-            $document->text(),
-            $this->positionConverter->toByteOffset($document->text(), $position),
-        );
+        $offset = $this->positionConverter->toByteOffset($document->text(), $position);
+        $reference = 'twig' === $document->languageId()
+            ? $this->twigReferenceExtractor->at($document->text(), $offset)
+            : (new RouteReferenceExtractor($this->positionConverter))->at($document->text(), $offset);
         if (null === $reference || null === $route = $this->routeIndexes->forProject($project)->get($reference->name())) {
             return null;
         }

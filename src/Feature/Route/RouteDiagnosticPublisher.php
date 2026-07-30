@@ -13,7 +13,8 @@ final class RouteDiagnosticPublisher
         private readonly DocumentStore $documents,
         private readonly ProjectRegistry $projects,
         private readonly RouteIndexRegistry $routeIndexes,
-        private readonly RouteReferenceExtractor $referenceExtractor,
+        private readonly RouteReferenceExtractor $phpReferenceExtractor,
+        private readonly TwigRouteReferenceExtractor $twigReferenceExtractor,
     ) {
     }
 
@@ -30,7 +31,7 @@ final class RouteDiagnosticPublisher
         $uri = $textDocument['uri'];
         $document = $this->documents->get($uri);
         $project = $this->projects->forDocumentUri($uri);
-        if (null === $document || null === $project || 'php' !== $document->languageId()) {
+        if (null === $document || null === $project || !\in_array($document->languageId(), ['php', 'twig'], true)) {
             return;
         }
 
@@ -40,7 +41,10 @@ final class RouteDiagnosticPublisher
         }
 
         $diagnostics = [];
-        foreach ($this->referenceExtractor->extract($document->text()) as $reference) {
+        $references = 'twig' === $document->languageId()
+            ? $this->twigReferenceExtractor->extract($document->text())
+            : $this->phpReferenceExtractor->extract($document->text());
+        foreach ($references as $reference) {
             $range = [
                 'start' => [
                     'line' => $reference->range()->start()->line(),

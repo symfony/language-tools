@@ -11,6 +11,7 @@ use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
+use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -103,6 +104,23 @@ final class RouteDiagnosticPublisherTest extends TestCase
         self::assertSame([], $client->notifications[0]['params']['diagnostics']);
     }
 
+    public function testDiagnosesUnknownRoutesInTwig(): void
+    {
+        $uri = 'file:///workspace/templates/navigation.html.twig';
+        [$publisher, $client] = $this->publisher(
+            $uri,
+            "{{ path('missing_route') }}",
+            languageId: 'twig',
+        );
+
+        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+
+        $diagnostics = $client->notifications[0]['params']['diagnostics'];
+        self::assertIsArray($diagnostics);
+        self::assertIsArray($diagnostics[0]);
+        self::assertSame('route.not_found', $diagnostics[0]['code']);
+    }
+
     public function testDoesNotDiagnoseBeforeCompleteRuntimeMetadataIsAvailable(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
@@ -127,6 +145,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $projects,
             new RouteIndexRegistry(),
             new RouteReferenceExtractor($positionConverter),
+            new TwigRouteReferenceExtractor($positionConverter),
         );
 
         $publisher->publish(['textDocument' => ['uri' => $uri]]);
@@ -150,11 +169,15 @@ final class RouteDiagnosticPublisherTest extends TestCase
     /**
      * @return array{RouteDiagnosticPublisher, DiagnosticClient}
      */
-    private function publisher(string $uri, string $text, ?Route $route = null): array
-    {
+    private function publisher(
+        string $uri,
+        string $text,
+        ?Route $route = null,
+        string $languageId = 'php',
+    ): array {
         $client = new DiagnosticClient();
         $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 1, $text));
+        $documents->open(new Document($uri, $languageId, 1, $text));
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $routeIndexes = new RouteIndexRegistry();
@@ -170,6 +193,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 $projects,
                 $routeIndexes,
                 new RouteReferenceExtractor($positionConverter),
+                new TwigRouteReferenceExtractor($positionConverter),
             ),
             $client,
         ];

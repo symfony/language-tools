@@ -3,13 +3,12 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\PositionConverter;
 
 final class RouteDefinitionHandler
 {
     public function __construct(
         private readonly DocumentContextResolver $documentContextResolver,
-        private readonly PositionConverter $positionConverter,
+        private readonly RouteSymbolResolver $symbolResolver,
         private readonly RouteDeclarationIndexRegistry $declarationIndexes,
     ) {
     }
@@ -27,15 +26,12 @@ final class RouteDefinitionHandler
         }
 
         [$document, $project, $position] = $request;
-        if ('php' !== $document->languageId()) {
+        if (!\in_array($document->languageId(), ['php', 'twig'], true)) {
             return null;
         }
 
-        $reference = (new RouteReferenceExtractor($this->positionConverter))->at(
-            $document->text(),
-            $this->positionConverter->toByteOffset($document->text(), $position),
-        );
-        if (null === $reference) {
+        $symbol = $this->symbolResolver->resolve($document->uri(), $document->text(), $position);
+        if (null === $symbol) {
             return null;
         }
 
@@ -53,7 +49,7 @@ final class RouteDefinitionHandler
                     ],
                 ],
             ],
-            $this->declarationIndexes->forProject($project)->find($reference->name()),
+            $this->declarationIndexes->forProject($project)->find($symbol->name()),
         );
     }
 }

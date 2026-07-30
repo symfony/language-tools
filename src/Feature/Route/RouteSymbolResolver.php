@@ -9,7 +9,8 @@ final class RouteSymbolResolver
 {
     public function __construct(
         private readonly PositionConverter $positionConverter,
-        private readonly RouteReferenceExtractor $referenceExtractor,
+        private readonly RouteReferenceExtractor $phpReferenceExtractor,
+        private readonly TwigRouteReferenceExtractor $twigReferenceExtractor,
         private readonly PhpRouteDeclarationExtractor $phpDeclarationExtractor,
         private readonly YamlRouteDeclarationExtractor $yamlDeclarationExtractor,
     ) {
@@ -18,12 +19,14 @@ final class RouteSymbolResolver
     public function resolve(string $uri, string $text, Position $position): ?RouteSymbol
     {
         $offset = $this->positionConverter->toByteOffset($text, $position);
-        $reference = $this->referenceExtractor->at($text, $offset);
+        $extension = strtolower(pathinfo((string) parse_url($uri, \PHP_URL_PATH), \PATHINFO_EXTENSION));
+        $reference = 'twig' === $extension
+            ? $this->twigReferenceExtractor->at($text, $offset)
+            : $this->phpReferenceExtractor->at($text, $offset);
         if (null !== $reference) {
             return new RouteSymbol($reference->name(), $reference->range());
         }
 
-        $extension = strtolower(pathinfo((string) parse_url($uri, \PHP_URL_PATH), \PATHINFO_EXTENSION));
         $declarations = \in_array($extension, ['yaml', 'yml'], true)
             ? $this->yamlDeclarationExtractor->extract($uri, $text)
             : $this->phpDeclarationExtractor->extract($uri, $text);

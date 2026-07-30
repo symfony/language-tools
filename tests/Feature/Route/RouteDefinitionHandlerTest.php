@@ -9,9 +9,14 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
 use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteDefinitionHandler;
+use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
+use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
+use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
+use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -45,7 +50,13 @@ final class RouteDefinitionHandlerTest extends TestCase
         $position = $converter->toPosition($text, $cursor);
         $handler = new RouteDefinitionHandler(
             new DocumentContextResolver($documents, $projects),
-            $converter,
+            new RouteSymbolResolver(
+                $converter,
+                new RouteReferenceExtractor($converter),
+                new TwigRouteReferenceExtractor($converter),
+                new PhpRouteDeclarationExtractor($converter),
+                new YamlRouteDeclarationExtractor($converter),
+            ),
             $declarations,
         );
 

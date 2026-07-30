@@ -28,7 +28,7 @@ final class RouteReferencesHandler
         }
 
         [$document, $project, $position] = $request;
-        if (!\in_array($document->languageId(), ['php', 'yaml'], true)) {
+        if (!\in_array($document->languageId(), ['php', 'twig', 'yaml'], true)) {
             return null;
         }
 

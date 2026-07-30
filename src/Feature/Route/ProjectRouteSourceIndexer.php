@@ -20,7 +20,8 @@ final class ProjectRouteSourceIndexer
         private readonly RouteReferenceIndexRegistry $referenceIndexes,
         private readonly PhpRouteDeclarationExtractor $phpDeclarationExtractor,
         private readonly YamlRouteDeclarationExtractor $yamlDeclarationExtractor,
-        private readonly RouteReferenceExtractor $referenceExtractor,
+        private readonly RouteReferenceExtractor $phpReferenceExtractor,
+        private readonly TwigRouteReferenceExtractor $twigReferenceExtractor,
     ) {
     }
 
@@ -48,7 +49,7 @@ final class ProjectRouteSourceIndexer
         }
 
         $extension = strtolower(pathinfo($path, \PATHINFO_EXTENSION));
-        if ('php' === $extension || \in_array($extension, ['yaml', 'yml'], true)) {
+        if (\in_array($extension, ['php', 'twig', 'yaml', 'yml'], true)) {
             $this->index($project);
         }
     }
@@ -67,15 +68,20 @@ final class ProjectRouteSourceIndexer
             $extension = strtolower(pathinfo($path, \PATHINFO_EXTENSION));
             if ('php' === $extension) {
                 array_push($declarations, ...$this->phpDeclarationExtractor->extract($uri, $text));
-                foreach ($this->referenceExtractor->extract($text) as $reference) {
-                    $references[] = new RouteReferenceLocation(
-                        $reference->name(),
-                        $uri,
-                        $reference->range(),
-                    );
-                }
+                $fileReferences = $this->phpReferenceExtractor->extract($text);
+            } elseif ('twig' === $extension) {
+                $fileReferences = $this->twigReferenceExtractor->extract($text);
             } else {
+                $fileReferences = [];
                 array_push($declarations, ...$this->yamlDeclarationExtractor->extract($uri, $text));
+            }
+
+            foreach ($fileReferences as $reference) {
+                $references[] = new RouteReferenceLocation(
+                    $reference->name(),
+                    $uri,
+                    $reference->range(),
+                );
             }
         }
 
@@ -88,7 +94,7 @@ final class ProjectRouteSourceIndexer
      */
     private function sourceFiles(Project $project): \Generator
     {
-        yield from $this->phpFiles($project->rootPath());
+        yield from $this->ownedSourceFiles($project->rootPath());
 
         $configDirectory = $project->rootPath().'/config';
         if (is_dir($configDirectory)) {
@@ -99,7 +105,7 @@ final class ProjectRouteSourceIndexer
     /**
      * @return \Generator<int, string>
      */
-    private function phpFiles(string $directory): \Generator
+    private function ownedSourceFiles(string $directory): \Generator
     {
         $iterator = new \FilesystemIterator($directory, \FilesystemIterator::SKIP_DOTS);
         foreach ($iterator as $file) {
@@ -109,13 +115,13 @@ final class ProjectRouteSourceIndexer
 
             if ($file->isDir()) {
                 if (!$file->isLink() && !\in_array($file->getFilename(), self::EXCLUDED_DIRECTORIES, true)) {
-                    yield from $this->phpFiles($file->getPathname());
+                    yield from $this->ownedSourceFiles($file->getPathname());
                 }
 
                 continue;
             }
 
-            if ($file->isFile() && 'php' === strtolower($file->getExtension())) {
+            if ($file->isFile() && \in_array(strtolower($file->getExtension()), ['php', 'twig'], true)) {
                 yield $file->getPathname();
             }
         }

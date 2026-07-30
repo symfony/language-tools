@@ -28,11 +28,26 @@ final class RouteCompletionHandler
         }
 
         [$document, $project, $position] = $request;
-        if ('php' !== $document->languageId()) {
+        if (!\in_array($document->languageId(), ['php', 'twig'], true)) {
             return null;
         }
 
         $routeIndex = $this->routeIndexes->forProject($project);
+        if ('twig' === $document->languageId()) {
+            $routeContext = TwigRouteCompletionContext::fromTwig(
+                $document->text(),
+                $position,
+                $this->positionConverter,
+            );
+            if (null === $routeContext) {
+                return null;
+            }
+
+            return $this->withTextEdits(
+                (new RouteCompletionProvider($routeIndex))->complete($routeContext->prefix()),
+                $routeContext->replacementRange(),
+            );
+        }
         $parameterContext = RouteParameterCompletionContext::fromPhp(
             $document->text(),
             $position,
