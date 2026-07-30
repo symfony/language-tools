@@ -14,9 +14,21 @@ use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderRegistry;
 use Symfony\Lsp\Feature\DefinitionProviderRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDefinitionHandler;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDiagnosticProvider;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionHoverHandler;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionReferencesHandler;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionRenameHandler;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexer;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolResolver;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\ProjectServiceSnapshotLoader;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceCompletionHandler;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\HoverProviderRegistry;
 use Symfony\Lsp\Feature\ReferencesProviderRegistry;
@@ -70,6 +82,8 @@ final class LanguageServerFactory
         $statuses = new ProjectIndexStatusRegistry();
         $routeIndexes = new RouteIndexRegistry();
         $serviceIndexes = new ServiceIndexRegistry();
+        $parameterIndexes = new ParameterIndexRegistry();
+        $dependencyInjectionSourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $routeDeclarationIndexes = new RouteDeclarationIndexRegistry();
         $routeReferenceIndexes = new RouteReferenceIndexRegistry();
         $client = new JsonRpcClient($peer);
@@ -79,6 +93,14 @@ final class LanguageServerFactory
         $twigRouteReferenceExtractor = new TwigRouteReferenceExtractor($positionConverter);
         $phpRouteDeclarationExtractor = new PhpRouteDeclarationExtractor($positionConverter);
         $yamlRouteDeclarationExtractor = new YamlRouteDeclarationExtractor($positionConverter);
+        $yamlDependencyInjectionExtractor = new YamlDependencyInjectionExtractor($positionConverter);
+        $autowireExtractor = new PhpAutowireReferenceExtractor($positionConverter);
+        $classExtractor = new PhpClassDeclarationExtractor($positionConverter);
+        $dependencyInjectionSymbolResolver = new DependencyInjectionSymbolResolver(
+            $positionConverter,
+            $yamlDependencyInjectionExtractor,
+            $autowireExtractor,
+        );
         $routeDiagnostics = new RouteDiagnosticPublisher(
             $documents,
             $projects,
@@ -91,6 +113,15 @@ final class LanguageServerFactory
             $documents,
             $projects,
             $routeDiagnostics,
+            new DependencyInjectionDiagnosticProvider(
+                $documents,
+                $projects,
+                $serviceIndexes,
+                $parameterIndexes,
+                $dependencyInjectionSourceIndexes,
+                $yamlDependencyInjectionExtractor,
+                $autowireExtractor,
+            ),
         );
         $runtimeConfiguration = new RuntimeConfiguration();
         $runtimeInitializer = new ObservedRuntimeInitializer(
@@ -101,7 +132,7 @@ final class LanguageServerFactory
                         new NativeProcessRunner(),
                         new RuntimeSnapshotLoaderRegistry(
                             new ProjectRouteSnapshotLoader($routeIndexes),
-                            new ProjectServiceSnapshotLoader($serviceIndexes),
+                            new ProjectServiceSnapshotLoader($serviceIndexes, $parameterIndexes),
                         ),
                         $runtimeConfiguration,
                     ),
@@ -126,11 +157,18 @@ final class LanguageServerFactory
             $routeReferenceExtractor,
             $twigRouteReferenceExtractor,
         );
+        $dependencyInjectionSourceIndexer = new DependencyInjectionSourceIndexer(
+            $dependencyInjectionSourceIndexes,
+            $yamlDependencyInjectionExtractor,
+            $autowireExtractor,
+            $classExtractor,
+        );
         $sourceScanner = new ApplicationSourceScanner(
             $projects,
             $documents,
             $statuses,
             $routeSourceIndexer,
+            $dependencyInjectionSourceIndexer,
         );
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
@@ -176,11 +214,30 @@ final class LanguageServerFactory
                     $documentContextResolver,
                     $positionConverter,
                     $serviceIndexes,
+                    $parameterIndexes,
+                    $dependencyInjectionSourceIndexes,
                 ),
             ),
-            new HoverProviderRegistry($routeHover),
+            new HoverProviderRegistry(
+                $routeHover,
+                new DependencyInjectionHoverHandler(
+                    $documentContextResolver,
+                    $dependencyInjectionSymbolResolver,
+                    $serviceIndexes,
+                    $parameterIndexes,
+                    $dependencyInjectionSourceIndexes,
+                ),
+            ),
             $diagnosticProviders,
-            new DefinitionProviderRegistry($routeDefinition),
+            new DefinitionProviderRegistry(
+                $routeDefinition,
+                new DependencyInjectionDefinitionHandler(
+                    $documentContextResolver,
+                    $dependencyInjectionSymbolResolver,
+                    $dependencyInjectionSourceIndexes,
+                    $serviceIndexes,
+                ),
+            ),
             new RouteDocumentLinkHandler(
                 $documents,
                 $projects,
@@ -188,8 +245,24 @@ final class LanguageServerFactory
                 $routeReferenceExtractor,
                 $twigRouteReferenceExtractor,
             ),
-            new ReferencesProviderRegistry($routeReferences),
-            new RenameProviderRegistry($routeRename),
+            new ReferencesProviderRegistry(
+                $routeReferences,
+                new DependencyInjectionReferencesHandler(
+                    $documentContextResolver,
+                    $dependencyInjectionSymbolResolver,
+                    $dependencyInjectionSourceIndexes,
+                ),
+            ),
+            new RenameProviderRegistry(
+                $routeRename,
+                new DependencyInjectionRenameHandler(
+                    $documentContextResolver,
+                    $dependencyInjectionSymbolResolver,
+                    $dependencyInjectionSourceIndexes,
+                    $serviceIndexes,
+                    $parameterIndexes,
+                ),
+            ),
             new ProjectRuntimeRefresher(
                 $projects,
                 $workspaceTrust,

@@ -8,7 +8,8 @@ use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
 final class ProjectServiceSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
     public function __construct(
-        private readonly ServiceIndexRegistry $indexes,
+        private readonly ServiceIndexRegistry $serviceIndexes,
+        private readonly ParameterIndexRegistry $parameterIndexes,
     ) {
     }
 
@@ -42,13 +43,25 @@ final class ProjectServiceSnapshotLoader implements RuntimeSnapshotLoaderInterfa
                 $this->strings($item['tags'] ?? null),
                 \is_string($item['decorates'] ?? null) ? $item['decorates'] : null,
                 $this->strings($item['autowiringTypes'] ?? null),
+                $this->strings($item['decorationStack'] ?? null),
             );
         }
 
-        $this->indexes->forProject($project)->replace(
-            true === ($container['complete'] ?? null),
-            ...$services,
-        );
+        $complete = true === ($container['complete'] ?? null);
+        $this->serviceIndexes->forProject($project)->replace($complete, ...$services);
+
+        $parameters = [];
+        foreach (\is_array($container['parameters'] ?? null) ? $container['parameters'] : [] as $item) {
+            if (!\is_array($item) || !\is_string($item['name'] ?? null)) {
+                continue;
+            }
+
+            $parameters[] = new Parameter(
+                $item['name'],
+                \is_string($item['deprecation'] ?? null) ? $item['deprecation'] : null,
+            );
+        }
+        $this->parameterIndexes->forProject($project)->replace($complete, ...$parameters);
     }
 
     /** @return list<string> */

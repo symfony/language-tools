@@ -125,7 +125,7 @@ final class BridgeTest extends TestCase
 
         $snapshot = implode("\n", $output);
         self::assertSame(0, $exitCode, $snapshot);
-        self::assertStringNotContainsString('CANARY_SECRET_VALUE', $snapshot);
+        self::assertStringNotContainsString('CANARY_SECRET_', $snapshot);
         $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
         self::assertIsArray($result);
         self::assertSame([], $result['errors']);
@@ -141,6 +141,7 @@ final class BridgeTest extends TestCase
                 'deprecation' => 'Use app.new_mailer instead.',
                 'tags' => ['kernel.reset', 'monolog.logger'],
                 'decorates' => 'mailer',
+                'decorationStack' => ['app.mailer', 'mailer.inner'],
                 'autowiringTypes' => ['App\\MailerInterface'],
             ],
             [
@@ -152,12 +153,14 @@ final class BridgeTest extends TestCase
                 'deprecation' => null,
                 'tags' => [],
                 'decorates' => null,
+                'decorationStack' => [],
                 'autowiringTypes' => [],
             ],
         ], $result['sections']['container']['items']);
         self::assertSame([
             ['name' => 'app.api_key', 'deprecation' => null],
-            ['name' => 'app.storage_dir', 'deprecation' => null],
+            ['name' => 'app.storage_dir', 'deprecation' => 'Since symfony/dependency-injection 8.0: Use app.data_dir.'],
+            ['name' => 'app.structured', 'deprecation' => null],
         ], $result['sections']['container']['parameters']);
     }
 
@@ -288,12 +291,17 @@ final class BridgeTest extends TestCase
                                     'class' => 'App\\Mailer',
                                     'public' => false,
                                     'lazy' => true,
-                                    'deprecated' => ['message' => 'Use app.new_mailer instead.'],
+                                    'deprecated' => true,
+                                    'deprecation_message' => 'Use app.new_mailer instead.',
                                     'tags' => [
                                         'monolog.logger' => [['channel' => 'mail']],
                                         ['name' => 'kernel.reset'],
                                     ],
                                     'decorates' => 'mailer',
+                                    'decoration_stack' => [
+                                        ['id' => 'app.mailer', 'class' => 'App\\Mailer', 'priority' => 1],
+                                        ['id' => 'mailer.inner', 'class' => 'App\\BaseMailer', 'priority' => 0],
+                                    ],
                                     'arguments' => ['CANARY_SECRET_VALUE'],
                                 ],
                             ],
@@ -302,11 +310,25 @@ final class BridgeTest extends TestCase
                             ],
                         ];
                     } elseif (isset($input->arguments['--types'])) {
-                        $result = ['types' => ['App\\MailerInterface' => ['app.mailer']]];
+                        $result = [
+                            'definitions' => [],
+                            'aliases' => [
+                                'App\\MailerInterface' => ['service' => 'app.mailer', 'public' => false],
+                            ],
+                            'services' => [],
+                        ];
                     } else {
                         $result = ['parameters' => [
                             'app.api_key' => 'CANARY_SECRET_VALUE',
                             'app.storage_dir' => '/private/storage',
+                            'app.structured' => [
+                                'name' => 'CANARY_SECRET_NAME',
+                                'deprecation' => 'CANARY_SECRET_DEPRECATION',
+                            ],
+                            '_deprecations' => [
+                                'app.api_key' => 'CANARY_SECRET_PARAMETER_DEPRECATION',
+                                'app.storage_dir' => 'Since symfony/dependency-injection 8.0: Use app.data_dir.',
+                            ],
                         ]];
                     }
                     $output->write(json_encode($result, JSON_THROW_ON_ERROR));

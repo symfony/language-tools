@@ -104,26 +104,41 @@ from the VS Code command palette.
 What to Test
 ------------
 
-The current prototype provides route completion, hover, definition, references,
-rename and diagnostics in open PHP and Twig files. It also completes effective
-service IDs in YAML service references. Runtime metadata comes from the
-configured Symfony environment.
+The current prototype provides completion, hover, definition, references,
+rename and diagnostics for routes, dependency injection services and parameters.
+Runtime metadata comes from the configured Symfony environment.
 
-Service ID Completion
-~~~~~~~~~~~~~~~~~~~~~
+Services and Parameters
+~~~~~~~~~~~~~~~~~~~~~~~
 
-In a YAML service configuration value, type ``@`` followed by a service ID
-prefix and invoke completion:
+In YAML service configuration, type ``@`` followed by a service ID prefix or
+``%`` followed by a parameter prefix and invoke completion:
 
 .. code-block:: yaml
 
     services:
         App\\Controller\\DemoController:
-            arguments: ['@app.ma']
+            arguments: ['@app.ma', '%app.storage_']
 
-Completion includes private and hidden services from the effective container,
-along with aliases. The completion detail displays the service class or alias
-target. Parameter names and values aren't included in service completion.
+Completion includes private and hidden services, aliases and effective parameter
+names. It is also available for the ``service`` and ``param`` arguments of PHP
+``#[Autowire]`` attributes and for parameter placeholders passed as the first
+attribute argument.
+
+Hover displays safe container metadata such as the service class, alias target,
+visibility, laziness, deprecation, tags, decorator target and autowiring types.
+Parameter hover displays only the name and deprecation. Parameter values are
+discarded inside the runtime bridge and are never displayed or stored.
+
+``Go to Definition`` navigates to application-owned YAML declarations, alias
+declarations and service classes. ``Find All References`` covers YAML references
+and recognized PHP ``#[Autowire]`` attributes. Rename updates application-owned
+YAML declarations and these static references. Dynamic references remain
+unchanged and require confirmation in the rename preview.
+
+Definitely unknown service and parameter references are diagnosed after a
+complete runtime snapshot is available. Optional services aren't diagnosed and
+unknown tags are intentionally accepted.
 
 Route Name Completion
 ~~~~~~~~~~~~~~~~~~~~~
@@ -245,7 +260,7 @@ Current Limitations
 This early build has intentional limitations:
 
 * only ``App\\Kernel`` is discovered;
-* references and rename cover only statically resolved PHP and Twig strings;
+* references and rename cover only statically resolved PHP, Twig and YAML strings;
 * no standalone binary is available;
 * bridge failures aren't shown through a dedicated status UI yet.
 
@@ -262,7 +277,9 @@ messages. If completion returns no results, check the following:
 * ``vendor/autoload.php`` exists in the Symfony application;
 * ``App\\Kernel`` can boot in the ``dev`` environment;
 * ``php bin/console debug:router --format=json --show-aliases`` succeeds;
-* the route call uses one of the high-confidence contexts listed above.
+* ``php bin/console debug:container --format=json --show-hidden`` succeeds;
+* ``php bin/console debug:container --types --format=json`` succeeds;
+* the reference uses one of the high-confidence contexts listed above.
 
 After updating the server checkout, run ``composer install`` when dependencies
 changed. Rebuild and reinstall the VSIX when files under ``editor/vscode/``

@@ -6,13 +6,16 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
+use Symfony\Lsp\Project\Project;
 
 final class ServiceCompletionHandler implements CompletionProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documentContextResolver,
         private readonly PositionConverter $positionConverter,
-        private readonly ServiceIndexRegistry $indexes,
+        private readonly ServiceIndexRegistry $serviceIndexes,
+        private readonly ParameterIndexRegistry $parameterIndexes,
+        private readonly DependencyInjectionSourceIndexRegistry $sourceIndexes,
     ) {
     }
 
@@ -24,31 +27,97 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
         }
 
         [$document, $project, $position] = $request;
-        if ('yaml' !== $document->languageId()) {
+        if (!\in_array($document->languageId(), ['php', 'yaml'], true)) {
             return null;
         }
 
-        $context = ServiceCompletionContext::fromYaml(
-            $document->text(),
-            $position,
-            $this->positionConverter,
-        );
-        if (null === $context) {
+        $parameterContext = 'yaml' === $document->languageId()
+            ? ParameterCompletionContext::fromYaml($document->text(), $position, $this->positionConverter)
+            : ParameterCompletionContext::fromPhp($document->text(), $position, $this->positionConverter);
+        if (null !== $parameterContext) {
+            return $this->completeParameters($project, $parameterContext);
+        }
+
+        $serviceContext = 'yaml' === $document->languageId()
+            ? ServiceCompletionContext::fromYaml($document->text(), $position, $this->positionConverter)
+            : ServiceCompletionContext::fromPhp($document->text(), $position, $this->positionConverter);
+        if (null === $serviceContext) {
             return null;
         }
 
-        return array_map(
-            fn (Service $service): array => [
-                'label' => $service->id(),
-                'kind' => 18,
-                'detail' => $this->detail($service),
-                'textEdit' => $this->textEdit($context->replacementRange(), $service->id()),
-            ],
-            $this->indexes->forProject($project)->matching($context->prefix()),
-        );
+        return $this->completeServices($project, $serviceContext);
     }
 
-    private function detail(Service $service): string
+    /** @return list<array<array-key, mixed>> */
+    private function completeServices(Project $project, ServiceCompletionContext $context): array
+    {
+        $items = [];
+        foreach ($this->serviceIndexes->forProject($project)->matching($context->prefix()) as $service) {
+            $items[$service->id()] = [
+                'label' => $service->id(),
+                'kind' => 18,
+                'detail' => $this->serviceDetail($service),
+                'textEdit' => $this->textEdit($context->replacementRange(), $service->id()),
+            ];
+        }
+
+        $sourceIndex = $this->sourceIndexes->forProject($project);
+        foreach ($sourceIndex->serviceIds() as $id) {
+            if (isset($items[$id]) || !str_starts_with($id, $context->prefix())) {
+                continue;
+            }
+
+            $declaration = $sourceIndex->serviceDeclarations($id)[0] ?? null;
+            $detail = $declaration?->className();
+            if (null !== $declaration?->alias()) {
+                $detail = 'Alias of '.$declaration->alias();
+            }
+            $items[$id] = [
+                'label' => $id,
+                'kind' => 18,
+                'detail' => $detail ?? 'Symfony service',
+                'textEdit' => $this->textEdit($context->replacementRange(), $id),
+            ];
+        }
+        ksort($items);
+
+        return array_values($items);
+    }
+
+    /** @return list<array<array-key, mixed>> */
+    private function completeParameters(Project $project, ParameterCompletionContext $context): array
+    {
+        $items = [];
+        foreach ($this->parameterIndexes->forProject($project)->matching($context->prefix()) as $parameter) {
+            $items[$parameter->name()] = [
+                'label' => $parameter->name(),
+                'kind' => 12,
+                'detail' => null !== $parameter->deprecation() ? 'Deprecated Symfony parameter' : 'Symfony parameter',
+                'textEdit' => $this->textEdit(
+                    $context->replacementRange(),
+                    $context->completionText($parameter->name()),
+                ),
+            ];
+        }
+
+        foreach ($this->sourceIndexes->forProject($project)->parameterNames() as $name) {
+            if (isset($items[$name]) || !str_starts_with($name, $context->prefix())) {
+                continue;
+            }
+
+            $items[$name] = [
+                'label' => $name,
+                'kind' => 12,
+                'detail' => 'Symfony parameter',
+                'textEdit' => $this->textEdit($context->replacementRange(), $context->completionText($name)),
+            ];
+        }
+        ksort($items);
+
+        return array_values($items);
+    }
+
+    private function serviceDetail(Service $service): string
     {
         if (null !== $service->alias()) {
             return 'Alias of '.$service->alias();

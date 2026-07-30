@@ -277,6 +277,12 @@ function normalizeServices(array $container, array $types): array
         $services[$id] = normalizeService($id, $definition, $alias);
     }
 
+    foreach (is_array($container['services'] ?? null) ? $container['services'] : [] as $id => $className) {
+        if (is_string($id) && is_string($className)) {
+            $services[$id] = normalizeService($id, ['class' => $className], null);
+        }
+    }
+
     foreach (is_array($container['aliases'] ?? null) ? $container['aliases'] : [] as $key => $alias) {
         $metadata = is_array($alias) ? $alias : [];
         $id = is_string($metadata['id'] ?? null)
@@ -324,16 +330,25 @@ function normalizeService(string $id, array $metadata, ?string $alias): array
         : (is_array($metadata['decoration'] ?? null) && is_string($metadata['decoration']['service'] ?? null)
             ? $metadata['decoration']['service']
             : null);
+    $decorationStack = [];
+    foreach (is_array($metadata['decoration_stack'] ?? null) ? $metadata['decoration_stack'] : [] as $decorator) {
+        if (is_array($decorator) && is_string($decorator['id'] ?? null)) {
+            $decorationStack[] = $decorator['id'];
+        }
+    }
 
     return [
         'id' => $id,
         'class' => is_string($metadata['class'] ?? null) ? $metadata['class'] : null,
         'alias' => $alias,
         'public' => is_bool($metadata['public'] ?? null) ? $metadata['public'] : null,
-        'lazy' => is_bool($metadata['lazy'] ?? null) ? $metadata['lazy'] : null,
-        'deprecation' => normalizeDeprecation($metadata['deprecated'] ?? $metadata['deprecation'] ?? null),
+        'lazy' => is_bool($metadata['lazy'] ?? null)
+            ? $metadata['lazy']
+            : (is_string($metadata['lazy'] ?? null) && '' !== $metadata['lazy'] ? true : null),
+        'deprecation' => normalizeDeprecation($metadata['deprecation_message'] ?? $metadata['deprecated'] ?? $metadata['deprecation'] ?? null),
         'tags' => $tags,
         'decorates' => $decorates,
+        'decorationStack' => array_values(array_unique($decorationStack)),
         'autowiringTypes' => [],
     ];
 }
@@ -341,20 +356,38 @@ function normalizeService(string $id, array $metadata, ?string $alias): array
 function normalizeAutowiringTypes(array $output): array
 {
     $typesByService = [];
-    $types = is_array($output['types'] ?? null) ? $output['types'] : $output;
-    foreach ($types as $key => $services) {
-        $type = is_string($key)
-            ? $key
-            : (is_array($services) && is_string($services['type'] ?? null) ? $services['type'] : null);
-        if (null === $type) {
-            continue;
+    if (array_key_exists('definitions', $output) || array_key_exists('aliases', $output)) {
+        foreach (is_array($output['definitions'] ?? null) ? $output['definitions'] : [] as $type => $_) {
+            if (is_string($type)) {
+                $typesByService[$type][] = $type;
+            }
         }
+        foreach (is_array($output['aliases'] ?? null) ? $output['aliases'] : [] as $type => $alias) {
+            if (is_string($type) && is_array($alias) && is_string($alias['service'] ?? null)) {
+                $typesByService[$alias['service']][] = $type;
+            }
+        }
+        foreach (is_array($output['services'] ?? null) ? $output['services'] : [] as $type => $_) {
+            if (is_string($type)) {
+                $typesByService[$type][] = $type;
+            }
+        }
+    } else {
+        $types = is_array($output['types'] ?? null) ? $output['types'] : $output;
+        foreach ($types as $key => $services) {
+            $type = is_string($key)
+                ? $key
+                : (is_array($services) && is_string($services['type'] ?? null) ? $services['type'] : null);
+            if (null === $type) {
+                continue;
+            }
 
-        $serviceIds = is_array($services) && array_key_exists('services', $services)
-            ? $services['services']
-            : $services;
-        foreach (serviceIds($serviceIds) as $serviceId) {
-            $typesByService[$serviceId][] = $type;
+            $serviceIds = is_array($services) && array_key_exists('services', $services)
+                ? $services['services']
+                : $services;
+            foreach (serviceIds($serviceIds) as $serviceId) {
+                $typesByService[$serviceId][] = $type;
+            }
         }
     }
 
@@ -393,20 +426,24 @@ function serviceIds(mixed $services): array
 function normalizeParameters(array $output): array
 {
     $parameters = $output['parameters'] ?? $output;
+    $deprecations = [];
+    if (is_array($parameters) && is_array($parameters['_deprecations'] ?? null)) {
+        foreach ($parameters['_deprecations'] as $name => $deprecation) {
+            if (is_string($name) && is_string($deprecation) && str_starts_with($deprecation, 'Since ')) {
+                $deprecations[$name] = $deprecation;
+            }
+        }
+    }
+
     $items = [];
-    foreach (is_array($parameters) ? $parameters : [] as $key => $parameter) {
-        $name = is_array($parameter) && is_string($parameter['name'] ?? null)
-            ? $parameter['name']
-            : (is_string($key) ? $key : null);
-        if (null === $name) {
+    foreach (is_array($parameters) ? $parameters : [] as $name => $_) {
+        if (!is_string($name) || '_deprecations' === $name) {
             continue;
         }
 
         $items[$name] = [
             'name' => $name,
-            'deprecation' => is_array($parameter)
-                ? normalizeDeprecation($parameter['deprecated'] ?? $parameter['deprecation'] ?? null)
-                : null,
+            'deprecation' => $deprecations[$name] ?? null,
         ];
     }
     ksort($items);

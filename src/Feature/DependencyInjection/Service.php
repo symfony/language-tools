@@ -7,6 +7,7 @@ final class Service
     /**
      * @param list<string> $tags
      * @param list<string> $autowiringTypes
+     * @param list<string> $decorationStack
      */
     public function __construct(
         private readonly string $id,
@@ -18,6 +19,7 @@ final class Service
         private readonly array $tags,
         private readonly ?string $decorates,
         private readonly array $autowiringTypes,
+        private readonly array $decorationStack = [],
     ) {
     }
 
@@ -66,5 +68,11 @@ final class Service
     public function autowiringTypes(): array
     {
         return $this->autowiringTypes;
+    }
+
+    /** @return list<string> */
+    public function decorationStack(): array
+    {
+        return $this->decorationStack;
     }
 }

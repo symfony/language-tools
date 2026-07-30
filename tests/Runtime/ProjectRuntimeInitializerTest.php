@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Runtime;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\ProjectServiceSnapshotLoader;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Feature\Route\ProjectRouteSnapshotLoader;
@@ -54,11 +55,15 @@ final class ProjectRuntimeInitializerTest extends TestCase
                     'items' => [
                         ['id' => 'app.mailer', 'class' => 'App\\Mailer'],
                     ],
+                    'parameters' => [
+                        ['name' => 'app.storage_dir'],
+                    ],
                 ],
             ],
         ], \JSON_THROW_ON_ERROR), ''));
         $indexes = new RouteIndexRegistry();
         $serviceIndexes = new ServiceIndexRegistry();
+        $parameterIndexes = new ParameterIndexRegistry();
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
         $configuration = new RuntimeConfiguration();
         $configuration->configure([
@@ -71,7 +76,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             $processRunner,
             new RuntimeSnapshotLoaderRegistry(
                 new ProjectRouteSnapshotLoader($indexes),
-                new ProjectServiceSnapshotLoader($serviceIndexes),
+                new ProjectServiceSnapshotLoader($serviceIndexes, $parameterIndexes),
             ),
             $configuration,
         );
@@ -80,6 +85,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
         self::assertSame('homepage', $indexes->forProject($project)->get('homepage')?->name());
         self::assertSame('app.mailer', $serviceIndexes->forProject($project)->get('app.mailer')?->id());
+        self::assertSame('app.storage_dir', $parameterIndexes->forProject($project)->get('app.storage_dir')?->name());
         self::assertSame('project-php', $processRunner->command[0]);
         self::assertSame('--flag', $processRunner->command[1]);
         self::assertSame('--environment=test', $processRunner->command[4]);

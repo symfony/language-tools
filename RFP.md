@@ -895,7 +895,7 @@ diagnostics must remain standard LSP behavior.
 Each area should have an independent implementation and acceptance checklist so
 features can land step by step without reducing the intended initial scope.
 
-- [ ] Implement dependency injection services and parameters.
+- [x] Implement dependency injection services and parameters.
 - [x] Implement routes and route parameters.
 - [ ] Implement Twig template names and links.
 - [ ] Implement translation keys, domains, and placeholders, with missing-key
