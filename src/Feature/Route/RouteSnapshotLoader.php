@@ -35,6 +35,8 @@ final class RouteSnapshotLoader
                 \is_string($item['host'] ?? null) ? $item['host'] : null,
                 \is_string($item['controller'] ?? null) ? $item['controller'] : null,
                 $this->strings($item['defaults'] ?? null),
+                $this->stringMap($item['requirements'] ?? null),
+                \is_string($item['alias'] ?? null) ? $item['alias'] : null,
             );
         }
 
@@ -49,5 +51,24 @@ final class RouteSnapshotLoader
         }
 
         return array_values(array_filter($values, 'is_string'));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function stringMap(mixed $values): array
+    {
+        if (!\is_array($values)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($values as $key => $value) {
+            if (\is_string($key) && \is_string($value)) {
+                $result[$key] = $value;
+            }
+        }
+
+        return $result;
     }
 }

@@ -5,9 +5,10 @@ namespace Symfony\Lsp\Feature\Route;
 final class Route
 {
     /**
-     * @param list<string> $methods
-     * @param list<string> $schemes
-     * @param list<string> $defaults
+     * @param list<string>          $methods
+     * @param list<string>          $schemes
+     * @param list<string>          $defaults
+     * @param array<string, string> $requirements
      */
     public function __construct(
         private readonly string $name,
@@ -17,6 +18,8 @@ final class Route
         private readonly ?string $host,
         private readonly ?string $controller,
         private readonly array $defaults = [],
+        private readonly array $requirements = [],
+        private readonly ?string $alias = null,
     ) {
     }
 
@@ -50,6 +53,27 @@ final class Route
     public function controller(): ?string
     {
         return $this->controller;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function defaults(): array
+    {
+        return $this->defaults;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function requirements(): array
+    {
+        return $this->requirements;
+    }
+
+    public function alias(): ?string
+    {
+        return $this->alias;
     }
 
     /**

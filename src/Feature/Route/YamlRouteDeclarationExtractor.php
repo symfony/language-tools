@@ -54,6 +54,6 @@ final class YamlRouteDeclarationExtractor
             : \strlen($remaining);
         $block = substr($remaining, 0, $nextEntry);
 
-        return (bool) preg_match('/^\s+(?:path|controller|methods|host|schemes|condition|defaults|requirements|options)\s*:/m', $block);
+        return (bool) preg_match('/^\s+(?:path|controller|methods|host|schemes|condition|defaults|requirements|options|alias)\s*:/m', $block);
     }
 }

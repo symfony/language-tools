@@ -112,6 +112,15 @@ if (in_array('routes', $requestedSections, true)) {
                     ? $route['host']
                     : null;
                 $defaults = is_array($route['defaults'] ?? null) ? $route['defaults'] : [];
+                $requirements = [];
+                foreach (is_array($route['requirements'] ?? null) ? $route['requirements'] : [] as $key => $value) {
+                    if (is_string($key) && (is_string($value) || is_int($value) || is_float($value))) {
+                        $requirements[$key] = (string) $value;
+                    }
+                }
+                $alias = is_string($route['alias'] ?? null)
+                    ? $route['alias']
+                    : (is_string($route['aliasFor'] ?? null) ? $route['aliasFor'] : null);
                 $items[] = [
                     'name' => $name,
                     'path' => is_string($route['path'] ?? null) ? $route['path'] : null,
@@ -125,6 +134,8 @@ if (in_array('routes', $requestedSections, true)) {
                         array_keys($defaults),
                         static fn (mixed $key): bool => is_string($key),
                     )),
+                    'requirements' => $requirements,
+                    'alias' => $alias,
                 ];
             }
 

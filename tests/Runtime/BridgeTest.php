@@ -76,6 +76,17 @@ final class BridgeTest extends TestCase
         self::assertIsArray($result['sections']['routes'] ?? null);
         self::assertSame([
             [
+                'name' => 'article_legacy',
+                'path' => null,
+                'methods' => [],
+                'schemes' => [],
+                'host' => null,
+                'controller' => null,
+                'defaults' => [],
+                'requirements' => [],
+                'alias' => 'article_show',
+            ],
+            [
                 'name' => 'article_show',
                 'path' => '/article/{id}',
                 'methods' => ['GET', 'HEAD'],
@@ -83,6 +94,8 @@ final class BridgeTest extends TestCase
                 'host' => null,
                 'controller' => 'App\\Controller\\ArticleController::show',
                 'defaults' => ['_controller'],
+                'requirements' => ['id' => '\\d+'],
+                'alias' => null,
             ],
             [
                 'name' => 'homepage',
@@ -92,6 +105,8 @@ final class BridgeTest extends TestCase
                 'host' => 'example.com',
                 'controller' => null,
                 'defaults' => [],
+                'requirements' => [],
+                'alias' => null,
             ],
         ], $result['sections']['routes']['items']);
         self::assertTrue($result['sections']['routes']['complete']);
@@ -150,6 +165,13 @@ final class BridgeTest extends TestCase
                 public function run(object $input, object $output): int
                 {
                     $output->write(json_encode([
+                        'article_legacy' => [
+                            'alias' => 'article_show',
+                            'method' => 'ANY',
+                            'scheme' => 'ANY',
+                            'host' => 'ANY',
+                            'defaults' => [],
+                        ],
                         'homepage' => [
                             'path' => '/',
                             'method' => 'ANY',
@@ -163,6 +185,7 @@ final class BridgeTest extends TestCase
                             'scheme' => 'ANY',
                             'host' => 'ANY',
                             'defaults' => ['_controller' => 'App\\Controller\\ArticleController::show'],
+                            'requirements' => ['id' => '\\d+'],
                         ],
                     ], JSON_THROW_ON_ERROR));
 
