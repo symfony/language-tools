@@ -9,6 +9,7 @@ use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
 use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
+use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -20,14 +21,18 @@ final class ProjectRouteSourceIndexerTest extends TestCase
     {
         $this->temporaryDirectory = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
         mkdir($this->temporaryDirectory.'/src', 0777, true);
+        mkdir($this->temporaryDirectory.'/config/routes', 0777, true);
         mkdir($this->temporaryDirectory.'/vendor', 0777, true);
     }
 
     protected function tearDown(): void
     {
         @unlink($this->temporaryDirectory.'/src/Controller.php');
+        @unlink($this->temporaryDirectory.'/config/routes/admin.yaml');
         @unlink($this->temporaryDirectory.'/vendor/Ignored.php');
         @rmdir($this->temporaryDirectory.'/src');
+        @rmdir($this->temporaryDirectory.'/config/routes');
+        @rmdir($this->temporaryDirectory.'/config');
         @rmdir($this->temporaryDirectory.'/vendor');
         @rmdir($this->temporaryDirectory);
     }
@@ -39,6 +44,11 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             #[Route('/article', name: 'article_list')]
             final class Controller {}
             PHP);
+        file_put_contents($this->temporaryDirectory.'/config/routes/admin.yaml', <<<'YAML'
+            admin_dashboard:
+                path: /admin
+                controller: App\Controller\AdminController
+            YAML);
         file_put_contents($this->temporaryDirectory.'/vendor/Ignored.php', <<<'PHP'
             <?php
             #[Route('/ignored', name: 'ignored_route')]
@@ -58,12 +68,14 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             $indexes,
             $referenceIndexes,
             new PhpRouteDeclarationExtractor($positionConverter),
+            new YamlRouteDeclarationExtractor($positionConverter),
             new RouteReferenceExtractor($positionConverter),
         );
 
         $indexer->indexAll();
 
         self::assertCount(1, $indexes->forProject($project)->find('article_list'));
+        self::assertCount(1, $indexes->forProject($project)->find('admin_dashboard'));
         self::assertSame([], $indexes->forProject($project)->find('ignored_route'));
     }
 }

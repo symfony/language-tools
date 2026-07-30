@@ -33,6 +33,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const clientOptions: LanguageClientOptions = {
         documentSelector: [
             { scheme: 'file', language: 'php' },
+            { scheme: 'file', language: 'yaml' },
         ],
         outputChannel,
         traceOutputChannel: outputChannel,

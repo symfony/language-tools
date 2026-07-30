@@ -10,7 +10,8 @@ final class RouteSymbolResolver
     public function __construct(
         private readonly PositionConverter $positionConverter,
         private readonly RouteReferenceExtractor $referenceExtractor,
-        private readonly PhpRouteDeclarationExtractor $declarationExtractor,
+        private readonly PhpRouteDeclarationExtractor $phpDeclarationExtractor,
+        private readonly YamlRouteDeclarationExtractor $yamlDeclarationExtractor,
     ) {
     }
 
@@ -22,7 +23,11 @@ final class RouteSymbolResolver
             return new RouteSymbol($reference->name(), $reference->range());
         }
 
-        foreach ($this->declarationExtractor->extract($uri, $text) as $declaration) {
+        $extension = strtolower(pathinfo((string) parse_url($uri, \PHP_URL_PATH), \PATHINFO_EXTENSION));
+        $declarations = \in_array($extension, ['yaml', 'yml'], true)
+            ? $this->yamlDeclarationExtractor->extract($uri, $text)
+            : $this->phpDeclarationExtractor->extract($uri, $text);
+        foreach ($declarations as $declaration) {
             $start = $this->positionConverter->toByteOffset($text, $declaration->range()->start());
             $end = $this->positionConverter->toByteOffset($text, $declaration->range()->end());
             if ($offset >= $start && $offset <= $end) {

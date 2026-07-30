@@ -19,6 +19,7 @@ use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceLocation;
 use Symfony\Lsp\Feature\Route\RouteRenameHandler;
 use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
+use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -77,6 +78,64 @@ final class RouteRenameHandlerTest extends TestCase
         ], $handler->rename([...$params, 'newName' => 'article_display']));
     }
 
+    public function testRenamesFromYamlDeclaration(): void
+    {
+        $uri = 'file:///workspace/config/routes.yaml';
+        $text = <<<'YAML'
+            article_show:
+                path: /article/{id}
+                controller: App\Controller\ArticleController::show
+            YAML;
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'yaml', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $declarations = new RouteDeclarationIndexRegistry();
+        $declarations->forProject($project)->replace(new RouteDeclaration(
+            'article_show',
+            $uri,
+            new Range(new Position(0, 0), new Position(0, 12)),
+        ));
+        $references = new RouteReferenceIndexRegistry();
+        $references->forProject($project)->replace(new RouteReferenceLocation(
+            'article_show',
+            'file:///workspace/src/ConsumerController.php',
+            new Range(new Position(5, 28), new Position(5, 40)),
+        ));
+        $routes = new RouteIndexRegistry();
+        $routes->forProject($project)->replace(new Route('article_show', '/article/{id}', [], [], null, null));
+        $positionConverter = new PositionConverter();
+        $handler = new RouteRenameHandler(
+            new DocumentContextResolver($documents, $projects),
+            new RouteSymbolResolver(
+                $positionConverter,
+                new RouteReferenceExtractor($positionConverter),
+                new PhpRouteDeclarationExtractor($positionConverter),
+                new YamlRouteDeclarationExtractor($positionConverter),
+            ),
+            $references,
+            $declarations,
+            $routes,
+        );
+
+        $edit = $handler->rename([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => 0, 'character' => 3],
+            'newName' => 'article_display',
+        ]);
+
+        self::assertIsArray($edit);
+        self::assertSame(
+            'file:///workspace/config/routes.yaml',
+            $edit['documentChanges'][0]['textDocument']['uri'],
+        );
+        self::assertSame(
+            'file:///workspace/src/ConsumerController.php',
+            $edit['documentChanges'][1]['textDocument']['uri'],
+        );
+        self::assertSame('article_display', $edit['documentChanges'][0]['edits'][0]['newText']);
+    }
+
     public function testRejectsExistingRouteName(): void
     {
         [$handler, $params] = $this->handler();
@@ -128,6 +187,7 @@ final class RouteRenameHandlerTest extends TestCase
                 $positionConverter,
                 new RouteReferenceExtractor($positionConverter),
                 new PhpRouteDeclarationExtractor($positionConverter),
+                new YamlRouteDeclarationExtractor($positionConverter),
             ),
             $references,
             $declarations,

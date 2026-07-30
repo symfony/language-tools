@@ -24,6 +24,7 @@ use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferencesHandler;
 use Symfony\Lsp\Feature\Route\RouteRenameHandler;
 use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
+use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -63,17 +64,20 @@ final class LanguageServerFactory
         $workspaceTrust = new WorkspaceTrust();
         $documentContextResolver = new DocumentContextResolver($documents, $projects);
         $routeReferenceExtractor = new RouteReferenceExtractor($positionConverter);
-        $routeDeclarationExtractor = new PhpRouteDeclarationExtractor($positionConverter);
+        $phpRouteDeclarationExtractor = new PhpRouteDeclarationExtractor($positionConverter);
+        $yamlRouteDeclarationExtractor = new YamlRouteDeclarationExtractor($positionConverter);
         $routeSymbolResolver = new RouteSymbolResolver(
             $positionConverter,
             $routeReferenceExtractor,
-            $routeDeclarationExtractor,
+            $phpRouteDeclarationExtractor,
+            $yamlRouteDeclarationExtractor,
         );
         $routeSourceIndexer = new ProjectRouteSourceIndexer(
             $projects,
             $routeDeclarationIndexes,
             $routeReferenceIndexes,
-            $routeDeclarationExtractor,
+            $phpRouteDeclarationExtractor,
+            $yamlRouteDeclarationExtractor,
             $routeReferenceExtractor,
         );
         $workspaceConfiguration = new WorkspaceConfiguration(

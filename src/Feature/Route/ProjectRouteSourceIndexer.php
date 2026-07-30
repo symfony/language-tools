@@ -18,7 +18,8 @@ final class ProjectRouteSourceIndexer
         private readonly ProjectRegistry $projects,
         private readonly RouteDeclarationIndexRegistry $declarationIndexes,
         private readonly RouteReferenceIndexRegistry $referenceIndexes,
-        private readonly PhpRouteDeclarationExtractor $declarationExtractor,
+        private readonly PhpRouteDeclarationExtractor $phpDeclarationExtractor,
+        private readonly YamlRouteDeclarationExtractor $yamlDeclarationExtractor,
         private readonly RouteReferenceExtractor $referenceExtractor,
     ) {
     }
@@ -42,7 +43,12 @@ final class ProjectRouteSourceIndexer
 
         $path = parse_url($textDocument['uri'], \PHP_URL_PATH);
         $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null !== $project && \is_string($path) && 'php' === strtolower(pathinfo($path, \PATHINFO_EXTENSION))) {
+        if (null === $project || !\is_string($path)) {
+            return;
+        }
+
+        $extension = strtolower(pathinfo($path, \PATHINFO_EXTENSION));
+        if ('php' === $extension || \in_array($extension, ['yaml', 'yml'], true)) {
             $this->index($project);
         }
     }
@@ -51,25 +57,43 @@ final class ProjectRouteSourceIndexer
     {
         $declarations = [];
         $references = [];
-        foreach ($this->phpFiles($project->rootPath()) as $path) {
+        foreach ($this->sourceFiles($project) as $path) {
             $text = file_get_contents($path);
             if (false === $text) {
                 continue;
             }
 
             $uri = $this->uri($project, $path);
-            array_push($declarations, ...$this->declarationExtractor->extract($uri, $text));
-            foreach ($this->referenceExtractor->extract($text) as $reference) {
-                $references[] = new RouteReferenceLocation(
-                    $reference->name(),
-                    $uri,
-                    $reference->range(),
-                );
+            $extension = strtolower(pathinfo($path, \PATHINFO_EXTENSION));
+            if ('php' === $extension) {
+                array_push($declarations, ...$this->phpDeclarationExtractor->extract($uri, $text));
+                foreach ($this->referenceExtractor->extract($text) as $reference) {
+                    $references[] = new RouteReferenceLocation(
+                        $reference->name(),
+                        $uri,
+                        $reference->range(),
+                    );
+                }
+            } else {
+                array_push($declarations, ...$this->yamlDeclarationExtractor->extract($uri, $text));
             }
         }
 
         $this->declarationIndexes->forProject($project)->replace(...$declarations);
         $this->referenceIndexes->forProject($project)->replace(...$references);
+    }
+
+    /**
+     * @return \Generator<int, string>
+     */
+    private function sourceFiles(Project $project): \Generator
+    {
+        yield from $this->phpFiles($project->rootPath());
+
+        $configDirectory = $project->rootPath().'/config';
+        if (is_dir($configDirectory)) {
+            yield from $this->routeYamlFiles($configDirectory, true);
+        }
     }
 
     /**
@@ -92,6 +116,35 @@ final class ProjectRouteSourceIndexer
             }
 
             if ($file->isFile() && 'php' === strtolower($file->getExtension())) {
+                yield $file->getPathname();
+            }
+        }
+    }
+
+    /**
+     * @return \Generator<int, string>
+     */
+    private function routeYamlFiles(string $directory, bool $root = false): \Generator
+    {
+        $iterator = new \FilesystemIterator($directory, \FilesystemIterator::SKIP_DOTS);
+        foreach ($iterator as $file) {
+            if (!$file instanceof \SplFileInfo) {
+                continue;
+            }
+
+            if ($file->isDir()) {
+                if (!$file->isLink() && (!$root || 'routes' === $file->getFilename())) {
+                    yield from $this->routeYamlFiles($file->getPathname());
+                }
+
+                continue;
+            }
+
+            $extension = strtolower($file->getExtension());
+            if ($file->isFile()
+                && \in_array($extension, ['yaml', 'yml'], true)
+                && (!$root || str_starts_with($file->getBasename('.'.$extension), 'routes'))
+            ) {
                 yield $file->getPathname();
             }
         }

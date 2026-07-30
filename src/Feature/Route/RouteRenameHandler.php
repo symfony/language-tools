@@ -101,7 +101,7 @@ final class RouteRenameHandler
         }
 
         [$document, $project, $position] = $request;
-        if ('php' !== $document->languageId()) {
+        if (!\in_array($document->languageId(), ['php', 'yaml'], true)) {
             return null;
         }
 
