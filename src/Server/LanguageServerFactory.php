@@ -39,6 +39,7 @@ use Symfony\Lsp\Runtime\BridgeInstaller;
 use Symfony\Lsp\Runtime\NativeProcessRunner;
 use Symfony\Lsp\Runtime\ProjectRuntimeInitializer;
 use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
+use Symfony\Lsp\Runtime\ReportingRuntimeInitializer;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 final class LanguageServerFactory
@@ -58,11 +59,14 @@ final class LanguageServerFactory
         $client = new JsonRpcClient($peer);
         $bridgeInstaller = new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', 'dev');
         $runtimeConfiguration = new RuntimeConfiguration();
-        $runtimeInitializer = new ProjectRuntimeInitializer(
-            $bridgeInstaller,
-            new NativeProcessRunner(),
-            $routeIndexes,
-            $runtimeConfiguration,
+        $runtimeInitializer = new ReportingRuntimeInitializer(
+            new ProjectRuntimeInitializer(
+                $bridgeInstaller,
+                new NativeProcessRunner(),
+                $routeIndexes,
+                $runtimeConfiguration,
+            ),
+            $client,
         );
         $workspaceTrust = new WorkspaceTrust();
         $documentContextResolver = new DocumentContextResolver($documents, $projects);
