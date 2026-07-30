@@ -161,29 +161,35 @@ If ``article_show`` has the path ``/article/{slug}``, completion suggests
 Route Hover
 ~~~~~~~~~~~
 
-Hover over a route name in one of the supported PHP calls. The hover displays
-available runtime metadata:
+Hover over a route name in one of the supported PHP or Twig calls. The hover
+displays available runtime metadata:
 
-* route name;
-* path;
-* allowed methods;
+* route name and alias target;
+* path and host;
+* allowed methods and schemes;
+* default parameter names and requirements;
 * controller.
 
 Route Definition
 ~~~~~~~~~~~~~~~~
 
 Use ``Go to Definition`` on a route name to navigate to the matching named PHP
-``#[Route]`` attribute or YAML route declaration. The source index scans
-application-owned PHP files, ``config/routes.yaml`` and YAML files under
-``config/routes/``. It excludes ``vendor/`` and generated files.
+``#[Route]`` attribute, PHP routing configurator call or YAML route declaration.
+Route references also become clickable document links when exactly one source
+declaration is known.
+
+The source index scans application-owned PHP and Twig files,
+``config/routes.yaml`` and YAML files under ``config/routes/``. It excludes
+``vendor/`` and generated files. Unsaved changes in open documents immediately
+overlay the disk-backed source index for navigation, references and rename.
 
 Route References and Rename
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Use ``Find All References`` from a route reference, named PHP ``#[Route]``
-attribute or YAML route declaration to list statically resolved PHP and Twig
-usages. Rename updates those references and PHP or YAML declarations across
-application-owned files.
+attribute, PHP routing configurator call or YAML route declaration to list
+statically resolved PHP and Twig usages. Rename updates those references and PHP
+or YAML declarations across application-owned files.
 
 The rename preview requires confirmation because dynamic route references may
 remain unchanged. It never edits ``vendor/`` or generated files. Renaming to an
@@ -204,9 +210,11 @@ contexts. They update while typing and are cleared when the file closes.
 Route Metadata Refresh
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Saving a PHP file or a ``.yaml`` file under ``config/`` reloads the effective
-route collection. Completion, hover and diagnostics then use the refreshed
-metadata. A failed refresh keeps the previous route collection available.
+Saving a PHP file or a ``.yaml`` file under ``config/`` schedules a debounced
+reload of the effective route collection. Completion, hover and diagnostics
+then use the refreshed metadata. Open-document diagnostics are republished
+afterward. A failed refresh keeps the previous route collection available and
+shows an error without exposing application output.
 
 Current Limitations
 -------------------
@@ -214,9 +222,7 @@ Current Limitations
 This early build has intentional limitations:
 
 * only ``App\\Kernel`` is discovered;
-* route metadata refreshes aren't debounced yet;
 * references and rename cover only statically resolved PHP and Twig strings;
-* PHP routing configurator files aren't indexed yet;
 * no standalone binary is available;
 * bridge failures aren't shown through a dedicated status UI yet.
 
