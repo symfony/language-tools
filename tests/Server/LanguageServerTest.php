@@ -36,6 +36,9 @@ final class LanguageServerTest extends TestCase
                         ],
                         'hoverProvider' => true,
                         'definitionProvider' => true,
+                        'documentLinkProvider' => [
+                            'resolveProvider' => false,
+                        ],
                         'referencesProvider' => true,
                         'renameProvider' => [
                             'prepareProvider' => true,

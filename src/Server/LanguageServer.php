@@ -11,6 +11,7 @@ use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
 use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
 use Symfony\Lsp\Feature\Route\RouteDefinitionHandler;
 use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
+use Symfony\Lsp\Feature\Route\RouteDocumentLinkHandler;
 use Symfony\Lsp\Feature\Route\RouteHoverHandler;
 use Symfony\Lsp\Feature\Route\RouteReferencesHandler;
 use Symfony\Lsp\Feature\Route\RouteRenameHandler;
@@ -31,6 +32,7 @@ final class LanguageServer
         private readonly RouteHoverHandler $routeHoverHandler,
         private readonly RouteDiagnosticPublisher $routeDiagnosticPublisher,
         private readonly RouteDefinitionHandler $routeDefinitionHandler,
+        private readonly RouteDocumentLinkHandler $routeDocumentLinkHandler,
         private readonly RouteReferencesHandler $routeReferencesHandler,
         private readonly RouteRenameHandler $routeRenameHandler,
         private readonly ProjectRuntimeRefresher $projectRuntimeRefresher,
@@ -57,6 +59,7 @@ final class LanguageServer
         $this->dispatcher->onRequest('textDocument/completion', $this->routeCompletionHandler->complete(...));
         $this->dispatcher->onRequest('textDocument/hover', $this->routeHoverHandler->hover(...));
         $this->dispatcher->onRequest('textDocument/definition', $this->routeDefinitionHandler->definition(...));
+        $this->dispatcher->onRequest('textDocument/documentLink', $this->routeDocumentLinkHandler->links(...));
         $this->dispatcher->onRequest('textDocument/references', $this->routeReferencesHandler->references(...));
         $this->dispatcher->onRequest('textDocument/prepareRename', $this->routeRenameHandler->prepare(...));
         $this->dispatcher->onRequest('textDocument/rename', $this->routeRenameHandler->rename(...));
@@ -88,6 +91,9 @@ final class LanguageServer
                 ],
                 'hoverProvider' => true,
                 'definitionProvider' => true,
+                'documentLinkProvider' => [
+                    'resolveProvider' => false,
+                ],
                 'referencesProvider' => true,
                 'renameProvider' => [
                     'prepareProvider' => true,

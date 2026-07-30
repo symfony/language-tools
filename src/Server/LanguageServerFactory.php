@@ -17,6 +17,7 @@ use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
 use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteDefinitionHandler;
 use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
+use Symfony\Lsp\Feature\Route\RouteDocumentLinkHandler;
 use Symfony\Lsp\Feature\Route\RouteHoverHandler;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
@@ -127,6 +128,13 @@ final class LanguageServerFactory
                 $documentContextResolver,
                 $routeSymbolResolver,
                 $routeDeclarationIndexes,
+            ),
+            new RouteDocumentLinkHandler(
+                $documents,
+                $projects,
+                $routeDeclarationIndexes,
+                $routeReferenceExtractor,
+                $twigRouteReferenceExtractor,
             ),
             new RouteReferencesHandler(
                 $documentContextResolver,
