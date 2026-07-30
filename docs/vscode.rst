@@ -72,6 +72,9 @@ workspace's ``.vscode/settings.json`` file:
     {
         "symfonyLsp.serverPath": "/absolute/path/to/lsp/bin/symfony-lsp",
         "symfonyLsp.trustWorkspace": true,
+        "symfonyLsp.phpCommand": ["php"],
+        "symfonyLsp.environment": "dev",
+        "symfonyLsp.debug": true,
         "php.suggest.basic": false
     }
 
@@ -81,14 +84,19 @@ automatically only when running the extension directly from this repository.
 ``symfonyLsp.trustWorkspace`` allows the server to execute application code.
 Runtime indexing needs this permission because it boots ``App\\Kernel`` and
 runs Symfony's structured ``debug:router`` command. Keep it disabled for code
-that you don't trust. With trust disabled, route metadata isn't loaded and the
-currently implemented features return no results.
+that you don't trust. With trust disabled, runtime route metadata isn't loaded;
+source-backed navigation remains available.
+
+``symfonyLsp.phpCommand`` is an argument array used to run the bridge with the
+project's PHP runtime. For example, use ``["symfony", "php"]`` for Symfony CLI
+or ``["ddev", "exec", "php"]`` for DDEV. The selected environment and debug
+mode apply to route metadata indexing.
 
 The PHP suggestion setting is optional. Symfony LSP is designed to coexist with
 a general PHP language server such as Intelephense or PHP Tools. Keep that
 server enabled for PHP diagnostics, types and general completion.
 
-After changing either Symfony LSP setting, run ``Developer: Reload Window``
+After changing a Symfony LSP setting, run ``Developer: Reload Window``
 from the VS Code command palette.
 
 What to Test
@@ -96,7 +104,7 @@ What to Test
 
 The current prototype provides route completion, hover, definition, references,
 rename and diagnostics in open PHP files. It gets effective route metadata from
-the selected application's ``dev`` environment with debug mode enabled.
+the configured Symfony environment.
 
 Route Name Completion
 ~~~~~~~~~~~~~~~~~~~~~
@@ -200,8 +208,6 @@ This early build has intentional limitations:
 
 * only PHP route calls are supported;
 * only ``App\\Kernel`` is discovered;
-* indexing always uses ``dev`` with debug mode enabled;
-* the project PHP command can't be configured yet;
 * route metadata refreshes aren't debounced yet;
 * references and rename cover only statically resolved PHP strings;
 * PHP routing configurator files aren't indexed yet;
