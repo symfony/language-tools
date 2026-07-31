@@ -1,0 +1,23 @@
+name: PHP quality
+
+on:
+    pull_request:
+    push:
+    workflow_dispatch:
+
+jobs:
+    quality:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.4'
+                  coverage: none
+            - uses: ramsey/composer-install@v4
+            - name: Run unit tests
+              run: composer test
+            - name: Run static analysis
+              run: composer phpstan
+            - name: Check coding standards
+              run: composer cs-check
