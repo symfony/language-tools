@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+build="$root/var/build/tree_sitter"
+
+rm -rf "$build"
+mkdir -p "$build"
+cp -R "$root/ext/tree_sitter/." "$build/"
+
+cd "$build"
+phpize
+./configure --enable-symfony-lsp-tree-sitter
+make
+
+printf 'extension=%s\n' "$build/modules/symfony_lsp_tree_sitter.so" > "$build/symfony_lsp_tree_sitter.ini"
+printf '%s\n' "$build/modules/symfony_lsp_tree_sitter.so"

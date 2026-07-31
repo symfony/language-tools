@@ -22,13 +22,16 @@ Installing the Server from Source
 ---------------------------------
 
 Clone this repository outside the Symfony application that you want to edit.
-Install the server dependencies from the repository root:
+Install the server dependencies and build the bundled Twig and YAML parser
+extension from the repository root:
 
 .. code-block:: terminal
 
     $ composer install
+    $ composer tree-sitter:build
 
-The development executable is ``bin/symfony-lsp``. Verify that it starts:
+The development executable is ``bin/symfony-lsp``. It automatically loads the
+locally built parser extension on Unix systems. Verify that it starts:
 
 .. code-block:: terminal
 

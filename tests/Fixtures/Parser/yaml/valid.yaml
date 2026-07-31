@@ -1,0 +1,9 @@
+services:
+    App\Handler\HandlerCollection:
+        arguments:
+            - !tagged_iterator { tag: app.handler, default_priority_method: getPriority }
+            - !service '@app.locator'
+            - !php/const App\Feature::ENABLED
+    App\Listener\AuditListener:
+        tags:
+            - { name: kernel.event_listener, event: !php/const App\Event::NAME }

@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+extension="$root/var/build/tree_sitter/modules/symfony_lsp_tree_sitter.so"
+
+if [ ! -f "$extension" ]; then
+    printf '%s\n' 'The Tree-sitter extension is not built. Run: composer tree-sitter:build' >&2
+    exit 1
+fi
+
+exec php -d "extension=$extension" "$@"

@@ -6,7 +6,7 @@ use Symfony\Lsp\Project\Project;
 
 final class PersistentSourceIndexStore implements SourceIndexStoreInterface
 {
-    private const SCHEMA_VERSION = 1;
+    private const SCHEMA_VERSION = 2;
 
     public function __construct(private readonly string $serverVersion)
     {

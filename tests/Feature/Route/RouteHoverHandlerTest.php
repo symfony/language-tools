@@ -11,6 +11,8 @@ use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteHoverHandler;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -51,7 +53,7 @@ final class RouteHoverHandlerTest extends TestCase
             new DocumentContextResolver($documents, $projects),
             $converter,
             $indexes,
-            new TwigRouteReferenceExtractor($converter),
+            new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser())),
         );
 
         self::assertSame([

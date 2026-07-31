@@ -1,0 +1,10 @@
+framework:
+    router:
+        resource: '%kernel.project_dir%/config/routes.yaml'
+    messenger:
+        routing:
+            App\Message\GenerateReport: [async, failed
+services:
+    App\Handler\HandlerCollection:
+        arguments:
+            - !tagged_iterator { tag: app.handler

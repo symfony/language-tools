@@ -97,6 +97,9 @@ use Symfony\Lsp\Index\IndexCommandHandler;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\ProjectSettings;
@@ -153,13 +156,15 @@ final class LanguageServerFactory
         $workspaceTrust = new WorkspaceTrust();
         $documentContextResolver = new DocumentContextResolver($documents, $projects);
         $routeReferenceExtractor = new RouteReferenceExtractor($positionConverter);
-        $twigRouteReferenceExtractor = new TwigRouteReferenceExtractor($positionConverter);
+        $treeSitterParser = new NativeTreeSitterParser();
+        $twigParser = new TwigDocumentParser($treeSitterParser);
+        $twigRouteReferenceExtractor = new TwigRouteReferenceExtractor($positionConverter, $twigParser);
         $phpRouteDeclarationExtractor = new PhpRouteDeclarationExtractor($positionConverter);
         $yamlRouteDeclarationExtractor = new YamlRouteDeclarationExtractor($positionConverter);
         $yamlDependencyInjectionExtractor = new YamlDependencyInjectionExtractor($positionConverter);
         $autowireExtractor = new PhpAutowireReferenceExtractor($positionConverter);
         $classExtractor = new PhpClassDeclarationExtractor($positionConverter);
-        $yamlConfigurationParser = new YamlConfigurationParser($positionConverter);
+        $yamlConfigurationParser = new YamlConfigurationParser($positionConverter, new YamlDocumentParser($treeSitterParser));
         $messengerExtractor = new MessengerExtractor($positionConverter);
         $messengerProvider = new MessengerProvider(
             $documentContextResolver,
@@ -199,7 +204,7 @@ final class LanguageServerFactory
             $yamlDependencyInjectionExtractor,
             $autowireExtractor,
         );
-        $templateReferenceExtractor = new TemplateReferenceExtractor($positionConverter);
+        $templateReferenceExtractor = new TemplateReferenceExtractor($positionConverter, $twigParser);
         $templateNavigation = new TemplateNavigationProvider(
             $documentContextResolver,
             $documents,

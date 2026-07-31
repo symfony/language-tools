@@ -17,6 +17,8 @@ use Symfony\Lsp\Feature\Security\SecurityRole;
 use Symfony\Lsp\Feature\Security\SecuritySourceIndexRegistry;
 use Symfony\Lsp\Feature\Security\SecurityUserProvider;
 use Symfony\Lsp\Feature\Security\SecurityVoter;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -25,7 +27,7 @@ final class SecurityProviderTest extends TestCase
     public function testExtractsOnlyRecognizedSecuritySymbols(): void
     {
         $converter = new PositionConverter();
-        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter));
+        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser())));
         $php = <<<'PHP'
 <?php
 namespace App;
@@ -102,7 +104,7 @@ PHP;
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter));
+        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser())));
         $indexes = new SecurityIndexRegistry();
         $indexes->forProject($project)->replace(
             [new SecurityFirewall('main', 'users', true, false, true, ['App\\Security\\Authenticator'])],

@@ -880,8 +880,11 @@ diagnostics must remain standard LSP behavior.
   `fabpot/json-rpc-peer` without adding LSP semantics.
 - [x] Implement LSP lifecycle, cancellation, document synchronization, logging,
   and workspace folders on that transport.
-- [ ] Add tolerant PHP, Twig, YAML, XLIFF, JSON translation, and dotenv context
-  extraction with high-confidence Symfony call recognition.
+- [x] Add bundled Tree-sitter parsing for tolerant Twig and YAML context
+  extraction.
+- [ ] Add tolerant PHP context extraction with high-confidence Symfony call
+  recognition.
+- [ ] Complete tolerant XLIFF, JSON translation, and dotenv context extraction.
 - [x] Define the persistent source index, runtime snapshot schema, live-overlay
   model, bridge protocol, normal-cache reuse, and debounced invalidation.
 - [x] Add FrameworkBundle project discovery, `supported_versions` checks,

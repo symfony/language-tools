@@ -9,4 +9,14 @@ use function Amp\ByteStream\getStdout;
 
 require dirname(__DIR__).'/vendor/autoload.php';
 
+if (!function_exists('symfony_lsp_tree_sitter_parse')) {
+    $extension = dirname(__DIR__).'/var/build/tree_sitter/modules/symfony_lsp_tree_sitter.so';
+    if (is_file($extension) && function_exists('pcntl_exec')) {
+        pcntl_exec(\PHP_BINARY, ['-d', 'extension='.$extension, __FILE__, ...array_slice($argv, 1)]);
+    }
+
+    fwrite(\STDERR, "The Symfony LSP Tree-sitter extension is not loaded. Run: composer tree-sitter:build\n");
+    exit(1);
+}
+
 exit((new LanguageServerFactory())->create(getStdin(), getStdout(), getStderr())->run());

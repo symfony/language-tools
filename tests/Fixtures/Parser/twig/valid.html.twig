@@ -1,0 +1,7 @@
+{% extends '@App/base.html.twig' %}
+
+{% block body %}
+    {{ path('article_show', {'slug': article.slug}) }}
+    {% include 'article/_card.html.twig' with {article} only %}
+    <twig:Alert type="success">{{ message|trans }}</twig:Alert>
+{% endblock %}

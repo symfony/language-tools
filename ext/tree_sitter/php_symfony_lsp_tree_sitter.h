@@ -1,0 +1,9 @@
+#ifndef PHP_SYMFONY_LSP_TREE_SITTER_H
+#define PHP_SYMFONY_LSP_TREE_SITTER_H
+
+extern zend_module_entry symfony_lsp_tree_sitter_module_entry;
+#define phpext_symfony_lsp_tree_sitter_ptr &symfony_lsp_tree_sitter_module_entry
+
+#define PHP_SYMFONY_LSP_TREE_SITTER_VERSION "0.1.0"
+
+#endif

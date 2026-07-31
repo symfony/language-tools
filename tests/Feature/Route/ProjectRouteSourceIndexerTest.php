@@ -16,6 +16,8 @@ use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
@@ -85,7 +87,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new PhpRouteDeclarationExtractor($positionConverter),
             new YamlRouteDeclarationExtractor($positionConverter),
             new RouteReferenceExtractor($positionConverter),
-            new TwigRouteReferenceExtractor($positionConverter),
+            new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser())),
         );
         $scanner = new ApplicationSourceScanner(
             $projects,

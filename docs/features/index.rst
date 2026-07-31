@@ -119,8 +119,10 @@ Source Indexes and Overlays
 ---------------------------
 
 The source scanner indexes application-owned PHP, Twig, YAML, translation and
-dotenv files. It excludes ``vendor/``, ``var/``, ``node_modules/`` and Git
-metadata. Versioned source facts persist under
+dotenv files. Twig and YAML use bundled Tree-sitter grammars, preserving useful
+source facts and exact byte ranges around incomplete syntax. The scanner
+excludes ``vendor/``, ``var/``, ``node_modules/`` and Git metadata. Versioned
+source facts persist under
 ``var/symfony-lsp/<server-version>/index/`` with atomic writes. Entries record
 file metadata and content hashes, while corrupted entries rebuild transparently.
 Environment and parameter values are never persisted.

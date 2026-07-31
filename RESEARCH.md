@@ -579,12 +579,20 @@ Recommendation:
 * add incremental parsing only after profiling shows whole-document parsing is
   a bottleneck.
 
-The currently packaged Twig grammar comes from `gbprod/tree-sitter-twig`.
-`kaermorchen/tree-sitter-twig` is another active candidate. Selection should be
-based primarily on technical quality against Symfony and Twig fixtures. Because
-Twig is a Symfony project, creating and maintaining an official Tree-sitter Twig
-grammar is also a valid option and may be preferable if existing grammars are
-incomplete or difficult to evolve.
+The bundled Twig grammar comes from `gbprod/tree-sitter-twig`. An evaluation
+against `kaermorchen/tree-sitter-twig` selected it because generic extension
+tags retained useful structure, its parser corpus passed, and its generated
+parser was substantially smaller. Both grammars recovered useful nodes around
+incomplete expressions. The runtime and grammar revisions are pinned in
+`ext/tree_sitter/README.md`.
+
+The minimal native PHP extension contains only the Tree-sitter runtime and the
+Twig and YAML grammars. It returns named nodes, byte ranges, fields, and error
+metadata without downloading code. The permanent valid and malformed fixtures
+parse in under 0.1 ms each on the development benchmark machine. Whole-document
+parsing is therefore the initial strategy. The benchmark remains available as
+`composer tree-sitter:benchmark` so incremental parsing can be reconsidered if
+real projects show a bottleneck.
 
 Symfony YAML custom tags such as `!tagged_iterator`, `!service`, and
 `!php/const` need dedicated parser fixtures. The grammar need not assign their

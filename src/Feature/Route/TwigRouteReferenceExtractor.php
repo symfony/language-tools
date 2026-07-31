@@ -4,37 +4,54 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
+use Symfony\Lsp\Parser\Twig\TwigDocument;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
 final class TwigRouteReferenceExtractor
 {
+    private readonly TwigDocumentParser $parser;
+
     public function __construct(
         private readonly PositionConverter $positionConverter,
+        ?TwigDocumentParser $parser = null,
     ) {
+        $this->parser = $parser ?? new TwigDocumentParser(new NativeTreeSitterParser());
     }
 
-    /**
-     * @return list<RouteReference>
-     */
+    /** @return list<RouteReference> */
     public function extract(string $text): array
     {
-        preg_match_all(
-            '/\b(?:path|url)\s*\(\s*([\'\"])([^\'\"]+)\1/s',
-            $text,
-            $matches,
-            \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE,
-        );
+        $document = $this->parser->parse($text);
         $references = [];
+        foreach ($document->nodesOfType('function_call') as $call) {
+            $function = $document->directChild($call, 'function_identifier');
+            if (null === $function || !\in_array($document->text($function), ['path', 'url'], true)) {
+                continue;
+            }
+            $argumentsNode = $document->directChild($call, 'arguments');
+            if (null === $argumentsNode) {
+                continue;
+            }
+            $arguments = [];
+            foreach ($document->children($argumentsNode) as $argument) {
+                if ('argument' === $argument->type()) {
+                    $arguments[] = $argument;
+                }
+            }
+            $route = isset($arguments[0]) ? $document->literalString($arguments[0]) : null;
+            if (null === $route) {
+                continue;
+            }
 
-        foreach ($matches as $match) {
-            $name = $match[2][0];
-            $offset = $match[2][1];
             $references[] = new RouteReference(
-                $name,
+                $route[0],
                 new Range(
-                    $this->positionConverter->toPosition($text, $offset),
-                    $this->positionConverter->toPosition($text, $offset + \strlen($name)),
+                    $this->positionConverter->toPosition($text, $route[1]),
+                    $this->positionConverter->toPosition($text, $route[2]),
                 ),
-                $this->providedParameters(substr($text, $match[0][1] + \strlen($match[0][0]))),
+                $this->providedParameters($document, $arguments[1] ?? null),
             );
         }
 
@@ -54,21 +71,36 @@ final class TwigRouteReferenceExtractor
         return null;
     }
 
-    /**
-     * @return list<string>|null
-     */
-    private function providedParameters(string $afterRouteName): ?array
+    /** @return list<string>|null */
+    private function providedParameters(TwigDocument $document, ?TreeSitterNode $argument): ?array
     {
-        if (preg_match('/^\s*\)/', $afterRouteName)) {
+        if (null === $argument) {
             return [];
         }
-
-        if (!preg_match('/^\s*,\s*\{([^{}]*)\}\s*[,)]/s', $afterRouteName, $parameters)) {
+        $value = trim($document->text($argument));
+        if (!str_starts_with($value, '{') || !str_ends_with($value, '}')) {
+            return null;
+        }
+        $hash = $document->firstDescendant($argument, 'hash');
+        if (null === $hash) {
             return null;
         }
 
-        preg_match_all('/([\'\"])([^\'\"]+)\1\s*:/', $parameters[1], $keys);
+        $parameters = [];
+        foreach ($document->children($hash) as $key) {
+            if ('hash_key' !== $key->type()) {
+                continue;
+            }
+            $string = $document->firstString($key);
+            if (null !== $string && null !== $literal = $document->string($string)) {
+                $parameters[] = $literal[0];
+                continue;
+            }
+            if (null !== $name = $document->firstDescendant($key, 'name')) {
+                $parameters[] = $document->text($name);
+            }
+        }
 
-        return array_values(array_unique($keys[2]));
+        return array_values(array_unique($parameters));
     }
 }

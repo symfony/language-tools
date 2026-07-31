@@ -1,0 +1,20 @@
+<?php
+
+/**
+ * @return array{
+ *     hasError: bool,
+ *     nodes: list<array{
+ *         type: string,
+ *         startByte: int,
+ *         endByte: int,
+ *         parent: int,
+ *         field: string|null,
+ *         error: bool,
+ *         missing: bool,
+ *         hasError: bool
+ *     }>
+ * }
+ */
+function symfony_lsp_tree_sitter_parse(string $language, string $source): array
+{
+}

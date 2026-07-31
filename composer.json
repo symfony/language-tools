@@ -32,7 +32,9 @@
         "sort-packages": true
     },
     "scripts": {
-        "test": "phpunit --no-progress",
+        "tree-sitter:build": "./tools/build-tree-sitter-extension",
+        "tree-sitter:benchmark": "./tools/php-with-tree-sitter tools/benchmark-tree-sitter.php",
+        "test": "./tools/php-with-tree-sitter vendor/bin/phpunit --no-progress",
         "phpstan": "phpstan analyze --no-progress",
         "cs-check": "php-cs-fixer fix --show-progress=none --dry-run --diff",
         "cs-fix": "php-cs-fixer fix --show-progress=none"

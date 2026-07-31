@@ -4,6 +4,8 @@ parameters:
         - bin
         - src
         - tests
+    stubFiles:
+        - stubs/tree_sitter.stub
     excludePaths:
         analyseAndScan:
             - tests/Fixtures/RuntimeApplication/*

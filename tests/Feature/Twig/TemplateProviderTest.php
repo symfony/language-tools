@@ -13,12 +13,32 @@ use Symfony\Lsp\Feature\Twig\TemplateCompletionHandler;
 use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TemplateNavigationProvider;
+use Symfony\Lsp\Feature\Twig\TemplateReference;
 use Symfony\Lsp\Feature\Twig\TemplateReferenceExtractor;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
 final class TemplateProviderTest extends TestCase
 {
+    public function testExtractsValidReferencesAroundMalformedTwigWithoutMatchingComments(): void
+    {
+        $extractor = new TemplateReferenceExtractor(new PositionConverter(), new TwigDocumentParser(new NativeTreeSitterParser()));
+        $references = $extractor->extract('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+            {# {% include 'ignored.html.twig' %} #}
+            {{ include(template_name('ignored.html.twig')) }}
+            {% extends 'base.html.twig' %}
+            {{ include('card.html.twig') }}
+            {{ include('unfinished.html.twig'
+            TWIG);
+
+        self::assertSame(
+            ['base.html.twig', 'card.html.twig'],
+            array_map(static fn (TemplateReference $reference): string => $reference->name(), $references),
+        );
+    }
+
     public function testCompletesAndLinksTemplateNames(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
@@ -70,7 +90,7 @@ final class TemplateProviderTest extends TestCase
             new Range(new Position(0, 0), new Position(0, 0)),
         ));
         $converter = new PositionConverter();
-        $extractor = new TemplateReferenceExtractor($converter);
+        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser()));
         $resolver = new DocumentContextResolver($documents, $projects);
 
         return [
