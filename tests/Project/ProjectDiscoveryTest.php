@@ -20,7 +20,16 @@ final class ProjectDiscoveryTest extends TestCase
 
     protected function tearDown(): void
     {
-        @unlink($this->temporaryDirectory.'/composer.json');
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($this->temporaryDirectory, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST,
+        );
+        foreach ($iterator as $file) {
+            if (!$file instanceof \SplFileInfo) {
+                continue;
+            }
+            $file->isDir() ? @rmdir($file->getPathname()) : @unlink($file->getPathname());
+        }
         @rmdir($this->temporaryDirectory);
     }
 
@@ -39,6 +48,29 @@ final class ProjectDiscoveryTest extends TestCase
         self::assertSame($this->temporaryDirectory, $projects[0]->rootPath());
         self::assertSame($uri, $projects[0]->rootUri());
         self::assertSame('^7.4', $projects[0]->frameworkBundleConstraint());
+    }
+
+    public function testDiscoversNestedAndExplicitProjectRoots(): void
+    {
+        mkdir($this->temporaryDirectory.'/apps/admin', 0777, true);
+        mkdir($this->temporaryDirectory.'/apps/ignored', 0777, true);
+        foreach (['admin', 'ignored'] as $name) {
+            file_put_contents($this->temporaryDirectory.'/apps/'.$name.'/composer.json', json_encode([
+                'require' => ['symfony/framework-bundle' => '^8.0'],
+            ], \JSON_THROW_ON_ERROR));
+        }
+        $discovery = new ProjectDiscovery(new UriToPathConverter());
+        $workspace = [['uri' => 'file://'.$this->temporaryDirectory]];
+
+        $projects = $discovery->discover($workspace);
+        self::assertSame([
+            $this->temporaryDirectory.'/apps/admin',
+            $this->temporaryDirectory.'/apps/ignored',
+        ], array_map(static fn (Project $project): string => $project->rootPath(), $projects));
+
+        $projects = $discovery->discover($workspace, ['apps/admin']);
+        self::assertCount(1, $projects);
+        self::assertSame($this->temporaryDirectory.'/apps/admin', $projects[0]->rootPath());
     }
 
     public function testSelectsMostSpecificProjectForDocument(): void

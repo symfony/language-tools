@@ -15,6 +15,20 @@ final class RouteDeclarationIndex
         $this->declarations = array_values($declarations);
     }
 
+    public function replaceSource(string $uri, RouteDeclaration ...$declarations): void
+    {
+        $this->declarations = array_values(array_filter(
+            $this->declarations,
+            static fn (RouteDeclaration $declaration): bool => $declaration->uri() !== $uri,
+        ));
+        array_push($this->declarations, ...$declarations);
+    }
+
+    public function removeSource(string $uri): void
+    {
+        $this->replaceSource($uri);
+    }
+
     public function replaceForUri(string $uri, RouteDeclaration ...$declarations): void
     {
         $this->overlays[$uri] = array_values($declarations);

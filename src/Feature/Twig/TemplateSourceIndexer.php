@@ -22,22 +22,29 @@ final class TemplateSourceIndexer implements SourceIndexProviderInterface
     ) {
     }
 
+    public function name(): string
+    {
+        return 'templates';
+    }
+
     public function begin(Project $project): void
     {
         $this->templates[$project->rootPath()] = [];
         $this->references[$project->rootPath()] = [];
     }
 
-    public function index(Project $project, SourceDocument $document): void
+    public function index(Project $project, SourceDocument $document): TemplateSourceFacts
     {
-        $key = $project->rootPath();
-        if (null !== $declaration = $this->declaration($project, $document->uri())) {
-            $this->templates[$key][] = $declaration;
+        return $this->add($project, $this->extract($project, $document));
+    }
+
+    public function restore(Project $project, mixed $data): void
+    {
+        if (!$data instanceof TemplateSourceFacts) {
+            throw new \UnexpectedValueException('The cached template source facts are invalid.');
         }
-        array_push(
-            $this->references[$key],
-            ...$this->extractor->extract($document->uri(), $document->languageId(), $document->text()),
-        );
+
+        $this->add($project, $data);
     }
 
     public function finish(Project $project): void
@@ -49,18 +56,52 @@ final class TemplateSourceIndexer implements SourceIndexProviderInterface
         unset($this->templates[$key], $this->references[$key]);
     }
 
+    public function replace(Project $project, SourceDocument $document): TemplateSourceFacts
+    {
+        $facts = $this->extract($project, $document);
+        $this->indexes->forProject($project)->replaceSource($facts->uri(), $facts->declaration(), $facts->references());
+
+        return $facts;
+    }
+
+    public function remove(Project $project, string $uri): void
+    {
+        $this->indexes->forProject($project)->removeSource($uri);
+    }
+
     public function overlay(Project $project, Document $document): void
     {
+        $facts = $this->extract($project, new SourceDocument($document->uri(), $document->languageId(), $document->text()));
         $this->indexes->forProject($project)->overlay(
-            $document->uri(),
-            $this->declaration($project, $document->uri()),
-            $this->extractor->extract($document->uri(), $document->languageId(), $document->text()),
+            $facts->uri(),
+            $facts->declaration(),
+            $facts->references(),
         );
     }
 
     public function removeOverlay(Project $project, string $uri): void
     {
         $this->indexes->forProject($project)->removeOverlay($uri);
+    }
+
+    private function add(Project $project, TemplateSourceFacts $facts): TemplateSourceFacts
+    {
+        $key = $project->rootPath();
+        if (null !== $facts->declaration()) {
+            $this->templates[$key][] = $facts->declaration();
+        }
+        array_push($this->references[$key], ...$facts->references());
+
+        return $facts;
+    }
+
+    private function extract(Project $project, SourceDocument $document): TemplateSourceFacts
+    {
+        return new TemplateSourceFacts(
+            $document->uri(),
+            $this->declaration($project, $document->uri()),
+            $this->extractor->extract($document->uri(), $document->languageId(), $document->text()),
+        );
     }
 
     private function declaration(Project $project, string $uri): ?TemplateDeclaration

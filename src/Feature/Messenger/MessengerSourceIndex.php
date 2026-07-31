@@ -17,6 +17,16 @@ final class MessengerSourceIndex
         }
     }
 
+    public function replaceSource(MessengerSourceFacts $source): void
+    {
+        $this->sources[$source->uri()] = $source;
+    }
+
+    public function removeSource(string $uri): void
+    {
+        unset($this->sources[$uri]);
+    }
+
     public function overlay(MessengerSourceFacts $source): void
     {
         $this->overlays[$source->uri()] = $source;

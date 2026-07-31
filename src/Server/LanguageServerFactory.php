@@ -94,7 +94,9 @@ use Symfony\Lsp\Feature\Twig\TemplateReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TemplateSourceIndexer;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\IndexCommandHandler;
+use Symfony\Lsp\Index\PersistentSourceIndexStore;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\ProjectSettings;
@@ -106,6 +108,7 @@ use Symfony\Lsp\Runtime\BridgeInstaller;
 use Symfony\Lsp\Runtime\DebouncedRuntimeRefreshScheduler;
 use Symfony\Lsp\Runtime\NativeProcessRunner;
 use Symfony\Lsp\Runtime\ObservedRuntimeInitializer;
+use Symfony\Lsp\Runtime\ProgressRuntimeInitializer;
 use Symfony\Lsp\Runtime\ProjectRuntimeInitializer;
 use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
 use Symfony\Lsp\Runtime\ReportingRuntimeInitializer;
@@ -115,9 +118,14 @@ use Symfony\Lsp\Runtime\StatusRuntimeInitializer;
 
 final class LanguageServerFactory
 {
-    public function create(ReadableStream $input, WritableStream $output): LanguageServer
+    public function create(ReadableStream $input, WritableStream $output, ?WritableStream $errorOutput = null): LanguageServer
     {
-        $peer = new JsonRpcPeer(new ContentLengthJsonRpcTransport($input, $output));
+        $logger = new ServerLogger($errorOutput);
+        $peer = new JsonRpcPeer(new ContentLengthJsonRpcTransport($input, $output), $logger);
+        $dispatcher = new JsonRpcDispatcher($peer);
+        $dispatcher->onUnhandledError(static function (\Throwable $error) use ($logger): void {
+            $logger->error($error);
+        });
 
         $documents = new DocumentStore();
         $positionConverter = new PositionConverter();
@@ -141,6 +149,7 @@ final class LanguageServerFactory
         $securityIndexes = new SecurityIndexRegistry();
         $securitySourceIndexes = new SecuritySourceIndexRegistry();
         $client = new JsonRpcClient($peer);
+        $progress = new WorkDoneProgressReporter($client);
         $workspaceTrust = new WorkspaceTrust();
         $documentContextResolver = new DocumentContextResolver($documents, $projects);
         $routeReferenceExtractor = new RouteReferenceExtractor($positionConverter);
@@ -259,26 +268,30 @@ final class LanguageServerFactory
         $runtimeConfiguration = new RuntimeConfiguration();
         $runtimeInitializer = new ObservedRuntimeInitializer(
             new ReportingRuntimeInitializer(
-                new StatusRuntimeInitializer(
-                    new ProjectRuntimeInitializer(
-                        new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', 'dev'),
-                        new NativeProcessRunner(),
-                        new RuntimeSnapshotLoaderRegistry(
-                            new ProjectRouteSnapshotLoader($routeIndexes),
-                            new ProjectServiceSnapshotLoader($serviceIndexes, $parameterIndexes),
-                            new ProjectTemplateSnapshotLoader($templateIndexes),
-                            new ProjectTranslationSnapshotLoader($translationIndexes),
-                            new ProjectEnvironmentSnapshotLoader($environmentIndexes),
-                            new ProjectConfigurationSnapshotLoader($configurationIndexes),
-                            new ProjectMessengerSnapshotLoader($messengerIndexes),
-                            new ProjectEventSnapshotLoader($eventIndexes),
-                            new ProjectSecuritySnapshotLoader($securityIndexes),
+                new ProgressRuntimeInitializer(
+                    new StatusRuntimeInitializer(
+                        new ProjectRuntimeInitializer(
+                            new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', 'dev'),
+                            new NativeProcessRunner(),
+                            new RuntimeSnapshotLoaderRegistry(
+                                new ProjectRouteSnapshotLoader($routeIndexes),
+                                new ProjectServiceSnapshotLoader($serviceIndexes, $parameterIndexes),
+                                new ProjectTemplateSnapshotLoader($templateIndexes),
+                                new ProjectTranslationSnapshotLoader($translationIndexes),
+                                new ProjectEnvironmentSnapshotLoader($environmentIndexes),
+                                new ProjectConfigurationSnapshotLoader($configurationIndexes),
+                                new ProjectMessengerSnapshotLoader($messengerIndexes),
+                                new ProjectEventSnapshotLoader($eventIndexes),
+                                new ProjectSecuritySnapshotLoader($securityIndexes),
+                            ),
+                            $runtimeConfiguration,
                         ),
-                        $runtimeConfiguration,
+                        $statuses,
                     ),
-                    $statuses,
+                    $progress,
                 ),
                 $client,
+                $statuses,
             ),
             $diagnosticProviders,
         );
@@ -307,6 +320,9 @@ final class LanguageServerFactory
             $projects,
             $documents,
             $statuses,
+            $progress,
+            new PersistentSourceIndexStore('dev'),
+            new SourceIndexPayloadCodec(),
             $routeSourceIndexer,
             $dependencyInjectionSourceIndexer,
             new TemplateSourceIndexer($templateIndexes, $templateReferenceExtractor),
@@ -321,7 +337,8 @@ final class LanguageServerFactory
             $projects,
             new WorkspaceTrustManager($client, $workspaceTrust, $runtimeInitializer),
             $runtimeConfiguration,
-            new ProjectSettings($client, $projects, $translationConfiguration),
+            new ProjectSettings($client, $projects, $translationConfiguration, $runtimeConfiguration),
+            $positionConverter,
         );
         $routeCompletion = new RouteCompletionHandler($documentContextResolver, $positionConverter, $routeIndexes);
         $routeHover = new RouteHoverHandler(
@@ -351,7 +368,7 @@ final class LanguageServerFactory
 
         return new LanguageServer(
             $peer,
-            new JsonRpcDispatcher($peer),
+            $dispatcher,
             new ServerState(),
             $workspaceConfiguration,
             new DocumentSynchronizer($documents, $positionConverter),
@@ -456,6 +473,7 @@ final class LanguageServerFactory
                 $workspaceTrust,
                 new DebouncedRuntimeRefreshScheduler($runtimeInitializer),
                 $statuses,
+                $runtimeConfiguration,
             ),
             $sourceScanner,
             new IndexCommandHandler(
@@ -464,7 +482,10 @@ final class LanguageServerFactory
                 $sourceScanner,
                 $runtimeInitializer,
                 $statuses,
+                $runtimeConfiguration,
             ),
+            $logger,
+            $progress,
         );
     }
 }

@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Project;
 
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
+use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 final class ProjectSettings
 {
@@ -13,6 +14,7 @@ final class ProjectSettings
         private readonly ClientInterface $client,
         private readonly ProjectRegistry $projects,
         private readonly TranslationConfigurationRegistry $translationConfiguration,
+        private readonly RuntimeConfiguration $runtimeConfiguration,
     ) {
     }
 
@@ -35,7 +37,7 @@ final class ProjectSettings
             $response = $this->client->request('workspace/configuration', [
                 'items' => array_map(static fn (Project $project): array => [
                     'scopeUri' => $project->rootUri(),
-                    'section' => 'symfonyLsp.translationDiagnostics',
+                    'section' => 'symfonyLsp',
                 ], $projects),
             ]);
         } catch (\Throwable) {
@@ -46,8 +48,12 @@ final class ProjectSettings
         }
 
         foreach ($projects as $index => $project) {
-            $value = $response[$index] ?? null;
-            $this->translationConfiguration->configure($project, true === $value);
+            $settings = $response[$index] ?? null;
+            if (!\is_array($settings)) {
+                continue;
+            }
+            $this->translationConfiguration->configure($project, true === ($settings['translationDiagnostics'] ?? null));
+            $this->runtimeConfiguration->configureProject($project, $settings);
         }
     }
 }

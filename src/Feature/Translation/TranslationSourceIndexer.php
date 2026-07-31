@@ -16,14 +16,28 @@ final class TranslationSourceIndexer implements SourceIndexProviderInterface
     {
     }
 
+    public function name(): string
+    {
+        return 'translations';
+    }
+
     public function begin(Project $project): void
     {
         $this->facts[$project->rootPath()] = [];
     }
 
-    public function index(Project $project, SourceDocument $document): void
+    public function index(Project $project, SourceDocument $document): TranslationSourceFacts
     {
-        $this->facts[$project->rootPath()][] = $this->extractor->extract($document->uri(), $document->languageId(), $document->text());
+        return $this->add($project, $this->extract($document));
+    }
+
+    public function restore(Project $project, mixed $data): void
+    {
+        if (!$data instanceof TranslationSourceFacts) {
+            throw new \UnexpectedValueException('The cached translation source facts are invalid.');
+        }
+
+        $this->add($project, $data);
     }
 
     public function finish(Project $project): void
@@ -31,6 +45,19 @@ final class TranslationSourceIndexer implements SourceIndexProviderInterface
         $key = $project->rootPath();
         $this->indexes->forProject($project)->replaceSources(...$this->facts[$key]);
         unset($this->facts[$key]);
+    }
+
+    public function replace(Project $project, SourceDocument $document): TranslationSourceFacts
+    {
+        $facts = $this->extract($document);
+        $this->indexes->forProject($project)->replaceSource($facts);
+
+        return $facts;
+    }
+
+    public function remove(Project $project, string $uri): void
+    {
+        $this->indexes->forProject($project)->removeSource($uri);
     }
 
     public function overlay(Project $project, Document $document): void
@@ -41,5 +68,17 @@ final class TranslationSourceIndexer implements SourceIndexProviderInterface
     public function removeOverlay(Project $project, string $uri): void
     {
         $this->indexes->forProject($project)->removeOverlay($uri);
+    }
+
+    private function add(Project $project, TranslationSourceFacts $facts): TranslationSourceFacts
+    {
+        $this->facts[$project->rootPath()][] = $facts;
+
+        return $facts;
+    }
+
+    private function extract(SourceDocument $document): TranslationSourceFacts
+    {
+        return $this->extractor->extract($document->uri(), $document->languageId(), $document->text());
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Runtime;
 
+use Amp\Cancellation;
 use Symfony\Lsp\Project\Project;
 
 final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
@@ -14,17 +15,33 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
     ) {
     }
 
-    public function initialize(Project $project): void
+    public function initialize(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Reuse, ?Cancellation $cancellation = null): void
     {
+        if (RuntimeRefreshMode::Reuse !== $mode) {
+            $command = RuntimeRefreshMode::Clear === $mode ? 'cache:clear' : 'cache:warmup';
+            $result = $this->processRunner->run([
+                ...$this->configuration->phpCommand($project),
+                $this->configuration->consolePath($project),
+                $command,
+                '--env='.$this->configuration->environment($project),
+                '--no-interaction',
+                ...($this->configuration->debug($project) ? [] : ['--no-debug']),
+            ], $project->rootPath(), $cancellation);
+            if (0 !== $result->exitCode()) {
+                throw new \RuntimeException(\sprintf('The project cache command failed with status %d: %s', $result->exitCode(), trim($result->stderr())));
+            }
+        }
+
+        $cancellation?->throwIfRequested();
         $bridge = $this->bridgeInstaller->install($project);
         $result = $this->processRunner->run([
-            ...$this->configuration->phpCommand(),
+            ...$this->configuration->phpCommand($project),
             $bridge,
             '--project='.$project->rootPath(),
-            '--environment='.$this->configuration->environment(),
-            '--debug='.($this->configuration->debug() ? '1' : '0'),
+            '--environment='.$this->configuration->environment($project),
+            '--debug='.($this->configuration->debug($project) ? '1' : '0'),
             '--sections='.implode(',', $this->snapshotLoaders->sections()),
-        ], $project->rootPath());
+        ], $project->rootPath(), $cancellation);
 
         if (0 !== $result->exitCode()) {
             throw new \RuntimeException(\sprintf('The project bridge failed with status %d: %s', $result->exitCode(), trim($result->stderr())));

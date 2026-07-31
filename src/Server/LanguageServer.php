@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Server;
 
+use Amp\Cancellation;
 use Fabpot\JsonRpc\Exception\JsonRpcException;
 use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcError;
@@ -41,6 +42,8 @@ final class LanguageServer
         private readonly ProjectRuntimeRefresher $projectRuntimeRefresher,
         private readonly ApplicationSourceScanner $sourceScanner,
         private readonly IndexCommandHandler $indexCommandHandler,
+        private readonly ServerLogger $logger,
+        private readonly WorkDoneProgressReporter $progress,
     ) {
         $this->registerHandlers();
     }
@@ -61,15 +64,18 @@ final class LanguageServer
         $this->dispatcher->onNotification('textDocument/didClose', $this->closeDocument(...));
         $this->dispatcher->onNotification('textDocument/didSave', $this->saveDocument(...));
         $this->dispatcher->onNotification('workspace/didChangeConfiguration', $this->changeConfiguration(...));
-        $this->dispatcher->onRequest('textDocument/completion', $this->completionProviders->complete(...));
-        $this->dispatcher->onRequest('textDocument/codeLens', $this->codeLensProviders->codeLenses(...));
-        $this->dispatcher->onRequest('textDocument/hover', $this->hoverProviders->hover(...));
-        $this->dispatcher->onRequest('textDocument/definition', $this->definitionProviders->definition(...));
-        $this->dispatcher->onRequest('textDocument/documentLink', $this->documentLinkProviders->links(...));
-        $this->dispatcher->onRequest('textDocument/references', $this->referencesProviders->references(...));
-        $this->dispatcher->onRequest('textDocument/prepareRename', $this->renameProviders->prepare(...));
-        $this->dispatcher->onRequest('textDocument/rename', $this->renameProviders->rename(...));
-        $this->dispatcher->onRequest('workspace/executeCommand', $this->indexCommandHandler->execute(...));
+        $this->dispatcher->onNotification('workspace/didChangeWorkspaceFolders', $this->changeWorkspaceFolders(...));
+        $this->dispatcher->onNotification('workspace/didChangeWatchedFiles', $this->changeWatchedFiles(...));
+        $this->dispatcher->onNotification('$/setTrace', $this->setTrace(...));
+        $this->dispatcher->onRequest('textDocument/completion', $this->guarded($this->completionProviders->complete(...)));
+        $this->dispatcher->onRequest('textDocument/codeLens', $this->guarded($this->codeLensProviders->codeLenses(...)));
+        $this->dispatcher->onRequest('textDocument/hover', $this->guarded($this->hoverProviders->hover(...)));
+        $this->dispatcher->onRequest('textDocument/definition', $this->guarded($this->definitionProviders->definition(...)));
+        $this->dispatcher->onRequest('textDocument/documentLink', $this->guarded($this->documentLinkProviders->links(...)));
+        $this->dispatcher->onRequest('textDocument/references', $this->guarded($this->referencesProviders->references(...)));
+        $this->dispatcher->onRequest('textDocument/prepareRename', $this->guarded($this->renameProviders->prepare(...)));
+        $this->dispatcher->onRequest('textDocument/rename', $this->guarded($this->renameProviders->rename(...)));
+        $this->dispatcher->onRequest('workspace/executeCommand', $this->executeCommand(...));
         $this->dispatcher->onRequest('shutdown', $this->shutdown(...));
         $this->dispatcher->onNotification('exit', $this->exit(...));
         $this->dispatcher->onCancel('$/cancelRequest', 'id');
@@ -86,12 +92,17 @@ final class LanguageServer
             throw new JsonRpcException(JsonRpcError::INVALID_REQUEST, 'The server is already initialized.');
         }
 
+        $this->progress->initialize($params);
         $this->workspaceConfiguration->initialize($params);
+        $initializationOptions = $params['initializationOptions'] ?? null;
+        if (\is_array($initializationOptions) && \is_string($initializationOptions['trace'] ?? null)) {
+            $this->logger->configure($initializationOptions['trace']);
+        }
         $this->state->markInitialized();
 
         return [
             'capabilities' => [
-                'positionEncoding' => 'utf-16',
+                'positionEncoding' => $this->workspaceConfiguration->positionEncoding(),
                 'textDocumentSync' => 2,
                 'completionProvider' => [
                     'triggerCharacters' => ["'", '"', '@', '%'],
@@ -112,6 +123,13 @@ final class LanguageServer
                     'commands' => [
                         IndexCommandHandler::REFRESH_COMMAND,
                         IndexCommandHandler::STATUS_COMMAND,
+                        IndexCommandHandler::SWITCH_ENVIRONMENT_COMMAND,
+                    ],
+                ],
+                'workspace' => [
+                    'workspaceFolders' => [
+                        'supported' => true,
+                        'changeNotifications' => true,
                     ],
                 ],
             ],
@@ -169,8 +187,56 @@ final class LanguageServer
     {
         async(function (): void {
             $this->workspaceConfiguration->refreshProjectSettings();
+            $this->workspaceConfiguration->requestWorkspaceTrust();
             $this->diagnosticProviders->refreshAll();
         })->ignore();
+    }
+
+    /** @param array<array-key, mixed> $params */
+    private function changeWorkspaceFolders(array $params): void
+    {
+        async(function () use ($params): void {
+            $this->workspaceConfiguration->changeWorkspaceFolders($params);
+            $this->workspaceConfiguration->refreshProjectSettings();
+            $this->sourceScanner->indexAll();
+            $this->workspaceConfiguration->requestWorkspaceTrust();
+        })->ignore();
+    }
+
+    /** @param array<array-key, mixed> $params */
+    private function changeWatchedFiles(array $params): void
+    {
+        $changes = $params['changes'] ?? null;
+        if (!\is_array($changes)) {
+            return;
+        }
+
+        $rediscover = false;
+        foreach ($changes as $change) {
+            if (!\is_array($change) || !\is_string($change['uri'] ?? null) || !\is_int($change['type'] ?? null)) {
+                continue;
+            }
+            $deleted = 3 === $change['type'];
+            $this->sourceScanner->refreshUri($change['uri'], $deleted);
+            $this->projectRuntimeRefresher->refreshUri($change['uri']);
+            if ('composer.json' === basename((string) parse_url($change['uri'], \PHP_URL_PATH))) {
+                $rediscover = true;
+            }
+        }
+
+        if ($rediscover) {
+            $this->workspaceConfiguration->rediscoverProjects();
+            $this->sourceScanner->indexAll();
+            $this->workspaceConfiguration->requestWorkspaceTrust();
+        }
+    }
+
+    /** @param array<array-key, mixed> $params */
+    private function setTrace(array $params): void
+    {
+        if (\is_string($params['value'] ?? null)) {
+            $this->logger->configure($params['value']);
+        }
     }
 
     /**
@@ -183,6 +249,18 @@ final class LanguageServer
             $this->sourceScanner->indexAll();
             $this->workspaceConfiguration->requestWorkspaceTrust();
         })->ignore();
+    }
+
+    /**
+     * @param array<array-key, mixed> $params
+     *
+     * @return list<array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string}}>|null
+     */
+    private function executeCommand(array $params, Cancellation $cancellation): ?array
+    {
+        $this->assertRunning();
+
+        return $this->indexCommandHandler->execute($params, $cancellation);
     }
 
     /**
@@ -205,5 +283,32 @@ final class LanguageServer
     private function exit(array $params): void
     {
         $this->state->requestExit();
+    }
+
+    /**
+     * @param callable(array<array-key, mixed>): mixed $handler
+     *
+     * @return \Closure(array<array-key, mixed>, Cancellation): mixed
+     */
+    private function guarded(callable $handler): \Closure
+    {
+        return function (array $params, Cancellation $cancellation) use ($handler): mixed {
+            $this->assertRunning();
+            $cancellation->throwIfRequested();
+            $result = $handler($params);
+            $cancellation->throwIfRequested();
+
+            return $result;
+        };
+    }
+
+    private function assertRunning(): void
+    {
+        if (!$this->state->isInitialized()) {
+            throw new JsonRpcException(-32002, 'The server has not been initialized.');
+        }
+        if ($this->state->isShutdown()) {
+            throw new JsonRpcException(JsonRpcError::INVALID_REQUEST, 'The server has shut down.');
+        }
     }
 }

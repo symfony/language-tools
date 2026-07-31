@@ -16,14 +16,28 @@ final class EnvironmentSourceIndexer implements SourceIndexProviderInterface
     {
     }
 
+    public function name(): string
+    {
+        return 'environment';
+    }
+
     public function begin(Project $project): void
     {
         $this->facts[$project->rootPath()] = [];
     }
 
-    public function index(Project $project, SourceDocument $document): void
+    public function index(Project $project, SourceDocument $document): EnvironmentSourceFacts
     {
-        $this->facts[$project->rootPath()][] = $this->extractor->extract($document->uri(), $document->languageId(), $document->text());
+        return $this->add($project, $this->extract($document));
+    }
+
+    public function restore(Project $project, mixed $data): void
+    {
+        if (!$data instanceof EnvironmentSourceFacts) {
+            throw new \UnexpectedValueException('The cached environment source facts are invalid.');
+        }
+
+        $this->add($project, $data);
     }
 
     public function finish(Project $project): void
@@ -31,6 +45,19 @@ final class EnvironmentSourceIndexer implements SourceIndexProviderInterface
         $key = $project->rootPath();
         $this->indexes->forProject($project)->replaceSources(...$this->facts[$key]);
         unset($this->facts[$key]);
+    }
+
+    public function replace(Project $project, SourceDocument $document): EnvironmentSourceFacts
+    {
+        $facts = $this->extract($document);
+        $this->indexes->forProject($project)->replaceSource($facts);
+
+        return $facts;
+    }
+
+    public function remove(Project $project, string $uri): void
+    {
+        $this->indexes->forProject($project)->removeSource($uri);
     }
 
     public function overlay(Project $project, Document $document): void
@@ -41,5 +68,17 @@ final class EnvironmentSourceIndexer implements SourceIndexProviderInterface
     public function removeOverlay(Project $project, string $uri): void
     {
         $this->indexes->forProject($project)->removeOverlay($uri);
+    }
+
+    private function add(Project $project, EnvironmentSourceFacts $facts): EnvironmentSourceFacts
+    {
+        $this->facts[$project->rootPath()][] = $facts;
+
+        return $facts;
+    }
+
+    private function extract(SourceDocument $document): EnvironmentSourceFacts
+    {
+        return $this->extractor->extract($document->uri(), $document->languageId(), $document->text());
     }
 }

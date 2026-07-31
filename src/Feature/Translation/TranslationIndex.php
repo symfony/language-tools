@@ -26,6 +26,16 @@ final class TranslationIndex
         }
     }
 
+    public function replaceSource(TranslationSourceFacts $facts): void
+    {
+        $this->sources[$facts->uri()] = $facts;
+    }
+
+    public function removeSource(string $uri): void
+    {
+        unset($this->sources[$uri]);
+    }
+
     public function overlay(TranslationSourceFacts $facts): void
     {
         $this->overlays[$facts->uri()] = $facts;

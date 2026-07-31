@@ -15,6 +15,7 @@ final class ProjectRuntimeRefresher
         private readonly WorkspaceTrust $workspaceTrust,
         private readonly RuntimeRefreshSchedulerInterface $refreshScheduler,
         private readonly ProjectIndexStatusRegistry $statuses,
+        private readonly RuntimeConfiguration $configuration,
     ) {
     }
 
@@ -28,19 +29,35 @@ final class ProjectRuntimeRefresher
             return;
         }
 
-        $project = $this->projects->forDocumentUri($textDocument['uri']);
+        $this->refreshUri($textDocument['uri']);
+    }
+
+    public function refreshUri(string $uri): void
+    {
+        $project = $this->projects->forDocumentUri($uri);
         if (null === $project
+            || !$this->configuration->runtimeIndexing($project)
             || TrustStatus::Trusted !== $this->workspaceTrust->status($project)
-            || !$this->affectsRoutes($project, $textDocument['uri'])
+            || !$this->affectsRuntime($project, $uri)
         ) {
             return;
         }
 
         $this->statuses->runtimeStale($project);
-        $this->refreshScheduler->schedule($project);
+        $this->refreshScheduler->schedule($project, $this->refreshMode($uri));
     }
 
-    private function affectsRoutes(Project $project, string $uri): bool
+    private function refreshMode(string $uri): RuntimeRefreshMode
+    {
+        $path = parse_url($uri, \PHP_URL_PATH);
+        if (\is_string($path) && str_contains(str_replace('\\', '/', $path), '/translations/')) {
+            return RuntimeRefreshMode::Warmup;
+        }
+
+        return RuntimeRefreshMode::Clear;
+    }
+
+    private function affectsRuntime(Project $project, string $uri): bool
     {
         $path = parse_url($uri, \PHP_URL_PATH);
         if (!\is_string($path)) {

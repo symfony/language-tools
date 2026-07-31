@@ -2,16 +2,20 @@
 
 namespace Symfony\Lsp\Index;
 
+use Amp\Cancellation;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\TrustStatus;
 use Symfony\Lsp\Project\WorkspaceTrust;
+use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
+use Symfony\Lsp\Runtime\RuntimeRefreshMode;
 
 final class IndexCommandHandler
 {
     public const REFRESH_COMMAND = 'symfony.refreshIndex';
     public const STATUS_COMMAND = 'symfony.indexStatus';
+    public const SWITCH_ENVIRONMENT_COMMAND = 'symfony.switchEnvironment';
 
     public function __construct(
         private readonly ProjectRegistry $projects,
@@ -19,6 +23,7 @@ final class IndexCommandHandler
         private readonly ApplicationSourceScanner $sourceScanner,
         private readonly RuntimeInitializerInterface $runtimeInitializer,
         private readonly ProjectIndexStatusRegistry $statuses,
+        private readonly RuntimeConfiguration $configuration,
     ) {
     }
 
@@ -27,24 +32,46 @@ final class IndexCommandHandler
      *
      * @return list<array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string}}>|null
      */
-    public function execute(array $params): ?array
+    public function execute(array $params, ?Cancellation $cancellation = null): ?array
     {
         $command = $params['command'] ?? null;
-        if (!\is_string($command) || !\in_array($command, [self::REFRESH_COMMAND, self::STATUS_COMMAND], true)) {
+        if (!\is_string($command) || !\in_array($command, [self::REFRESH_COMMAND, self::STATUS_COMMAND, self::SWITCH_ENVIRONMENT_COMMAND], true)) {
             return null;
         }
 
         $projects = $this->selectedProjects($params);
-        if (self::REFRESH_COMMAND === $command) {
+        if (self::SWITCH_ENVIRONMENT_COMMAND === $command) {
+            $environment = $this->environment($params);
+            if (null === $environment) {
+                return null;
+            }
             foreach ($projects as $project) {
-                $this->sourceScanner->refreshProject($project);
-                if (TrustStatus::Trusted === $this->workspaceTrust->status($project)) {
-                    $this->runtimeInitializer->initialize($project);
+                $cancellation?->throwIfRequested();
+                $this->configuration->setEnvironment($project, $environment);
+                if ($this->configuration->runtimeIndexing($project) && TrustStatus::Trusted === $this->workspaceTrust->status($project)) {
+                    $this->runtimeInitializer->initialize($project, RuntimeRefreshMode::Clear, $cancellation);
+                }
+            }
+        } elseif (self::REFRESH_COMMAND === $command) {
+            foreach ($projects as $project) {
+                $cancellation?->throwIfRequested();
+                $this->sourceScanner->refreshProject($project, $cancellation);
+                if ($this->configuration->runtimeIndexing($project) && TrustStatus::Trusted === $this->workspaceTrust->status($project)) {
+                    $this->runtimeInitializer->initialize($project, cancellation: $cancellation);
                 }
             }
         }
 
         return array_map($this->statuses->status(...), $projects);
+    }
+
+    /** @param array<array-key, mixed> $params */
+    private function environment(array $params): ?string
+    {
+        $arguments = $params['arguments'] ?? null;
+        $environment = \is_array($arguments) ? ($arguments[1] ?? null) : null;
+
+        return \is_string($environment) && preg_match('/^[A-Za-z0-9_.-]+$/', $environment) ? $environment : null;
     }
 
     /**

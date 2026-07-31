@@ -40,6 +40,22 @@ final class TemplateIndex
     }
 
     /** @param list<TemplateReference> $references */
+    public function replaceSource(string $uri, ?TemplateDeclaration $declaration, array $references): void
+    {
+        if (null === $declaration) {
+            unset($this->sources[$uri]);
+        } else {
+            $this->sources[$uri] = $declaration;
+        }
+        $this->references[$uri] = $references;
+    }
+
+    public function removeSource(string $uri): void
+    {
+        unset($this->sources[$uri], $this->references[$uri]);
+    }
+
+    /** @param list<TemplateReference> $references */
     public function overlay(string $uri, ?TemplateDeclaration $declaration, array $references): void
     {
         $this->overlays[$uri] = ['declaration' => $declaration, 'references' => $references];

@@ -39,6 +39,19 @@ final class PositionConverterTest extends TestCase
         self::assertSame(3, $position->character());
     }
 
+    public function testNegotiatesUtf8AndUtf32Positions(): void
+    {
+        $converter = new PositionConverter();
+
+        self::assertSame('utf-8', $converter->negotiate(['utf-8', 'utf-16']));
+        self::assertSame(5, $converter->toPosition('a😀b', 5)->character());
+        self::assertSame(5, $converter->toByteOffset('a😀b', new Position(0, 5)));
+
+        self::assertSame('utf-32', $converter->negotiate(['unsupported', 'utf-32']));
+        self::assertSame(2, $converter->toPosition('a😀b', 5)->character());
+        self::assertSame(5, $converter->toByteOffset('a😀b', new Position(0, 2)));
+    }
+
     public function testAppliesIncrementalChangesWithUtf16Ranges(): void
     {
         $converter = new PositionConverter();

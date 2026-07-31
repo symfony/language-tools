@@ -26,4 +26,14 @@ final class UriToPathConverter
 
         return rtrim(str_replace('\\', '/', $path), '/');
     }
+
+    public function toUri(string $path): string
+    {
+        $path = str_replace('\\', '/', $path);
+        if (!str_starts_with($path, '/')) {
+            $path = '/'.$path;
+        }
+
+        return 'file://'.implode('/', array_map('rawurlencode', explode('/', $path)));
+    }
 }

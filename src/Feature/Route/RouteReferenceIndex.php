@@ -15,6 +15,20 @@ final class RouteReferenceIndex
         $this->references = array_values($references);
     }
 
+    public function replaceSource(string $uri, RouteReferenceLocation ...$references): void
+    {
+        $this->references = array_values(array_filter(
+            $this->references,
+            static fn (RouteReferenceLocation $reference): bool => $reference->uri() !== $uri,
+        ));
+        array_push($this->references, ...$references);
+    }
+
+    public function removeSource(string $uri): void
+    {
+        $this->replaceSource($uri);
+    }
+
     public function replaceForUri(string $uri, RouteReferenceLocation ...$references): void
     {
         $this->overlays[$uri] = array_values($references);

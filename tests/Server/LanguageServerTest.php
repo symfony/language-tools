@@ -50,6 +50,13 @@ final class LanguageServerTest extends TestCase
                             'commands' => [
                                 'symfony.refreshIndex',
                                 'symfony.indexStatus',
+                                'symfony.switchEnvironment',
+                            ],
+                        ],
+                        'workspace' => [
+                            'workspaceFolders' => [
+                                'supported' => true,
+                                'changeNotifications' => true,
                             ],
                         ],
                     ],
@@ -65,6 +72,25 @@ final class LanguageServerTest extends TestCase
                 'result' => null,
             ],
         ], $this->decodeFrames($output->contents()));
+    }
+
+    public function testRejectsFeatureRequestsBeforeInitialization(): void
+    {
+        $input = new ReadableBuffer(
+            $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'textDocument/completion', 'params' => []]).
+            $this->frame(['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []])
+        );
+        $output = new CapturingWritableStream();
+
+        self::assertSame(1, (new LanguageServerFactory())->create($input, $output)->run());
+        self::assertSame([[
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'error' => [
+                'code' => -32002,
+                'message' => 'The server has not been initialized.',
+            ],
+        ]], $this->decodeFrames($output->contents()));
     }
 
     public function testExitWithoutShutdownIsUnsuccessful(): void

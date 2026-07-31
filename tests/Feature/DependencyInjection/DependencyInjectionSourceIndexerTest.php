@@ -13,8 +13,11 @@ use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
+use Symfony\Lsp\Tests\Support\NullProgressReporter;
 
 final class DependencyInjectionSourceIndexerTest extends TestCase
 {
@@ -51,6 +54,9 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
             $projects,
             $documents,
             new ProjectIndexStatusRegistry(),
+            new NullProgressReporter(),
+            new InMemorySourceIndexStore(),
+            new SourceIndexPayloadCodec(),
             new DependencyInjectionSourceIndexer(
                 $indexes,
                 new YamlDependencyInjectionExtractor($converter),

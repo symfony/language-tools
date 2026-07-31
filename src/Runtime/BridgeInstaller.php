@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Runtime;
 
+use Amp\Cancellation;
 use Symfony\Lsp\Project\Project;
 
 final class BridgeInstaller implements RuntimeInitializerInterface
@@ -12,8 +13,9 @@ final class BridgeInstaller implements RuntimeInitializerInterface
     ) {
     }
 
-    public function initialize(Project $project): void
+    public function initialize(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Reuse, ?Cancellation $cancellation = null): void
     {
+        $cancellation?->throwIfRequested();
         $this->install($project);
     }
 

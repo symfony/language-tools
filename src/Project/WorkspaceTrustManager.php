@@ -7,6 +7,9 @@ use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 
 final class WorkspaceTrustManager
 {
+    /** @var array<string, true> */
+    private array $runtimeStarted = [];
+
     public function __construct(
         private readonly ClientInterface $client,
         private readonly WorkspaceTrust $workspaceTrust,
@@ -31,14 +34,19 @@ final class WorkspaceTrustManager
             : TrustStatus::Untrusted;
 
         foreach ($projects->all() as $project) {
-            $this->setStatus($project, $status);
+            $this->workspaceTrust->set($project, $status);
         }
     }
 
     public function requestUnknownDecisions(ProjectRegistry $projects): void
     {
         foreach ($projects->all() as $project) {
-            if (TrustStatus::Unknown !== $this->workspaceTrust->status($project)) {
+            $status = $this->workspaceTrust->status($project);
+            if (TrustStatus::Trusted === $status) {
+                $this->startRuntime($project);
+                continue;
+            }
+            if (TrustStatus::Untrusted === $status) {
                 continue;
             }
 
@@ -56,18 +64,21 @@ final class WorkspaceTrustManager
 
             $trusted = \is_array($response)
                 && 'Trust and enable runtime indexing' === ($response['title'] ?? null);
-            $this->setStatus(
-                $project,
-                $trusted ? TrustStatus::Trusted : TrustStatus::Untrusted,
-            );
+            $status = $trusted ? TrustStatus::Trusted : TrustStatus::Untrusted;
+            $this->workspaceTrust->set($project, $status);
+            if (TrustStatus::Trusted === $status) {
+                $this->startRuntime($project);
+            }
         }
     }
 
-    private function setStatus(Project $project, TrustStatus $status): void
+    private function startRuntime(Project $project): void
     {
-        $this->workspaceTrust->set($project, $status);
-        if (TrustStatus::Trusted === $status) {
-            $this->runtimeInitializer->initialize($project);
+        if (isset($this->runtimeStarted[$project->rootPath()])) {
+            return;
         }
+
+        $this->runtimeStarted[$project->rootPath()] = true;
+        $this->runtimeInitializer->initialize($project);
     }
 }

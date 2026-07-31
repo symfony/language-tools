@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Project;
 
+use Amp\Cancellation;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Project\Project;
@@ -10,6 +11,7 @@ use Symfony\Lsp\Project\TrustStatus;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Project\WorkspaceTrustManager;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
+use Symfony\Lsp\Runtime\RuntimeRefreshMode;
 
 final class WorkspaceTrustManagerTest extends TestCase
 {
@@ -77,7 +79,7 @@ final class CapturingRuntimeInitializer implements RuntimeInitializerInterface
     /** @var list<string> */
     public array $projects = [];
 
-    public function initialize(Project $project): void
+    public function initialize(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Reuse, ?Cancellation $cancellation = null): void
     {
         $this->projects[] = $project->rootPath();
     }

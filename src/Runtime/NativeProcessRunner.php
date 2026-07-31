@@ -2,6 +2,10 @@
 
 namespace Symfony\Lsp\Runtime;
 
+use Amp\Cancellation;
+
+use function Amp\delay;
+
 final class NativeProcessRunner implements ProcessRunnerInterface
 {
     public function __construct(
@@ -13,8 +17,9 @@ final class NativeProcessRunner implements ProcessRunnerInterface
         }
     }
 
-    public function run(array $command, string $workingDirectory): ProcessResult
+    public function run(array $command, string $workingDirectory, ?Cancellation $cancellation = null): ProcessResult
     {
+        $cancellation?->throwIfRequested();
         $pipes = [];
         $process = proc_open($command, [
             0 => ['pipe', 'r'],
@@ -53,11 +58,15 @@ final class NativeProcessRunner implements ProcessRunnerInterface
                     throw new \RuntimeException('The project bridge timed out.');
                 }
 
-                usleep(1000);
+                delay(0.001, cancellation: $cancellation);
             }
 
             $stdout .= stream_get_contents($pipes[1]);
             $stderr .= stream_get_contents($pipes[2]);
+        } catch (\Throwable $error) {
+            proc_terminate($process, 9);
+
+            throw $error;
         } finally {
             fclose($pipes[1]);
             fclose($pipes[2]);

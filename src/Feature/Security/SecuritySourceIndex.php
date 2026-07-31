@@ -17,6 +17,16 @@ final class SecuritySourceIndex
         }
     }
 
+    public function replaceSource(SecuritySourceFacts $source): void
+    {
+        $this->sources[$source->uri()] = $source;
+    }
+
+    public function removeSource(string $uri): void
+    {
+        unset($this->sources[$uri]);
+    }
+
     public function overlay(SecuritySourceFacts $source): void
     {
         $this->overlays[$source->uri()] = $source;

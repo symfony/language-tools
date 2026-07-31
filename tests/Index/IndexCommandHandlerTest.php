@@ -2,17 +2,23 @@
 
 namespace Symfony\Lsp\Tests\Index;
 
+use Amp\Cancellation;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\IndexCommandHandler;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\TrustStatus;
 use Symfony\Lsp\Project\WorkspaceTrust;
+use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
+use Symfony\Lsp\Runtime\RuntimeRefreshMode;
 use Symfony\Lsp\Runtime\StatusRuntimeInitializer;
+use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
+use Symfony\Lsp\Tests\Support\NullProgressReporter;
 
 final class IndexCommandHandlerTest extends TestCase
 {
@@ -42,16 +48,21 @@ final class IndexCommandHandlerTest extends TestCase
             $projects,
             new DocumentStore(),
             $statuses,
+            new NullProgressReporter(),
+            new InMemorySourceIndexStore(),
+            new SourceIndexPayloadCodec(),
         );
         $runtime = new RecordingRuntimeInitializer();
         $workspaceTrust = new WorkspaceTrust();
         $workspaceTrust->set($project, TrustStatus::Trusted);
+        $runtimeConfiguration = new RuntimeConfiguration();
         $handler = new IndexCommandHandler(
             $projects,
             $workspaceTrust,
             $sourceScanner,
             new StatusRuntimeInitializer($runtime, $statuses),
             $statuses,
+            $runtimeConfiguration,
         );
 
         $result = $handler->execute([
@@ -68,6 +79,13 @@ final class IndexCommandHandlerTest extends TestCase
         self::assertSame($result, $handler->execute([
             'command' => IndexCommandHandler::STATUS_COMMAND,
         ]));
+
+        $handler->execute([
+            'command' => IndexCommandHandler::SWITCH_ENVIRONMENT_COMMAND,
+            'arguments' => [$project->rootUri(), 'test'],
+        ]);
+        self::assertSame('test', $runtimeConfiguration->environment($project));
+        self::assertSame(RuntimeRefreshMode::Clear, $runtime->modes[1]);
     }
 }
 
@@ -76,8 +94,12 @@ final class RecordingRuntimeInitializer implements RuntimeInitializerInterface
     /** @var list<string> */
     public array $projects = [];
 
-    public function initialize(Project $project): void
+    /** @var list<RuntimeRefreshMode> */
+    public array $modes = [];
+
+    public function initialize(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Reuse, ?Cancellation $cancellation = null): void
     {
         $this->projects[] = $project->rootPath();
+        $this->modes[] = $mode;
     }
 }

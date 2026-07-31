@@ -8,6 +8,7 @@ use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\ProjectSettings;
+use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 final class ProjectSettingsTest extends TestCase
 {
@@ -17,16 +18,18 @@ final class ProjectSettingsTest extends TestCase
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $configuration = new TranslationConfigurationRegistry();
         $client = new ProjectSettingsClient();
-        $settings = new ProjectSettings($client, $projects, $configuration);
+        $runtime = new RuntimeConfiguration();
+        $settings = new ProjectSettings($client, $projects, $configuration, $runtime);
         $settings->initialize(['capabilities' => ['workspace' => ['configuration' => true]]]);
 
         $settings->refresh();
 
         self::assertTrue($configuration->missingKeyDiagnostics($project));
+        self::assertSame('test', $runtime->environment($project));
         self::assertSame([
             'items' => [[
                 'scopeUri' => 'file:///workspace',
-                'section' => 'symfonyLsp.translationDiagnostics',
+                'section' => 'symfonyLsp',
             ]],
         ], $client->params);
     }
@@ -41,7 +44,7 @@ final class ProjectSettingsClient implements ClientInterface
     {
         $this->params = $params;
 
-        return [true];
+        return [['translationDiagnostics' => true, 'environment' => 'test']];
     }
 
     public function notify(string $method, array $params): void

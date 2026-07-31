@@ -2,28 +2,36 @@
 
 namespace Symfony\Lsp\Tests\Runtime;
 
+use Amp\Cancellation;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Client\ClientInterface;
+use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\ReportingRuntimeInitializer;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
+use Symfony\Lsp\Runtime\RuntimeRefreshMode;
 
 final class ReportingRuntimeInitializerTest extends TestCase
 {
     public function testReportsRefreshFailuresWithoutDiscardingTheServerSession(): void
     {
         $client = new ReportingClient();
+        $statuses = new ProjectIndexStatusRegistry();
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $statuses->runtimeReady($project);
+        $statuses->runtimeFailed($project, new \RuntimeException('failed'));
         $initializer = new ReportingRuntimeInitializer(
             new class implements RuntimeInitializerInterface {
-                public function initialize(Project $project): void
+                public function initialize(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Reuse, ?Cancellation $cancellation = null): void
                 {
                     throw new \RuntimeException('secret=value');
                 }
             },
             $client,
+            $statuses,
         );
 
-        $initializer->initialize(new Project('/workspace', 'file:///workspace', '^8.0'));
+        $initializer->initialize($project);
 
         self::assertSame([[
             'method' => 'window/showMessage',
@@ -32,6 +40,31 @@ final class ReportingRuntimeInitializerTest extends TestCase
                 'message' => 'Symfony LSP could not refresh runtime metadata for "/workspace". The last valid metadata remains active.',
             ],
         ]], $client->notifications);
+    }
+
+    public function testReportsInitialFailureAsStaticOnly(): void
+    {
+        $client = new ReportingClient();
+        $statuses = new ProjectIndexStatusRegistry();
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $statuses->runtimeFailed($project, new \RuntimeException('failed'));
+        $initializer = new ReportingRuntimeInitializer(
+            new class implements RuntimeInitializerInterface {
+                public function initialize(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Reuse, ?Cancellation $cancellation = null): void
+                {
+                    throw new \RuntimeException('secret=value');
+                }
+            },
+            $client,
+            $statuses,
+        );
+
+        $initializer->initialize($project);
+
+        self::assertSame(
+            'Symfony LSP could not initialize runtime metadata for "/workspace". Static-only features remain active.',
+            $client->notifications[0]['params']['message'],
+        );
     }
 }
 

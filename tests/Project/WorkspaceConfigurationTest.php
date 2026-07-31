@@ -2,8 +2,10 @@
 
 namespace Symfony\Lsp\Tests\Project;
 
+use Amp\Cancellation;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Client\ClientInterface;
+use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectDiscovery;
@@ -15,6 +17,7 @@ use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Project\WorkspaceTrustManager;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
+use Symfony\Lsp\Runtime\RuntimeRefreshMode;
 
 final class WorkspaceConfigurationTest extends TestCase
 {
@@ -44,13 +47,16 @@ final class WorkspaceConfigurationTest extends TestCase
             $registry,
             new WorkspaceTrustManager($this->client(), new WorkspaceTrust(), $this->runtimeInitializer()),
             $runtimeConfiguration,
-            new ProjectSettings($this->client(), $registry, new TranslationConfigurationRegistry()),
+            new ProjectSettings($this->client(), $registry, new TranslationConfigurationRegistry(), $runtimeConfiguration),
+            new PositionConverter(),
         );
 
         $configuration->initialize([
             'rootUri' => 'file://'.$this->temporaryDirectory,
+            'capabilities' => ['general' => ['positionEncodings' => ['utf-8', 'utf-16']]],
             'initializationOptions' => [
                 'phpCommand' => ['symfony', 'php'],
+                'consolePath' => 'app-console',
                 'environment' => 'test',
                 'debug' => false,
             ],
@@ -59,8 +65,40 @@ final class WorkspaceConfigurationTest extends TestCase
         self::assertCount(1, $registry->all());
         self::assertSame('^8.0', $registry->all()[0]->frameworkBundleConstraint());
         self::assertSame(['symfony', 'php'], $runtimeConfiguration->phpCommand());
+        self::assertSame('app-console', $runtimeConfiguration->consolePath());
         self::assertSame('test', $runtimeConfiguration->environment());
         self::assertFalse($runtimeConfiguration->debug());
+        self::assertSame('utf-8', $configuration->positionEncoding());
+    }
+
+    public function testRediscoversProjectsAfterWorkspaceFolderChanges(): void
+    {
+        $registry = new ProjectRegistry();
+        $runtimeConfiguration = new RuntimeConfiguration();
+        $configuration = new WorkspaceConfiguration(
+            new ProjectDiscovery(new UriToPathConverter()),
+            $registry,
+            new WorkspaceTrustManager($this->client(), new WorkspaceTrust(), $this->runtimeInitializer()),
+            $runtimeConfiguration,
+            new ProjectSettings($this->client(), $registry, new TranslationConfigurationRegistry(), $runtimeConfiguration),
+            new PositionConverter(),
+        );
+        $rootUri = 'file://'.$this->temporaryDirectory;
+        $configuration->initialize(['workspaceFolders' => [['uri' => $rootUri]]]);
+        mkdir($this->temporaryDirectory.'/nested');
+        file_put_contents($this->temporaryDirectory.'/nested/composer.json', json_encode([
+            'require' => ['symfony/framework-bundle' => '^8.1'],
+        ], \JSON_THROW_ON_ERROR));
+
+        $configuration->changeWorkspaceFolders(['event' => [
+            'removed' => [['uri' => $rootUri]],
+            'added' => [['uri' => $rootUri.'/nested']],
+        ]]);
+
+        self::assertCount(1, $registry->all());
+        self::assertSame($this->temporaryDirectory.'/nested', $registry->all()[0]->rootPath());
+        unlink($this->temporaryDirectory.'/nested/composer.json');
+        rmdir($this->temporaryDirectory.'/nested');
     }
 
     private function client(): ClientInterface
@@ -80,7 +118,7 @@ final class WorkspaceConfigurationTest extends TestCase
     private function runtimeInitializer(): RuntimeInitializerInterface
     {
         return new class implements RuntimeInitializerInterface {
-            public function initialize(Project $project): void
+            public function initialize(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Reuse, ?Cancellation $cancellation = null): void
             {
             }
         };

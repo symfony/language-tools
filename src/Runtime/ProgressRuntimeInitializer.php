@@ -4,32 +4,33 @@ namespace Symfony\Lsp\Runtime;
 
 use Amp\Cancellation;
 use Amp\CancelledException;
-use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Progress\ProgressReporterInterface;
 use Symfony\Lsp\Project\Project;
 
-final class StatusRuntimeInitializer implements RuntimeInitializerInterface
+final class ProgressRuntimeInitializer implements RuntimeInitializerInterface
 {
     public function __construct(
         private readonly RuntimeInitializerInterface $initializer,
-        private readonly ProjectIndexStatusRegistry $statuses,
+        private readonly ProgressReporterInterface $progress,
     ) {
     }
 
     public function initialize(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Reuse, ?Cancellation $cancellation = null): void
     {
-        $this->statuses->runtimeIndexing($project);
-
+        $token = $this->progress->begin('Symfony runtime index', $project->rootPath());
+        $message = 'Runtime index ready';
         try {
             $this->initializer->initialize($project, $mode, $cancellation);
-            $this->statuses->runtimeReady($project);
         } catch (CancelledException $error) {
-            $this->statuses->runtimeStale($project);
+            $message = 'Runtime indexing canceled';
 
             throw $error;
         } catch (\Throwable $error) {
-            $this->statuses->runtimeFailed($project, $error);
+            $message = 'Runtime indexing failed';
 
             throw $error;
+        } finally {
+            $this->progress->end($token, $message);
         }
     }
 }

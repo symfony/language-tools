@@ -9,6 +9,9 @@ final class ProjectIndexStatusRegistry
     /** @var array<string, array{source: array{state: string, error?: string}, runtime: array{state: string, error?: string}}> */
     private array $statuses = [];
 
+    /** @var array<string, true> */
+    private array $hasRuntimeSnapshot = [];
+
     public function sourceIndexing(Project $project): void
     {
         $this->section($project, 'source', 'indexing');
@@ -31,6 +34,7 @@ final class ProjectIndexStatusRegistry
 
     public function runtimeReady(Project $project): void
     {
+        $this->hasRuntimeSnapshot[$project->rootPath()] = true;
         $this->section($project, 'runtime', 'ready');
     }
 
@@ -41,7 +45,8 @@ final class ProjectIndexStatusRegistry
 
     public function runtimeFailed(Project $project, \Throwable $error): void
     {
-        $this->section($project, 'runtime', 'failed', $error->getMessage());
+        $state = isset($this->hasRuntimeSnapshot[$project->rootPath()]) ? 'stale' : 'failed';
+        $this->section($project, 'runtime', $state, $error->getMessage());
     }
 
     /**

@@ -16,14 +16,28 @@ final class EventSourceIndexer implements SourceIndexProviderInterface
     {
     }
 
+    public function name(): string
+    {
+        return 'events';
+    }
+
     public function begin(Project $project): void
     {
         $this->facts[$project->rootPath()] = [];
     }
 
-    public function index(Project $project, SourceDocument $document): void
+    public function index(Project $project, SourceDocument $document): EventSourceFacts
     {
-        $this->facts[$project->rootPath()][] = $this->extractor->extract($document->uri(), $document->languageId(), $document->text());
+        return $this->add($project, $this->extract($document));
+    }
+
+    public function restore(Project $project, mixed $data): void
+    {
+        if (!$data instanceof EventSourceFacts) {
+            throw new \UnexpectedValueException('The cached event source facts are invalid.');
+        }
+
+        $this->add($project, $data);
     }
 
     public function finish(Project $project): void
@@ -31,6 +45,19 @@ final class EventSourceIndexer implements SourceIndexProviderInterface
         $key = $project->rootPath();
         $this->indexes->forProject($project)->replace(...$this->facts[$key]);
         unset($this->facts[$key]);
+    }
+
+    public function replace(Project $project, SourceDocument $document): EventSourceFacts
+    {
+        $facts = $this->extract($document);
+        $this->indexes->forProject($project)->replaceSource($facts);
+
+        return $facts;
+    }
+
+    public function remove(Project $project, string $uri): void
+    {
+        $this->indexes->forProject($project)->removeSource($uri);
     }
 
     public function overlay(Project $project, Document $document): void
@@ -41,5 +68,17 @@ final class EventSourceIndexer implements SourceIndexProviderInterface
     public function removeOverlay(Project $project, string $uri): void
     {
         $this->indexes->forProject($project)->removeOverlay($uri);
+    }
+
+    private function add(Project $project, EventSourceFacts $facts): EventSourceFacts
+    {
+        $this->facts[$project->rootPath()][] = $facts;
+
+        return $facts;
+    }
+
+    private function extract(SourceDocument $document): EventSourceFacts
+    {
+        return $this->extractor->extract($document->uri(), $document->languageId(), $document->text());
     }
 }

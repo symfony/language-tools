@@ -15,8 +15,11 @@ use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
+use Symfony\Lsp\Tests\Support\NullProgressReporter;
 
 final class ProjectRouteSourceIndexerTest extends TestCase
 {
@@ -88,6 +91,9 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             $projects,
             $documents,
             new ProjectIndexStatusRegistry(),
+            new NullProgressReporter(),
+            new InMemorySourceIndexStore(),
+            new SourceIndexPayloadCodec(),
             $indexer,
         );
 
@@ -97,6 +103,10 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         self::assertCount(1, $indexes->forProject($project)->find('admin_dashboard'));
         self::assertCount(1, $referenceIndexes->forProject($project)->find('article_list'));
         self::assertSame([], $indexes->forProject($project)->find('ignored_route'));
+
+        $scanner->indexAll();
+        self::assertCount(1, $indexes->forProject($project)->find('article_list'));
+        self::assertCount(1, $indexes->forProject($project)->find('admin_dashboard'));
 
         $uri = 'file://'.$this->temporaryDirectory.'/src/Controller.php';
         $documents->open(new Document($uri, 'php', 2, <<<'PHP'

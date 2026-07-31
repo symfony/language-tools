@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Runtime;
 
+use Amp\Cancellation;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\ProjectServiceSnapshotLoader;
@@ -15,6 +16,7 @@ use Symfony\Lsp\Runtime\ProcessResult;
 use Symfony\Lsp\Runtime\ProcessRunnerInterface;
 use Symfony\Lsp\Runtime\ProjectRuntimeInitializer;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Runtime\RuntimeRefreshMode;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 
 final class ProjectRuntimeInitializerTest extends TestCase
@@ -87,6 +89,44 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame('--debug=0', $processRunner->command[5]);
         self::assertSame('--sections=routes,container', $processRunner->command[6]);
         self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
+    }
+
+    public function testClearsTheNormalProjectCacheBeforeRefreshingMetadata(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $processRunner = new CapturingProcessRunner(
+            new ProcessResult(0, '', ''),
+            new ProcessResult(0, json_encode(['schemaVersion' => 1, 'sections' => []], \JSON_THROW_ON_ERROR), ''),
+        );
+        $configuration = new RuntimeConfiguration();
+        $configuration->configure([
+            'phpCommand' => ['project-php'],
+            'consolePath' => 'app-console',
+            'environment' => 'test',
+            'debug' => false,
+        ]);
+        $initializer = new ProjectRuntimeInitializer(
+            new BridgeInstaller($source, 'test'),
+            $processRunner,
+            new RuntimeSnapshotLoaderRegistry(),
+            $configuration,
+        );
+
+        $initializer->initialize(
+            new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0'),
+            RuntimeRefreshMode::Clear,
+        );
+
+        self::assertSame([
+            'project-php',
+            'app-console',
+            'cache:clear',
+            '--env=test',
+            '--no-interaction',
+            '--no-debug',
+        ], $processRunner->commands[0]);
+        self::assertStringEndsWith('/bridge.php', $processRunner->commands[1][1]);
     }
 
     public function testLoadsAvailableSectionsBeforeReportingSectionErrors(): void
@@ -177,18 +217,25 @@ final class CapturingProcessRunner implements ProcessRunnerInterface
 {
     /** @var non-empty-list<string> */
     public array $command = ['unset'];
+
+    /** @var list<non-empty-list<string>> */
+    public array $commands = [];
     public string $workingDirectory = '';
 
-    public function __construct(
-        private readonly ProcessResult $result,
-    ) {
+    /** @var list<ProcessResult> */
+    private array $results;
+
+    public function __construct(ProcessResult ...$results)
+    {
+        $this->results = array_values($results);
     }
 
-    public function run(array $command, string $workingDirectory): ProcessResult
+    public function run(array $command, string $workingDirectory, ?Cancellation $cancellation = null): ProcessResult
     {
         $this->command = $command;
+        $this->commands[] = $command;
         $this->workingDirectory = $workingDirectory;
 
-        return $this->result;
+        return array_shift($this->results) ?? throw new \LogicException('No process result was configured.');
     }
 }

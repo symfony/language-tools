@@ -18,6 +18,16 @@ final class DependencyInjectionSourceIndex
         }
     }
 
+    public function replaceSource(DependencyInjectionSourceFacts $source): void
+    {
+        $this->sources[$source->uri()] = $source;
+    }
+
+    public function removeSource(string $uri): void
+    {
+        unset($this->sources[$uri]);
+    }
+
     public function overlay(DependencyInjectionSourceFacts $source): void
     {
         $this->overlays[$source->uri()] = $source;
