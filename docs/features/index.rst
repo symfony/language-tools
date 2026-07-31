@@ -66,8 +66,9 @@ Runtime Indexing and Trust
 --------------------------
 
 Runtime indexing boots ``App\\Kernel`` and executes application code. Enable it
-only for workspaces that you trust. The project bridge runs structured Symfony
-commands to obtain effective metadata:
+only for workspaces that you trust. One kernel is shared by all sections in a
+snapshot, then shut down before the snapshot is returned. The project bridge
+runs structured Symfony commands to obtain effective metadata:
 
 * ``debug:router --format=json --show-aliases``;
 * ``debug:container --format=json --show-hidden``;

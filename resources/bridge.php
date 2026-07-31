@@ -58,6 +58,8 @@ if (class_exists(Symfony\Component\Runtime\SymfonyRuntime::class)) {
 
 $sections = [];
 $errors = [];
+$bridgeKernel = null;
+$bridgeKernelError = null;
 if (in_array('routes', $requestedSections, true)) {
     if (!class_exists(Symfony\Component\Console\Input\ArrayInput::class)
         || !class_exists(Symfony\Component\Console\Output\BufferedOutput::class)
@@ -71,7 +73,8 @@ if (in_array('routes', $requestedSections, true)) {
                 throw new RuntimeException('The default App\\Kernel class was not found.');
             }
 
-            $kernel = new $kernelClass(
+            $kernel = bridgeKernel(
+                $kernelClass,
                 is_string($environment) ? $environment : 'dev',
                 !in_array($debug, ['0', 'false'], true),
             );
@@ -149,10 +152,6 @@ if (in_array('routes', $requestedSections, true)) {
             ];
         } catch (Throwable $error) {
             $errors[] = ['section' => 'routes', 'message' => $error->getMessage()];
-        } finally {
-            if (is_object($kernel) && method_exists($kernel, 'shutdown')) {
-                $kernel->shutdown();
-            }
         }
     }
 }
@@ -170,7 +169,8 @@ if (in_array('container', $requestedSections, true)) {
                 throw new RuntimeException('The default App\\Kernel class was not found.');
             }
 
-            $kernel = new $kernelClass(
+            $kernel = bridgeKernel(
+                $kernelClass,
                 is_string($environment) ? $environment : 'dev',
                 !in_array($debug, ['0', 'false'], true),
             );
@@ -212,10 +212,6 @@ if (in_array('container', $requestedSections, true)) {
             $sections['container'] = $safeContainer;
         } catch (Throwable $error) {
             $errors[] = ['section' => 'container', 'message' => $error->getMessage()];
-        } finally {
-            if (is_object($kernel) && method_exists($kernel, 'shutdown')) {
-                $kernel->shutdown();
-            }
         }
     }
 }
@@ -229,7 +225,8 @@ if (in_array('twig', $requestedSections, true)) {
             if (!class_exists($kernelClass)) {
                 throw new RuntimeException('The default App\\Kernel class was not found.');
             }
-            $kernel = new $kernelClass(
+            $kernel = bridgeKernel(
+                $kernelClass,
                 is_string($environment) ? $environment : 'dev',
                 !in_array($debug, ['0', 'false'], true),
             );
@@ -251,10 +248,6 @@ if (in_array('twig', $requestedSections, true)) {
             }
         } catch (Throwable $error) {
             $errors[] = ['section' => 'twig', 'message' => $error->getMessage()];
-        } finally {
-            if (is_object($kernel) && method_exists($kernel, 'shutdown')) {
-                $kernel->shutdown();
-            }
         }
     }
     usort($paths, static fn (array $a, array $b): int => [$a['namespace'], $a['path']] <=> [$b['namespace'], $b['path']]);
@@ -276,8 +269,7 @@ if (in_array('translations', $requestedSections, true)) {
             if (!class_exists($kernelClass)) {
                 throw new RuntimeException('The default App\\Kernel class was not found.');
             }
-            $kernel = new $kernelClass(is_string($environment) ? $environment : 'dev', !in_array($debug, ['0', 'false'], true));
-            $kernel->boot();
+            $kernel = bridgeKernel($kernelClass, is_string($environment) ? $environment : 'dev', !in_array($debug, ['0', 'false'], true));
             $container = $kernel->getContainer();
             if ($container->has('translator')) {
                 $translator = $container->get('translator');
@@ -305,10 +297,6 @@ if (in_array('translations', $requestedSections, true)) {
             }
         } catch (Throwable $error) {
             $errors[] = ['section' => 'translations', 'message' => $error->getMessage()];
-        } finally {
-            if (is_object($kernel) && method_exists($kernel, 'shutdown')) {
-                $kernel->shutdown();
-            }
         }
     }
     usort($items, static fn (array $a, array $b): int => [$a['domain'], $a['key'], $a['locale']] <=> [$b['domain'], $b['key'], $b['locale']]);
@@ -331,8 +319,7 @@ if (in_array('configuration', $requestedSections, true)) {
         if (!class_exists($kernelClass)) {
             throw new RuntimeException('The default App\\Kernel class was not found.');
         }
-        $kernel = new $kernelClass(is_string($environment) ? $environment : 'dev', !in_array($debug, ['0', 'false'], true));
-        $kernel->boot();
+        $kernel = bridgeKernel($kernelClass, is_string($environment) ? $environment : 'dev', !in_array($debug, ['0', 'false'], true));
         $builder = new Symfony\Component\DependencyInjection\ContainerBuilder();
         $builder->setParameter('kernel.environment', is_string($environment) ? $environment : 'dev');
         $builder->setParameter('kernel.debug', !in_array($debug, ['0', 'false'], true));
@@ -376,10 +363,6 @@ if (in_array('configuration', $requestedSections, true)) {
     } catch (Throwable $error) {
         $complete = false;
         $errors[] = ['section' => 'configuration', 'message' => $error->getMessage()];
-    } finally {
-        if (is_object($kernel) && method_exists($kernel, 'shutdown')) {
-            $kernel->shutdown();
-        }
     }
     usort($bundles, static fn (array $left, array $right): int => $left['alias'] <=> $right['alias']);
     sort($warnings);
@@ -415,7 +398,7 @@ if (in_array('environment', $requestedSections, true)) {
             if (!class_exists($kernelClass)) {
                 throw new RuntimeException('The default App\\Kernel class was not found.');
             }
-            $kernel = new $kernelClass(is_string($environment) ? $environment : 'dev', !in_array($debug, ['0', 'false'], true));
+            $kernel = bridgeKernel($kernelClass, is_string($environment) ? $environment : 'dev', !in_array($debug, ['0', 'false'], true));
             $application = new Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
             $application->setAutoExit(false);
             $tagged = runJsonCommand($application, [
@@ -434,10 +417,6 @@ if (in_array('environment', $requestedSections, true)) {
         } catch (Throwable $error) {
             $complete = false;
             $errors[] = ['section' => 'environment', 'message' => $error->getMessage()];
-        } finally {
-            if (is_object($kernel) && method_exists($kernel, 'shutdown')) {
-                $kernel->shutdown();
-            }
         }
         foreach (array_values(array_unique($classes)) as $class) {
             if (is_a($class, Symfony\Component\DependencyInjection\EnvVarProcessorInterface::class, true)) {
@@ -463,6 +442,12 @@ if (in_array('environment', $requestedSections, true)) {
     ];
 }
 
+try {
+    shutdownBridgeKernel();
+} catch (Throwable $error) {
+    $errors[] = ['section' => 'runtime', 'message' => $error->getMessage()];
+}
+
 $result = [
     'schemaVersion' => 1,
     'generation' => hash('sha256', json_encode($sections, JSON_THROW_ON_ERROR)),
@@ -479,6 +464,39 @@ $result = [
 ];
 
 fwrite(STDOUT, json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n");
+
+function bridgeKernel(string $kernelClass, string $environment, bool $debug): object
+{
+    global $bridgeKernel, $bridgeKernelError;
+
+    if ($bridgeKernelError instanceof Throwable) {
+        throw $bridgeKernelError;
+    }
+    if (is_object($bridgeKernel)) {
+        return $bridgeKernel;
+    }
+    try {
+        $kernel = new $kernelClass($environment, $debug);
+        if (method_exists($kernel, 'boot')) {
+            $kernel->boot();
+        }
+        $bridgeKernel = $kernel;
+
+        return $kernel;
+    } catch (Throwable $error) {
+        $bridgeKernelError = $error;
+        throw $error;
+    }
+}
+
+function shutdownBridgeKernel(): void
+{
+    global $bridgeKernel;
+
+    if (is_object($bridgeKernel) && method_exists($bridgeKernel, 'shutdown')) {
+        $bridgeKernel->shutdown();
+    }
+}
 
 function runJsonCommand(object $application, array $arguments): array
 {
