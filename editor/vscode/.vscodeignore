@@ -2,7 +2,7 @@ node_modules/
 src/
 Makefile
 test/
-out/test/
-out/**/*.map
+out/**
+!out/extension.js
 tsconfig.json
 tsconfig.test.json
