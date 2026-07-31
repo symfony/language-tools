@@ -897,7 +897,7 @@ features can land step by step without reducing the intended initial scope.
 
 - [x] Implement dependency injection services and parameters.
 - [x] Implement routes and route parameters.
-- [ ] Implement Twig template names and links.
+- [x] Implement Twig template names and links.
 - [ ] Implement translation keys, domains, and placeholders, with missing-key
   diagnostics opt-in.
 - [ ] Implement environment references and processors.

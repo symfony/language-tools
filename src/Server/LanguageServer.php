@@ -10,10 +10,10 @@ use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Feature\CompletionProviderRegistry;
 use Symfony\Lsp\Feature\DefinitionProviderRegistry;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
+use Symfony\Lsp\Feature\DocumentLinkProviderRegistry;
 use Symfony\Lsp\Feature\HoverProviderRegistry;
 use Symfony\Lsp\Feature\ReferencesProviderRegistry;
 use Symfony\Lsp\Feature\RenameProviderRegistry;
-use Symfony\Lsp\Feature\Route\RouteDocumentLinkHandler;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\IndexCommandHandler;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
@@ -33,7 +33,7 @@ final class LanguageServer
         private readonly HoverProviderRegistry $hoverProviders,
         private readonly DiagnosticProviderRegistry $diagnosticProviders,
         private readonly DefinitionProviderRegistry $definitionProviders,
-        private readonly RouteDocumentLinkHandler $routeDocumentLinkHandler,
+        private readonly DocumentLinkProviderRegistry $documentLinkProviders,
         private readonly ReferencesProviderRegistry $referencesProviders,
         private readonly RenameProviderRegistry $renameProviders,
         private readonly ProjectRuntimeRefresher $projectRuntimeRefresher,
@@ -61,7 +61,7 @@ final class LanguageServer
         $this->dispatcher->onRequest('textDocument/completion', $this->completionProviders->complete(...));
         $this->dispatcher->onRequest('textDocument/hover', $this->hoverProviders->hover(...));
         $this->dispatcher->onRequest('textDocument/definition', $this->definitionProviders->definition(...));
-        $this->dispatcher->onRequest('textDocument/documentLink', $this->routeDocumentLinkHandler->links(...));
+        $this->dispatcher->onRequest('textDocument/documentLink', $this->documentLinkProviders->links(...));
         $this->dispatcher->onRequest('textDocument/references', $this->referencesProviders->references(...));
         $this->dispatcher->onRequest('textDocument/prepareRename', $this->renameProviders->prepare(...));
         $this->dispatcher->onRequest('textDocument/rename', $this->renameProviders->rename(...));

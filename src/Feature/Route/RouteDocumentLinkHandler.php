@@ -3,9 +3,10 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Project\ProjectRegistry;
 
-final class RouteDocumentLinkHandler
+final class RouteDocumentLinkHandler implements DocumentLinkProviderInterface
 {
     public function __construct(
         private readonly DocumentStore $documents,

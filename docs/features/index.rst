@@ -33,6 +33,13 @@ Supported Integrations
       - Yes
       - Yes
       - Yes
+    * - :doc:`Twig template names </features/templates>`
+      - Yes
+      - Yes
+      - Yes
+      - Yes
+      - No
+      - Yes
 
 Runtime Indexing and Trust
 --------------------------
@@ -43,7 +50,8 @@ commands to obtain effective metadata:
 
 * ``debug:router --format=json --show-aliases``;
 * ``debug:container --format=json --show-hidden``;
-* ``debug:container --types --format=json``.
+* ``debug:container --types --format=json``;
+* ``debug:twig --format=json``.
 
 The bridge also uses the structured parameter output internally to discover
 parameter names and deprecations. Parameter values are discarded inside the
@@ -57,10 +65,10 @@ suppressed.
 Source Indexes and Overlays
 ---------------------------
 
-The source scanner indexes application-owned PHP, Twig and YAML files. It
-excludes ``vendor/``, ``var/``, ``node_modules/`` and Git metadata. Changes in
-open documents overlay the disk-backed index, so navigation, references and
-rename reflect unsaved edits.
+The source scanner indexes application-owned PHP, Twig, YAML, translation and
+dotenv files. It excludes ``vendor/``, ``var/``, ``node_modules/`` and Git
+metadata. Changes in open documents overlay the disk-backed index, so
+navigation, references and rename reflect unsaved edits.
 
 Runtime Metadata Refresh
 ------------------------
@@ -106,3 +114,4 @@ feature-specific limitations.
 
     routing
     dependency-injection
+    templates

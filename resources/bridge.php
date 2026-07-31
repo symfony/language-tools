@@ -220,6 +220,53 @@ if (in_array('container', $requestedSections, true)) {
     }
 }
 
+if (in_array('twig', $requestedSections, true)) {
+    $paths = [];
+    if (class_exists(Twig\Environment::class)) {
+        $kernel = null;
+        try {
+            $kernelClass = 'App\\Kernel';
+            if (!class_exists($kernelClass)) {
+                throw new RuntimeException('The default App\\Kernel class was not found.');
+            }
+            $kernel = new $kernelClass(
+                is_string($environment) ? $environment : 'dev',
+                !in_array($debug, ['0', 'false'], true),
+            );
+            $application = new Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
+            $application->setAutoExit(false);
+            $twig = runJsonCommand($application, [
+                'command' => 'debug:twig',
+                '--format' => 'json',
+                '--env' => is_string($environment) ? $environment : 'dev',
+                '--no-debug' => in_array($debug, ['0', 'false'], true),
+                '--no-interaction' => true,
+            ]);
+            foreach (is_array($twig['loader_paths'] ?? null) ? $twig['loader_paths'] : [] as $namespace => $loaderPaths) {
+                foreach (is_array($loaderPaths) ? $loaderPaths : [] as $path) {
+                    if (is_string($namespace) && is_string($path)) {
+                        $paths[] = ['namespace' => $namespace, 'path' => $path];
+                    }
+                }
+            }
+        } catch (Throwable $error) {
+            $errors[] = ['section' => 'twig', 'message' => $error->getMessage()];
+        } finally {
+            if (is_object($kernel) && method_exists($kernel, 'shutdown')) {
+                $kernel->shutdown();
+            }
+        }
+    }
+    usort($paths, static fn (array $a, array $b): int => [$a['namespace'], $a['path']] <=> [$b['namespace'], $b['path']]);
+    $sections['twig'] = [
+        'complete' => true,
+        'generation' => hash('sha256', json_encode($paths, JSON_THROW_ON_ERROR)),
+        'paths' => $paths,
+        'resources' => [],
+        'warnings' => [],
+    ];
+}
+
 $result = [
     'schemaVersion' => 1,
     'generation' => hash('sha256', json_encode($sections, JSON_THROW_ON_ERROR)),
