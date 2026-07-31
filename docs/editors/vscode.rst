@@ -77,10 +77,13 @@ workspace's ``.vscode/settings.json`` file:
 
     {
         "symfonyLsp.serverPath": "/absolute/path/to/lsp/bin/symfony-lsp",
-        "symfonyLsp.trustWorkspace": true,
         "symfonyLsp.phpCommand": ["php"],
+        "symfonyLsp.consolePath": "bin/console",
         "symfonyLsp.environment": "dev",
         "symfonyLsp.debug": true,
+        "symfonyLsp.runtimeIndexing": true,
+        "symfonyLsp.projectRoots": [],
+        "symfonyLsp.trace": "off",
         "symfonyLsp.translationDiagnostics": false,
         "php.suggest.basic": false
     }
@@ -88,18 +91,27 @@ workspace's ``.vscode/settings.json`` file:
 ``symfonyLsp.serverPath`` must be an absolute path. The server path is detected
 automatically only when running the extension directly from this repository.
 
-``symfonyLsp.trustWorkspace`` allows the server to execute application code.
-Enable it only for code that you trust. See
+The extension forwards VS Code's workspace trust decision to the server.
+Untrusted workspaces remain in static-only mode. See
 :doc:`Symfony integrations </features/index>` for runtime indexing and
 static-only behavior.
 
 ``symfonyLsp.phpCommand`` is an argument array used to run the project bridge.
 For example, use ``["symfony", "php"]`` for Symfony CLI or
 ``["ddev", "exec", "php"]`` for DDEV. The command must be compatible with the
-Symfony application.
+Symfony application. ``symfonyLsp.consolePath`` selects the project console
+used for normal cache maintenance.
 
 ``symfonyLsp.environment`` and ``symfonyLsp.debug`` select the Symfony runtime
-whose effective metadata is indexed.
+whose effective metadata is indexed. ``symfonyLsp.runtimeIndexing`` can disable
+application execution even in a trusted workspace.
+
+``symfonyLsp.projectRoots`` can list application roots relative to the
+workspace folder or as absolute paths. Leave it empty to discover nested
+FrameworkBundle applications automatically.
+
+``symfonyLsp.trace`` writes recursively redacted protocol traffic to the output
+channel. It is disabled by default.
 
 ``symfonyLsp.translationDiagnostics`` enables missing-key diagnostics. It is a
 resource-scoped setting and defaults to ``false``.

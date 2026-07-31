@@ -120,21 +120,34 @@ Source Indexes and Overlays
 
 The source scanner indexes application-owned PHP, Twig, YAML, translation and
 dotenv files. It excludes ``vendor/``, ``var/``, ``node_modules/`` and Git
-metadata. Changes in open documents overlay the disk-backed index, so
-navigation, references and rename reflect unsaved edits.
+metadata. Versioned source facts persist under
+``var/symfony-lsp/<server-version>/index/`` with atomic writes. Entries record
+file metadata and content hashes, while corrupted entries rebuild transparently.
+Environment and parameter values are never persisted.
+
+Changes in open documents overlay the disk-backed index, so navigation,
+references and rename reflect unsaved edits. Saves and watched-file
+notifications update individual entries instead of rescanning the application.
 
 Runtime Metadata Refresh
 ------------------------
 
 Saving relevant PHP, YAML, XML, translation or bundle metadata resources
-schedules a debounced runtime refresh.
+schedules a debounced runtime refresh. Refreshes are serialized per application
+root; changes received during a refresh queue one replacement. Resources that
+can stale the compiled container clear the application's normal cache before
+the bridge creates a replacement snapshot.
+
 The last valid metadata remains available when a refresh fails. Open-document
-diagnostics are republished after a successful refresh.
+diagnostics are republished after a successful refresh. Clients that support
+work-done progress receive source and runtime indexing progress notifications.
 
 Language Server Protocol clients can execute these commands:
 
 * ``symfony.refreshIndex`` refreshes source and trusted runtime indexes;
-* ``symfony.indexStatus`` returns source and runtime status for each project.
+* ``symfony.indexStatus`` returns source and runtime status for each project;
+* ``symfony.switchEnvironment`` selects an environment and refreshes its normal
+  application cache.
 
 Current Limitations
 -------------------
@@ -142,7 +155,7 @@ Current Limitations
 The current implementation has these limitations:
 
 * only ``App\\Kernel`` is discovered;
-* one Symfony environment is indexed for each application root;
+* one Symfony environment is indexed at a time for each application root;
 * references and rename only cover statically recognized strings;
 * no standalone binary is available;
 * bridge failures aren't exposed through a dedicated status interface yet.

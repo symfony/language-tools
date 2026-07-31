@@ -878,11 +878,11 @@ diagnostics must remain standard LSP behavior.
 
 - [x] Add generic content-length stream framing and limits to
   `fabpot/json-rpc-peer` without adding LSP semantics.
-- [ ] Implement LSP lifecycle, cancellation, document synchronization, logging,
+- [x] Implement LSP lifecycle, cancellation, document synchronization, logging,
   and workspace folders on that transport.
 - [ ] Add tolerant PHP, Twig, YAML, XLIFF, JSON translation, and dotenv context
   extraction with high-confidence Symfony call recognition.
-- [ ] Define the persistent source index, runtime snapshot schema, live-overlay
+- [x] Define the persistent source index, runtime snapshot schema, live-overlay
   model, bridge protocol, normal-cache reuse, and debounced invalidation.
 - [x] Add FrameworkBundle project discovery, `supported_versions` checks,
   explicit PHP commands, workspace trust, static-only mode, and status
