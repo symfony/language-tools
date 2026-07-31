@@ -16,8 +16,7 @@ Build and package the development extension from the repository root:
 .. code-block:: terminal
 
     $ cd editor/vscode
-    $ npm install
-    $ npm run package
+    $ make
 
 This creates ``editor/vscode/symfony-lsp-0.0.1.vsix``. Install it with VS Code:
 
