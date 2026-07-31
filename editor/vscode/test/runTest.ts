@@ -19,7 +19,6 @@ async function main(): Promise<void> {
     await fs.promises.writeFile(workspacePath, JSON.stringify({
         folders: [{ path: fixturePath }],
         settings: {
-            'symfonyLsp.trustWorkspace': true,
             'symfonyLsp.phpCommand': ['php'],
             'symfonyLsp.environment': 'test',
             'symfonyLsp.debug': true,

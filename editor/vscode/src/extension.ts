@@ -43,14 +43,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         outputChannel,
         traceOutputChannel: outputChannel,
         initializationOptions: {
-            workspaceTrust: configuration.get<boolean>('trustWorkspace', false),
+            workspaceTrust: vscode.workspace.isTrusted,
             phpCommand: configuration.get<string[]>('phpCommand', ['php']),
+            consolePath: configuration.get<string>('consolePath', 'bin/console'),
             environment: configuration.get<string>('environment', 'dev'),
             debug: configuration.get<boolean>('debug', true),
+            runtimeIndexing: configuration.get<boolean>('runtimeIndexing', true),
+            projectRoots: configuration.get<string[]>('projectRoots', []),
+            trace: configuration.get<string>('trace', 'off'),
         },
         synchronize: {
             configurationSection: 'symfonyLsp',
-            fileEvents: vscode.workspace.createFileSystemWatcher('**/composer.{json,lock}'),
+            fileEvents: [
+                vscode.workspace.createFileSystemWatcher('**/*.{php,twig,yaml,yml,json,xml,xlf,xliff}'),
+                vscode.workspace.createFileSystemWatcher('**/.env*'),
+                vscode.workspace.createFileSystemWatcher('**/composer.{json,lock}'),
+            ],
         },
     };
 

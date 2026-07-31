@@ -63,11 +63,6 @@
           "default": "",
           "description": "Absolute path to bin/symfony-lsp in the Symfony LSP checkout."
         },
-        "symfonyLsp.trustWorkspace": {
-          "type": "boolean",
-          "default": false,
-          "description": "Allow Symfony LSP to execute application code for runtime indexing."
-        },
         "symfonyLsp.phpCommand": {
           "type": "array",
           "items": {
@@ -78,6 +73,11 @@
           ],
           "description": "Command and arguments used to run the project bridge."
         },
+        "symfonyLsp.consolePath": {
+          "type": "string",
+          "default": "bin/console",
+          "description": "Project console path used for cache maintenance."
+        },
         "symfonyLsp.environment": {
           "type": "string",
           "default": "dev",
@@ -87,6 +87,29 @@
           "type": "boolean",
           "default": true,
           "description": "Enable kernel debug mode during runtime indexing."
+        },
+        "symfonyLsp.runtimeIndexing": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable trusted runtime indexing."
+        },
+        "symfonyLsp.projectRoots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Explicit application roots, relative to each workspace folder or absolute."
+        },
+        "symfonyLsp.trace": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Write redacted Language Server Protocol traffic to the Symfony LSP output channel."
         },
         "symfonyLsp.translationDiagnostics": {
           "type": "boolean",
