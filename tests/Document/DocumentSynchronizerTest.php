@@ -40,6 +40,22 @@ final class DocumentSynchronizerTest extends TestCase
         self::assertNull($store->get($uri));
     }
 
+    public function testNormalizesTwigFilesReportedAsHtml(): void
+    {
+        $store = new DocumentStore();
+        $synchronizer = new DocumentSynchronizer($store, new PositionConverter());
+        $uri = 'file:///workspace/templates/page.html.twig';
+
+        $synchronizer->open(['textDocument' => [
+            'uri' => $uri,
+            'languageId' => 'html',
+            'version' => 1,
+            'text' => "{{ path('home') }}",
+        ]]);
+
+        self::assertSame('twig', $store->get($uri)?->languageId());
+    }
+
     public function testAppliesFullDocumentChanges(): void
     {
         $store = new DocumentStore();

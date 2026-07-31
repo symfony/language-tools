@@ -27,6 +27,25 @@ This creates ``editor/vscode/symfony-lsp-0.0.1.vsix``. Install it with VS Code:
 
 Restart VS Code after installation.
 
+Twig Support
+------------
+
+The extension registers ``.twig`` and ``.html.twig`` files as the ``twig``
+language so Symfony features work without another extension. It deliberately
+doesn't provide generic Twig syntax highlighting, formatting or built-in symbol
+completion.
+
+Optional extensions can provide those editor features alongside Symfony LSP:
+
+* Modern Twig (``Stanislav.vscode-twig``) provides generic Twig diagnostics,
+  completion, hover and signature help;
+* Twig Language 2 (``mblode.twig-language-2``) provides syntax highlighting,
+  snippets, Emmet support and formatting;
+* djLint (``monosans.djlint``) provides template formatting and linting.
+
+Some extensions associate Twig files with the ``html`` language. Symfony LSP
+also recognizes ``.twig`` files in that configuration.
+
 Automated Extension Tests
 -------------------------
 

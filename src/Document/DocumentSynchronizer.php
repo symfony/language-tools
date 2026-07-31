@@ -27,7 +27,7 @@ final class DocumentSynchronizer
 
         $this->documentStore->open(new Document(
             $document['uri'],
-            $document['languageId'],
+            $this->languageId($document['uri'], $document['languageId']),
             $document['version'],
             $document['text'],
         ));
@@ -77,6 +77,13 @@ final class DocumentSynchronizer
         if (\is_array($textDocument) && \is_string($textDocument['uri'] ?? null)) {
             $this->documentStore->close($textDocument['uri']);
         }
+    }
+
+    private function languageId(string $uri, string $languageId): string
+    {
+        $path = parse_url($uri, \PHP_URL_PATH);
+
+        return \is_string($path) && str_ends_with(strtolower($path), '.twig') ? 'twig' : $languageId;
     }
 
     private function range(mixed $value): ?Range

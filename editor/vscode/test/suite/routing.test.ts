@@ -14,7 +14,7 @@ import {
 
 export const routingTests: TestCase[] = [
     ['Routing completes, describes and navigates route names', testRouteLanguageFeatures],
-    ['Routing links route references and updates diagnostics for unsaved edits', testRouteLinksAndOverlays],
+    ['Routing supports Twig language registration, HTML associations and unsaved edits', testRouteLinksAndOverlays],
 ];
 
 async function testRouteLanguageFeatures(): Promise<void> {
@@ -56,6 +56,7 @@ final class RouteConsumer extends AbstractController
 
 async function testRouteLinksAndOverlays(): Promise<void> {
     await withTemporaryDocument('route.html.twig', "{{ path('fixture_home') }}\n{{ path('missing_route') }}\n", async (document) => {
+        assert.equal(document.languageId, 'twig');
         const links = await waitFor(
             () => vscode.commands.executeCommand<vscode.DocumentLink[]>('vscode.executeLinkProvider', document.uri),
             (items) => items.some((item) => item.target?.path.endsWith('/config/routes.yaml')),
@@ -79,5 +80,15 @@ async function testRouteLinksAndOverlays(): Promise<void> {
             (items) => !items.some((item) => 'route.not_found' === item.code),
             'cleared route diagnostic after an unsaved edit',
         );
-    }, 'twig');
+    });
+
+    await withTemporaryDocument('html-associated.html.twig', "{{ path('fixture_home') }}\n", async (document) => {
+        assert.equal(document.languageId, 'html');
+        const links = await waitFor(
+            () => vscode.commands.executeCommand<vscode.DocumentLink[]>('vscode.executeLinkProvider', document.uri),
+            (items) => items.some((item) => item.target?.path.endsWith('/config/routes.yaml')),
+            'route document link for an HTML-associated Twig file',
+        );
+        assert.ok(links.some((item) => item.tooltip?.includes('fixture_home')));
+    }, 'html');
 }

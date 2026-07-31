@@ -34,6 +34,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         documentSelector: [
             { scheme: 'file', language: 'php' },
             { scheme: 'file', language: 'twig' },
+            { scheme: 'file', language: 'html', pattern: '**/*.twig' },
             { scheme: 'file', language: 'yaml' },
             { scheme: 'file', language: 'json' },
             { scheme: 'file', language: 'xml' },

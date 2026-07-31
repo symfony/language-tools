@@ -42,6 +42,18 @@
     "typescript": "^5.9.3"
   },
   "contributes": {
+    "languages": [
+      {
+        "id": "twig",
+        "aliases": [
+          "Twig"
+        ],
+        "extensions": [
+          ".twig",
+          ".html.twig"
+        ]
+      }
+    ],
     "configuration": {
       "title": "Symfony LSP",
       "properties": {
