@@ -370,6 +370,42 @@ if (in_array('messenger', $requestedSections, true)) {
                     }
                 }
             }
+            try {
+                $configuration = runJsonCommand($application, [
+                    'command' => 'debug:config',
+                    'name' => 'framework',
+                    'path' => 'messenger',
+                    '--format' => 'json',
+                    ...$commandOptions,
+                ]);
+                $defaultBus = is_string($configuration['default_bus'] ?? null) ? $configuration['default_bus'] : null;
+                foreach (is_array($configuration['buses'] ?? null) ? $configuration['buses'] : [] as $name => $options) {
+                    if (is_string($name)) {
+                        $buses[$name] = ['name' => $name, 'default' => $name === $defaultBus];
+                    }
+                }
+                $failureTransport = is_string($configuration['failure_transport'] ?? null) ? $configuration['failure_transport'] : null;
+                foreach (is_array($configuration['transports'] ?? null) ? $configuration['transports'] : [] as $name => $options) {
+                    if (is_string($name)) {
+                        $transports[$name] = ['name' => $name, 'failure' => $name === $failureTransport];
+                    }
+                }
+                foreach (is_array($configuration['routing'] ?? null) ? $configuration['routing'] : [] as $message => $routing) {
+                    if (!is_string($message)) {
+                        continue;
+                    }
+                    $senders = is_array($routing) && is_array($routing['senders'] ?? null) ? $routing['senders'] : $routing;
+                    if (is_string($senders)) {
+                        $senders = [$senders];
+                    }
+                    $messages[$message] = [
+                        'class' => $message,
+                        'transports' => array_values(array_filter(is_array($senders) ? $senders : [], 'is_string')),
+                    ];
+                }
+            } catch (Throwable $error) {
+                $warnings[] = 'Configuration: '.$error->getMessage();
+            }
             foreach (array_keys($buses) as $bus) {
                 try {
                     $locator = runJsonCommand($application, [
@@ -411,6 +447,33 @@ if (in_array('messenger', $requestedSections, true)) {
                     }
                 } catch (Throwable $error) {
                     $warnings[] = sprintf('%s: %s', $bus, $error->getMessage());
+                }
+            }
+            if ([] === $handlers) {
+                foreach ($definitions as $service => $definition) {
+                    if (!is_string($service) || !is_array($definition)) {
+                        continue;
+                    }
+                    foreach (definitionTagParameters($definition, 'messenger.message_handler') as $options) {
+                        $class = is_string($definition['class'] ?? null) ? $definition['class'] : $service;
+                        $method = is_string($options['method'] ?? null) && '' !== $options['method'] ? $options['method'] : '__invoke';
+                        $handledMessages = is_string($options['handles'] ?? null) && '' !== $options['handles'] ? [$options['handles']] : inferHandlerMessages($class, $method);
+                        $handlerBuses = is_string($options['bus'] ?? null) && '' !== $options['bus'] ? [$options['bus']] : array_keys($buses);
+                        foreach ($handledMessages as $message) {
+                            $messages[$message] ??= ['class' => $message, 'transports' => []];
+                            foreach ($handlerBuses as $bus) {
+                                $handlers[] = [
+                                    'message' => $message,
+                                    'bus' => $bus,
+                                    'service' => $service,
+                                    'class' => $class,
+                                    'method' => $method,
+                                    'priority' => is_int($options['priority'] ?? null) ? $options['priority'] : 0,
+                                    'fromTransport' => is_string($options['from_transport'] ?? null) && '' !== $options['from_transport'] ? $options['from_transport'] : null,
+                                ];
+                            }
+                        }
+                    }
                 }
             }
             try {
@@ -700,6 +763,28 @@ function firstJsonDocument(string $output): string
     }
 
     return substr($output, $start);
+}
+
+function inferHandlerMessages(string $class, string $method): array
+{
+    if (!class_exists($class) || !method_exists($class, $method)) {
+        return [];
+    }
+    try {
+        $parameters = (new ReflectionMethod($class, $method))->getParameters();
+        $type = ($parameters[0] ?? null)?->getType();
+        $types = $type instanceof ReflectionUnionType ? $type->getTypes() : [$type];
+        $messages = [];
+        foreach ($types as $candidate) {
+            if ($candidate instanceof ReflectionNamedType && !$candidate->isBuiltin()) {
+                $messages[] = $candidate->getName();
+            }
+        }
+
+        return $messages;
+    } catch (Throwable) {
+        return [];
+    }
 }
 
 function definitionTagParameters(array $definition, string $tagName): array

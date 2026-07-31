@@ -76,8 +76,9 @@ indexing is unavailable or incomplete.
 Static and Runtime Indexing
 ---------------------------
 
-The runtime bridge reads public ``debug:container --format=json`` output for
-Messenger tags, handler locators and routing metadata. The source index scans
+The runtime bridge reads public ``debug:config --format=json`` output for the
+effective routing configuration and ``debug:container --format=json`` output
+for Messenger tags and handler locators. The source index scans
 application-owned PHP and YAML files. Unsaved documents overlay the disk-backed
 index immediately.
 
