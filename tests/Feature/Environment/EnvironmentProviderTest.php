@@ -29,7 +29,7 @@ final class EnvironmentProviderTest extends TestCase
     public function testCompletesHoversNavigatesAndDiagnosesProcessors(): void
     {
         $uri = 'file:///workspace/config/services.yaml';
-        $text = "dsn: '%env(json:APP_URL)%'\nbad: '%env(unknown:APP_URL)%'";
+        $text = "dsn: '%env(json:APP_URL)%'\nbad: '%env(unknown:APP_URL)%'\ncustom: '%env(custom:option:APP_URL)%'";
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'yaml', 1, $text));
         $projects = new ProjectRegistry();
@@ -38,7 +38,7 @@ final class EnvironmentProviderTest extends TestCase
         $extractor = new EnvironmentExtractor($converter);
         $indexes = new EnvironmentIndexRegistry();
         $indexes->forProject($project)->replaceSources($extractor->extract('file:///workspace/.env', 'dotenv', "APP_URL=CANARY_SECRET_VALUE\n"), $extractor->extract($uri, 'yaml', $text));
-        $indexes->forProject($project)->replaceProcessors(['json' => 'array']);
+        $indexes->forProject($project)->replaceProcessors(['custom' => 'string', 'json' => 'array']);
         $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $indexes, $extractor);
         $position = $converter->toPosition($text, strpos($text, 'APP_UR') + \strlen('APP_UR'));
         $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];

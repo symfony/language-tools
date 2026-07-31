@@ -17,7 +17,8 @@ use Symfony\Lsp\Project\ProjectRegistry;
 
 final class EnvironmentProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
-    private const ARGUMENT_PROCESSORS = ['const', 'default', 'enum', 'key'];
+    private const ARGUMENT_PROCESSORS = ['default', 'enum', 'key'];
+    private const BUILT_IN_PROCESSORS = ['base64', 'bool', 'const', 'csv', 'default', 'defined', 'enum', 'file', 'float', 'int', 'json', 'key', 'not', 'query_string', 'require', 'resolve', 'shuffle', 'string', 'trim', 'url', 'urlencode'];
 
     public function __construct(
         private readonly DocumentContextResolver $resolver,
@@ -128,9 +129,11 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         $diagnostics = [];
         foreach ($this->extractor->extract($document->uri(), $document->languageId(), $document->text())->references() as $reference) {
             $skipNext = false;
+            $previousProcessor = null;
             foreach ($reference->processors() as $processor) {
                 if ($skipNext) {
                     $skipNext = false;
+                    $previousProcessor = null;
                     continue;
                 }
                 if ('' === $processor) {
@@ -140,9 +143,11 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
                 if (\in_array($processor, self::ARGUMENT_PROCESSORS, true)) {
                     $skipNext = true;
                 }
-                if ($index->processorsComplete() && !isset($processors[$processor])) {
+                $customProcessorArgument = null !== $previousProcessor && isset($processors[$previousProcessor]) && !\in_array($previousProcessor, self::BUILT_IN_PROCESSORS, true);
+                if ($index->processorsComplete() && !$customProcessorArgument && !isset($processors[$processor])) {
                     $diagnostics[] = ['range' => $this->range($reference->range()), 'severity' => 1, 'source' => 'symfony', 'code' => 'env.unknown_processor', 'message' => \sprintf('Environment processor "%s" is not installed.', $processor)];
                 }
+                $previousProcessor = $processor;
             }
         }
         preg_match_all('/%env\([^\)\r\n]*%/', $document->text(), $malformed, \PREG_OFFSET_CAPTURE);
