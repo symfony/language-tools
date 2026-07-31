@@ -110,10 +110,11 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
                 continue;
             }
             $key = implode('.', $path);
-            if (isset($seen[$key]) && !$occurrence->sequenceItem()) {
+            $identity = $occurrence->scope().'|'.$key;
+            if (isset($seen[$identity]) && !$occurrence->sequenceItem()) {
                 $diagnostics[] = $this->diagnostic($occurrence->keyRange(), 1, 'config.duplicate_key', \sprintf('Configuration key "%s" is duplicated.', $key));
             }
-            $seen[$key] = true;
+            $seen[$identity] = true;
             $node = $index->find($path);
             if (null === $node) {
                 $diagnostics[] = $this->diagnostic($occurrence->keyRange(), 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', $key));
@@ -143,7 +144,7 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
                     continue;
                 }
                 $childKey = implode('.', [...$occurrence->path(), $child->name()]);
-                if (!isset($seen[$childKey])) {
+                if (!isset($seen[$occurrence->scope().'|'.$childKey])) {
                     $diagnostics[] = $this->diagnostic($occurrence->keyRange(), 1, 'config.missing_required_key', \sprintf('Required configuration key "%s" is missing.', $childKey));
                 }
             }

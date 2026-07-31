@@ -41,6 +41,15 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame(['config.invalid_type', 'config.deprecated_key', 'config.invalid_type', 'config.unknown_key', 'config.duplicate_key'], array_column($provider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
     }
 
+    public function testDoesNotTreatEnvironmentOverridesAsDuplicates(): void
+    {
+        [$provider, $documents] = $this->provider();
+        $uri = 'file:///workspace/config/framework.yaml';
+        $documents->open(new Document($uri, 'yaml', 1, "framework:\n    router:\n        utf8: true\nwhen@test:\n    framework:\n        router:\n            utf8: false\n"));
+
+        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
     public function testReportsIncompatibleEnvironmentProcessorTypes(): void
     {
         [$provider, $documents] = $this->provider();

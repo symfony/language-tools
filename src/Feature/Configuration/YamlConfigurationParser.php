@@ -15,7 +15,7 @@ final class YamlConfigurationParser
     public function parse(string $text): array
     {
         $occurrences = [];
-        /** @var array<int, array{path: list<string>, sequence: bool}> $stack */
+        /** @var array<int, array{path: list<string>, sequence: bool, scope: string}> $stack */
         $stack = [];
         preg_match_all('/^.*(?:\R|$)/m', $text, $lines, \PREG_OFFSET_CAPTURE);
         foreach ($lines[0] as [$line, $lineOffset]) {
@@ -34,17 +34,23 @@ final class YamlConfigurationParser
             ksort($stack);
             $parent = [];
             $insideSequence = false;
+            $scope = 'base';
             foreach ($stack as $entry) {
                 $parent = $entry['path'];
                 $insideSequence = $entry['sequence'];
+                $scope = $entry['scope'];
+            }
+            $environmentSection = str_starts_with($key, 'when@');
+            if ($environmentSection) {
+                $scope = $key;
             }
             $sequenceItem = $insideSequence || '-' === $match[2][0];
             $schemaKey = str_replace('-', '_', $key);
-            $path = str_starts_with($key, 'when@') ? $parent : [...$parent, $schemaKey];
-            if (str_starts_with($key, 'when@') || '' === $value) {
-                $stack[$indent] = ['path' => $path, 'sequence' => $sequenceItem];
+            $path = $environmentSection ? $parent : [...$parent, $schemaKey];
+            if ($environmentSection || '' === $value) {
+                $stack[$indent] = ['path' => $path, 'sequence' => $sequenceItem, 'scope' => $scope];
             } elseif ('-' === $match[2][0]) {
-                $stack[$indent] = ['path' => $parent, 'sequence' => true];
+                $stack[$indent] = ['path' => $parent, 'sequence' => true, 'scope' => $scope];
             }
             if (str_starts_with($key, 'when@')) {
                 continue;
@@ -57,6 +63,7 @@ final class YamlConfigurationParser
                 $this->range($text, $keyOffset, \strlen($key)),
                 $this->range($text, $valueOffset, \strlen($value)),
                 $sequenceItem,
+                $scope,
             );
         }
 

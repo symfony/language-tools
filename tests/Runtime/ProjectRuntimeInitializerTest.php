@@ -7,6 +7,7 @@ use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\ProjectServiceSnapshotLoader;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Feature\Route\ProjectRouteSnapshotLoader;
+use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\BridgeInstaller;
@@ -99,23 +100,28 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
         $serviceIndexes = new ServiceIndexRegistry();
+        $routeIndexes = new RouteIndexRegistry();
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
         $initializer = new ProjectRuntimeInitializer(
             new BridgeInstaller($source, 'test'),
             new CapturingProcessRunner(new ProcessResult(0, json_encode([
                 'schemaVersion' => 1,
                 'errors' => [['section' => 'routes', 'message' => 'missing environment']],
-                'sections' => ['container' => ['complete' => true, 'items' => [
-                    ['id' => 'app.mailer', 'class' => 'App\\Mailer'],
-                ], 'parameters' => []]],
+                'sections' => [
+                    'routes' => ['complete' => true, 'items' => [['name' => 'replacement', 'path' => '/replacement']]],
+                    'container' => ['complete' => true, 'items' => [
+                        ['id' => 'app.mailer', 'class' => 'App\\Mailer'],
+                    ], 'parameters' => []],
+                ],
             ], \JSON_THROW_ON_ERROR), '')),
             new RuntimeSnapshotLoaderRegistry(
-                new ProjectRouteSnapshotLoader(new RouteIndexRegistry()),
+                new ProjectRouteSnapshotLoader($routeIndexes),
                 new ProjectServiceSnapshotLoader($serviceIndexes, new ParameterIndexRegistry()),
             ),
             new RuntimeConfiguration(),
         );
 
+        $routeIndexes->forProject($project)->replace(new Route('existing', '/existing', [], [], null, null));
         try {
             $initializer->initialize($project);
             self::fail('The section error was not reported.');
@@ -123,6 +129,8 @@ final class ProjectRuntimeInitializerTest extends TestCase
             self::assertStringContainsString('missing environment', $error->getMessage());
         }
         self::assertSame('app.mailer', $serviceIndexes->forProject($project)->get('app.mailer')?->id());
+        self::assertSame('existing', $routeIndexes->forProject($project)->get('existing')?->name());
+        self::assertNull($routeIndexes->forProject($project)->get('replacement'));
     }
 
     public function testRejectsFailedBridgeExecution(): void

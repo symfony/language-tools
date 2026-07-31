@@ -13,6 +13,7 @@ final class ConfigurationOccurrence
         private readonly Range $keyRange,
         private readonly Range $valueRange,
         private readonly bool $sequenceItem,
+        private readonly string $scope,
     ) {
     }
 
@@ -40,5 +41,10 @@ final class ConfigurationOccurrence
     public function sequenceItem(): bool
     {
         return $this->sequenceItem;
+    }
+
+    public function scope(): string
+    {
+        return $this->scope;
     }
 }
