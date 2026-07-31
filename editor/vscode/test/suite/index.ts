@@ -7,6 +7,7 @@ import { eventTests } from './events.test';
 import { lifecycleTests } from './lifecycle.test';
 import { messengerTests } from './messenger.test';
 import { routingTests } from './routing.test';
+import { securityTests } from './security.test';
 import { cleanupTemporaryDocuments, setWorkspace, TestCase } from './support';
 import { translationTests } from './translation.test';
 import { twigTests } from './twig.test';
@@ -30,6 +31,7 @@ export async function run(): Promise<void> {
         ...configurationTests,
         ...messengerTests,
         ...eventTests,
+        ...securityTests,
     ];
     try {
         for (const [name, test] of tests) {

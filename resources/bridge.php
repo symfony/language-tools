@@ -15,6 +15,7 @@ require __DIR__.'/bridge/sections/twig.php';
 require __DIR__.'/bridge/sections/translations.php';
 require __DIR__.'/bridge/sections/messenger.php';
 require __DIR__.'/bridge/sections/events.php';
+require __DIR__.'/bridge/sections/security.php';
 require __DIR__.'/bridge/sections/configuration.php';
 require __DIR__.'/bridge/sections/environment.php';
 
@@ -82,6 +83,7 @@ foreach ($requestedSections as $sectionName) {
             'translations' => bridgeTranslationsSection($context),
             'messenger' => bridgeMessengerSection($context),
             'events' => bridgeEventsSection($context),
+            'security' => bridgeSecuritySection($context),
             'configuration' => bridgeConfigurationSection($context),
             'environment' => bridgeEnvironmentSection($context),
             default => null,

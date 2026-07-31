@@ -73,6 +73,12 @@ use Symfony\Lsp\Feature\Route\RouteRenameHandler;
 use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
+use Symfony\Lsp\Feature\Security\ProjectSecuritySnapshotLoader;
+use Symfony\Lsp\Feature\Security\SecurityExtractor;
+use Symfony\Lsp\Feature\Security\SecurityIndexRegistry;
+use Symfony\Lsp\Feature\Security\SecurityProvider;
+use Symfony\Lsp\Feature\Security\SecuritySourceIndexer;
+use Symfony\Lsp\Feature\Security\SecuritySourceIndexRegistry;
 use Symfony\Lsp\Feature\Translation\ProjectTranslationSnapshotLoader;
 use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationExtractor;
@@ -132,6 +138,8 @@ final class LanguageServerFactory
         $messengerSourceIndexes = new MessengerSourceIndexRegistry();
         $eventIndexes = new EventIndexRegistry();
         $eventSourceIndexes = new EventSourceIndexRegistry();
+        $securityIndexes = new SecurityIndexRegistry();
+        $securitySourceIndexes = new SecuritySourceIndexRegistry();
         $client = new JsonRpcClient($peer);
         $workspaceTrust = new WorkspaceTrust();
         $documentContextResolver = new DocumentContextResolver($documents, $projects);
@@ -142,6 +150,7 @@ final class LanguageServerFactory
         $yamlDependencyInjectionExtractor = new YamlDependencyInjectionExtractor($positionConverter);
         $autowireExtractor = new PhpAutowireReferenceExtractor($positionConverter);
         $classExtractor = new PhpClassDeclarationExtractor($positionConverter);
+        $yamlConfigurationParser = new YamlConfigurationParser($positionConverter);
         $messengerExtractor = new MessengerExtractor($positionConverter);
         $messengerProvider = new MessengerProvider(
             $documentContextResolver,
@@ -165,6 +174,16 @@ final class LanguageServerFactory
             $eventExtractor,
             $classExtractor,
             $dependencyInjectionSourceIndexes,
+        );
+        $securityExtractor = new SecurityExtractor($positionConverter, $yamlConfigurationParser);
+        $securityProvider = new SecurityProvider(
+            $documentContextResolver,
+            $documents,
+            $projects,
+            $positionConverter,
+            $securityIndexes,
+            $securitySourceIndexes,
+            $securityExtractor,
         );
         $dependencyInjectionSymbolResolver = new DependencyInjectionSymbolResolver(
             $positionConverter,
@@ -205,7 +224,7 @@ final class LanguageServerFactory
             $projects,
             $positionConverter,
             $configurationIndexes,
-            new YamlConfigurationParser($positionConverter),
+            $yamlConfigurationParser,
             $environmentIndexes,
         );
         $routeDiagnostics = new RouteDiagnosticPublisher(
@@ -235,6 +254,7 @@ final class LanguageServerFactory
             $configurationProvider,
             $messengerProvider,
             $eventProvider,
+            $securityProvider,
         );
         $runtimeConfiguration = new RuntimeConfiguration();
         $runtimeInitializer = new ObservedRuntimeInitializer(
@@ -252,6 +272,7 @@ final class LanguageServerFactory
                             new ProjectConfigurationSnapshotLoader($configurationIndexes),
                             new ProjectMessengerSnapshotLoader($messengerIndexes),
                             new ProjectEventSnapshotLoader($eventIndexes),
+                            new ProjectSecuritySnapshotLoader($securityIndexes),
                         ),
                         $runtimeConfiguration,
                     ),
@@ -293,6 +314,7 @@ final class LanguageServerFactory
             new EnvironmentSourceIndexer($environmentIndexes, $environmentExtractor),
             new MessengerSourceIndexer($messengerSourceIndexes, $messengerExtractor),
             new EventSourceIndexer($eventSourceIndexes, $eventExtractor),
+            new SecuritySourceIndexer($securitySourceIndexes, $securityExtractor),
         );
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
@@ -352,6 +374,7 @@ final class LanguageServerFactory
                 $configurationProvider,
                 $messengerProvider,
                 $eventProvider,
+                $securityProvider,
             ),
             new CodeLensProviderRegistry($messengerProvider, $eventProvider),
             new HoverProviderRegistry(
@@ -369,6 +392,7 @@ final class LanguageServerFactory
                 $configurationProvider,
                 $messengerProvider,
                 $eventProvider,
+                $securityProvider,
             ),
             $diagnosticProviders,
             new DefinitionProviderRegistry(
@@ -384,6 +408,7 @@ final class LanguageServerFactory
                 $environmentProvider,
                 $messengerProvider,
                 $eventProvider,
+                $securityProvider,
             ),
             new DocumentLinkProviderRegistry(
                 new RouteDocumentLinkHandler(
@@ -408,6 +433,7 @@ final class LanguageServerFactory
                 $environmentProvider,
                 $messengerProvider,
                 $eventProvider,
+                $securityProvider,
             ),
             new RenameProviderRegistry(
                 $routeRename,

@@ -62,8 +62,8 @@ then run the tests:
 The first run downloads a matching VS Code build into
 ``editor/vscode/.vscode-test/``. The suite covers server lifecycle, routing,
 dependency injection, Twig templates, translations, environment variables,
-bundle configuration, Messenger, and Events. Installed extensions are disabled
-inside
+bundle configuration, Messenger, Events, and Security. Installed extensions are
+disabled inside
 the test host to keep completion, hover, navigation, diagnostics and code lens
 results deterministic. This doesn't change the regular VS Code profile.
 

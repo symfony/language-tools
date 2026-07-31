@@ -8,6 +8,7 @@
         "symfony/dotenv": "*",
         "symfony/framework-bundle": "*",
         "symfony/messenger": "*",
+        "symfony/security-bundle": "*",
         "symfony/string": "*",
         "symfony/translation": "*",
         "symfony/twig-bundle": "*",

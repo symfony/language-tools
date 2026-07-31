@@ -20,7 +20,7 @@ final class BridgeCompatibilityTest extends TestCase
             '--project='.$project,
             '--environment=test',
             '--debug=1',
-            '--sections=routes,container,twig,translations,configuration,environment,messenger,events',
+            '--sections=routes,container,twig,translations,configuration,environment,messenger,events,security',
         ], $project);
 
         $snapshot = $process->stdout();
@@ -43,6 +43,7 @@ final class BridgeCompatibilityTest extends TestCase
         $twig = $this->section($result['sections'], 'twig');
         $messenger = $this->section($result['sections'], 'messenger');
         $events = $this->section($result['sections'], 'events');
+        $security = $this->section($result['sections'], 'security');
 
         self::assertContains('fixture_home', array_column(\is_array($routes['items'] ?? null) ? $routes['items'] : [], 'name'));
         self::assertContains('App\\Environment\\CustomEnvVarProcessor', array_column(\is_array($container['items'] ?? null) ? $container['items'] : [], 'class'));
@@ -56,6 +57,10 @@ final class BridgeCompatibilityTest extends TestCase
         self::assertContains('App\\MessageHandler\\PingHandler', array_column(\is_array($messenger['handlers'] ?? null) ? $messenger['handlers'] : [], 'class'));
         self::assertContains('App\\Event\\OrderPlaced', array_column(\is_array($events['events'] ?? null) ? $events['events'] : [], 'name'));
         self::assertContains('App\\EventListener\\NotifyCustomer', array_column(\is_array($events['listeners'] ?? null) ? $events['listeners'] : [], 'class'));
+        self::assertContains('main', array_column(\is_array($security['firewalls'] ?? null) ? $security['firewalls'] : [], 'name'));
+        self::assertContains('fixture_users', array_column(\is_array($security['providers'] ?? null) ? $security['providers'] : [], 'name'));
+        self::assertContains('ROLE_ADMIN', array_column(\is_array($security['roles'] ?? null) ? $security['roles'] : [], 'name'));
+        self::assertContains('App\\Security\\PostVoter', array_column(\is_array($security['voters'] ?? null) ? $security['voters'] : [], 'class'));
     }
 
     /**

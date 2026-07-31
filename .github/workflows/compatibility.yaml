@@ -28,6 +28,7 @@ jobs:
                   --with "symfony/dotenv:${{ matrix.symfony }}"
                   --with "symfony/framework-bundle:${{ matrix.symfony }}"
                   --with "symfony/messenger:${{ matrix.symfony }}"
+                  --with "symfony/security-bundle:${{ matrix.symfony }}"
                   --with "symfony/string:${{ matrix.symfony }}"
                   --with "symfony/translation:${{ matrix.symfony }}"
                   --with "symfony/twig-bundle:${{ matrix.symfony }}"

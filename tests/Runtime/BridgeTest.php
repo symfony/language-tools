@@ -273,6 +273,56 @@ final class BridgeTest extends TestCase
         ], $result['sections']['events']['listeners'] ?? null);
     }
 
+    public function testNormalizesSecurityMetadataWithoutExportingProviderValues(): void
+    {
+        $this->writeSecurityApplication();
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=security 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $snapshot = implode("\n", $output);
+        self::assertSame(0, $exitCode, $snapshot);
+        self::assertStringNotContainsString('CANARY_SECRET_', $snapshot);
+        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null);
+        self::assertIsArray($result['sections'] ?? null);
+        self::assertIsArray($result['sections']['security'] ?? null);
+        self::assertSame([
+            ['name' => 'main', 'provider' => 'users', 'enabled' => true, 'stateless' => true, 'lazy' => false, 'authenticators' => ['App\\Security\\Authenticator']],
+        ], $result['sections']['security']['firewalls'] ?? null);
+        self::assertSame([['name' => 'users', 'type' => 'memory']], $result['sections']['security']['providers'] ?? null);
+        self::assertSame([
+            ['name' => 'ROLE_ADMIN', 'inheritedRoles' => ['ROLE_USER']],
+            ['name' => 'ROLE_USER', 'inheritedRoles' => []],
+        ], $result['sections']['security']['roles'] ?? null);
+        self::assertSame([['class' => 'App\\Security\\PostVoter']], $result['sections']['security']['voters'] ?? null);
+    }
+
+    public function testIgnoresAnUnregisteredSecurityBundle(): void
+    {
+        $this->writeUnregisteredSecurityApplication();
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=security 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $result = json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame(0, $exitCode);
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null);
+        self::assertIsArray($result['sections'] ?? null);
+        self::assertIsArray($result['sections']['security'] ?? null);
+        self::assertSame([], $result['sections']['security']['firewalls'] ?? null);
+    }
+
     public function testRejectsUnsupportedSymfonyBranches(): void
     {
         $this->writeAutoloader('7.3.9');
@@ -632,6 +682,94 @@ final class BridgeTest extends TestCase
 
                     return 0;
                 }
+            }
+            PHP);
+    }
+
+    private function writeSecurityApplication(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/vendor/autoload.php', <<<'PHP'
+            <?php
+            namespace Composer;
+            final class InstalledVersions
+            {
+                public static function getPrettyVersion(string $package): ?string { return '8.0.6'; }
+            }
+            namespace Symfony\Bundle\SecurityBundle;
+            final class SecurityBundle {}
+            namespace Symfony\Component\Console\Input;
+            final class ArrayInput
+            {
+                public function __construct(public array $arguments) {}
+            }
+            namespace Symfony\Component\Console\Output;
+            final class BufferedOutput
+            {
+                private string $contents = '';
+                public function write(string $contents): void { $this->contents .= $contents; }
+                public function fetch(): string { return $this->contents; }
+            }
+            namespace App;
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function shutdown(): void {}
+                public function getBundles(): array { return [new \Symfony\Bundle\SecurityBundle\SecurityBundle()]; }
+            }
+            namespace Symfony\Bundle\FrameworkBundle\Console;
+            final class Application
+            {
+                public function __construct(object $kernel) {}
+                public function setAutoExit(bool $autoExit): void {}
+                public function run(object $input, object $output): int
+                {
+                    $result = 'debug:config' === $input->arguments['command'] ? [
+                        'security' => [
+                            'providers' => [
+                                'users' => ['memory' => ['users' => ['admin' => ['password' => 'CANARY_SECRET_PASSWORD']]]],
+                            ],
+                            'firewalls' => [
+                                'main' => [
+                                    'provider' => 'users',
+                                    'security' => true,
+                                    'stateless' => true,
+                                    'lazy' => false,
+                                    'custom_authenticators' => ['App\\Security\\Authenticator'],
+                                ],
+                            ],
+                            'role_hierarchy' => ['ROLE_ADMIN' => ['ROLE_USER']],
+                            'access_control' => [['roles' => ['ROLE_ADMIN']]],
+                        ],
+                    ] : [
+                        'definitions' => [
+                            'app.voter' => ['class' => 'App\\Security\\PostVoter'],
+                        ],
+                    ];
+                    $output->write(json_encode($result, JSON_THROW_ON_ERROR));
+
+                    return 0;
+                }
+            }
+            PHP);
+    }
+
+    private function writeUnregisteredSecurityApplication(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/vendor/autoload.php', <<<'PHP'
+            <?php
+            namespace Composer;
+            final class InstalledVersions
+            {
+                public static function getPrettyVersion(string $package): ?string { return '8.0.6'; }
+            }
+            namespace Symfony\Bundle\SecurityBundle;
+            final class SecurityBundle {}
+            namespace App;
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function getBundles(): array { return []; }
+                public function shutdown(): void {}
             }
             PHP);
     }
