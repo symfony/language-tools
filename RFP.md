@@ -875,7 +875,7 @@ diagnostics must remain standard LSP behavior.
 
 ### Phase 1: Protocol and indexing foundation
 
-- [ ] Add generic content-length stream framing and limits to
+- [x] Add generic content-length stream framing and limits to
   `fabpot/json-rpc-peer` without adding LSP semantics.
 - [ ] Implement LSP lifecycle, cancellation, document synchronization, logging,
   and workspace folders on that transport.
@@ -883,10 +883,10 @@ diagnostics must remain standard LSP behavior.
   extraction with high-confidence Symfony call recognition.
 - [ ] Define the persistent source index, runtime snapshot schema, live-overlay
   model, bridge protocol, normal-cache reuse, and debounced invalidation.
-- [ ] Add FrameworkBundle project discovery, `supported_versions` checks,
+- [x] Add FrameworkBundle project discovery, `supported_versions` checks,
   explicit PHP commands, workspace trust, static-only mode, and status
   reporting.
-- [ ] Establish fixture applications and protocol-level test infrastructure.
+- [x] Establish fixture applications and protocol-level test infrastructure.
 - [ ] Establish reproducible standalone binary builds for macOS, Linux, and
   Windows.
 
@@ -900,10 +900,10 @@ features can land step by step without reducing the intended initial scope.
 - [x] Implement Twig template names and links.
 - [x] Implement translation keys, domains, and placeholders, with missing-key
   diagnostics opt-in.
-- [ ] Implement environment references and processors.
-- [ ] Implement bundle configuration trees.
-- [ ] Implement framework-specific code actions and best-effort rename for
-  supported identifiers.
+- [x] Implement environment references and processors.
+- [x] Implement bundle configuration trees.
+- [ ] Implement framework-specific code actions.
+- [x] Implement best-effort rename for supported identifiers.
 
 This phase should produce a usable initial release. It is better to support
 fewer contexts exactly than to match common method names heuristically and
@@ -912,7 +912,7 @@ produce false positives.
 ### Phase 3: Cross-file framework graphs
 
 - [ ] Implement Twig variables and components.
-- [ ] Implement Messenger messages, handlers, buses, and transports.
+- [x] Implement Messenger messages, handlers, buses, and transports.
 - [ ] Implement events and listeners.
 - [ ] Implement Security firewalls, providers, and roles.
 - [ ] Implement forms, validation, and serializer metadata.
