@@ -51,6 +51,13 @@ use Symfony\Lsp\Feature\Route\RouteRenameHandler;
 use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
+use Symfony\Lsp\Feature\Translation\ProjectTranslationSnapshotLoader;
+use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
+use Symfony\Lsp\Feature\Translation\TranslationExtractor;
+use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
+use Symfony\Lsp\Feature\Translation\TranslationProvider;
+use Symfony\Lsp\Feature\Translation\TranslationRenameHandler;
+use Symfony\Lsp\Feature\Translation\TranslationSourceIndexer;
 use Symfony\Lsp\Feature\Twig\ProjectTemplateSnapshotLoader;
 use Symfony\Lsp\Feature\Twig\TemplateCompletionHandler;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
@@ -62,6 +69,7 @@ use Symfony\Lsp\Index\IndexCommandHandler;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\ProjectSettings;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
 use Symfony\Lsp\Project\WorkspaceTrust;
@@ -92,6 +100,8 @@ final class LanguageServerFactory
         $parameterIndexes = new ParameterIndexRegistry();
         $dependencyInjectionSourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $templateIndexes = new TemplateIndexRegistry();
+        $translationIndexes = new TranslationIndexRegistry();
+        $translationConfiguration = new TranslationConfigurationRegistry();
         $routeDeclarationIndexes = new RouteDeclarationIndexRegistry();
         $routeReferenceIndexes = new RouteReferenceIndexRegistry();
         $client = new JsonRpcClient($peer);
@@ -118,6 +128,16 @@ final class LanguageServerFactory
             $templateReferenceExtractor,
             $templateIndexes,
         );
+        $translationExtractor = new TranslationExtractor($positionConverter);
+        $translationProvider = new TranslationProvider(
+            $documentContextResolver,
+            $documents,
+            $projects,
+            $positionConverter,
+            $translationIndexes,
+            $translationExtractor,
+            $translationConfiguration,
+        );
         $routeDiagnostics = new RouteDiagnosticPublisher(
             $documents,
             $projects,
@@ -140,6 +160,7 @@ final class LanguageServerFactory
                 $autowireExtractor,
             ),
             $templateNavigation,
+            $translationProvider,
         );
         $runtimeConfiguration = new RuntimeConfiguration();
         $runtimeInitializer = new ObservedRuntimeInitializer(
@@ -152,6 +173,7 @@ final class LanguageServerFactory
                             new ProjectRouteSnapshotLoader($routeIndexes),
                             new ProjectServiceSnapshotLoader($serviceIndexes, $parameterIndexes),
                             new ProjectTemplateSnapshotLoader($templateIndexes),
+                            new ProjectTranslationSnapshotLoader($translationIndexes),
                         ),
                         $runtimeConfiguration,
                     ),
@@ -189,12 +211,14 @@ final class LanguageServerFactory
             $routeSourceIndexer,
             $dependencyInjectionSourceIndexer,
             new TemplateSourceIndexer($templateIndexes, $templateReferenceExtractor),
+            new TranslationSourceIndexer($translationIndexes, $translationExtractor),
         );
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
             $projects,
             new WorkspaceTrustManager($client, $workspaceTrust, $runtimeInitializer),
             $runtimeConfiguration,
+            new ProjectSettings($client, $projects, $translationConfiguration),
         );
         $routeCompletion = new RouteCompletionHandler($documentContextResolver, $positionConverter, $routeIndexes);
         $routeHover = new RouteHoverHandler(
@@ -242,6 +266,7 @@ final class LanguageServerFactory
                     $positionConverter,
                     $templateIndexes,
                 ),
+                $translationProvider,
             ),
             new HoverProviderRegistry(
                 $routeHover,
@@ -253,6 +278,7 @@ final class LanguageServerFactory
                     $dependencyInjectionSourceIndexes,
                 ),
                 $templateNavigation,
+                $translationProvider,
             ),
             $diagnosticProviders,
             new DefinitionProviderRegistry(
@@ -264,6 +290,7 @@ final class LanguageServerFactory
                     $serviceIndexes,
                 ),
                 $templateNavigation,
+                $translationProvider,
             ),
             new DocumentLinkProviderRegistry(
                 new RouteDocumentLinkHandler(
@@ -283,6 +310,7 @@ final class LanguageServerFactory
                     $dependencyInjectionSourceIndexes,
                 ),
                 $templateNavigation,
+                $translationProvider,
             ),
             new RenameProviderRegistry(
                 $routeRename,
@@ -292,6 +320,12 @@ final class LanguageServerFactory
                     $dependencyInjectionSourceIndexes,
                     $serviceIndexes,
                     $parameterIndexes,
+                ),
+                new TranslationRenameHandler(
+                    $documentContextResolver,
+                    $positionConverter,
+                    $translationExtractor,
+                    $translationIndexes,
                 ),
             ),
             new ProjectRuntimeRefresher(

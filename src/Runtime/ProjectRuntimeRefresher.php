@@ -52,13 +52,15 @@ final class ProjectRuntimeRefresher
             return true;
         }
 
+        $rootPath = rtrim(str_replace('\\', '/', $project->rootPath()), '/');
+        $path = str_replace('\\', '/', rawurldecode($path));
+        if (\in_array($extension, ['json', 'xlf', 'xliff'], true)) {
+            return str_contains($path, '/translations/');
+        }
         if (!\in_array($extension, ['yaml', 'yml'], true)) {
             return false;
         }
 
-        $rootPath = rtrim(str_replace('\\', '/', $project->rootPath()), '/');
-        $path = str_replace('\\', '/', rawurldecode($path));
-
-        return str_starts_with($path, $rootPath.'/config/');
+        return str_starts_with($path, $rootPath.'/config/') || str_contains($path, '/translations/');
     }
 }

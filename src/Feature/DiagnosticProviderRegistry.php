@@ -60,6 +60,13 @@ final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterfac
         ]);
     }
 
+    public function refreshAll(): void
+    {
+        foreach ($this->projects->all() as $project) {
+            $this->refreshed($project);
+        }
+    }
+
     public function refreshed(Project $project): void
     {
         foreach ($this->documents->all() as $document) {

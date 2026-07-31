@@ -35,6 +35,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             { scheme: 'file', language: 'php' },
             { scheme: 'file', language: 'twig' },
             { scheme: 'file', language: 'yaml' },
+            { scheme: 'file', language: 'json' },
+            { scheme: 'file', language: 'xml' },
         ],
         outputChannel,
         traceOutputChannel: outputChannel,
@@ -45,6 +47,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             debug: configuration.get<boolean>('debug', true),
         },
         synchronize: {
+            configurationSection: 'symfonyLsp',
             fileEvents: vscode.workspace.createFileSystemWatcher('**/composer.{json,lock}'),
         },
     };

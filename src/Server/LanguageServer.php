@@ -58,6 +58,7 @@ final class LanguageServer
         $this->dispatcher->onNotification('textDocument/didChange', $this->changeDocument(...));
         $this->dispatcher->onNotification('textDocument/didClose', $this->closeDocument(...));
         $this->dispatcher->onNotification('textDocument/didSave', $this->saveDocument(...));
+        $this->dispatcher->onNotification('workspace/didChangeConfiguration', $this->changeConfiguration(...));
         $this->dispatcher->onRequest('textDocument/completion', $this->completionProviders->complete(...));
         $this->dispatcher->onRequest('textDocument/hover', $this->hoverProviders->hover(...));
         $this->dispatcher->onRequest('textDocument/definition', $this->definitionProviders->definition(...));
@@ -158,9 +159,19 @@ final class LanguageServer
     /**
      * @param array<array-key, mixed> $params
      */
+    private function changeConfiguration(array $params): void
+    {
+        $this->workspaceConfiguration->refreshProjectSettings();
+        $this->diagnosticProviders->refreshAll();
+    }
+
+    /**
+     * @param array<array-key, mixed> $params
+     */
     private function initialized(array $params): void
     {
         async(function (): void {
+            $this->workspaceConfiguration->refreshProjectSettings();
             $this->sourceScanner->indexAll();
             $this->workspaceConfiguration->requestWorkspaceTrust();
         })->ignore();

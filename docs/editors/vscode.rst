@@ -41,6 +41,7 @@ workspace's ``.vscode/settings.json`` file:
         "symfonyLsp.phpCommand": ["php"],
         "symfonyLsp.environment": "dev",
         "symfonyLsp.debug": true,
+        "symfonyLsp.translationDiagnostics": false,
         "php.suggest.basic": false
     }
 
@@ -59,6 +60,9 @@ Symfony application.
 
 ``symfonyLsp.environment`` and ``symfonyLsp.debug`` select the Symfony runtime
 whose effective metadata is indexed.
+
+``symfonyLsp.translationDiagnostics`` enables missing-key diagnostics. It is a
+resource-scoped setting and defaults to ``false``.
 
 The PHP suggestion setting is optional. Symfony LSP is designed to coexist with
 a general PHP language server such as Intelephense or PHP Tools. Keep that

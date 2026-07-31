@@ -11,6 +11,7 @@ final class WorkspaceConfiguration
         private readonly ProjectRegistry $projectRegistry,
         private readonly WorkspaceTrustManager $workspaceTrustManager,
         private readonly RuntimeConfiguration $runtimeConfiguration,
+        private readonly ProjectSettings $projectSettings,
     ) {
     }
 
@@ -24,9 +25,15 @@ final class WorkspaceConfiguration
             $this->runtimeConfiguration->configure($initializationOptions);
         }
 
+        $this->projectSettings->initialize($params);
         $workspaceFolders = $this->workspaceFolders($params);
         $this->projectRegistry->replace($this->projectDiscovery->discover($workspaceFolders));
         $this->workspaceTrustManager->applyInitializationOptions($params, $this->projectRegistry);
+    }
+
+    public function refreshProjectSettings(): void
+    {
+        $this->projectSettings->refresh();
     }
 
     public function requestWorkspaceTrust(): void

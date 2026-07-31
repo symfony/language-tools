@@ -40,6 +40,13 @@ Supported Integrations
       - Yes
       - No
       - Yes
+    * - :doc:`Translations </features/translations>`
+      - Yes
+      - Yes
+      - Yes
+      - Yes
+      - Yes
+      - Yes
 
 Runtime Indexing and Trust
 --------------------------
@@ -54,8 +61,10 @@ commands to obtain effective metadata:
 * ``debug:twig --format=json``.
 
 The bridge also uses the structured parameter output internally to discover
-parameter names and deprecations. Parameter values are discarded inside the
-bridge and never enter snapshots, logs or Language Server Protocol responses.
+parameter names and deprecations. Effective translation catalogues are read
+through Symfony's public translator interfaces. Parameter values are discarded
+inside the bridge and never enter snapshots, logs or Language Server Protocol
+responses.
 
 With runtime indexing disabled, source-backed navigation, references and rename
 remain available. Features that need the effective router or compiled container
@@ -73,7 +82,8 @@ navigation, references and rename reflect unsaved edits.
 Runtime Metadata Refresh
 ------------------------
 
-Saving relevant PHP or YAML configuration schedules a debounced runtime refresh.
+Saving relevant PHP, YAML or translation resources schedules a debounced runtime
+refresh.
 The last valid metadata remains available when a refresh fails. Open-document
 diagnostics are republished after a successful refresh.
 
@@ -115,3 +125,4 @@ feature-specific limitations.
     routing
     dependency-injection
     templates
+    translations

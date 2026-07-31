@@ -32,6 +32,9 @@ final class ProjectRuntimeRefresherTest extends TestCase
         yield 'PHP' => ['file:///workspace/src/Controller.php'];
         yield 'route YAML' => ['file:///workspace/config/routes.yaml'];
         yield 'package YAML' => ['file:///workspace/config/packages/framework.yaml'];
+        yield 'translation YAML' => ['file:///workspace/translations/messages.en.yaml'];
+        yield 'translation JSON' => ['file:///workspace/translations/messages.en.json'];
+        yield 'translation XLIFF' => ['file:///workspace/translations/messages.en.xlf'];
     }
 
     public function testDoesNotRefreshUntrustedProjects(): void

@@ -4,9 +4,11 @@ namespace Symfony\Lsp\Tests\Project;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Client\ClientInterface;
+use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\ProjectSettings;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
 use Symfony\Lsp\Project\WorkspaceTrust;
@@ -42,6 +44,7 @@ final class WorkspaceConfigurationTest extends TestCase
             $registry,
             new WorkspaceTrustManager($this->client(), new WorkspaceTrust(), $this->runtimeInitializer()),
             $runtimeConfiguration,
+            new ProjectSettings($this->client(), $registry, new TranslationConfigurationRegistry()),
         );
 
         $configuration->initialize([
