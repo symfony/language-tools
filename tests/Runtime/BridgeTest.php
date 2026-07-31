@@ -197,6 +197,7 @@ final class BridgeTest extends TestCase
     public function testExportsEnvironmentProcessorMetadataWithoutValues(): void
     {
         $this->writeEnvironmentApplication();
+        $previousSecret = getenv('APP_SECRET');
         putenv('APP_SECRET=CANARY_SECRET_ENVIRONMENT_VALUE');
 
         exec(\sprintf(
@@ -205,6 +206,11 @@ final class BridgeTest extends TestCase
             escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
             escapeshellarg($this->temporaryDirectory),
         ), $output, $exitCode);
+        if (false === $previousSecret) {
+            putenv('APP_SECRET');
+        } else {
+            putenv('APP_SECRET='.$previousSecret);
+        }
 
         $snapshot = implode("\n", $output);
         self::assertSame(0, $exitCode, $snapshot);
