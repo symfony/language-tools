@@ -41,6 +41,8 @@ use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Environment\EnvironmentProvider;
 use Symfony\Lsp\Feature\Environment\EnvironmentSourceIndexer;
 use Symfony\Lsp\Feature\Environment\ProjectEnvironmentSnapshotLoader;
+use Symfony\Lsp\Feature\Event\EventIndexRegistry;
+use Symfony\Lsp\Feature\Event\ProjectEventSnapshotLoader;
 use Symfony\Lsp\Feature\HoverProviderRegistry;
 use Symfony\Lsp\Feature\Messenger\MessengerExtractor;
 use Symfony\Lsp\Feature\Messenger\MessengerIndexRegistry;
@@ -124,6 +126,7 @@ final class LanguageServerFactory
         $routeReferenceIndexes = new RouteReferenceIndexRegistry();
         $messengerIndexes = new MessengerIndexRegistry();
         $messengerSourceIndexes = new MessengerSourceIndexRegistry();
+        $eventIndexes = new EventIndexRegistry();
         $client = new JsonRpcClient($peer);
         $workspaceTrust = new WorkspaceTrust();
         $documentContextResolver = new DocumentContextResolver($documents, $projects);
@@ -230,6 +233,7 @@ final class LanguageServerFactory
                             new ProjectEnvironmentSnapshotLoader($environmentIndexes),
                             new ProjectConfigurationSnapshotLoader($configurationIndexes),
                             new ProjectMessengerSnapshotLoader($messengerIndexes),
+                            new ProjectEventSnapshotLoader($eventIndexes),
                         ),
                         $runtimeConfiguration,
                     ),

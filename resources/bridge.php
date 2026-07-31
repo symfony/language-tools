@@ -517,6 +517,64 @@ if (in_array('messenger', $requestedSections, true)) {
     $sections['messenger'] = $messenger;
 }
 
+if (in_array('events', $requestedSections, true)) {
+    $eventItems = [];
+    $listeners = [];
+    $complete = true;
+    if (interface_exists(Symfony\Contracts\EventDispatcher\EventDispatcherInterface::class)) {
+        try {
+            $kernelClass = 'App\\Kernel';
+            if (!class_exists($kernelClass)) {
+                throw new RuntimeException('The default App\\Kernel class was not found.');
+            }
+            $kernel = bridgeKernel($kernelClass, is_string($environment) ? $environment : 'dev', !in_array($debug, ['0', 'false'], true));
+            $application = new Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
+            $application->setAutoExit(false);
+            $events = runJsonCommand($application, [
+                'command' => 'debug:event-dispatcher',
+                '--format' => 'json',
+                '--env' => is_string($environment) ? $environment : 'dev',
+                '--no-debug' => in_array($debug, ['0', 'false'], true),
+                '--no-interaction' => true,
+            ]);
+            foreach ($events as $name => $eventListeners) {
+                if (!is_string($name)) {
+                    continue;
+                }
+                $eventItems[] = [
+                    'name' => $name,
+                    'class' => class_exists($name) || interface_exists($name) ? $name : null,
+                ];
+                foreach (is_array($eventListeners) ? $eventListeners : [] as $listener) {
+                    if (!is_array($listener) || !is_string($listener['class'] ?? null) || !is_string($listener['name'] ?? null)) {
+                        continue;
+                    }
+                    $listeners[] = [
+                        'event' => $name,
+                        'class' => $listener['class'],
+                        'method' => $listener['name'],
+                        'priority' => is_int($listener['priority'] ?? null) ? $listener['priority'] : 0,
+                    ];
+                }
+            }
+        } catch (Throwable $error) {
+            $complete = false;
+            $errors[] = ['section' => 'events', 'message' => $error->getMessage()];
+        }
+    }
+    usort($eventItems, static fn (array $left, array $right): int => $left['name'] <=> $right['name']);
+    usort($listeners, static fn (array $left, array $right): int => [$left['event'], -$left['priority'], $left['class'], $left['method']] <=> [$right['event'], -$right['priority'], $right['class'], $right['method']]);
+    $events = [
+        'complete' => $complete,
+        'events' => $eventItems,
+        'listeners' => $listeners,
+        'resources' => [],
+        'warnings' => [],
+    ];
+    $events['generation'] = hash('sha256', json_encode($events, JSON_THROW_ON_ERROR));
+    $sections['events'] = $events;
+}
+
 if (in_array('configuration', $requestedSections, true)) {
     $bundles = [];
     $warnings = [];

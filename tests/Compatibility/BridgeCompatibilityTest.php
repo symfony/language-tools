@@ -20,7 +20,7 @@ final class BridgeCompatibilityTest extends TestCase
             '--project='.$project,
             '--environment=test',
             '--debug=1',
-            '--sections=routes,container,twig,translations,configuration,environment,messenger',
+            '--sections=routes,container,twig,translations,configuration,environment,messenger,events',
         ], $project);
 
         $snapshot = $process->stdout();
@@ -42,6 +42,7 @@ final class BridgeCompatibilityTest extends TestCase
         $environment = $this->section($result['sections'], 'environment');
         $twig = $this->section($result['sections'], 'twig');
         $messenger = $this->section($result['sections'], 'messenger');
+        $events = $this->section($result['sections'], 'events');
 
         self::assertContains('fixture_home', array_column(\is_array($routes['items'] ?? null) ? $routes['items'] : [], 'name'));
         self::assertContains('App\\Environment\\CustomEnvVarProcessor', array_column(\is_array($container['items'] ?? null) ? $container['items'] : [], 'class'));
@@ -53,6 +54,8 @@ final class BridgeCompatibilityTest extends TestCase
         self::assertContains('async', array_column(\is_array($messenger['transports'] ?? null) ? $messenger['transports'] : [], 'name'));
         self::assertContains('App\\Message\\Ping', array_column(\is_array($messenger['messages'] ?? null) ? $messenger['messages'] : [], 'class'));
         self::assertContains('App\\MessageHandler\\PingHandler', array_column(\is_array($messenger['handlers'] ?? null) ? $messenger['handlers'] : [], 'class'));
+        self::assertContains('kernel.request', array_column(\is_array($events['events'] ?? null) ? $events['events'] : [], 'name'));
+        self::assertNotSame([], $events['listeners'] ?? []);
     }
 
     /**

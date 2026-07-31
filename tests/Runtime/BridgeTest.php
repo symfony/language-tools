@@ -245,6 +245,34 @@ final class BridgeTest extends TestCase
         ], $result['sections']['environment']['processors'] ?? null);
     }
 
+    public function testNormalizesEventDispatcherMetadata(): void
+    {
+        $this->writeEventApplication();
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=events 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $snapshot = implode("\n", $output);
+        self::assertSame(0, $exitCode, $snapshot);
+        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null);
+        self::assertIsArray($result['sections'] ?? null);
+        self::assertIsArray($result['sections']['events'] ?? null);
+        self::assertSame([
+            ['name' => 'App\\Event\\OrderPlaced', 'class' => 'App\\Event\\OrderPlaced'],
+            ['name' => 'legacy.order_placed', 'class' => null],
+        ], $result['sections']['events']['events'] ?? null);
+        self::assertSame([
+            ['event' => 'App\\Event\\OrderPlaced', 'class' => 'App\\EventListener\\NotifyCustomer', 'method' => 'onOrderPlaced', 'priority' => 10],
+            ['event' => 'legacy.order_placed', 'class' => 'App\\EventListener\\AuditOrder', 'method' => '__invoke', 'priority' => 0],
+        ], $result['sections']['events']['listeners'] ?? null);
+    }
+
     public function testRejectsUnsupportedSymfonyBranches(): void
     {
         $this->writeAutoloader('7.3.9');
@@ -545,6 +573,65 @@ final class BridgeTest extends TestCase
                 public function boot(): void {}
                 public function shutdown(): void {}
                 public function getBundles(): array { return [new Bundle()]; }
+            }
+            PHP);
+    }
+
+    private function writeEventApplication(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/vendor/autoload.php', <<<'PHP'
+            <?php
+            namespace Composer;
+            final class InstalledVersions
+            {
+                public static function getPrettyVersion(string $package): ?string { return '8.0.6'; }
+            }
+            namespace Symfony\Contracts\EventDispatcher;
+            interface EventDispatcherInterface {}
+            namespace Symfony\Component\Console\Input;
+            final class ArrayInput
+            {
+                public function __construct(public array $arguments) {}
+            }
+            namespace Symfony\Component\Console\Output;
+            final class BufferedOutput
+            {
+                private string $contents = '';
+                public function write(string $contents): void { $this->contents .= $contents; }
+                public function fetch(): string { return $this->contents; }
+            }
+            namespace App\Event;
+            final class OrderPlaced {}
+            namespace App;
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function shutdown(): void {}
+            }
+            namespace Symfony\Bundle\FrameworkBundle\Console;
+            final class Application
+            {
+                public function __construct(object $kernel) {}
+                public function setAutoExit(bool $autoExit): void {}
+                public function run(object $input, object $output): int
+                {
+                    $output->write(json_encode([
+                        'legacy.order_placed' => [[
+                            'type' => 'function',
+                            'name' => '__invoke',
+                            'class' => 'App\\EventListener\\AuditOrder',
+                            'priority' => 0,
+                        ]],
+                        'App\\Event\\OrderPlaced' => [[
+                            'type' => 'function',
+                            'name' => 'onOrderPlaced',
+                            'class' => 'App\\EventListener\\NotifyCustomer',
+                            'priority' => 10,
+                        ]],
+                    ], JSON_THROW_ON_ERROR));
+
+                    return 0;
+                }
             }
             PHP);
     }
