@@ -68,9 +68,16 @@ Supported Integrations
       - Yes
       - No
       - Yes
+    * - :doc:`Events </features/events>`
+      - Yes
+      - Yes
+      - Yes
+      - Yes
+      - No
+      - Yes
 
-Messenger message and handler classes also provide code lenses for navigating
-between related classes.
+Messenger message and handler classes, and event and listener classes, also
+provide code lenses for navigating between related classes.
 
 Runtime Indexing and Trust
 --------------------------
@@ -83,7 +90,8 @@ runs structured Symfony commands to obtain effective metadata:
 * ``debug:router --format=json --show-aliases``;
 * ``debug:container --format=json --show-hidden``;
 * ``debug:container --types --format=json``;
-* ``debug:twig --format=json``.
+* ``debug:twig --format=json``;
+* ``debug:event-dispatcher --format=json``.
 
 The bridge also discovers environment processor types and bundle configuration
 through public Symfony interfaces. It never executes the ``env-vars`` command.
@@ -157,3 +165,4 @@ feature-specific limitations.
     environment
     configuration
     messenger
+    events

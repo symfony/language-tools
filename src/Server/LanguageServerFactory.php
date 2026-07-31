@@ -41,7 +41,11 @@ use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Environment\EnvironmentProvider;
 use Symfony\Lsp\Feature\Environment\EnvironmentSourceIndexer;
 use Symfony\Lsp\Feature\Environment\ProjectEnvironmentSnapshotLoader;
+use Symfony\Lsp\Feature\Event\EventExtractor;
 use Symfony\Lsp\Feature\Event\EventIndexRegistry;
+use Symfony\Lsp\Feature\Event\EventProvider;
+use Symfony\Lsp\Feature\Event\EventSourceIndexer;
+use Symfony\Lsp\Feature\Event\EventSourceIndexRegistry;
 use Symfony\Lsp\Feature\Event\ProjectEventSnapshotLoader;
 use Symfony\Lsp\Feature\HoverProviderRegistry;
 use Symfony\Lsp\Feature\Messenger\MessengerExtractor;
@@ -127,6 +131,7 @@ final class LanguageServerFactory
         $messengerIndexes = new MessengerIndexRegistry();
         $messengerSourceIndexes = new MessengerSourceIndexRegistry();
         $eventIndexes = new EventIndexRegistry();
+        $eventSourceIndexes = new EventSourceIndexRegistry();
         $client = new JsonRpcClient($peer);
         $workspaceTrust = new WorkspaceTrust();
         $documentContextResolver = new DocumentContextResolver($documents, $projects);
@@ -146,6 +151,18 @@ final class LanguageServerFactory
             $messengerIndexes,
             $messengerSourceIndexes,
             $messengerExtractor,
+            $classExtractor,
+            $dependencyInjectionSourceIndexes,
+        );
+        $eventExtractor = new EventExtractor($positionConverter);
+        $eventProvider = new EventProvider(
+            $documentContextResolver,
+            $documents,
+            $projects,
+            $positionConverter,
+            $eventIndexes,
+            $eventSourceIndexes,
+            $eventExtractor,
             $classExtractor,
             $dependencyInjectionSourceIndexes,
         );
@@ -217,6 +234,7 @@ final class LanguageServerFactory
             $environmentProvider,
             $configurationProvider,
             $messengerProvider,
+            $eventProvider,
         );
         $runtimeConfiguration = new RuntimeConfiguration();
         $runtimeInitializer = new ObservedRuntimeInitializer(
@@ -274,6 +292,7 @@ final class LanguageServerFactory
             new TranslationSourceIndexer($translationIndexes, $translationExtractor),
             new EnvironmentSourceIndexer($environmentIndexes, $environmentExtractor),
             new MessengerSourceIndexer($messengerSourceIndexes, $messengerExtractor),
+            new EventSourceIndexer($eventSourceIndexes, $eventExtractor),
         );
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
@@ -332,8 +351,9 @@ final class LanguageServerFactory
                 $environmentProvider,
                 $configurationProvider,
                 $messengerProvider,
+                $eventProvider,
             ),
-            new CodeLensProviderRegistry($messengerProvider),
+            new CodeLensProviderRegistry($messengerProvider, $eventProvider),
             new HoverProviderRegistry(
                 $routeHover,
                 new DependencyInjectionHoverHandler(
@@ -348,6 +368,7 @@ final class LanguageServerFactory
                 $environmentProvider,
                 $configurationProvider,
                 $messengerProvider,
+                $eventProvider,
             ),
             $diagnosticProviders,
             new DefinitionProviderRegistry(
@@ -362,6 +383,7 @@ final class LanguageServerFactory
                 $translationProvider,
                 $environmentProvider,
                 $messengerProvider,
+                $eventProvider,
             ),
             new DocumentLinkProviderRegistry(
                 new RouteDocumentLinkHandler(
@@ -385,6 +407,7 @@ final class LanguageServerFactory
                 $translationProvider,
                 $environmentProvider,
                 $messengerProvider,
+                $eventProvider,
             ),
             new RenameProviderRegistry(
                 $routeRename,

@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { configurationTests } from './configuration.test';
 import { dependencyInjectionTests } from './dependency-injection.test';
 import { environmentTests } from './environment.test';
+import { eventTests } from './events.test';
 import { lifecycleTests } from './lifecycle.test';
 import { messengerTests } from './messenger.test';
 import { routingTests } from './routing.test';
@@ -28,6 +29,7 @@ export async function run(): Promise<void> {
         ...environmentTests,
         ...configurationTests,
         ...messengerTests,
+        ...eventTests,
     ];
     try {
         for (const [name, test] of tests) {

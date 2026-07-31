@@ -54,8 +54,8 @@ final class BridgeCompatibilityTest extends TestCase
         self::assertContains('async', array_column(\is_array($messenger['transports'] ?? null) ? $messenger['transports'] : [], 'name'));
         self::assertContains('App\\Message\\Ping', array_column(\is_array($messenger['messages'] ?? null) ? $messenger['messages'] : [], 'class'));
         self::assertContains('App\\MessageHandler\\PingHandler', array_column(\is_array($messenger['handlers'] ?? null) ? $messenger['handlers'] : [], 'class'));
-        self::assertContains('kernel.request', array_column(\is_array($events['events'] ?? null) ? $events['events'] : [], 'name'));
-        self::assertNotSame([], $events['listeners'] ?? []);
+        self::assertContains('App\\Event\\OrderPlaced', array_column(\is_array($events['events'] ?? null) ? $events['events'] : [], 'name'));
+        self::assertContains('App\\EventListener\\NotifyCustomer', array_column(\is_array($events['listeners'] ?? null) ? $events['listeners'] : [], 'class'));
     }
 
     /**

@@ -913,7 +913,7 @@ produce false positives.
 
 - [ ] Implement Twig variables and components.
 - [x] Implement Messenger messages, handlers, buses, and transports.
-- [ ] Implement events and listeners.
+- [x] Implement events and listeners.
 - [ ] Implement Security firewalls, providers, and roles.
 - [ ] Implement forms, validation, and serializer metadata.
 - [ ] Implement code lenses and references backed by these graphs.
