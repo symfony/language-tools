@@ -111,6 +111,7 @@ final class ConfigurationProviderTest extends TestCase
         $cases = [
             ['file:///workspace/config/framework.yaml', 'yaml', "framework:\n    router:\n        mode: ", ['dev', 'prod']],
             ['file:///workspace/config/framework.php', 'php', '<?php $framework->router()->ut', ['utf8']],
+            ['file:///workspace/config/framework-typed.php', 'php', '<?php function configure(FrameworkConfig $options) { $options->router()->ut', ['utf8']],
             ['file:///workspace/config/framework.xml', 'xml', '<container><framework:config><framework:ro', ['router']],
             ['file:///workspace/config/framework-attribute.xml', 'xml', '<container><framework:config><framework:router ut', ['utf8']],
         ];

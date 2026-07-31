@@ -229,7 +229,7 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
         if (!preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)((?:->[A-Za-z_][A-Za-z0-9_]*\(\))*)->([A-Za-z_][A-Za-z0-9_]*)?$/', $before, $match)) {
             return null;
         }
-        $path = [$this->snake($match[1])];
+        $path = [$this->phpRoot($before, $match[1])];
         preg_match_all('/->([A-Za-z_][A-Za-z0-9_]*)\(\)/', $match[2], $methods);
         foreach ($methods[1] as $method) {
             $path[] = $this->snake($method);
@@ -300,7 +300,7 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
     {
         preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)((?:->[A-Za-z_][A-Za-z0-9_]*\([^)]*\))+)/', $document->text(), $chains, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($chains as $chain) {
-            $path = [$this->snake($chain[1][0])];
+            $path = [$this->phpRoot(substr($document->text(), 0, $chain[1][1]), $chain[1][0])];
             preg_match_all('/->([A-Za-z_][A-Za-z0-9_]*)\(([^)]*)\)/', $chain[2][0], $methods, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
             foreach ($methods as $method) {
                 $path[] = $this->snake($method[1][0]);
@@ -349,7 +349,7 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
         $diagnostics = [];
         preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)((?:->[A-Za-z_][A-Za-z0-9_]*\([^)]*\))+)/', $document->text(), $chains, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($chains as $chain) {
-            $path = [$this->snake($chain[1][0])];
+            $path = [$this->phpRoot(substr($document->text(), 0, $chain[1][1]), $chain[1][0])];
             if (!isset($index->roots()[$path[0]])) {
                 continue;
             }
@@ -597,6 +597,18 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
     private function shortDescription(ConfigurationNode $node): string
     {
         return $node->type().(null !== $node->info() ? ' - '.$node->info() : '');
+    }
+
+    private function phpRoot(string $before, string $variable): string
+    {
+        preg_match_all('/([A-Za-z_\\\\][A-Za-z0-9_\\\\]*Config)\s+\$'.preg_quote($variable, '/').'\b/', $before, $matches);
+        $class = end($matches[1]);
+        if (false === $class) {
+            return $this->snake($variable);
+        }
+        $shortName = substr($class, (int) strrpos('\\'.$class, '\\'));
+
+        return $this->snake(substr($shortName, 0, -\strlen('Config')));
     }
 
     private function snake(string $name): string
