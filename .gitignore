@@ -1,6 +1,7 @@
 /.php-cs-fixer.cache
 /.phpunit.cache/
 /vendor/
+/editor/vscode/.vscode-test/
 /editor/vscode/node_modules/
 /editor/vscode/out/
 /editor/vscode/*.vsix

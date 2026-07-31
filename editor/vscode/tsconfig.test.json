@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "out/test",
+    "rootDir": "test",
+    "types": [
+      "node",
+      "vscode"
+    ]
+  },
+  "include": [
+    "test/**/*.ts"
+  ]
+}

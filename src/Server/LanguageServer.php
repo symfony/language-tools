@@ -167,8 +167,10 @@ final class LanguageServer
      */
     private function changeConfiguration(array $params): void
     {
-        $this->workspaceConfiguration->refreshProjectSettings();
-        $this->diagnosticProviders->refreshAll();
+        async(function (): void {
+            $this->workspaceConfiguration->refreshProjectSettings();
+            $this->diagnosticProviders->refreshAll();
+        })->ignore();
     }
 
     /**

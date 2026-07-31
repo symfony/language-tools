@@ -27,6 +27,26 @@ This creates ``editor/vscode/symfony-lsp-0.0.1.vsix``. Install it with VS Code:
 
 Restart VS Code after installation.
 
+Automated Extension Tests
+-------------------------
+
+The extension test suite launches an isolated VS Code Extension Development
+Host against the Symfony runtime fixture. Install the fixture dependencies,
+then run the tests:
+
+.. code-block:: terminal
+
+    $ cd tests/Fixtures/RuntimeApplication
+    $ composer update
+    $ cd ../../../editor/vscode
+    $ npm ci
+    $ npm run test:e2e
+
+The first run downloads a matching VS Code build into
+``editor/vscode/.vscode-test/``. Installed extensions are disabled inside the
+test host to keep completion, hover, navigation, diagnostics and code lens
+results deterministic. This doesn't change the regular VS Code profile.
+
 Configuration
 -------------
 
