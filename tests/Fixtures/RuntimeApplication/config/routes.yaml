@@ -1,0 +1,4 @@
+fixture_home:
+    path: /fixture
+    controller: App\Controller\HomeController
+    methods: [GET]

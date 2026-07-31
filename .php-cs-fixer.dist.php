@@ -3,6 +3,7 @@
 $finder = (new PhpCsFixer\Finder())
     ->in(__DIR__.'/src')
     ->in(__DIR__.'/tests')
+    ->exclude('Fixtures/RuntimeApplication')
     ->append([__FILE__, __DIR__.'/bin/symfony-lsp'])
 ;
 

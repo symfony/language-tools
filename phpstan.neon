@@ -4,3 +4,6 @@ parameters:
         - bin
         - src
         - tests
+    excludePaths:
+        analyseAndScan:
+            - tests/Fixtures/RuntimeApplication/*

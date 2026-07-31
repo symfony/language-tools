@@ -1,0 +1,38 @@
+name: Symfony compatibility
+
+on:
+    pull_request:
+    push:
+    workflow_dispatch:
+
+jobs:
+    bridge:
+        name: Symfony ${{ matrix.symfony }}
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                symfony: ['6.4.*', '7.4.*', '8.0.*', '8.1.*']
+        steps:
+            - uses: actions/checkout@v4
+            - uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.4'
+                  coverage: none
+            - uses: ramsey/composer-install@v3
+            - name: Install the compatibility application
+              working-directory: tests/Fixtures/RuntimeApplication
+              run: >-
+                  composer update --no-interaction --no-progress --with-all-dependencies
+                  --with "symfony/console:${{ matrix.symfony }}"
+                  --with "symfony/dotenv:${{ matrix.symfony }}"
+                  --with "symfony/framework-bundle:${{ matrix.symfony }}"
+                  --with "symfony/string:${{ matrix.symfony }}"
+                  --with "symfony/translation:${{ matrix.symfony }}"
+                  --with "symfony/twig-bundle:${{ matrix.symfony }}"
+                  --with "symfony/yaml:${{ matrix.symfony }}"
+            - name: Test the project bridge
+              env:
+                  SYMFONY_LSP_COMPAT_BRANCH: ${{ matrix.symfony }}
+                  SYMFONY_LSP_COMPAT_PROJECT: ${{ github.workspace }}/tests/Fixtures/RuntimeApplication
+              run: ./vendor/bin/phpunit --no-progress tests/Compatibility
