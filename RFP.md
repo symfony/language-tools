@@ -554,8 +554,9 @@ This split provides several benefits:
 The bridge is bundled with Symfony LSP and must be compatible with all PHP
 versions allowed by supported Symfony branches. Projects do not install a
 separate integration package. After workspace trust is granted, the bridge is
-written atomically under `var/symfony-lsp/<version>/bridge.php` so project PHP
-wrappers can access it. Symfony LSP must not modify `.gitignore`. Bridge output
+written atomically under
+`var/symfony-lsp/<version>/<bundle-hash>/bridge.php` so project PHP wrappers can
+access it. Symfony LSP must not modify `.gitignore`. Bridge output
 should contain data only. Logs and application output must be captured
 separately and must never reach the server's stdout.
 

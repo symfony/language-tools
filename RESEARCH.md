@@ -402,11 +402,12 @@ become required until every supported branch provides them.
 ### Invocation
 
 After workspace trust is granted, the standalone server should write its bundled
-bridge atomically to `var/symfony-lsp/<version>/bridge.php`. It should not modify
+bridge atomically to
+`var/symfony-lsp/<version>/<bundle-hash>/bridge.php`. It should not modify
 `.gitignore`. It then invokes an argument array such as:
 
 ```text
-<phpCommand...> var/symfony-lsp/<version>/bridge.php snapshot \
+<phpCommand...> var/symfony-lsp/<version>/<bundle-hash>/bridge.php snapshot \
     --project=/workspace/app \
     --environment=dev \
     --debug=1 \

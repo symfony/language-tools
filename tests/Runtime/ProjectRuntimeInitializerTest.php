@@ -29,13 +29,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     protected function tearDown(): void
     {
-        $bridgeDirectory = $this->temporaryDirectory.'/var/symfony-lsp/test';
-        @unlink($bridgeDirectory.'/bridge.php');
-        @rmdir($bridgeDirectory);
-        @rmdir(\dirname($bridgeDirectory));
-        @rmdir(\dirname($bridgeDirectory, 2));
-        @unlink($this->temporaryDirectory.'/source.php');
-        @rmdir($this->temporaryDirectory);
+        $this->removeDirectory($this->temporaryDirectory);
     }
 
     public function testExecutesBridgeAndLoadsRoutes(): void
@@ -154,6 +148,28 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'file://'.$this->temporaryDirectory,
             '^8.0',
         ));
+    }
+
+    private function removeDirectory(string $directory): void
+    {
+        if (!is_dir($directory)) {
+            return;
+        }
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST,
+        );
+        foreach ($iterator as $file) {
+            if (!$file instanceof \SplFileInfo) {
+                continue;
+            }
+            if ($file->isDir()) {
+                @rmdir($file->getPathname());
+            } else {
+                @unlink($file->getPathname());
+            }
+        }
+        @rmdir($directory);
     }
 }
 

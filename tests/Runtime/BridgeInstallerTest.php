@@ -18,29 +18,62 @@ final class BridgeInstallerTest extends TestCase
 
     protected function tearDown(): void
     {
-        $bridgeDirectory = $this->temporaryDirectory.'/var/symfony-lsp/test';
-        @unlink($bridgeDirectory.'/bridge.php');
-        @rmdir($bridgeDirectory);
-        @rmdir(\dirname($bridgeDirectory));
-        @rmdir(\dirname($bridgeDirectory, 2));
-        @rmdir($this->temporaryDirectory);
+        $this->removeDirectory($this->temporaryDirectory);
     }
 
-    public function testInstallsBridgeAtomicallyInsideProject(): void
+    public function testInstallsBridgeBundleAtomicallyInsideProject(): void
     {
         $source = $this->temporaryDirectory.'/source.php';
-        file_put_contents($source, '<?php echo "bridge";');
+        $module = $this->temporaryDirectory.'/bridge/sections/routes.php';
+        mkdir(\dirname($module), 0777, true);
+        file_put_contents($source, "<?php require __DIR__.'/bridge/sections/routes.php';");
+        file_put_contents($module, '<?php function routes(): array { return []; }');
         $installer = new BridgeInstaller($source, 'test');
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
 
-        $installer->initialize($project);
-        $installer->initialize($project);
+        $first = $installer->install($project);
+        $second = $installer->install($project);
 
+        self::assertSame($first, $second);
+        self::assertMatchesRegularExpression('{/var/symfony-lsp/test/[a-f0-9]{64}/bridge\.php$}', $first);
         self::assertSame(
-            '<?php echo "bridge";',
-            file_get_contents($this->temporaryDirectory.'/var/symfony-lsp/test/bridge.php'),
+            "<?php require __DIR__.'/bridge/sections/routes.php';",
+            file_get_contents($first),
+        );
+        self::assertSame(
+            '<?php function routes(): array { return []; }',
+            file_get_contents(\dirname($first).'/bridge/sections/routes.php'),
         );
 
-        @unlink($source);
+        file_put_contents($module, '<?php function routes(): array { return ["updated"]; }');
+        $updated = $installer->install($project);
+
+        self::assertNotSame($first, $updated);
+        self::assertSame(
+            '<?php function routes(): array { return ["updated"]; }',
+            file_get_contents(\dirname($updated).'/bridge/sections/routes.php'),
+        );
+    }
+
+    private function removeDirectory(string $directory): void
+    {
+        if (!is_dir($directory)) {
+            return;
+        }
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST,
+        );
+        foreach ($iterator as $file) {
+            if (!$file instanceof \SplFileInfo) {
+                continue;
+            }
+            if ($file->isDir()) {
+                @rmdir($file->getPathname());
+            } else {
+                @unlink($file->getPathname());
+            }
+        }
+        @rmdir($directory);
     }
 }
