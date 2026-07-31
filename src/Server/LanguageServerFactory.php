@@ -12,6 +12,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\CodeLensProviderRegistry;
 use Symfony\Lsp\Feature\CompletionProviderRegistry;
 use Symfony\Lsp\Feature\Configuration\ConfigurationIndexRegistry;
 use Symfony\Lsp\Feature\Configuration\ConfigurationProvider;
@@ -41,6 +42,12 @@ use Symfony\Lsp\Feature\Environment\EnvironmentProvider;
 use Symfony\Lsp\Feature\Environment\EnvironmentSourceIndexer;
 use Symfony\Lsp\Feature\Environment\ProjectEnvironmentSnapshotLoader;
 use Symfony\Lsp\Feature\HoverProviderRegistry;
+use Symfony\Lsp\Feature\Messenger\MessengerExtractor;
+use Symfony\Lsp\Feature\Messenger\MessengerIndexRegistry;
+use Symfony\Lsp\Feature\Messenger\MessengerProvider;
+use Symfony\Lsp\Feature\Messenger\MessengerSourceIndexer;
+use Symfony\Lsp\Feature\Messenger\MessengerSourceIndexRegistry;
+use Symfony\Lsp\Feature\Messenger\ProjectMessengerSnapshotLoader;
 use Symfony\Lsp\Feature\ReferencesProviderRegistry;
 use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
@@ -115,6 +122,8 @@ final class LanguageServerFactory
         $configurationIndexes = new ConfigurationIndexRegistry();
         $routeDeclarationIndexes = new RouteDeclarationIndexRegistry();
         $routeReferenceIndexes = new RouteReferenceIndexRegistry();
+        $messengerIndexes = new MessengerIndexRegistry();
+        $messengerSourceIndexes = new MessengerSourceIndexRegistry();
         $client = new JsonRpcClient($peer);
         $workspaceTrust = new WorkspaceTrust();
         $documentContextResolver = new DocumentContextResolver($documents, $projects);
@@ -125,6 +134,18 @@ final class LanguageServerFactory
         $yamlDependencyInjectionExtractor = new YamlDependencyInjectionExtractor($positionConverter);
         $autowireExtractor = new PhpAutowireReferenceExtractor($positionConverter);
         $classExtractor = new PhpClassDeclarationExtractor($positionConverter);
+        $messengerExtractor = new MessengerExtractor($positionConverter);
+        $messengerProvider = new MessengerProvider(
+            $documentContextResolver,
+            $documents,
+            $projects,
+            $positionConverter,
+            $messengerIndexes,
+            $messengerSourceIndexes,
+            $messengerExtractor,
+            $classExtractor,
+            $dependencyInjectionSourceIndexes,
+        );
         $dependencyInjectionSymbolResolver = new DependencyInjectionSymbolResolver(
             $positionConverter,
             $yamlDependencyInjectionExtractor,
@@ -192,6 +213,7 @@ final class LanguageServerFactory
             $translationProvider,
             $environmentProvider,
             $configurationProvider,
+            $messengerProvider,
         );
         $runtimeConfiguration = new RuntimeConfiguration();
         $runtimeInitializer = new ObservedRuntimeInitializer(
@@ -207,6 +229,7 @@ final class LanguageServerFactory
                             new ProjectTranslationSnapshotLoader($translationIndexes),
                             new ProjectEnvironmentSnapshotLoader($environmentIndexes),
                             new ProjectConfigurationSnapshotLoader($configurationIndexes),
+                            new ProjectMessengerSnapshotLoader($messengerIndexes),
                         ),
                         $runtimeConfiguration,
                     ),
@@ -246,6 +269,7 @@ final class LanguageServerFactory
             new TemplateSourceIndexer($templateIndexes, $templateReferenceExtractor),
             new TranslationSourceIndexer($translationIndexes, $translationExtractor),
             new EnvironmentSourceIndexer($environmentIndexes, $environmentExtractor),
+            new MessengerSourceIndexer($messengerSourceIndexes, $messengerExtractor),
         );
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
@@ -303,7 +327,9 @@ final class LanguageServerFactory
                 $translationProvider,
                 $environmentProvider,
                 $configurationProvider,
+                $messengerProvider,
             ),
+            new CodeLensProviderRegistry($messengerProvider),
             new HoverProviderRegistry(
                 $routeHover,
                 new DependencyInjectionHoverHandler(
@@ -317,6 +343,7 @@ final class LanguageServerFactory
                 $translationProvider,
                 $environmentProvider,
                 $configurationProvider,
+                $messengerProvider,
             ),
             $diagnosticProviders,
             new DefinitionProviderRegistry(
@@ -330,6 +357,7 @@ final class LanguageServerFactory
                 $templateNavigation,
                 $translationProvider,
                 $environmentProvider,
+                $messengerProvider,
             ),
             new DocumentLinkProviderRegistry(
                 new RouteDocumentLinkHandler(
@@ -352,6 +380,7 @@ final class LanguageServerFactory
                 $templateNavigation,
                 $translationProvider,
                 $environmentProvider,
+                $messengerProvider,
             ),
             new RenameProviderRegistry(
                 $routeRename,

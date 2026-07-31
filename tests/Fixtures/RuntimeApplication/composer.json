@@ -7,6 +7,7 @@
         "symfony/console": "*",
         "symfony/dotenv": "*",
         "symfony/framework-bundle": "*",
+        "symfony/messenger": "*",
         "symfony/string": "*",
         "symfony/translation": "*",
         "symfony/twig-bundle": "*",

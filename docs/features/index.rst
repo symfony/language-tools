@@ -61,6 +61,16 @@ Supported Integrations
       - No
       - No
       - Yes
+    * - :doc:`Messenger </features/messenger>`
+      - Yes
+      - Yes
+      - Yes
+      - Yes
+      - No
+      - Yes
+
+Messenger message and handler classes also provide code lenses for navigating
+between related classes.
 
 Runtime Indexing and Trust
 --------------------------
@@ -146,3 +156,4 @@ feature-specific limitations.
     translations
     environment
     configuration
+    messenger

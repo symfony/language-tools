@@ -7,6 +7,7 @@ use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcError;
 use Fabpot\JsonRpc\JsonRpcPeer;
 use Symfony\Lsp\Document\DocumentSynchronizer;
+use Symfony\Lsp\Feature\CodeLensProviderRegistry;
 use Symfony\Lsp\Feature\CompletionProviderRegistry;
 use Symfony\Lsp\Feature\DefinitionProviderRegistry;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
@@ -30,6 +31,7 @@ final class LanguageServer
         private readonly WorkspaceConfiguration $workspaceConfiguration,
         private readonly DocumentSynchronizer $documentSynchronizer,
         private readonly CompletionProviderRegistry $completionProviders,
+        private readonly CodeLensProviderRegistry $codeLensProviders,
         private readonly HoverProviderRegistry $hoverProviders,
         private readonly DiagnosticProviderRegistry $diagnosticProviders,
         private readonly DefinitionProviderRegistry $definitionProviders,
@@ -60,6 +62,7 @@ final class LanguageServer
         $this->dispatcher->onNotification('textDocument/didSave', $this->saveDocument(...));
         $this->dispatcher->onNotification('workspace/didChangeConfiguration', $this->changeConfiguration(...));
         $this->dispatcher->onRequest('textDocument/completion', $this->completionProviders->complete(...));
+        $this->dispatcher->onRequest('textDocument/codeLens', $this->codeLensProviders->codeLenses(...));
         $this->dispatcher->onRequest('textDocument/hover', $this->hoverProviders->hover(...));
         $this->dispatcher->onRequest('textDocument/definition', $this->definitionProviders->definition(...));
         $this->dispatcher->onRequest('textDocument/documentLink', $this->documentLinkProviders->links(...));
@@ -92,6 +95,9 @@ final class LanguageServer
                 'textDocumentSync' => 2,
                 'completionProvider' => [
                     'triggerCharacters' => ["'", '"', '@', '%'],
+                ],
+                'codeLensProvider' => [
+                    'resolveProvider' => false,
                 ],
                 'hoverProvider' => true,
                 'definitionProvider' => true,

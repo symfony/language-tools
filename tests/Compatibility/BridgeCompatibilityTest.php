@@ -20,7 +20,7 @@ final class BridgeCompatibilityTest extends TestCase
             '--project='.$project,
             '--environment=test',
             '--debug=1',
-            '--sections=routes,container,twig,translations,configuration,environment',
+            '--sections=routes,container,twig,translations,configuration,environment,messenger',
         ], $project);
 
         $snapshot = $process->stdout();
@@ -41,6 +41,7 @@ final class BridgeCompatibilityTest extends TestCase
         $configuration = $this->section($result['sections'], 'configuration');
         $environment = $this->section($result['sections'], 'environment');
         $twig = $this->section($result['sections'], 'twig');
+        $messenger = $this->section($result['sections'], 'messenger');
 
         self::assertContains('fixture_home', array_column(\is_array($routes['items'] ?? null) ? $routes['items'] : [], 'name'));
         self::assertContains('App\\Environment\\CustomEnvVarProcessor', array_column(\is_array($container['items'] ?? null) ? $container['items'] : [], 'class'));
@@ -48,6 +49,10 @@ final class BridgeCompatibilityTest extends TestCase
         self::assertContains('framework', array_column(\is_array($configuration['bundles'] ?? null) ? $configuration['bundles'] : [], 'alias'));
         self::assertContains('fixture_upper', array_column(\is_array($environment['processors'] ?? null) ? $environment['processors'] : [], 'name'));
         self::assertNotSame([], $twig['paths'] ?? []);
+        self::assertContains('command.bus', array_column(\is_array($messenger['buses'] ?? null) ? $messenger['buses'] : [], 'name'));
+        self::assertContains('async', array_column(\is_array($messenger['transports'] ?? null) ? $messenger['transports'] : [], 'name'));
+        self::assertContains('App\\Message\\Ping', array_column(\is_array($messenger['messages'] ?? null) ? $messenger['messages'] : [], 'class'));
+        self::assertContains('App\\MessageHandler\\PingHandler', array_column(\is_array($messenger['handlers'] ?? null) ? $messenger['handlers'] : [], 'class'));
     }
 
     /**

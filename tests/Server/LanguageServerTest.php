@@ -34,6 +34,9 @@ final class LanguageServerTest extends TestCase
                         'completionProvider' => [
                             'triggerCharacters' => ["'", '"', '@', '%'],
                         ],
+                        'codeLensProvider' => [
+                            'resolveProvider' => false,
+                        ],
                         'hoverProvider' => true,
                         'definitionProvider' => true,
                         'documentLinkProvider' => [

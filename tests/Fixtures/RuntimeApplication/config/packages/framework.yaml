@@ -3,3 +3,14 @@ framework:
     default_locale: en
     translator:
         default_path: '%kernel.project_dir%/translations'
+    messenger:
+        default_bus: command.bus
+        buses:
+            command.bus: ~
+            event.bus: ~
+        transports:
+            async: 'in-memory://'
+            failed: 'in-memory://'
+        failure_transport: failed
+        routing:
+            App\Message\Ping: async
