@@ -13,6 +13,10 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderRegistry;
+use Symfony\Lsp\Feature\Configuration\ConfigurationIndexRegistry;
+use Symfony\Lsp\Feature\Configuration\ConfigurationProvider;
+use Symfony\Lsp\Feature\Configuration\ProjectConfigurationSnapshotLoader;
+use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Feature\DefinitionProviderRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDefinitionHandler;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDiagnosticProvider;
@@ -31,6 +35,11 @@ use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\DocumentLinkProviderRegistry;
+use Symfony\Lsp\Feature\Environment\EnvironmentExtractor;
+use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
+use Symfony\Lsp\Feature\Environment\EnvironmentProvider;
+use Symfony\Lsp\Feature\Environment\EnvironmentSourceIndexer;
+use Symfony\Lsp\Feature\Environment\ProjectEnvironmentSnapshotLoader;
 use Symfony\Lsp\Feature\HoverProviderRegistry;
 use Symfony\Lsp\Feature\ReferencesProviderRegistry;
 use Symfony\Lsp\Feature\RenameProviderRegistry;
@@ -102,6 +111,8 @@ final class LanguageServerFactory
         $templateIndexes = new TemplateIndexRegistry();
         $translationIndexes = new TranslationIndexRegistry();
         $translationConfiguration = new TranslationConfigurationRegistry();
+        $environmentIndexes = new EnvironmentIndexRegistry();
+        $configurationIndexes = new ConfigurationIndexRegistry();
         $routeDeclarationIndexes = new RouteDeclarationIndexRegistry();
         $routeReferenceIndexes = new RouteReferenceIndexRegistry();
         $client = new JsonRpcClient($peer);
@@ -138,6 +149,24 @@ final class LanguageServerFactory
             $translationExtractor,
             $translationConfiguration,
         );
+        $environmentExtractor = new EnvironmentExtractor($positionConverter);
+        $environmentProvider = new EnvironmentProvider(
+            $documentContextResolver,
+            $documents,
+            $projects,
+            $positionConverter,
+            $environmentIndexes,
+            $environmentExtractor,
+        );
+        $configurationProvider = new ConfigurationProvider(
+            $documentContextResolver,
+            $documents,
+            $projects,
+            $positionConverter,
+            $configurationIndexes,
+            new YamlConfigurationParser($positionConverter),
+            $environmentIndexes,
+        );
         $routeDiagnostics = new RouteDiagnosticPublisher(
             $documents,
             $projects,
@@ -161,6 +190,8 @@ final class LanguageServerFactory
             ),
             $templateNavigation,
             $translationProvider,
+            $environmentProvider,
+            $configurationProvider,
         );
         $runtimeConfiguration = new RuntimeConfiguration();
         $runtimeInitializer = new ObservedRuntimeInitializer(
@@ -174,6 +205,8 @@ final class LanguageServerFactory
                             new ProjectServiceSnapshotLoader($serviceIndexes, $parameterIndexes),
                             new ProjectTemplateSnapshotLoader($templateIndexes),
                             new ProjectTranslationSnapshotLoader($translationIndexes),
+                            new ProjectEnvironmentSnapshotLoader($environmentIndexes),
+                            new ProjectConfigurationSnapshotLoader($configurationIndexes),
                         ),
                         $runtimeConfiguration,
                     ),
@@ -212,6 +245,7 @@ final class LanguageServerFactory
             $dependencyInjectionSourceIndexer,
             new TemplateSourceIndexer($templateIndexes, $templateReferenceExtractor),
             new TranslationSourceIndexer($translationIndexes, $translationExtractor),
+            new EnvironmentSourceIndexer($environmentIndexes, $environmentExtractor),
         );
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
@@ -267,6 +301,8 @@ final class LanguageServerFactory
                     $templateIndexes,
                 ),
                 $translationProvider,
+                $environmentProvider,
+                $configurationProvider,
             ),
             new HoverProviderRegistry(
                 $routeHover,
@@ -279,6 +315,8 @@ final class LanguageServerFactory
                 ),
                 $templateNavigation,
                 $translationProvider,
+                $environmentProvider,
+                $configurationProvider,
             ),
             $diagnosticProviders,
             new DefinitionProviderRegistry(
@@ -291,6 +329,7 @@ final class LanguageServerFactory
                 ),
                 $templateNavigation,
                 $translationProvider,
+                $environmentProvider,
             ),
             new DocumentLinkProviderRegistry(
                 new RouteDocumentLinkHandler(
@@ -301,6 +340,7 @@ final class LanguageServerFactory
                     $twigRouteReferenceExtractor,
                 ),
                 $templateNavigation,
+                $configurationProvider,
             ),
             new ReferencesProviderRegistry(
                 $routeReferences,
@@ -311,6 +351,7 @@ final class LanguageServerFactory
                 ),
                 $templateNavigation,
                 $translationProvider,
+                $environmentProvider,
             ),
             new RenameProviderRegistry(
                 $routeRename,

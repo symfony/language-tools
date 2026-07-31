@@ -37,6 +37,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             { scheme: 'file', language: 'yaml' },
             { scheme: 'file', language: 'json' },
             { scheme: 'file', language: 'xml' },
+            { scheme: 'file', pattern: '**/.env*' },
         ],
         outputChannel,
         traceOutputChannel: outputChannel,

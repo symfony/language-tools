@@ -62,7 +62,7 @@ final class ApplicationSourceScanner
                 $extension = strtolower(pathinfo($path, \PATHINFO_EXTENSION));
                 $document = new SourceDocument(
                     $this->uri($project, $path),
-                    self::LANGUAGE_IDS[$extension],
+                    str_starts_with(basename($path), '.env') ? 'dotenv' : self::LANGUAGE_IDS[$extension],
                     $text,
                 );
                 foreach ($this->providers as $provider) {
@@ -137,7 +137,7 @@ final class ApplicationSourceScanner
         }
 
         $extension = strtolower(pathinfo($path, \PATHINFO_EXTENSION));
-        if (!isset(self::LANGUAGE_IDS[$extension])) {
+        if (!isset(self::LANGUAGE_IDS[$extension]) && !str_starts_with(basename($path), '.env')) {
             return;
         }
 
@@ -163,7 +163,7 @@ final class ApplicationSourceScanner
                 continue;
             }
 
-            if ($file->isFile() && isset(self::LANGUAGE_IDS[strtolower($file->getExtension())])) {
+            if ($file->isFile() && (isset(self::LANGUAGE_IDS[strtolower($file->getExtension())]) || str_starts_with($file->getFilename(), '.env'))) {
                 yield $file->getPathname();
             }
         }

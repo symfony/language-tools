@@ -94,30 +94,35 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
     }
 
-    public function testRejectsSnapshotSectionErrors(): void
+    public function testLoadsAvailableSectionsBeforeReportingSectionErrors(): void
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
+        $serviceIndexes = new ServiceIndexRegistry();
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
         $initializer = new ProjectRuntimeInitializer(
             new BridgeInstaller($source, 'test'),
             new CapturingProcessRunner(new ProcessResult(0, json_encode([
                 'schemaVersion' => 1,
                 'errors' => [['section' => 'routes', 'message' => 'missing environment']],
+                'sections' => ['container' => ['complete' => true, 'items' => [
+                    ['id' => 'app.mailer', 'class' => 'App\\Mailer'],
+                ], 'parameters' => []]],
             ], \JSON_THROW_ON_ERROR), '')),
             new RuntimeSnapshotLoaderRegistry(
                 new ProjectRouteSnapshotLoader(new RouteIndexRegistry()),
+                new ProjectServiceSnapshotLoader($serviceIndexes, new ParameterIndexRegistry()),
             ),
             new RuntimeConfiguration(),
         );
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('missing environment');
-
-        $initializer->initialize(new Project(
-            $this->temporaryDirectory,
-            'file://'.$this->temporaryDirectory,
-            '^8.0',
-        ));
+        try {
+            $initializer->initialize($project);
+            self::fail('The section error was not reported.');
+        } catch (\RuntimeException $error) {
+            self::assertStringContainsString('missing environment', $error->getMessage());
+        }
+        self::assertSame('app.mailer', $serviceIndexes->forProject($project)->get('app.mailer')?->id());
     }
 
     public function testRejectsFailedBridgeExecution(): void

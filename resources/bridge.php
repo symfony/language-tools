@@ -321,6 +321,148 @@ if (in_array('translations', $requestedSections, true)) {
     ];
 }
 
+if (in_array('configuration', $requestedSections, true)) {
+    $bundles = [];
+    $warnings = [];
+    $complete = true;
+    $kernel = null;
+    try {
+        $kernelClass = 'App\\Kernel';
+        if (!class_exists($kernelClass)) {
+            throw new RuntimeException('The default App\\Kernel class was not found.');
+        }
+        $kernel = new $kernelClass(is_string($environment) ? $environment : 'dev', !in_array($debug, ['0', 'false'], true));
+        $kernel->boot();
+        $builder = new Symfony\Component\DependencyInjection\ContainerBuilder();
+        $builder->setParameter('kernel.environment', is_string($environment) ? $environment : 'dev');
+        $builder->setParameter('kernel.debug', !in_array($debug, ['0', 'false'], true));
+        $builder->setParameter('kernel.project_dir', realpath($project) ?: $project);
+        $builder->setParameter('kernel.bundles', array_map(static fn (object $item): string => $item::class, $kernel->getBundles()));
+        if (method_exists($kernel, 'getContainer')) {
+            $runtimeContainer = $kernel->getContainer();
+            foreach (['kernel.bundles_metadata', 'kernel.build_dir', 'kernel.cache_dir', 'kernel.charset', 'kernel.container_class', 'kernel.logs_dir', 'kernel.runtime_environment'] as $parameterName) {
+                if ($runtimeContainer->hasParameter($parameterName)) {
+                    $builder->setParameter($parameterName, $runtimeContainer->getParameter($parameterName));
+                }
+            }
+        }
+        foreach ($kernel->getBundles() as $bundle) {
+            $extension = $bundle->getContainerExtension();
+            if (null !== $extension) {
+                $builder->registerExtension($extension);
+            }
+        }
+        foreach ($kernel->getBundles() as $bundle) {
+            try {
+                $extension = $bundle->getContainerExtension();
+                if (null === $extension || !method_exists($extension, 'getConfiguration')) {
+                    continue;
+                }
+                $configuration = $extension->getConfiguration([], $builder);
+                if (null === $configuration) {
+                    continue;
+                }
+                $tree = $configuration->getConfigTreeBuilder()->buildTree();
+                $alias = method_exists($extension, 'getAlias') ? $extension->getAlias() : $tree->getName();
+                $bundles[] = [
+                    'alias' => (string) $alias,
+                    'class' => $bundle::class,
+                    'tree' => normalizeConfigNode($tree),
+                ];
+            } catch (Throwable $error) {
+                $warnings[] = sprintf('%s: %s', $bundle::class, $error->getMessage());
+            }
+        }
+    } catch (Throwable $error) {
+        $complete = false;
+        $errors[] = ['section' => 'configuration', 'message' => $error->getMessage()];
+    } finally {
+        if (is_object($kernel) && method_exists($kernel, 'shutdown')) {
+            $kernel->shutdown();
+        }
+    }
+    usort($bundles, static fn (array $left, array $right): int => $left['alias'] <=> $right['alias']);
+    sort($warnings);
+    $resources = [];
+    $configDir = rtrim($project, '/\\').'/config';
+    if (is_dir($configDir)) {
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($configDir, FilesystemIterator::SKIP_DOTS)) as $file) {
+            if ($file->isFile() && in_array(strtolower($file->getExtension()), ['php', 'xml', 'yaml', 'yml'], true)) {
+                $resources[] = $file->getPathname();
+            }
+        }
+    }
+    sort($resources);
+    $sections['configuration'] = [
+        'complete' => $complete,
+        'generation' => hash('sha256', json_encode($bundles, JSON_THROW_ON_ERROR)),
+        'bundles' => $bundles,
+        'resources' => $resources,
+        'warnings' => $warnings,
+    ];
+}
+
+if (in_array('environment', $requestedSections, true)) {
+    $processors = [];
+    $complete = true;
+    if (interface_exists(Symfony\Component\DependencyInjection\EnvVarProcessorInterface::class)) {
+        $classes = class_exists(Symfony\Component\DependencyInjection\EnvVarProcessor::class)
+            ? [Symfony\Component\DependencyInjection\EnvVarProcessor::class]
+            : [];
+        $kernel = null;
+        try {
+            $kernelClass = 'App\\Kernel';
+            if (!class_exists($kernelClass)) {
+                throw new RuntimeException('The default App\\Kernel class was not found.');
+            }
+            $kernel = new $kernelClass(is_string($environment) ? $environment : 'dev', !in_array($debug, ['0', 'false'], true));
+            $application = new Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
+            $application->setAutoExit(false);
+            $tagged = runJsonCommand($application, [
+                'command' => 'debug:container',
+                '--tag' => 'container.env_var_processor',
+                '--format' => 'json',
+                '--env' => is_string($environment) ? $environment : 'dev',
+                '--no-debug' => in_array($debug, ['0', 'false'], true),
+                '--no-interaction' => true,
+            ]);
+            foreach (is_array($tagged['definitions'] ?? null) ? $tagged['definitions'] : [] as $definition) {
+                if (is_array($definition) && is_string($definition['class'] ?? null)) {
+                    $classes[] = $definition['class'];
+                }
+            }
+        } catch (Throwable $error) {
+            $complete = false;
+            $errors[] = ['section' => 'environment', 'message' => $error->getMessage()];
+        } finally {
+            if (is_object($kernel) && method_exists($kernel, 'shutdown')) {
+                $kernel->shutdown();
+            }
+        }
+        foreach (array_values(array_unique($classes)) as $class) {
+            if (is_a($class, Symfony\Component\DependencyInjection\EnvVarProcessorInterface::class, true)) {
+                foreach ($class::getProvidedTypes() as $name => $type) {
+                    if (is_string($name) && is_string($type)) {
+                        $processors[$name] = $type;
+                    }
+                }
+            }
+        }
+    }
+    ksort($processors);
+    $processorItems = [];
+    foreach ($processors as $name => $type) {
+        $processorItems[] = ['name' => $name, 'type' => $type];
+    }
+    $sections['environment'] = [
+        'complete' => $complete,
+        'generation' => hash('sha256', json_encode($processorItems, JSON_THROW_ON_ERROR)),
+        'processors' => $processorItems,
+        'resources' => [],
+        'warnings' => [],
+    ];
+}
+
 $result = [
     'schemaVersion' => 1,
     'generation' => hash('sha256', json_encode($sections, JSON_THROW_ON_ERROR)),
@@ -574,4 +716,90 @@ function splitDebugValues(mixed $value): array
     }
 
     return preg_split('/[|, ]+/', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+}
+
+function configNodeType(object $node): string
+{
+    $class = basename(str_replace('\\', '/', $node::class));
+
+    return match ($class) {
+        'ArrayNode', 'PrototypedArrayNode' => 'array',
+        'BooleanNode' => 'boolean',
+        'EnumNode' => 'enum',
+        'FloatNode' => 'float',
+        'IntegerNode' => 'integer',
+        'ScalarNode' => 'scalar',
+        'VariableNode' => 'variable',
+        default => strtolower(preg_replace('/Node$/', '', $class)),
+    };
+}
+
+function configDefaultSummary(object $node): ?string
+{
+    if (!method_exists($node, 'hasDefaultValue') || !$node->hasDefaultValue()) {
+        return null;
+    }
+    $value = $node->getDefaultValue();
+
+    return match (true) {
+        null === $value => 'null',
+        is_array($value) => sprintf('array (%d items)', count($value)),
+        is_bool($value) => 'boolean',
+        is_float($value) => 'float',
+        is_int($value) => 'integer',
+        is_string($value) => 'string',
+        default => get_debug_type($value),
+    };
+}
+
+function normalizeConfigExample(mixed $example): mixed
+{
+    if (null === $example || is_bool($example) || is_float($example) || is_int($example) || is_string($example)) {
+        return $example;
+    }
+    if (is_array($example)) {
+        $normalized = [];
+        foreach (array_slice($example, 0, 20, true) as $key => $value) {
+            $normalized[$key] = normalizeConfigExample($value);
+        }
+
+        return $normalized;
+    }
+
+    return null;
+}
+
+function normalizeConfigNode(object $node, int $depth = 0): array
+{
+    $normalized = [
+        'name' => method_exists($node, 'getName') ? (string) $node->getName() : '',
+        'type' => configNodeType($node),
+        'required' => method_exists($node, 'isRequired') && $node->isRequired(),
+        'hasDefault' => method_exists($node, 'hasDefaultValue') && $node->hasDefaultValue(),
+        'defaultSummary' => configDefaultSummary($node),
+        'info' => method_exists($node, 'getInfo') && is_string($node->getInfo()) ? $node->getInfo() : null,
+        'example' => method_exists($node, 'getExample') ? normalizeConfigExample($node->getExample()) : null,
+        'deprecated' => method_exists($node, 'isDeprecated') && $node->isDeprecated(),
+        'allowedValues' => method_exists($node, 'getValues') ? normalizeConfigExample($node->getValues()) : null,
+        'children' => [],
+        'prototype' => null,
+    ];
+    if ($depth >= 32) {
+        return $normalized;
+    }
+    if (method_exists($node, 'getChildren')) {
+        foreach ($node->getChildren() as $child) {
+            if (is_object($child)) {
+                $normalized['children'][] = normalizeConfigNode($child, $depth + 1);
+            }
+        }
+    }
+    if (method_exists($node, 'getPrototype')) {
+        $prototype = $node->getPrototype();
+        if (is_object($prototype)) {
+            $normalized['prototype'] = normalizeConfigNode($prototype, $depth + 1);
+        }
+    }
+
+    return $normalized;
 }

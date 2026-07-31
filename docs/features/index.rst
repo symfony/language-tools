@@ -47,6 +47,20 @@ Supported Integrations
       - Yes
       - Yes
       - Yes
+    * - :doc:`Environment variables </features/environment>`
+      - Yes
+      - Yes
+      - Yes
+      - Yes
+      - No
+      - Yes
+    * - :doc:`Bundle configuration </features/configuration>`
+      - Yes
+      - Yes
+      - No
+      - No
+      - No
+      - Yes
 
 Runtime Indexing and Trust
 --------------------------
@@ -59,6 +73,9 @@ commands to obtain effective metadata:
 * ``debug:container --format=json --show-hidden``;
 * ``debug:container --types --format=json``;
 * ``debug:twig --format=json``.
+
+The bridge also discovers environment processor types and bundle configuration
+through public Symfony interfaces. It never executes the ``env-vars`` command.
 
 The bridge also uses the structured parameter output internally to discover
 parameter names and deprecations. Effective translation catalogues are read
@@ -82,8 +99,8 @@ navigation, references and rename reflect unsaved edits.
 Runtime Metadata Refresh
 ------------------------
 
-Saving relevant PHP, YAML or translation resources schedules a debounced runtime
-refresh.
+Saving relevant PHP, YAML, XML, translation or bundle metadata resources
+schedules a debounced runtime refresh.
 The last valid metadata remains available when a refresh fails. Open-document
 diagnostics are republished after a successful refresh.
 
@@ -126,3 +143,5 @@ feature-specific limitations.
     dependency-injection
     templates
     translations
+    environment
+    configuration

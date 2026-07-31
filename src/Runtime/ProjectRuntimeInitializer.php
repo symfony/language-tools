@@ -40,6 +40,8 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             throw new \RuntimeException('The project bridge returned an unsupported snapshot.');
         }
 
+        $this->snapshotLoaders->load($project, $snapshot);
+
         $errors = $snapshot['errors'] ?? null;
         if (\is_array($errors) && [] !== $errors) {
             $messages = [];
@@ -51,7 +53,5 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
 
             throw new \RuntimeException('The project bridge could not load runtime metadata: '.implode('; ', $messages));
         }
-
-        $this->snapshotLoaders->load($project, $snapshot);
     }
 }

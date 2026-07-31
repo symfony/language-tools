@@ -164,6 +164,61 @@ final class BridgeTest extends TestCase
         ], $result['sections']['container']['parameters']);
     }
 
+    public function testExportsPublicBundleConfigurationTrees(): void
+    {
+        $this->writeConfigurationApplication();
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=configuration 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $snapshot = implode("\n", $output);
+        self::assertSame(0, $exitCode, $snapshot);
+        self::assertStringNotContainsString('CANARY_SECRET_', $snapshot);
+        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($result);
+        self::assertIsArray($result['sections'] ?? null);
+        self::assertIsArray($result['sections']['configuration'] ?? null);
+        self::assertIsArray($result['sections']['configuration']['bundles'] ?? null);
+        $bundle = $result['sections']['configuration']['bundles'][0] ?? null;
+        self::assertIsArray($bundle);
+        self::assertIsArray($bundle['tree'] ?? null);
+        self::assertIsArray($bundle['tree']['children'] ?? null);
+        $child = $bundle['tree']['children'][0] ?? null;
+        self::assertIsArray($child);
+        self::assertSame('framework', $bundle['alias'] ?? null);
+        self::assertSame('scalar', $child['type'] ?? null);
+        self::assertSame('string', $child['defaultSummary'] ?? null);
+    }
+
+    public function testExportsEnvironmentProcessorMetadataWithoutValues(): void
+    {
+        $this->writeEnvironmentApplication();
+        putenv('APP_SECRET=CANARY_SECRET_ENVIRONMENT_VALUE');
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=environment 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $snapshot = implode("\n", $output);
+        self::assertSame(0, $exitCode, $snapshot);
+        self::assertStringNotContainsString('CANARY_SECRET_', $snapshot);
+        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($result);
+        self::assertIsArray($result['sections'] ?? null);
+        self::assertIsArray($result['sections']['environment'] ?? null);
+        self::assertSame([
+            ['name' => 'int', 'type' => 'int'],
+            ['name' => 'json', 'type' => 'array'],
+        ], $result['sections']['environment']['processors'] ?? null);
+    }
+
     public function testRejectsUnsupportedSymfonyBranches(): void
     {
         $this->writeAutoloader('7.3.9');
@@ -332,6 +387,121 @@ final class BridgeTest extends TestCase
                         ]];
                     }
                     $output->write(json_encode($result, JSON_THROW_ON_ERROR));
+
+                    return 0;
+                }
+            }
+            PHP);
+    }
+
+    private function writeConfigurationApplication(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/vendor/autoload.php', <<<'PHP'
+            <?php
+            namespace Composer;
+            final class InstalledVersions
+            {
+                public static function getPrettyVersion(string $package): ?string { return '8.0.6'; }
+            }
+            namespace Symfony\Component\DependencyInjection;
+            final class ContainerBuilder
+            {
+                public function setParameter(string $name, mixed $value): void {}
+                public function registerExtension(object $extension): void {}
+            }
+            namespace Symfony\Component\Config\Definition;
+            abstract class TestNode
+            {
+                public function __construct(private string $name) {}
+                public function getName(): string { return $this->name; }
+                public function isRequired(): bool { return false; }
+                public function hasDefaultValue(): bool { return false; }
+                public function getDefaultValue(): mixed { return null; }
+                public function getInfo(): ?string { return null; }
+                public function getExample(): mixed { return null; }
+                public function isDeprecated(): bool { return false; }
+            }
+            final class ScalarNode extends TestNode
+            {
+                public function hasDefaultValue(): bool { return true; }
+                public function getDefaultValue(): mixed { return 'CANARY_SECRET_CONFIG_DEFAULT'; }
+            }
+            final class ArrayNode extends TestNode
+            {
+                public function getChildren(): array { return [new ScalarNode('secret')]; }
+            }
+            namespace App;
+            final class TreeBuilder
+            {
+                public function buildTree(): object { return new \Symfony\Component\Config\Definition\ArrayNode('framework'); }
+            }
+            final class Configuration
+            {
+                public function getConfigTreeBuilder(): object { return new TreeBuilder(); }
+            }
+            final class Extension
+            {
+                public function getAlias(): string { return 'framework'; }
+                public function getConfiguration(array $config, object $container): object { return new Configuration(); }
+            }
+            final class Bundle
+            {
+                public function getContainerExtension(): object { return new Extension(); }
+            }
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function boot(): void {}
+                public function shutdown(): void {}
+                public function getBundles(): array { return [new Bundle()]; }
+            }
+            PHP);
+    }
+
+    private function writeEnvironmentApplication(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/vendor/autoload.php', <<<'PHP'
+            <?php
+            namespace Composer;
+            final class InstalledVersions
+            {
+                public static function getPrettyVersion(string $package): ?string { return '8.0.6'; }
+            }
+            namespace Symfony\Component\DependencyInjection;
+            interface EnvVarProcessorInterface
+            {
+                public static function getProvidedTypes(): array;
+            }
+            final class EnvVarProcessor implements EnvVarProcessorInterface
+            {
+                public static function getProvidedTypes(): array { return ['json' => 'array', 'int' => 'int']; }
+            }
+            namespace Symfony\Component\Console\Input;
+            final class ArrayInput
+            {
+                public function __construct(public array $arguments) {}
+            }
+            namespace Symfony\Component\Console\Output;
+            final class BufferedOutput
+            {
+                private string $contents = '';
+                public function write(string $contents): void { $this->contents .= $contents; }
+                public function fetch(): string { return $this->contents; }
+            }
+            namespace App;
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function shutdown(): void {}
+            }
+            namespace Symfony\Bundle\FrameworkBundle\Console;
+            final class Application
+            {
+                public function __construct(object $kernel) {}
+                public function setAutoExit(bool $autoExit): void {}
+                public function run(object $input, object $output): int
+                {
+                    $output->write('{"definitions":[]}');
 
                     return 0;
                 }

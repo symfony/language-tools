@@ -48,12 +48,15 @@ final class ProjectRuntimeRefresher
         }
 
         $extension = strtolower(pathinfo($path, \PATHINFO_EXTENSION));
-        if ('php' === $extension) {
+        if ('php' === $extension || 'composer.json' === basename($path)) {
             return true;
         }
 
         $rootPath = rtrim(str_replace('\\', '/', $project->rootPath()), '/');
         $path = str_replace('\\', '/', rawurldecode($path));
+        if ('xml' === $extension) {
+            return str_starts_with($path, $rootPath.'/config/');
+        }
         if (\in_array($extension, ['json', 'xlf', 'xliff'], true)) {
             return str_contains($path, '/translations/');
         }
