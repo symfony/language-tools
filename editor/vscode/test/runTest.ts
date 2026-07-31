@@ -28,7 +28,10 @@ async function main(): Promise<void> {
     }, null, 2));
 
     await runTests({
-        extensionDevelopmentPath,
+        extensionDevelopmentPath: [
+            extensionDevelopmentPath,
+            path.join(extensionDevelopmentPath, 'test', 'fixtures', 'twig-language'),
+        ],
         extensionTestsPath: path.join(extensionDevelopmentPath, 'out', 'test', 'suite', 'index.js'),
         cachePath: testDataPath,
         version: process.env.VSCODE_TEST_VERSION ?? '1.131.0',

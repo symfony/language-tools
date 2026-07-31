@@ -1,3 +1,6 @@
+parameters:
+    app.fixture_name: Symfony LSP
+
 services:
     _defaults:
         autowire: true
@@ -5,6 +8,9 @@ services:
 
     App\:
         resource: '../src/'
+
+    app.fixture_controller:
+        class: App\Controller\HomeController
 
     App\Environment\CustomEnvVarProcessor:
         tags: ['container.env_var_processor']
