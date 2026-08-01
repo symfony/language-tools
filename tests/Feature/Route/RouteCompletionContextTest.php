@@ -55,6 +55,30 @@ final class RouteCompletionContextTest extends TestCase
                 $generator->generate('home|');
             }
             PHP, 'home'];
+        yield 'typed router property' => [<<<'PHP'
+            <?php
+            final class Generator
+            {
+                private RouterInterface $router;
+
+                public function run(): void
+                {
+                    $this->router->generate('home|');
+                }
+            }
+            PHP, 'home'];
+        yield 'promoted URL generator property' => [<<<'PHP'
+            <?php
+            final class Generator
+            {
+                public function __construct(private UrlGeneratorInterface $generator) {}
+
+                public function run(): void
+                {
+                    $this->generator->generate('home|');
+                }
+            }
+            PHP, 'home'];
     }
 
     public function testRejectsGenericMethodNameOnUnknownReceiver(): void

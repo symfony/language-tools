@@ -15,7 +15,7 @@ final class RoutePhpReceiver
             );
         }
 
-        if (!preg_match('/\$(\w+)\s*$/', $source, $receiver)) {
+        if (!preg_match('/(?:\$this->|\$)(\w+)\s*$/', $source, $receiver)) {
             return false;
         }
 
