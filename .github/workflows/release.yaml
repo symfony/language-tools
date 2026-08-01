@@ -117,7 +117,8 @@ jobs:
                   Copy-Item var/build/tree_sitter_cli/Release/symfony-lsp-tree-sitter.exe "dist/$package/symfony-lsp-tree-sitter.exe"
                   Copy-Item LICENSE "dist/$package/LICENSE"
                   & "dist/$package/symfony-lsp.exe" --version
-                  php tools/smoke-test-server "dist/$package/symfony-lsp.exe" "dist/$package/symfony-lsp-tree-sitter.exe"
+                  $tree = "{{ path('homepage') }}" | & "dist/$package/symfony-lsp-tree-sitter.exe" twig | ConvertFrom-Json
+                  if ($tree.nodes.Count -eq 0) { throw 'The Tree-sitter sidecar returned no nodes.' }
                   Compress-Archive "dist/$package" "dist/$package.zip"
             - uses: actions/upload-artifact@v7
               with:
