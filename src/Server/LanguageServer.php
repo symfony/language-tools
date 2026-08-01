@@ -44,6 +44,7 @@ final class LanguageServer
         private readonly IndexCommandHandler $indexCommandHandler,
         private readonly ServerLogger $logger,
         private readonly WorkDoneProgressReporter $progress,
+        private readonly string $version,
     ) {
         $this->registerHandlers();
     }
@@ -135,7 +136,7 @@ final class LanguageServer
             ],
             'serverInfo' => [
                 'name' => 'Symfony LSP',
-                'version' => 'dev',
+                'version' => $this->version,
             ],
         ];
     }
