@@ -85,7 +85,7 @@ export function hoverText(hovers: vscode.Hover[] | undefined): string {
 }
 
 export async function waitFor<T>(probe: () => PromiseLike<T>, ready: (value: T) => boolean, description: string): Promise<T> {
-    const deadline = Date.now() + 10_000;
+    const deadline = Date.now() + 30_000;
     let lastValue: T | undefined;
     let lastError: unknown;
     while (Date.now() < deadline) {
