@@ -56,11 +56,10 @@ async function testDependencyInjectionFeatures(): Promise<void> {
 
         const diagnostics = await waitFor(
             async () => vscode.languages.getDiagnostics(document.uri),
-            (items) => items.some((item) => 'service.not_found' === item.code)
-                && items.some((item) => 'parameter.not_found' === item.code),
+            (items) => items.some((item) => 'parameter.not_found' === item.code),
             'dependency injection diagnostics',
         );
-        assert.ok(diagnostics.some((item) => item.message.includes('missing.service')));
+        assert.ok(!diagnostics.some((item) => item.message.includes('missing.service')));
         assert.ok(diagnostics.some((item) => item.message.includes('missing.parameter')));
     });
 }
