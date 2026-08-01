@@ -1,0 +1,87 @@
+#!/usr/bin/env php
+<?php
+
+function writeMessage($stream, array $message): void
+{
+    $json = json_encode($message, \JSON_THROW_ON_ERROR);
+    fwrite($stream, 'Content-Length: '.\strlen($json)."\r\n\r\n".$json);
+}
+
+function readMessage($stream): array
+{
+    $length = null;
+    while (false !== ($line = fgets($stream))) {
+        if ("\r\n" === $line) {
+            break;
+        }
+        if (preg_match('/^Content-Length: (\d+)\r\n$/i', $line, $match)) {
+            $length = (int) $match[1];
+        }
+    }
+    if (null === $length) {
+        throw new \RuntimeException('Symfony LSP returned an invalid response header.');
+    }
+
+    $json = '';
+    while (\strlen($json) < $length && !feof($stream)) {
+        $chunk = fread($stream, $length - \strlen($json));
+        if (false === $chunk) {
+            throw new \RuntimeException('Unable to read the Symfony LSP response.');
+        }
+        $json .= $chunk;
+    }
+
+    return json_decode($json, true, flags: \JSON_THROW_ON_ERROR);
+}
+
+if (!isset($argv[1])) {
+    fwrite(\STDERR, "Usage: smoke-test-server <server> [tree-sitter-sidecar]\n");
+    exit(2);
+}
+
+$environment = null;
+if (isset($argv[2])) {
+    $environment = [...getenv(), 'SYMFONY_LSP_TREE_SITTER' => $argv[2]];
+}
+$process = proc_open(
+    [$argv[1]],
+    [
+        ['pipe', 'r'],
+        ['pipe', 'w'],
+        ['pipe', 'w'],
+    ],
+    $pipes,
+    env_vars: $environment,
+    options: ['bypass_shell' => true],
+);
+if (!\is_resource($process)) {
+    throw new \RuntimeException('Unable to start Symfony LSP.');
+}
+
+writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => [
+    'processId' => null,
+    'rootUri' => null,
+    'capabilities' => new \stdClass(),
+    'initializationOptions' => ['workspaceTrust' => false],
+]]);
+$initialize = readMessage($pipes[1]);
+writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []]);
+writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'shutdown', 'params' => []]);
+$shutdown = readMessage($pipes[1]);
+writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []]);
+fclose($pipes[0]);
+fclose($pipes[1]);
+$error = stream_get_contents($pipes[2]);
+fclose($pipes[2]);
+$status = proc_close($process);
+if (0 !== $status) {
+    throw new \RuntimeException('Symfony LSP exited with status '.$status.":\n".$error);
+}
+if (1 !== ($initialize['id'] ?? null) || !isset($initialize['result']['capabilities'])) {
+    throw new \RuntimeException('Symfony LSP did not initialize successfully.');
+}
+if (2 !== ($shutdown['id'] ?? null) || !array_key_exists('result', $shutdown)) {
+    throw new \RuntimeException('Symfony LSP did not shut down successfully.');
+}
+
+fwrite(\STDOUT, "Symfony LSP smoke test passed.\n");

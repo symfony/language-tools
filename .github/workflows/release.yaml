@@ -1,0 +1,167 @@
+name: Release
+
+on:
+    push:
+        tags: ['v*']
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+jobs:
+    unix-binaries:
+        name: ${{ matrix.platform }}
+        runs-on: ${{ matrix.runner }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - platform: linux-x64
+                      runner: ubuntu-latest
+                      spc: linux-x86_64
+                    - platform: linux-arm64
+                      runner: ubuntu-24.04-arm
+                      spc: linux-aarch64
+                    - platform: macos-x64
+                      runner: macos-15-intel
+                      spc: macos-x86_64
+                    - platform: macos-arm64
+                      runner: macos-14
+                      spc: macos-aarch64
+        steps:
+            - uses: actions/checkout@v7
+            - uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.4'
+                  coverage: none
+            - name: Install production dependencies
+              run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+            - name: Build the server PHAR
+              run: |
+                  mkdir -p var/build/release build
+                  curl -fsSL https://github.com/box-project/box/releases/download/4.7.0/box.phar -o var/build/release/box.phar
+                  echo '3d390eeaec33288098fe83f8a54c60cc575cb6be295f38ff4482b4b4f26f8d52  var/build/release/box.phar' | shasum -a 256 -c
+                  php var/build/release/box.phar compile
+            - name: Build the standalone server
+              working-directory: var/build/release
+              run: |
+                  curl -fsSL https://github.com/crazywhalecc/static-php-cli/releases/download/2.8.5/spc-${{ matrix.spc }}.tar.gz -o spc.tar.gz
+                  tar -xzf spc.tar.gz
+                  curl -fsSL https://dl.static-php.dev/static-php-cli/common/php-8.4.20-micro-${{ matrix.spc }}.tar.gz -o micro.tar.gz
+                  tar -xzf micro.tar.gz
+                  mkdir -p buildroot/bin
+                  mv micro.sfx buildroot/bin/micro.sfx
+                  ./spc micro:combine ../../../build/symfony-lsp.phar -O ../../../build/symfony-lsp
+                  chmod +x ../../../build/symfony-lsp
+            - name: Build the Tree-sitter sidecar
+              run: composer tree-sitter:build-sidecar
+            - name: Package and smoke-test
+              env:
+                  PLATFORM: ${{ matrix.platform }}
+                  VERSION: ${{ github.ref_name }}
+              run: |
+                  mkdir -p "dist/symfony-lsp-$VERSION-$PLATFORM"
+                  cp build/symfony-lsp "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp"
+                  cp var/build/tree_sitter_cli/symfony-lsp-tree-sitter "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp-tree-sitter"
+                  cp LICENSE "dist/symfony-lsp-$VERSION-$PLATFORM/LICENSE"
+                  "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp" --version
+                  ./tools/smoke-test-server "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp" "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp-tree-sitter"
+                  tar -czf "dist/symfony-lsp-$VERSION-$PLATFORM.tar.gz" -C dist "symfony-lsp-$VERSION-$PLATFORM"
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: symfony-lsp-${{ github.ref_name }}-${{ matrix.platform }}
+                  path: dist/*.tar.gz
+                  if-no-files-found: error
+
+    windows-binary:
+        name: windows-x64
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.4'
+                  coverage: none
+            - name: Install production dependencies
+              run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+            - name: Build the server PHAR
+              shell: pwsh
+              run: |
+                  New-Item -ItemType Directory -Force var/build/release, build | Out-Null
+                  Invoke-WebRequest https://github.com/box-project/box/releases/download/4.7.0/box.phar -OutFile var/build/release/box.phar
+                  if ((Get-FileHash var/build/release/box.phar -Algorithm SHA256).Hash.ToLower() -ne '3d390eeaec33288098fe83f8a54c60cc575cb6be295f38ff4482b4b4f26f8d52') { throw 'Invalid Box checksum.' }
+                  php var/build/release/box.phar compile
+            - name: Build the standalone server
+              shell: pwsh
+              working-directory: var/build/release
+              run: |
+                  Invoke-WebRequest https://github.com/crazywhalecc/static-php-cli/releases/download/2.8.5/spc-windows-x64.exe -OutFile spc.exe
+                  Invoke-WebRequest https://dl.static-php.dev/static-php-cli/windows/spc-max/php-8.4.20-micro-win.zip -OutFile micro.zip
+                  Expand-Archive micro.zip -DestinationPath micro
+                  New-Item -ItemType Directory -Force buildroot/bin | Out-Null
+                  Move-Item micro/micro.sfx buildroot/bin/micro.sfx
+                  ./spc.exe micro:combine ../../../build/symfony-lsp.phar -O ../../../build/symfony-lsp
+            - name: Build the Tree-sitter sidecar
+              run: |
+                  cmake -S ext/tree_sitter -B var/build/tree_sitter_cli -DCMAKE_BUILD_TYPE=Release
+                  cmake --build var/build/tree_sitter_cli --config Release
+            - name: Package and smoke-test
+              shell: pwsh
+              run: |
+                  $package = "symfony-lsp-${{ github.ref_name }}-windows-x64"
+                  New-Item -ItemType Directory -Force "dist/$package" | Out-Null
+                  Copy-Item build/symfony-lsp.exe "dist/$package/symfony-lsp.exe"
+                  Copy-Item var/build/tree_sitter_cli/Release/symfony-lsp-tree-sitter.exe "dist/$package/symfony-lsp-tree-sitter.exe"
+                  Copy-Item LICENSE "dist/$package/LICENSE"
+                  & "dist/$package/symfony-lsp.exe" --version
+                  php tools/smoke-test-server "dist/$package/symfony-lsp.exe" "dist/$package/symfony-lsp-tree-sitter.exe"
+                  Compress-Archive "dist/$package" "dist/$package.zip"
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: symfony-lsp-${{ github.ref_name }}-windows-x64
+                  path: dist/*.zip
+                  if-no-files-found: error
+
+    vscode-extension:
+        name: VS Code extension
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: '24'
+                  cache: npm
+                  cache-dependency-path: editor/vscode/package-lock.json
+            - name: Build the VS Code extension
+              working-directory: editor/vscode
+              run: |
+                  npm ci
+                  mkdir -p dist
+                  npm run package -- --out dist/symfony-lsp-${{ github.ref_name }}.vsix
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: symfony-lsp-${{ github.ref_name }}-vscode
+                  path: editor/vscode/dist/*.vsix
+                  if-no-files-found: error
+
+    release:
+        name: Create private release
+        if: startsWith(github.ref, 'refs/tags/')
+        needs: [unix-binaries, windows-binary, vscode-extension]
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/download-artifact@v8
+              with:
+                  path: dist
+            - name: Generate checksums
+              run: find dist -type f -print0 | sort -z | xargs -0 sha256sum > dist/SHA256SUMS
+            - uses: softprops/action-gh-release@v3
+              with:
+                  files: |
+                      dist/**/*.tar.gz
+                      dist/**/*.zip
+                      dist/**/*.vsix
+                      dist/SHA256SUMS
+                  fail_on_unmatched_files: true
+                  generate_release_notes: true
+                  prerelease: true

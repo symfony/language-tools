@@ -2,7 +2,7 @@
   "name": "symfony-lsp",
   "displayName": "Symfony LSP",
   "description": "Early access VS Code client for Symfony LSP",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "license": "MIT",
   "repository": {

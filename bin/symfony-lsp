@@ -1,6 +1,7 @@
 #!/usr/bin/env php
 <?php
 
+use Composer\InstalledVersions;
 use Symfony\Lsp\Server\LanguageServerFactory;
 
 use function Amp\ByteStream\getStderr;
@@ -9,14 +10,29 @@ use function Amp\ByteStream\getStdout;
 
 require dirname(__DIR__).'/vendor/autoload.php';
 
-if (!function_exists('symfony_lsp_tree_sitter_parse')) {
-    $extension = dirname(__DIR__).'/var/build/tree_sitter/modules/symfony_lsp_tree_sitter.so';
-    if (is_file($extension) && function_exists('pcntl_exec')) {
-        pcntl_exec(\PHP_BINARY, ['-d', 'extension='.$extension, __FILE__, ...array_slice($argv, 1)]);
-    }
+if (in_array($argv[1] ?? null, ['--version', '-V'], true)) {
+    fwrite(\STDOUT, 'Symfony LSP '.InstalledVersions::getRootPackage()['pretty_version']."\n");
+    exit(0);
+}
+if (in_array($argv[1] ?? null, ['--help', '-h'], true)) {
+    fwrite(\STDOUT, "Usage: symfony-lsp [--help] [--version]\n");
+    exit(0);
+}
 
-    fwrite(\STDERR, "The Symfony LSP Tree-sitter extension is not loaded. Run: composer tree-sitter:build\n");
-    exit(1);
+if (!function_exists('symfony_lsp_tree_sitter_parse')) {
+    $configuredSidecar = getenv('SYMFONY_LSP_TREE_SITTER');
+    $sidecar = false !== $configuredSidecar && '' !== $configuredSidecar
+        ? $configuredSidecar
+        : dirname(\PHP_BINARY).'/symfony-lsp-tree-sitter'.('Windows' === \PHP_OS_FAMILY ? '.exe' : '');
+    if (!is_executable($sidecar)) {
+        $extension = dirname(__DIR__).'/var/build/tree_sitter/modules/symfony_lsp_tree_sitter.so';
+        if (is_file($extension) && function_exists('pcntl_exec')) {
+            pcntl_exec(\PHP_BINARY, ['-d', 'extension='.$extension, __FILE__, ...array_slice($argv, 1)]);
+        }
+
+        fwrite(\STDERR, "The Symfony LSP Tree-sitter parser is unavailable. Run: composer tree-sitter:build\n");
+        exit(1);
+    }
 }
 
 exit((new LanguageServerFactory())->create(getStdin(), getStdout(), getStderr())->run());

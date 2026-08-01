@@ -1,0 +1,21 @@
+{
+    "main": "bin/symfony-lsp",
+    "output": "build/symfony-lsp.phar",
+    "chmod": "0755",
+    "directories": [
+        "resources",
+        "src",
+        "vendor"
+    ],
+    "files": [
+        "composer.json",
+        "LICENSE"
+    ],
+    "exclude-composer-files": false,
+    "exclude-dev-files": true,
+    "compression": "GZ",
+    "compactors": [
+        "KevinGH\\Box\\Compactor\\Php",
+        "KevinGH\\Box\\Compactor\\Json"
+    ]
+}
