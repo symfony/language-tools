@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0ccc8607320f49137084efea27668772",
+    "content-hash": "5eac65f5e5bb25c251f9ed7b032a4d90",
     "packages": [
         {
             "name": "amphp/amp",
@@ -500,6 +500,69 @@
                 }
             ],
             "time": "2026-07-30T14:41:03+00:00"
+        },
+        {
+            "name": "fabpot/tolerant-php-parser",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/fabpot/tolerant-php-parser.git",
+                "reference": "ec866de953eb7c0b31afdb1136cd452ba85750a1"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/fabpot/tolerant-php-parser/zipball/ec866de953eb7c0b31afdb1136cd452ba85750a1",
+                "reference": "ec866de953eb7c0b31afdb1136cd452ba85750a1",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.1"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^2.2",
+                "phpunit/phpunit": "^10.0"
+            },
+            "default-branch": true,
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Microsoft\\PhpParser\\": [
+                        "src/"
+                    ]
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Microsoft\\PhpParser\\Tests\\Unit\\": [
+                        "tests/unit/"
+                    ]
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Rob Lourens",
+                    "email": "roblou@microsoft.com"
+                },
+                {
+                    "name": "Fabien Potencier",
+                    "homepage": "https://fabien.potencier.org"
+                }
+            ],
+            "description": "Tolerant PHP-to-AST parser for IDE usage scenarios",
+            "support": {
+                "issues": "https://github.com/fabpot/tolerant-php-parser/issues",
+                "source": "https://github.com/fabpot/tolerant-php-parser"
+            },
+            "funding": [
+                {
+                    "type": "github",
+                    "url": "https://github.com/fabpot"
+                }
+            ],
+            "time": "2026-07-31T21:44:01+00:00"
         },
         {
             "name": "revolt/event-loop",
@@ -2544,7 +2607,8 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "fabpot/json-rpc-peer": 20
+        "fabpot/json-rpc-peer": 20,
+        "fabpot/tolerant-php-parser": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,

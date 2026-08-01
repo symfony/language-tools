@@ -1,0 +1,13 @@
+<?php
+
+namespace App\Controller;
+
+use Symfony\Component\Routing\Attribute\Route;
+
+final class ArticleController
+{
+    #[Route('/article/{id}', name: 'article_show', methods: ['GET'])]
+    public function show(string $id): void
+    {
+    }
+}
