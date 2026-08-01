@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
@@ -12,6 +13,7 @@ use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -48,7 +50,7 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
             $parameterIndexes,
             $sourceIndexes,
             $yamlExtractor,
-            new PhpAutowireReferenceExtractor($converter),
+            new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser())),
         );
 
         $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);

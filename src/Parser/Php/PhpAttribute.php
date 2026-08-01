@@ -18,6 +18,12 @@ final class PhpAttribute
         return $this->name;
     }
 
+    /** @return list<PhpArgument> */
+    public function arguments(): array
+    {
+        return $this->arguments;
+    }
+
     public function argument(string|int $name): ?PhpArgument
     {
         if (\is_int($name)) {

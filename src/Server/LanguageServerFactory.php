@@ -165,7 +165,7 @@ final class LanguageServerFactory
         $phpRouteDeclarationExtractor = new PhpRouteDeclarationExtractor($positionConverter, $phpParser);
         $yamlRouteDeclarationExtractor = new YamlRouteDeclarationExtractor($positionConverter);
         $yamlDependencyInjectionExtractor = new YamlDependencyInjectionExtractor($positionConverter);
-        $autowireExtractor = new PhpAutowireReferenceExtractor($positionConverter);
+        $autowireExtractor = new PhpAutowireReferenceExtractor($positionConverter, $phpParser);
         $classExtractor = new PhpClassDeclarationExtractor($positionConverter);
         $yamlConfigurationParser = new YamlConfigurationParser($positionConverter, new YamlDocumentParser($treeSitterParser));
         $messengerExtractor = new MessengerExtractor($positionConverter);

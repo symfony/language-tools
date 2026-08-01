@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -16,6 +17,7 @@ use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -62,14 +64,14 @@ final class DependencyInjectionNavigationTest extends TestCase
         $classUri = 'file:///workspace/src/Mailer.php';
         $class = '<?php namespace App; final class Mailer {}';
         $consumerUri = 'file:///workspace/src/Consumer.php';
-        $consumer = "<?php #[Autowire(service: 'app.mailer')] final class Consumer {}";
+        $consumer = "<?php use Symfony\\Component\\DependencyInjection\\Attribute\\Autowire; #[Autowire(service: 'app.mailer')] final class Consumer {}";
         $documents = new DocumentStore();
         $documents->open(new Document($consumerUri, 'php', 1, $consumer));
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
         $yamlExtractor = new YamlDependencyInjectionExtractor($converter);
-        $autowireExtractor = new PhpAutowireReferenceExtractor($converter);
+        $autowireExtractor = new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser()));
         $classExtractor = new PhpClassDeclarationExtractor($converter);
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace(

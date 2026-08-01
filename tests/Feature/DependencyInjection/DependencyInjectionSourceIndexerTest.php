@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
@@ -14,6 +15,7 @@ use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
@@ -60,7 +62,7 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
             new DependencyInjectionSourceIndexer(
                 $indexes,
                 new YamlDependencyInjectionExtractor($converter),
-                new PhpAutowireReferenceExtractor($converter),
+                new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser())),
                 new PhpClassDeclarationExtractor($converter),
             ),
         );

@@ -2,10 +2,12 @@
 
 namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 
 final class PhpAutowireReferenceExtractorTest extends TestCase
 {
@@ -15,14 +17,15 @@ final class PhpAutowireReferenceExtractorTest extends TestCase
             <?php
             namespace App\Controller;
 
-            use Symfony\Component\DependencyInjection\Attribute\Autowire;
+            use Symfony\Component\DependencyInjection\Attribute\Autowire as Inject;
 
+            #[\App\Autowire(service: 'ignored')]
             final class DemoController
             {
                 public function __construct(
-                    #[Autowire(service: 'app.mailer')]
+                    #[Inject(service: 'app.mailer')]
                     object $mailer,
-                    #[Autowire(param: 'app.storage_dir')]
+                    #[Inject(param: 'app.storage_dir')]
                     string $storage,
                     #[\Symfony\Component\DependencyInjection\Attribute\Autowire('%app.api_key%')]
                     string $apiKey,
@@ -31,7 +34,7 @@ final class PhpAutowireReferenceExtractorTest extends TestCase
             }
             PHP;
         $converter = new PositionConverter();
-        $references = (new PhpAutowireReferenceExtractor($converter))->extract(
+        $references = (new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser())))->extract(
             'file:///workspace/src/Controller/DemoController.php',
             $text,
         );
