@@ -38,7 +38,7 @@ from the extracted directory after verifying where the archive came from:
 
 .. code-block:: terminal
 
-    $ xattr -dr com.apple.quarantine /path/to/symfony-lsp-v0.1.3-macos-arm64
+    $ xattr -dr com.apple.quarantine /path/to/symfony-lsp-v0.1.4-macos-arm64
 
 The release also contains ``SHA256SUMS``. Verify the archive checksum before
 running it.

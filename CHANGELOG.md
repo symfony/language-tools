@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4 (2026-08-01)
+
+- Fixed runtime bridge namespaces in release builds.
+
 ## 0.1.3 (2026-08-01)
 
 - Fixed runtime metadata parsing when console output precedes JSON.
