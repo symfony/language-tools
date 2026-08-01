@@ -36,7 +36,7 @@ function readMessage($stream): array
 }
 
 if (!isset($argv[1])) {
-    fwrite(\STDERR, "Usage: smoke-test-server <server> [tree-sitter-sidecar]\n");
+    fwrite(\STDERR, "Usage: smoke-test-server <server> [tree-sitter-sidecar] [expected-version]\n");
     exit(2);
 }
 
@@ -80,6 +80,9 @@ if (0 !== $status) {
 }
 if (1 !== ($initialize['id'] ?? null) || !isset($initialize['result']['capabilities'])) {
     throw new \RuntimeException('Symfony LSP did not initialize successfully.');
+}
+if (isset($argv[3]) && $argv[3] !== ($initialize['result']['serverInfo']['version'] ?? null)) {
+    throw new \RuntimeException('Symfony LSP reported an unexpected protocol version.');
 }
 if (2 !== ($shutdown['id'] ?? null) || !array_key_exists('result', $shutdown)) {
     throw new \RuntimeException('Symfony LSP did not shut down successfully.');

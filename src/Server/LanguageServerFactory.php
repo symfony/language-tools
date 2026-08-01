@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Server;
 
 use Amp\ByteStream\ReadableStream;
 use Amp\ByteStream\WritableStream;
-use Composer\InstalledVersions;
 use Fabpot\JsonRpc\ContentLengthJsonRpcTransport;
 use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcPeer;
@@ -129,8 +128,7 @@ final class LanguageServerFactory
 {
     public function create(ReadableStream $input, WritableStream $output, ?WritableStream $errorOutput = null): LanguageServer
     {
-        $prettyVersion = InstalledVersions::getRootPackage()['pretty_version'];
-        $version = str_starts_with($prettyVersion, 'dev-') ? 'dev' : ltrim($prettyVersion, 'v');
+        $version = (new ServerVersion())->value();
         $logger = new ServerLogger($errorOutput);
         $peer = new JsonRpcPeer(new ContentLengthJsonRpcTransport($input, $output), $logger);
         $dispatcher = new JsonRpcDispatcher($peer);

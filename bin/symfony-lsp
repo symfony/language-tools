@@ -1,8 +1,8 @@
 #!/usr/bin/env php
 <?php
 
-use Composer\InstalledVersions;
 use Symfony\Lsp\Server\LanguageServerFactory;
+use Symfony\Lsp\Server\ServerVersion;
 
 use function Amp\ByteStream\getStderr;
 use function Amp\ByteStream\getStdin;
@@ -11,7 +11,7 @@ use function Amp\ByteStream\getStdout;
 require dirname(__DIR__).'/vendor/autoload.php';
 
 if (in_array($argv[1] ?? null, ['--version', '-V'], true)) {
-    fwrite(\STDOUT, 'Symfony LSP '.InstalledVersions::getRootPackage()['pretty_version']."\n");
+    fwrite(\STDOUT, 'Symfony LSP '.(new ServerVersion())->value()."\n");
     exit(0);
 }
 if (in_array($argv[1] ?? null, ['--help', '-h'], true)) {

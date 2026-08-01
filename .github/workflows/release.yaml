@@ -39,6 +39,9 @@ jobs:
             - name: Build the server PHAR
               run: |
                   mkdir -p var/build/release build
+                  VERSION=dev
+                  if [ "$GITHUB_REF_TYPE" = tag ]; then VERSION="${GITHUB_REF_NAME#v}"; fi
+                  printf '%s\n' "$VERSION" > resources/version
                   # Box 4.7.0 cannot compile on Windows.
                   curl -fsSL https://github.com/box-project/box/releases/download/4.6.7/box.phar -o var/build/release/box.phar
                   echo 'f49a711985219c9e0ef9faa49a95d8ab47385b8b8966dc5ac0ca10f9ac318e6b  var/build/release/box.phar' | shasum -a 256 -c
@@ -66,7 +69,7 @@ jobs:
                   cp var/build/tree_sitter_cli/symfony-lsp-tree-sitter "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp-tree-sitter"
                   cp LICENSE "dist/symfony-lsp-$VERSION-$PLATFORM/LICENSE"
                   "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp" --version
-                  ./tools/smoke-test-server "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp" "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp-tree-sitter"
+                  ./tools/smoke-test-server "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp" "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp-tree-sitter" "${VERSION#v}"
                   tar -czf "dist/symfony-lsp-$VERSION-$PLATFORM.tar.gz" -C dist "symfony-lsp-$VERSION-$PLATFORM"
             - uses: actions/upload-artifact@v7
               with:
@@ -89,6 +92,8 @@ jobs:
               shell: pwsh
               run: |
                   New-Item -ItemType Directory -Force var/build/release, build | Out-Null
+                  $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { 'dev' }
+                  Set-Content -Path resources/version -Value $version
                   # Box 4.7.0 cannot compile on Windows.
                   Invoke-WebRequest https://github.com/box-project/box/releases/download/4.6.7/box.phar -OutFile var/build/release/box.phar
                   if ((Get-FileHash var/build/release/box.phar -Algorithm SHA256).Hash.ToLower() -ne 'f49a711985219c9e0ef9faa49a95d8ab47385b8b8966dc5ac0ca10f9ac318e6b') { throw 'Invalid Box checksum.' }
