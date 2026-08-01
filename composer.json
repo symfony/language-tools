@@ -8,7 +8,7 @@
         "amphp/amp": "^3.1",
         "amphp/byte-stream": "^2.1",
         "fabpot/json-rpc-peer": "dev-main",
-        "fabpot/tolerant-php-parser": "dev-main"
+        "fabpot/tolerant-php-parser": "^0.2"
     },
     "require-dev": {
         "phpstan/phpstan": "^2.1",

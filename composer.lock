@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "5eac65f5e5bb25c251f9ed7b032a4d90",
+    "content-hash": "b6103c44cbb987fceac7bcb8d31906c3",
     "packages": [
         {
             "name": "amphp/amp",
@@ -503,7 +503,7 @@
         },
         {
             "name": "fabpot/tolerant-php-parser",
-            "version": "dev-main",
+            "version": "v0.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/fabpot/tolerant-php-parser.git",
@@ -522,7 +522,6 @@
                 "phpstan/phpstan": "^2.2",
                 "phpunit/phpunit": "^10.0"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -2607,8 +2606,7 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "fabpot/json-rpc-peer": 20,
-        "fabpot/tolerant-php-parser": 20
+        "fabpot/json-rpc-peer": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,
