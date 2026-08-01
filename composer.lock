@@ -503,16 +503,16 @@
         },
         {
             "name": "fabpot/tolerant-php-parser",
-            "version": "v0.2.0",
+            "version": "v0.2.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/fabpot/tolerant-php-parser.git",
-                "reference": "ec866de953eb7c0b31afdb1136cd452ba85750a1"
+                "reference": "6ca211ab2c76e42a3dfeb39a654588884d979104"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/fabpot/tolerant-php-parser/zipball/ec866de953eb7c0b31afdb1136cd452ba85750a1",
-                "reference": "ec866de953eb7c0b31afdb1136cd452ba85750a1",
+                "url": "https://api.github.com/repos/fabpot/tolerant-php-parser/zipball/6ca211ab2c76e42a3dfeb39a654588884d979104",
+                "reference": "6ca211ab2c76e42a3dfeb39a654588884d979104",
                 "shasum": ""
             },
             "require": {
@@ -561,7 +561,7 @@
                     "url": "https://github.com/fabpot"
                 }
             ],
-            "time": "2026-07-31T21:44:01+00:00"
+            "time": "2026-08-01T12:54:25+00:00"
         },
         {
             "name": "revolt/event-loop",
