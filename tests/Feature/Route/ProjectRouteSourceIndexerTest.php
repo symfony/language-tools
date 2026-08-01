@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
@@ -16,6 +17,7 @@ use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
@@ -54,6 +56,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
     {
         file_put_contents($this->temporaryDirectory.'/src/Controller.php', <<<'PHP'
             <?php
+            use Symfony\Component\Routing\Attribute\Route;
             #[Route('/article', name: 'article_list')]
             final class Controller {}
             PHP);
@@ -68,6 +71,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         );
         file_put_contents($this->temporaryDirectory.'/vendor/Ignored.php', <<<'PHP'
             <?php
+            use Symfony\Component\Routing\Attribute\Route;
             #[Route('/ignored', name: 'ignored_route')]
             final class Ignored {}
             PHP);
@@ -84,7 +88,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         $indexer = new ProjectRouteSourceIndexer(
             $indexes,
             $referenceIndexes,
-            new PhpRouteDeclarationExtractor($positionConverter),
+            new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
             new YamlRouteDeclarationExtractor($positionConverter),
             new RouteReferenceExtractor($positionConverter),
             new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser())),
@@ -113,6 +117,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         $uri = 'file://'.$this->temporaryDirectory.'/src/Controller.php';
         $documents->open(new Document($uri, 'php', 2, <<<'PHP'
             <?php
+            use Symfony\Component\Routing\Attribute\Route;
             #[Route('/article', name: 'article_new')]
             final class Controller {}
             PHP));

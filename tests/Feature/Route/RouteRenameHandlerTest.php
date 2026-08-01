@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -21,6 +22,7 @@ use Symfony\Lsp\Feature\Route\RouteRenameHandler;
 use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -112,7 +114,7 @@ final class RouteRenameHandlerTest extends TestCase
                 $positionConverter,
                 new RouteReferenceExtractor($positionConverter),
                 new TwigRouteReferenceExtractor($positionConverter),
-                new PhpRouteDeclarationExtractor($positionConverter),
+                new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
                 new YamlRouteDeclarationExtractor($positionConverter),
             ),
             $references,
@@ -189,7 +191,7 @@ final class RouteRenameHandlerTest extends TestCase
                 $positionConverter,
                 new RouteReferenceExtractor($positionConverter),
                 new TwigRouteReferenceExtractor($positionConverter),
-                new PhpRouteDeclarationExtractor($positionConverter),
+                new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
                 new YamlRouteDeclarationExtractor($positionConverter),
             ),
             $references,

@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -17,6 +18,7 @@ use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
@@ -56,7 +58,7 @@ final class RouteDefinitionHandlerTest extends TestCase
                 $converter,
                 new RouteReferenceExtractor($converter),
                 new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser())),
-                new PhpRouteDeclarationExtractor($converter),
+                new PhpRouteDeclarationExtractor($converter, new TolerantPhpParser(new Parser())),
                 new YamlRouteDeclarationExtractor($converter),
             ),
             $declarations,

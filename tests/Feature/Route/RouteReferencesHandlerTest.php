@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -19,6 +20,7 @@ use Symfony\Lsp\Feature\Route\RouteReferencesHandler;
 use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
@@ -31,6 +33,7 @@ final class RouteReferencesHandlerTest extends TestCase
         $uri = 'file:///workspace/src/ArticleController.php';
         $text = <<<'PHP'
             <?php
+            use Symfony\Component\Routing\Attribute\Route;
             #[Route('/article', name: 'article_list')]
             final class ArticleController {}
             PHP;
@@ -42,7 +45,7 @@ final class RouteReferencesHandlerTest extends TestCase
         $declarations->forProject($project)->replace(new RouteDeclaration(
             'article_list',
             $uri,
-            new Range(new Position(1, 32), new Position(1, 44)),
+            new Range(new Position(2, 32), new Position(2, 44)),
         ));
         $references = new RouteReferenceIndexRegistry();
         $references->forProject($project)->replace(new RouteReferenceLocation(
@@ -57,7 +60,7 @@ final class RouteReferencesHandlerTest extends TestCase
                 $positionConverter,
                 new RouteReferenceExtractor($positionConverter),
                 new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser())),
-                new PhpRouteDeclarationExtractor($positionConverter),
+                new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
                 new YamlRouteDeclarationExtractor($positionConverter),
             ),
             $references,
@@ -75,13 +78,13 @@ final class RouteReferencesHandlerTest extends TestCase
             [
                 'uri' => $uri,
                 'range' => [
-                    'start' => ['line' => 1, 'character' => 32],
-                    'end' => ['line' => 1, 'character' => 44],
+                    'start' => ['line' => 2, 'character' => 32],
+                    'end' => ['line' => 2, 'character' => 44],
                 ],
             ],
         ], $handler->references([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => 1, 'character' => 35],
+            'position' => ['line' => 2, 'character' => 35],
             'context' => ['includeDeclaration' => true],
         ]));
     }

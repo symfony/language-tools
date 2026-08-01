@@ -4,11 +4,13 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
 final class PhpRouteDeclarationExtractor
 {
     public function __construct(
         private readonly PositionConverter $positionConverter,
+        private readonly PhpParserInterface $parser,
     ) {
     }
 
@@ -17,59 +19,52 @@ final class PhpRouteDeclarationExtractor
      */
     public function extract(string $uri, string $text): array
     {
-        preg_match_all(
-            '/#\[\s*(?:\\\\?Symfony\\\\Component\\\\Routing\\\\Attribute\\\\)?Route\s*\((.*?)\)\s*\]/s',
-            $text,
-            $attributes,
-            \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE,
-        );
         $declarations = [];
-
-        foreach ($attributes as $attribute) {
-            if (!preg_match(
-                '/\bname\s*:\s*([\'\"])([^\'\"]+)\1/s',
-                $attribute[1][0],
-                $name,
-                \PREG_OFFSET_CAPTURE,
-            ) && !preg_match(
-                '/^\s*(?:([\'\"])[^\'\"]*\1|null)\s*,\s*([\'\"])([^\'\"]+)\2/s',
-                $attribute[1][0],
-                $positionalName,
-                \PREG_OFFSET_CAPTURE,
-            )) {
+        $document = $this->parser->parse($text);
+        foreach ($document->attributes() as $attribute) {
+            if (!\in_array($attribute->name(), [
+                'Symfony\Component\Routing\Annotation\Route',
+                'Symfony\Component\Routing\Attribute\Route',
+            ], true)) {
                 continue;
             }
 
-            $nameMatch = isset($name[2]) ? $name[2] : $positionalName[3];
+            $name = ($attribute->argument('name') ?? $attribute->argument(1))?->stringLiteral();
+            if (null === $name || '' === $name->value()) {
+                continue;
+            }
+
             $declarations[] = $this->declaration(
-                $nameMatch[0],
+                $name->value(),
                 $uri,
                 $text,
-                $attribute[1][1] + $nameMatch[1],
+                $name->startOffset(),
+                $name->endOffset(),
             );
         }
 
-        preg_match_all(
-            '/\$(\w+)\s*->\s*add\s*\(\s*([\'\"])([^\'\"]+)\2/s',
-            $text,
-            $calls,
-            \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE,
-        );
-        foreach ($calls as $call) {
-            $variable = $call[1][0];
-            $beforeCall = substr($text, 0, $call[0][1]);
+        foreach ($document->methodCalls() as $call) {
+            if ('add' !== $call->method() || !preg_match('/^\$(\w+)$/', $call->receiver(), $variable)) {
+                continue;
+            }
+            $beforeCall = substr($text, 0, $call->startOffset());
             if (!preg_match(
-                '/(?:RoutingConfigurator\s+\$'.preg_quote($variable, '/').'\b|\$'.preg_quote($variable, '/').'\s*=\s*new\s+(?:\\\\?RouteCollection|[^\s;(]*\\\\RouteCollection)\b)/s',
+                '/(?:RoutingConfigurator\s+\$'.preg_quote($variable[1], '/').'\b|\$'.preg_quote($variable[1], '/').'\s*=\s*new\s+(?:\\\\?RouteCollection|[^\s;(]*\\\\RouteCollection)\b)/s',
                 $beforeCall,
             )) {
                 continue;
             }
+            $name = $call->argument(0)?->stringLiteral();
+            if (null === $name || '' === $name->value()) {
+                continue;
+            }
 
             $declarations[] = $this->declaration(
-                $call[3][0],
+                $name->value(),
                 $uri,
                 $text,
-                $call[3][1],
+                $name->startOffset(),
+                $name->endOffset(),
             );
         }
 
@@ -82,14 +77,14 @@ final class PhpRouteDeclarationExtractor
         return $declarations;
     }
 
-    private function declaration(string $name, string $uri, string $text, int $offset): RouteDeclaration
+    private function declaration(string $name, string $uri, string $text, int $offset, int $endOffset): RouteDeclaration
     {
         return new RouteDeclaration(
             $name,
             $uri,
             new Range(
                 $this->positionConverter->toPosition($text, $offset),
-                $this->positionConverter->toPosition($text, $offset + \strlen($name)),
+                $this->positionConverter->toPosition($text, $endOffset),
             ),
         );
     }
