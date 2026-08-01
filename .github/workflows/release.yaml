@@ -39,8 +39,9 @@ jobs:
             - name: Build the server PHAR
               run: |
                   mkdir -p var/build/release build
-                  curl -fsSL https://github.com/box-project/box/releases/download/4.7.0/box.phar -o var/build/release/box.phar
-                  echo '3d390eeaec33288098fe83f8a54c60cc575cb6be295f38ff4482b4b4f26f8d52  var/build/release/box.phar' | shasum -a 256 -c
+                  # Box 4.7.0 cannot compile on Windows.
+                  curl -fsSL https://github.com/box-project/box/releases/download/4.6.7/box.phar -o var/build/release/box.phar
+                  echo 'f49a711985219c9e0ef9faa49a95d8ab47385b8b8966dc5ac0ca10f9ac318e6b  var/build/release/box.phar' | shasum -a 256 -c
                   php var/build/release/box.phar compile --no-parallel
             - name: Build the standalone server
               working-directory: var/build/release
@@ -88,8 +89,9 @@ jobs:
               shell: pwsh
               run: |
                   New-Item -ItemType Directory -Force var/build/release, build | Out-Null
-                  Invoke-WebRequest https://github.com/box-project/box/releases/download/4.7.0/box.phar -OutFile var/build/release/box.phar
-                  if ((Get-FileHash var/build/release/box.phar -Algorithm SHA256).Hash.ToLower() -ne '3d390eeaec33288098fe83f8a54c60cc575cb6be295f38ff4482b4b4f26f8d52') { throw 'Invalid Box checksum.' }
+                  # Box 4.7.0 cannot compile on Windows.
+                  Invoke-WebRequest https://github.com/box-project/box/releases/download/4.6.7/box.phar -OutFile var/build/release/box.phar
+                  if ((Get-FileHash var/build/release/box.phar -Algorithm SHA256).Hash.ToLower() -ne 'f49a711985219c9e0ef9faa49a95d8ab47385b8b8966dc5ac0ca10f9ac318e6b') { throw 'Invalid Box checksum.' }
                   php var/build/release/box.phar compile --no-parallel
             - name: Build the standalone server
               shell: pwsh
