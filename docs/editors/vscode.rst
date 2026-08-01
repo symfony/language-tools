@@ -14,7 +14,7 @@ install it:
 
 .. code-block:: terminal
 
-    $ code --install-extension symfony-lsp-v0.1.1.vsix
+    $ code --install-extension symfony-lsp-v0.1.2.vsix
 
 Set ``symfonyLsp.serverPath`` to the absolute path of the executable extracted
 from the server archive, then restart VS Code.
@@ -29,7 +29,7 @@ from the repository root:
 
     $ make -C editor/vscode
 
-This creates ``editor/vscode/symfony-lsp-0.1.1.vsix``.
+This creates ``editor/vscode/symfony-lsp-0.1.2.vsix``.
 
 Twig Support
 ------------
