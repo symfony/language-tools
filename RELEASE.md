@@ -10,4 +10,4 @@ Target: `v0.1.1`
 - [x] Add a changelog and release notes.
 - [x] Update the delivery checklist to match implemented behavior.
 - [x] Run the full PHP, compatibility, VS Code, and release validation matrix.
-- [ ] Tag `v0.1.1` and create the private GitHub release.
+- [x] Tag `v0.1.1` and create the private GitHub release.
