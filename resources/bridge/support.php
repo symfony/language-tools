@@ -24,39 +24,46 @@ function runJsonCommand(object $application, array $arguments): array
 
 function firstJsonDocument(string $output): string
 {
-    $object = strpos($output, '{');
-    $array = strpos($output, '[');
-    $start = false === $object ? $array : (false === $array ? $object : min($object, $array));
-    if (false === $start) {
-        return $output;
-    }
-    $depth = 0;
-    $quoted = false;
-    $escaped = false;
-    for ($index = $start, $length = strlen($output); $index < $length; ++$index) {
-        $character = $output[$index];
-        if ($quoted) {
-            if ($escaped) {
-                $escaped = false;
-            } elseif ('\\' === $character) {
-                $escaped = true;
-            } elseif ('"' === $character) {
-                $quoted = false;
-            }
+    for ($start = 0, $length = strlen($output); $start < $length; ++$start) {
+        if ('{' !== $output[$start] && '[' !== $output[$start]) {
             continue;
         }
-        if ('"' === $character) {
-            $quoted = true;
-        } elseif ('{' === $character || '[' === $character) {
-            ++$depth;
-        } elseif ('}' === $character || ']' === $character) {
-            if (0 === --$depth) {
-                return substr($output, $start, $index - $start + 1);
+
+        $depth = 0;
+        $quoted = false;
+        $escaped = false;
+        for ($index = $start; $index < $length; ++$index) {
+            $character = $output[$index];
+            if ($quoted) {
+                if ($escaped) {
+                    $escaped = false;
+                } elseif ('\\' === $character) {
+                    $escaped = true;
+                } elseif ('"' === $character) {
+                    $quoted = false;
+                }
+                continue;
+            }
+            if ('"' === $character) {
+                $quoted = true;
+            } elseif ('{' === $character || '[' === $character) {
+                ++$depth;
+            } elseif ('}' === $character || ']' === $character) {
+                if (0 !== --$depth) {
+                    continue;
+                }
+
+                $document = substr($output, $start, $index - $start + 1);
+                json_decode($document);
+                if (\JSON_ERROR_NONE === json_last_error()) {
+                    return $document;
+                }
+                break;
             }
         }
     }
 
-    return substr($output, $start);
+    return $output;
 }
 
 function splitDebugValues(mixed $value): array

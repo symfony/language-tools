@@ -303,6 +303,31 @@ final class BridgeTest extends TestCase
         self::assertSame([['class' => 'App\\Security\\PostVoter']], $result['sections']['security']['voters'] ?? null);
     }
 
+    public function testReportsUnavailableTwigDebugCommandAsAWarning(): void
+    {
+        $this->writeTwigApplicationWithoutDebugCommand();
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=twig 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $result = json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame(0, $exitCode);
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null);
+        self::assertIsArray($result['sections'] ?? null);
+        self::assertSame([
+            'complete' => false,
+            'generation' => hash('sha256', '[]'),
+            'paths' => [],
+            'resources' => [],
+            'warnings' => ['The debug:twig command is unavailable.'],
+        ], $result['sections']['twig'] ?? null);
+    }
+
     public function testIgnoresAnUnregisteredSecurityBundle(): void
     {
         $this->writeUnregisteredSecurityApplication();
@@ -745,10 +770,38 @@ final class BridgeTest extends TestCase
                             'app.voter' => ['class' => 'App\\Security\\PostVoter'],
                         ],
                     ];
+                    $output->write("[deprecation] Outdated application configuration.\n[\n  exception => configuration\n]\n");
                     $output->write(json_encode($result, JSON_THROW_ON_ERROR));
 
                     return 0;
                 }
+            }
+            PHP);
+    }
+
+    private function writeTwigApplicationWithoutDebugCommand(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/vendor/autoload.php', <<<'PHP'
+            <?php
+            namespace Composer;
+            final class InstalledVersions
+            {
+                public static function getPrettyVersion(string $package): ?string { return '8.0.6'; }
+            }
+            namespace Twig;
+            final class Environment {}
+            namespace App;
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function shutdown(): void {}
+            }
+            namespace Symfony\Bundle\FrameworkBundle\Console;
+            final class Application
+            {
+                public function __construct(object $kernel) {}
+                public function setAutoExit(bool $autoExit): void {}
+                public function has(string $name): bool { return false; }
             }
             PHP);
     }
