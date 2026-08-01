@@ -28,7 +28,7 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
 
                     app.mailer:
                         class: App\Mailer
-                        arguments: ['@logger', '@?optional.mailer', '@@escaped', '@=service("dynamic")']
+                        arguments: ['@logger', '@?optional.mailer', '@@escaped', '@=service("dynamic")', 'support@app.symfony.com']
                         tags: ['mailer.transport', { name: kernel.reset }]
 
                     mailer: '@app.mailer'

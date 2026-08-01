@@ -55,6 +55,8 @@ final class ServiceCompletionHandlerTest extends TestCase
                 ],
             ],
         ]);
+        self::assertFalse($indexes->forProject($project)->isComplete());
+        self::assertTrue($parameterIndexes->forProject($project)->isComplete());
         $converter = new PositionConverter();
         $cursor = strpos($text, 'app.ma') + \strlen('app.ma');
         $position = $converter->toPosition($text, $cursor);

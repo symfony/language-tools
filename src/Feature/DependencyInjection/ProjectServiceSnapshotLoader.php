@@ -47,8 +47,8 @@ final class ProjectServiceSnapshotLoader implements RuntimeSnapshotLoaderInterfa
             );
         }
 
-        $complete = true === ($container['complete'] ?? null);
-        $this->serviceIndexes->forProject($project)->replace($complete, ...$services);
+        $servicesComplete = true === ($container['servicesComplete'] ?? null);
+        $this->serviceIndexes->forProject($project)->replace($servicesComplete, ...$services);
 
         $parameters = [];
         foreach (\is_array($container['parameters'] ?? null) ? $container['parameters'] : [] as $item) {
@@ -61,7 +61,8 @@ final class ProjectServiceSnapshotLoader implements RuntimeSnapshotLoaderInterfa
                 \is_string($item['deprecation'] ?? null) ? $item['deprecation'] : null,
             );
         }
-        $this->parameterIndexes->forProject($project)->replace($complete, ...$parameters);
+        $parametersComplete = true === ($container['parametersComplete'] ?? $container['complete'] ?? null);
+        $this->parameterIndexes->forProject($project)->replace($parametersComplete, ...$parameters);
     }
 
     /** @return list<string> */

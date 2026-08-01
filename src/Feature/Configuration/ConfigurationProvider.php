@@ -106,7 +106,7 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
         foreach ($occurrences as $occurrence) {
             $path = $occurrence->path();
             $root = $path[0] ?? null;
-            if (null === $root || !isset($index->roots()[$root])) {
+            if (null === $root || \in_array($root, ['parameters', 'services'], true) || !isset($index->roots()[$root])) {
                 continue;
             }
             $key = implode('.', $path);
@@ -135,7 +135,11 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
             $diagnostics[] = $this->diagnostic($this->offsetRange($document->text(), $offset, \strlen($line)), 1, 'config.malformed_structure', 'YAML indentation cannot contain tabs.');
         }
         foreach ($occurrences as $occurrence) {
-            $node = $index->find($occurrence->path());
+            $path = $occurrence->path();
+            if (\in_array($path[0] ?? null, ['parameters', 'services'], true)) {
+                continue;
+            }
+            $node = $index->find($path);
             if (null === $node || '' !== $occurrence->value()) {
                 continue;
             }

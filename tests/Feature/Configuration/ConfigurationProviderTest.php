@@ -44,6 +44,15 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame(['config.invalid_type', 'config.deprecated_key', 'config.invalid_type', 'config.unknown_key', 'config.duplicate_key'], array_column($provider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
     }
 
+    public function testDoesNotTreatDependencyInjectionSectionsAsBundleConfiguration(): void
+    {
+        [$provider, $documents] = $this->provider();
+        $uri = 'file:///workspace/config/services.yaml';
+        $documents->open(new Document($uri, 'yaml', 1, "parameters:\n    app.name: Demo\nservices:\n    _defaults:\n        autowire: true\n    App\\:\n        resource: ../src/\n"));
+
+        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
     public function testDoesNotTreatEnvironmentOverridesAsDuplicates(): void
     {
         [$provider, $documents] = $this->provider();
@@ -137,22 +146,28 @@ final class ConfigurationProviderTest extends TestCase
         $indexes = new ConfigurationIndexRegistry();
         $environmentIndexes = new EnvironmentIndexRegistry();
         $environmentIndexes->forProject($project)->replaceProcessors(['bool' => 'bool', 'json' => 'array']);
-        (new ProjectConfigurationSnapshotLoader($indexes))->load($project, ['sections' => ['configuration' => ['bundles' => [[
-            'alias' => 'framework',
-            'tree' => $this->node('framework', 'array', children: [
-                $this->node('router', 'array', children: [
-                    $this->node('utf8', 'boolean', info: 'Use UTF-8 routes.'),
-                    $this->node('strict', 'boolean'),
-                    $this->node('mode', 'enum', deprecated: true, allowedValues: ['dev', 'prod']),
+        (new ProjectConfigurationSnapshotLoader($indexes))->load($project, ['sections' => ['configuration' => ['bundles' => [
+            [
+                'alias' => 'framework',
+                'tree' => $this->node('framework', 'array', children: [
+                    $this->node('router', 'array', children: [
+                        $this->node('utf8', 'boolean', info: 'Use UTF-8 routes.'),
+                        $this->node('strict', 'boolean'),
+                        $this->node('mode', 'enum', deprecated: true, allowedValues: ['dev', 'prod']),
+                    ]),
+                    $this->node('required_parent', 'array', children: [
+                        $this->node('token', 'scalar', required: true),
+                    ]),
+                    $this->node('items', 'array', prototype: $this->node('item', 'array', children: [
+                        $this->node('name', 'boolean'),
+                    ])),
                 ]),
-                $this->node('required_parent', 'array', children: [
-                    $this->node('token', 'scalar', required: true),
-                ]),
-                $this->node('items', 'array', prototype: $this->node('item', 'array', children: [
-                    $this->node('name', 'boolean'),
-                ])),
-            ]),
-        ]]]]]);
+            ],
+            [
+                'alias' => 'services',
+                'tree' => $this->node('services', 'array'),
+            ],
+        ]]]]);
 
         return [new ConfigurationProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $indexes, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), $environmentIndexes), $documents, $converter];
     }

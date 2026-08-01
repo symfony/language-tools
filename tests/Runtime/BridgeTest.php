@@ -131,6 +131,8 @@ final class BridgeTest extends TestCase
         self::assertSame([], $result['errors']);
         self::assertIsArray($result['sections']);
         self::assertIsArray($result['sections']['container']);
+        self::assertFalse($result['sections']['container']['servicesComplete'] ?? null);
+        self::assertTrue($result['sections']['container']['parametersComplete'] ?? null);
         self::assertSame([
             [
                 'id' => 'app.mailer',

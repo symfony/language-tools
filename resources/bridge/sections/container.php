@@ -40,6 +40,8 @@ function bridgeContainerSection(SymfonyLspBridgeContext $context): ?array
             $items = normalizeServices($container, $types);
             $section = [
                 'complete' => true,
+                'servicesComplete' => false,
+                'parametersComplete' => true,
                 'items' => $items,
                 'parameters' => $parameterItems,
                 'resources' => [],

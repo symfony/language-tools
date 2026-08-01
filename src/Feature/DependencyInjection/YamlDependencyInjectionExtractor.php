@@ -201,7 +201,7 @@ final class YamlDependencyInjectionExtractor
     {
         $references = [];
         preg_match_all(
-            '/(?<!@)@(\?)?([.A-Za-z_\\\\][A-Za-z0-9_.\\\\:$-]*)/',
+            '/(?<![A-Za-z0-9_@])@(\?)?([.A-Za-z_\\\\][A-Za-z0-9_.\\\\:$-]*)/',
             $line,
             $serviceMatches,
             \PREG_OFFSET_CAPTURE,
