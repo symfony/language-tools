@@ -882,7 +882,7 @@ diagnostics must remain standard LSP behavior.
   and workspace folders on that transport.
 - [x] Add bundled Tree-sitter parsing for tolerant Twig and YAML context
   extraction.
-- [ ] Add tolerant PHP context extraction with high-confidence Symfony call
+- [x] Add tolerant PHP context extraction with high-confidence Symfony call
   recognition.
 - [ ] Complete tolerant XLIFF, JSON translation, and dotenv context extraction.
 - [x] Define the persistent source index, runtime snapshot schema, live-overlay
@@ -891,7 +891,7 @@ diagnostics must remain standard LSP behavior.
   explicit PHP commands, workspace trust, static-only mode, and status
   reporting.
 - [x] Establish fixture applications and protocol-level test infrastructure.
-- [ ] Establish reproducible standalone binary builds for macOS, Linux, and
+- [x] Establish reproducible standalone binary builds for macOS, Linux, and
   Windows.
 
 ### Phase 2: First useful Symfony features

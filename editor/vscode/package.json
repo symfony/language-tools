@@ -61,7 +61,7 @@
         "symfonyLsp.serverPath": {
           "type": "string",
           "default": "",
-          "description": "Absolute path to bin/symfony-lsp in the Symfony LSP checkout."
+          "description": "Absolute path to the Symfony LSP executable."
         },
         "symfonyLsp.phpCommand": {
           "type": "array",

@@ -1,29 +1,35 @@
 Using Symfony LSP with VS Code
 ==============================
 
-Symfony LSP is under active development. The bundled VS Code extension makes it
-possible to test the language server from a source checkout before standalone
-binaries and a published extension are available.
+The bundled VS Code extension configures the Symfony LSP client, workspace
+trust, file associations and project settings. It requires VS Code 1.91 or
+later.
 
-Before continuing, :doc:`install the language server </index>`. Building the
-development extension also requires Node.js, npm and VS Code 1.91 or later.
+Installing the Private Extension
+--------------------------------
 
-Building the Extension
-----------------------
+Install the standalone server first. See :doc:`the installation instructions
+</index>`. Download the ``.vsix`` file from the same private GitHub release and
+install it:
 
-Build and package the development extension from the repository root:
+.. code-block:: terminal
+
+    $ code --install-extension symfony-lsp-v0.1.0.vsix
+
+Set ``symfonyLsp.serverPath`` to the absolute path of the executable extracted
+from the server archive, then restart VS Code.
+
+Building the Extension from Source
+----------------------------------
+
+Development builds require Node.js and npm. Build and package the extension
+from the repository root:
 
 .. code-block:: terminal
 
     $ make -C editor/vscode
 
-This creates ``editor/vscode/symfony-lsp-0.0.1.vsix``. Install it with VS Code:
-
-.. code-block:: terminal
-
-    $ code --install-extension editor/vscode/symfony-lsp-0.0.1.vsix
-
-Restart VS Code after installation.
+This creates ``editor/vscode/symfony-lsp-0.1.0.vsix``.
 
 Twig Support
 ------------
