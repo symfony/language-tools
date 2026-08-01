@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3 (2026-08-01)
+
+- Fixed runtime metadata parsing when console output precedes JSON.
+- Fixed runtime indexing when the Twig debug command is unavailable.
+- Fixed version reporting and persistent cache namespaces in release builds.
+
 ## 0.1.2 (2026-08-01)
 
 - Added Symfony-aware completion, navigation, references, hover and diagnostics.
