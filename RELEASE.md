@@ -8,6 +8,6 @@ Target: `v0.1.0`
 - [x] Package and test the VS Code extension for the private release.
 - [x] Add release installation and upgrade documentation.
 - [x] Add a changelog and release notes.
-- [ ] Update the delivery checklist to match implemented behavior.
-- [ ] Run the full PHP, compatibility, VS Code, and release validation matrix.
+- [x] Update the delivery checklist to match implemented behavior.
+- [x] Run the full PHP, compatibility, VS Code, and release validation matrix.
 - [ ] Tag `v0.1.0` and create the private GitHub release.
