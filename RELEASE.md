@@ -1,6 +1,6 @@
 # First private release
 
-Target: `v0.1.0`
+Target: `v0.1.1`
 
 - [x] Provide reproducible standalone server archives for Linux, macOS, and Windows.
 - [x] Add a portable Tree-sitter sidecar for standalone builds.
@@ -10,4 +10,4 @@ Target: `v0.1.0`
 - [x] Add a changelog and release notes.
 - [x] Update the delivery checklist to match implemented behavior.
 - [x] Run the full PHP, compatibility, VS Code, and release validation matrix.
-- [ ] Tag `v0.1.0` and create the private GitHub release.
+- [ ] Tag `v0.1.1` and create the private GitHub release.

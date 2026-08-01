@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (2026-08-01)
+## 0.1.1 (2026-08-01)
 
 - Added Symfony-aware completion, navigation, references, hover and diagnostics.
 - Added route, service, parameter, template, translation and environment indexing.

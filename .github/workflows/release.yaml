@@ -154,6 +154,7 @@ jobs:
         needs: [unix-binaries, windows-binary, vscode-extension]
         runs-on: ubuntu-latest
         steps:
+            - uses: actions/checkout@v7
             - uses: actions/download-artifact@v8
               with:
                   path: dist
@@ -167,7 +168,7 @@ jobs:
                       dist/**/*.vsix
                       dist/SHA256SUMS
                   fail_on_unmatched_files: true
-                  generate_release_notes: true
+                  body_path: CHANGELOG.md
                   prerelease: true
                   draft: true
             - name: Publish private release
