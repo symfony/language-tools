@@ -63,7 +63,7 @@ final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterf
             }
             if ($file->isDir()) {
                 yield from $this->files($file->getPathname());
-            } elseif ($file->isFile() && str_ends_with(strtolower($file->getFilename()), '.twig')) {
+            } elseif ($file->isFile()) {
                 yield $file->getPathname();
             }
         }
