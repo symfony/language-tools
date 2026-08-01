@@ -69,7 +69,9 @@ jobs:
                   cp var/build/tree_sitter_cli/symfony-lsp-tree-sitter "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp-tree-sitter"
                   cp LICENSE "dist/symfony-lsp-$VERSION-$PLATFORM/LICENSE"
                   "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp" --version
-                  ./tools/smoke-test-server "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp" "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp-tree-sitter" "${VERSION#v}"
+                  EXPECTED_VERSION=dev
+                  if [ "$GITHUB_REF_TYPE" = tag ]; then EXPECTED_VERSION="${VERSION#v}"; fi
+                  ./tools/smoke-test-server "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp" "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp-tree-sitter" "$EXPECTED_VERSION"
                   tar -czf "dist/symfony-lsp-$VERSION-$PLATFORM.tar.gz" -C dist "symfony-lsp-$VERSION-$PLATFORM"
             - uses: actions/upload-artifact@v7
               with:
