@@ -108,6 +108,7 @@ jobs:
                   cmake -S ext/tree_sitter -B var/build/tree_sitter_cli -DCMAKE_BUILD_TYPE=Release
                   cmake --build var/build/tree_sitter_cli --config Release
             - name: Package and smoke-test
+              timeout-minutes: 2
               shell: pwsh
               run: |
                   $package = "symfony-lsp-${{ github.ref_name }}-windows-x64"

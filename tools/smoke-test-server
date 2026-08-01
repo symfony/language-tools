@@ -5,6 +5,7 @@ function writeMessage($stream, array $message): void
 {
     $json = json_encode($message, \JSON_THROW_ON_ERROR);
     fwrite($stream, 'Content-Length: '.\strlen($json)."\r\n\r\n".$json);
+    fflush($stream);
 }
 
 function readMessage($stream): array
