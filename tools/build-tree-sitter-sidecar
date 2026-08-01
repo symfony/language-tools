@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+build="$root/var/build/tree_sitter_cli"
+
+cmake -S "$root/ext/tree_sitter" -B "$build" -DCMAKE_BUILD_TYPE=Release
+cmake --build "$build" --config Release
+
+binary="$build/symfony-lsp-tree-sitter"
+if [ ! -f "$binary" ]; then
+    binary="$build/Release/symfony-lsp-tree-sitter.exe"
+fi
+
+printf '%s\n' "$binary"

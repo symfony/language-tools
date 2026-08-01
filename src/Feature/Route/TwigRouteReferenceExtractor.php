@@ -4,20 +4,16 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
 final class TwigRouteReferenceExtractor
 {
-    private readonly TwigDocumentParser $parser;
-
     public function __construct(
         private readonly PositionConverter $positionConverter,
-        ?TwigDocumentParser $parser = null,
+        private readonly TwigDocumentParser $parser,
     ) {
-        $this->parser = $parser ?? new TwigDocumentParser(new NativeTreeSitterParser());
     }
 
     /** @return list<RouteReference> */

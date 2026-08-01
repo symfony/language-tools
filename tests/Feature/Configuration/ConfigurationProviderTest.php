@@ -13,6 +13,7 @@ use Symfony\Lsp\Feature\Configuration\ProjectConfigurationSnapshotLoader;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -153,7 +154,7 @@ final class ConfigurationProviderTest extends TestCase
             ]),
         ]]]]]);
 
-        return [new ConfigurationProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $indexes, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser())), $environmentIndexes), $documents, $converter];
+        return [new ConfigurationProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $indexes, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), $environmentIndexes), $documents, $converter];
     }
 
     /**

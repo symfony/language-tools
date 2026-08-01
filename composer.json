@@ -34,6 +34,7 @@
     },
     "scripts": {
         "tree-sitter:build": "./tools/build-tree-sitter-extension",
+        "tree-sitter:build-sidecar": "./tools/build-tree-sitter-sidecar",
         "tree-sitter:benchmark": "./tools/php-with-tree-sitter tools/benchmark-tree-sitter.php",
         "php-parser:benchmark": "php tools/benchmark-php-parser.php",
         "test": "./tools/php-with-tree-sitter vendor/bin/phpunit --no-progress",

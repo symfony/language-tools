@@ -16,6 +16,7 @@ use Symfony\Lsp\Feature\Twig\TemplateNavigationProvider;
 use Symfony\Lsp\Feature\Twig\TemplateReference;
 use Symfony\Lsp\Feature\Twig\TemplateReferenceExtractor;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -24,7 +25,7 @@ final class TemplateProviderTest extends TestCase
 {
     public function testExtractsValidReferencesAroundMalformedTwigWithoutMatchingComments(): void
     {
-        $extractor = new TemplateReferenceExtractor(new PositionConverter(), new TwigDocumentParser(new NativeTreeSitterParser()));
+        $extractor = new TemplateReferenceExtractor(new PositionConverter(), new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
         $references = $extractor->extract('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
             {# {% include 'ignored.html.twig' %} #}
             {{ include(template_name('ignored.html.twig')) }}
@@ -90,7 +91,7 @@ final class TemplateProviderTest extends TestCase
             new Range(new Position(0, 0), new Position(0, 0)),
         ));
         $converter = new PositionConverter();
-        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser()));
+        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
         $resolver = new DocumentContextResolver($documents, $projects);
 
         return [

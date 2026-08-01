@@ -5,13 +5,14 @@ namespace Symfony\Lsp\Tests\Parser\TreeSitter;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 
 final class NativeTreeSitterParserTest extends TestCase
 {
     public function testRecoversAroundIncompleteTwigAndPreservesByteRanges(): void
     {
         $source = "{{ '😀'|trans }}\n{{ path('article_";
-        $tree = (new NativeTreeSitterParser())->parse('twig', $source);
+        $tree = (new NativeTreeSitterParser(new TreeSitterResultDecoder()))->parse('twig', $source);
 
         self::assertTrue($tree->hasError());
         $strings = $tree->nodesOfType('string');
@@ -31,7 +32,7 @@ final class NativeTreeSitterParserTest extends TestCase
                         - !service '@app.locator'
                         - !php/const App\Feature::ENABLED
             YAML;
-        $tree = (new NativeTreeSitterParser())->parse('yaml', $source);
+        $tree = (new NativeTreeSitterParser(new TreeSitterResultDecoder()))->parse('yaml', $source);
 
         self::assertFalse($tree->hasError());
         self::assertSame(
@@ -44,6 +45,6 @@ final class NativeTreeSitterParserTest extends TestCase
     {
         $this->expectException(\ValueError::class);
 
-        (new NativeTreeSitterParser())->parse('php', '<?php');
+        (new NativeTreeSitterParser(new TreeSitterResultDecoder()))->parse('php', '<?php');
     }
 }

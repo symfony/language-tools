@@ -13,6 +13,9 @@ use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -149,7 +152,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 $projects,
                 new RouteIndexRegistry(),
                 new RouteReferenceExtractor($positionConverter),
-                new TwigRouteReferenceExtractor($positionConverter),
+                new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
             ),
         );
 
@@ -221,7 +224,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                     $projects,
                     $routeIndexes,
                     new RouteReferenceExtractor($positionConverter),
-                    new TwigRouteReferenceExtractor($positionConverter),
+                    new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
                 ),
             ),
             $client,

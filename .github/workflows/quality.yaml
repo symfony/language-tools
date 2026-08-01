@@ -17,6 +17,8 @@ jobs:
             - uses: ramsey/composer-install@v4
             - name: Build the Tree-sitter extension
               run: composer tree-sitter:build
+            - name: Build the Tree-sitter sidecar
+              run: composer tree-sitter:build-sidecar
             - name: Run unit tests
               run: composer test
             - name: Run static analysis

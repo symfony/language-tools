@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Parser\Yaml;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Parser\Yaml\YamlMapping;
 
@@ -21,7 +22,7 @@ final class YamlDocumentParserTest extends TestCase
                     arguments:
                         - !service '@app.reporter'
             YAML;
-        $mappings = (new YamlDocumentParser(new NativeTreeSitterParser()))->parse($source);
+        $mappings = (new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))->parse($source);
 
         self::assertContains(
             ['services', 'App\Handler\ReportHandler', 'arguments'],
@@ -37,7 +38,7 @@ final class YamlDocumentParserTest extends TestCase
                     router:
                         utf8: true
             YAML;
-        $mappings = (new YamlDocumentParser(new NativeTreeSitterParser()))->parse($source);
+        $mappings = (new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))->parse($source);
 
         self::assertSame(
             [

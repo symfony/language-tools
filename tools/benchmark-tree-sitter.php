@@ -1,10 +1,11 @@
 <?php
 
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 
 require dirname(__DIR__).'/vendor/autoload.php';
 
-$parser = new NativeTreeSitterParser();
+$parser = new NativeTreeSitterParser(new TreeSitterResultDecoder());
 $fixtures = [
     ['twig', 'tests/Fixtures/Parser/twig/valid.html.twig'],
     ['twig', 'tests/Fixtures/Parser/twig/incomplete.html.twig'],

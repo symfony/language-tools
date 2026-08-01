@@ -7,13 +7,14 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Route\RouteReference;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
 final class TwigRouteReferenceExtractorTest extends TestCase
 {
     public function testExtractsPathAndUrlReferencesWithLiteralParameters(): void
     {
-        $references = (new TwigRouteReferenceExtractor(new PositionConverter(), new TwigDocumentParser(new NativeTreeSitterParser())))->extract(<<<'TWIG'
+        $references = (new TwigRouteReferenceExtractor(new PositionConverter(), new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))))->extract(<<<'TWIG'
             {# {{ path('ignored') }} #}
             {{ path(route_name('ignored')) }}
             <a href="{{ path('article_show', {'id': article.id}) }}">Show</a>

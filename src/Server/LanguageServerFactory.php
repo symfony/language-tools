@@ -100,6 +100,9 @@ use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\SidecarTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\ProjectDiscovery;
@@ -158,7 +161,7 @@ final class LanguageServerFactory
         $workspaceTrust = new WorkspaceTrust();
         $documentContextResolver = new DocumentContextResolver($documents, $projects);
         $routeReferenceExtractor = new RouteReferenceExtractor($positionConverter);
-        $treeSitterParser = new NativeTreeSitterParser();
+        $treeSitterParser = $this->treeSitterParser();
         $twigParser = new TwigDocumentParser($treeSitterParser);
         $twigRouteReferenceExtractor = new TwigRouteReferenceExtractor($positionConverter, $twigParser);
         $phpParser = new TolerantPhpParser(new Parser());
@@ -495,5 +498,20 @@ final class LanguageServerFactory
             $logger,
             $progress,
         );
+    }
+
+    private function treeSitterParser(): TreeSitterParserInterface
+    {
+        $decoder = new TreeSitterResultDecoder();
+        if (\function_exists('symfony_lsp_tree_sitter_parse')) {
+            return new NativeTreeSitterParser($decoder);
+        }
+
+        $configuredSidecar = getenv('SYMFONY_LSP_TREE_SITTER');
+        $sidecar = false !== $configuredSidecar && '' !== $configuredSidecar
+            ? $configuredSidecar
+            : \dirname(\PHP_BINARY).'/symfony-lsp-tree-sitter'.('Windows' === \PHP_OS_FAMILY ? '.exe' : '');
+
+        return new SidecarTreeSitterParser($sidecar, $decoder);
     }
 }
