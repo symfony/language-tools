@@ -6,6 +6,7 @@ use Amp\ByteStream\ReadableBuffer;
 use Fabpot\JsonRpc\ContentLengthJsonRpcTransport;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Server\LanguageServerFactory;
+use Symfony\Lsp\Server\ServerVersion;
 use Symfony\Lsp\Tests\Support\CapturingWritableStream;
 
 final class LanguageServerTest extends TestCase
@@ -74,6 +75,41 @@ final class LanguageServerTest extends TestCase
         ], $this->decodeFrames($output->contents()));
     }
 
+    public function testUsesServerVersionForSourceAndRuntimeIndexes(): void
+    {
+        $version = '9.8.7-test';
+        $root = realpath(\dirname(__DIR__).'/Fixtures/RuntimeApplication');
+        self::assertIsString($root);
+        $input = new ReadableBuffer(
+            $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => [
+                'rootUri' => 'file://'.$root,
+                'capabilities' => new \stdClass(),
+                'initializationOptions' => ['workspaceTrust' => true],
+            ]]).
+            $this->frame(['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []]).
+            $this->frame(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'workspace/executeCommand', 'params' => [
+                'command' => 'symfony.refreshIndex',
+            ]]).
+            $this->frame(['jsonrpc' => '2.0', 'id' => 3, 'method' => 'shutdown', 'params' => []]).
+            $this->frame(['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []])
+        );
+        $output = new CapturingWritableStream();
+
+        try {
+            $exitCode = (new LanguageServerFactory(new ServerVersion($version)))->create($input, $output)->run();
+            $messages = $this->decodeFrames($output->contents());
+
+            self::assertSame(0, $exitCode);
+            self::assertIsArray($messages[0]['result'] ?? null);
+            self::assertIsArray($messages[0]['result']['serverInfo'] ?? null);
+            self::assertSame($version, $messages[0]['result']['serverInfo']['version'] ?? null);
+            self::assertFileExists($root.'/var/symfony-lsp/'.$version.'/index/source.json');
+            self::assertCount(1, glob($root.'/var/symfony-lsp/'.$version.'/*/bridge.php') ?: []);
+        } finally {
+            $this->removeDirectory($root.'/var/symfony-lsp/'.$version);
+        }
+    }
+
     public function testRejectsFeatureRequestsBeforeInitialization(): void
     {
         $input = new ReadableBuffer(
@@ -133,5 +169,27 @@ final class LanguageServerTest extends TestCase
         }
 
         return $messages;
+    }
+
+    private function removeDirectory(string $directory): void
+    {
+        if (!is_dir($directory)) {
+            return;
+        }
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST,
+        );
+        foreach ($iterator as $file) {
+            if (!$file instanceof \SplFileInfo) {
+                continue;
+            }
+            if ($file->isDir()) {
+                @rmdir($file->getPathname());
+            } else {
+                @unlink($file->getPathname());
+            }
+        }
+        @rmdir($directory);
     }
 }

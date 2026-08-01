@@ -126,9 +126,16 @@ use Symfony\Lsp\Runtime\StatusRuntimeInitializer;
 
 final class LanguageServerFactory
 {
+    private readonly ServerVersion $serverVersion;
+
+    public function __construct(?ServerVersion $serverVersion = null)
+    {
+        $this->serverVersion = $serverVersion ?? new ServerVersion();
+    }
+
     public function create(ReadableStream $input, WritableStream $output, ?WritableStream $errorOutput = null): LanguageServer
     {
-        $version = (new ServerVersion())->value();
+        $version = $this->serverVersion->value();
         $logger = new ServerLogger($errorOutput);
         $peer = new JsonRpcPeer(new ContentLengthJsonRpcTransport($input, $output), $logger);
         $dispatcher = new JsonRpcDispatcher($peer);
@@ -283,7 +290,7 @@ final class LanguageServerFactory
                 new ProgressRuntimeInitializer(
                     new StatusRuntimeInitializer(
                         new ProjectRuntimeInitializer(
-                            new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', 'dev'),
+                            new BridgeInstaller(\dirname(__DIR__, 2).'/resources/bridge.php', $version),
                             new NativeProcessRunner(),
                             new RuntimeSnapshotLoaderRegistry(
                                 new ProjectRouteSnapshotLoader($routeIndexes),
