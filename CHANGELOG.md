@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Fixed route features for injected router properties.
+- Fixed false configuration and service diagnostics.
+- Fixed indexing templates without a Twig file extension.
+
 ## 0.1.4 (2026-08-01)
 
 - Fixed runtime bridge namespaces in release builds.
