@@ -13,6 +13,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\CodeActionProviderRegistry;
 use Symfony\Lsp\Feature\CodeLensProviderRegistry;
 use Symfony\Lsp\Feature\CompletionProviderRegistry;
 use Symfony\Lsp\Feature\Configuration\ConfigurationIndexRegistry;
@@ -60,6 +61,7 @@ use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\ProjectRouteSnapshotLoader;
 use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
+use Symfony\Lsp\Feature\Route\RouteCodeActionProvider;
 use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
 use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteDefinitionHandler;
@@ -81,6 +83,7 @@ use Symfony\Lsp\Feature\Security\SecurityProvider;
 use Symfony\Lsp\Feature\Security\SecuritySourceIndexer;
 use Symfony\Lsp\Feature\Security\SecuritySourceIndexRegistry;
 use Symfony\Lsp\Feature\Translation\ProjectTranslationSnapshotLoader;
+use Symfony\Lsp\Feature\Translation\TranslationCodeActionProvider;
 use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationExtractor;
 use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
@@ -88,6 +91,7 @@ use Symfony\Lsp\Feature\Translation\TranslationProvider;
 use Symfony\Lsp\Feature\Translation\TranslationRenameHandler;
 use Symfony\Lsp\Feature\Translation\TranslationSourceIndexer;
 use Symfony\Lsp\Feature\Twig\ProjectTemplateSnapshotLoader;
+use Symfony\Lsp\Feature\Twig\TemplateCodeActionProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCompletionHandler;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TemplateNavigationProvider;
@@ -411,6 +415,29 @@ final class LanguageServerFactory
                 $messengerProvider,
                 $eventProvider,
                 $securityProvider,
+            ),
+            new CodeActionProviderRegistry(
+                new RouteCodeActionProvider(
+                    $documents,
+                    $projects,
+                    $positionConverter,
+                    $routeIndexes,
+                    $routeReferenceExtractor,
+                    $twigRouteReferenceExtractor,
+                ),
+                new TemplateCodeActionProvider(
+                    $documents,
+                    $projects,
+                    $templateReferenceExtractor,
+                    $templateIndexes,
+                ),
+                new TranslationCodeActionProvider(
+                    $documents,
+                    $projects,
+                    $positionConverter,
+                    $translationExtractor,
+                    $translationIndexes,
+                ),
             ),
             new CodeLensProviderRegistry($messengerProvider, $eventProvider),
             new HoverProviderRegistry(

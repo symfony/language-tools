@@ -906,7 +906,7 @@ features can land step by step without reducing the intended initial scope.
   diagnostics opt-in.
 - [x] Implement environment references and processors.
 - [x] Implement bundle configuration trees.
-- [ ] Implement framework-specific code actions.
+- [x] Implement framework-specific code actions.
 - [x] Implement best-effort rename for supported identifiers.
 
 This phase should produce a usable initial release. It is better to support

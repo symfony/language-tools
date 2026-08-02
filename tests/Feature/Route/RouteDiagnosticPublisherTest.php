@@ -9,6 +9,7 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\Route\Route;
+use Symfony\Lsp\Feature\Route\RouteCodeActionProvider;
 use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
@@ -86,6 +87,55 @@ final class RouteDiagnosticPublisherTest extends TestCase
             'Route "article_show" requires parameter "id".',
             $diagnostics[0]['message'],
         );
+    }
+
+    public function testAddsMissingRouteParameters(): void
+    {
+        $cases = [
+            ['php', 'file:///workspace/src/Controller.php', <<<'PHP'
+                <?php
+                class ArticleController extends AbstractController
+                {
+                    public function show(): void
+                    {
+                        $this->generateUrl('article_show');
+                    }
+                }
+                PHP, ", ['id' => null]"],
+            ['twig', 'file:///workspace/templates/page.html.twig', "{{ path('article_show', {foo: 1}) }}", "'id': null, "],
+        ];
+        foreach ($cases as [$languageId, $uri, $text, $expectedText]) {
+            $documents = new DocumentStore();
+            $documents->open(new Document($uri, $languageId, 1, $text));
+            $projects = new ProjectRegistry();
+            $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+            $indexes = new RouteIndexRegistry();
+            $indexes->forProject($project)->replace(new Route('article_show', '/article/{id}', ['GET'], [], null, null));
+            $converter = new PositionConverter();
+            $phpExtractor = new RouteReferenceExtractor($converter);
+            $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
+            $diagnosticProvider = new RouteDiagnosticPublisher($documents, $projects, $indexes, $phpExtractor, $twigExtractor);
+            $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]);
+            self::assertIsArray($diagnostics);
+            $provider = new RouteCodeActionProvider($documents, $projects, $converter, $indexes, $phpExtractor, $twigExtractor);
+
+            $actions = $provider->actions([
+                'textDocument' => ['uri' => $uri],
+                'range' => $diagnostics[0]['range'],
+                'context' => ['diagnostics' => $diagnostics],
+            ]);
+
+            self::assertIsArray($actions);
+            self::assertCount(1, $actions);
+            $action = $actions[0];
+            self::assertSame('Add missing route parameter', $action['title'] ?? null);
+            self::assertIsArray($action['edit'] ?? null);
+            self::assertIsArray($action['edit']['documentChanges'] ?? null);
+            self::assertIsArray($action['edit']['documentChanges'][0]);
+            self::assertIsArray($action['edit']['documentChanges'][0]['edits'] ?? null);
+            self::assertIsArray($action['edit']['documentChanges'][0]['edits'][0]);
+            self::assertSame($expectedText, $action['edit']['documentChanges'][0]['edits'][0]['newText'] ?? null);
+        }
     }
 
     public function testDoesNotDiagnoseDynamicRouteParameters(): void

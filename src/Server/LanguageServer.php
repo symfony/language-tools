@@ -8,6 +8,7 @@ use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcError;
 use Fabpot\JsonRpc\JsonRpcPeer;
 use Symfony\Lsp\Document\DocumentSynchronizer;
+use Symfony\Lsp\Feature\CodeActionProviderRegistry;
 use Symfony\Lsp\Feature\CodeLensProviderRegistry;
 use Symfony\Lsp\Feature\CompletionProviderRegistry;
 use Symfony\Lsp\Feature\DefinitionProviderRegistry;
@@ -32,6 +33,7 @@ final class LanguageServer
         private readonly WorkspaceConfiguration $workspaceConfiguration,
         private readonly DocumentSynchronizer $documentSynchronizer,
         private readonly CompletionProviderRegistry $completionProviders,
+        private readonly CodeActionProviderRegistry $codeActionProviders,
         private readonly CodeLensProviderRegistry $codeLensProviders,
         private readonly HoverProviderRegistry $hoverProviders,
         private readonly DiagnosticProviderRegistry $diagnosticProviders,
@@ -69,6 +71,7 @@ final class LanguageServer
         $this->dispatcher->onNotification('workspace/didChangeWatchedFiles', $this->changeWatchedFiles(...));
         $this->dispatcher->onNotification('$/setTrace', $this->setTrace(...));
         $this->dispatcher->onRequest('textDocument/completion', $this->guarded($this->completionProviders->complete(...)));
+        $this->dispatcher->onRequest('textDocument/codeAction', $this->guarded($this->codeActionProviders->actions(...)));
         $this->dispatcher->onRequest('textDocument/codeLens', $this->guarded($this->codeLensProviders->codeLenses(...)));
         $this->dispatcher->onRequest('textDocument/hover', $this->guarded($this->hoverProviders->hover(...)));
         $this->dispatcher->onRequest('textDocument/definition', $this->guarded($this->definitionProviders->definition(...)));
@@ -108,6 +111,7 @@ final class LanguageServer
                 'completionProvider' => [
                     'triggerCharacters' => ["'", '"', '@', '%'],
                 ],
+                'codeActionProvider' => true,
                 'codeLensProvider' => [
                     'resolveProvider' => false,
                 ],

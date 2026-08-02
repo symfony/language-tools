@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Twig\ProjectTemplateSnapshotLoader;
+use Symfony\Lsp\Feature\Twig\TemplateCodeActionProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCompletionHandler;
 use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
@@ -61,6 +62,39 @@ final class TemplateProviderTest extends TestCase
             @rmdir($root.'/templates');
             @rmdir($root);
         }
+    }
+
+    public function testCreatesMissingApplicationTemplate(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = "<?php \$this->render('missing.html.twig');";
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $indexes = new TemplateIndexRegistry();
+        $indexes->forProject($project)->replaceRuntime(true);
+        $converter = new PositionConverter();
+        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
+        $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $extractor, $indexes);
+        $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
+        self::assertIsArray($diagnostics);
+        $provider = new TemplateCodeActionProvider($documents, $projects, $extractor, $indexes);
+
+        $actions = $provider->actions([
+            'textDocument' => ['uri' => $uri],
+            'range' => $diagnostics[0]['range'],
+            'context' => ['diagnostics' => $diagnostics],
+        ]);
+
+        self::assertIsArray($actions);
+        self::assertCount(1, $actions);
+        $action = $actions[0];
+        self::assertSame('Create template "missing.html.twig"', $action['title'] ?? null);
+        self::assertIsArray($action['edit'] ?? null);
+        self::assertIsArray($action['edit']['documentChanges'] ?? null);
+        self::assertIsArray($action['edit']['documentChanges'][0]);
+        self::assertSame('file:///workspace/templates/missing.html.twig', $action['edit']['documentChanges'][0]['uri'] ?? null);
     }
 
     public function testCompletesAndLinksTemplateNames(): void
