@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a server benchmark for indexing, latency, cancellation, and memory targets.
 - Added quick fixes for missing templates, translations, and route parameters.
 - Added tolerant extraction for incomplete JSON, XLIFF, and dotenv resources.
 - Fixed route features for injected router properties.

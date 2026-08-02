@@ -37,6 +37,7 @@
         "tree-sitter:build-sidecar": "./tools/build-tree-sitter-sidecar",
         "tree-sitter:benchmark": "./tools/php-with-tree-sitter tools/benchmark-tree-sitter.php",
         "php-parser:benchmark": "php tools/benchmark-php-parser.php",
+        "server:benchmark": "./tools/benchmark-server bin/symfony-lsp tests/Fixtures/RuntimeApplication",
         "test": "./tools/php-with-tree-sitter vendor/bin/phpunit --no-progress",
         "phpstan": "phpstan analyze --no-progress",
         "cs-check": "php-cs-fixer fix --show-progress=none --dry-run --diff",

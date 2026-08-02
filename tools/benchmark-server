@@ -1,0 +1,244 @@
+#!/usr/bin/env php
+<?php
+
+function writeMessage($stream, array $message): void
+{
+    $json = json_encode($message, \JSON_THROW_ON_ERROR);
+    fwrite($stream, 'Content-Length: '.\strlen($json)."\r\n\r\n".$json);
+    fflush($stream);
+}
+
+function readMessage($stream, float $timeout): ?array
+{
+    $read = [$stream];
+    $write = null;
+    $except = null;
+    $seconds = (int) $timeout;
+    $microseconds = (int) (($timeout - $seconds) * 1_000_000);
+    if (0 === stream_select($read, $write, $except, $seconds, $microseconds)) {
+        return null;
+    }
+
+    $length = null;
+    while (false !== $line = fgets($stream)) {
+        if ("\r\n" === $line) {
+            break;
+        }
+        if (preg_match('/^Content-Length: (\d+)\r\n$/i', $line, $matches)) {
+            $length = (int) $matches[1];
+        }
+    }
+    if (null === $length) {
+        throw new \RuntimeException('Invalid LSP response header.');
+    }
+
+    $json = '';
+    while (\strlen($json) < $length) {
+        $chunk = fread($stream, $length - \strlen($json));
+        if (false === $chunk || '' === $chunk) {
+            throw new \RuntimeException('Incomplete LSP response body.');
+        }
+        $json .= $chunk;
+    }
+
+    return json_decode($json, true, flags: \JSON_THROW_ON_ERROR);
+}
+
+function response($input, $output, int $id, float $timeout): array
+{
+    $deadline = microtime(true) + $timeout;
+    while (microtime(true) < $deadline) {
+        $message = readMessage($output, max(0.0, min(1.0, $deadline - microtime(true))));
+        if (null === $message) {
+            continue;
+        }
+        if (isset($message['method'], $message['id'])) {
+            writeMessage($input, ['jsonrpc' => '2.0', 'id' => $message['id'], 'result' => null]);
+            continue;
+        }
+        if (($message['id'] ?? null) === $id) {
+            return $message;
+        }
+    }
+
+    throw new \RuntimeException(\sprintf('Timed out waiting for LSP response %d.', $id));
+}
+
+function request($input, $output, int &$id, string $method, array $params): array
+{
+    ++$id;
+    writeMessage($input, ['jsonrpc' => '2.0', 'id' => $id, 'method' => $method, 'params' => $params]);
+
+    return response($input, $output, $id, 30.0);
+}
+
+function percentile(array $samples, float $percentile): float
+{
+    sort($samples);
+    $index = (int) ceil($percentile * \count($samples)) - 1;
+
+    return $samples[max(0, $index)];
+}
+
+function rss(int $pid): ?int
+{
+    $output = [];
+    exec('ps -o rss= -p '.escapeshellarg((string) $pid), $output, $status);
+    if (0 !== $status || !isset($output[0]) || !is_numeric(trim($output[0]))) {
+        return null;
+    }
+
+    return (int) trim($output[0]) * 1024;
+}
+
+if ($argc < 3 || $argc > 5) {
+    fwrite(\STDERR, "Usage: benchmark-server <server> <project> [tree-sitter-sidecar] [iterations]\n");
+    exit(2);
+}
+
+$server = realpath($argv[1]);
+$project = realpath($argv[2]);
+$sidecar = isset($argv[3]) ? realpath($argv[3]) : false;
+$iterations = isset($argv[4]) ? (int) $argv[4] : 100;
+if (false === $server || false === $project || $iterations < 1) {
+    throw new \InvalidArgumentException('The server, project, and iteration count must be valid.');
+}
+$environment = false === $sidecar ? null : [...getenv(), 'SYMFONY_LSP_TREE_SITTER' => $sidecar];
+$process = proc_open([$server], [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes, env_vars: $environment, options: ['bypass_shell' => true]);
+if (!\is_resource($process)) {
+    throw new \RuntimeException('Unable to start Symfony LSP.');
+}
+$status = proc_get_status($process);
+$pid = $status['pid'];
+$id = 1;
+$rootUri = 'file://'.str_replace('%2F', '/', rawurlencode($project));
+$startedAt = microtime(true);
+writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $id, 'method' => 'initialize', 'params' => [
+    'processId' => null,
+    'rootUri' => $rootUri,
+    'workspaceFolders' => [['uri' => $rootUri, 'name' => basename($project)]],
+    'capabilities' => new \stdClass(),
+    'initializationOptions' => ['workspaceTrust' => true],
+]]);
+$initialize = response($pipes[0], $pipes[1], $id, 10.0);
+$initializedAt = microtime(true);
+writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []]);
+
+$sourceReadyAt = null;
+$runtimeReadyAt = null;
+$indexStatus = null;
+$deadline = microtime(true) + 30.0;
+while (microtime(true) < $deadline) {
+    $result = request($pipes[0], $pipes[1], $id, 'workspace/executeCommand', ['command' => 'symfony.indexStatus']);
+    $indexStatus = $result['result'][0] ?? null;
+    if (\is_array($indexStatus)) {
+        $now = microtime(true);
+        if (null === $sourceReadyAt && 'ready' === ($indexStatus['source']['state'] ?? null)) {
+            $sourceReadyAt = $now;
+        }
+        if (null === $runtimeReadyAt && 'ready' === ($indexStatus['runtime']['state'] ?? null)) {
+            $runtimeReadyAt = $now;
+        }
+        if (null !== $sourceReadyAt && null !== $runtimeReadyAt) {
+            break;
+        }
+        if ('failed' === ($indexStatus['source']['state'] ?? null) || 'failed' === ($indexStatus['runtime']['state'] ?? null)) {
+            break;
+        }
+    }
+    usleep(25_000);
+}
+
+$documentUri = $rootUri.'/src/SymfonyLspBenchmark.php';
+$text = <<<'PHP'
+    <?php
+    final class SymfonyLspBenchmark extends AbstractController
+    {
+        public function run(): void
+        {
+            $this->generateUrl('fixture_home');
+        }
+    }
+    PHP;
+writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'textDocument/didOpen', 'params' => ['textDocument' => [
+    'uri' => $documentUri,
+    'languageId' => 'php',
+    'version' => 1,
+    'text' => $text,
+]]]);
+$prefixOffset = strpos($text, 'fixture_home') + \strlen('fixture_');
+$hoverOffset = strpos($text, 'fixture_home') + 2;
+$position = static function (int $offset) use ($text): array {
+    $before = substr($text, 0, $offset);
+    $line = substr_count($before, "\n");
+    $lastNewline = strrpos($before, "\n");
+
+    return ['line' => $line, 'character' => \strlen(false === $lastNewline ? $before : substr($before, $lastNewline + 1))];
+};
+$completionParams = ['textDocument' => ['uri' => $documentUri], 'position' => $position($prefixOffset)];
+$hoverParams = ['textDocument' => ['uri' => $documentUri], 'position' => $position($hoverOffset)];
+request($pipes[0], $pipes[1], $id, 'textDocument/completion', $completionParams);
+request($pipes[0], $pipes[1], $id, 'textDocument/hover', $hoverParams);
+$memoryBefore = rss($pid);
+$completionSamples = [];
+$hoverSamples = [];
+for ($iteration = 0; $iteration < $iterations; ++$iteration) {
+    $before = hrtime(true);
+    request($pipes[0], $pipes[1], $id, 'textDocument/completion', $completionParams);
+    $completionSamples[] = (hrtime(true) - $before) / 1_000_000;
+    $before = hrtime(true);
+    request($pipes[0], $pipes[1], $id, 'textDocument/hover', $hoverParams);
+    $hoverSamples[] = (hrtime(true) - $before) / 1_000_000;
+}
+$memoryAfter = rss($pid);
+
+++$id;
+$cancellationId = $id;
+$cancellationStartedAt = hrtime(true);
+writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $cancellationId, 'method' => 'textDocument/completion', 'params' => $completionParams]);
+writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => '$/cancelRequest', 'params' => ['id' => $cancellationId]]);
+$cancellationResponse = response($pipes[0], $pipes[1], $cancellationId, 10.0);
+$cancellationMilliseconds = (hrtime(true) - $cancellationStartedAt) / 1_000_000;
+
+writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'textDocument/didClose', 'params' => ['textDocument' => ['uri' => $documentUri]]]);
+$shutdown = request($pipes[0], $pipes[1], $id, 'shutdown', []);
+writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []]);
+fclose($pipes[0]);
+fclose($pipes[1]);
+$stderr = stream_get_contents($pipes[2]);
+fclose($pipes[2]);
+$exitCode = proc_close($process);
+
+$initializeSeconds = $initializedAt - $startedAt;
+$sourceSeconds = null === $sourceReadyAt ? null : $sourceReadyAt - $initializedAt;
+$runtimeSeconds = null === $runtimeReadyAt ? null : $runtimeReadyAt - $initializedAt;
+$completionP95 = percentile($completionSamples, 0.95);
+$hoverP95 = percentile($hoverSamples, 0.95);
+$result = [
+    'serverVersion' => $initialize['result']['serverInfo']['version'] ?? null,
+    'iterations' => $iterations,
+    'initializeMilliseconds' => round($initializeSeconds * 1000, 2),
+    'sourceIndexMilliseconds' => null === $sourceSeconds ? null : round($sourceSeconds * 1000, 2),
+    'runtimeIndexMilliseconds' => null === $runtimeSeconds ? null : round($runtimeSeconds * 1000, 2),
+    'completionP95Milliseconds' => round($completionP95, 2),
+    'hoverP95Milliseconds' => round($hoverP95, 2),
+    'cancellationMilliseconds' => round($cancellationMilliseconds, 2),
+    'cancellationObserved' => -32800 === ($cancellationResponse['error']['code'] ?? null),
+    'idleMemoryBytesBefore' => $memoryBefore,
+    'idleMemoryBytesAfter' => $memoryAfter,
+    'idleMemoryGrowthBytes' => null === $memoryBefore || null === $memoryAfter ? null : $memoryAfter - $memoryBefore,
+    'indexStatus' => $indexStatus,
+    'targets' => [
+        'completionP95Under100Milliseconds' => $completionP95 < 100,
+        'hoverP95Under100Milliseconds' => $hoverP95 < 100,
+        'sourceIndexUnder500Milliseconds' => null !== $sourceSeconds && $sourceSeconds < 0.5,
+        'runtimeIndexUnder3Seconds' => null !== $runtimeSeconds && $runtimeSeconds < 3,
+        'cancellationUnder100Milliseconds' => $cancellationMilliseconds < 100,
+        'idleMemoryGrowthUnder10MiB' => null === $memoryBefore || null === $memoryAfter || $memoryAfter - $memoryBefore < 10 * 1024 * 1024,
+    ],
+    'shutdownSucceeded' => array_key_exists('result', $shutdown),
+    'exitCode' => $exitCode,
+    'serverError' => '' === trim($stderr) ? null : trim($stderr),
+];
+
+echo json_encode($result, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR)."\n";

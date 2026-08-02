@@ -91,6 +91,14 @@ Language Server Protocol capabilities:
 
     features/index
 
+Development
+-----------
+
+.. toctree::
+    :maxdepth: 1
+
+    benchmarking
+
 Editor Integrations
 -------------------
 
