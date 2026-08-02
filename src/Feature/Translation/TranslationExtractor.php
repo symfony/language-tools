@@ -38,13 +38,7 @@ final class TranslationExtractor
     private function declarations(string $uri, string $text, string $domain, string $locale, string $format): array
     {
         if ('json' === $format) {
-            try {
-                $data = json_decode($text, true, 512, \JSON_THROW_ON_ERROR);
-            } catch (\JsonException) {
-                return [];
-            }
-
-            return \is_array($data) ? $this->jsonDeclarations($uri, $text, $domain, $locale, $data) : [];
+            return $this->jsonDeclarations($uri, $text, $domain, $locale);
         }
         if (\in_array($format, ['xlf', 'xliff'], true)) {
             return $this->xliffDeclarations($uri, $text, $domain, $locale);
@@ -81,50 +75,103 @@ final class TranslationExtractor
         return $result;
     }
 
+    /** @return list<TranslationDeclaration> */
+    private function jsonDeclarations(string $uri, string $text, string $domain, string $locale): array
+    {
+        preg_match_all('/"(?:\\\\.|[^"\\\\])*(?:"|$)|[{}:,]/s', $text, $matches, \PREG_OFFSET_CAPTURE);
+        $tokens = $matches[0];
+        $index = 0;
+
+        return $this->jsonObject($uri, $text, $domain, $locale, $tokens, $index, []);
+    }
+
     /**
-     * @param array<array-key, mixed> $data
+     * @param list<array{string, int}> $tokens
+     * @param list<string>             $path
      *
      * @return list<TranslationDeclaration>
      */
-    private function jsonDeclarations(string $uri, string $text, string $domain, string $locale, array $data, string $prefix = ''): array
+    private function jsonObject(string $uri, string $text, string $domain, string $locale, array $tokens, int &$index, array $path): array
     {
         $result = [];
-        foreach ($data as $key => $message) {
-            if (!\is_string($key)) {
+        if ('{' === ($tokens[$index][0] ?? null)) {
+            ++$index;
+        }
+        while (isset($tokens[$index])) {
+            [$token, $offset] = $tokens[$index];
+            if ('}' === $token) {
+                ++$index;
+                break;
+            }
+            if (!str_starts_with($token, '"')) {
+                ++$index;
                 continue;
             }
-            $fullKey = '' === $prefix ? $key : $prefix.'.'.$key;
-            if (\is_array($message)) {
-                array_push($result, ...$this->jsonDeclarations($uri, $text, $domain, $locale, $message, $fullKey));
+            $key = $this->jsonString($token);
+            ++$index;
+            if (':' !== ($tokens[$index][0] ?? null)) {
                 continue;
             }
-            if (!\is_string($message)) {
+            ++$index;
+            $fullPath = [...$path, $key];
+            $value = $tokens[$index][0] ?? null;
+            if ('{' === $value) {
+                array_push($result, ...$this->jsonObject($uri, $text, $domain, $locale, $tokens, $index, $fullPath));
                 continue;
             }
-            $offset = strpos($text, '"'.$key.'"');
-            $result[] = $this->declaration($fullKey, $message, $domain, $locale, $uri, $text, false === $offset ? 0 : $offset + 1, \strlen($key));
+            if (\is_string($value) && str_starts_with($value, '"')) {
+                $result[] = $this->declaration(
+                    implode('.', $fullPath),
+                    $this->jsonString($value),
+                    $domain,
+                    $locale,
+                    $uri,
+                    $text,
+                    $offset + 1,
+                    \strlen($key),
+                );
+                ++$index;
+            }
         }
 
         return $result;
     }
 
+    private function jsonString(string $token): string
+    {
+        $closed = str_ends_with($token, '"') && 1 < \strlen($token);
+        $contents = substr($token, 1, $closed ? -1 : null);
+        $decoded = json_decode('"'.$contents.'"');
+
+        return \is_string($decoded) ? $decoded : stripcslashes($contents);
+    }
+
     /** @return list<TranslationDeclaration> */
     private function xliffDeclarations(string $uri, string $text, string $domain, string $locale): array
     {
-        preg_match_all('/<(?:trans-unit|unit)\b([^>]*)>(.*?)<\/(?:trans-unit|unit)>/s', $text, $units, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?(?:trans-unit|unit)\b([^>]*)>/i', $text, $units, \PREG_OFFSET_CAPTURE);
         $result = [];
-        foreach ($units[0] as $i => $_) {
-            if (!preg_match('/\b(?:resname|name)=[\'\"]([^\'\"]+)[\'\"]/', $units[1][$i][0], $name)) {
-                preg_match('/\bid=[\'\"]([^\'\"]+)[\'\"]/', $units[1][$i][0], $name);
+        foreach ($units[0] as $i => [$opening, $unitOffset]) {
+            $contentOffset = $unitOffset + \strlen($opening);
+            $nextOffset = $units[0][$i + 1][1] ?? \strlen($text);
+            $content = substr($text, $contentOffset, $nextOffset - $contentOffset);
+            preg_match('/\b(?:resname|name)\s*=\s*[\'\"]([^\'\"]+)[\'\"]/i', $units[1][$i][0], $name);
+            preg_match('/<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?source(?:\s[^>]*)?>(.*?)(?:<\/(?:[A-Za-z_][A-Za-z0-9_.-]*:)?source>|(?=<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?target\b)|$)/is', $content, $source);
+            preg_match('/<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?target(?:\s[^>]*)?>(.*?)(?:<\/(?:[A-Za-z_][A-Za-z0-9_.-]*:)?target>|$)/is', $content, $target);
+            if (!isset($name[1]) && isset($source[1])) {
+                $name[1] = html_entity_decode(strip_tags($source[1]));
             }
-            preg_match('/<(?:target|source)(?:\s[^>]*)?>(.*?)<\/(?:target|source)>/s', $units[2][$i][0], $message);
-            if (!isset($name[1], $message[1])) {
+            if (!isset($name[1])) {
+                preg_match('/\bid\s*=\s*[\'\"]([^\'\"]+)[\'\"]/i', $units[1][$i][0], $name);
+            }
+            $message = $target[1] ?? $source[1] ?? null;
+            if (!isset($name[1]) || !\is_string($message)) {
                 continue;
             }
             $key = html_entity_decode(strip_tags($name[1]));
-            $value = html_entity_decode(strip_tags($message[1]));
-            $offset = strpos($text, $name[1], $units[0][$i][1]);
-            $result[] = $this->declaration($key, $value, $domain, $locale, $uri, $text, false === $offset ? 0 : $offset);
+            $value = html_entity_decode(strip_tags($message));
+            $offset = strpos($text, $name[1], $unitOffset);
+            $result[] = $this->declaration($key, $value, $domain, $locale, $uri, $text, false === $offset ? $unitOffset : $offset);
         }
 
         return $result;

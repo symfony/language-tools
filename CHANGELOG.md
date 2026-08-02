@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added tolerant extraction for incomplete JSON, XLIFF, and dotenv resources.
 - Fixed route features for injected router properties.
 - Fixed false configuration and service diagnostics.
 - Fixed indexing templates without a Twig file extension.

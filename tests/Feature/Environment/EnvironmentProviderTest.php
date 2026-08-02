@@ -18,10 +18,10 @@ final class EnvironmentProviderTest extends TestCase
     public function testIndexesNamesAndReferencesWithoutValues(): void
     {
         $extractor = new EnvironmentExtractor(new PositionConverter());
-        $facts = $extractor->extract('file:///workspace/.env', 'dotenv', "APP_SECRET=CANARY_SECRET_VALUE\nAPP_URL=https://example.com\nEMPTY=\nCHILD=\${APP_URL:-https://example.com}/\$EMPTY\n");
+        $facts = $extractor->extract('file:///workspace/.env', 'dotenv', "APP_SECRET=CANARY_SECRET_VALUE\nAPP_URL=https://example.com\nEMPTY=\nCHILD=\${APP_URL:-\${FALLBACK_URL}}/\$EMPTY\nPARTIAL=\${UNFINISHED\nESCAPED=\\\$IGNORED\n");
 
-        self::assertSame(['APP_SECRET', 'APP_URL', 'EMPTY', 'CHILD'], array_map(static fn ($item): string => $item->name(), $facts->declarations()));
-        self::assertSame(['APP_URL', 'EMPTY'], array_map(static fn ($item): string => $item->name(), $facts->references()));
+        self::assertSame(['APP_SECRET', 'APP_URL', 'EMPTY', 'CHILD', 'PARTIAL', 'ESCAPED'], array_map(static fn ($item): string => $item->name(), $facts->declarations()));
+        self::assertSame(['APP_URL', 'FALLBACK_URL', 'EMPTY', 'UNFINISHED'], array_map(static fn ($item): string => $item->name(), $facts->references()));
         self::assertTrue($facts->declarations()[2]->hasDefault());
         self::assertStringNotContainsString('CANARY_SECRET_VALUE', implode(' ', array_map(static fn ($item): string => $item->name(), $facts->declarations())));
     }

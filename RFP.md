@@ -884,7 +884,7 @@ diagnostics must remain standard LSP behavior.
   extraction.
 - [x] Add tolerant PHP context extraction with high-confidence Symfony call
   recognition.
-- [ ] Complete tolerant XLIFF, JSON translation, and dotenv context extraction.
+- [x] Complete tolerant XLIFF, JSON translation, and dotenv context extraction.
 - [x] Define the persistent source index, runtime snapshot schema, live-overlay
   model, bridge protocol, normal-cache reuse, and debounced invalidation.
 - [x] Add FrameworkBundle project discovery, `supported_versions` checks,

@@ -29,6 +29,49 @@ final class TranslationExtractorTest extends TestCase
         ], array_map(static fn ($item): array => [$item->key(), $item->domain(), $item->placeholders()], $references->references()));
     }
 
+    public function testToleratesIncompleteJsonAndXliffResources(): void
+    {
+        $extractor = new TranslationExtractor(new PositionConverter());
+        $json = $extractor->extract('file:///workspace/translations/admin.fr.json', 'json', <<<'JSON'
+            {
+                "dashboard": {
+                    "title": "Administration",
+                    "subtitle": "Welcome
+            JSON);
+        $xliff = $extractor->extract('file:///workspace/translations/validators.en.xlf', 'xml', <<<'XLIFF'
+            <xliff xmlns="urn:oasis:names:tc:xliff:document:2.0" version="2.0">
+                <file id="messages">
+                    <unit id="generated-id" name="required">
+                        <segment><source>required</source><target>Required</target></segment>
+                    </unit>
+                    <unit id="fallback"><segment><source>fallback.key</source><target>Fallback
+            XLIFF);
+
+        self::assertSame(
+            ['dashboard.title', 'dashboard.subtitle'],
+            array_map(static fn ($item): string => $item->key(), $json->declarations()),
+        );
+        self::assertSame(
+            ['required', 'fallback.key'],
+            array_map(static fn ($item): string => $item->key(), $xliff->declarations()),
+        );
+        self::assertSame(
+            ['Required', 'Fallback'],
+            array_map(static fn ($item): string => trim($item->message()), $xliff->declarations()),
+        );
+    }
+
+    public function testKeepsDistinctRangesForRepeatedJsonKeys(): void
+    {
+        $text = '{"first":{"title":"One"},"second":{"title":"Two"}}';
+        $declarations = (new TranslationExtractor(new PositionConverter()))
+            ->extract('file:///workspace/translations/messages.en.json', 'json', $text)
+            ->declarations();
+
+        self::assertSame(['first.title', 'second.title'], array_map(static fn ($item): string => $item->key(), $declarations));
+        self::assertNotSame($declarations[0]->range()->start()->character(), $declarations[1]->range()->start()->character());
+    }
+
     public function testExtractsJsonXliffAndPhpResources(): void
     {
         $extractor = new TranslationExtractor(new PositionConverter());

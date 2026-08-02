@@ -26,17 +26,13 @@ final class EnvironmentExtractor
                     true,
                 );
             }
-            preg_match_all('/(?<!\\\\)\$(?:\{([A-Za-z_][A-Za-z0-9_]*)(?:[^}]*)\}|([A-Za-z_][A-Za-z0-9_]*))/', $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+            preg_match_all('/(?<!\\\\)\$(?:\{)?([A-Za-z_][A-Za-z0-9_]*)/', $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
             foreach ($matches as $match) {
-                $capture = '' !== ($match[1][0] ?? '') ? $match[1] : ($match[2] ?? null);
-                if (null === $capture) {
-                    continue;
-                }
-                [$name, $offset] = $capture;
+                [$name, $offset] = $match[1];
                 $references[] = new EnvironmentReference($name, $uri, $this->range($text, $offset, \strlen($name)), []);
             }
         }
-        if (\in_array($languageId, ['php', 'twig', 'yaml'], true)) {
+        if (\in_array($languageId, ['php', 'twig', 'yaml', 'xml'], true)) {
             preg_match_all('/%env\(([^)%]+)\)%/', $text, $matches, \PREG_OFFSET_CAPTURE);
             foreach ($matches[1] as [$expression, $offset]) {
                 $parts = explode(':', $expression);
