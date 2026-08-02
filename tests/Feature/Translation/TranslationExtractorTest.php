@@ -61,6 +61,16 @@ final class TranslationExtractorTest extends TestCase
         );
     }
 
+    public function testPreservesSourceRangeForEscapedJsonKeys(): void
+    {
+        $declaration = (new TranslationExtractor(new PositionConverter()))
+            ->extract('file:///workspace/translations/messages.en.json', 'json', '{"first\\u002etitle":"Title"}')
+            ->declarations()[0];
+
+        self::assertSame('first.title', $declaration->key());
+        self::assertSame(16, $declaration->range()->end()->character() - $declaration->range()->start()->character());
+    }
+
     public function testKeepsDistinctRangesForRepeatedJsonKeys(): void
     {
         $text = '{"first":{"title":"One"},"second":{"title":"Two"}}';

@@ -108,6 +108,7 @@ final class TranslationExtractor
                 continue;
             }
             $key = $this->jsonString($token);
+            $keyLength = \strlen($token) - (str_ends_with($token, '"') ? 2 : 1);
             ++$index;
             if (':' !== ($tokens[$index][0] ?? null)) {
                 continue;
@@ -128,7 +129,7 @@ final class TranslationExtractor
                     $uri,
                     $text,
                     $offset + 1,
-                    \strlen($key),
+                    $keyLength,
                 );
                 ++$index;
             }
