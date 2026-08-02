@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 (2026-08-01)
 
 - Added a server benchmark for indexing, latency, cancellation, and memory targets.
 - Added quick fixes for missing templates, translations, and route parameters.
