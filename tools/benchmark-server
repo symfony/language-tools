@@ -214,6 +214,7 @@ $sourceSeconds = null === $sourceReadyAt ? null : $sourceReadyAt - $initializedA
 $runtimeSeconds = null === $runtimeReadyAt ? null : $runtimeReadyAt - $initializedAt;
 $completionP95 = percentile($completionSamples, 0.95);
 $hoverP95 = percentile($hoverSamples, 0.95);
+$cancellationObserved = -32800 === ($cancellationResponse['error']['code'] ?? null);
 $result = [
     'serverVersion' => $initialize['result']['serverInfo']['version'] ?? null,
     'iterations' => $iterations,
@@ -223,7 +224,7 @@ $result = [
     'completionP95Milliseconds' => round($completionP95, 2),
     'hoverP95Milliseconds' => round($hoverP95, 2),
     'cancellationMilliseconds' => round($cancellationMilliseconds, 2),
-    'cancellationObserved' => -32800 === ($cancellationResponse['error']['code'] ?? null),
+    'cancellationObserved' => $cancellationObserved,
     'idleMemoryBytesBefore' => $memoryBefore,
     'idleMemoryBytesAfter' => $memoryAfter,
     'idleMemoryGrowthBytes' => null === $memoryBefore || null === $memoryAfter ? null : $memoryAfter - $memoryBefore,
@@ -233,7 +234,7 @@ $result = [
         'hoverP95Under100Milliseconds' => $hoverP95 < 100,
         'sourceIndexUnder500Milliseconds' => null !== $sourceSeconds && $sourceSeconds < 0.5,
         'runtimeIndexUnder3Seconds' => null !== $runtimeSeconds && $runtimeSeconds < 3,
-        'cancellationUnder100Milliseconds' => $cancellationMilliseconds < 100,
+        'cancellationObservedUnder100Milliseconds' => $cancellationObserved && $cancellationMilliseconds < 100,
         'idleMemoryGrowthUnder10MiB' => null === $memoryBefore || null === $memoryAfter || $memoryAfter - $memoryBefore < 10 * 1024 * 1024,
     ],
     'shutdownSucceeded' => array_key_exists('result', $shutdown),

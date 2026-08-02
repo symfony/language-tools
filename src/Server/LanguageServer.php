@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Server;
 
 use Amp\Cancellation;
+use Amp\CancelledException;
 use Fabpot\JsonRpc\Exception\JsonRpcException;
 use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcError;
@@ -298,12 +299,16 @@ final class LanguageServer
     private function guarded(callable $handler): \Closure
     {
         return function (array $params, Cancellation $cancellation) use ($handler): mixed {
-            $this->assertRunning();
-            $cancellation->throwIfRequested();
-            $result = $handler($params);
-            $cancellation->throwIfRequested();
+            try {
+                $this->assertRunning();
+                $cancellation->throwIfRequested();
+                $result = $handler($params);
+                $cancellation->throwIfRequested();
 
-            return $result;
+                return $result;
+            } catch (CancelledException) {
+                throw new JsonRpcException(-32800, 'Request cancelled.');
+            }
         };
     }
 

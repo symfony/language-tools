@@ -111,6 +111,27 @@ final class LanguageServerTest extends TestCase
         }
     }
 
+    public function testReportsCancelledFeatureRequestsWithoutAnInternalError(): void
+    {
+        $input = new ReadableBuffer(
+            $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => []]).
+            $this->frame(['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []]).
+            $this->frame(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'textDocument/completion', 'params' => []]).
+            $this->frame(['jsonrpc' => '2.0', 'method' => '$/cancelRequest', 'params' => ['id' => 2]]).
+            $this->frame(['jsonrpc' => '2.0', 'id' => 3, 'method' => 'shutdown', 'params' => []]).
+            $this->frame(['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []])
+        );
+        $output = new CapturingWritableStream();
+
+        self::assertSame(0, (new LanguageServerFactory())->create($input, $output)->run());
+        $responses = $this->decodeFrames($output->contents());
+        self::assertSame([
+            'jsonrpc' => '2.0',
+            'id' => 2,
+            'error' => ['code' => -32800, 'message' => 'Request cancelled.'],
+        ], $responses[1]);
+    }
+
     public function testRejectsFeatureRequestsBeforeInitialization(): void
     {
         $input = new ReadableBuffer(
