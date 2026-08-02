@@ -97,6 +97,11 @@ use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TemplateNavigationProvider;
 use Symfony\Lsp\Feature\Twig\TemplateReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TemplateSourceIndexer;
+use Symfony\Lsp\Feature\Twig\TwigComponentExtractor;
+use Symfony\Lsp\Feature\Twig\TwigComponentIndexRegistry;
+use Symfony\Lsp\Feature\Twig\TwigComponentProvider;
+use Symfony\Lsp\Feature\Twig\TwigComponentSourceIndexer;
+use Symfony\Lsp\Feature\Twig\TwigVariableProvider;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\IndexCommandHandler;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
@@ -156,6 +161,7 @@ final class LanguageServerFactory
         $parameterIndexes = new ParameterIndexRegistry();
         $dependencyInjectionSourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $templateIndexes = new TemplateIndexRegistry();
+        $twigComponentIndexes = new TwigComponentIndexRegistry();
         $translationIndexes = new TranslationIndexRegistry();
         $translationConfiguration = new TranslationConfigurationRegistry();
         $environmentIndexes = new EnvironmentIndexRegistry();
@@ -231,6 +237,20 @@ final class LanguageServerFactory
             $templateReferenceExtractor,
             $templateIndexes,
         );
+        $twigVariableProvider = new TwigVariableProvider(
+            $documentContextResolver,
+            $positionConverter,
+            $templateIndexes,
+            $twigComponentIndexes,
+        );
+        $twigComponentExtractor = new TwigComponentExtractor($positionConverter);
+        $twigComponentProvider = new TwigComponentProvider(
+            $documents,
+            $projects,
+            $positionConverter,
+            $twigComponentIndexes,
+            $twigComponentExtractor,
+        );
         $translationExtractor = new TranslationExtractor($positionConverter);
         $translationProvider = new TranslationProvider(
             $documentContextResolver,
@@ -281,6 +301,7 @@ final class LanguageServerFactory
                 $autowireExtractor,
             ),
             $templateNavigation,
+            $twigComponentProvider,
             $translationProvider,
             $environmentProvider,
             $configurationProvider,
@@ -349,6 +370,7 @@ final class LanguageServerFactory
             $routeSourceIndexer,
             $dependencyInjectionSourceIndexer,
             new TemplateSourceIndexer($templateIndexes, $templateReferenceExtractor),
+            new TwigComponentSourceIndexer($twigComponentIndexes, $twigComponentExtractor),
             new TranslationSourceIndexer($translationIndexes, $translationExtractor),
             new EnvironmentSourceIndexer($environmentIndexes, $environmentExtractor),
             new MessengerSourceIndexer($messengerSourceIndexes, $messengerExtractor),
@@ -409,6 +431,8 @@ final class LanguageServerFactory
                     $positionConverter,
                     $templateIndexes,
                 ),
+                $twigVariableProvider,
+                $twigComponentProvider,
                 $translationProvider,
                 $environmentProvider,
                 $configurationProvider,
@@ -439,7 +463,7 @@ final class LanguageServerFactory
                     $translationIndexes,
                 ),
             ),
-            new CodeLensProviderRegistry($messengerProvider, $eventProvider),
+            new CodeLensProviderRegistry($messengerProvider, $eventProvider, $twigComponentProvider),
             new HoverProviderRegistry(
                 $routeHover,
                 new DependencyInjectionHoverHandler(
@@ -450,6 +474,8 @@ final class LanguageServerFactory
                     $dependencyInjectionSourceIndexes,
                 ),
                 $templateNavigation,
+                $twigVariableProvider,
+                $twigComponentProvider,
                 $translationProvider,
                 $environmentProvider,
                 $configurationProvider,
@@ -467,6 +493,7 @@ final class LanguageServerFactory
                     $serviceIndexes,
                 ),
                 $templateNavigation,
+                $twigComponentProvider,
                 $translationProvider,
                 $environmentProvider,
                 $messengerProvider,
@@ -492,6 +519,7 @@ final class LanguageServerFactory
                     $dependencyInjectionSourceIndexes,
                 ),
                 $templateNavigation,
+                $twigComponentProvider,
                 $translationProvider,
                 $environmentProvider,
                 $messengerProvider,

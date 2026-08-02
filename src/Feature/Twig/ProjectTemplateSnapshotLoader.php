@@ -25,6 +25,8 @@ final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterf
         if (!\is_array($section) || !\is_array($section['paths'] ?? null)) {
             return;
         }
+        $globals = \is_array($section['globals'] ?? null) ? array_values(array_filter($section['globals'], 'is_string')) : [];
+        $this->indexes->forProject($project)->replaceGlobals($globals);
         $templates = [];
         foreach ($section['paths'] as $loaderPath) {
             if (!\is_array($loaderPath) || !\is_string($loaderPath['namespace'] ?? null) || !\is_string($loaderPath['path'] ?? null)) {

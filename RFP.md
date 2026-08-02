@@ -915,7 +915,7 @@ produce false positives.
 
 ### Phase 3: Cross-file framework graphs
 
-- [ ] Implement Twig variables and components.
+- [x] Implement Twig variables and components.
 - [x] Implement Messenger messages, handlers, buses, and transports.
 - [x] Implement events and listeners.
 - [x] Implement Security firewalls, providers, and roles.

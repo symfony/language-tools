@@ -1,5 +1,5 @@
-Twig Template Names
-===================
+Twig Templates and Components
+=============================
 
 Symfony LSP understands template names resolved through Twig filesystem loader
 paths. It complements generic Twig syntax support from the editor.
@@ -26,6 +26,29 @@ Navigation and Links
 Hover shows the resolved template file. Go to Definition and document links open
 the resolved file. Find All References lists statically recognized PHP and Twig
 references.
+
+Variables
+---------
+
+Variable completion and hover are available in Twig templates for Twig globals
+and literal keys passed by PHP ``render()`` and ``renderView()`` calls. Twig
+component templates also expose public component properties.
+
+This first implementation deliberately avoids inferring values propagated
+through dynamic arrays, includes, inheritance, or arbitrary PHP expressions.
+
+Twig Components
+---------------
+
+Component names and public properties are completed in ``<twig:...>`` tags.
+Hover shows the component class, template, and public properties. Go to
+Definition opens the component class and anonymous component template. Find All
+References and code lenses expose statically recognized component usages.
+
+Symfony LSP indexes ``#[AsTwigComponent]`` classes, templates under
+``templates/components/``, ``<twig:...>`` tags, and static ``component()``
+function calls. Unknown static component names are reported after source
+indexing finishes.
 
 Diagnostics
 -----------

@@ -5,6 +5,7 @@ function bridgeTwigSection(SymfonyLspBridgeContext $context): ?array
     $environment = $context->environment();
     $noDebug = !$context->debug();
     $paths = [];
+    $globals = [];
     $warnings = [];
     $complete = true;
     if (class_exists(Twig\Environment::class)) {
@@ -23,6 +24,11 @@ function bridgeTwigSection(SymfonyLspBridgeContext $context): ?array
                     '--no-debug' => $noDebug,
                     '--no-interaction' => true,
                 ]);
+                foreach (is_array($twig['globals'] ?? null) ? array_keys($twig['globals']) : [] as $name) {
+                    if (is_string($name)) {
+                        $globals[] = $name;
+                    }
+                }
                 foreach (is_array($twig['loader_paths'] ?? null) ? $twig['loader_paths'] : [] as $namespace => $loaderPaths) {
                     foreach (is_array($loaderPaths) ? $loaderPaths : [] as $path) {
                         if (is_string($namespace) && is_string($path)) {
@@ -36,10 +42,12 @@ function bridgeTwigSection(SymfonyLspBridgeContext $context): ?array
         }
     }
     usort($paths, static fn (array $a, array $b): int => [$a['namespace'], $a['path']] <=> [$b['namespace'], $b['path']]);
+    sort($globals);
     $section = [
         'complete' => $complete,
-        'generation' => hash('sha256', json_encode($paths, JSON_THROW_ON_ERROR)),
+        'generation' => hash('sha256', json_encode([$paths, $globals], JSON_THROW_ON_ERROR)),
         'paths' => $paths,
+        'globals' => $globals,
         'resources' => [],
         'warnings' => $warnings,
     ];

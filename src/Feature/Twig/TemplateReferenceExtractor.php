@@ -22,10 +22,25 @@ final class TemplateReferenceExtractor
             return [];
         }
 
-        preg_match_all('/(?:->|::)(?:render|renderView)\s*\(\s*([\'"])([^\'"]+)\1/', $text, $matches, \PREG_OFFSET_CAPTURE);
+        preg_match_all(
+            '/(?:->|::)(?:render|renderView)\s*\(\s*([\'"])([^\'"]+)\1\s*(?:,\s*\[([^\]]*)\])?/',
+            $text,
+            $matches,
+            \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL,
+        );
         $references = [];
-        foreach ($matches[2] as [$name, $offset]) {
-            $references[] = $this->reference($name, $uri, $text, $offset);
+        foreach ($matches as $match) {
+            $name = $match[2][0] ?? null;
+            $offset = $match[2][1];
+            if (!\is_string($name)) {
+                continue;
+            }
+            $variables = [];
+            if (\is_string($match[3][0] ?? null)) {
+                preg_match_all('/([\'"])([^\'"]+)\1\s*=>/', $match[3][0], $keys);
+                $variables = array_values(array_unique($keys[2]));
+            }
+            $references[] = $this->reference($name, $uri, $text, $offset, $variables);
         }
 
         return $references;
@@ -76,7 +91,8 @@ final class TemplateReferenceExtractor
         return $references;
     }
 
-    private function reference(string $name, string $uri, string $text, int $offset): TemplateReference
+    /** @param list<string> $variables */
+    private function reference(string $name, string $uri, string $text, int $offset, array $variables = []): TemplateReference
     {
         return new TemplateReference(
             $name,
@@ -85,6 +101,7 @@ final class TemplateReferenceExtractor
                 $this->positionConverter->toPosition($text, $offset),
                 $this->positionConverter->toPosition($text, $offset + \strlen($name)),
             ),
+            $variables,
         );
     }
 }

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added Twig render-context variables, globals, and component support.
+
 ## 0.2.0 (2026-08-01)
 
 - Added a server benchmark for indexing, latency, cancellation, and memory targets.

@@ -4,14 +4,12 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\Range;
 
-final class TemplateReference
+final class TwigComponentReference
 {
-    /** @param list<string> $variables */
     public function __construct(
         private readonly string $name,
         private readonly string $uri,
         private readonly Range $range,
-        private readonly array $variables = [],
     ) {
     }
 
@@ -28,11 +26,5 @@ final class TemplateReference
     public function range(): Range
     {
         return $this->range;
-    }
-
-    /** @return list<string> */
-    public function variables(): array
-    {
-        return $this->variables;
     }
 }

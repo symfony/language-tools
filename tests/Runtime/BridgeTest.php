@@ -323,8 +323,9 @@ final class BridgeTest extends TestCase
         self::assertIsArray($result['sections'] ?? null);
         self::assertSame([
             'complete' => false,
-            'generation' => hash('sha256', '[]'),
+            'generation' => hash('sha256', '[[],[]]'),
             'paths' => [],
+            'globals' => [],
             'resources' => [],
             'warnings' => ['The debug:twig command is unavailable.'],
         ], $result['sections']['twig'] ?? null);

@@ -13,6 +13,15 @@ final class TemplateIndex
     /** @var array<string, array{declaration: ?TemplateDeclaration, references: list<TemplateReference>}> */
     private array $overlays = [];
     private bool $complete = false;
+    /** @var list<string> */
+    private array $globals = [];
+
+    /** @param list<string> $globals */
+    public function replaceGlobals(array $globals): void
+    {
+        $this->globals = array_values(array_unique($globals));
+        sort($this->globals);
+    }
 
     public function replaceRuntime(bool $complete, TemplateDeclaration ...$templates): void
     {
@@ -130,6 +139,26 @@ final class TemplateIndex
     public function isComplete(): bool
     {
         return $this->complete;
+    }
+
+    /** @return list<string> */
+    public function variables(string $template): array
+    {
+        $variables = array_fill_keys($this->globals, true);
+        foreach ($this->references($template) as $reference) {
+            foreach ($reference->variables() as $variable) {
+                $variables[$variable] = true;
+            }
+        }
+        $variables = array_keys($variables);
+        sort($variables);
+
+        return $variables;
+    }
+
+    public function isGlobal(string $name): bool
+    {
+        return \in_array($name, $this->globals, true);
     }
 
     /** @return list<TemplateDeclaration> */

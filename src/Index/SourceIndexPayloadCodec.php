@@ -32,6 +32,9 @@ use Symfony\Lsp\Feature\Translation\TranslationSourceFacts;
 use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateReference;
 use Symfony\Lsp\Feature\Twig\TemplateSourceFacts;
+use Symfony\Lsp\Feature\Twig\TwigComponent;
+use Symfony\Lsp\Feature\Twig\TwigComponentReference;
+use Symfony\Lsp\Feature\Twig\TwigComponentSourceFacts;
 
 final class SourceIndexPayloadCodec
 {
@@ -66,6 +69,9 @@ final class SourceIndexPayloadCodec
         TemplateDeclaration::class,
         TemplateReference::class,
         TemplateSourceFacts::class,
+        TwigComponent::class,
+        TwigComponentReference::class,
+        TwigComponentSourceFacts::class,
     ];
 
     public function encode(mixed $data): string
