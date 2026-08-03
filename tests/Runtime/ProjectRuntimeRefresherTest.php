@@ -37,6 +37,7 @@ final class ProjectRuntimeRefresherTest extends TestCase
         yield 'package YAML' => ['file:///workspace/config/packages/framework.yaml', RuntimeRefreshMode::Clear];
         yield 'package XML' => ['file:///workspace/config/packages/framework.xml', RuntimeRefreshMode::Clear];
         yield 'bundle metadata' => ['file:///workspace/composer.json', RuntimeRefreshMode::Clear];
+        yield 'mapped asset' => ['file:///workspace/assets/app.js', RuntimeRefreshMode::Clear];
         yield 'translation YAML' => ['file:///workspace/translations/messages.en.yaml', RuntimeRefreshMode::Warmup];
         yield 'translation JSON' => ['file:///workspace/translations/messages.en.json', RuntimeRefreshMode::Warmup];
         yield 'translation XLIFF' => ['file:///workspace/translations/messages.en.xlf', RuntimeRefreshMode::Warmup];

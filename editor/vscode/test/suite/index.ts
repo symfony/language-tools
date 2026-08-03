@@ -1,5 +1,6 @@
 import * as assert from 'node:assert/strict';
 import * as vscode from 'vscode';
+import { assetTests } from './assets.test';
 import { configurationTests } from './configuration.test';
 import { dependencyInjectionTests } from './dependency-injection.test';
 import { environmentTests } from './environment.test';
@@ -26,6 +27,7 @@ export async function run(): Promise<void> {
         ...routingTests,
         ...dependencyInjectionTests,
         ...twigTests,
+        ...assetTests,
         ...translationTests,
         ...environmentTests,
         ...configurationTests,

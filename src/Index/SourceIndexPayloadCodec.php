@@ -4,6 +4,9 @@ namespace Symfony\Lsp\Index;
 
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\Asset\AssetSourceFacts;
+use Symfony\Lsp\Feature\Asset\AssetSourceSymbol;
+use Symfony\Lsp\Feature\Asset\AssetSymbolKind;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionReference;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbol;
@@ -44,6 +47,9 @@ final class SourceIndexPayloadCodec
     private const ALLOWED_CLASSES = [
         Position::class,
         Range::class,
+        AssetSourceFacts::class,
+        AssetSourceSymbol::class,
+        AssetSymbolKind::class,
         DependencyInjectionReference::class,
         DependencyInjectionSourceFacts::class,
         DependencyInjectionSymbol::class,

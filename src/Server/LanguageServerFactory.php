@@ -13,6 +13,12 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Asset\AssetExtractor;
+use Symfony\Lsp\Feature\Asset\AssetIndexRegistry;
+use Symfony\Lsp\Feature\Asset\AssetProvider;
+use Symfony\Lsp\Feature\Asset\AssetSourceIndexer;
+use Symfony\Lsp\Feature\Asset\AssetSourceIndexRegistry;
+use Symfony\Lsp\Feature\Asset\ProjectAssetSnapshotLoader;
 use Symfony\Lsp\Feature\CodeActionProviderRegistry;
 use Symfony\Lsp\Feature\CodeLensProviderRegistry;
 use Symfony\Lsp\Feature\CompletionProviderRegistry;
@@ -160,6 +166,7 @@ final class LanguageServerFactory
 
         $documents = new DocumentStore();
         $positionConverter = new PositionConverter();
+        $uriConverter = new UriToPathConverter();
         $projects = new ProjectRegistry();
         $statuses = new ProjectIndexStatusRegistry();
         $routeIndexes = new RouteIndexRegistry();
@@ -182,6 +189,8 @@ final class LanguageServerFactory
         $securitySourceIndexes = new SecuritySourceIndexRegistry();
         $metadataIndexes = new MetadataIndexRegistry();
         $metadataSourceIndexes = new MetadataSourceIndexRegistry();
+        $assetIndexes = new AssetIndexRegistry();
+        $assetSourceIndexes = new AssetSourceIndexRegistry();
         $client = new JsonRpcClient($peer);
         $progress = new WorkDoneProgressReporter($client);
         $workspaceTrust = new WorkspaceTrust();
@@ -240,6 +249,17 @@ final class LanguageServerFactory
             $metadataIndexes,
             $metadataSourceIndexes,
             $metadataExtractor,
+        );
+        $assetExtractor = new AssetExtractor($positionConverter);
+        $assetProvider = new AssetProvider(
+            $documentContextResolver,
+            $documents,
+            $projects,
+            $positionConverter,
+            $uriConverter,
+            $assetIndexes,
+            $assetSourceIndexes,
+            $assetExtractor,
         );
         $dependencyInjectionSymbolResolver = new DependencyInjectionSymbolResolver(
             $positionConverter,
@@ -327,6 +347,7 @@ final class LanguageServerFactory
             $eventProvider,
             $securityProvider,
             $metadataProvider,
+            $assetProvider,
         );
         $runtimeConfiguration = new RuntimeConfiguration();
         $runtimeInitializer = new ObservedRuntimeInitializer(
@@ -347,6 +368,7 @@ final class LanguageServerFactory
                                 new ProjectEventSnapshotLoader($eventIndexes),
                                 new ProjectSecuritySnapshotLoader($securityIndexes),
                                 new ProjectMetadataSnapshotLoader($metadataIndexes),
+                                new ProjectAssetSnapshotLoader($assetIndexes),
                             ),
                             $runtimeConfiguration,
                         ),
@@ -397,9 +419,10 @@ final class LanguageServerFactory
             new EventSourceIndexer($eventSourceIndexes, $eventExtractor),
             new SecuritySourceIndexer($securitySourceIndexes, $securityExtractor),
             new MetadataSourceIndexer($metadataSourceIndexes, $metadataExtractor),
+            new AssetSourceIndexer($assetSourceIndexes, $assetExtractor),
         );
         $workspaceConfiguration = new WorkspaceConfiguration(
-            new ProjectDiscovery(new UriToPathConverter()),
+            new ProjectDiscovery($uriConverter),
             $projects,
             new WorkspaceTrustManager($client, $workspaceTrust, $runtimeInitializer),
             $runtimeConfiguration,
@@ -461,6 +484,7 @@ final class LanguageServerFactory
                 $eventProvider,
                 $securityProvider,
                 $metadataProvider,
+                $assetProvider,
             ),
             new CodeActionProviderRegistry(
                 new RouteCodeActionProvider(
@@ -505,6 +529,7 @@ final class LanguageServerFactory
                 $eventProvider,
                 $securityProvider,
                 $metadataProvider,
+                $assetProvider,
             ),
             $diagnosticProviders,
             new DefinitionProviderRegistry(
@@ -523,6 +548,7 @@ final class LanguageServerFactory
                 $eventProvider,
                 $securityProvider,
                 $metadataProvider,
+                $assetProvider,
             ),
             new DocumentLinkProviderRegistry(
                 new RouteDocumentLinkHandler(
@@ -534,6 +560,7 @@ final class LanguageServerFactory
                 ),
                 $templateNavigation,
                 $configurationProvider,
+                $assetProvider,
             ),
             new ReferencesProviderRegistry(
                 $routeReferences,
@@ -550,6 +577,7 @@ final class LanguageServerFactory
                 $eventProvider,
                 $securityProvider,
                 $metadataProvider,
+                $assetProvider,
             ),
             new RenameProviderRegistry(
                 $routeRename,

@@ -4,6 +4,7 @@
     "license": "MIT",
     "require": {
         "php": ">=8.1",
+        "symfony/asset-mapper": "*",
         "symfony/console": "*",
         "symfony/dotenv": "*",
         "symfony/framework-bundle": "*",

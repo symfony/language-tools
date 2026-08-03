@@ -71,6 +71,9 @@ final class ProjectRuntimeRefresher
 
         $rootPath = rtrim(str_replace('\\', '/', $project->rootPath()), '/');
         $path = str_replace('\\', '/', rawurldecode($path));
+        if (str_starts_with($path, $rootPath.'/assets/')) {
+            return true;
+        }
         if ('xml' === $extension) {
             return str_starts_with($path, $rootPath.'/config/');
         }

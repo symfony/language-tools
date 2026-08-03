@@ -305,6 +305,29 @@ final class BridgeTest extends TestCase
         self::assertSame([['class' => 'App\\Security\\PostVoter']], $result['sections']['security']['voters'] ?? null);
     }
 
+    public function testReportsUnavailableOptionalAssetMapper(): void
+    {
+        $this->writeAutoloader('8.0.6');
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=assets 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $result = json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame(0, $exitCode);
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null);
+        self::assertIsArray($result['sections'] ?? null);
+        self::assertIsArray($result['sections']['assets'] ?? null);
+        self::assertFalse($result['sections']['assets']['assetsComplete'] ?? null);
+        self::assertFalse($result['sections']['assets']['importMapComplete'] ?? null);
+        self::assertSame([], $result['sections']['assets']['assets'] ?? null);
+        self::assertSame([], $result['sections']['assets']['importMap'] ?? null);
+    }
+
     public function testReportsUnavailableOptionalMetadataComponents(): void
     {
         $this->writeAutoloader('8.0.6');

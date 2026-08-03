@@ -20,7 +20,7 @@ final class BridgeCompatibilityTest extends TestCase
             '--project='.$project,
             '--environment=test',
             '--debug=1',
-            '--sections=routes,container,twig,translations,configuration,environment,messenger,events,security',
+            '--sections=routes,container,twig,translations,configuration,environment,messenger,events,security,assets',
         ], $project);
 
         $snapshot = $process->stdout();
@@ -44,6 +44,7 @@ final class BridgeCompatibilityTest extends TestCase
         $messenger = $this->section($result['sections'], 'messenger');
         $events = $this->section($result['sections'], 'events');
         $security = $this->section($result['sections'], 'security');
+        $assets = $this->section($result['sections'], 'assets');
 
         self::assertContains('fixture_home', array_column(\is_array($routes['items'] ?? null) ? $routes['items'] : [], 'name'));
         self::assertContains('App\\Environment\\CustomEnvVarProcessor', array_column(\is_array($container['items'] ?? null) ? $container['items'] : [], 'class'));
@@ -61,6 +62,11 @@ final class BridgeCompatibilityTest extends TestCase
         self::assertContains('fixture_users', array_column(\is_array($security['providers'] ?? null) ? $security['providers'] : [], 'name'));
         self::assertContains('ROLE_ADMIN', array_column(\is_array($security['roles'] ?? null) ? $security['roles'] : [], 'name'));
         self::assertContains('App\\Security\\PostVoter', array_column(\is_array($security['voters'] ?? null) ? $security['voters'] : [], 'class'));
+        $mappedAssets = \is_array($assets['assets'] ?? null) ? $assets['assets'] : [];
+        self::assertContains('app.js', array_column($mappedAssets, 'logicalPath'));
+        self::assertIsArray($mappedAssets[0] ?? null);
+        self::assertFalse($mappedAssets[0]['vendor'] ?? true);
+        self::assertContains('app', array_column(\is_array($assets['importMap'] ?? null) ? $assets['importMap'] : [], 'name'));
     }
 
     /**

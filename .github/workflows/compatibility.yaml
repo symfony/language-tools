@@ -24,6 +24,7 @@ jobs:
               working-directory: tests/Fixtures/RuntimeApplication
               run: >-
                   composer update --no-interaction --no-progress --with-all-dependencies
+                  --with "symfony/asset-mapper:${{ matrix.symfony }}"
                   --with "symfony/console:${{ matrix.symfony }}"
                   --with "symfony/dotenv:${{ matrix.symfony }}"
                   --with "symfony/framework-bundle:${{ matrix.symfony }}"

@@ -89,6 +89,13 @@ Supported Integrations
       - Yes
       - No
       - Yes
+    * - :doc:`AssetMapper and importmaps </features/assets>`
+      - Yes
+      - Yes
+      - Yes
+      - Yes
+      - No
+      - Yes
 
 Messenger message and handler classes, and event and listener classes, also
 provide code lenses for navigating between related classes.
@@ -110,8 +117,9 @@ runs structured Symfony commands to obtain effective metadata:
 * ``debug:form --format=json`` when Form is installed.
 
 The bridge also discovers installed constraint options through reflection,
-environment processor types, and bundle configuration
-through public Symfony interfaces. It never executes the ``env-vars`` command.
+AssetMapper paths through structured container metadata and environment
+processor types and bundle configuration through public Symfony interfaces. It
+never executes the ``env-vars`` command.
 
 The bridge also uses the structured parameter output internally to discover
 parameter names and deprecations. Effective translation catalogues are read
@@ -200,3 +208,4 @@ feature-specific limitations.
     events
     security
     metadata
+    assets

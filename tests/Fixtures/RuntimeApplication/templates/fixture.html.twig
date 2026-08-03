@@ -1,2 +1,4 @@
 {{ 'fixture.message'|trans }}
 {% if is_granted('ROLE_ADMIN') %}Admin{% endif %}
+<script src="{{ asset('app.js') }}"></script>
+{{ importmap('app') }}
