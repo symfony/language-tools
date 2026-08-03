@@ -199,3 +199,4 @@ feature-specific limitations.
     messenger
     events
     security
+    metadata

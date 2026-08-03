@@ -1,0 +1,136 @@
+#!/usr/bin/env php
+<?php
+
+$projects = [
+    'book.symfony.com',
+    'certification.symfony.com',
+    'connect.symfony.com',
+    'insight.symfony.com',
+    'live.symfony.com',
+    'symfony.com',
+    'tui.symfony.com',
+    'oss-websites/twig.symfony.com',
+];
+
+if ($argc < 4 || $argc > 5) {
+    fwrite(\STDERR, "Usage: dogfood-symfonycorp <server> <sidecar> <symfonycorp-root> [environment]\n");
+    exit(2);
+}
+
+$server = realpath($argv[1]);
+$sidecar = realpath($argv[2]);
+$root = realpath($argv[3]);
+$environment = $argv[4] ?? 'dev';
+if (false === $server || false === $sidecar || false === $root) {
+    throw new InvalidArgumentException('The server, sidecar, and Symfonycorp root must exist.');
+}
+
+$outputDirectory = dirname(__DIR__).'/var/dogfood';
+if (!is_dir($outputDirectory) && !mkdir($outputDirectory, 0777, true) && !is_dir($outputDirectory)) {
+    throw new RuntimeException('Unable to create the dogfood output directory.');
+}
+
+$failed = false;
+$summary = [];
+foreach ($projects as $relativePath) {
+    $project = $root.'/'.$relativePath;
+    if (!is_file($project.'/composer.json')) {
+        $summary[] = ['project' => $relativePath, 'error' => 'Project not found.'];
+        $failed = true;
+        continue;
+    }
+
+    $process = proc_open(
+        [\PHP_BINARY, __DIR__.'/dogfood-server', $server, $sidecar, $project, $environment],
+        [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']],
+        $pipes,
+        options: ['bypass_shell' => true],
+    );
+    if (!is_resource($process)) {
+        throw new RuntimeException('Unable to start the dogfood harness.');
+    }
+    fclose($pipes[0]);
+    $output = stream_get_contents($pipes[1]);
+    fclose($pipes[1]);
+    $errorOutput = stream_get_contents($pipes[2]);
+    fclose($pipes[2]);
+    $exitCode = proc_close($process);
+    if (false === $output || false === $errorOutput) {
+        throw new RuntimeException('Unable to read the dogfood harness output.');
+    }
+
+    $destination = $outputDirectory.'/'.str_replace('/', '-', $relativePath).'.json';
+    if (false === file_put_contents($destination, $output)) {
+        throw new RuntimeException(sprintf('Unable to write "%s".', $destination));
+    }
+
+    try {
+        $result = json_decode($output, true, flags: \JSON_THROW_ON_ERROR);
+    } catch (JsonException) {
+        $summary[] = ['project' => $relativePath, 'error' => trim($errorOutput) ?: 'Invalid harness output.'];
+        $failed = true;
+        continue;
+    }
+    if (!is_array($result)) {
+        $summary[] = ['project' => $relativePath, 'error' => 'Invalid harness result.'];
+        $failed = true;
+        continue;
+    }
+
+    $requestErrors = 0;
+    $maxMilliseconds = 0.0;
+    foreach (is_array($result['probes'] ?? null) ? $result['probes'] : [] as $probe) {
+        if (!is_array($probe)) {
+            continue;
+        }
+        foreach (is_array($probe['requests'] ?? null) ? $probe['requests'] : [] as $request) {
+            if (!is_array($request)) {
+                continue;
+            }
+            if (null !== ($request['error'] ?? null)) {
+                ++$requestErrors;
+            }
+            if (is_float($request['milliseconds'] ?? null) || is_int($request['milliseconds'] ?? null)) {
+                $maxMilliseconds = max($maxMilliseconds, (float) $request['milliseconds']);
+            }
+        }
+    }
+    $source = $result['status']['source']['state'] ?? 'unknown';
+    $runtime = $result['status']['runtime']['state'] ?? 'unknown';
+    $serverError = $result['serverError'] ?? null;
+    $projectFailed = 0 !== $exitCode
+        || 0 !== ($result['exitCode'] ?? 0)
+        || 'ready' !== $source
+        || 'ready' !== $runtime
+        || null !== $serverError
+        || 0 !== $requestErrors;
+    $failed = $failed || $projectFailed;
+    $summary[] = [
+        'project' => $relativePath,
+        'source' => $source,
+        'runtime' => $runtime,
+        'probes' => $result['probeCount'] ?? 0,
+        'maxMilliseconds' => $maxMilliseconds,
+        'requestErrors' => $requestErrors,
+        'error' => $projectFailed ? (trim($errorOutput) ?: $serverError) : null,
+    ];
+}
+
+foreach ($summary as $result) {
+    if (isset($result['source'])) {
+        printf(
+            "%-32s source=%-7s runtime=%-7s probes=%2d max=%6.1fms errors=%d%s\n",
+            $result['project'],
+            $result['source'],
+            $result['runtime'],
+            $result['probes'],
+            $result['maxMilliseconds'],
+            $result['requestErrors'],
+            null === $result['error'] ? '' : ' '.$result['error'],
+        );
+    } else {
+        printf("%-32s error=%s\n", $result['project'], $result['error']);
+    }
+}
+
+exit($failed ? 1 : 0);

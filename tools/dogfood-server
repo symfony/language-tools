@@ -1,0 +1,277 @@
+#!/usr/bin/env php
+<?php
+
+function writeMessage($stream, array $message): void
+{
+    $json = json_encode($message, \JSON_THROW_ON_ERROR);
+    fwrite($stream, 'Content-Length: '.strlen($json)."\r\n\r\n".$json);
+    fflush($stream);
+}
+
+function readMessage($stream, float $timeout): ?array
+{
+    $read = [$stream];
+    $write = null;
+    $except = null;
+    $seconds = max(0, (int) $timeout);
+    $microseconds = max(0, (int) (($timeout - $seconds) * 1_000_000));
+    if (0 === stream_select($read, $write, $except, $seconds, $microseconds)) {
+        return null;
+    }
+    $length = null;
+    while (false !== $line = fgets($stream)) {
+        if ("\r\n" === $line) {
+            break;
+        }
+        if (preg_match('/^Content-Length: (\d+)\r\n$/i', $line, $matches)) {
+            $length = (int) $matches[1];
+        }
+    }
+    if (null === $length) {
+        throw new RuntimeException('Invalid response header.');
+    }
+    $json = '';
+    while (strlen($json) < $length) {
+        $chunk = fread($stream, $length - strlen($json));
+        if (false === $chunk || '' === $chunk) {
+            throw new RuntimeException('Incomplete response body.');
+        }
+        $json .= $chunk;
+    }
+
+    return json_decode($json, true, flags: \JSON_THROW_ON_ERROR);
+}
+
+function awaitResponse($input, $output, int $id, float $timeout, array &$notifications): array
+{
+    $deadline = microtime(true) + $timeout;
+    while (microtime(true) < $deadline) {
+        $message = readMessage($output, max(0.0, min(1.0, $deadline - microtime(true))));
+        if (null === $message) {
+            continue;
+        }
+        if (isset($message['method'], $message['id'])) {
+            writeMessage($input, ['jsonrpc' => '2.0', 'id' => $message['id'], 'result' => null]);
+            continue;
+        }
+        if (isset($message['method'])) {
+            $notifications[] = $message;
+            continue;
+        }
+        if (($message['id'] ?? null) === $id) {
+            return $message;
+        }
+    }
+    throw new RuntimeException(sprintf('Timed out waiting for response %d.', $id));
+}
+
+function position(string $contents, int $offset): array
+{
+    $before = substr($contents, 0, $offset);
+    $line = substr_count($before, "\n");
+    $lineStart = strrpos($before, "\n");
+    $lineText = false === $lineStart ? $before : substr($before, $lineStart + 1);
+    $character = intdiv(strlen(mb_convert_encoding($lineText, 'UTF-16LE', 'UTF-8')), 2);
+
+    return ['line' => $line, 'character' => $character];
+}
+
+function uri(string $path): string
+{
+    return 'file://'.str_replace('%2F', '/', rawurlencode($path));
+}
+
+function languageId(string $path): string
+{
+    return match (strtolower(pathinfo($path, \PATHINFO_EXTENSION))) {
+        'php' => 'php',
+        'twig' => 'twig',
+        'yaml', 'yml' => 'yaml',
+        'json' => 'json',
+        'xlf', 'xliff' => 'xml',
+        default => 'plaintext',
+    };
+}
+
+function findProbe(string $root, array $probe): ?array
+{
+    foreach (['src', 'templates', 'config'] as $sourceDirectory) {
+        $directory = $root.'/'.$sourceDirectory;
+        if (!is_dir($directory)) {
+            continue;
+        }
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS));
+        foreach ($iterator as $file) {
+            if (!$file instanceof SplFileInfo || !$file->isFile()) {
+                continue;
+            }
+            $path = str_replace('\\', '/', $file->getPathname());
+            if (!preg_match($probe['files'], $path)) {
+                continue;
+            }
+            $contents = file_get_contents($path);
+            if (false === $contents || !preg_match($probe['pattern'], $contents, $matches, \PREG_OFFSET_CAPTURE)) {
+                continue;
+            }
+            $value = $matches[1][0];
+            if (!is_string($value) || '' === $value) {
+                continue;
+            }
+
+            return [
+                'category' => $probe['category'],
+                'path' => $path,
+                'contents' => $contents,
+                'value' => $value,
+                'position' => position($contents, $matches[1][1] + max(0, intdiv(strlen($value), 2))),
+            ];
+        }
+    }
+
+    return null;
+}
+
+if ($argc < 4 || $argc > 5) {
+    fwrite(\STDERR, "Usage: dogfood-server <server> <sidecar> <project> [environment]\n");
+    exit(2);
+}
+
+[$script, $server, $sidecar, $project] = array_pad($argv, 5, 'dev');
+$project = realpath($project);
+if (false === $project) {
+    throw new RuntimeException('Project does not exist.');
+}
+$process = proc_open([$server], [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes, env_vars: [...getenv(), 'SYMFONY_LSP_TREE_SITTER' => $sidecar], options: ['bypass_shell' => true]);
+if (!is_resource($process)) {
+    throw new RuntimeException('Unable to start Symfony LSP.');
+}
+$notifications = [];
+$id = 1;
+writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $id, 'method' => 'initialize', 'params' => [
+    'processId' => null,
+    'rootUri' => uri($project),
+    'workspaceFolders' => [['uri' => uri($project), 'name' => basename($project)]],
+    'capabilities' => new stdClass(),
+    'initializationOptions' => ['workspaceTrust' => true, 'runtimeIndexing' => true, 'environment' => $argv[4] ?? 'dev'],
+]]);
+$initialize = awaitResponse($pipes[0], $pipes[1], $id, 10.0, $notifications);
+writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []]);
+
+$status = null;
+$deadline = microtime(true) + 30.0;
+while (microtime(true) < $deadline) {
+    ++$id;
+    writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $id, 'method' => 'workspace/executeCommand', 'params' => ['command' => 'symfony.indexStatus']]);
+    $response = awaitResponse($pipes[0], $pipes[1], $id, 10.0, $notifications);
+    $status = $response['result'][0] ?? null;
+    if (is_array($status) && in_array($status['source']['state'] ?? null, ['ready', 'failed'], true) && in_array($status['runtime']['state'] ?? null, ['ready', 'failed'], true)) {
+        break;
+    }
+    usleep(250_000);
+}
+
+$definitions = [
+    ['category' => 'route.php', 'files' => '{\.php$}', 'pattern' => '{(?:generate|redirectToRoute)\(\s*[\'\"]([^\'\"]+)}'],
+    ['category' => 'route.twig', 'files' => '{\.twig$}', 'pattern' => '{\b(?:path|url)\(\s*[\'\"]([^\'\"]+)}'],
+    ['category' => 'template.php', 'files' => '{\.php$}', 'pattern' => '{(?:render|renderView)\(\s*[\'\"]([^\'\"]+\.twig)}'],
+    ['category' => 'template.twig', 'files' => '{\.twig$}', 'pattern' => '{\b(?:extends|include|embed|import|from|use)\s+[\'\"]([^\'\"]+\.twig)}'],
+    ['category' => 'component.twig', 'files' => '{\.twig$}', 'pattern' => '{<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\b}'],
+    ['category' => 'form.option.php', 'files' => '{\.php$}', 'pattern' => '{createForm\s*\([^,);]+,\s*[^,);]+,\s*\[[^;]+?[\'\"]([A-Za-z_][A-Za-z0-9_]*)[\'\"]\s*=>}s'],
+    ['category' => 'constraint.option.php', 'files' => '{\.php$}', 'pattern' => '{Assert\\\\[A-Za-z_][A-Za-z0-9_]*\s*\([^\)]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*:}s'],
+    ['category' => 'translation.php', 'files' => '{\.php$}', 'pattern' => '{(?:->trans|\bt)\(\s*[\'\"]([^\'\"]+)}'],
+    ['category' => 'translation.twig', 'files' => '{\.twig$}', 'pattern' => '{[\'\"]([^\'\"]+)[\'\"]\s*\|\s*trans\b}'],
+    ['category' => 'service.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{[\'\"]@([^\'\"]+)[\'\"]}'],
+    ['category' => 'parameter.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{%([^%()]+)%}'],
+    ['category' => 'environment', 'files' => '{\.(?:php|ya?ml)$}', 'pattern' => '{%env\([^)]*?([A-Z][A-Z0-9_]+)\)%}'],
+];
+$probes = [];
+foreach ($definitions as $definition) {
+    $probe = findProbe($project, $definition);
+    if (null !== $probe) {
+        $probes[] = $probe;
+    }
+}
+
+$opened = [];
+$results = [];
+foreach ($probes as $probe) {
+    $documentUri = uri($probe['path']);
+    if (!isset($opened[$documentUri])) {
+        writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'textDocument/didOpen', 'params' => ['textDocument' => [
+            'uri' => $documentUri,
+            'languageId' => languageId($probe['path']),
+            'version' => 1,
+            'text' => $probe['contents'],
+        ]]]);
+        $opened[$documentUri] = true;
+    }
+    $entry = [
+        'category' => $probe['category'],
+        'file' => substr($probe['path'], strlen($project) + 1),
+        'value' => $probe['value'],
+        'requests' => [],
+    ];
+    foreach (['textDocument/completion', 'textDocument/hover', 'textDocument/definition', 'textDocument/references', 'textDocument/documentLink', 'textDocument/codeLens', 'textDocument/codeAction', 'textDocument/prepareRename', 'textDocument/rename'] as $method) {
+        ++$id;
+        $params = ['textDocument' => ['uri' => $documentUri]];
+        if (!in_array($method, ['textDocument/documentLink', 'textDocument/codeLens', 'textDocument/codeAction'], true)) {
+            $params['position'] = $probe['position'];
+        }
+        if ('textDocument/codeAction' === $method) {
+            $params['range'] = ['start' => $probe['position'], 'end' => $probe['position']];
+            $params['context'] = ['diagnostics' => []];
+        }
+        if ('textDocument/references' === $method) {
+            $params['context'] = ['includeDeclaration' => true];
+        } elseif ('textDocument/rename' === $method) {
+            $params['newName'] = 'dogfood_'.str_replace(['.', '\\', '/'], '_', $probe['value']);
+        }
+        $startedAt = microtime(true);
+        writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $id, 'method' => $method, 'params' => $params]);
+        $response = awaitResponse($pipes[0], $pipes[1], $id, 10.0, $notifications);
+        $result = $response['result'] ?? null;
+        $entry['requests'][substr($method, strlen('textDocument/'))] = [
+            'milliseconds' => round((microtime(true) - $startedAt) * 1000, 1),
+            'resultCount' => is_array($result) && array_is_list($result) ? count($result) : (null === $result ? 0 : 1),
+            'error' => $response['error']['message'] ?? null,
+        ];
+    }
+    $results[] = $entry;
+}
+
+foreach (array_keys($opened) as $documentUri) {
+    writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'textDocument/didClose', 'params' => ['textDocument' => ['uri' => $documentUri]]]);
+}
+++$id;
+writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $id, 'method' => 'shutdown', 'params' => []]);
+awaitResponse($pipes[0], $pipes[1], $id, 10.0, $notifications);
+writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []]);
+fclose($pipes[0]);
+fclose($pipes[1]);
+$stderr = stream_get_contents($pipes[2]);
+fclose($pipes[2]);
+$exitCode = proc_close($process);
+$diagnostics = [];
+foreach ($notifications as $notification) {
+    if ('textDocument/publishDiagnostics' === ($notification['method'] ?? null)) {
+        $diagnostics[] = [
+            'uri' => $notification['params']['uri'] ?? null,
+            'items' => array_map(static fn (array $diagnostic): array => [
+                'severity' => $diagnostic['severity'] ?? null,
+                'message' => $diagnostic['message'] ?? null,
+            ], $notification['params']['diagnostics'] ?? []),
+        ];
+    }
+}
+
+echo json_encode([
+    'project' => $project,
+    'environment' => $argv[4] ?? 'dev',
+    'serverVersion' => $initialize['result']['serverInfo']['version'] ?? null,
+    'status' => $status,
+    'probeCount' => count($results),
+    'probes' => $results,
+    'diagnostics' => $diagnostics,
+    'serverError' => '' === trim($stderr) ? null : trim($stderr),
+    'exitCode' => $exitCode,
+], \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR)."\n";

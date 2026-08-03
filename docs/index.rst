@@ -98,6 +98,7 @@ Development
     :maxdepth: 1
 
     benchmarking
+    dogfooding
 
 Editor Integrations
 -------------------
