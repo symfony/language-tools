@@ -82,6 +82,13 @@ Supported Integrations
       - Yes
       - No
       - Yes
+    * - :doc:`Forms, validation, and serializer metadata </features/metadata>`
+      - Yes
+      - Yes
+      - Yes
+      - Yes
+      - No
+      - Yes
 
 Messenger message and handler classes, and event and listener classes, also
 provide code lenses for navigating between related classes.
@@ -99,9 +106,11 @@ runs structured Symfony commands to obtain effective metadata:
 * ``debug:container --types --format=json``;
 * ``debug:twig --format=json``;
 * ``debug:event-dispatcher --format=json``;
-* ``debug:config security --format=json`` when SecurityBundle is installed.
+* ``debug:config security --format=json`` when SecurityBundle is installed;
+* ``debug:form --format=json`` when Form is installed.
 
-The bridge also discovers environment processor types and bundle configuration
+The bridge also discovers installed constraint options through reflection,
+environment processor types, and bundle configuration
 through public Symfony interfaces. It never executes the ``env-vars`` command.
 
 The bridge also uses the structured parameter output internally to discover

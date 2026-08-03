@@ -919,8 +919,8 @@ produce false positives.
 - [x] Implement Messenger messages, handlers, buses, and transports.
 - [x] Implement events and listeners.
 - [x] Implement Security firewalls, providers, and roles.
-- [ ] Implement forms, validation, and serializer metadata.
-- [ ] Implement code lenses and references backed by these graphs.
+- [x] Implement forms, validation, and serializer metadata.
+- [x] Implement code lenses and references backed by these graphs.
 
 ### Phase 4: Ecosystem and editor integration
 

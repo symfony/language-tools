@@ -20,6 +20,9 @@ use Symfony\Lsp\Feature\Event\InvalidEventListenerMethod;
 use Symfony\Lsp\Feature\Messenger\MessengerSourceFacts;
 use Symfony\Lsp\Feature\Messenger\MessengerSourceSymbol;
 use Symfony\Lsp\Feature\Messenger\MessengerSymbolKind;
+use Symfony\Lsp\Feature\Metadata\MetadataSourceFacts;
+use Symfony\Lsp\Feature\Metadata\MetadataSourceSymbol;
+use Symfony\Lsp\Feature\Metadata\MetadataSymbolKind;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
 use Symfony\Lsp\Feature\Route\RouteReferenceLocation;
 use Symfony\Lsp\Feature\Route\RouteSourceFacts;
@@ -57,6 +60,9 @@ final class SourceIndexPayloadCodec
         MessengerSourceFacts::class,
         MessengerSourceSymbol::class,
         MessengerSymbolKind::class,
+        MetadataSourceFacts::class,
+        MetadataSourceSymbol::class,
+        MetadataSymbolKind::class,
         RouteDeclaration::class,
         RouteReferenceLocation::class,
         RouteSourceFacts::class,

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added form option, validation constraint, serializer group, and mapped metadata support.
 - Added Twig render-context variables, globals, and component support.
 
 ## 0.2.0 (2026-08-01)

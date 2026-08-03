@@ -56,6 +56,12 @@ use Symfony\Lsp\Feature\Messenger\MessengerProvider;
 use Symfony\Lsp\Feature\Messenger\MessengerSourceIndexer;
 use Symfony\Lsp\Feature\Messenger\MessengerSourceIndexRegistry;
 use Symfony\Lsp\Feature\Messenger\ProjectMessengerSnapshotLoader;
+use Symfony\Lsp\Feature\Metadata\MetadataExtractor;
+use Symfony\Lsp\Feature\Metadata\MetadataIndexRegistry;
+use Symfony\Lsp\Feature\Metadata\MetadataProvider;
+use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexer;
+use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexRegistry;
+use Symfony\Lsp\Feature\Metadata\ProjectMetadataSnapshotLoader;
 use Symfony\Lsp\Feature\ReferencesProviderRegistry;
 use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
@@ -174,6 +180,8 @@ final class LanguageServerFactory
         $eventSourceIndexes = new EventSourceIndexRegistry();
         $securityIndexes = new SecurityIndexRegistry();
         $securitySourceIndexes = new SecuritySourceIndexRegistry();
+        $metadataIndexes = new MetadataIndexRegistry();
+        $metadataSourceIndexes = new MetadataSourceIndexRegistry();
         $client = new JsonRpcClient($peer);
         $progress = new WorkDoneProgressReporter($client);
         $workspaceTrust = new WorkspaceTrust();
@@ -222,6 +230,16 @@ final class LanguageServerFactory
             $securityIndexes,
             $securitySourceIndexes,
             $securityExtractor,
+        );
+        $metadataExtractor = new MetadataExtractor($positionConverter, $yamlConfigurationParser);
+        $metadataProvider = new MetadataProvider(
+            $documentContextResolver,
+            $documents,
+            $projects,
+            $positionConverter,
+            $metadataIndexes,
+            $metadataSourceIndexes,
+            $metadataExtractor,
         );
         $dependencyInjectionSymbolResolver = new DependencyInjectionSymbolResolver(
             $positionConverter,
@@ -308,6 +326,7 @@ final class LanguageServerFactory
             $messengerProvider,
             $eventProvider,
             $securityProvider,
+            $metadataProvider,
         );
         $runtimeConfiguration = new RuntimeConfiguration();
         $runtimeInitializer = new ObservedRuntimeInitializer(
@@ -327,6 +346,7 @@ final class LanguageServerFactory
                                 new ProjectMessengerSnapshotLoader($messengerIndexes),
                                 new ProjectEventSnapshotLoader($eventIndexes),
                                 new ProjectSecuritySnapshotLoader($securityIndexes),
+                                new ProjectMetadataSnapshotLoader($metadataIndexes),
                             ),
                             $runtimeConfiguration,
                         ),
@@ -376,6 +396,7 @@ final class LanguageServerFactory
             new MessengerSourceIndexer($messengerSourceIndexes, $messengerExtractor),
             new EventSourceIndexer($eventSourceIndexes, $eventExtractor),
             new SecuritySourceIndexer($securitySourceIndexes, $securityExtractor),
+            new MetadataSourceIndexer($metadataSourceIndexes, $metadataExtractor),
         );
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery(new UriToPathConverter()),
@@ -439,6 +460,7 @@ final class LanguageServerFactory
                 $messengerProvider,
                 $eventProvider,
                 $securityProvider,
+                $metadataProvider,
             ),
             new CodeActionProviderRegistry(
                 new RouteCodeActionProvider(
@@ -482,6 +504,7 @@ final class LanguageServerFactory
                 $messengerProvider,
                 $eventProvider,
                 $securityProvider,
+                $metadataProvider,
             ),
             $diagnosticProviders,
             new DefinitionProviderRegistry(
@@ -499,6 +522,7 @@ final class LanguageServerFactory
                 $messengerProvider,
                 $eventProvider,
                 $securityProvider,
+                $metadataProvider,
             ),
             new DocumentLinkProviderRegistry(
                 new RouteDocumentLinkHandler(
@@ -525,6 +549,7 @@ final class LanguageServerFactory
                 $messengerProvider,
                 $eventProvider,
                 $securityProvider,
+                $metadataProvider,
             ),
             new RenameProviderRegistry(
                 $routeRename,
