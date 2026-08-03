@@ -97,8 +97,12 @@ Development
 .. toctree::
     :maxdepth: 1
 
+    architecture
+    adding-integrations
+    testing
     benchmarking
     dogfooding
+    releasing
 
 Editor Integrations
 -------------------
