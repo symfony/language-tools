@@ -54,15 +54,22 @@ final class ProjectRuntimeRefresherTest extends TestCase
         self::assertSame([], $scheduler->projects);
     }
 
-    public function testDoesNotRefreshUnrelatedResources(): void
+    #[DataProvider('ignoredResourceProvider')]
+    public function testDoesNotRefreshUnrelatedOrGeneratedResources(string $uri): void
     {
         [$refresher, $scheduler] = $this->refresher(TrustStatus::Trusted);
 
-        $refresher->refreshAfterSave([
-            'textDocument' => ['uri' => 'file:///workspace/templates/article.html.twig'],
-        ]);
+        $refresher->refreshAfterSave(['textDocument' => ['uri' => $uri]]);
 
         self::assertSame([], $scheduler->projects);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function ignoredResourceProvider(): iterable
+    {
+        yield 'template' => ['file:///workspace/templates/article.html.twig'];
+        yield 'cache' => ['file:///workspace/var/cache/test/Container.php'];
+        yield 'dependency' => ['file:///workspace/vendor/acme/example-bundle/Extension.php'];
     }
 
     /**

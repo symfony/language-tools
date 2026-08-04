@@ -64,13 +64,18 @@ final class ProjectRuntimeRefresher
             return false;
         }
 
+        $rootPath = ltrim(rtrim(str_replace('\\', '/', $project->rootPath()), '/'), '/');
+        $path = ltrim(str_replace('\\', '/', rawurldecode($path)), '/');
+        $relativePath = str_starts_with($path, $rootPath.'/') ? substr($path, \strlen($rootPath) + 1) : null;
+        if (null !== $relativePath && (str_starts_with($relativePath, 'var/') || str_starts_with($relativePath, 'vendor/'))) {
+            return false;
+        }
+
         $extension = strtolower(pathinfo($path, \PATHINFO_EXTENSION));
         if ('php' === $extension || 'composer.json' === basename($path)) {
             return true;
         }
 
-        $rootPath = rtrim(str_replace('\\', '/', $project->rootPath()), '/');
-        $path = str_replace('\\', '/', rawurldecode($path));
         if (str_starts_with($path, $rootPath.'/assets/')) {
             return true;
         }
