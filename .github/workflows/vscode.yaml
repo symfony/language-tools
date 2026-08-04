@@ -28,6 +28,17 @@ jobs:
             - name: Install the VS Code extension
               working-directory: editor/vscode
               run: npm ci
+            - name: Verify the self-contained package
+              working-directory: editor/vscode
+              run: |
+                  trap 'rm -rf server' EXIT
+                  mkdir -p server dist
+                  printf '#!/bin/sh\nexit 0\n' > server/symfony-lsp
+                  printf '#!/bin/sh\nexit 0\n' > server/symfony-lsp-tree-sitter
+                  chmod +x server/*
+                  npm run package -- --target linux-x64 --out dist/symfony-lsp-linux-x64.vsix
+                  npx vsce ls | grep -Fx 'server/symfony-lsp'
+                  npx vsce ls | grep -Fx 'server/symfony-lsp-tree-sitter'
             - uses: actions/cache@v6
               with:
                   path: editor/vscode/.vscode-test/vscode-*

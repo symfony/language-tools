@@ -1,10 +1,10 @@
 Releasing Symfony LSP
 =====================
 
-Symfony LSP private releases contain standalone server binaries for each
-supported platform, the matching Tree-sitter sidecar, a VS Code extension and a
-checksum manifest. The GitHub release workflow builds and publishes them from a
-version tag.
+Symfony LSP releases contain standalone server binaries for each supported
+platform, matching Tree-sitter sidecars, self-contained VS Code extensions and
+a checksum manifest. The GitHub release workflow builds and publishes them from
+a version tag.
 
 Release Invariants
 ------------------
@@ -16,7 +16,7 @@ A release must satisfy these rules:
 * ``resources/version`` remains ``dev`` in source control;
 * release jobs derive the server and protocol version from the tag;
 * the server and sidecar from one release stay together;
-* every archive and the VSIX appears in ``SHA256SUMS``;
+* every archive and VSIX appears in ``SHA256SUMS``;
 * the published tag is never moved;
 * CHANGELOG entries contain one short sentence each.
 
@@ -91,13 +91,14 @@ Pushing the tag starts ``.github/workflows/release.yaml``. The workflow builds:
 * Linux x64 and arm64 archives;
 * macOS x64 and arm64 archives;
 * a Windows x64 archive;
-* the VS Code VSIX;
+* one self-contained VS Code VSIX for each platform;
 * ``SHA256SUMS`` covering every published artifact.
 
 Unix jobs build a PHAR, combine it with the pinned static PHP runtime, build the
 Tree-sitter sidecar and run the protocol smoke test. The Windows job builds both
-executables and checks sidecar parsing. The final job publishes a private
-prerelease after every platform job succeeds.
+executables and checks sidecar parsing. Each VS Code job packages the matching
+executables. The final job publishes a prerelease after every platform job
+succeeds.
 
 Monitoring the Workflow
 -----------------------
@@ -127,9 +128,9 @@ Inspect the release and download every asset into an ignored directory:
     $ shasum -a 256 -c SHA256SUMS
     $ cd ../../..
 
-Verify that the release contains five platform archives, one VSIX and the
-checksum manifest. Extract the archive for the current machine and check the
-reported version:
+Verify that the release contains five platform archives, five VSIX files and
+the checksum manifest. Extract the archive for the current machine and check
+the reported version:
 
 .. code-block:: terminal
 
@@ -160,10 +161,10 @@ latency with the development build when a packaged result differs.
 VS Code Verification
 --------------------
 
-Install the downloaded VSIX into a disposable VS Code profile or test
-installation. Confirm that it starts the extracted server, forwards workspace
-trust and settings, recognizes Twig documents and exposes the expected server
-version.
+Install the downloaded VSIX for the current platform into a disposable VS Code
+profile or test installation. Confirm that it starts its bundled server,
+forwards workspace trust and settings, recognizes Twig documents, exposes the
+expected server version and provides index commands and status.
 
 Post-Release Work
 -----------------

@@ -134,10 +134,64 @@ jobs:
                   if-no-files-found: error
 
     vscode-extension:
-        name: VS Code extension
+        name: VS Code extension (${{ matrix.target }})
+        needs: [unix-binaries, windows-binary]
         runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - platform: linux-x64
+                      target: linux-x64
+                      executable: symfony-lsp
+                      sidecar: symfony-lsp-tree-sitter
+                    - platform: linux-arm64
+                      target: linux-arm64
+                      executable: symfony-lsp
+                      sidecar: symfony-lsp-tree-sitter
+                    - platform: macos-x64
+                      target: darwin-x64
+                      executable: symfony-lsp
+                      sidecar: symfony-lsp-tree-sitter
+                    - platform: macos-arm64
+                      target: darwin-arm64
+                      executable: symfony-lsp
+                      sidecar: symfony-lsp-tree-sitter
+                    - platform: windows-x64
+                      target: win32-x64
+                      executable: symfony-lsp.exe
+                      sidecar: symfony-lsp-tree-sitter.exe
         steps:
             - uses: actions/checkout@v7
+            - uses: actions/download-artifact@v8
+              with:
+                  name: symfony-lsp-${{ github.ref_name }}-${{ matrix.platform }}
+                  path: var/vscode-server
+            - name: Extract the bundled server
+              env:
+                  EXECUTABLE: ${{ matrix.executable }}
+                  SIDECAR: ${{ matrix.sidecar }}
+              run: |
+                  mkdir -p editor/vscode/server var/vscode-server/extracted
+                  archive="$(find var/vscode-server -maxdepth 1 -type f | head -1)"
+                  case "$archive" in
+                      *.tar.gz)
+                          tar -xzf "$archive" --strip-components=1 -C editor/vscode/server
+                          ;;
+                      *.zip)
+                          unzip -q "$archive" -d var/vscode-server/extracted
+                          find var/vscode-server/extracted -type f -name "$EXECUTABLE" -exec cp {} editor/vscode/server/ \;
+                          find var/vscode-server/extracted -type f -name "$SIDECAR" -exec cp {} editor/vscode/server/ \;
+                          ;;
+                      *)
+                          echo "Unsupported server archive: $archive" >&2
+                          exit 1
+                          ;;
+                  esac
+                  rm -f editor/vscode/server/LICENSE
+                  test -f "editor/vscode/server/$EXECUTABLE"
+                  test -f "editor/vscode/server/$SIDECAR"
+                  if [[ "$EXECUTABLE" != *.exe ]]; then chmod +x editor/vscode/server/*; fi
             - uses: actions/setup-node@v7
               with:
                   node-version: '24'
@@ -145,18 +199,25 @@ jobs:
                   cache-dependency-path: editor/vscode/package-lock.json
             - name: Build the VS Code extension
               working-directory: editor/vscode
+              env:
+                  EXECUTABLE: ${{ matrix.executable }}
+                  SIDECAR: ${{ matrix.sidecar }}
+                  TARGET: ${{ matrix.target }}
+                  VERSION: ${{ github.ref_name }}
               run: |
                   npm ci
                   mkdir -p dist
-                  npm run package -- --out dist/symfony-lsp-${{ github.ref_name }}.vsix
+                  npm run package -- --target "$TARGET" --out "dist/symfony-lsp-$VERSION-$TARGET.vsix"
+                  npx vsce ls | grep -Fx "server/$EXECUTABLE"
+                  npx vsce ls | grep -Fx "server/$SIDECAR"
             - uses: actions/upload-artifact@v7
               with:
-                  name: symfony-lsp-${{ github.ref_name }}-vscode
+                  name: symfony-lsp-${{ github.ref_name }}-vscode-${{ matrix.target }}
                   path: editor/vscode/dist/*.vsix
                   if-no-files-found: error
 
     release:
-        name: Create private release
+        name: Create release
         if: startsWith(github.ref, 'refs/tags/')
         needs: [unix-binaries, windows-binary, vscode-extension]
         runs-on: ubuntu-latest
@@ -180,7 +241,7 @@ jobs:
                   body_path: CHANGELOG.md
                   prerelease: true
                   draft: true
-            - name: Publish private release
+            - name: Publish release
               env:
                   GH_TOKEN: ${{ github.token }}
               run: gh release edit "${{ github.ref_name }}" --draft=false --prerelease

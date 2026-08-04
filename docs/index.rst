@@ -13,10 +13,10 @@ FrameworkBundle 6.4, 7.4, 8.0 or 8.1. The application still needs PHP and
 Composer. Configure the project bridge to use a PHP command accepted by the
 application's Symfony branch.
 
-Installing a Private Release
-----------------------------
+Installing a Release
+--------------------
 
-Download the archive for your platform from the private GitHub release:
+Download the archive for your platform from the GitHub release:
 
 * ``linux-x64`` or ``linux-arm64``;
 * ``macos-x64`` or ``macos-arm64``;
@@ -32,8 +32,8 @@ Verify the Unix executable before configuring an editor:
 
     $ ./symfony-lsp --version
 
-The private macOS binaries aren't signed or notarized. If macOS quarantines an
-archive downloaded from the private release, remove the quarantine attribute
+The macOS binaries aren't signed or notarized. If macOS quarantines an archive
+downloaded from the release, remove the quarantine attribute
 from the extracted directory after verifying where the archive came from:
 
 .. code-block:: terminal

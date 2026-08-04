@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added self-contained VS Code packages with index status and controls.
 - Added Doctrine entity, repository, and mapped field support.
 - Added Stimulus and Live Component support.
 - Added AssetMapper path and importmap entrypoint support.

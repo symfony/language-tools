@@ -12,6 +12,9 @@ import {
 
 interface IndexStatus {
     root: string;
+    environment: string;
+    runtimeEnabled: boolean;
+    trusted: boolean;
     source: { state: string };
     runtime: { state: string };
 }
@@ -22,16 +25,27 @@ export const lifecycleTests: TestCase[] = [
 ];
 
 async function testIndexCommands(): Promise<void> {
+    const commands = await vscode.commands.getCommands(true);
+    assert.ok(commands.includes('symfonyLsp.refreshIndex'));
+    assert.ok(commands.includes('symfonyLsp.indexStatus'));
+    assert.ok(commands.includes('symfonyLsp.switchEnvironment'));
+
     const statuses = await waitFor(
-        () => vscode.commands.executeCommand<IndexStatus[]>('symfony.indexStatus'),
+        () => vscode.commands.executeCommand<IndexStatus[]>('symfonyLsp.indexStatus'),
         (items) => 1 === items?.length && 'ready' === items[0].source.state && 'ready' === items[0].runtime.state,
         'ready source and runtime indexes',
     );
     assert.equal(statuses[0].root, workspace().uri.fsPath);
+    assert.equal(statuses[0].environment, 'test');
+    assert.equal(statuses[0].runtimeEnabled, true);
+    assert.equal(statuses[0].trusted, true);
 
-    const refreshed = await vscode.commands.executeCommand<IndexStatus[]>('symfony.refreshIndex');
+    const refreshed = await vscode.commands.executeCommand<IndexStatus[]>('symfonyLsp.refreshIndex');
     assert.equal(refreshed[0].source.state, 'ready');
     assert.equal(refreshed[0].runtime.state, 'ready');
+
+    const switched = await vscode.commands.executeCommand<IndexStatus[]>('symfonyLsp.switchEnvironment', 'test', statuses[0].root);
+    assert.equal(switched[0].environment, 'test');
 }
 
 async function testConfigurationChange(): Promise<void> {

@@ -916,7 +916,7 @@ produce false positives.
 - [x] Implement AssetMapper and importmap providers.
 - [x] Implement Stimulus and remaining Symfony UX providers.
 - [x] Prototype selected Doctrine and ecosystem integrations.
-- [ ] Add official editor integrations where they improve setup.
+- [x] Add official editor integrations where they improve setup.
 
 ## Testing strategy
 

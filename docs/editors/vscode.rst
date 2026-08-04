@@ -5,19 +5,19 @@ The bundled VS Code extension configures the Symfony LSP client, workspace
 trust, file associations and project settings. It requires VS Code 1.91 or
 later.
 
-Installing the Private Extension
---------------------------------
+Installing the Extension
+------------------------
 
-Install the standalone server first. See :doc:`the installation instructions
-</index>`. Download the ``.vsix`` file from the same private GitHub release and
-install it:
+Download the ``.vsix`` file for the VS Code extension host's platform from the
+GitHub release and install it:
 
 .. code-block:: terminal
 
-    $ code --install-extension symfony-lsp-v0.2.0.vsix
+    $ code --install-extension /path/to/downloaded-extension.vsix
 
-Set ``symfonyLsp.serverPath`` to the absolute path of the executable extracted
-from the server archive, then restart VS Code.
+Packages are available for Linux x64 and ARM64, macOS x64 and ARM64 and Windows
+x64. Each package contains the matching language server and Tree-sitter
+sidecar, so ``symfonyLsp.serverPath`` doesn't need to be configured.
 
 Building the Extension from Source
 ----------------------------------
@@ -29,7 +29,9 @@ from the repository root:
 
     $ make -C editor/vscode
 
-This creates ``editor/vscode/symfony-lsp-0.2.0.vsix``.
+This creates ``editor/vscode/symfony-lsp-0.2.0.vsix``. Source builds don't
+contain a standalone server; configure ``symfonyLsp.serverPath`` before
+installing this package.
 
 Twig Support
 ------------
@@ -74,6 +76,21 @@ Installed extensions are disabled inside the test host to keep completion,
 hover, navigation, diagnostics and code lens results deterministic. This doesn't
 change the regular VS Code profile.
 
+Index Status and Commands
+-------------------------
+
+The status bar shows the source and runtime index state for the application
+owning the active document. It identifies indexing, static-only, stale and
+failed states and displays the selected environment when both indexes are
+ready. Select the status bar item to show details.
+
+The command palette provides these commands:
+
+* ``Symfony LSP: Refresh Index`` rebuilds source and runtime indexes;
+* ``Symfony LSP: Show Index Status`` reports each discovered application;
+* ``Symfony LSP: Switch Environment`` selects an environment and rebuilds its
+  runtime index.
+
 Configuration
 -------------
 
@@ -83,7 +100,6 @@ workspace's ``.vscode/settings.json`` file:
 .. code-block:: json
 
     {
-        "symfonyLsp.serverPath": "/absolute/path/to/lsp/bin/symfony-lsp",
         "symfonyLsp.phpCommand": ["php"],
         "symfonyLsp.consolePath": "bin/console",
         "symfonyLsp.environment": "dev",
@@ -95,8 +111,9 @@ workspace's ``.vscode/settings.json`` file:
         "php.suggest.basic": false
     }
 
-``symfonyLsp.serverPath`` must be an absolute path. The server path is detected
-automatically only when running the extension directly from this repository.
+``symfonyLsp.serverPath`` overrides the bundled executable and must be an
+absolute path. Use it for a server built from source or a separately downloaded
+standalone release.
 
 The extension forwards VS Code's workspace trust decision to the server.
 Untrusted workspaces remain in static-only mode. See
@@ -127,8 +144,9 @@ The PHP suggestion setting is optional. Symfony LSP is designed to coexist with
 a general PHP language server such as Intelephense or PHP Tools. Keep that
 server enabled for PHP diagnostics, types and general completion.
 
-After changing a Symfony LSP setting, run ``Developer: Reload Window`` from the
-VS Code command palette.
+Run ``Developer: Reload Window`` after changing ``symfonyLsp.serverPath``. Use
+``Symfony LSP: Switch Environment`` to change the active environment without
+restarting the extension.
 
 Troubleshooting
 ---------------
@@ -136,7 +154,8 @@ Troubleshooting
 Open ``View > Output`` and select ``Symfony LSP`` to inspect extension and
 protocol messages. If the server doesn't start, verify that:
 
-* ``symfonyLsp.serverPath`` points to an executable file;
+* the installed extension package matches the extension host's platform;
+* a configured ``symfonyLsp.serverPath`` points to an executable file;
 * the extension was rebuilt after updating files under ``editor/vscode/``;
 * the workspace settings contain a valid project PHP command.
 

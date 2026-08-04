@@ -8,4 +8,5 @@
 /editor/vscode/node_modules/
 /editor/vscode/out/
 /editor/vscode/dist/
+/editor/vscode/server/
 /editor/vscode/*.vsix

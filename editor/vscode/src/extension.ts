@@ -6,17 +6,18 @@ import {
     LanguageClientOptions,
     ServerOptions,
 } from 'vscode-languageclient/node';
+import { IndexStatusController } from './indexStatus';
 
 let client: LanguageClient | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-    const configuration = vscode.workspace.getConfiguration('symfonyLsp');
+    const configuration = vscode.workspace.getConfiguration('symfonyLsp', vscode.workspace.workspaceFolders?.[0]?.uri ?? null);
     const configuredServerPath = configuration.get<string>('serverPath', '').trim();
     const serverPath = configuredServerPath || findServerPath(context.extensionPath);
 
     if (!serverPath || !fs.existsSync(serverPath)) {
         void vscode.window.showErrorMessage(
-            'Symfony LSP executable not found. Configure symfonyLsp.serverPath with an absolute path to bin/symfony-lsp.',
+            'Symfony LSP executable not found. Install the extension package for this platform or configure symfonyLsp.serverPath.',
         );
 
         return;
@@ -72,6 +73,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
     context.subscriptions.push(client);
     await client.start();
+
+    const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    const statusController = new IndexStatusController(client, statusBar, outputChannel);
+    context.subscriptions.push(statusController);
+    statusController.start(context);
 }
 
 export async function deactivate(): Promise<void> {
@@ -81,7 +87,9 @@ export async function deactivate(): Promise<void> {
 }
 
 function findServerPath(extensionPath: string): string | undefined {
+    const executable = 'win32' === process.platform ? 'symfony-lsp.exe' : 'symfony-lsp';
     const candidates = [
+        path.resolve(extensionPath, 'server', executable),
         path.resolve(extensionPath, '..', '..', 'bin', 'symfony-lsp'),
         path.resolve(extensionPath, '..', '..', '..', 'bin', 'symfony-lsp'),
     ];

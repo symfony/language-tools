@@ -1,19 +1,29 @@
 {
   "name": "symfony-lsp",
   "displayName": "Symfony LSP",
-  "description": "Early access VS Code client for Symfony LSP",
+  "publisher": "symfony",
+  "description": "Symfony-aware completion, navigation and diagnostics through Symfony LSP",
   "version": "0.2.0",
-  "private": true,
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/symfony/lsp.git"
+  },
+  "homepage": "https://github.com/symfony/lsp",
+  "bugs": {
+    "url": "https://github.com/symfony/lsp/issues"
   },
   "engines": {
     "vscode": "^1.91.0"
   },
   "categories": [
     "Programming Languages"
+  ],
+  "keywords": [
+    "Symfony",
+    "PHP",
+    "Twig",
+    "LSP"
   ],
   "extensionKind": [
     "workspace"
@@ -55,13 +65,34 @@
         ]
       }
     ],
+    "commands": [
+      {
+        "command": "symfonyLsp.refreshIndex",
+        "title": "Refresh Index",
+        "category": "Symfony LSP",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "symfonyLsp.indexStatus",
+        "title": "Show Index Status",
+        "category": "Symfony LSP",
+        "icon": "$(info)"
+      },
+      {
+        "command": "symfonyLsp.switchEnvironment",
+        "title": "Switch Environment",
+        "category": "Symfony LSP",
+        "icon": "$(server-environment)"
+      }
+    ],
     "configuration": {
       "title": "Symfony LSP",
       "properties": {
         "symfonyLsp.serverPath": {
           "type": "string",
           "default": "",
-          "description": "Absolute path to the Symfony LSP executable."
+          "scope": "machine",
+          "description": "Absolute path overriding the Symfony LSP executable bundled with the extension."
         },
         "symfonyLsp.phpCommand": {
           "type": "array",
@@ -71,26 +102,31 @@
           "default": [
             "php"
           ],
+          "scope": "resource",
           "description": "Command and arguments used to run the project bridge."
         },
         "symfonyLsp.consolePath": {
           "type": "string",
           "default": "bin/console",
+          "scope": "resource",
           "description": "Project console path used for cache maintenance."
         },
         "symfonyLsp.environment": {
           "type": "string",
           "default": "dev",
+          "scope": "resource",
           "description": "Symfony environment used for runtime indexing."
         },
         "symfonyLsp.debug": {
           "type": "boolean",
           "default": true,
+          "scope": "resource",
           "description": "Enable kernel debug mode during runtime indexing."
         },
         "symfonyLsp.runtimeIndexing": {
           "type": "boolean",
           "default": true,
+          "scope": "resource",
           "description": "Enable trusted runtime indexing."
         },
         "symfonyLsp.projectRoots": {
@@ -99,6 +135,7 @@
             "type": "string"
           },
           "default": [],
+          "scope": "window",
           "description": "Explicit application roots, relative to each workspace folder or absolute."
         },
         "symfonyLsp.trace": {
@@ -109,6 +146,7 @@
             "verbose"
           ],
           "default": "off",
+          "scope": "window",
           "description": "Write redacted Language Server Protocol traffic to the Symfony LSP output channel."
         },
         "symfonyLsp.translationDiagnostics": {

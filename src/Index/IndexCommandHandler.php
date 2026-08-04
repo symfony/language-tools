@@ -30,7 +30,7 @@ final class IndexCommandHandler
     /**
      * @param array<array-key, mixed> $params
      *
-     * @return list<array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string}}>|null
+     * @return list<array{root: string, environment: string, runtimeEnabled: bool, trusted: bool, source: array{state: string, error?: string}, runtime: array{state: string, error?: string}}>|null
      */
     public function execute(array $params, ?Cancellation $cancellation = null): ?array
     {
@@ -62,7 +62,12 @@ final class IndexCommandHandler
             }
         }
 
-        return array_map($this->statuses->status(...), $projects);
+        return array_map(fn (Project $project): array => [
+            ...$this->statuses->status($project),
+            'environment' => $this->configuration->environment($project),
+            'runtimeEnabled' => $this->configuration->runtimeIndexing($project),
+            'trusted' => TrustStatus::Trusted === $this->workspaceTrust->status($project),
+        ], $projects);
     }
 
     /** @param array<array-key, mixed> $params */

@@ -100,7 +100,7 @@ manual review.
 
 Run the matrix twice when changing persistent source facts or cache restoration.
 The second run exercises restored indexes. Run the complete matrix before a
-private release and against the packaged server and sidecar after packaging.
+release and against the packaged server and sidecar after packaging.
 
 Adding Probes
 -------------

@@ -260,7 +260,7 @@ final class LanguageServer
     /**
      * @param array<array-key, mixed> $params
      *
-     * @return list<array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string}}>|null
+     * @return list<array{root: string, environment: string, runtimeEnabled: bool, trusted: bool, source: array{state: string, error?: string}, runtime: array{state: string, error?: string}}>|null
      */
     private function executeCommand(array $params, Cancellation $cancellation): ?array
     {

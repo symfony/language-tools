@@ -75,17 +75,28 @@ final class IndexCommandHandlerTest extends TestCase
             'root' => $this->temporaryDirectory,
             'source' => ['state' => 'ready'],
             'runtime' => ['state' => 'ready'],
+            'environment' => 'dev',
+            'runtimeEnabled' => true,
+            'trusted' => true,
         ]], $result);
         self::assertSame($result, $handler->execute([
             'command' => IndexCommandHandler::STATUS_COMMAND,
         ]));
 
-        $handler->execute([
+        $switched = $handler->execute([
             'command' => IndexCommandHandler::SWITCH_ENVIRONMENT_COMMAND,
             'arguments' => [$project->rootUri(), 'test'],
         ]);
         self::assertSame('test', $runtimeConfiguration->environment($project));
+        self::assertSame('test', $switched[0]['environment'] ?? null);
         self::assertSame(RuntimeRefreshMode::Clear, $runtime->modes[1]);
+
+        $workspaceTrust->set($project, TrustStatus::Untrusted);
+        $untrusted = $handler->execute([
+            'command' => IndexCommandHandler::STATUS_COMMAND,
+            'arguments' => [$project->rootUri()],
+        ]);
+        self::assertFalse($untrusted[0]['trusted'] ?? null);
     }
 }
 
