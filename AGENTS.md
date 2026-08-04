@@ -9,7 +9,7 @@ adding a feature:
   patterns.
 - `docs/testing.rst`: validation by change type.
 - `docs/dogfooding.rst`: the eight-application Symfonycorp matrix.
-- `docs/releasing.rst`: private release preparation and verification.
+- `docs/releasing.rst`: release preparation and verification.
 
 ## Architecture rules
 

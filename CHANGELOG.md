@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.3.0 (2026-08-04)
 
 - Added self-contained VS Code packages with index status and controls.
