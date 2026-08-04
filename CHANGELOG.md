@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added Doctrine entity, repository, and mapped field support.
 - Added Stimulus and Live Component support.
 - Added AssetMapper path and importmap entrypoint support.
 - Added form option, validation constraint, serializer group, and mapped metadata support.

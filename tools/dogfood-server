@@ -184,6 +184,8 @@ $definitions = [
     ['category' => 'live.event.php', 'files' => '{\.php$}', 'pattern' => '{\bemit\s*\(\s*[\'"]([^\'"]+)}'],
     ['category' => 'asset.twig', 'files' => '{\.twig$}', 'pattern' => '{\basset\s*\(\s*[\'\"]([A-Za-z0-9_@.-][A-Za-z0-9_@./-]*)[\'\"]\s*\)}'],
     ['category' => 'importmap.twig', 'files' => '{\.twig$}', 'pattern' => '{\bimportmap\s*\(\s*(?:\[\s*)?[\'\"]([A-Za-z0-9_@./-]+)}'],
+    ['category' => 'doctrine.field.repository.php', 'files' => '{\.php$}', 'pattern' => '{\b(?:findBy|findOneBy|count)\s*\(\s*\[\s*[\'\"]([A-Za-z_][A-Za-z0-9_]*)[\'\"]\s*=>}'],
+    ['category' => 'doctrine.field.form.php', 'files' => '{\.php$}', 'pattern' => '{EntityType::class\s*,\s*\[[^;]+?[\'\"](?:choice_label|choice_value|group_by)[\'\"]\s*=>\s*[\'\"]([A-Za-z_][A-Za-z0-9_]*)}s'],
     ['category' => 'form.option.php', 'files' => '{\.php$}', 'pattern' => '{createForm\s*\([^,);]+,\s*[^,);]+,\s*\[[^;]+?[\'\"]([A-Za-z_][A-Za-z0-9_]*)[\'\"]\s*=>}s'],
     ['category' => 'constraint.option.php', 'files' => '{\.php$}', 'pattern' => '{Assert\\\\[A-Za-z_][A-Za-z0-9_]*\s*\([^\)]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*:}s'],
     ['category' => 'translation.php', 'files' => '{\.php$}', 'pattern' => '{(?:->trans|\bt)\(\s*[\'\"]([^\'\"]+)}'],

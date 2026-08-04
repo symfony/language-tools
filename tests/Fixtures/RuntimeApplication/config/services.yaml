@@ -8,6 +8,9 @@ services:
 
     App\:
         resource: '../src/'
+        exclude:
+            - '../src/Entity/'
+            - '../src/Repository/'
 
     app.fixture_controller:
         class: App\Controller\HomeController

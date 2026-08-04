@@ -103,9 +103,17 @@ Supported Integrations
       - Yes
       - No
       - Yes
+    * - :doc:`Doctrine entities and repositories </features/doctrine>`
+      - Yes
+      - Yes
+      - Yes
+      - Yes
+      - No
+      - No
 
-Messenger message and handler classes, and event and listener classes, also
-provide code lenses for navigating between related classes.
+Messenger message and handler classes, event and listener classes, Stimulus
+controllers and Doctrine entity and repository classes also provide code lenses
+for navigating between related declarations.
 
 Runtime Indexing and Trust
 --------------------------

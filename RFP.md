@@ -926,7 +926,7 @@ produce false positives.
 
 - [x] Implement AssetMapper and importmap providers.
 - [x] Implement Stimulus and remaining Symfony UX providers.
-- [ ] Prototype selected Doctrine and ecosystem integrations.
+- [x] Prototype selected Doctrine and ecosystem integrations.
 - [ ] Define a declarative bundle extension API based on proven integration
   needs.
 - [ ] Add official editor integrations where they improve setup.

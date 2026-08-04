@@ -43,6 +43,10 @@ use Symfony\Lsp\Feature\DependencyInjection\ServiceCompletionHandler;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
+use Symfony\Lsp\Feature\Doctrine\DoctrineExtractor;
+use Symfony\Lsp\Feature\Doctrine\DoctrineIndexRegistry;
+use Symfony\Lsp\Feature\Doctrine\DoctrineProvider;
+use Symfony\Lsp\Feature\Doctrine\DoctrineSourceIndexer;
 use Symfony\Lsp\Feature\DocumentLinkProviderRegistry;
 use Symfony\Lsp\Feature\Environment\EnvironmentExtractor;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
@@ -200,6 +204,7 @@ final class LanguageServerFactory
         $assetSourceIndexes = new AssetSourceIndexRegistry();
         $stimulusIndexes = new StimulusIndexRegistry();
         $stimulusSourceIndexes = new StimulusSourceIndexRegistry();
+        $doctrineIndexes = new DoctrineIndexRegistry();
         $client = new JsonRpcClient($peer);
         $progress = new WorkDoneProgressReporter($client);
         $workspaceTrust = new WorkspaceTrust();
@@ -280,6 +285,15 @@ final class LanguageServerFactory
             $stimulusIndexes,
             $stimulusSourceIndexes,
             $stimulusExtractor,
+        );
+        $doctrineExtractor = new DoctrineExtractor($positionConverter);
+        $doctrineProvider = new DoctrineProvider(
+            $documentContextResolver,
+            $documents,
+            $projects,
+            $positionConverter,
+            $doctrineIndexes,
+            $doctrineExtractor,
         );
         $dependencyInjectionSymbolResolver = new DependencyInjectionSymbolResolver(
             $positionConverter,
@@ -449,6 +463,7 @@ final class LanguageServerFactory
             new MetadataSourceIndexer($metadataSourceIndexes, $metadataExtractor),
             new AssetSourceIndexer($assetSourceIndexes, $assetExtractor),
             new StimulusSourceIndexer($stimulusSourceIndexes, $stimulusExtractor),
+            new DoctrineSourceIndexer($doctrineIndexes, $doctrineExtractor),
         );
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery($uriConverter),
@@ -516,6 +531,7 @@ final class LanguageServerFactory
                 $metadataProvider,
                 $assetProvider,
                 $stimulusProvider,
+                $doctrineProvider,
             ),
             new CodeActionProviderRegistry(
                 new RouteCodeActionProvider(
@@ -540,7 +556,7 @@ final class LanguageServerFactory
                     $translationIndexes,
                 ),
             ),
-            new CodeLensProviderRegistry($messengerProvider, $eventProvider, $twigComponentProvider, $stimulusProvider),
+            new CodeLensProviderRegistry($messengerProvider, $eventProvider, $twigComponentProvider, $stimulusProvider, $doctrineProvider),
             new HoverProviderRegistry(
                 $routeHover,
                 new DependencyInjectionHoverHandler(
@@ -563,6 +579,7 @@ final class LanguageServerFactory
                 $metadataProvider,
                 $assetProvider,
                 $stimulusProvider,
+                $doctrineProvider,
             ),
             $diagnosticProviders,
             new DefinitionProviderRegistry(
@@ -584,6 +601,7 @@ final class LanguageServerFactory
                 $metadataProvider,
                 $assetProvider,
                 $stimulusProvider,
+                $doctrineProvider,
             ),
             new DocumentLinkProviderRegistry(
                 new RouteDocumentLinkHandler(
@@ -616,6 +634,7 @@ final class LanguageServerFactory
                 $metadataProvider,
                 $assetProvider,
                 $stimulusProvider,
+                $doctrineProvider,
             ),
             new RenameProviderRegistry(
                 $routeRename,

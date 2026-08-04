@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { assetTests } from './assets.test';
 import { configurationTests } from './configuration.test';
 import { dependencyInjectionTests } from './dependency-injection.test';
+import { doctrineTests } from './doctrine.test';
 import { environmentTests } from './environment.test';
 import { eventTests } from './events.test';
 import { lifecycleTests } from './lifecycle.test';
@@ -27,6 +28,7 @@ export async function run(): Promise<void> {
         ...lifecycleTests,
         ...routingTests,
         ...dependencyInjectionTests,
+        ...doctrineTests,
         ...twigTests,
         ...assetTests,
         ...stimulusTests,

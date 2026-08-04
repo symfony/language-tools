@@ -14,6 +14,12 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolKind;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceDeclaration;
+use Symfony\Lsp\Feature\Doctrine\DoctrineEntity;
+use Symfony\Lsp\Feature\Doctrine\DoctrineField;
+use Symfony\Lsp\Feature\Doctrine\DoctrineRepository;
+use Symfony\Lsp\Feature\Doctrine\DoctrineSourceFacts;
+use Symfony\Lsp\Feature\Doctrine\DoctrineSourceSymbol;
+use Symfony\Lsp\Feature\Doctrine\DoctrineSymbolKind;
 use Symfony\Lsp\Feature\Environment\EnvironmentDeclaration;
 use Symfony\Lsp\Feature\Environment\EnvironmentReference;
 use Symfony\Lsp\Feature\Environment\EnvironmentSourceFacts;
@@ -65,6 +71,12 @@ final class SourceIndexPayloadCodec
         ParameterDeclaration::class,
         PhpClassDeclaration::class,
         ServiceDeclaration::class,
+        DoctrineEntity::class,
+        DoctrineField::class,
+        DoctrineRepository::class,
+        DoctrineSourceFacts::class,
+        DoctrineSourceSymbol::class,
+        DoctrineSymbolKind::class,
         EnvironmentDeclaration::class,
         EnvironmentReference::class,
         EnvironmentSourceFacts::class,
