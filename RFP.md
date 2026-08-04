@@ -72,8 +72,6 @@ The project should:
    an explicit project PHP command.
 8. Require no editor-specific protocol extensions for the core experience.
 9. Provide framework-specific code actions and best-effort rename operations.
-10. Provide a future path for Symfony bundles to expose additional
-    framework-aware metadata without coupling themselves to an editor.
 
 ## Non-goals
 
@@ -466,14 +464,12 @@ Optional providers could add:
 
 Priority: P2
 
-Doctrine, API Platform, Webpack Encore, and other packages should eventually
-integrate through an extension mechanism rather than become hard-coded
-assumptions of the core server. Useful examples include Doctrine entity field
-completion in Symfony options, repository and mapping navigation, and API
-resource operation names. The first release should support only metadata
-represented through standard Symfony mechanisms. Internal providers should
-remain extensible, but no public bundle extension API should be published until
-real integrations establish the required abstractions.
+Doctrine, API Platform, Webpack Encore, and other packages may receive focused
+integrations when concrete use cases justify maintaining them in the core
+server. Useful examples include Doctrine entity field completion in Symfony
+options, repository and mapping navigation, and API resource operation names.
+The first release should support only metadata represented through standard
+Symfony mechanisms.
 
 ## LSP methods
 
@@ -711,14 +707,7 @@ Providers should depend on narrow index interfaces rather than the kernel or LSP
 transport.
 
 This keeps the protocol layer independent from Symfony feature logic and makes
-providers independently testable. It also creates a future extension point for
-bundles.
-
-Third-party packages should not register arbitrary LSP request handlers in the
-server process. A future bundle extension mechanism should exchange declarative,
-versioned metadata with the bridge. The public contract should be defined only
-after core providers and experimental ecosystem integrations establish the
-necessary abstractions.
+providers independently testable.
 
 ### Multi-root and application discovery
 
@@ -927,8 +916,6 @@ produce false positives.
 - [x] Implement AssetMapper and importmap providers.
 - [x] Implement Stimulus and remaining Symfony UX providers.
 - [x] Prototype selected Doctrine and ecosystem integrations.
-- [ ] Define a declarative bundle extension API based on proven integration
-  needs.
 - [ ] Add official editor integrations where they improve setup.
 
 ## Testing strategy
@@ -1038,5 +1025,4 @@ of the intended initial feature set and should follow on the same foundation.
 Standalone binaries for macOS, Linux, and Windows are a first-release
 requirement. The remaining component and ecosystem features can then build on
 the same indexes and internal provider contracts without turning the project
-into another general-purpose PHP language server or prematurely freezing a
-public bundle extension API.
+into another general-purpose PHP language server.
