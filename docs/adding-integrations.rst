@@ -172,7 +172,8 @@ Before committing an integration:
 * run the benchmark when indexing or request latency can change;
 * run the eight-application dogfood matrix for cross-file or runtime changes;
 * update the feature documentation and supported-integration table;
-* add one short sentence to the ``Unreleased`` CHANGELOG section;
+* add one short imperative entry without trailing punctuation to the
+  ``Unreleased`` CHANGELOG section;
 * update the RFP checklist when the planned capability is complete;
 * verify that no secret or resolved application value reaches output;
 * review all registered contexts for false-positive diagnostics.

@@ -18,7 +18,7 @@ A release must satisfy these rules:
 * the server and sidecar from one release stay together;
 * every archive and VSIX appears in ``SHA256SUMS``;
 * the published tag is never moved;
-* CHANGELOG entries contain one short sentence each.
+* CHANGELOG entries use an imperative verb and omit trailing punctuation.
 
 Preparing the Release Commit
 ----------------------------

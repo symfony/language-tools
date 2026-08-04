@@ -56,7 +56,8 @@ adding a feature:
 ## Completing a feature
 
 - Update the feature documentation and supported-integration table.
-- Add one short sentence to the `Unreleased` CHANGELOG section.
+- Add one short imperative entry without trailing punctuation to the
+  `Unreleased` CHANGELOG section.
 - Update the RFP checklist when a planned capability is complete.
 - Add or update a conservative dogfood probe when real applications contain the
   context.
