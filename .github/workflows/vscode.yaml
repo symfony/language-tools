@@ -36,7 +36,8 @@ jobs:
                   printf '#!/bin/sh\nexit 0\n' > server/symfony-lsp
                   printf '#!/bin/sh\nexit 0\n' > server/symfony-lsp-tree-sitter
                   chmod +x server/*
-                  npm run package -- --target linux-x64 --out dist/symfony-lsp-linux-x64.vsix
+                  npm run package -- --pre-release --target linux-x64 --out dist/symfony-lsp-linux-x64.vsix
+                  unzip -p dist/symfony-lsp-linux-x64.vsix extension.vsixmanifest | grep -F 'Microsoft.VisualStudio.Code.PreRelease'
                   npx vsce ls | grep -Fx 'server/symfony-lsp'
                   npx vsce ls | grep -Fx 'server/symfony-lsp-tree-sitter'
             - uses: actions/cache@v6

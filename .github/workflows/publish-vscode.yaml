@@ -1,0 +1,122 @@
+name: Publish VS Code extension
+
+on:
+    workflow_call:
+        inputs:
+            tag:
+                description: GitHub release tag to publish
+                required: true
+                type: string
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: GitHub release tag to publish
+                required: true
+                type: string
+
+jobs:
+    publish:
+        name: Publish to Visual Studio Marketplace
+        runs-on: ubuntu-latest
+        environment: vscode-marketplace
+        permissions:
+            contents: read
+            id-token: write
+        env:
+            AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+            AZURE_CORE_OUTPUT: none
+            AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+            RELEASE_TAG: ${{ inputs.tag }}
+            VSIX_DIRECTORY: ${{ github.workspace }}/var/vscode-marketplace
+        steps:
+            - name: Validate release tag
+              run: |
+                  if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                      echo "Invalid release tag: $RELEASE_TAG" >&2
+                      exit 1
+                  fi
+            - uses: actions/checkout@v7
+              with:
+                  ref: ${{ inputs.tag }}
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: '24'
+                  cache: npm
+                  cache-dependency-path: editor/vscode/package-lock.json
+            - name: Install publishing dependencies
+              working-directory: editor/vscode
+              run: npm ci
+            - name: Download release packages
+              id: release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  mkdir -p "$VSIX_DIRECTORY"
+                  gh release download "$RELEASE_TAG" \
+                      --pattern '*.vsix' \
+                      --pattern SHA256SUMS \
+                      --dir "$VSIX_DIRECTORY"
+                  prerelease="$(gh release view "$RELEASE_TAG" \
+                      --json isPrerelease \
+                      --jq .isPrerelease)"
+                  echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+            - name: Verify release packages
+              env:
+                  PRERELEASE: ${{ steps.release.outputs.prerelease }}
+              run: |
+                  version="${RELEASE_TAG#v}"
+                  package_version="$(node --print \
+                      "require('./editor/vscode/package.json').version")"
+                  test "$package_version" = "$version"
+
+                  for target in \
+                      linux-x64 \
+                      linux-arm64 \
+                      darwin-x64 \
+                      darwin-arm64 \
+                      win32-x64
+                  do
+                      vsix="$VSIX_DIRECTORY/symfony-lsp-$RELEASE_TAG-$target.vsix"
+                      test -f "$vsix"
+                      bundled_version="$(unzip -p "$vsix" \
+                          extension/package.json | jq --raw-output .version)"
+                      test "$bundled_version" = "$version"
+                      manifest="$(unzip -p "$vsix" extension.vsixmanifest)"
+                      if [[ "$PRERELEASE" = true ]]; then
+                          grep -Fq 'Microsoft.VisualStudio.Code.PreRelease' \
+                              <<< "$manifest"
+                      elif grep -Fq 'Microsoft.VisualStudio.Code.PreRelease' \
+                          <<< "$manifest"
+                      then
+                          echo "Stable release contains a prerelease VSIX: $vsix" >&2
+                          exit 1
+                      fi
+                  done
+
+                  test "$(find "$VSIX_DIRECTORY" -maxdepth 1 \
+                      -type f -name '*.vsix' | wc -l)" -eq 5
+                  cd "$VSIX_DIRECTORY"
+                  grep -E '  symfony-lsp-.*\.vsix$' SHA256SUMS \
+                      | sha256sum --check --strict -
+            - name: Authenticate with Microsoft Entra ID
+              uses: azure/login@v3
+              with:
+                  client-id: ${{ vars.AZURE_CLIENT_ID }}
+                  tenant-id: ${{ vars.AZURE_TENANT_ID }}
+                  allow-no-subscriptions: true
+            - name: Verify Marketplace access
+              working-directory: editor/vscode
+              run: |
+                  publisher="$(node --print "require('./package.json').publisher")"
+                  npx vsce verify-pat "$publisher" --azure-credential
+            - name: Publish release packages
+              working-directory: editor/vscode
+              env:
+                  PRERELEASE: ${{ steps.release.outputs.prerelease }}
+              run: |
+                  options=(publish --azure-credential --skip-duplicate)
+                  if [[ "$PRERELEASE" = true ]]; then
+                      options+=(--pre-release)
+                  fi
+                  npx vsce "${options[@]}" \
+                      --packagePath "$VSIX_DIRECTORY"/*.vsix

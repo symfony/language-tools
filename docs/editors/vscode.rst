@@ -8,16 +8,24 @@ later.
 Installing the Extension
 ------------------------
 
-Download the ``.vsix`` file for the VS Code extension host's platform from the
-GitHub release and install it:
+Install Symfony LSP from the Visual Studio Marketplace. Releases are currently
+published on the prerelease channel:
+
+.. code-block:: terminal
+
+    $ code --install-extension symfony.symfony-lsp --pre-release
+
+The Marketplace selects the package matching the extension host. Packages are
+available for Linux x64 and ARM64, macOS x64 and ARM64 and Windows x64. Each
+package contains the matching language server and Tree-sitter sidecar, so
+``symfonyLsp.serverPath`` doesn't need to be configured.
+
+You can also download the matching ``.vsix`` file from the GitHub release and
+install it directly:
 
 .. code-block:: terminal
 
     $ code --install-extension /path/to/downloaded-extension.vsix
-
-Packages are available for Linux x64 and ARM64, macOS x64 and ARM64 and Windows
-x64. Each package contains the matching language server and Tree-sitter
-sidecar, so ``symfonyLsp.serverPath`` doesn't need to be configured.
 
 Building the Extension from Source
 ----------------------------------

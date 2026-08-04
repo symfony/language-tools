@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Publish release VSIX packages automatically to the Visual Studio Marketplace
+
 ## 0.3.0 (2026-08-04)
 
 - Add self-contained VS Code packages with index status and controls

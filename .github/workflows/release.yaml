@@ -207,7 +207,8 @@ jobs:
               run: |
                   npm ci
                   mkdir -p dist
-                  npm run package -- --target "$TARGET" --out "dist/symfony-lsp-$VERSION-$TARGET.vsix"
+                  npm run package -- --pre-release --target "$TARGET" --out "dist/symfony-lsp-$VERSION-$TARGET.vsix"
+                  unzip -p "dist/symfony-lsp-$VERSION-$TARGET.vsix" extension.vsixmanifest | grep -F 'Microsoft.VisualStudio.Code.PreRelease'
                   npx vsce ls | grep -Fx "server/$EXECUTABLE"
                   npx vsce ls | grep -Fx "server/$SIDECAR"
             - uses: actions/upload-artifact@v7
@@ -245,3 +246,14 @@ jobs:
               env:
                   GH_TOKEN: ${{ github.token }}
               run: gh release edit "${{ github.ref_name }}" --draft=false --prerelease
+
+    marketplace:
+        name: Publish VS Code extension
+        if: startsWith(github.ref, 'refs/tags/')
+        needs: release
+        permissions:
+            contents: read
+            id-token: write
+        uses: ./.github/workflows/publish-vscode.yaml
+        with:
+            tag: ${{ github.ref_name }}
