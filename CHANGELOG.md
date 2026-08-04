@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 (2026-08-04)
 
 - Added self-contained VS Code packages with index status and controls.
 - Added Doctrine entity, repository, and mapped field support.
@@ -8,6 +8,7 @@
 - Added AssetMapper path and importmap entrypoint support.
 - Added form option, validation constraint, serializer group, and mapped metadata support.
 - Added Twig render-context variables, globals, and component support.
+- Fixed runtime refreshes triggered by generated cache and dependency files.
 
 ## 0.2.0 (2026-08-01)
 
