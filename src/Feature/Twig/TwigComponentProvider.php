@@ -11,6 +11,7 @@ use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
 final class TwigComponentProvider implements CodeLensProviderInterface, CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface, ReferencesProviderInterface
@@ -37,7 +38,12 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
         $cursor = $this->converter->toByteOffset($document->text(), $position);
         $before = substr($document->text(), 0, $cursor);
         $index = $this->indexes->forProject($project);
-        if (preg_match('/<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\s+[^>]*?([A-Za-z_][A-Za-z0-9_]*)$/', $before, $match)) {
+        $liveActionContext = $this->liveActionCompletionContext($project, $document->uri(), $before);
+        if (null !== $liveActionContext) {
+            [$component, $prefix] = $liveActionContext;
+            $values = array_map(static fn (TwigComponentAction $action): string => $action->name(), $component->actions());
+            $detail = \sprintf('Live action of component %s', $component->name());
+        } elseif (preg_match('/<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\s+[^>]*?([A-Za-z_][A-Za-z0-9_]*)$/', $before, $match)) {
             $component = $index->get($match[1]);
             if (null === $component) {
                 return null;
@@ -77,12 +83,18 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
 
     public function hover(array $params): ?array
     {
+        $action = $this->resolveAction($params);
+        if (null !== $action) {
+            [$component, $componentAction] = $action;
+
+            return ['contents' => ['kind' => 'markdown', 'value' => \sprintf('Live action: `%s#%s`', $component->name(), $componentAction->name())]];
+        }
         $resolved = $this->resolve($params);
         if (null === $resolved) {
             return null;
         }
         [$component] = $resolved;
-        $details = [\sprintf('Twig component: `%s`', $component->name())];
+        $details = [\sprintf('%s component: `%s`', $component->isLive() ? 'Live' : 'Twig', $component->name())];
         if (null !== $component->className()) {
             $details[] = \sprintf('Class: `%s`', $component->className());
         }
@@ -92,12 +104,29 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
         if ([] !== $component->properties()) {
             $details[] = \sprintf('Properties: `%s`', implode('`, `', $component->properties()));
         }
+        if ([] !== $component->actions()) {
+            $details[] = \sprintf('Actions: `%s`', implode('`, `', array_map(static fn (TwigComponentAction $action): string => $action->name(), $component->actions())));
+        }
 
         return ['contents' => ['kind' => 'markdown', 'value' => implode("\n\n", $details)]];
     }
 
     public function definition(array $params): ?array
     {
+        $action = $this->resolveAction($params);
+        if (null !== $action) {
+            [$component, $componentAction, $project] = $action;
+            $locations = [];
+            foreach ($this->indexes->forProject($project)->declarations($component->name()) as $declaration) {
+                foreach ($declaration->actions() as $declarationAction) {
+                    if ($componentAction->name() === $declarationAction->name()) {
+                        $locations[] = ['uri' => $declaration->uri(), 'range' => $this->range($declarationAction->range())];
+                    }
+                }
+            }
+
+            return $locations;
+        }
         $resolved = $this->resolve($params);
         if (null === $resolved) {
             return null;
@@ -112,6 +141,16 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
 
     public function references(array $params): ?array
     {
+        $action = $this->resolveAction($params);
+        if (null !== $action) {
+            [$component, $componentAction, $project] = $action;
+            $locations = $this->definition($params) ?? [];
+            foreach ($this->indexes->forProject($project)->actionReferences($component->name(), $componentAction->name()) as $reference) {
+                $locations[] = ['uri' => $reference->uri(), 'range' => $this->range($reference->range())];
+            }
+
+            return $locations;
+        }
         $resolved = $this->resolve($params);
         if (null === $resolved) {
             return null;
@@ -189,10 +228,91 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
         return $lenses;
     }
 
+    /** @return array{TwigComponent, string}|null */
+    private function liveActionCompletionContext(Project $project, string $uri, string $before): ?array
+    {
+        $component = null;
+        $value = null;
+        if (preg_match('/<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\b[^>]*\bdata-live-action-param\s*=\s*([\'"])([^\'"]*)$/s', $before, $match)) {
+            $tagComponent = $this->indexes->forProject($project)->get($match[1]);
+            if ($tagComponent?->isLive()) {
+                $component = $tagComponent;
+                $value = $match[3];
+            }
+        }
+        if (null === $component && preg_match('/\bdata-live-action-param\s*=\s*([\'"])([^\'"]*)$/s', $before, $match)) {
+            $component = $this->componentForUri($project, $uri);
+            $value = $match[2];
+        }
+        if (null === $component && preg_match('/\blive_action\s*\(\s*([\'"])([^\'"]*)$/s', $before, $match)) {
+            $component = $this->componentForUri($project, $uri);
+            $value = $match[2];
+        }
+        if (null === $component || null === $value) {
+            return null;
+        }
+        $parts = explode('|', $value);
+        $prefix = explode(':', end($parts))[0];
+
+        return [$component, $prefix];
+    }
+
+    private function componentForUri(Project $project, string $uri): ?TwigComponent
+    {
+        foreach ($this->indexes->forProject($project)->components() as $component) {
+            foreach ($this->indexes->forProject($project)->declarations($component->name()) as $declaration) {
+                if ($uri === $declaration->uri() && $component->isLive()) {
+                    return $component;
+                }
+            }
+        }
+
+        return null;
+    }
+
     /**
      * @param array<array-key, mixed> $params
      *
-     * @return array{TwigComponent, \Symfony\Lsp\Project\Project}|null
+     * @return array{TwigComponent, TwigComponentAction, Project}|null
+     */
+    private function resolveAction(array $params): ?array
+    {
+        $resolved = $this->document($params);
+        if (null === $resolved) {
+            return null;
+        }
+        [$document, $project, $position] = $resolved;
+        $offset = $this->converter->toByteOffset($document->text(), $position);
+        $facts = $this->extractor->extract($project, $document->uri(), $document->languageId(), $document->text());
+        foreach ($facts->actionReferences() as $reference) {
+            if (!$this->contains($document->text(), $reference->range(), $offset)) {
+                continue;
+            }
+            $component = $this->indexes->forProject($project)->get($reference->component());
+            if (null === $component) {
+                return null;
+            }
+            foreach ($component->actions() as $action) {
+                if ($reference->action() === $action->name()) {
+                    return [$component, $action, $project];
+                }
+            }
+        }
+        foreach ($facts->components() as $component) {
+            foreach ($component->actions() as $action) {
+                if ($this->contains($document->text(), $action->range(), $offset)) {
+                    return [$this->indexes->forProject($project)->get($component->name()) ?? $component, $action, $project];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<array-key, mixed> $params
+     *
+     * @return array{TwigComponent, Project}|null
      */
     private function resolve(array $params): ?array
     {
@@ -222,7 +342,7 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
     /**
      * @param array<array-key, mixed> $params
      *
-     * @return array{\Symfony\Lsp\Document\Document, \Symfony\Lsp\Project\Project, \Symfony\Lsp\Document\Position}|null
+     * @return array{\Symfony\Lsp\Document\Document, Project, \Symfony\Lsp\Document\Position}|null
      */
     private function document(array $params): ?array
     {

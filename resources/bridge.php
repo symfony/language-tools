@@ -18,6 +18,7 @@ require __DIR__.'/bridge/sections/events.php';
 require __DIR__.'/bridge/sections/security.php';
 require __DIR__.'/bridge/sections/metadata.php';
 require __DIR__.'/bridge/sections/assets.php';
+require __DIR__.'/bridge/sections/stimulus.php';
 require __DIR__.'/bridge/sections/configuration.php';
 require __DIR__.'/bridge/sections/environment.php';
 
@@ -88,6 +89,7 @@ foreach ($requestedSections as $sectionName) {
             'security' => bridgeSecuritySection($context),
             'metadata' => bridgeMetadataSection($context),
             'assets' => bridgeAssetsSection($context),
+            'stimulus' => bridgeStimulusSection($context),
             'configuration' => bridgeConfigurationSection($context),
             'environment' => bridgeEnvironmentSection($context),
             default => null,

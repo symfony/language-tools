@@ -94,6 +94,12 @@ use Symfony\Lsp\Feature\Security\SecurityIndexRegistry;
 use Symfony\Lsp\Feature\Security\SecurityProvider;
 use Symfony\Lsp\Feature\Security\SecuritySourceIndexer;
 use Symfony\Lsp\Feature\Security\SecuritySourceIndexRegistry;
+use Symfony\Lsp\Feature\Stimulus\ProjectStimulusSnapshotLoader;
+use Symfony\Lsp\Feature\Stimulus\StimulusExtractor;
+use Symfony\Lsp\Feature\Stimulus\StimulusIndexRegistry;
+use Symfony\Lsp\Feature\Stimulus\StimulusProvider;
+use Symfony\Lsp\Feature\Stimulus\StimulusSourceIndexer;
+use Symfony\Lsp\Feature\Stimulus\StimulusSourceIndexRegistry;
 use Symfony\Lsp\Feature\Translation\ProjectTranslationSnapshotLoader;
 use Symfony\Lsp\Feature\Translation\TranslationCodeActionProvider;
 use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
@@ -102,6 +108,7 @@ use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationProvider;
 use Symfony\Lsp\Feature\Translation\TranslationRenameHandler;
 use Symfony\Lsp\Feature\Translation\TranslationSourceIndexer;
+use Symfony\Lsp\Feature\Twig\LiveComponentEventProvider;
 use Symfony\Lsp\Feature\Twig\ProjectTemplateSnapshotLoader;
 use Symfony\Lsp\Feature\Twig\TemplateCodeActionProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCompletionHandler;
@@ -191,6 +198,8 @@ final class LanguageServerFactory
         $metadataSourceIndexes = new MetadataSourceIndexRegistry();
         $assetIndexes = new AssetIndexRegistry();
         $assetSourceIndexes = new AssetSourceIndexRegistry();
+        $stimulusIndexes = new StimulusIndexRegistry();
+        $stimulusSourceIndexes = new StimulusSourceIndexRegistry();
         $client = new JsonRpcClient($peer);
         $progress = new WorkDoneProgressReporter($client);
         $workspaceTrust = new WorkspaceTrust();
@@ -261,6 +270,17 @@ final class LanguageServerFactory
             $assetSourceIndexes,
             $assetExtractor,
         );
+        $stimulusExtractor = new StimulusExtractor($positionConverter);
+        $stimulusProvider = new StimulusProvider(
+            $documentContextResolver,
+            $documents,
+            $projects,
+            $positionConverter,
+            $uriConverter,
+            $stimulusIndexes,
+            $stimulusSourceIndexes,
+            $stimulusExtractor,
+        );
         $dependencyInjectionSymbolResolver = new DependencyInjectionSymbolResolver(
             $positionConverter,
             $yamlDependencyInjectionExtractor,
@@ -285,6 +305,12 @@ final class LanguageServerFactory
         $twigComponentProvider = new TwigComponentProvider(
             $documents,
             $projects,
+            $positionConverter,
+            $twigComponentIndexes,
+            $twigComponentExtractor,
+        );
+        $liveComponentEventProvider = new LiveComponentEventProvider(
+            $documentContextResolver,
             $positionConverter,
             $twigComponentIndexes,
             $twigComponentExtractor,
@@ -348,6 +374,7 @@ final class LanguageServerFactory
             $securityProvider,
             $metadataProvider,
             $assetProvider,
+            $stimulusProvider,
         );
         $runtimeConfiguration = new RuntimeConfiguration();
         $runtimeInitializer = new ObservedRuntimeInitializer(
@@ -369,6 +396,7 @@ final class LanguageServerFactory
                                 new ProjectSecuritySnapshotLoader($securityIndexes),
                                 new ProjectMetadataSnapshotLoader($metadataIndexes),
                                 new ProjectAssetSnapshotLoader($assetIndexes),
+                                new ProjectStimulusSnapshotLoader($stimulusIndexes),
                             ),
                             $runtimeConfiguration,
                         ),
@@ -420,6 +448,7 @@ final class LanguageServerFactory
             new SecuritySourceIndexer($securitySourceIndexes, $securityExtractor),
             new MetadataSourceIndexer($metadataSourceIndexes, $metadataExtractor),
             new AssetSourceIndexer($assetSourceIndexes, $assetExtractor),
+            new StimulusSourceIndexer($stimulusSourceIndexes, $stimulusExtractor),
         );
         $workspaceConfiguration = new WorkspaceConfiguration(
             new ProjectDiscovery($uriConverter),
@@ -477,6 +506,7 @@ final class LanguageServerFactory
                 ),
                 $twigVariableProvider,
                 $twigComponentProvider,
+                $liveComponentEventProvider,
                 $translationProvider,
                 $environmentProvider,
                 $configurationProvider,
@@ -485,6 +515,7 @@ final class LanguageServerFactory
                 $securityProvider,
                 $metadataProvider,
                 $assetProvider,
+                $stimulusProvider,
             ),
             new CodeActionProviderRegistry(
                 new RouteCodeActionProvider(
@@ -509,7 +540,7 @@ final class LanguageServerFactory
                     $translationIndexes,
                 ),
             ),
-            new CodeLensProviderRegistry($messengerProvider, $eventProvider, $twigComponentProvider),
+            new CodeLensProviderRegistry($messengerProvider, $eventProvider, $twigComponentProvider, $stimulusProvider),
             new HoverProviderRegistry(
                 $routeHover,
                 new DependencyInjectionHoverHandler(
@@ -522,6 +553,7 @@ final class LanguageServerFactory
                 $templateNavigation,
                 $twigVariableProvider,
                 $twigComponentProvider,
+                $liveComponentEventProvider,
                 $translationProvider,
                 $environmentProvider,
                 $configurationProvider,
@@ -530,6 +562,7 @@ final class LanguageServerFactory
                 $securityProvider,
                 $metadataProvider,
                 $assetProvider,
+                $stimulusProvider,
             ),
             $diagnosticProviders,
             new DefinitionProviderRegistry(
@@ -542,6 +575,7 @@ final class LanguageServerFactory
                 ),
                 $templateNavigation,
                 $twigComponentProvider,
+                $liveComponentEventProvider,
                 $translationProvider,
                 $environmentProvider,
                 $messengerProvider,
@@ -549,6 +583,7 @@ final class LanguageServerFactory
                 $securityProvider,
                 $metadataProvider,
                 $assetProvider,
+                $stimulusProvider,
             ),
             new DocumentLinkProviderRegistry(
                 new RouteDocumentLinkHandler(
@@ -561,6 +596,7 @@ final class LanguageServerFactory
                 $templateNavigation,
                 $configurationProvider,
                 $assetProvider,
+                $stimulusProvider,
             ),
             new ReferencesProviderRegistry(
                 $routeReferences,
@@ -571,6 +607,7 @@ final class LanguageServerFactory
                 ),
                 $templateNavigation,
                 $twigComponentProvider,
+                $liveComponentEventProvider,
                 $translationProvider,
                 $environmentProvider,
                 $messengerProvider,
@@ -578,6 +615,7 @@ final class LanguageServerFactory
                 $securityProvider,
                 $metadataProvider,
                 $assetProvider,
+                $stimulusProvider,
             ),
             new RenameProviderRegistry(
                 $routeRename,

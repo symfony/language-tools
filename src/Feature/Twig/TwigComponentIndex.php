@@ -94,6 +94,53 @@ final class TwigComponentIndex
         return $references;
     }
 
+    /** @return list<TwigComponentActionReference> */
+    public function actionReferences(string $component, string $action): array
+    {
+        $references = [];
+        foreach ($this->facts() as $facts) {
+            foreach ($facts->actionReferences() as $reference) {
+                if ($component === $reference->component() && $action === $reference->action()) {
+                    $references[] = $reference;
+                }
+            }
+        }
+
+        return $references;
+    }
+
+    /** @return list<LiveComponentEvent> */
+    public function events(string $name): array
+    {
+        $events = [];
+        foreach ($this->facts() as $facts) {
+            foreach ($facts->events() as $event) {
+                if ($name === $event->name()) {
+                    $events[] = $event;
+                }
+            }
+        }
+
+        return $events;
+    }
+
+    /** @return list<string> */
+    public function eventNames(): array
+    {
+        $names = [];
+        foreach ($this->facts() as $facts) {
+            foreach ($facts->events() as $event) {
+                if ($event->isDeclaration()) {
+                    $names[] = $event->name();
+                }
+            }
+        }
+        $names = array_values(array_unique($names));
+        sort($names);
+
+        return $names;
+    }
+
     public function isComplete(): bool
     {
         return $this->complete;
@@ -111,6 +158,11 @@ final class TwigComponentIndex
             return $component;
         }
 
+        $actions = [];
+        foreach ([...$current->actions(), ...$component->actions()] as $action) {
+            $actions[$action->name()] = $action;
+        }
+
         return new TwigComponent(
             $component->name(),
             null !== $component->className() ? $component->uri() : $current->uri(),
@@ -118,6 +170,8 @@ final class TwigComponentIndex
             $component->className() ?? $current->className(),
             $component->template() ?? $current->template(),
             array_values(array_unique([...$current->properties(), ...$component->properties()])),
+            $current->isLive() || $component->isLive(),
+            array_values($actions),
         );
     }
 }

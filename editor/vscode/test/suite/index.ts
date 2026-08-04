@@ -9,6 +9,7 @@ import { lifecycleTests } from './lifecycle.test';
 import { messengerTests } from './messenger.test';
 import { routingTests } from './routing.test';
 import { securityTests } from './security.test';
+import { stimulusTests } from './stimulus.test';
 import { cleanupTemporaryDocuments, setWorkspace, TestCase } from './support';
 import { translationTests } from './translation.test';
 import { twigTests } from './twig.test';
@@ -28,6 +29,7 @@ export async function run(): Promise<void> {
         ...dependencyInjectionTests,
         ...twigTests,
         ...assetTests,
+        ...stimulusTests,
         ...translationTests,
         ...environmentTests,
         ...configurationTests,

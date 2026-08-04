@@ -328,6 +328,27 @@ final class BridgeTest extends TestCase
         self::assertSame([], $result['sections']['assets']['importMap'] ?? null);
     }
 
+    public function testReportsUnavailableOptionalStimulusBundle(): void
+    {
+        $this->writeAutoloader('8.0.6');
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=stimulus 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $result = json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame(0, $exitCode);
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null);
+        self::assertIsArray($result['sections'] ?? null);
+        self::assertIsArray($result['sections']['stimulus'] ?? null);
+        self::assertFalse($result['sections']['stimulus']['complete'] ?? null);
+        self::assertSame([], $result['sections']['stimulus']['controllers'] ?? null);
+    }
+
     public function testReportsUnavailableOptionalMetadataComponents(): void
     {
         $this->writeAutoloader('8.0.6');

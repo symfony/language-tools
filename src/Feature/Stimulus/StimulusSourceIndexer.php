@@ -1,24 +1,24 @@
 <?php
 
-namespace Symfony\Lsp\Feature\Twig;
+namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Project\Project;
 
-final class TwigComponentSourceIndexer implements SourceIndexProviderInterface
+final class StimulusSourceIndexer implements SourceIndexProviderInterface
 {
-    /** @var array<string, list<TwigComponentSourceFacts>> */
+    /** @var array<string, list<StimulusSourceFacts>> */
     private array $facts = [];
 
-    public function __construct(private readonly TwigComponentIndexRegistry $indexes, private readonly TwigComponentExtractor $extractor)
+    public function __construct(private readonly StimulusSourceIndexRegistry $indexes, private readonly StimulusExtractor $extractor)
     {
     }
 
     public function name(): string
     {
-        return 'twig_components_v2';
+        return 'stimulus';
     }
 
     public function begin(Project $project): void
@@ -26,15 +26,15 @@ final class TwigComponentSourceIndexer implements SourceIndexProviderInterface
         $this->facts[$project->rootPath()] = [];
     }
 
-    public function index(Project $project, SourceDocument $document): TwigComponentSourceFacts
+    public function index(Project $project, SourceDocument $document): StimulusSourceFacts
     {
         return $this->add($project, $this->extract($project, $document));
     }
 
     public function restore(Project $project, mixed $data): void
     {
-        if (!$data instanceof TwigComponentSourceFacts) {
-            throw new \UnexpectedValueException('The cached Twig component source facts are invalid.');
+        if (!$data instanceof StimulusSourceFacts) {
+            throw new \UnexpectedValueException('The cached Stimulus source facts are invalid.');
         }
         $this->add($project, $data);
     }
@@ -46,7 +46,7 @@ final class TwigComponentSourceIndexer implements SourceIndexProviderInterface
         unset($this->facts[$key]);
     }
 
-    public function replace(Project $project, SourceDocument $document): TwigComponentSourceFacts
+    public function replace(Project $project, SourceDocument $document): StimulusSourceFacts
     {
         $facts = $this->extract($project, $document);
         $this->indexes->forProject($project)->replaceSource($facts);
@@ -69,14 +69,14 @@ final class TwigComponentSourceIndexer implements SourceIndexProviderInterface
         $this->indexes->forProject($project)->removeOverlay($uri);
     }
 
-    private function add(Project $project, TwigComponentSourceFacts $facts): TwigComponentSourceFacts
+    private function add(Project $project, StimulusSourceFacts $facts): StimulusSourceFacts
     {
         $this->facts[$project->rootPath()][] = $facts;
 
         return $facts;
     }
 
-    private function extract(Project $project, SourceDocument $document): TwigComponentSourceFacts
+    private function extract(Project $project, SourceDocument $document): StimulusSourceFacts
     {
         return $this->extractor->extract($project, $document->uri(), $document->languageId(), $document->text());
     }

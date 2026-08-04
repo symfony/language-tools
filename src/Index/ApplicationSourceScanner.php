@@ -21,8 +21,11 @@ final class ApplicationSourceScanner
     ];
 
     private const LANGUAGE_IDS = [
+        'js' => 'javascript',
         'json' => 'json',
+        'mjs' => 'javascript',
         'php' => 'php',
+        'ts' => 'typescript',
         'twig' => 'twig',
         'xlf' => 'xml',
         'xliff' => 'xml',
@@ -273,7 +276,12 @@ final class ApplicationSourceScanner
             return 'dotenv';
         }
 
-        return self::LANGUAGE_IDS[strtolower(pathinfo($path, \PATHINFO_EXTENSION))] ?? null;
+        $extension = strtolower(pathinfo($path, \PATHINFO_EXTENSION));
+        if (\in_array($extension, ['js', 'mjs', 'ts'], true) && !str_contains(str_replace('\\', '/', $path), '/assets/')) {
+            return null;
+        }
+
+        return self::LANGUAGE_IDS[$extension] ?? null;
     }
 
     /**

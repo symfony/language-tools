@@ -2,3 +2,5 @@
 {% if is_granted('ROLE_ADMIN') %}Admin{% endif %}
 <script src="{{ asset('app.js') }}"></script>
 {{ importmap('app') }}
+<div data-controller="search" data-action="click->search#open" data-search-target="results"></div>
+<twig:Search query="symfony" data-live-action-param="submit" />

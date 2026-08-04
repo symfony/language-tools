@@ -10,9 +10,11 @@
         "symfony/framework-bundle": "*",
         "symfony/messenger": "*",
         "symfony/security-bundle": "*",
+        "symfony/stimulus-bundle": "*",
         "symfony/string": "*",
         "symfony/translation": "*",
         "symfony/twig-bundle": "*",
+        "symfony/ux-live-component": "*",
         "symfony/yaml": "*"
     },
     "autoload": {

@@ -96,6 +96,13 @@ Supported Integrations
       - Yes
       - No
       - Yes
+    * - :doc:`Stimulus and Live Components </features/stimulus>`
+      - Yes
+      - Yes
+      - Yes
+      - Yes
+      - No
+      - Yes
 
 Messenger message and handler classes, and event and listener classes, also
 provide code lenses for navigating between related classes.
@@ -114,7 +121,8 @@ runs structured Symfony commands to obtain effective metadata:
 * ``debug:twig --format=json``;
 * ``debug:event-dispatcher --format=json``;
 * ``debug:config security --format=json`` when SecurityBundle is installed;
-* ``debug:form --format=json`` when Form is installed.
+* ``debug:form --format=json`` when Form is installed;
+* ``debug:config stimulus --format=json`` when StimulusBundle is installed.
 
 The bridge also discovers installed constraint options through reflection,
 AssetMapper paths through structured container metadata and environment
@@ -135,8 +143,9 @@ suppressed.
 Source Indexes and Overlays
 ---------------------------
 
-The source scanner indexes application-owned PHP, Twig, YAML, translation and
-dotenv files. Twig and YAML use bundled Tree-sitter grammars, preserving useful
+The source scanner indexes application-owned PHP, Twig, YAML, translation,
+dotenv and JavaScript or TypeScript controller files. Twig and YAML use bundled
+Tree-sitter grammars, preserving useful
 source facts and exact byte ranges around incomplete syntax. The scanner
 excludes ``vendor/``, ``var/``, ``node_modules/`` and Git metadata. Versioned
 source facts persist under

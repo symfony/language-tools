@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added Stimulus and Live Component support.
 - Added AssetMapper path and importmap entrypoint support.
 - Added form option, validation constraint, serializer group, and mapped metadata support.
 - Added Twig render-context variables, globals, and component support.

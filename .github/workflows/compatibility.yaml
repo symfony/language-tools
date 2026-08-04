@@ -12,7 +12,11 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                symfony: ['6.4.*', '7.4.*', '8.0.*', '8.1.*']
+                include:
+                    - { symfony: '6.4.*', ux: '2.*' }
+                    - { symfony: '7.4.*', ux: '3.*' }
+                    - { symfony: '8.0.*', ux: '3.*' }
+                    - { symfony: '8.1.*', ux: '3.*' }
         steps:
             - uses: actions/checkout@v7
             - uses: shivammathur/setup-php@v2
@@ -29,10 +33,14 @@ jobs:
                   --with "symfony/dotenv:${{ matrix.symfony }}"
                   --with "symfony/framework-bundle:${{ matrix.symfony }}"
                   --with "symfony/messenger:${{ matrix.symfony }}"
+                  --with "symfony/property-info:${{ matrix.symfony }}"
                   --with "symfony/security-bundle:${{ matrix.symfony }}"
+                  --with "symfony/stimulus-bundle:${{ matrix.ux }}"
                   --with "symfony/string:${{ matrix.symfony }}"
                   --with "symfony/translation:${{ matrix.symfony }}"
                   --with "symfony/twig-bundle:${{ matrix.symfony }}"
+                  --with "symfony/ux-live-component:${{ matrix.ux }}"
+                  --with "symfony/ux-twig-component:${{ matrix.ux }}"
                   --with "symfony/yaml:${{ matrix.symfony }}"
             - name: Test the project bridge
               env:

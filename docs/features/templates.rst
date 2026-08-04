@@ -45,10 +45,14 @@ Hover shows the component class, template, and public properties. Go to
 Definition opens the component class and anonymous component template. Find All
 References and code lenses expose statically recognized component usages.
 
-Symfony LSP indexes ``#[AsTwigComponent]`` classes, templates under
-``templates/components/``, ``<twig:...>`` tags, and static ``component()``
-function calls. Unknown static component names are reported after source
-indexing finishes.
+Symfony LSP indexes ``#[AsTwigComponent]`` and ``#[AsLiveComponent]`` classes,
+templates under ``templates/components/``, ``<twig:...>`` tags and static
+``component()`` function calls. Live Component properties and actions are
+included in component metadata. Unknown static component names are reported
+after source indexing finishes.
+
+Stimulus controllers and Live Component actions and events are documented in
+:doc:`/features/stimulus`.
 
 Diagnostics
 -----------

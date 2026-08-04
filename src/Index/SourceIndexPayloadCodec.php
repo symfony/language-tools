@@ -32,13 +32,21 @@ use Symfony\Lsp\Feature\Route\RouteSourceFacts;
 use Symfony\Lsp\Feature\Security\SecuritySourceFacts;
 use Symfony\Lsp\Feature\Security\SecuritySourceSymbol;
 use Symfony\Lsp\Feature\Security\SecuritySymbolKind;
+use Symfony\Lsp\Feature\Stimulus\StimulusControllerDeclaration;
+use Symfony\Lsp\Feature\Stimulus\StimulusMember;
+use Symfony\Lsp\Feature\Stimulus\StimulusMemberKind;
+use Symfony\Lsp\Feature\Stimulus\StimulusReference;
+use Symfony\Lsp\Feature\Stimulus\StimulusSourceFacts;
 use Symfony\Lsp\Feature\Translation\TranslationDeclaration;
 use Symfony\Lsp\Feature\Translation\TranslationReference;
 use Symfony\Lsp\Feature\Translation\TranslationSourceFacts;
+use Symfony\Lsp\Feature\Twig\LiveComponentEvent;
 use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateReference;
 use Symfony\Lsp\Feature\Twig\TemplateSourceFacts;
 use Symfony\Lsp\Feature\Twig\TwigComponent;
+use Symfony\Lsp\Feature\Twig\TwigComponentAction;
+use Symfony\Lsp\Feature\Twig\TwigComponentActionReference;
 use Symfony\Lsp\Feature\Twig\TwigComponentReference;
 use Symfony\Lsp\Feature\Twig\TwigComponentSourceFacts;
 
@@ -75,13 +83,21 @@ final class SourceIndexPayloadCodec
         SecuritySourceFacts::class,
         SecuritySourceSymbol::class,
         SecuritySymbolKind::class,
+        StimulusControllerDeclaration::class,
+        StimulusMember::class,
+        StimulusMemberKind::class,
+        StimulusReference::class,
+        StimulusSourceFacts::class,
         TranslationDeclaration::class,
         TranslationReference::class,
         TranslationSourceFacts::class,
         TemplateDeclaration::class,
+        LiveComponentEvent::class,
         TemplateReference::class,
         TemplateSourceFacts::class,
         TwigComponent::class,
+        TwigComponentAction::class,
+        TwigComponentActionReference::class,
         TwigComponentReference::class,
         TwigComponentSourceFacts::class,
     ];

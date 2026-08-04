@@ -20,7 +20,7 @@ final class BridgeCompatibilityTest extends TestCase
             '--project='.$project,
             '--environment=test',
             '--debug=1',
-            '--sections=routes,container,twig,translations,configuration,environment,messenger,events,security,assets',
+            '--sections=routes,container,twig,translations,configuration,environment,messenger,events,security,assets,stimulus',
         ], $project);
 
         $snapshot = $process->stdout();
@@ -45,6 +45,7 @@ final class BridgeCompatibilityTest extends TestCase
         $events = $this->section($result['sections'], 'events');
         $security = $this->section($result['sections'], 'security');
         $assets = $this->section($result['sections'], 'assets');
+        $stimulus = $this->section($result['sections'], 'stimulus');
 
         self::assertContains('fixture_home', array_column(\is_array($routes['items'] ?? null) ? $routes['items'] : [], 'name'));
         self::assertContains('App\\Environment\\CustomEnvVarProcessor', array_column(\is_array($container['items'] ?? null) ? $container['items'] : [], 'class'));
@@ -64,9 +65,19 @@ final class BridgeCompatibilityTest extends TestCase
         self::assertContains('App\\Security\\PostVoter', array_column(\is_array($security['voters'] ?? null) ? $security['voters'] : [], 'class'));
         $mappedAssets = \is_array($assets['assets'] ?? null) ? $assets['assets'] : [];
         self::assertContains('app.js', array_column($mappedAssets, 'logicalPath'));
-        self::assertIsArray($mappedAssets[0] ?? null);
-        self::assertFalse($mappedAssets[0]['vendor'] ?? true);
+        $applicationAssets = array_values(array_filter($mappedAssets, static fn (mixed $asset): bool => \is_array($asset) && 'app.js' === ($asset['logicalPath'] ?? null)));
+        self::assertCount(1, $applicationAssets);
+        self::assertFalse($applicationAssets[0]['vendor'] ?? true);
         self::assertContains('app', array_column(\is_array($assets['importMap'] ?? null) ? $assets['importMap'] : [], 'name'));
+        $stimulusControllers = \is_array($stimulus['controllers'] ?? null) ? $stimulus['controllers'] : [];
+        self::assertContains('search', array_column($stimulusControllers, 'name'));
+        self::assertIsArray($stimulusControllers[0] ?? null);
+        $stimulusActions = $stimulusControllers[0]['actions'] ?? [];
+        $stimulusTargets = $stimulusControllers[0]['targets'] ?? [];
+        self::assertIsArray($stimulusActions);
+        self::assertIsArray($stimulusTargets);
+        self::assertContains('open', $stimulusActions);
+        self::assertContains('results', $stimulusTargets);
     }
 
     /**

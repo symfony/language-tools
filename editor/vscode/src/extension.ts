@@ -33,6 +33,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const clientOptions: LanguageClientOptions = {
         documentSelector: [
             { scheme: 'file', language: 'php' },
+            { scheme: 'file', language: 'javascript' },
+            { scheme: 'file', language: 'typescript' },
             { scheme: 'file', language: 'twig' },
             { scheme: 'file', language: 'html', pattern: '**/*.twig' },
             { scheme: 'file', language: 'yaml' },
@@ -55,7 +57,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         synchronize: {
             configurationSection: 'symfonyLsp',
             fileEvents: [
-                vscode.workspace.createFileSystemWatcher('**/*.{php,twig,yaml,yml,json,xml,xlf,xliff,css,js,mjs,svg,png,jpg,jpeg,gif,webp,woff,woff2,ttf,otf,wasm}'),
+                vscode.workspace.createFileSystemWatcher('**/*.{php,twig,yaml,yml,json,xml,xlf,xliff,css,js,mjs,ts,svg,png,jpg,jpeg,gif,webp,woff,woff2,ttf,otf,wasm}'),
                 vscode.workspace.createFileSystemWatcher('**/.env*'),
                 vscode.workspace.createFileSystemWatcher('**/composer.{json,lock}'),
             ],
