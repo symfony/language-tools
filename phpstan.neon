@@ -4,9 +4,7 @@ parameters:
         - bin
         - src
         - tests
-        - tools/release
-        - tools/ReleaseCommand.php
-        - tools/ReleaseMetadataUpdater.php
+        - tools
     stubFiles:
         - stubs/tree_sitter.stub
     excludePaths:
