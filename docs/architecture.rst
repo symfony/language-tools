@@ -3,8 +3,7 @@ Architecture and Data Flow
 
 Symfony LSP combines application-owned source facts with effective metadata from
 a running Symfony application. This page describes the implementation as it
-exists today. The root ``RFP.md`` file remains the historical design document,
-but it isn't the operational source of truth.
+exists today.
 
 Process Boundaries
 ------------------
