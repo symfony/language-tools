@@ -32,8 +32,10 @@ Initialization and Project Discovery
 ------------------------------------
 
 ``LanguageServer`` registers protocol handlers and delegates construction to
-``LanguageServerFactory``, the composition root for every parser, index, loader
-and provider.
+``LanguageServerFactory``. The factory creates the transport-bound services and
+compiles the service definitions in ``resources/services.php``, which autowire
+parsers, indexes, loaders and providers. Provider interfaces, source indexers
+and runtime snapshot loaders are collected through tagged iterators.
 
 During ``initialize`` and ``initialized``:
 

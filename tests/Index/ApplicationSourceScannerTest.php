@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Index;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
@@ -36,17 +37,7 @@ final class ApplicationSourceScannerTest extends TestCase
 
     protected function tearDown(): void
     {
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($this->temporaryDirectory, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST,
-        );
-        foreach ($iterator as $file) {
-            if (!$file instanceof \SplFileInfo) {
-                continue;
-            }
-            $file->isDir() ? @rmdir($file->getPathname()) : @unlink($file->getPathname());
-        }
-        @rmdir($this->temporaryDirectory);
+        (new Filesystem())->remove($this->temporaryDirectory);
     }
 
     public function testRestoresPersistentFactsAndRebuildsCorruptedEntries(): void
@@ -125,9 +116,9 @@ final class ApplicationSourceScannerTest extends TestCase
             new DocumentStore(),
             new ProjectIndexStatusRegistry(),
             new NullProgressReporter(),
-            new PersistentSourceIndexStore('test'),
+            new PersistentSourceIndexStore('test', new Filesystem()),
             new SourceIndexPayloadCodec(),
-            $provider,
+            [$provider],
         );
     }
 }

@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Runtime;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\BridgeInstaller;
 
@@ -18,7 +19,7 @@ final class BridgeInstallerTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->removeDirectory($this->temporaryDirectory);
+        (new Filesystem())->remove($this->temporaryDirectory);
     }
 
     public function testInstallsBridgeBundleAtomicallyInsideProject(): void
@@ -28,7 +29,7 @@ final class BridgeInstallerTest extends TestCase
         mkdir(\dirname($module), 0777, true);
         file_put_contents($source, "<?php require __DIR__.'/bridge/sections/routes.php';");
         file_put_contents($module, '<?php function routes(): array { return []; }');
-        $installer = new BridgeInstaller($source, 'test');
+        $installer = new BridgeInstaller($source, 'test', new Filesystem());
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
 
         $first = $installer->install($project);
@@ -53,27 +54,5 @@ final class BridgeInstallerTest extends TestCase
             '<?php function routes(): array { return ["updated"]; }',
             file_get_contents(\dirname($updated).'/bridge/sections/routes.php'),
         );
-    }
-
-    private function removeDirectory(string $directory): void
-    {
-        if (!is_dir($directory)) {
-            return;
-        }
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST,
-        );
-        foreach ($iterator as $file) {
-            if (!$file instanceof \SplFileInfo) {
-                continue;
-            }
-            if ($file->isDir()) {
-                @rmdir($file->getPathname());
-            } else {
-                @unlink($file->getPathname());
-            }
-        }
-        @rmdir($directory);
     }
 }

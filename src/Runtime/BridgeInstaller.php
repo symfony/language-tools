@@ -3,6 +3,9 @@
 namespace Symfony\Lsp\Runtime;
 
 use Amp\Cancellation;
+use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Project\Project;
 
 final class BridgeInstaller implements RuntimeInitializerInterface
@@ -10,6 +13,7 @@ final class BridgeInstaller implements RuntimeInitializerInterface
     public function __construct(
         private readonly string $bridgeSource,
         private readonly string $serverVersion,
+        private readonly Filesystem $filesystem,
     ) {
     }
 
@@ -24,9 +28,7 @@ final class BridgeInstaller implements RuntimeInitializerInterface
         $files = $this->bundleFiles();
         $hash = hash('sha256', serialize($files));
         $baseDirectory = $project->rootPath().'/var/symfony-lsp/'.$this->serverVersion;
-        if (!is_dir($baseDirectory) && !mkdir($baseDirectory, 0777, true) && !is_dir($baseDirectory)) {
-            throw new \RuntimeException(\sprintf('Unable to create bridge directory "%s".', $baseDirectory));
-        }
+        $this->filesystem->mkdir($baseDirectory);
 
         $directory = $baseDirectory.'/'.$hash;
         if ($this->isInstalled($directory, $files)) {
@@ -34,28 +36,21 @@ final class BridgeInstaller implements RuntimeInitializerInterface
         }
 
         $temporary = $baseDirectory.'/.bridge-'.$hash.'-'.bin2hex(random_bytes(8));
-        if (!mkdir($temporary, 0777)) {
-            throw new \RuntimeException(\sprintf('Unable to create a bridge directory in "%s".', $baseDirectory));
-        }
+        $this->filesystem->mkdir($temporary);
 
         try {
             foreach ($files as $relativePath => $contents) {
-                $destination = $temporary.'/'.$relativePath;
-                $parent = \dirname($destination);
-                if (!is_dir($parent) && !mkdir($parent, 0777, true) && !is_dir($parent)) {
-                    throw new \RuntimeException(\sprintf('Unable to create bridge directory "%s".', $parent));
-                }
-                if (false === file_put_contents($destination, $contents)) {
-                    throw new \RuntimeException(\sprintf('Unable to install project bridge file "%s".', $destination));
-                }
+                $this->filesystem->dumpFile($temporary.'/'.$relativePath, $contents);
             }
-            if (!@rename($temporary, $directory) && !$this->isInstalled($directory, $files)) {
-                throw new \RuntimeException(\sprintf('Unable to install project bridge "%s".', $directory));
+            try {
+                $this->filesystem->rename($temporary, $directory);
+            } catch (IOExceptionInterface $error) {
+                if (!$this->isInstalled($directory, $files)) {
+                    throw new \RuntimeException(\sprintf('Unable to install project bridge "%s".', $directory), previous: $error);
+                }
             }
         } finally {
-            if (is_dir($temporary)) {
-                $this->removeDirectory($temporary);
-            }
+            $this->filesystem->remove($temporary);
         }
 
         return $directory.'/bridge.php';
@@ -71,11 +66,8 @@ final class BridgeInstaller implements RuntimeInitializerInterface
         $files = ['bridge.php' => $contents];
         $sourceDirectory = \dirname($this->bridgeSource).'/bridge';
         if (is_dir($sourceDirectory)) {
-            $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($sourceDirectory, \FilesystemIterator::SKIP_DOTS));
-            foreach ($iterator as $file) {
-                if (!$file instanceof \SplFileInfo || !$file->isFile()) {
-                    continue;
-                }
+            $finder = (new Finder())->files()->in($sourceDirectory)->ignoreDotFiles(false);
+            foreach ($finder as $file) {
                 $contents = file_get_contents($file->getPathname());
                 if (false === $contents) {
                     throw new \RuntimeException(\sprintf('Unable to read bundled project bridge file "%s".', $file->getPathname()));
@@ -104,24 +96,5 @@ final class BridgeInstaller implements RuntimeInitializerInterface
         }
 
         return true;
-    }
-
-    private function removeDirectory(string $directory): void
-    {
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST,
-        );
-        foreach ($iterator as $file) {
-            if (!$file instanceof \SplFileInfo) {
-                continue;
-            }
-            if ($file->isDir()) {
-                @rmdir($file->getPathname());
-            } else {
-                @unlink($file->getPathname());
-            }
-        }
-        @rmdir($directory);
     }
 }

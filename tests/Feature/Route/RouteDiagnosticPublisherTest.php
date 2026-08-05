@@ -197,13 +197,13 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $client,
             $documents,
             $projects,
-            new RouteDiagnosticPublisher(
+            [new RouteDiagnosticPublisher(
                 $documents,
                 $projects,
                 new RouteIndexRegistry(),
                 new RouteReferenceExtractor($positionConverter),
                 new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-            ),
+            )],
         );
 
         $publisher->publish(['textDocument' => ['uri' => $uri]]);
@@ -269,13 +269,13 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 $client,
                 $documents,
                 $projects,
-                new RouteDiagnosticPublisher(
+                [new RouteDiagnosticPublisher(
                     $documents,
                     $projects,
                     $routeIndexes,
                     new RouteReferenceExtractor($positionConverter),
                     new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-                ),
+                )],
             ),
             $client,
             $project,

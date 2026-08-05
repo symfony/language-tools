@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Runtime;
 
 use Amp\Cancellation;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\ProjectServiceSnapshotLoader;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
@@ -31,7 +32,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->removeDirectory($this->temporaryDirectory);
+        (new Filesystem())->remove($this->temporaryDirectory);
     }
 
     public function testExecutesBridgeAndLoadsRoutes(): void
@@ -69,12 +70,12 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'debug' => false,
         ]);
         $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test'),
+            new BridgeInstaller($source, 'test', new Filesystem()),
             $processRunner,
-            new RuntimeSnapshotLoaderRegistry(
+            new RuntimeSnapshotLoaderRegistry([
                 new ProjectRouteSnapshotLoader($indexes),
                 new ProjectServiceSnapshotLoader($serviceIndexes, $parameterIndexes),
-            ),
+            ]),
             $configuration,
         );
 
@@ -107,9 +108,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'debug' => false,
         ]);
         $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test'),
+            new BridgeInstaller($source, 'test', new Filesystem()),
             $processRunner,
-            new RuntimeSnapshotLoaderRegistry(),
+            new RuntimeSnapshotLoaderRegistry([]),
             $configuration,
         );
 
@@ -137,7 +138,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $routeIndexes = new RouteIndexRegistry();
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
         $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test'),
+            new BridgeInstaller($source, 'test', new Filesystem()),
             new CapturingProcessRunner(new ProcessResult(0, json_encode([
                 'schemaVersion' => 1,
                 'errors' => [['section' => 'routes', 'message' => 'missing environment']],
@@ -148,10 +149,10 @@ final class ProjectRuntimeInitializerTest extends TestCase
                     ], 'parameters' => []],
                 ],
             ], \JSON_THROW_ON_ERROR), '')),
-            new RuntimeSnapshotLoaderRegistry(
+            new RuntimeSnapshotLoaderRegistry([
                 new ProjectRouteSnapshotLoader($routeIndexes),
                 new ProjectServiceSnapshotLoader($serviceIndexes, new ParameterIndexRegistry()),
-            ),
+            ]),
             new RuntimeConfiguration(),
         );
 
@@ -172,11 +173,11 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
         $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test'),
+            new BridgeInstaller($source, 'test', new Filesystem()),
             new CapturingProcessRunner(new ProcessResult(1, '', 'broken container')),
-            new RuntimeSnapshotLoaderRegistry(
+            new RuntimeSnapshotLoaderRegistry([
                 new ProjectRouteSnapshotLoader(new RouteIndexRegistry()),
-            ),
+            ]),
             new RuntimeConfiguration(),
         );
 
@@ -188,28 +189,6 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'file://'.$this->temporaryDirectory,
             '^8.0',
         ));
-    }
-
-    private function removeDirectory(string $directory): void
-    {
-        if (!is_dir($directory)) {
-            return;
-        }
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST,
-        );
-        foreach ($iterator as $file) {
-            if (!$file instanceof \SplFileInfo) {
-                continue;
-            }
-            if ($file->isDir()) {
-                @rmdir($file->getPathname());
-            } else {
-                @unlink($file->getPathname());
-            }
-        }
-        @rmdir($directory);
     }
 }
 

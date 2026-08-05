@@ -4,6 +4,8 @@
 
 - Support stable and prerelease GitHub and Marketplace releases
 - Track supported Symfony branches from Symfony release metadata
+- Use Symfony components for service wiring and filesystem operations
+- Require PHP 8.4.1 or later
 
 ## 0.3.2 (2026-08-05)
 

@@ -90,8 +90,7 @@ raw command output or resolved values.
 
 Add a ``RuntimeSnapshotLoaderInterface`` implementation that validates the
 section arrays, builds domain models and atomically replaces the project index.
-Register it in ``RuntimeSnapshotLoaderRegistry`` through
-``LanguageServerFactory``.
+Autoconfiguration registers it in ``RuntimeSnapshotLoaderRegistry``.
 
 Providers and Context Resolution
 --------------------------------
@@ -106,9 +105,9 @@ provider should:
 5. Return ``null`` when the context isn't recognized.
 6. Return an empty list when the context is recognized but has no result.
 
-Register the provider in each relevant registry in ``LanguageServerFactory``.
-That factory is the composition root; don't instantiate dependencies from
-inside providers.
+Autoconfiguration registers the provider in every registry matching its
+implemented interfaces. ``LanguageServerFactory`` remains the composition root;
+don't instantiate dependencies from inside providers.
 
 Diagnostics Policy
 ------------------
@@ -132,14 +131,17 @@ Composition Root Checklist
 
 A complete integration can touch these locations:
 
-* runtime and source index registries near the top of
-  ``LanguageServerFactory``;
 * parsers and extractors shared by the runtime and provider layers;
-* ``DiagnosticProviderRegistry`` and each implemented feature registry;
-* ``RuntimeSnapshotLoaderRegistry`` for a bridge-backed feature;
-* ``ApplicationSourceScanner`` for a source-backed feature;
+* ``resources/services.php`` when a service doesn't use one of its recognized
+  service class suffixes;
 * ``SourceIndexPayloadCodec`` for persistent source facts;
 * bridge section registration in ``resources/bridge.php``.
+
+Classes ending in ``Provider``, ``Handler``, ``Extractor``, ``Indexer``,
+``Registry``, ``Resolver``, ``Loader``, ``Publisher`` or ``Parser`` are loaded as
+feature services. Implemented provider interfaces,
+``SourceIndexProviderInterface`` and ``RuntimeSnapshotLoaderInterface`` determine
+their registry tags.
 
 Search for a similar completed feature and follow its data flow, but keep the
 new domain model independent.

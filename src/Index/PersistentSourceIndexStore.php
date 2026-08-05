@@ -2,13 +2,15 @@
 
 namespace Symfony\Lsp\Index;
 
+use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Project\Project;
 
 final class PersistentSourceIndexStore implements SourceIndexStoreInterface
 {
     private const SCHEMA_VERSION = 2;
 
-    public function __construct(private readonly string $serverVersion)
+    public function __construct(private readonly string $serverVersion, private readonly Filesystem $filesystem)
     {
     }
 
@@ -51,22 +53,14 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface
     public function save(Project $project, array $entries): void
     {
         $path = $this->path($project);
-        $directory = \dirname($path);
-        if (!is_dir($directory) && !@mkdir($directory, 0777, true) && !is_dir($directory)) {
-            return;
-        }
-
         $json = json_encode([
             'schemaVersion' => self::SCHEMA_VERSION,
             'serverVersion' => $this->serverVersion,
             'entries' => $entries,
         ], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
-        $temporaryPath = $path.'.'.bin2hex(random_bytes(8)).'.tmp';
-        if (false === @file_put_contents($temporaryPath, $json, \LOCK_EX)) {
-            return;
-        }
-        if (!@rename($temporaryPath, $path)) {
-            @unlink($temporaryPath);
+        try {
+            $this->filesystem->dumpFile($path, $json);
+        } catch (IOExceptionInterface) {
         }
     }
 

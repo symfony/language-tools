@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
+use Symfony\Component\Filesystem\Path;
+use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Project\Project;
@@ -59,20 +61,18 @@ final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterf
     /** @return \Generator<int, string> */
     private function files(string $directory): \Generator
     {
-        foreach (new \FilesystemIterator($directory, \FilesystemIterator::SKIP_DOTS) as $file) {
-            if (!$file instanceof \SplFileInfo || $file->isLink()) {
-                continue;
-            }
-            if ($file->isDir()) {
-                yield from $this->files($file->getPathname());
-            } elseif ($file->isFile()) {
-                yield $file->getPathname();
-            }
+        $files = (new Finder())
+            ->files()
+            ->in($directory)
+            ->ignoreDotFiles(false)
+            ->filter(static fn (\SplFileInfo $file): bool => !$file->isLink());
+        foreach ($files as $file) {
+            yield $file->getPathname();
         }
     }
 
     private function absolute(string $path): bool
     {
-        return str_starts_with($path, '/') || 1 === preg_match('/^[A-Za-z]:[\\\\\/]/', $path);
+        return Path::isAbsolute($path);
     }
 }

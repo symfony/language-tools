@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Configuration;
 
+use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
@@ -175,7 +176,7 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
                 continue;
             }
             $path = str_starts_with($resource, '/') ? $resource : $basePath.'/'.$resource;
-            $path = $this->normalizePath($path);
+            $path = Path::canonicalize($path);
             $links[] = ['range' => $this->range(new Range($this->converter->toPosition($document->text(), $offset), $this->converter->toPosition($document->text(), $offset + \strlen($resource)))), 'target' => 'file://'.str_replace('%2F', '/', rawurlencode($path))];
         }
 
@@ -618,23 +619,6 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
     private function snake(string $name): string
     {
         return strtolower((string) preg_replace('/(?<!^)[A-Z]/', '_$0', $name));
-    }
-
-    private function normalizePath(string $path): string
-    {
-        $parts = [];
-        foreach (explode('/', $path) as $part) {
-            if ('' === $part || '.' === $part) {
-                continue;
-            }
-            if ('..' === $part) {
-                array_pop($parts);
-            } else {
-                $parts[] = $part;
-            }
-        }
-
-        return '/'.implode('/', $parts);
     }
 
     private function offsetRange(string $text, int $offset, int $length): Range

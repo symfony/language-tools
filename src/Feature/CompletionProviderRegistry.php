@@ -4,12 +4,9 @@ namespace Symfony\Lsp\Feature;
 
 final class CompletionProviderRegistry
 {
-    /** @var list<CompletionProviderInterface> */
-    private array $providers;
-
-    public function __construct(CompletionProviderInterface ...$providers)
+    /** @param iterable<CompletionProviderInterface> $providers */
+    public function __construct(private readonly iterable $providers)
     {
-        $this->providers = array_values($providers);
     }
 
     /**

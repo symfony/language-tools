@@ -59,12 +59,12 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
             new NullProgressReporter(),
             new InMemorySourceIndexStore(),
             new SourceIndexPayloadCodec(),
-            new DependencyInjectionSourceIndexer(
+            [new DependencyInjectionSourceIndexer(
                 $indexes,
                 new YamlDependencyInjectionExtractor($converter),
                 new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser())),
                 new PhpClassDeclarationExtractor($converter),
-            ),
+            )],
         );
 
         $scanner->indexAll();

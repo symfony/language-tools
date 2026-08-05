@@ -4,12 +4,9 @@ namespace Symfony\Lsp\Feature;
 
 final class DocumentLinkProviderRegistry
 {
-    /** @var list<DocumentLinkProviderInterface> */
-    private array $providers;
-
-    public function __construct(DocumentLinkProviderInterface ...$providers)
+    /** @param iterable<DocumentLinkProviderInterface> $providers */
+    public function __construct(private readonly iterable $providers)
     {
-        $this->providers = array_values($providers);
     }
 
     /**

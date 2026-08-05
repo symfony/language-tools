@@ -2,6 +2,7 @@ parameters:
     level: max
     paths:
         - bin
+        - resources/services.php
         - src
         - tests
         - tools

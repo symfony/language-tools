@@ -51,6 +51,7 @@ final class IndexCommandHandlerTest extends TestCase
             new NullProgressReporter(),
             new InMemorySourceIndexStore(),
             new SourceIndexPayloadCodec(),
+            [],
         );
         $runtime = new RecordingRuntimeInitializer();
         $workspaceTrust = new WorkspaceTrust();

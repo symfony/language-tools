@@ -4,12 +4,9 @@ namespace Symfony\Lsp\Feature;
 
 final class HoverProviderRegistry
 {
-    /** @var list<HoverProviderInterface> */
-    private array $providers;
-
-    public function __construct(HoverProviderInterface ...$providers)
+    /** @param iterable<HoverProviderInterface> $providers */
+    public function __construct(private readonly iterable $providers)
     {
-        $this->providers = array_values($providers);
     }
 
     /**

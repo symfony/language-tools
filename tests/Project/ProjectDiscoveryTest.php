@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Project;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -20,17 +21,7 @@ final class ProjectDiscoveryTest extends TestCase
 
     protected function tearDown(): void
     {
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($this->temporaryDirectory, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST,
-        );
-        foreach ($iterator as $file) {
-            if (!$file instanceof \SplFileInfo) {
-                continue;
-            }
-            $file->isDir() ? @rmdir($file->getPathname()) : @unlink($file->getPathname());
-        }
-        @rmdir($this->temporaryDirectory);
+        (new Filesystem())->remove($this->temporaryDirectory);
     }
 
     public function testDiscoversFrameworkBundleProjects(): void
@@ -52,10 +43,12 @@ final class ProjectDiscoveryTest extends TestCase
 
     public function testDiscoversNestedAndExplicitProjectRoots(): void
     {
+        mkdir($this->temporaryDirectory.'/.hidden', 0777, true);
         mkdir($this->temporaryDirectory.'/apps/admin', 0777, true);
         mkdir($this->temporaryDirectory.'/apps/ignored', 0777, true);
-        foreach (['admin', 'ignored'] as $name) {
-            file_put_contents($this->temporaryDirectory.'/apps/'.$name.'/composer.json', json_encode([
+        mkdir($this->temporaryDirectory.'/vendor/package', 0777, true);
+        foreach (['.hidden', 'apps/admin', 'apps/ignored', 'vendor/package'] as $path) {
+            file_put_contents($this->temporaryDirectory.'/'.$path.'/composer.json', json_encode([
                 'require' => ['symfony/framework-bundle' => '^8.0'],
             ], \JSON_THROW_ON_ERROR));
         }
@@ -64,6 +57,7 @@ final class ProjectDiscoveryTest extends TestCase
 
         $projects = $discovery->discover($workspace);
         self::assertSame([
+            $this->temporaryDirectory.'/.hidden',
             $this->temporaryDirectory.'/apps/admin',
             $this->temporaryDirectory.'/apps/ignored',
         ], array_map(static fn (Project $project): string => $project->rootPath(), $projects));

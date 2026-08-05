@@ -101,7 +101,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new NullProgressReporter(),
             new InMemorySourceIndexStore(),
             new SourceIndexPayloadCodec(),
-            $indexer,
+            [$indexer],
         );
 
         $scanner->indexAll();

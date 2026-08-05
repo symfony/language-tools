@@ -10,16 +10,13 @@ use Symfony\Lsp\Runtime\RuntimeRefreshObserverInterface;
 
 final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterface
 {
-    /** @var list<DiagnosticProviderInterface> */
-    private array $providers;
-
+    /** @param iterable<DiagnosticProviderInterface> $providers */
     public function __construct(
         private readonly ClientInterface $client,
         private readonly DocumentStore $documents,
         private readonly ProjectRegistry $projects,
-        DiagnosticProviderInterface ...$providers,
+        private readonly iterable $providers,
     ) {
-        $this->providers = array_values($providers);
     }
 
     /**

@@ -4,12 +4,9 @@ namespace Symfony\Lsp\Feature;
 
 final class ReferencesProviderRegistry
 {
-    /** @var list<ReferencesProviderInterface> */
-    private array $providers;
-
-    public function __construct(ReferencesProviderInterface ...$providers)
+    /** @param iterable<ReferencesProviderInterface> $providers */
+    public function __construct(private readonly iterable $providers)
     {
-        $this->providers = array_values($providers);
     }
 
     /**

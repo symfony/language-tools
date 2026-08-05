@@ -4,11 +4,15 @@
     "type": "project",
     "license": "MIT",
     "require": {
-        "php": ">=8.4",
+        "php": ">=8.4.1",
         "amphp/amp": "^3.1",
         "amphp/byte-stream": "^2.1",
         "fabpot/json-rpc-peer": "dev-main",
-        "fabpot/tolerant-php-parser": "^0.2"
+        "fabpot/tolerant-php-parser": "^0.2",
+        "symfony/config": "^8.1",
+        "symfony/dependency-injection": "^8.1",
+        "symfony/filesystem": "^8.1",
+        "symfony/finder": "^8.1"
     },
     "require-dev": {
         "phpstan/phpstan": "^2.1",

@@ -6,12 +6,9 @@ use Symfony\Lsp\Project\Project;
 
 final class RuntimeSnapshotLoaderRegistry
 {
-    /** @var list<RuntimeSnapshotLoaderInterface> */
-    private array $loaders;
-
-    public function __construct(RuntimeSnapshotLoaderInterface ...$loaders)
+    /** @param iterable<RuntimeSnapshotLoaderInterface> $loaders */
+    public function __construct(private readonly iterable $loaders)
     {
-        $this->loaders = array_values($loaders);
     }
 
     /**
@@ -19,10 +16,12 @@ final class RuntimeSnapshotLoaderRegistry
      */
     public function sections(): array
     {
-        return array_values(array_unique(array_map(
-            static fn (RuntimeSnapshotLoaderInterface $loader): string => $loader->section(),
-            $this->loaders,
-        )));
+        $sections = [];
+        foreach ($this->loaders as $loader) {
+            $sections[] = $loader->section();
+        }
+
+        return array_values(array_unique($sections));
     }
 
     /**

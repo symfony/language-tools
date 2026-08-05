@@ -4,12 +4,9 @@ namespace Symfony\Lsp\Feature;
 
 final class CodeLensProviderRegistry
 {
-    /** @var list<CodeLensProviderInterface> */
-    private array $providers;
-
-    public function __construct(CodeLensProviderInterface ...$providers)
+    /** @param iterable<CodeLensProviderInterface> $providers */
+    public function __construct(private readonly iterable $providers)
     {
-        $this->providers = array_values($providers);
     }
 
     /**

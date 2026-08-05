@@ -2,6 +2,9 @@
 
 namespace Symfony\Lsp\Project;
 
+use Symfony\Component\Filesystem\Path;
+use Symfony\Component\Finder\Finder;
+
 final class ProjectDiscovery
 {
     private const EXCLUDED_DIRECTORIES = [
@@ -68,7 +71,7 @@ final class ProjectDiscovery
 
             return null === $path ? [] : [$path];
         }
-        if (str_starts_with($configuredRoot, '/') || preg_match('{^[A-Za-z]:[\\\\/]}', $configuredRoot)) {
+        if (Path::isAbsolute($configuredRoot)) {
             return [rtrim(str_replace('\\', '/', $configuredRoot), '/')];
         }
 
@@ -89,21 +92,15 @@ final class ProjectDiscovery
         if (!is_dir($directory)) {
             return;
         }
-        if (is_file($directory.'/composer.json')) {
-            yield $directory;
-        }
 
-        $iterator = new \FilesystemIterator($directory, \FilesystemIterator::SKIP_DOTS);
-        foreach ($iterator as $file) {
-            if (!$file instanceof \SplFileInfo
-                || !$file->isDir()
-                || $file->isLink()
-                || \in_array($file->getFilename(), self::EXCLUDED_DIRECTORIES, true)
-            ) {
-                continue;
-            }
-
-            yield from $this->candidateRoots($file->getPathname());
+        $files = (new Finder())
+            ->files()
+            ->name('composer.json')
+            ->in($directory)
+            ->exclude(self::EXCLUDED_DIRECTORIES)
+            ->ignoreDotFiles(false);
+        foreach ($files as $file) {
+            yield str_replace('\\', '/', $file->getPath());
         }
     }
 

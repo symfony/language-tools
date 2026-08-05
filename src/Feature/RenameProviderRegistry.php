@@ -4,12 +4,9 @@ namespace Symfony\Lsp\Feature;
 
 final class RenameProviderRegistry
 {
-    /** @var list<RenameProviderInterface> */
-    private array $providers;
-
-    public function __construct(RenameProviderInterface ...$providers)
+    /** @param iterable<RenameProviderInterface> $providers */
+    public function __construct(private readonly iterable $providers)
     {
-        $this->providers = array_values($providers);
     }
 
     /**

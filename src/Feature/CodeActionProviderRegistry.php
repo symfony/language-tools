@@ -4,12 +4,9 @@ namespace Symfony\Lsp\Feature;
 
 final class CodeActionProviderRegistry
 {
-    /** @var list<CodeActionProviderInterface> */
-    private array $providers;
-
-    public function __construct(CodeActionProviderInterface ...$providers)
+    /** @param iterable<CodeActionProviderInterface> $providers */
+    public function __construct(private readonly iterable $providers)
     {
-        $this->providers = array_values($providers);
     }
 
     /**

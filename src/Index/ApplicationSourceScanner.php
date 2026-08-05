@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Index;
 
 use Amp\Cancellation;
 use Amp\CancelledException;
+use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Progress\ProgressReporterInterface;
 use Symfony\Lsp\Project\Project;
@@ -39,6 +40,7 @@ final class ApplicationSourceScanner
     /** @var array<string, array<string, array{size: int, modifiedAt: int, hash: string, languageId: string, providers: array<string, string>}>> */
     private array $entries = [];
 
+    /** @param iterable<SourceIndexProviderInterface> $providers */
     public function __construct(
         private readonly ProjectRegistry $projects,
         private readonly DocumentStore $documents,
@@ -46,14 +48,15 @@ final class ApplicationSourceScanner
         private readonly ProgressReporterInterface $progress,
         private readonly SourceIndexStoreInterface $store,
         private readonly SourceIndexPayloadCodec $codec,
-        SourceIndexProviderInterface ...$providers,
+        iterable $providers,
     ) {
+        $providers = \is_array($providers) ? array_values($providers) : iterator_to_array($providers, false);
         $names = array_map(static fn (SourceIndexProviderInterface $provider): string => $provider->name(), $providers);
         if (\count($names) !== \count(array_unique($names))) {
             throw new \InvalidArgumentException('Source index provider names must be unique.');
         }
 
-        $this->providers = array_values($providers);
+        $this->providers = $providers;
     }
 
     public function indexAll(?Cancellation $cancellation = null): void
@@ -250,23 +253,14 @@ final class ApplicationSourceScanner
             return;
         }
 
-        $iterator = new \FilesystemIterator($directory, \FilesystemIterator::SKIP_DOTS);
-        foreach ($iterator as $file) {
-            if (!$file instanceof \SplFileInfo) {
-                continue;
-            }
-
-            if ($file->isDir()) {
-                if (!$file->isLink() && !\in_array($file->getFilename(), self::EXCLUDED_DIRECTORIES, true)) {
-                    yield from $this->sourceFiles($file->getPathname());
-                }
-
-                continue;
-            }
-
-            if ($file->isFile() && null !== $this->languageId($file->getPathname())) {
-                yield $file->getPathname();
-            }
+        $files = (new Finder())
+            ->files()
+            ->in($directory)
+            ->exclude(self::EXCLUDED_DIRECTORIES)
+            ->ignoreDotFiles(false)
+            ->filter(fn (\SplFileInfo $file): bool => null !== $this->languageId($file->getPathname()));
+        foreach ($files as $file) {
+            yield $file->getPathname();
         }
     }
 
