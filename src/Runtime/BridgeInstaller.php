@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Runtime;
 
 use Amp\Cancellation;
-use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Project\Project;
@@ -42,12 +41,8 @@ final class BridgeInstaller implements RuntimeInitializerInterface
             foreach ($files as $relativePath => $contents) {
                 $this->filesystem->dumpFile($temporary.'/'.$relativePath, $contents);
             }
-            try {
-                $this->filesystem->rename($temporary, $directory);
-            } catch (IOExceptionInterface $error) {
-                if (!$this->isInstalled($directory, $files)) {
-                    throw new \RuntimeException(\sprintf('Unable to install project bridge "%s".', $directory), previous: $error);
-                }
+            if (!@rename($temporary, $directory) && !$this->isInstalled($directory, $files)) {
+                throw new \RuntimeException(\sprintf('Unable to install project bridge "%s".', $directory));
             }
         } finally {
             $this->filesystem->remove($temporary);
@@ -66,7 +61,7 @@ final class BridgeInstaller implements RuntimeInitializerInterface
         $files = ['bridge.php' => $contents];
         $sourceDirectory = \dirname($this->bridgeSource).'/bridge';
         if (is_dir($sourceDirectory)) {
-            $finder = (new Finder())->files()->in($sourceDirectory)->ignoreDotFiles(false);
+            $finder = (new Finder())->files()->in($sourceDirectory)->ignoreDotFiles(false)->ignoreVCS(false);
             foreach ($finder as $file) {
                 $contents = file_get_contents($file->getPathname());
                 if (false === $contents) {
