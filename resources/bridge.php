@@ -48,8 +48,8 @@ if (!is_string($version)) {
     exit(1);
 }
 
-if (!preg_match('/^(?:v)?(6\.4|7\.4|8\.0|8\.1)(?:\.|$)/', $version, $matches)) {
-    fwrite(STDERR, sprintf("Symfony FrameworkBundle %s is not supported.\n", $version));
+if (!preg_match('/^(?:v)?([0-9]+\.[0-9]+)(?:\.|$)/', $version, $matches)) {
+    fwrite(STDERR, sprintf("Symfony FrameworkBundle %s does not identify a release branch.\n", $version));
     exit(1);
 }
 

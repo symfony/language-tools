@@ -6,17 +6,34 @@ on:
     workflow_dispatch:
 
 jobs:
+    supported_versions:
+        name: Resolve supported Symfony versions
+        runs-on: ubuntu-latest
+        outputs:
+            versions: ${{ steps.versions.outputs.versions }}
+        steps:
+            - name: Read Symfony release metadata
+              id: versions
+              run: |
+                  versions="$(curl -fsSL --retry 3 https://symfony.com/releases.json | jq -cer '
+                      .supported_versions
+                      | if type == "array"
+                          and length > 0
+                          and all(.[]; type == "string" and test("^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"))
+                        then .
+                        else error("Invalid supported_versions release metadata")
+                        end
+                  ')"
+                  echo "versions=$versions" >> "$GITHUB_OUTPUT"
+
     bridge:
         name: Symfony ${{ matrix.symfony }}
+        needs: supported_versions
         runs-on: ubuntu-latest
         strategy:
             fail-fast: false
             matrix:
-                include:
-                    - { symfony: '6.4.*', ux: '2.*' }
-                    - { symfony: '7.4.*', ux: '3.*' }
-                    - { symfony: '8.0.*', ux: '3.*' }
-                    - { symfony: '8.1.*', ux: '3.*' }
+                symfony: ${{ fromJSON(needs.supported_versions.outputs.versions) }}
         steps:
             - uses: actions/checkout@v7
             - uses: shivammathur/setup-php@v2
@@ -28,20 +45,17 @@ jobs:
               working-directory: tests/Fixtures/RuntimeApplication
               run: >-
                   composer update --no-interaction --no-progress --with-all-dependencies
-                  --with "symfony/asset-mapper:${{ matrix.symfony }}"
-                  --with "symfony/console:${{ matrix.symfony }}"
-                  --with "symfony/dotenv:${{ matrix.symfony }}"
-                  --with "symfony/framework-bundle:${{ matrix.symfony }}"
-                  --with "symfony/messenger:${{ matrix.symfony }}"
-                  --with "symfony/property-info:${{ matrix.symfony }}"
-                  --with "symfony/security-bundle:${{ matrix.symfony }}"
-                  --with "symfony/stimulus-bundle:${{ matrix.ux }}"
-                  --with "symfony/string:${{ matrix.symfony }}"
-                  --with "symfony/translation:${{ matrix.symfony }}"
-                  --with "symfony/twig-bundle:${{ matrix.symfony }}"
-                  --with "symfony/ux-live-component:${{ matrix.ux }}"
-                  --with "symfony/ux-twig-component:${{ matrix.ux }}"
-                  --with "symfony/yaml:${{ matrix.symfony }}"
+                  --with "symfony/asset-mapper:${{ matrix.symfony }}.*"
+                  --with "symfony/console:${{ matrix.symfony }}.*"
+                  --with "symfony/dotenv:${{ matrix.symfony }}.*"
+                  --with "symfony/framework-bundle:${{ matrix.symfony }}.*"
+                  --with "symfony/messenger:${{ matrix.symfony }}.*"
+                  --with "symfony/property-info:${{ matrix.symfony }}.*"
+                  --with "symfony/security-bundle:${{ matrix.symfony }}.*"
+                  --with "symfony/string:${{ matrix.symfony }}.*"
+                  --with "symfony/translation:${{ matrix.symfony }}.*"
+                  --with "symfony/twig-bundle:${{ matrix.symfony }}.*"
+                  --with "symfony/yaml:${{ matrix.symfony }}.*"
             - name: Test the project bridge
               env:
                   SYMFONY_LSP_COMPAT_BRANCH: ${{ matrix.symfony }}

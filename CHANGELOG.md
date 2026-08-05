@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Support stable and prerelease GitHub and Marketplace releases
+- Track supported Symfony branches from Symfony release metadata
+
 ## 0.3.2 (2026-08-05)
 
 - Add the Symfony icon to the VS Code extension

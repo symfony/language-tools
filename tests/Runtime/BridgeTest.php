@@ -24,8 +24,8 @@ final class BridgeTest extends TestCase
         @rmdir($this->temporaryDirectory);
     }
 
-    #[DataProvider('supportedVersionProvider')]
-    public function testReportsSupportedProjectMetadata(string $version, string $branch): void
+    #[DataProvider('versionProvider')]
+    public function testReportsProjectMetadataWithoutAStaticBranchList(string $version): void
     {
         $this->writeAutoloader($version);
 
@@ -41,20 +41,17 @@ final class BridgeTest extends TestCase
         self::assertIsArray($result);
         self::assertIsArray($result['project'] ?? null);
         self::assertSame($version, $result['project']['symfonyVersion']);
-        self::assertSame($branch, $result['project']['symfonyBranch']);
+        self::assertSame('42.7', $result['project']['symfonyBranch']);
         self::assertSame('test', $result['project']['environment']);
         self::assertFalse($result['project']['debug']);
     }
 
-    /**
-     * @return iterable<string, array{string, string}>
-     */
-    public static function supportedVersionProvider(): iterable
+    /** @return iterable<string, array{string}> */
+    public static function versionProvider(): iterable
     {
-        yield '6.4' => ['6.4.30', '6.4'];
-        yield '7.4' => ['7.4.8', '7.4'];
-        yield '8.0' => ['8.0.6', '8.0'];
-        yield '8.1' => ['8.1.0-RC1', '8.1'];
+        yield 'release' => ['42.7.3'];
+        yield 'prefixed release' => ['v42.7.3'];
+        yield 'prerelease' => ['42.7.0-RC1'];
     }
 
     public function testNormalizesStructuredRouteOutput(): void
@@ -418,9 +415,9 @@ final class BridgeTest extends TestCase
         self::assertSame([], $result['sections']['security']['firewalls'] ?? null);
     }
 
-    public function testRejectsUnsupportedSymfonyBranches(): void
+    public function testRejectsVersionsWithoutAReleaseBranch(): void
     {
-        $this->writeAutoloader('7.3.9');
+        $this->writeAutoloader('dev-main');
 
         exec(\sprintf(
             '%s %s --project=%s 2>&1',
@@ -430,7 +427,7 @@ final class BridgeTest extends TestCase
         ), $output, $exitCode);
 
         self::assertSame(1, $exitCode);
-        self::assertSame('Symfony FrameworkBundle 7.3.9 is not supported.', implode("\n", $output));
+        self::assertSame('Symfony FrameworkBundle dev-main does not identify a release branch.', implode("\n", $output));
     }
 
     private function writeRouteApplication(): void

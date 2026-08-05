@@ -8,10 +8,10 @@ features are independent of any particular editor.
 Requirements
 ------------
 
-The standalone language server supports Symfony applications using
-FrameworkBundle 6.4, 7.4, 8.0 or 8.1. The application still needs PHP and
-Composer. Configure the project bridge to use a PHP command accepted by the
-application's Symfony branch.
+The standalone language server supports Symfony applications using a
+FrameworkBundle branch listed in Symfony's `release metadata`_. The application
+still needs PHP and Composer. Configure the project bridge to use a PHP command
+accepted by the application's Symfony branch.
 
 Installing a Release
 --------------------
@@ -79,6 +79,8 @@ or reload the editor:
 Each server release uses a separate persistent index namespace. The first
 workspace initialization rebuilds the source index when the server version
 changes.
+
+.. _`release metadata`: https://symfony.com/releases.json
 
 Features
 --------

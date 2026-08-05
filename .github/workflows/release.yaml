@@ -207,8 +207,16 @@ jobs:
               run: |
                   npm ci
                   mkdir -p dist
-                  npm run package -- --pre-release --target "$TARGET" --out "dist/symfony-lsp-$VERSION-$TARGET.vsix"
-                  unzip -p "dist/symfony-lsp-$VERSION-$TARGET.vsix" extension.vsixmanifest | grep -F 'Microsoft.VisualStudio.Code.PreRelease'
+                  options=(--target "$TARGET")
+                  if [[ "$VERSION" == *-* ]]; then options=(--pre-release "${options[@]}"); fi
+                  npm run package -- "${options[@]}" --out "dist/symfony-lsp-$VERSION-$TARGET.vsix"
+                  manifest="$(unzip -p "dist/symfony-lsp-$VERSION-$TARGET.vsix" extension.vsixmanifest)"
+                  if [[ "$VERSION" == *-* ]]; then
+                      grep -Fq 'Microsoft.VisualStudio.Code.PreRelease' <<< "$manifest"
+                  elif grep -Fq 'Microsoft.VisualStudio.Code.PreRelease' <<< "$manifest"; then
+                      echo "Stable release contains a prerelease VSIX" >&2
+                      exit 1
+                  fi
                   npx vsce ls | grep -Fx 'images/icon.png'
                   npx vsce ls | grep -Fx "server/$EXECUTABLE"
                   npx vsce ls | grep -Fx "server/$SIDECAR"
@@ -241,12 +249,13 @@ jobs:
                       dist/SHA256SUMS
                   fail_on_unmatched_files: true
                   body_path: CHANGELOG.md
-                  prerelease: true
+                  prerelease: ${{ contains(github.ref_name, '-') }}
                   draft: true
             - name: Publish release
               env:
                   GH_TOKEN: ${{ github.token }}
-              run: gh release edit "${{ github.ref_name }}" --draft=false --prerelease
+                  PRERELEASE: ${{ contains(github.ref_name, '-') }}
+              run: gh release edit "${{ github.ref_name }}" --draft=false --prerelease="$PRERELEASE"
 
     marketplace:
         name: Publish VS Code extension

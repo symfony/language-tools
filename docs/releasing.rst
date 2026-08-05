@@ -18,6 +18,7 @@ A release must satisfy these rules:
 * the server and sidecar from one release stay together;
 * every archive and VSIX appears in ``SHA256SUMS``;
 * every platform VSIX is published under the matching Marketplace version;
+* a prerelease suffix selects the GitHub and Marketplace prerelease channels;
 * Marketplace automation uses Microsoft Entra ID without a stored credential;
 * the published tag is never moved;
 * CHANGELOG entries use an imperative verb and omit trailing punctuation.
@@ -92,7 +93,7 @@ rebuilds an existing asset:
 
     $ gh workflow run publish-vscode.yaml \
         --ref main \
-        -f tag=vX.Y.Z
+        -f tag=vVERSION
 
 Publisher Verification
 ----------------------
@@ -119,9 +120,12 @@ one command with the next semantic version:
 .. code-block:: terminal
 
     $ ./tools/release X.Y.Z
+    $ ./tools/release X.Y.Z-PRERELEASE
 
-Type the version again at the confirmation prompt. Pass ``--yes`` only for an
-intentional non-interactive invocation.
+Use a version such as ``1.0.0`` for a stable release or ``1.0.0-rc.1`` for a
+prerelease. The suffix selects the corresponding GitHub and Visual Studio
+Marketplace channel. Type the version again at the confirmation prompt. Pass
+``--yes`` only for an intentional non-interactive invocation.
 
 Before changing release metadata, the command runs PHPUnit, PHPStan, coding
 standards, the VS Code checks, the server benchmark and all eight Symfonycorp
@@ -160,10 +164,10 @@ Pushing the tag starts ``.github/workflows/release.yaml``. The workflow builds:
 Unix jobs build a PHAR, combine it with the pinned static PHP runtime, build the
 Tree-sitter sidecar and run the protocol smoke test. The Windows job builds both
 executables and checks sidecar parsing. Each VS Code job packages the matching
-executables. After every platform succeeds, the release job publishes a GitHub
-prerelease. The Marketplace job then downloads those published assets, verifies
-the checksums and embedded versions and publishes all five VSIX packages with
-the same prerelease status.
+executables. After every platform succeeds, the release job publishes a stable
+GitHub release or prerelease according to the version suffix. The Marketplace
+job then downloads those published assets, verifies the checksums and embedded
+versions and publishes all five VSIX packages on the same channel.
 
 Artifact Verification
 ---------------------
@@ -172,10 +176,10 @@ Inspect the release and download every asset into an ignored directory:
 
 .. code-block:: terminal
 
-    $ gh release view vX.Y.Z
-    $ mkdir -p var/release/vX.Y.Z
-    $ gh release download vX.Y.Z --dir var/release/vX.Y.Z
-    $ cd var/release/vX.Y.Z
+    $ gh release view vVERSION
+    $ mkdir -p var/release/vVERSION
+    $ gh release download vVERSION --dir var/release/vVERSION
+    $ cd var/release/vVERSION
     $ shasum -a 256 -c SHA256SUMS
     $ cd ../../..
 
@@ -189,9 +193,10 @@ the reported version:
     $ ./tools/smoke-test-server \
         /path/to/symfony-lsp \
         /path/to/symfony-lsp-tree-sitter \
-        X.Y.Z
+        VERSION
 
-The CLI version and ``initialize`` response version must both equal ``X.Y.Z``.
+The CLI version and ``initialize`` response version must both equal the complete
+release version, including any prerelease suffix.
 
 Packaged Dogfooding
 -------------------

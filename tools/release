@@ -2,6 +2,7 @@
 <?php
 
 require __DIR__.'/ReleaseMetadataUpdater.php';
+require __DIR__.'/ReleaseVersion.php';
 require __DIR__.'/ReleaseCommand.php';
 
 use Symfony\Lsp\Tools\ReleaseCommand;
@@ -17,13 +18,13 @@ foreach ($arguments as $argument) {
         continue;
     }
     if (null !== $version) {
-        fwrite(\STDERR, "Usage: tools/release X.Y.Z [--yes]\n");
+        fwrite(\STDERR, "Usage: tools/release X.Y.Z[-PRERELEASE] [--yes]\n");
         exit(2);
     }
     $version = $argument;
 }
 if (null === $version) {
-    fwrite(\STDERR, "Usage: tools/release X.Y.Z [--yes]\n");
+    fwrite(\STDERR, "Usage: tools/release X.Y.Z[-PRERELEASE] [--yes]\n");
     exit(2);
 }
 

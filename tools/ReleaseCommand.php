@@ -25,7 +25,8 @@ final class ReleaseCommand
 
     public function release(string $version): void
     {
-        $this->assertVersion($version);
+        $releaseVersion = new ReleaseVersion($version);
+        $version = $releaseVersion->value();
         $this->assertRequirements();
         $this->assertCleanMainBranch();
         $this->run(
@@ -33,13 +34,13 @@ final class ReleaseCommand
             $this->root,
         );
 
-        $tag = 'v'.$version;
+        $tag = $releaseVersion->tag();
         $remoteTagExists = $this->succeeds(
             ['git', 'ls-remote', '--exit-code', '--tags', 'origin', 'refs/tags/'.$tag],
             $this->root,
         );
         if (!$remoteTagExists) {
-            $this->prepareAndPublishTag($version, $tag);
+            $this->prepareAndPublishTag($releaseVersion, $tag);
         } elseif ($version !== $this->packageVersion()) {
             throw new \RuntimeException(\sprintf('The project is no longer at version %s.', $version));
         }
@@ -55,14 +56,15 @@ final class ReleaseCommand
         fwrite(\STDOUT, \sprintf("Release %s completed: %s\n", $version, $url));
     }
 
-    private function prepareAndPublishTag(string $version, string $tag): void
+    private function prepareAndPublishTag(ReleaseVersion $releaseVersion, string $tag): void
     {
+        $version = $releaseVersion->value();
         $currentVersion = $this->packageVersion();
         $head = $this->gitRevision('HEAD');
         $originMain = $this->gitRevision('refs/remotes/origin/main');
 
         if ($currentVersion !== $version) {
-            if (!version_compare($version, $currentVersion, '>')) {
+            if (!$releaseVersion->isGreaterThan($currentVersion)) {
                 throw new \RuntimeException(\sprintf('Version %s must be greater than %s.', $version, $currentVersion));
             }
             if ($head !== $originMain) {
@@ -283,13 +285,6 @@ final class ReleaseCommand
         }
         if ('' !== $this->capture(['git', 'status', '--porcelain=v1', '--untracked-files=no'], $this->root)) {
             throw new \RuntimeException('Tracked files must be clean before releasing.');
-        }
-    }
-
-    private function assertVersion(string $version): void
-    {
-        if (!preg_match('/^[0-9]+\.[0-9]+\.[0-9]+$/', $version)) {
-            throw new \InvalidArgumentException('The release version must use X.Y.Z format.');
         }
     }
 

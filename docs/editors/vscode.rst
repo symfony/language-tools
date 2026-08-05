@@ -8,8 +8,14 @@ later.
 Installing the Extension
 ------------------------
 
-Install Symfony LSP from the Visual Studio Marketplace. Releases are currently
-published on the prerelease channel:
+Install a stable Symfony LSP release from the Visual Studio Marketplace:
+
+.. code-block:: terminal
+
+    $ code --install-extension symfonycorp.symfony-lsp
+
+Versions with a prerelease suffix are published separately on the prerelease
+channel:
 
 .. code-block:: terminal
 

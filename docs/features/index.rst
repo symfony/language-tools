@@ -192,9 +192,7 @@ The current implementation has these limitations:
 
 * only ``App\\Kernel`` is discovered;
 * one Symfony environment is indexed at a time for each application root;
-* references and rename only cover statically recognized strings;
-* no standalone binary is available;
-* bridge failures aren't exposed through a dedicated status interface yet.
+* references and rename only cover statically recognized strings.
 
 Troubleshooting
 ---------------

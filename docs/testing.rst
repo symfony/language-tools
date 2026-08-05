@@ -62,9 +62,10 @@ prove they never enter bridge snapshots, logs or LSP responses.
 Symfony Compatibility
 ~~~~~~~~~~~~~~~~~~~~~
 
-The compatibility workflow installs the runtime fixture against FrameworkBundle
-6.4, 7.4, 8.0 and 8.1. Run or extend ``tests/Compatibility/`` whenever a bridge
-section uses version-sensitive commands, services or public APIs.
+The compatibility workflow reads ``supported_versions`` from Symfony's release
+metadata and installs the runtime fixture against every listed FrameworkBundle
+branch. Run or extend ``tests/Compatibility/`` whenever a bridge section uses
+version-sensitive commands, services or public APIs.
 
 To reproduce one branch locally, install matching fixture dependencies and set
 the same environment variables used by the workflow:
