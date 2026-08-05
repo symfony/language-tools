@@ -1,5 +1,8 @@
 import * as assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { serverEnvironment } from '../../src/extension';
 import {
     completions,
     labels,
@@ -20,9 +23,25 @@ interface IndexStatus {
 }
 
 export const lifecycleTests: TestCase[] = [
+    ['Bundled server receives sibling sidecar path', testBundledSidecarEnvironment],
     ['Server reports and refreshes indexes', testIndexCommands],
     ['Server remains responsive after workspace configuration changes', testConfigurationChange],
 ];
+
+async function testBundledSidecarEnvironment(): Promise<void> {
+    const directory = path.join(workspace().uri.fsPath, '.lsp-e2e', 'bundled-server');
+    const serverName = 'win32' === process.platform ? 'symfony-lsp.exe' : 'symfony-lsp';
+    const sidecarName = 'win32' === process.platform ? 'symfony-lsp-tree-sitter.exe' : 'symfony-lsp-tree-sitter';
+    const serverPath = path.join(directory, serverName);
+    const sidecarPath = path.join(directory, sidecarName);
+    await fs.promises.mkdir(directory, { recursive: true });
+    await fs.promises.writeFile(sidecarPath, '');
+    try {
+        assert.equal(serverEnvironment(serverPath)?.SYMFONY_LSP_TREE_SITTER, sidecarPath);
+    } finally {
+        await fs.promises.rm(directory, { force: true, recursive: true });
+    }
+}
 
 async function testIndexCommands(): Promise<void> {
     const commands = await vscode.commands.getCommands(true);

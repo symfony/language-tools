@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add the Symfony icon to the VS Code extension
+- Fix packaged VS Code extension startup with its bundled Tree-sitter sidecar
 
 ## 0.3.1 (2026-08-05)
 

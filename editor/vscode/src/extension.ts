@@ -27,6 +27,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         command: serverPath,
         options: {
             cwd: workspaceDirectory(),
+            env: serverEnvironment(serverPath),
         },
     };
     const outputChannel = vscode.window.createOutputChannel('Symfony LSP', { log: true });
@@ -95,6 +96,15 @@ function findServerPath(extensionPath: string): string | undefined {
     ];
 
     return candidates.find(fs.existsSync);
+}
+
+export function serverEnvironment(serverPath: string): NodeJS.ProcessEnv | undefined {
+    const executable = 'win32' === process.platform ? 'symfony-lsp-tree-sitter.exe' : 'symfony-lsp-tree-sitter';
+    const sidecarPath = path.resolve(path.dirname(serverPath), executable);
+
+    return fs.existsSync(sidecarPath)
+        ? { ...process.env, SYMFONY_LSP_TREE_SITTER: sidecarPath }
+        : undefined;
 }
 
 function workspaceDirectory(): string | undefined {
