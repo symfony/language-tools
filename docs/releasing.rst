@@ -94,71 +94,44 @@ rebuilds an existing asset:
         --ref main \
         -f tag=vX.Y.Z
 
-Preparing the Release Commit
-----------------------------
+Running a Release
+-----------------
 
-Choose a semantic version ``X.Y.Z`` and update ``CHANGELOG.md``. Move the
-``Unreleased`` entries under a dated version heading:
-
-.. code-block:: text
-
-    ## X.Y.Z (YYYY-MM-DD)
-
-Update the VS Code package and lock file without creating a tag:
+Start from a clean ``main`` branch synchronized with ``origin/main``, then run
+one command with the next semantic version:
 
 .. code-block:: terminal
 
-    $ cd editor/vscode
-    $ npm version X.Y.Z --no-git-tag-version
-    $ cd ../..
+    $ ./tools/release X.Y.Z
 
-Update versioned installation examples in ``docs/index.rst`` and
-``docs/editors/vscode.rst``. Don't change ``resources/version``; tagged release
-jobs replace its value only inside their isolated checkout.
+Type the version again at the confirmation prompt. Pass ``--yes`` only for an
+intentional non-interactive invocation.
 
-Review the complete release diff, then create one release-preparation commit.
-The commit should contain version metadata, documentation and CHANGELOG changes
-only.
+Before changing release metadata, the command runs PHPUnit, PHPStan, coding
+standards, the VS Code checks, the server benchmark and all eight Symfonycorp
+applications. It then:
 
-Pre-Tag Validation
-------------------
+1. moves the ``Unreleased`` entries under the dated version heading;
+2. updates the VS Code package and lock file without creating an npm tag;
+3. updates versioned examples in ``docs/index.rst`` and
+   ``docs/editors/vscode.rst``;
+4. verifies that only release metadata files changed and commits them;
+5. pushes ``main`` with an explicit refspec;
+6. waits for ``PHP quality``, ``Symfony compatibility`` and
+   ``VS Code integration``;
+7. creates and pushes the version tag only after those workflows pass;
+8. waits for the complete GitHub and Marketplace release workflow;
+9. creates the empty ``Unreleased`` section, pushes that post-release commit
+   and waits for regular CI again.
 
-Run the complete local quality suite:
+The command never changes ``resources/version`` and never moves a published
+tag. Rerun the same command after a network interruption; it resumes a prepared
+commit or a tag that already reached the remote. Fix a local or pre-tag CI
+failure and rerun the same version. Once the tag reaches the remote, any fix
+requires a new version.
 
-.. code-block:: terminal
-
-    $ composer test
-    $ composer phpstan
-    $ composer cs-check
-    $ cd editor/vscode
-    $ npm ci
-    $ npm run check
-    $ cd ../..
-    $ composer server:benchmark
-
-Build the sidecar and run all Symfonycorp applications:
-
-.. code-block:: terminal
-
-    $ composer tree-sitter:build-sidecar
-    $ ./tools/dogfood-symfonycorp \
-        ./bin/symfony-lsp \
-        ./build/symfony-lsp-tree-sitter \
-        ../../symfonycorp
-
-Push the release-preparation commit with an explicit destination and wait for
-``PHP quality``, ``Symfony compatibility`` and ``VS Code integration`` to pass.
-Never derive a push destination from a local branch's upstream.
-
-Tagging
--------
-
-Create the tag only after the preparation commit and all CI workflows pass:
-
-.. code-block:: terminal
-
-    $ git tag vX.Y.Z
-    $ git push origin refs/tags/vX.Y.Z:refs/tags/vX.Y.Z
+Release Workflow
+----------------
 
 Pushing the tag starts ``.github/workflows/release.yaml``. The workflow builds:
 
@@ -175,21 +148,6 @@ executables. After every platform succeeds, the release job publishes a GitHub
 prerelease. The Marketplace job then downloads those published assets, verifies
 the checksums and embedded versions and publishes all five VSIX packages with
 the same prerelease status.
-
-Monitoring the Workflow
------------------------
-
-Watch every release job instead of waiting only for the final release job:
-
-.. code-block:: terminal
-
-    $ gh run list --workflow=release.yaml
-    $ gh run watch <run-id>
-
-A failed job means the release is incomplete. Fix the root cause on ``main`` and
-prepare a new version. A Marketplace-only failure can be retried through the
-manual publication workflow after fixing its automation or identity setup.
-Never force-push or move a tag that has already been published.
 
 Artifact Verification
 ---------------------
@@ -248,14 +206,13 @@ exposes the expected server version and provides index commands and status.
 Post-Release Work
 -----------------
 
-After verification:
+The release command adds the empty ``Unreleased`` section, confirms
+``resources/version`` remains ``dev`` and waits for post-release CI. After
+verification:
 
-1. Add an empty ``Unreleased`` section to ``CHANGELOG.md`` on ``main``.
-2. Record any release-only fix as a new commit, never by moving the tag.
-3. Confirm ``resources/version`` is still ``dev``.
-4. Confirm the Marketplace lists every supported platform for the version.
-5. Confirm regular CI passes after the post-release commit.
-6. Keep generated archives, checksums and dogfood JSON under ignored ``var/``
+1. Record any release-only fix as a new commit, never by moving the tag.
+2. Confirm the Marketplace lists every supported platform for the version.
+3. Keep generated archives, checksums and dogfood JSON under ignored ``var/``
    paths.
 
 See :doc:`Testing and Validation </testing>` and

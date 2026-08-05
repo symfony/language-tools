@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add a release command that prepares, validates, publishes and monitors a version
 - Publish release VSIX packages automatically under the symfonycorp Marketplace publisher
 
 ## 0.3.0 (2026-08-04)

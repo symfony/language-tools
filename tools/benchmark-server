@@ -4,7 +4,7 @@
 function writeMessage($stream, array $message): void
 {
     $json = json_encode($message, \JSON_THROW_ON_ERROR);
-    fwrite($stream, 'Content-Length: '.\strlen($json)."\r\n\r\n".$json);
+    fwrite($stream, 'Content-Length: '.strlen($json)."\r\n\r\n".$json);
     fflush($stream);
 }
 
@@ -29,14 +29,14 @@ function readMessage($stream, float $timeout): ?array
         }
     }
     if (null === $length) {
-        throw new \RuntimeException('Invalid LSP response header.');
+        throw new RuntimeException('Invalid LSP response header.');
     }
 
     $json = '';
-    while (\strlen($json) < $length) {
-        $chunk = fread($stream, $length - \strlen($json));
+    while (strlen($json) < $length) {
+        $chunk = fread($stream, $length - strlen($json));
         if (false === $chunk || '' === $chunk) {
-            throw new \RuntimeException('Incomplete LSP response body.');
+            throw new RuntimeException('Incomplete LSP response body.');
         }
         $json .= $chunk;
     }
@@ -61,7 +61,7 @@ function response($input, $output, int $id, float $timeout): array
         }
     }
 
-    throw new \RuntimeException(\sprintf('Timed out waiting for LSP response %d.', $id));
+    throw new RuntimeException(sprintf('Timed out waiting for LSP response %d.', $id));
 }
 
 function request($input, $output, int &$id, string $method, array $params): array
@@ -75,7 +75,7 @@ function request($input, $output, int &$id, string $method, array $params): arra
 function percentile(array $samples, float $percentile): float
 {
     sort($samples);
-    $index = (int) ceil($percentile * \count($samples)) - 1;
+    $index = (int) ceil($percentile * count($samples)) - 1;
 
     return $samples[max(0, $index)];
 }
@@ -101,12 +101,12 @@ $project = realpath($argv[2]);
 $sidecar = isset($argv[3]) ? realpath($argv[3]) : false;
 $iterations = isset($argv[4]) ? (int) $argv[4] : 100;
 if (false === $server || false === $project || $iterations < 1) {
-    throw new \InvalidArgumentException('The server, project, and iteration count must be valid.');
+    throw new InvalidArgumentException('The server, project, and iteration count must be valid.');
 }
 $environment = false === $sidecar ? null : [...getenv(), 'SYMFONY_LSP_TREE_SITTER' => $sidecar];
 $process = proc_open([$server], [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes, env_vars: $environment, options: ['bypass_shell' => true]);
-if (!\is_resource($process)) {
-    throw new \RuntimeException('Unable to start Symfony LSP.');
+if (!is_resource($process)) {
+    throw new RuntimeException('Unable to start Symfony LSP.');
 }
 $status = proc_get_status($process);
 $pid = $status['pid'];
@@ -117,7 +117,7 @@ writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $id, 'method' => 'initializ
     'processId' => null,
     'rootUri' => $rootUri,
     'workspaceFolders' => [['uri' => $rootUri, 'name' => basename($project)]],
-    'capabilities' => new \stdClass(),
+    'capabilities' => new stdClass(),
     'initializationOptions' => ['workspaceTrust' => true],
 ]]);
 $initialize = response($pipes[0], $pipes[1], $id, 10.0);
@@ -131,7 +131,7 @@ $deadline = microtime(true) + 30.0;
 while (microtime(true) < $deadline) {
     $result = request($pipes[0], $pipes[1], $id, 'workspace/executeCommand', ['command' => 'symfony.indexStatus']);
     $indexStatus = $result['result'][0] ?? null;
-    if (\is_array($indexStatus)) {
+    if (is_array($indexStatus)) {
         $now = microtime(true);
         if (null === $sourceReadyAt && 'ready' === ($indexStatus['source']['state'] ?? null)) {
             $sourceReadyAt = $now;
@@ -166,14 +166,14 @@ writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'textDocument/didOpen',
     'version' => 1,
     'text' => $text,
 ]]]);
-$prefixOffset = strpos($text, 'fixture_home') + \strlen('fixture_');
+$prefixOffset = strpos($text, 'fixture_home') + strlen('fixture_');
 $hoverOffset = strpos($text, 'fixture_home') + 2;
 $position = static function (int $offset) use ($text): array {
     $before = substr($text, 0, $offset);
     $line = substr_count($before, "\n");
     $lastNewline = strrpos($before, "\n");
 
-    return ['line' => $line, 'character' => \strlen(false === $lastNewline ? $before : substr($before, $lastNewline + 1))];
+    return ['line' => $line, 'character' => strlen(false === $lastNewline ? $before : substr($before, $lastNewline + 1))];
 };
 $completionParams = ['textDocument' => ['uri' => $documentUri], 'position' => $position($prefixOffset)];
 $hoverParams = ['textDocument' => ['uri' => $documentUri], 'position' => $position($hoverOffset)];

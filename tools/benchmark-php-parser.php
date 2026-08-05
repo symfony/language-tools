@@ -31,7 +31,7 @@ foreach ($fixtures as $path) {
         "%s,%d,%d,%.4f,%d\n",
         $path,
         strlen($source),
-        \count($document?->diagnostics() ?? []),
+        count($document?->diagnostics() ?? []),
         $elapsed / 1_000_000 / $iterations,
         memory_get_peak_usage(true),
     );

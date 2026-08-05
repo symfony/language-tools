@@ -1,0 +1,53 @@
+#!/usr/bin/env php
+<?php
+
+require __DIR__.'/ReleaseMetadataUpdater.php';
+require __DIR__.'/ReleaseCommand.php';
+
+use Symfony\Lsp\Tools\ReleaseCommand;
+use Symfony\Lsp\Tools\ReleaseMetadataUpdater;
+
+/** @var list<string> $argv */
+$arguments = array_slice($argv, 1);
+$confirmed = false;
+$version = null;
+foreach ($arguments as $argument) {
+    if ('--yes' === $argument) {
+        $confirmed = true;
+        continue;
+    }
+    if (null !== $version) {
+        fwrite(\STDERR, "Usage: tools/release X.Y.Z [--yes]\n");
+        exit(2);
+    }
+    $version = $argument;
+}
+if (null === $version) {
+    fwrite(\STDERR, "Usage: tools/release X.Y.Z [--yes]\n");
+    exit(2);
+}
+
+if (!$confirmed) {
+    fwrite(\STDOUT, sprintf(
+        "This will prepare %s, push main, wait for CI, publish v%s and start the next development cycle.\nType %s to continue: ",
+        $version,
+        $version,
+        $version,
+    ));
+    $answer = fgets(\STDIN);
+    if (false === $answer || $version !== trim($answer)) {
+        fwrite(\STDERR, "Release canceled.\n");
+        exit(1);
+    }
+}
+
+try {
+    $command = new ReleaseCommand(
+        dirname(__DIR__),
+        new ReleaseMetadataUpdater(),
+    );
+    $command->release($version);
+} catch (Throwable $error) {
+    fwrite(\STDERR, $error->getMessage()."\n");
+    exit(1);
+}
