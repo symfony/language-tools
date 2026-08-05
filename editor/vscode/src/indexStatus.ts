@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { LanguageClient } from 'vscode-languageclient/node';
+import { LanguageClient, State } from 'vscode-languageclient/node';
 
 const refreshCommand = 'symfony.refreshIndex';
 const statusCommand = 'symfony.indexStatus';
@@ -9,6 +9,10 @@ const switchEnvironmentCommand = 'symfony.switchEnvironment';
 interface IndexSection {
     state: string;
     error?: string;
+}
+
+export function indexStatusPollingEnabled(state: State): boolean {
+    return State.Running === state;
 }
 
 export interface IndexStatus {
@@ -45,22 +49,24 @@ export class IndexStatusController implements vscode.Disposable {
             vscode.commands.registerCommand('symfonyLsp.switchEnvironment', (environment?: string, root?: string) => this.switchEnvironment(environment, root)),
             vscode.window.onDidChangeActiveTextEditor(() => this.render()),
             vscode.workspace.onDidSaveTextDocument(() => this.scheduleRefresh()),
+            this.client.onDidChangeState(({ newState }) => this.handleClientState(newState)),
         );
-        this.timer = setInterval(() => void this.refresh(), 5_000);
-        void this.refresh();
+        this.handleClientState(this.client.state);
     }
 
     public dispose(): void {
-        if (this.timer) {
-            clearInterval(this.timer);
-        }
-        if (this.scheduledRefresh) {
-            clearTimeout(this.scheduledRefresh);
-        }
+        this.stopPolling();
+        this.cancelScheduledRefresh();
         this.statusBar.dispose();
     }
 
     private async execute(command: string, arguments_: unknown[] = []): Promise<IndexStatus[]> {
+        if (!indexStatusPollingEnabled(this.client.state)) {
+            void vscode.window.showErrorMessage('Symfony LSP server is not running.');
+
+            return this.statuses;
+        }
+
         const statuses = await this.client.sendRequest<IndexStatus[]>('workspace/executeCommand', {
             command,
             arguments: arguments_,
@@ -72,12 +78,18 @@ export class IndexStatusController implements vscode.Disposable {
     }
 
     private refresh(): Promise<IndexStatus[]> {
+        if (!indexStatusPollingEnabled(this.client.state)) {
+            return Promise.resolve(this.statuses);
+        }
+
         if (!this.pending) {
             this.pending = this.execute(statusCommand)
                 .catch((error: unknown) => {
-                    this.output.error(`Could not read index status: ${String(error)}`);
-                    this.statusBar.text = '$(error) Symfony';
-                    this.statusBar.tooltip = 'Symfony LSP index status is unavailable.';
+                    if (indexStatusPollingEnabled(this.client.state)) {
+                        this.output.error(`Could not read index status: ${String(error)}`);
+                        this.statusBar.text = '$(error) Symfony';
+                        this.statusBar.tooltip = 'Symfony LSP index status is unavailable.';
+                    }
 
                     return this.statuses;
                 })
@@ -90,6 +102,12 @@ export class IndexStatusController implements vscode.Disposable {
     }
 
     private async showStatus(): Promise<IndexStatus[]> {
+        if (!indexStatusPollingEnabled(this.client.state)) {
+            void vscode.window.showErrorMessage('Symfony LSP server is not running.');
+
+            return this.statuses;
+        }
+
         const statuses = await this.refresh();
         const message = 0 === statuses.length
             ? 'Symfony LSP did not discover a Symfony application.'
@@ -114,13 +132,49 @@ export class IndexStatusController implements vscode.Disposable {
     }
 
     private scheduleRefresh(): void {
-        if (this.scheduledRefresh) {
-            clearTimeout(this.scheduledRefresh);
+        if (!indexStatusPollingEnabled(this.client.state)) {
+            return;
         }
+
+        this.cancelScheduledRefresh();
         this.scheduledRefresh = setTimeout(() => {
             this.scheduledRefresh = undefined;
             void this.refresh();
         }, 500);
+    }
+
+    private handleClientState(state: State): void {
+        if (indexStatusPollingEnabled(state)) {
+            if (!this.timer) {
+                this.timer = setInterval(() => void this.refresh(), 5_000);
+            }
+            void this.refresh();
+
+            return;
+        }
+
+        this.stopPolling();
+        this.cancelScheduledRefresh();
+        const description = State.Starting === state
+            ? 'Symfony LSP is starting.'
+            : 'Symfony LSP server is not running.';
+        this.statusBar.text = State.Starting === state ? '$(sync~spin) Symfony' : '$(error) Symfony';
+        this.statusBar.tooltip = description;
+        this.statusBar.accessibilityInformation = { label: description };
+    }
+
+    private stopPolling(): void {
+        if (this.timer) {
+            clearInterval(this.timer);
+            this.timer = undefined;
+        }
+    }
+
+    private cancelScheduledRefresh(): void {
+        if (this.scheduledRefresh) {
+            clearTimeout(this.scheduledRefresh);
+            this.scheduledRefresh = undefined;
+        }
     }
 
     private render(): void {

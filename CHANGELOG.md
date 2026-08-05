@@ -6,6 +6,7 @@
 - Track supported Symfony branches from Symfony release metadata
 - Use Symfony components for service wiring and filesystem operations
 - Require PHP 8.4.1 or later
+- Stop VS Code index status polling and report failures when the server stops
 
 ## 0.3.2 (2026-08-05)
 

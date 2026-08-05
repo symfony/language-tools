@@ -166,7 +166,9 @@ Troubleshooting
 ---------------
 
 Open ``View > Output`` and select ``Symfony LSP`` to inspect extension and
-protocol messages. If the server doesn't start, verify that:
+protocol messages. An unexpected process failure is reported on a line starting
+with ``Symfony LSP failed:``; index status polling stops when the language client
+is no longer running. If the server doesn't start, verify that:
 
 * the installed extension package matches the extension host's platform;
 * a configured ``symfonyLsp.serverPath`` points to an executable file;

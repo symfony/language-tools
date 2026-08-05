@@ -2,7 +2,9 @@ import * as assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { State } from 'vscode-languageclient/node';
 import { serverEnvironment } from '../../src/extension';
+import { indexStatusPollingEnabled } from '../../src/indexStatus';
 import {
     completions,
     labels,
@@ -24,6 +26,7 @@ interface IndexStatus {
 
 export const lifecycleTests: TestCase[] = [
     ['Bundled server receives sibling sidecar path', testBundledSidecarEnvironment],
+    ['Index status polling follows the language client state', testIndexStatusPolling],
     ['Server reports and refreshes indexes', testIndexCommands],
     ['Server remains responsive after workspace configuration changes', testConfigurationChange],
 ];
@@ -41,6 +44,13 @@ async function testBundledSidecarEnvironment(): Promise<void> {
     } finally {
         await fs.promises.rm(directory, { force: true, recursive: true });
     }
+}
+
+async function testIndexStatusPolling(): Promise<void> {
+    assert.equal(indexStatusPollingEnabled(State.Stopped), false);
+    assert.equal(indexStatusPollingEnabled(State.Starting), false);
+    assert.equal(indexStatusPollingEnabled(State.StartFailed), false);
+    assert.equal(indexStatusPollingEnabled(State.Running), true);
 }
 
 async function testIndexCommands(): Promise<void> {

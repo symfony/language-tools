@@ -35,4 +35,11 @@ if (!function_exists('symfony_lsp_tree_sitter_parse')) {
     }
 }
 
-exit((new LanguageServerFactory())->create(getStdin(), getStdout(), getStderr())->run());
+try {
+    $exitCode = (new LanguageServerFactory())->create(getStdin(), getStdout(), getStderr())->run();
+} catch (\Throwable $error) {
+    fwrite(\STDERR, \sprintf("Symfony LSP failed: %s: %s\n", $error::class, $error->getMessage()));
+    exit(1);
+}
+
+exit($exitCode);
