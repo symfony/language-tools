@@ -7,12 +7,22 @@ on:
                 description: GitHub release tag to publish
                 required: true
                 type: string
+            verify_only:
+                description: Verify Marketplace access without publishing
+                required: false
+                default: false
+                type: boolean
     workflow_dispatch:
         inputs:
             tag:
                 description: GitHub release tag to publish
-                required: true
+                required: false
                 type: string
+            verify_only:
+                description: Verify Marketplace access without publishing
+                required: false
+                default: false
+                type: boolean
 
 jobs:
     publish:
@@ -30,6 +40,7 @@ jobs:
             VSIX_DIRECTORY: ${{ github.workspace }}/var/vscode-marketplace
         steps:
             - name: Validate release tag
+              if: ${{ inputs.verify_only != true }}
               run: |
                   if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                       echo "Invalid release tag: $RELEASE_TAG" >&2
@@ -37,7 +48,7 @@ jobs:
                   fi
             - uses: actions/checkout@v7
               with:
-                  ref: ${{ inputs.tag }}
+                  ref: ${{ inputs.tag || github.ref }}
             - uses: actions/setup-node@v7
               with:
                   node-version: '24'
@@ -47,6 +58,7 @@ jobs:
               working-directory: editor/vscode
               run: npm ci
             - name: Download release packages
+              if: ${{ inputs.verify_only != true }}
               id: release
               env:
                   GH_TOKEN: ${{ github.token }}
@@ -61,6 +73,7 @@ jobs:
                       --jq .isPrerelease)"
                   echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
             - name: Verify release packages
+              if: ${{ inputs.verify_only != true }}
               env:
                   PRERELEASE: ${{ steps.release.outputs.prerelease }}
               run: |
@@ -110,6 +123,7 @@ jobs:
                   publisher="$(node --print "require('./package.json').publisher")"
                   npx vsce verify-pat "$publisher" --azure-credential
             - name: Publish release packages
+              if: ${{ inputs.verify_only != true }}
               working-directory: editor/vscode
               env:
                   PRERELEASE: ${{ steps.release.outputs.prerelease }}

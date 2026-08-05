@@ -74,12 +74,19 @@ desired and add these environment variables:
 * ``AZURE_TENANT_ID``: the directory tenant ID.
 
 The identifiers aren't secrets. The federated credential only accepts GitHub
-OIDC tokens issued for the named environment.
+OIDC tokens issued for the named environment. After the workflow reaches
+``main``, verify the complete identity chain without publishing an extension:
 
-Use the manual dispatch only for the first publication or to recover a failed
-Marketplace job for an existing release. The workflow refuses a VSIX whose
-embedded prerelease marker doesn't match the GitHub release and never repackages
-an existing asset:
+.. code-block:: terminal
+
+    $ gh workflow run publish-vscode.yaml \
+        --ref main \
+        -f verify_only=true
+
+Use a publication dispatch only for the first publication or to recover a
+failed Marketplace job for an existing release. The workflow refuses a VSIX
+whose embedded prerelease marker doesn't match the GitHub release. It never
+rebuilds an existing asset:
 
 .. code-block:: terminal
 
