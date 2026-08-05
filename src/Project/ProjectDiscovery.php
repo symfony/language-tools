@@ -98,7 +98,8 @@ final class ProjectDiscovery
             ->name('composer.json')
             ->in($directory)
             ->exclude(self::EXCLUDED_DIRECTORIES)
-            ->ignoreDotFiles(false);
+            ->ignoreDotFiles(false)
+            ->ignoreVCS(false);
         foreach ($files as $file) {
             yield str_replace('\\', '/', $file->getPath());
         }

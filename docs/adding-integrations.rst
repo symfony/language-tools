@@ -132,14 +132,15 @@ Composition Root Checklist
 A complete integration can touch these locations:
 
 * parsers and extractors shared by the runtime and provider layers;
-* ``resources/services.php`` when a service doesn't use one of its recognized
-  service class suffixes;
+* ``resources/services.php`` to place the feature namespace in provider order
+  and when a service doesn't use one of the recognized class suffixes;
 * ``SourceIndexPayloadCodec`` for persistent source facts;
 * bridge section registration in ``resources/bridge.php``.
 
-Classes ending in ``Provider``, ``Handler``, ``Extractor``, ``Indexer``,
-``Registry``, ``Resolver``, ``Loader``, ``Publisher`` or ``Parser`` are loaded as
-feature services. Implemented provider interfaces,
+After its namespace is added to the ordered feature groups, classes ending in
+``Provider``, ``Handler``, ``Extractor``, ``Indexer``, ``Registry``, ``Resolver``,
+``Loader``, ``Publisher`` or ``Parser`` are loaded as feature services.
+Implemented provider interfaces,
 ``SourceIndexProviderInterface`` and ``RuntimeSnapshotLoaderInterface`` determine
 their registry tags.
 

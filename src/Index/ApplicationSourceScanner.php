@@ -258,6 +258,7 @@ final class ApplicationSourceScanner
             ->in($directory)
             ->exclude(self::EXCLUDED_DIRECTORIES)
             ->ignoreDotFiles(false)
+            ->ignoreVCS(false)
             ->filter(fn (\SplFileInfo $file): bool => null !== $this->languageId($file->getPathname()));
         foreach ($files as $file) {
             yield $file->getPathname();

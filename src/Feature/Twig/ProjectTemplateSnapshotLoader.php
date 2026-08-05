@@ -65,6 +65,7 @@ final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterf
             ->files()
             ->in($directory)
             ->ignoreDotFiles(false)
+            ->ignoreVCS(false)
             ->filter(static fn (\SplFileInfo $file): bool => !$file->isLink());
         foreach ($files as $file) {
             yield $file->getPathname();
