@@ -5,6 +5,7 @@
   "description": "Symfony-aware completion, navigation and diagnostics through Symfony LSP",
   "version": "0.3.1",
   "license": "MIT",
+  "icon": "images/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/symfony/lsp.git"

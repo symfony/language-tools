@@ -94,6 +94,22 @@ rebuilds an existing asset:
         --ref main \
         -f tag=vX.Y.Z
 
+Publisher Verification
+----------------------
+
+The Visual Studio Marketplace requires a publisher to have at least one listed
+extension for six months before it can receive a verified badge. The domain
+must also have been registered for at least six months. Since the first
+``symfonycorp`` extension was published on August 5, 2026, the publisher isn't
+eligible before February 5, 2027.
+
+Once eligible, open `Visual Studio Marketplace publisher management`_, select
+``symfonycorp`` and open the ``Details`` tab. Enter ``https://symfony.com`` in
+the ``Verified domain`` field, save it and select ``Verify``. Add the generated
+TXT record to the domain's DNS configuration, then complete verification in the
+Marketplace. The Marketplace team reviews the request within five business
+days. Changing the publisher display name later revokes the verified badge.
+
 Running a Release
 -----------------
 

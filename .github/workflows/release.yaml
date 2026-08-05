@@ -209,6 +209,7 @@ jobs:
                   mkdir -p dist
                   npm run package -- --pre-release --target "$TARGET" --out "dist/symfony-lsp-$VERSION-$TARGET.vsix"
                   unzip -p "dist/symfony-lsp-$VERSION-$TARGET.vsix" extension.vsixmanifest | grep -F 'Microsoft.VisualStudio.Code.PreRelease'
+                  npx vsce ls | grep -Fx 'images/icon.png'
                   npx vsce ls | grep -Fx "server/$EXECUTABLE"
                   npx vsce ls | grep -Fx "server/$SIDECAR"
             - uses: actions/upload-artifact@v7
