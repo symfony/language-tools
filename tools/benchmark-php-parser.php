@@ -22,8 +22,8 @@ foreach ($fixtures as $path) {
     gc_collect_cycles();
     memory_reset_peak_usage();
     $startedAt = hrtime(true);
-    $document = null;
-    for ($iteration = 0; $iteration < $iterations; ++$iteration) {
+    $document = $parser->parse($source);
+    for ($iteration = 1; $iteration < $iterations; ++$iteration) {
         $document = $parser->parse($source);
     }
     $elapsed = hrtime(true) - $startedAt;
@@ -31,7 +31,7 @@ foreach ($fixtures as $path) {
         "%s,%d,%d,%.4f,%d\n",
         $path,
         strlen($source),
-        count($document?->diagnostics() ?? []),
+        count($document->diagnostics()),
         $elapsed / 1_000_000 / $iterations,
         memory_get_peak_usage(true),
     );

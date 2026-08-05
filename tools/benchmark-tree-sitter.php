@@ -20,8 +20,8 @@ foreach ($fixtures as [$language, $path]) {
         throw new RuntimeException('unable to read '.$path);
     }
     $startedAt = hrtime(true);
-    $tree = null;
-    for ($iteration = 0; $iteration < $iterations; ++$iteration) {
+    $tree = $parser->parse($language, $source);
+    for ($iteration = 1; $iteration < $iterations; ++$iteration) {
         $tree = $parser->parse($language, $source);
     }
     $elapsed = hrtime(true) - $startedAt;
@@ -29,7 +29,7 @@ foreach ($fixtures as [$language, $path]) {
         "%s,%d,%s,%.4f,%d\n",
         $path,
         strlen($source),
-        $tree?->hasError() ? 'yes' : 'no',
+        $tree->hasError() ? 'yes' : 'no',
         $elapsed / 1_000_000 / $iterations,
         memory_get_peak_usage(true),
     );
