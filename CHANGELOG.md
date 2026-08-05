@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Publish release VSIX packages automatically to the Visual Studio Marketplace
+- Publish release VSIX packages automatically under the symfonycorp Marketplace publisher
 
 ## 0.3.0 (2026-08-04)
 

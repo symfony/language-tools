@@ -34,7 +34,9 @@ Add a federated credential with these values:
 
 * scenario: ``GitHub Actions deploying Azure resources``;
 * organization: ``symfony``;
+* organization ID: ``143937``;
 * repository: ``lsp``;
+* repository ID: ``1316083251``;
 * entity type: ``Environment``;
 * environment: ``vscode-marketplace``;
 * audience: ``api://AzureADTokenExchange``.
@@ -62,7 +64,7 @@ application and query its profile:
 
 Copy the response's ``id`` field. Immediately delete the temporary secret, then
 open `Visual Studio Marketplace publisher management`_. Add that ID to the
-``symfony`` publisher as a Contributor.
+``symfonycorp`` publisher as a Contributor.
 
 Create a GitHub environment named ``vscode-marketplace``. Limit deployments to
 ``main`` and tags matching ``v*``, configure required reviewers when approval is
@@ -229,7 +231,7 @@ latency with the development build when a packaged result differs.
 VS Code Verification
 --------------------
 
-Install ``symfony.symfony-lsp`` from the Visual Studio Marketplace into a
+Install ``symfonycorp.symfony-lsp`` from the Visual Studio Marketplace into a
 disposable VS Code profile or test installation. Select the prerelease channel
 when the GitHub release is a prerelease. Confirm that Marketplace selected the
 current platform package, then confirm that the extension starts its bundled

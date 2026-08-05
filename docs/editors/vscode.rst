@@ -13,7 +13,7 @@ published on the prerelease channel:
 
 .. code-block:: terminal
 
-    $ code --install-extension symfony.symfony-lsp --pre-release
+    $ code --install-extension symfonycorp.symfony-lsp --pre-release
 
 The Marketplace selects the package matching the extension host. Packages are
 available for Linux x64 and ARM64, macOS x64 and ARM64 and Windows x64. Each
