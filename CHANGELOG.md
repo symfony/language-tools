@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.3.1 (2026-08-05)
 
 - Add a release command that prepares, validates, publishes and monitors a version
