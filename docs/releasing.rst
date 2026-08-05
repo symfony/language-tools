@@ -42,8 +42,8 @@ Add a federated credential with these values:
 * audience: ``api://AzureADTokenExchange``.
 
 The resulting subject must be exactly
-``repo:symfony/lsp:environment:vscode-marketplace``. Record the application
-client ID and tenant ID.
+``repo:symfony@143937/lsp@1316083251:environment:vscode-marketplace``. Record
+the application client ID and tenant ID.
 
 The Visual Studio Marketplace requires the application's Team Foundation
 Identity ID, not its Entra application or object ID. Create a temporary client
