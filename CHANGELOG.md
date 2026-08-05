@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.3.2 (2026-08-05)
 
 - Add the Symfony icon to the VS Code extension
