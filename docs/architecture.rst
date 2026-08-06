@@ -101,9 +101,10 @@ Runtime Refresh
 ---------------
 
 Saving or watching relevant PHP and configuration files marks runtime metadata
-stale and schedules a refresh. ``DebouncedRuntimeRefreshScheduler`` collapses
-nearby changes, serializes refreshes per project and queues one replacement when
-changes arrive during an active refresh.
+stale and schedules a refresh. Notifications for unchanged indexed contents are
+ignored. ``DebouncedRuntimeRefreshScheduler`` collapses nearby changes,
+serializes refreshes per project and queues one replacement when changes arrive
+during an active refresh.
 
 Most runtime-affecting changes clear the selected application's normal cache
 before loading a new snapshot. Translation resource changes use cache warmup

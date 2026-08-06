@@ -14,6 +14,7 @@ use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceFileChange;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Project\Project;
@@ -96,11 +97,15 @@ final class ApplicationSourceScannerTest extends TestCase
 
         file_put_contents($firstPath, '<?php final class NewFirstVersion {}');
         $firstUri = 'file://'.$firstPath;
-        $scanner->refreshAfterSave(['textDocument' => ['uri' => $firstUri]]);
+        self::assertSame(SourceFileChange::Changed, $scanner->refreshAfterSave(['textDocument' => ['uri' => $firstUri]]));
 
         self::assertSame([$firstUri], $provider->replacements);
         self::assertCount(2, $provider->sources);
         self::assertSame(hash('sha256', '<?php final class NewFirstVersion {}'), $provider->sources[$firstUri]);
+
+        touch($firstPath, time() + 1);
+        self::assertSame(SourceFileChange::Unchanged, $scanner->refreshAfterSave(['textDocument' => ['uri' => $firstUri]]));
+        self::assertSame([$firstUri], $provider->replacements);
 
         $secondUri = 'file://'.$secondPath;
         unlink($secondPath);

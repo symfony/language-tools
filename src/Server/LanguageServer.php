@@ -173,8 +173,8 @@ final class LanguageServer
      */
     private function saveDocument(array $params): void
     {
-        $this->sourceScanner->refreshAfterSave($params);
-        $this->projectRuntimeRefresher->refreshAfterSave($params);
+        $sourceFileChange = $this->sourceScanner->refreshAfterSave($params);
+        $this->projectRuntimeRefresher->refreshAfterSave($params, $sourceFileChange);
         $this->diagnosticProviders->publish($params);
     }
 
@@ -225,8 +225,8 @@ final class LanguageServer
                 continue;
             }
             $deleted = 3 === $change['type'];
-            $this->sourceScanner->refreshUri($change['uri'], $deleted);
-            $this->projectRuntimeRefresher->refreshUri($change['uri']);
+            $sourceFileChange = $this->sourceScanner->refreshUri($change['uri'], $deleted);
+            $this->projectRuntimeRefresher->refreshUri($change['uri'], $sourceFileChange);
             if ('composer.json' === basename($this->uriToPathConverter->convert($change['uri']) ?? '')) {
                 $rediscover = true;
             }

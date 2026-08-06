@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Runtime;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Index\SourceFileChange;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -23,7 +24,7 @@ final class ProjectRuntimeRefresherTest extends TestCase
     {
         [$refresher, $scheduler] = $this->refresher(TrustStatus::Trusted);
 
-        $refresher->refreshAfterSave(['textDocument' => ['uri' => $uri]]);
+        $refresher->refreshAfterSave(['textDocument' => ['uri' => $uri]], SourceFileChange::Changed);
 
         self::assertSame(['/workspace'], $scheduler->projects);
         self::assertSame([$expectedMode], $scheduler->modes);
@@ -52,7 +53,7 @@ final class ProjectRuntimeRefresherTest extends TestCase
 
         $refresher->refreshAfterSave([
             'textDocument' => ['uri' => 'file:///workspace/src/Controller.php'],
-        ]);
+        ], SourceFileChange::Changed);
 
         self::assertSame([], $scheduler->projects);
     }
@@ -62,7 +63,18 @@ final class ProjectRuntimeRefresherTest extends TestCase
     {
         [$refresher, $scheduler] = $this->refresher(TrustStatus::Trusted);
 
-        $refresher->refreshAfterSave(['textDocument' => ['uri' => $uri]]);
+        $refresher->refreshAfterSave(['textDocument' => ['uri' => $uri]], SourceFileChange::Changed);
+
+        self::assertSame([], $scheduler->projects);
+    }
+
+    public function testDoesNotRefreshAfterSavingUnchangedSource(): void
+    {
+        [$refresher, $scheduler] = $this->refresher(TrustStatus::Trusted);
+
+        $refresher->refreshAfterSave([
+            'textDocument' => ['uri' => 'file:///workspace/src/Controller.php'],
+        ], SourceFileChange::Unchanged);
 
         self::assertSame([], $scheduler->projects);
     }

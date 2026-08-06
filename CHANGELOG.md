@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Skip index refreshes when saved source content is unchanged
+
 ## 0.3.4 (2026-08-06)
 
 - Retry individual Marketplace package publications after transient failures

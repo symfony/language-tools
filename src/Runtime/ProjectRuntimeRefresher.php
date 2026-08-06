@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Runtime;
 
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Index\SourceFileChange;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\TrustStatus;
@@ -24,18 +25,22 @@ final class ProjectRuntimeRefresher
     /**
      * @param array<array-key, mixed> $params
      */
-    public function refreshAfterSave(array $params): void
+    public function refreshAfterSave(array $params, SourceFileChange $sourceFileChange): void
     {
         $textDocument = $params['textDocument'] ?? null;
         if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
             return;
         }
 
-        $this->refreshUri($textDocument['uri']);
+        $this->refreshUri($textDocument['uri'], $sourceFileChange);
     }
 
-    public function refreshUri(string $uri): void
+    public function refreshUri(string $uri, SourceFileChange $sourceFileChange): void
     {
+        if (SourceFileChange::Unchanged === $sourceFileChange) {
+            return;
+        }
+
         $project = $this->projects->forDocumentUri($uri);
         $path = null === $project ? null : $this->pathResolver->relative($project, $uri);
         if (null === $project
