@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.3 (2026-08-06)
 
 - Support stable and prerelease GitHub and Marketplace releases
 - Track supported Symfony branches from Symfony release metadata
