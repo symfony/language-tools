@@ -4,11 +4,14 @@ namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class TranslationExtractor
 {
-    public function __construct(private readonly PositionConverter $converter)
-    {
+    public function __construct(
+        private readonly PositionConverter $converter,
+        private readonly UriToPathConverter $uriToPathConverter,
+    ) {
     }
 
     public function extract(string $uri, string $languageId, string $text): TranslationSourceFacts
@@ -23,8 +26,8 @@ final class TranslationExtractor
     /** @return array{string, string, string}|null */
     private function resourceMetadata(string $uri): ?array
     {
-        $path = str_replace('\\', '/', rawurldecode((string) parse_url($uri, \PHP_URL_PATH)));
-        if (!str_contains($path, '/translations/')) {
+        $path = $this->uriToPathConverter->convert($uri);
+        if (null === $path || !str_contains('/'.$path, '/translations/')) {
             return null;
         }
         if (!preg_match('/^(.+)\.([A-Za-z][A-Za-z0-9_@-]*)\.(yaml|yml|json|xlf|xliff|php)$/', basename($path), $matches)) {

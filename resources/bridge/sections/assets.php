@@ -26,7 +26,7 @@ function bridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
             ]);
             $configuration = is_array($configuration['asset_mapper'] ?? null) ? $configuration['asset_mapper'] : $configuration;
             $paths = is_array($configuration['paths'] ?? null) ? $configuration['paths'] : [];
-            $projectRoot = realpath($context->project()) ?: $context->project();
+            $projectRoot = Symfony\Component\Filesystem\Path::canonicalize(realpath($context->project()) ?: $context->project());
             $excludedPatterns = [];
             foreach (array_filter(is_array($configuration['excluded_patterns'] ?? null) ? $configuration['excluded_patterns'] : [], 'is_string') as $pattern) {
                 $excludedPatterns[] = Symfony\Component\Finder\Glob::toRegex($pattern);
@@ -55,6 +55,7 @@ function bridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
                 ]);
                 $importMapPath = is_string($configReader['arguments'][0] ?? null) ? $configReader['arguments'][0] : $importMapPath;
             }
+            $projectRoot = Symfony\Component\Filesystem\Path::canonicalize($projectRoot);
             foreach ($paths as $path => $namespace) {
                 if (!is_string($path) || !is_string($namespace)) {
                     continue;
@@ -64,21 +65,23 @@ function bridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
                     $warnings[] = sprintf('Asset path not found: %s', $path);
                     continue;
                 }
-                $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($absolutePath, FilesystemIterator::SKIP_DOTS));
-                foreach ($iterator as $file) {
-                    if (!$file instanceof SplFileInfo || !$file->isFile() || 'php' === strtolower($file->getExtension())) {
-                        continue;
-                    }
-                    $sourcePath = str_replace('\\', '/', $file->getPathname());
+                $finder = (new Symfony\Component\Finder\Finder())
+                    ->files()
+                    ->in($absolutePath)
+                    ->ignoreDotFiles(false)
+                    ->ignoreVCS(false)
+                    ->notName('/\.php$/i');
+                foreach ($finder as $file) {
+                    $sourcePath = Symfony\Component\Filesystem\Path::canonicalize($file->getPathname());
                     if (bridgeAssetExcluded($sourcePath, $excludedPatterns, $excludeDotFiles)) {
                         continue;
                     }
-                    $relativePath = substr($sourcePath, strlen(rtrim(str_replace('\\', '/', $absolutePath), '/')) + 1);
+                    $relativePath = Symfony\Component\Filesystem\Path::makeRelative($sourcePath, $absolutePath);
                     $logicalPath = ltrim(('' === $namespace ? '' : rtrim($namespace, '/').'/').$relativePath, '/');
                     $assets[$logicalPath] = [
                         'logicalPath' => $logicalPath,
                         'sourcePath' => $sourcePath,
-                        'vendor' => !str_starts_with($sourcePath, rtrim(str_replace('\\', '/', $projectRoot), '/').'/') || str_contains($sourcePath, '/vendor/'),
+                        'vendor' => !Symfony\Component\Filesystem\Path::isBasePath($projectRoot, $sourcePath) || str_contains('/'.$sourcePath, '/vendor/'),
                     ];
                 }
             }
@@ -134,9 +137,9 @@ function bridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
 
 function bridgeAssetAbsolutePath(string $projectRoot, string $path): ?string
 {
-    $absolute = str_starts_with($path, '/') || preg_match('{^[A-Za-z]:[\\\\/]}', $path)
-        ? $path
-        : rtrim($projectRoot, '/\\').'/'.$path;
+    $absolute = Symfony\Component\Filesystem\Path::isAbsolute($path)
+        ? Symfony\Component\Filesystem\Path::canonicalize($path)
+        : Symfony\Component\Filesystem\Path::join($projectRoot, $path);
     $realPath = realpath($absolute);
 
     return false !== $realPath && is_dir($realPath) ? $realPath : null;

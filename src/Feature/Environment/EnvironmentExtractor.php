@@ -4,19 +4,22 @@ namespace Symfony\Lsp\Feature\Environment;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class EnvironmentExtractor
 {
-    public function __construct(private readonly PositionConverter $converter)
-    {
+    public function __construct(
+        private readonly PositionConverter $converter,
+        private readonly UriToPathConverter $uriToPathConverter,
+    ) {
     }
 
     public function extract(string $uri, string $languageId, string $text): EnvironmentSourceFacts
     {
         $declarations = [];
         $references = [];
-        $path = rawurldecode((string) parse_url($uri, \PHP_URL_PATH));
-        if ('dotenv' === $languageId || str_starts_with(basename($path), '.env')) {
+        $path = $this->uriToPathConverter->convert($uri);
+        if ('dotenv' === $languageId || (null !== $path && str_starts_with(basename($path), '.env'))) {
             preg_match_all('/^(?:export[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)[ \t]*=(.*)$/m', $text, $matches, \PREG_OFFSET_CAPTURE);
             foreach ($matches[1] as [$name, $offset]) {
                 $declarations[] = new EnvironmentDeclaration(

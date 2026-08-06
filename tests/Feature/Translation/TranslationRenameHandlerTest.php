@@ -12,6 +12,7 @@ use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationRenameHandler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class TranslationRenameHandlerTest extends TestCase
 {
@@ -26,7 +27,7 @@ final class TranslationRenameHandlerTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new TranslationExtractor($converter);
+        $extractor = new TranslationExtractor($converter, new UriToPathConverter());
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceSources(
             $extractor->extract($resourceUri, 'yaml', $resource),

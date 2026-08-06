@@ -2,10 +2,12 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
+use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 
 final class ProjectRouteSourceIndexer implements SourceIndexProviderInterface
 {
@@ -22,6 +24,7 @@ final class ProjectRouteSourceIndexer implements SourceIndexProviderInterface
         private readonly YamlRouteDeclarationExtractor $yamlDeclarationExtractor,
         private readonly RouteReferenceExtractor $phpReferenceExtractor,
         private readonly TwigRouteReferenceExtractor $twigReferenceExtractor,
+        private readonly ProjectPathResolver $pathResolver,
     ) {
     }
 
@@ -128,16 +131,13 @@ final class ProjectRouteSourceIndexer implements SourceIndexProviderInterface
 
     private function isRouteYaml(Project $project, string $uri): bool
     {
-        $path = parse_url($uri, \PHP_URL_PATH);
-        if (!\is_string($path)) {
+        $relativePath = $this->pathResolver->relative($project, $uri);
+        if (null === $relativePath) {
             return false;
         }
 
-        $root = rtrim(str_replace('\\', '/', $project->rootPath()), '/');
-        $relativePath = ltrim(substr(str_replace('\\', '/', rawurldecode($path)), \strlen($root)), '/');
-
         return str_starts_with($relativePath, 'config/routes/')
             || (str_starts_with($relativePath, 'config/routes.')
-                && \in_array(strtolower(pathinfo($relativePath, \PATHINFO_EXTENSION)), ['yaml', 'yml'], true));
+                && \in_array(Path::getExtension($relativePath, true), ['yaml', 'yml'], true));
     }
 }

@@ -16,6 +16,7 @@ use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class ConfigurationProvider implements CompletionProviderInterface, DiagnosticProviderInterface, DocumentLinkProviderInterface, HoverProviderInterface
 {
@@ -27,6 +28,7 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
         private readonly ConfigurationIndexRegistry $indexes,
         private readonly YamlConfigurationParser $yaml,
         private readonly EnvironmentIndexRegistry $environmentIndexes,
+        private readonly UriToPathConverter $uriToPathConverter,
     ) {
     }
 
@@ -168,16 +170,19 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
         if (null === $document || 'yaml' !== $document->languageId()) {
             return null;
         }
+        $documentPath = $this->uriToPathConverter->convert($document->uri());
+        if (null === $documentPath) {
+            return [];
+        }
         $links = [];
         preg_match_all('/\bresource\s*:\s*(["\']?)([^"\'\s#]+)\1/', $document->text(), $matches, \PREG_OFFSET_CAPTURE);
-        $basePath = \dirname(rawurldecode((string) parse_url($document->uri(), \PHP_URL_PATH)));
+        $basePath = Path::getDirectory($documentPath);
         foreach ($matches[2] as [$resource, $offset]) {
             if (str_contains($resource, '*') || str_starts_with($resource, '@')) {
                 continue;
             }
-            $path = str_starts_with($resource, '/') ? $resource : $basePath.'/'.$resource;
-            $path = Path::canonicalize($path);
-            $links[] = ['range' => $this->range(new Range($this->converter->toPosition($document->text(), $offset), $this->converter->toPosition($document->text(), $offset + \strlen($resource)))), 'target' => 'file://'.str_replace('%2F', '/', rawurlencode($path))];
+            $targetPath = Path::isAbsolute($resource) ? Path::canonicalize($resource) : Path::join($basePath, $resource);
+            $links[] = ['range' => $this->range(new Range($this->converter->toPosition($document->text(), $offset), $this->converter->toPosition($document->text(), $offset + \strlen($resource)))), 'target' => $this->uriToPathConverter->toUri($targetPath)];
         }
 
         return $links;

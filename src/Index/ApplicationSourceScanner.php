@@ -4,11 +4,13 @@ namespace Symfony\Lsp\Index;
 
 use Amp\Cancellation;
 use Amp\CancelledException;
+use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Progress\ProgressReporterInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 use function Amp\delay;
 
@@ -48,6 +50,7 @@ final class ApplicationSourceScanner
         private readonly ProgressReporterInterface $progress,
         private readonly SourceIndexStoreInterface $store,
         private readonly SourceIndexPayloadCodec $codec,
+        private readonly UriToPathConverter $uriToPathConverter,
         iterable $providers,
     ) {
         $providers = \is_array($providers) ? array_values($providers) : iterator_to_array($providers, false);
@@ -152,7 +155,7 @@ final class ApplicationSourceScanner
     public function refreshUri(string $uri, bool $deleted = false): void
     {
         $project = $this->projects->forDocumentUri($uri);
-        $path = $this->path($uri);
+        $path = $this->uriToPathConverter->convert($uri);
         if (null === $project || null === $path || !$this->belongsToProject($project, $path)) {
             return;
         }
@@ -271,8 +274,8 @@ final class ApplicationSourceScanner
             return 'dotenv';
         }
 
-        $extension = strtolower(pathinfo($path, \PATHINFO_EXTENSION));
-        if (\in_array($extension, ['js', 'mjs', 'ts'], true) && !str_contains(str_replace('\\', '/', $path), '/assets/')) {
+        $extension = Path::getExtension($path, true);
+        if (\in_array($extension, ['js', 'mjs', 'ts'], true) && !str_contains('/'.Path::canonicalize($path), '/assets/')) {
             return null;
         }
 
@@ -313,13 +316,11 @@ final class ApplicationSourceScanner
 
     private function belongsToProject(Project $project, string $path): bool
     {
-        $root = rtrim(str_replace('\\', '/', $project->rootPath()), '/').'/';
-        $path = str_replace('\\', '/', $path);
-        if (!str_starts_with($path, $root)) {
+        $relativePath = $this->relativePath($project, $path);
+        if (null === $relativePath) {
             return false;
         }
 
-        $relativePath = substr($path, \strlen($root));
         foreach (explode('/', $relativePath) as $part) {
             if (\in_array($part, self::EXCLUDED_DIRECTORIES, true)) {
                 return false;
@@ -331,17 +332,13 @@ final class ApplicationSourceScanner
 
     private function relativePath(Project $project, string $path): ?string
     {
-        $root = rtrim(str_replace('\\', '/', $project->rootPath()), '/').'/';
-        $path = str_replace('\\', '/', $path);
+        $root = Path::canonicalize($project->rootPath());
+        $path = Path::canonicalize($path);
+        if (!Path::isBasePath($root, $path) || $root === $path) {
+            return null;
+        }
 
-        return str_starts_with($path, $root) ? substr($path, \strlen($root)) : null;
-    }
-
-    private function path(string $uri): ?string
-    {
-        $path = parse_url($uri, \PHP_URL_PATH);
-
-        return \is_string($path) ? rawurldecode($path) : null;
+        return Path::makeRelative($path, $root);
     }
 
     private function uri(Project $project, string $path): string

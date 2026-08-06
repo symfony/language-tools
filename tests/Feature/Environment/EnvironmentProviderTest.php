@@ -12,12 +12,13 @@ use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Environment\EnvironmentProvider;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class EnvironmentProviderTest extends TestCase
 {
     public function testIndexesNamesAndReferencesWithoutValues(): void
     {
-        $extractor = new EnvironmentExtractor(new PositionConverter());
+        $extractor = new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter());
         $facts = $extractor->extract('file:///workspace/.env', 'dotenv', "APP_SECRET=CANARY_SECRET_VALUE\nAPP_URL=https://example.com\nEMPTY=\nCHILD=\${APP_URL:-\${FALLBACK_URL}}/\$EMPTY\nPARTIAL=\${UNFINISHED\nESCAPED=\\\$IGNORED\n");
 
         self::assertSame(['APP_SECRET', 'APP_URL', 'EMPTY', 'CHILD', 'PARTIAL', 'ESCAPED'], array_map(static fn ($item): string => $item->name(), $facts->declarations()));
@@ -35,7 +36,7 @@ final class EnvironmentProviderTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new EnvironmentExtractor($converter);
+        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter());
         $indexes = new EnvironmentIndexRegistry();
         $indexes->forProject($project)->replaceSources($extractor->extract('file:///workspace/.env', 'dotenv', "APP_URL=CANARY_SECRET_VALUE\n"), $extractor->extract($uri, 'yaml', $text));
         $indexes->forProject($project)->replaceProcessors(['custom' => 'string', 'json' => 'array']);

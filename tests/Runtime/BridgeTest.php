@@ -664,6 +664,11 @@ final class BridgeTest extends TestCase
             {
                 public static function getPrettyVersion(string $package): ?string { return '8.0.6'; }
             }
+            namespace Symfony\Component\Filesystem;
+            final class Path
+            {
+                public static function join(string ...$paths): string { return implode('/', $paths); }
+            }
             namespace Symfony\Component\DependencyInjection;
             final class ContainerBuilder
             {

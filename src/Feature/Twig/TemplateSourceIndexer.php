@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
+use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\Range;
@@ -19,6 +20,7 @@ final class TemplateSourceIndexer implements SourceIndexProviderInterface
     public function __construct(
         private readonly TemplateIndexRegistry $indexes,
         private readonly TemplateReferenceExtractor $extractor,
+        private readonly TemplateNameResolver $nameResolver,
     ) {
     }
 
@@ -106,21 +108,9 @@ final class TemplateSourceIndexer implements SourceIndexProviderInterface
 
     private function declaration(Project $project, string $uri): ?TemplateDeclaration
     {
-        $path = parse_url($uri, \PHP_URL_PATH);
-        if (!\is_string($path) || !str_ends_with(strtolower($path), '.twig')) {
+        $name = $this->nameResolver->resolve($project, $uri);
+        if (null === $name || 'twig' !== Path::getExtension($name, true)) {
             return null;
-        }
-        $root = rtrim(str_replace('\\', '/', $project->rootPath()), '/').'/';
-        $path = str_replace('\\', '/', rawurldecode($path));
-        if (!str_starts_with($path, $root.'templates/')) {
-            return null;
-        }
-        $name = substr($path, \strlen($root.'templates/'));
-        if (str_starts_with($name, 'bundles/')) {
-            $parts = explode('/', $name, 3);
-            if (3 === \count($parts)) {
-                $name = '@'.$parts[1].'/'.$parts[2];
-            }
         }
 
         return new TemplateDeclaration($name, $uri, new Range(new Position(0, 0), new Position(0, 0)));

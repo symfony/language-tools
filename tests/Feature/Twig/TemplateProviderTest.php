@@ -14,6 +14,7 @@ use Symfony\Lsp\Feature\Twig\TemplateCodeActionProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCompletionHandler;
 use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
+use Symfony\Lsp\Feature\Twig\TemplateNameResolver;
 use Symfony\Lsp\Feature\Twig\TemplateNavigationProvider;
 use Symfony\Lsp\Feature\Twig\TemplateReference;
 use Symfony\Lsp\Feature\Twig\TemplateReferenceExtractor;
@@ -26,7 +27,9 @@ use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class TemplateProviderTest extends TestCase
 {
@@ -67,7 +70,7 @@ final class TemplateProviderTest extends TestCase
         $indexes = new TemplateIndexRegistry();
         $indexes->forProject($project)->replaceReferences($reference);
         $indexes->forProject($project)->replaceGlobals(['app']);
-        $provider = new TwigVariableProvider(new DocumentContextResolver($documents, $projects), $converter, $indexes, new TwigComponentIndexRegistry());
+        $provider = new TwigVariableProvider(new DocumentContextResolver($documents, $projects), $converter, $indexes, new TwigComponentIndexRegistry(), $this->templateNameResolver());
         $position = $converter->toPosition($text, strpos($text, 'art') + 3);
 
         self::assertSame(['article'], array_column($provider->complete([
@@ -89,7 +92,7 @@ final class TemplateProviderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
-        $extractor = new TwigComponentExtractor($converter);
+        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver());
         $classUri = 'file:///workspace/src/Twig/Alert.php';
         $classText = <<<'PHP'
             <?php
@@ -149,12 +152,27 @@ final class TemplateProviderTest extends TestCase
         self::assertCount(1, $lenses);
         self::assertIsArray($lenses[0]['command'] ?? null);
         self::assertSame('1 Twig component usage', $lenses[0]['command']['title'] ?? null);
-        $variableProvider = new TwigVariableProvider(new DocumentContextResolver($documents, $projects), $converter, new TemplateIndexRegistry(), $indexes);
+        $variableProvider = new TwigVariableProvider(new DocumentContextResolver($documents, $projects), $converter, new TemplateIndexRegistry(), $indexes, $this->templateNameResolver());
         $variablePosition = $converter->toPosition($componentTemplateText, strpos($componentTemplateText, 'ti') + 2);
         self::assertSame(['title'], array_column($variableProvider->complete([
             'textDocument' => ['uri' => $templateUri],
             'position' => ['line' => $variablePosition->line(), 'character' => $variablePosition->character()],
         ]) ?? [], 'label'));
+    }
+
+    public function testResolvesBundleTemplateNames(): void
+    {
+        $resolver = $this->templateNameResolver();
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+
+        self::assertSame('@AcmeBundle/article/show.html.twig', $resolver->resolve($project, 'file:///workspace/templates/bundles/AcmeBundle/article/show.html.twig'));
+        self::assertSame('bundles/AcmeBundle/article/show.html.twig', $resolver->relative($project, 'file:///workspace/templates/bundles/AcmeBundle/article/show.html.twig'));
+        self::assertNull($resolver->resolve($project, 'file:///workspace/src/article/show.html.twig'));
+    }
+
+    private function templateNameResolver(): TemplateNameResolver
+    {
+        return new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter()));
     }
 
     public function testIndexesTemplatesWithoutATwigExtension(): void
@@ -166,7 +184,7 @@ final class TemplateProviderTest extends TestCase
         $indexes = new TemplateIndexRegistry();
 
         try {
-            (new ProjectTemplateSnapshotLoader($indexes))->load($project, ['sections' => ['twig' => [
+            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter()))->load($project, ['sections' => ['twig' => [
                 'complete' => true,
                 'paths' => [['namespace' => '(None)', 'path' => $root.'/templates']],
             ]]]);
@@ -194,7 +212,7 @@ final class TemplateProviderTest extends TestCase
         $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $extractor, $indexes);
         $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
         self::assertIsArray($diagnostics);
-        $provider = new TemplateCodeActionProvider($documents, $projects, $extractor, $indexes);
+        $provider = new TemplateCodeActionProvider($documents, $projects, $extractor, $indexes, new UriToPathConverter());
 
         $actions = $provider->actions([
             'textDocument' => ['uri' => $uri],

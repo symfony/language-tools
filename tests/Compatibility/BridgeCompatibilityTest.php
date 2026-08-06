@@ -51,6 +51,9 @@ final class BridgeCompatibilityTest extends TestCase
         self::assertContains('App\\Environment\\CustomEnvVarProcessor', array_column(\is_array($container['items'] ?? null) ? $container['items'] : [], 'class'));
         self::assertContains('fixture.message', array_column(\is_array($translations['items'] ?? null) ? $translations['items'] : [], 'key'));
         self::assertContains('framework', array_column(\is_array($configuration['bundles'] ?? null) ? $configuration['bundles'] : [], 'alias'));
+        $configurationResources = $configuration['resources'] ?? null;
+        self::assertIsArray($configurationResources);
+        self::assertContains(realpath($project.'/config/services.yaml'), $configurationResources);
         self::assertContains('fixture_upper', array_column(\is_array($environment['processors'] ?? null) ? $environment['processors'] : [], 'name'));
         self::assertNotSame([], $twig['paths'] ?? []);
         self::assertContains('command.bus', array_column(\is_array($messenger['buses'] ?? null) ? $messenger['buses'] : [], 'name'));

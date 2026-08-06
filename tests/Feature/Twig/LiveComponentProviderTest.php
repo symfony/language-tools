@@ -8,11 +8,14 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Twig\LiveComponentEventProvider;
+use Symfony\Lsp\Feature\Twig\TemplateNameResolver;
 use Symfony\Lsp\Feature\Twig\TwigComponentExtractor;
 use Symfony\Lsp\Feature\Twig\TwigComponentIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigComponentProvider;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class LiveComponentProviderTest extends TestCase
 {
@@ -20,7 +23,7 @@ final class LiveComponentProviderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
-        $extractor = new TwigComponentExtractor($converter);
+        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())));
         $classUri = 'file:///workspace/src/Twig/Components/Search.php';
         $classText = <<<'PHP'
             <?php

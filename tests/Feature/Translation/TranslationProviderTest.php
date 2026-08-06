@@ -15,6 +15,7 @@ use Symfony\Lsp\Feature\Translation\TranslationMessage;
 use Symfony\Lsp\Feature\Translation\TranslationProvider;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class TranslationProviderTest extends TestCase
 {
@@ -68,7 +69,7 @@ final class TranslationProviderTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project($root, 'file://'.$root, '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new TranslationExtractor($converter);
+        $extractor = new TranslationExtractor($converter, new UriToPathConverter());
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true);
         $indexes->forProject($project)->replaceSources($extractor->extract('file://'.$translationPath, 'yaml', "existing: Existing\n"));
@@ -79,7 +80,7 @@ final class TranslationProviderTest extends TestCase
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
-            $actions = (new TranslationCodeActionProvider($documents, $projects, $converter, $extractor, $indexes))->actions([
+            $actions = (new TranslationCodeActionProvider($documents, $projects, $converter, $extractor, $indexes, new UriToPathConverter()))->actions([
                 'textDocument' => ['uri' => $uri],
                 'range' => $diagnostics[0]['range'],
                 'context' => ['diagnostics' => $diagnostics],
@@ -120,7 +121,7 @@ final class TranslationProviderTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new TranslationExtractor($converter);
+        $extractor = new TranslationExtractor($converter, new UriToPathConverter());
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true, new TranslationMessage('article.title', 'messages', 'en', 'Article %name%'));
         $configuration = new TranslationConfigurationRegistry();

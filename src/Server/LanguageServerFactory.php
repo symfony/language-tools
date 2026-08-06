@@ -10,6 +10,7 @@ use Fabpot\JsonRpc\JsonRpcPeer;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
+use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\SidecarTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
@@ -34,10 +35,11 @@ final class LanguageServerFactory
             $logger->error($error);
         });
 
+        $resources = Path::join(\dirname(__DIR__, 2), 'resources');
         $container = new ContainerBuilder();
         $container->setParameter('server.version', $version);
-        $container->setParameter('bridge.source', \dirname(__DIR__, 2).'/resources/bridge.php');
-        $loader = new PhpFileLoader($container, new FileLocator(\dirname(__DIR__, 2).'/resources'));
+        $container->setParameter('bridge.source', Path::join($resources, 'bridge.php'));
+        $loader = new PhpFileLoader($container, new FileLocator($resources));
         $loader->load('services.php');
         $container->compile();
         $container->set(JsonRpcPeer::class, $peer);
@@ -61,7 +63,7 @@ final class LanguageServerFactory
         $configuredSidecar = getenv('SYMFONY_LSP_TREE_SITTER');
         $sidecar = false !== $configuredSidecar && '' !== $configuredSidecar
             ? $configuredSidecar
-            : \dirname(\PHP_BINARY).'/symfony-lsp-tree-sitter'.('Windows' === \PHP_OS_FAMILY ? '.exe' : '');
+            : Path::join(\dirname(\PHP_BINARY), 'symfony-lsp-tree-sitter'.('Windows' === \PHP_OS_FAMILY ? '.exe' : ''));
 
         return new SidecarTreeSitterParser($sidecar, $decoder);
     }

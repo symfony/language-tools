@@ -8,8 +8,10 @@ use Symfony\Lsp\Project\Project;
 
 final class TwigComponentExtractor
 {
-    public function __construct(private readonly PositionConverter $converter)
-    {
+    public function __construct(
+        private readonly PositionConverter $converter,
+        private readonly TemplateNameResolver $templateNameResolver,
+    ) {
     }
 
     public function extract(Project $project, string $uri, string $languageId, string $text): TwigComponentSourceFacts
@@ -172,10 +174,7 @@ final class TwigComponentExtractor
 
     private function templateName(Project $project, string $uri): ?string
     {
-        $path = str_replace('\\', '/', rawurldecode((string) parse_url($uri, \PHP_URL_PATH)));
-        $root = rtrim(str_replace('\\', '/', $project->rootPath()), '/').'/templates/';
-
-        return str_starts_with($path, $root) ? substr($path, \strlen($root)) : null;
+        return $this->templateNameResolver->relative($project, $uri);
     }
 
     private function range(string $text, int $offset, int $length): Range

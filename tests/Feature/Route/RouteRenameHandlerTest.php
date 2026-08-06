@@ -28,6 +28,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class RouteRenameHandlerTest extends TestCase
 {
@@ -119,6 +120,7 @@ final class RouteRenameHandlerTest extends TestCase
                 new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
                 new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
                 new YamlRouteDeclarationExtractor($positionConverter),
+                new UriToPathConverter(),
             ),
             $references,
             $declarations,
@@ -196,6 +198,7 @@ final class RouteRenameHandlerTest extends TestCase
                 new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
                 new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
                 new YamlRouteDeclarationExtractor($positionConverter),
+                new UriToPathConverter(),
             ),
             $references,
             $declarations,

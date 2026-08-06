@@ -12,6 +12,7 @@ use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\TrustStatus;
+use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
@@ -51,6 +52,7 @@ final class IndexCommandHandlerTest extends TestCase
             new NullProgressReporter(),
             new InMemorySourceIndexStore(),
             new SourceIndexPayloadCodec(),
+            new UriToPathConverter(),
             [],
         );
         $runtime = new RecordingRuntimeInitializer();

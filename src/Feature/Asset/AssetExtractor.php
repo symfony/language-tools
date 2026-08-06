@@ -4,18 +4,21 @@ namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class AssetExtractor
 {
-    public function __construct(private readonly PositionConverter $converter)
-    {
+    public function __construct(
+        private readonly PositionConverter $converter,
+        private readonly UriToPathConverter $uriToPathConverter,
+    ) {
     }
 
     public function extract(string $uri, string $languageId, string $text): AssetSourceFacts
     {
         $symbols = match ($languageId) {
             'twig' => $this->twigSymbols($uri, $text),
-            'php' => str_ends_with((string) parse_url($uri, \PHP_URL_PATH), '/importmap.php') ? $this->importMapSymbols($uri, $text) : [],
+            'php' => 'importmap.php' === basename($this->uriToPathConverter->convert($uri) ?? '') ? $this->importMapSymbols($uri, $text) : [],
             default => [],
         };
 

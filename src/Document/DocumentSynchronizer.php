@@ -2,11 +2,15 @@
 
 namespace Symfony\Lsp\Document;
 
+use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Project\UriToPathConverter;
+
 final class DocumentSynchronizer
 {
     public function __construct(
         private readonly DocumentStore $documentStore,
         private readonly PositionConverter $positionConverter,
+        private readonly UriToPathConverter $uriToPathConverter,
     ) {
     }
 
@@ -81,9 +85,9 @@ final class DocumentSynchronizer
 
     private function languageId(string $uri, string $languageId): string
     {
-        $path = parse_url($uri, \PHP_URL_PATH);
+        $path = $this->uriToPathConverter->convert($uri);
 
-        return \is_string($path) && str_ends_with(strtolower($path), '.twig') ? 'twig' : $languageId;
+        return null !== $path && 'twig' === Path::getExtension($path, true) ? 'twig' : $languageId;
     }
 
     private function range(mixed $value): ?Range

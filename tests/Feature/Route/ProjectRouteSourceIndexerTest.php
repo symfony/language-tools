@@ -22,7 +22,9 @@ use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
 use Symfony\Lsp\Tests\Support\NullProgressReporter;
 
@@ -93,6 +95,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new YamlRouteDeclarationExtractor($positionConverter),
             new RouteReferenceExtractor($positionConverter),
             new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
+            new ProjectPathResolver(new UriToPathConverter()),
         );
         $scanner = new ApplicationSourceScanner(
             $projects,
@@ -101,6 +104,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new NullProgressReporter(),
             new InMemorySourceIndexStore(),
             new SourceIndexPayloadCodec(),
+            new UriToPathConverter(),
             [$indexer],
         );
 

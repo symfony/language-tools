@@ -7,12 +7,15 @@ use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
 
 final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
-    public function __construct(private readonly TemplateIndexRegistry $indexes)
-    {
+    public function __construct(
+        private readonly TemplateIndexRegistry $indexes,
+        private readonly UriToPathConverter $uriToPathConverter,
+    ) {
     }
 
     public function section(): string
@@ -34,20 +37,19 @@ final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterf
             if (!\is_array($loaderPath) || !\is_string($loaderPath['namespace'] ?? null) || !\is_string($loaderPath['path'] ?? null)) {
                 continue;
             }
-            $path = $loaderPath['path'];
-            if (!$this->absolute($path)) {
-                $path = $project->rootPath().'/'.$path;
-            }
+            $path = Path::isAbsolute($loaderPath['path'])
+                ? Path::canonicalize($loaderPath['path'])
+                : Path::join($project->rootPath(), $loaderPath['path']);
             if (!is_dir($path)) {
                 continue;
             }
             foreach ($this->files($path) as $file) {
-                $relative = ltrim(substr(str_replace('\\', '/', $file), \strlen(rtrim(str_replace('\\', '/', $path), '/'))), '/');
+                $relative = Path::makeRelative($file, $path);
                 $namespace = $loaderPath['namespace'];
                 $name = '(None)' === $namespace ? $relative : $namespace.'/'.$relative;
                 $templates[] = new TemplateDeclaration(
                     $name,
-                    'file://'.str_replace(' ', '%20', str_replace('\\', '/', $file)),
+                    $this->uriToPathConverter->toUri($file),
                     new Range(new Position(0, 0), new Position(0, 0)),
                 );
             }
@@ -70,10 +72,5 @@ final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterf
         foreach ($files as $file) {
             yield $file->getPathname();
         }
-    }
-
-    private function absolute(string $path): bool
-    {
-        return Path::isAbsolute($path);
     }
 }

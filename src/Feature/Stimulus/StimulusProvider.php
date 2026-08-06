@@ -88,7 +88,7 @@ final class StimulusProvider implements CodeLensProviderInterface, CompletionPro
             )]];
         }
         $details = [\sprintf('Stimulus controller: `%s`', $reference->controller())];
-        $source = $controller?->sourcePath() ?? (isset($declarations[0]) ? rawurldecode((string) parse_url($declarations[0]->uri(), \PHP_URL_PATH)) : null);
+        $source = $controller?->sourcePath() ?? (isset($declarations[0]) ? $this->uriConverter->convert($declarations[0]->uri()) : null);
         if (null !== $source) {
             $details[] = \sprintf('Source: `%s`', $source);
         }

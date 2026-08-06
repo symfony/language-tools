@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Runtime;
 
 use Amp\Cancellation;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Project\Project;
 
@@ -26,20 +27,20 @@ final class BridgeInstaller implements RuntimeInitializerInterface
     {
         $files = $this->bundleFiles();
         $hash = hash('sha256', serialize($files));
-        $baseDirectory = $project->rootPath().'/var/symfony-lsp/'.$this->serverVersion;
+        $baseDirectory = Path::join($project->rootPath(), 'var/symfony-lsp', $this->serverVersion);
         $this->filesystem->mkdir($baseDirectory);
 
-        $directory = $baseDirectory.'/'.$hash;
+        $directory = Path::join($baseDirectory, $hash);
         if ($this->isInstalled($directory, $files)) {
-            return $directory.'/bridge.php';
+            return Path::join($directory, 'bridge.php');
         }
 
-        $temporary = $baseDirectory.'/.bridge-'.$hash.'-'.bin2hex(random_bytes(8));
+        $temporary = Path::join($baseDirectory, '.bridge-'.$hash.'-'.bin2hex(random_bytes(8)));
         $this->filesystem->mkdir($temporary);
 
         try {
             foreach ($files as $relativePath => $contents) {
-                $this->filesystem->dumpFile($temporary.'/'.$relativePath, $contents);
+                $this->filesystem->dumpFile(Path::join($temporary, $relativePath), $contents);
             }
             if (!@rename($temporary, $directory) && !$this->isInstalled($directory, $files)) {
                 throw new \RuntimeException(\sprintf('Unable to install project bridge "%s".', $directory));
@@ -48,7 +49,7 @@ final class BridgeInstaller implements RuntimeInitializerInterface
             $this->filesystem->remove($temporary);
         }
 
-        return $directory.'/bridge.php';
+        return Path::join($directory, 'bridge.php');
     }
 
     /** @return array<string, string> */
@@ -59,7 +60,7 @@ final class BridgeInstaller implements RuntimeInitializerInterface
             throw new \RuntimeException('Unable to read the bundled project bridge.');
         }
         $files = ['bridge.php' => $contents];
-        $sourceDirectory = \dirname($this->bridgeSource).'/bridge';
+        $sourceDirectory = Path::join(\dirname($this->bridgeSource), 'bridge');
         if (is_dir($sourceDirectory)) {
             $finder = (new Finder())->files()->in($sourceDirectory)->ignoreDotFiles(false)->ignoreVCS(false);
             foreach ($finder as $file) {
@@ -67,7 +68,7 @@ final class BridgeInstaller implements RuntimeInitializerInterface
                 if (false === $contents) {
                     throw new \RuntimeException(\sprintf('Unable to read bundled project bridge file "%s".', $file->getPathname()));
                 }
-                $relativePath = 'bridge/'.str_replace('\\', '/', substr($file->getPathname(), \strlen($sourceDirectory) + 1));
+                $relativePath = Path::join('bridge', Path::makeRelative($file->getPathname(), $sourceDirectory));
                 $files[$relativePath] = $contents;
             }
         }
@@ -84,7 +85,7 @@ final class BridgeInstaller implements RuntimeInitializerInterface
     private function isInstalled(string $directory, array $files): bool
     {
         foreach ($files as $relativePath => $contents) {
-            $destination = $directory.'/'.$relativePath;
+            $destination = Path::join($directory, $relativePath);
             if (!is_file($destination) || hash('sha256', $contents) !== hash_file('sha256', $destination)) {
                 return false;
             }

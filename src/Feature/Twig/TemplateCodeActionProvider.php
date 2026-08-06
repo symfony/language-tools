@@ -2,9 +2,11 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
+use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class TemplateCodeActionProvider implements CodeActionProviderInterface
 {
@@ -13,6 +15,7 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
         private readonly ProjectRegistry $projects,
         private readonly TemplateReferenceExtractor $extractor,
         private readonly TemplateIndexRegistry $indexes,
+        private readonly UriToPathConverter $uriToPathConverter,
     ) {
     }
 
@@ -56,7 +59,7 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
                     'isPreferred' => true,
                     'edit' => ['documentChanges' => [[
                         'kind' => 'create',
-                        'uri' => 'file://'.str_replace('%2F', '/', rawurlencode($path)),
+                        'uri' => $this->uriToPathConverter->toUri($path),
                     ]]],
                 ];
                 break;
@@ -76,7 +79,7 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
             return null;
         }
 
-        return $root.'/templates/'.$name;
+        return Path::join($root, 'templates', $name);
     }
 
     /** @param array<array-key, mixed> $range */

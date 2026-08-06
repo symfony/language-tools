@@ -70,16 +70,18 @@ function bridgeStimulusLocalControllers(string $projectRoot, string $controllerP
     if (false === $realPath || !is_dir($realPath)) {
         return [];
     }
-    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($realPath, FilesystemIterator::SKIP_DOTS));
-    foreach ($iterator as $file) {
-        if (!$file instanceof SplFileInfo || !$file->isFile()) {
-            continue;
-        }
-        $relative = str_replace('\\', '/', substr($file->getPathname(), strlen(rtrim($realPath, '/\\')) + 1));
+    $finder = (new Symfony\Component\Finder\Finder())
+        ->files()
+        ->in($realPath)
+        ->ignoreDotFiles(false)
+        ->ignoreVCS(false)
+        ->name('/[-_]controller\.[jt]s$/');
+    foreach ($finder as $file) {
+        $relative = Symfony\Component\Filesystem\Path::makeRelative($file->getPathname(), $realPath);
         if (!preg_match('/^.*[-_](controller\.[jt]s)$/', $relative, $match)) {
             continue;
         }
-        if ('ts' === strtolower($file->getExtension()) && is_file(substr($file->getPathname(), 0, -2).'js')) {
+        if ('ts' === Symfony\Component\Filesystem\Path::getExtension($relative, true) && is_file(Symfony\Component\Filesystem\Path::changeExtension($file->getPathname(), 'js'))) {
             continue;
         }
         $name = str_replace(['_'.$match[1], '-'.$match[1]], '', $relative);
@@ -114,7 +116,10 @@ function bridgeStimulusUxControllers(string $projectRoot, string $controllersJso
             $warnings[] = sprintf('Stimulus package not found: %s', $composerPackage);
             continue;
         }
-        $packageJson = is_file($packagePath.'/assets/package.json') ? $packagePath.'/assets/package.json' : $packagePath.'/Resources/assets/package.json';
+        $packageJson = Symfony\Component\Filesystem\Path::join($packagePath, 'assets/package.json');
+        if (!is_file($packageJson)) {
+            $packageJson = Symfony\Component\Filesystem\Path::join($packagePath, 'Resources/assets/package.json');
+        }
         if (!is_file($packageJson)) {
             $warnings[] = sprintf('Stimulus package metadata not found: %s', $composerPackage);
             continue;
@@ -144,7 +149,7 @@ function bridgeStimulusUxControllers(string $projectRoot, string $controllersJso
             if (is_string($localConfiguration['name'] ?? null)) {
                 $name = str_replace('/', '--', $localConfiguration['name']);
             }
-            $sourcePath = realpath($packageDirectory.'/'.$packageConfiguration['main']);
+            $sourcePath = realpath(Symfony\Component\Filesystem\Path::join($packageDirectory, $packageConfiguration['main']));
             if (false === $sourcePath || !is_file($sourcePath)) {
                 $warnings[] = sprintf('Stimulus controller source not found: %s/%s', $packageName, $controllerName);
                 continue;
@@ -162,14 +167,14 @@ function bridgeStimulusController(string $projectRoot, string $name, string $sou
     $contents = file_get_contents($sourcePath);
     $contents = false === $contents ? '' : $contents;
     $metadata = bridgeStimulusJavascriptMetadata($contents);
-    $root = rtrim(str_replace('\\', '/', realpath($projectRoot) ?: $projectRoot), '/').'/';
-    $normalizedSource = str_replace('\\', '/', $sourcePath);
+    $root = Symfony\Component\Filesystem\Path::canonicalize(realpath($projectRoot) ?: $projectRoot);
+    $sourcePath = Symfony\Component\Filesystem\Path::canonicalize($sourcePath);
 
     return [
         'name' => $name,
-        'sourcePath' => $normalizedSource,
+        'sourcePath' => $sourcePath,
         'lazy' => $lazy ?? 1 === preg_match('/\/\*!?\s*stimulusFetch:\s*\'lazy\'\s*\*\//i', $contents),
-        'vendor' => !str_starts_with($normalizedSource, $root) || str_contains($normalizedSource, '/vendor/'),
+        'vendor' => !Symfony\Component\Filesystem\Path::isBasePath($root, $sourcePath) || str_contains('/'.$sourcePath, '/vendor/'),
         ...$metadata,
     ];
 }

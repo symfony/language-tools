@@ -20,6 +20,7 @@ use Symfony\Lsp\Feature\ReferencesProviderRegistry;
 use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\IndexCommandHandler;
+use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
 use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
 
@@ -45,6 +46,7 @@ final class LanguageServer
         private readonly ProjectRuntimeRefresher $projectRuntimeRefresher,
         private readonly ApplicationSourceScanner $sourceScanner,
         private readonly IndexCommandHandler $indexCommandHandler,
+        private readonly UriToPathConverter $uriToPathConverter,
         private readonly ServerLogger $logger,
         private readonly WorkDoneProgressReporter $progress,
         private readonly string $version,
@@ -225,7 +227,7 @@ final class LanguageServer
             $deleted = 3 === $change['type'];
             $this->sourceScanner->refreshUri($change['uri'], $deleted);
             $this->projectRuntimeRefresher->refreshUri($change['uri']);
-            if ('composer.json' === basename((string) parse_url($change['uri'], \PHP_URL_PATH))) {
+            if ('composer.json' === basename($this->uriToPathConverter->convert($change['uri']) ?? '')) {
                 $rediscover = true;
             }
         }

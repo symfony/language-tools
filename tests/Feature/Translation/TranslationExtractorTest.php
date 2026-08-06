@@ -5,12 +5,13 @@ namespace Symfony\Lsp\Tests\Feature\Translation;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Translation\TranslationExtractor;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class TranslationExtractorTest extends TestCase
 {
     public function testExtractsNestedYamlMessagesAndPhpReferences(): void
     {
-        $extractor = new TranslationExtractor(new PositionConverter());
+        $extractor = $this->extractor();
         $facts = $extractor->extract('file:///workspace/translations/messages.en.yaml', 'yaml', <<<'YAML'
             article:
                 title: 'Article %name%'
@@ -31,7 +32,7 @@ final class TranslationExtractorTest extends TestCase
 
     public function testToleratesIncompleteJsonAndXliffResources(): void
     {
-        $extractor = new TranslationExtractor(new PositionConverter());
+        $extractor = $this->extractor();
         $json = $extractor->extract('file:///workspace/translations/admin.fr.json', 'json', <<<'JSON'
             {
                 "dashboard": {
@@ -63,7 +64,7 @@ final class TranslationExtractorTest extends TestCase
 
     public function testPreservesSourceRangeForEscapedJsonKeys(): void
     {
-        $declaration = (new TranslationExtractor(new PositionConverter()))
+        $declaration = $this->extractor()
             ->extract('file:///workspace/translations/messages.en.json', 'json', '{"first\\u002etitle":"Title"}')
             ->declarations()[0];
 
@@ -74,7 +75,7 @@ final class TranslationExtractorTest extends TestCase
     public function testKeepsDistinctRangesForRepeatedJsonKeys(): void
     {
         $text = '{"first":{"title":"One"},"second":{"title":"Two"}}';
-        $declarations = (new TranslationExtractor(new PositionConverter()))
+        $declarations = $this->extractor()
             ->extract('file:///workspace/translations/messages.en.json', 'json', $text)
             ->declarations();
 
@@ -84,7 +85,7 @@ final class TranslationExtractorTest extends TestCase
 
     public function testExtractsJsonXliffAndPhpResources(): void
     {
-        $extractor = new TranslationExtractor(new PositionConverter());
+        $extractor = $this->extractor();
         $json = $extractor->extract('file:///workspace/translations/admin.fr.json', 'json', '{"dashboard":{"title":"Administration"}}');
         $xliff = $extractor->extract('file:///workspace/translations/validators.en.xlf', 'xml', '<xliff><file><body><trans-unit id="1" resname="required"><source>required</source><target>Required</target></trans-unit></body></file></xliff>');
         $php = $extractor->extract('file:///workspace/translations/messages.de.php', 'php', "<?php return ['hello' => 'Hallo'];");
@@ -92,5 +93,10 @@ final class TranslationExtractorTest extends TestCase
         self::assertSame('dashboard.title', $json->declarations()[0]->key());
         self::assertSame('required', $xliff->declarations()[0]->key());
         self::assertSame('hello', $php->declarations()[0]->key());
+    }
+
+    private function extractor(): TranslationExtractor
+    {
+        return new TranslationExtractor(new PositionConverter(), new UriToPathConverter());
     }
 }

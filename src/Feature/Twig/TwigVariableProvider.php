@@ -17,6 +17,7 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
         private readonly PositionConverter $converter,
         private readonly TemplateIndexRegistry $indexes,
         private readonly TwigComponentIndexRegistry $componentIndexes,
+        private readonly TemplateNameResolver $nameResolver,
     ) {
     }
 
@@ -27,7 +28,7 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
             return null;
         }
         [$document, $project, $position] = $request;
-        if ('twig' !== $document->languageId() || null === $template = $this->template($project, $document)) {
+        if ('twig' !== $document->languageId() || null === $template = $this->nameResolver->resolve($project, $document->uri())) {
             return null;
         }
         $cursor = $this->converter->toByteOffset($document->text(), $position);
@@ -67,7 +68,7 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
             return null;
         }
         [$document, $project, $position] = $request;
-        if ('twig' !== $document->languageId() || null === $template = $this->template($project, $document)) {
+        if ('twig' !== $document->languageId() || null === $template = $this->nameResolver->resolve($project, $document->uri())) {
             return null;
         }
         $name = $this->word($document, $position);
@@ -96,25 +97,6 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
         sort($variables);
 
         return $variables;
-    }
-
-    private function template(Project $project, Document $document): ?string
-    {
-        $path = rawurldecode((string) parse_url($document->uri(), \PHP_URL_PATH));
-        $root = rtrim(str_replace('\\', '/', $project->rootPath()), '/').'/templates/';
-        $path = str_replace('\\', '/', $path);
-        if (!str_starts_with($path, $root)) {
-            return null;
-        }
-        $name = substr($path, \strlen($root));
-        if (str_starts_with($name, 'bundles/')) {
-            $parts = explode('/', $name, 3);
-            if (3 === \count($parts)) {
-                return '@'.$parts[1].'/'.$parts[2];
-            }
-        }
-
-        return $name;
     }
 
     private function word(Document $document, Position $position): ?string

@@ -18,6 +18,7 @@ use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
 use Symfony\Lsp\Tests\Support\NullProgressReporter;
 
@@ -59,6 +60,7 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
             new NullProgressReporter(),
             new InMemorySourceIndexStore(),
             new SourceIndexPayloadCodec(),
+            new UriToPathConverter(),
             [new DependencyInjectionSourceIndexer(
                 $indexes,
                 new YamlDependencyInjectionExtractor($converter),

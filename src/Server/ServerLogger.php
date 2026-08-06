@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Server;
 
 use Amp\ByteStream\WritableStream;
 use Fabpot\JsonRpc\TrafficLoggerInterface;
+use Symfony\Component\Filesystem\Path;
 
 final class ServerLogger implements TrafficLoggerInterface
 {
@@ -89,10 +90,11 @@ final class ServerLogger implements TrafficLoggerInterface
 
     private function relativeFile(string $file): string
     {
-        $root = str_replace('\\', '/', \dirname(__DIR__, 2)).'/';
-        $file = str_replace('\\', '/', $file);
+        $root = \dirname(__DIR__, 2);
 
-        return str_starts_with($file, $root) ? substr($file, \strlen($root)) : $file;
+        return Path::isBasePath($root, $file) && Path::canonicalize($root) !== Path::canonicalize($file)
+            ? Path::makeRelative($file, $root)
+            : Path::canonicalize($file);
     }
 
     private function write(string $message): void

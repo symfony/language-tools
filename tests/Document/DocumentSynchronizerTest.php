@@ -6,13 +6,14 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\DocumentSynchronizer;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class DocumentSynchronizerTest extends TestCase
 {
     public function testSynchronizesOpenIncrementalChangeAndClose(): void
     {
         $store = new DocumentStore();
-        $synchronizer = new DocumentSynchronizer($store, new PositionConverter());
+        $synchronizer = $this->synchronizer($store);
         $uri = 'file:///workspace/src/Controller.php';
 
         $synchronizer->open(['textDocument' => [
@@ -43,7 +44,7 @@ final class DocumentSynchronizerTest extends TestCase
     public function testNormalizesTwigFilesReportedAsHtml(): void
     {
         $store = new DocumentStore();
-        $synchronizer = new DocumentSynchronizer($store, new PositionConverter());
+        $synchronizer = $this->synchronizer($store);
         $uri = 'file:///workspace/templates/page.html.twig';
 
         $synchronizer->open(['textDocument' => [
@@ -59,7 +60,7 @@ final class DocumentSynchronizerTest extends TestCase
     public function testAppliesFullDocumentChanges(): void
     {
         $store = new DocumentStore();
-        $synchronizer = new DocumentSynchronizer($store, new PositionConverter());
+        $synchronizer = $this->synchronizer($store);
         $uri = 'file:///workspace/config/routes.yaml';
         $synchronizer->open(['textDocument' => [
             'uri' => $uri,
@@ -74,5 +75,10 @@ final class DocumentSynchronizerTest extends TestCase
         ]);
 
         self::assertSame('new', $store->get($uri)?->text());
+    }
+
+    private function synchronizer(DocumentStore $store): DocumentSynchronizer
+    {
+        return new DocumentSynchronizer($store, new PositionConverter(), new UriToPathConverter());
     }
 }

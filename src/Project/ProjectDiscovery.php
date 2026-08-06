@@ -72,14 +72,14 @@ final class ProjectDiscovery
             return null === $path ? [] : [$path];
         }
         if (Path::isAbsolute($configuredRoot)) {
-            return [rtrim(str_replace('\\', '/', $configuredRoot), '/')];
+            return [Path::canonicalize($configuredRoot)];
         }
 
         $paths = [];
         foreach ($workspaceFolders as $workspaceFolder) {
             $workspacePath = $this->uriToPathConverter->convert($workspaceFolder['uri']);
             if (null !== $workspacePath) {
-                $paths[] = $workspacePath.'/'.trim(str_replace('\\', '/', $configuredRoot), '/');
+                $paths[] = Path::join($workspacePath, $configuredRoot);
             }
         }
 
@@ -101,13 +101,13 @@ final class ProjectDiscovery
             ->ignoreDotFiles(false)
             ->ignoreVCS(false);
         foreach ($files as $file) {
-            yield str_replace('\\', '/', $file->getPath());
+            yield Path::canonicalize($file->getPath());
         }
     }
 
     private function discoverRoot(string $rootPath, string $rootUri): ?Project
     {
-        $composerPath = $rootPath.'/composer.json';
+        $composerPath = Path::join($rootPath, 'composer.json');
         if (!is_file($composerPath)) {
             return null;
         }
@@ -141,7 +141,7 @@ final class ProjectDiscovery
             return rtrim($workspaceUri, '/');
         }
 
-        $relativePath = substr(str_replace('\\', '/', $projectPath), \strlen(rtrim(str_replace('\\', '/', $workspacePath), '/')) + 1);
+        $relativePath = Path::makeRelative($projectPath, $workspacePath);
         $encodedPath = implode('/', array_map('rawurlencode', explode('/', $relativePath)));
 
         return rtrim($workspaceUri, '/').'/'.$encodedPath;

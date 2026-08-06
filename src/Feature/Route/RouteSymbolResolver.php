@@ -2,8 +2,10 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
+use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class RouteSymbolResolver
 {
@@ -13,13 +15,14 @@ final class RouteSymbolResolver
         private readonly TwigRouteReferenceExtractor $twigReferenceExtractor,
         private readonly PhpRouteDeclarationExtractor $phpDeclarationExtractor,
         private readonly YamlRouteDeclarationExtractor $yamlDeclarationExtractor,
+        private readonly UriToPathConverter $uriToPathConverter,
     ) {
     }
 
     public function resolve(string $uri, string $text, Position $position): ?RouteSymbol
     {
         $offset = $this->positionConverter->toByteOffset($text, $position);
-        $extension = strtolower(pathinfo((string) parse_url($uri, \PHP_URL_PATH), \PATHINFO_EXTENSION));
+        $extension = Path::getExtension($this->uriToPathConverter->convert($uri) ?? '', true);
         $reference = 'twig' === $extension
             ? $this->twigReferenceExtractor->at($text, $offset)
             : $this->phpReferenceExtractor->at($text, $offset);

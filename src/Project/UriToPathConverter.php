@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Project;
 
+use Symfony\Component\Filesystem\Path;
+
 final class UriToPathConverter
 {
     public function convert(string $uri): ?string
@@ -24,12 +26,12 @@ final class UriToPathConverter
             $path = substr($path, 1);
         }
 
-        return rtrim(str_replace('\\', '/', $path), '/');
+        return Path::canonicalize(str_replace('\\', '/', $path));
     }
 
     public function toUri(string $path): string
     {
-        $path = str_replace('\\', '/', $path);
+        $path = Path::canonicalize(str_replace('\\', '/', $path));
         if (!str_starts_with($path, '/')) {
             $path = '/'.$path;
         }

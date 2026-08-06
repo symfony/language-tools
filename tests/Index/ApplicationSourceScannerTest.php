@@ -18,6 +18,7 @@ use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Tests\Support\NullProgressReporter;
 
 final class ApplicationSourceScannerTest extends TestCase
@@ -74,7 +75,7 @@ final class ApplicationSourceScannerTest extends TestCase
         $indexes = new EnvironmentIndexRegistry();
         $this->scanner(new EnvironmentSourceIndexer(
             $indexes,
-            new EnvironmentExtractor(new PositionConverter()),
+            new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter()),
         ))->indexAll();
 
         self::assertSame(['APP_SECRET'], $indexes->forProject($this->project)->names());
@@ -118,6 +119,7 @@ final class ApplicationSourceScannerTest extends TestCase
             new NullProgressReporter(),
             new PersistentSourceIndexStore('test', new Filesystem()),
             new SourceIndexPayloadCodec(),
+            new UriToPathConverter(),
             [$provider],
         );
     }

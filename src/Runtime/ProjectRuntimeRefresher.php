@@ -2,8 +2,9 @@
 
 namespace Symfony\Lsp\Runtime;
 
+use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\TrustStatus;
 use Symfony\Lsp\Project\WorkspaceTrust;
@@ -12,6 +13,7 @@ final class ProjectRuntimeRefresher
 {
     public function __construct(
         private readonly ProjectRegistry $projects,
+        private readonly ProjectPathResolver $pathResolver,
         private readonly WorkspaceTrust $workspaceTrust,
         private readonly RuntimeRefreshSchedulerInterface $refreshScheduler,
         private readonly ProjectIndexStatusRegistry $statuses,
@@ -35,60 +37,49 @@ final class ProjectRuntimeRefresher
     public function refreshUri(string $uri): void
     {
         $project = $this->projects->forDocumentUri($uri);
+        $path = null === $project ? null : $this->pathResolver->relative($project, $uri);
         if (null === $project
             || !$this->configuration->runtimeIndexing($project)
             || TrustStatus::Trusted !== $this->workspaceTrust->status($project)
-            || !$this->affectsRuntime($project, $uri)
+            || null === $path
+            || !$this->affectsRuntime($path)
         ) {
             return;
         }
 
         $this->statuses->runtimeStale($project);
-        $this->refreshScheduler->schedule($project, $this->refreshMode($uri));
+        $this->refreshScheduler->schedule($project, $this->refreshMode($path));
     }
 
-    private function refreshMode(string $uri): RuntimeRefreshMode
+    private function refreshMode(string $path): RuntimeRefreshMode
     {
-        $path = parse_url($uri, \PHP_URL_PATH);
-        if (\is_string($path) && str_contains(str_replace('\\', '/', $path), '/translations/')) {
-            return RuntimeRefreshMode::Warmup;
-        }
-
-        return RuntimeRefreshMode::Clear;
+        return str_contains('/'.$path, '/translations/') ? RuntimeRefreshMode::Warmup : RuntimeRefreshMode::Clear;
     }
 
-    private function affectsRuntime(Project $project, string $uri): bool
+    private function affectsRuntime(string $path): bool
     {
-        $path = parse_url($uri, \PHP_URL_PATH);
-        if (!\is_string($path)) {
+        if (str_starts_with($path, 'var/') || str_starts_with($path, 'vendor/')) {
             return false;
         }
 
-        $rootPath = ltrim(rtrim(str_replace('\\', '/', $project->rootPath()), '/'), '/');
-        $path = ltrim(str_replace('\\', '/', rawurldecode($path)), '/');
-        $relativePath = str_starts_with($path, $rootPath.'/') ? substr($path, \strlen($rootPath) + 1) : null;
-        if (null !== $relativePath && (str_starts_with($relativePath, 'var/') || str_starts_with($relativePath, 'vendor/'))) {
-            return false;
-        }
-
-        $extension = strtolower(pathinfo($path, \PATHINFO_EXTENSION));
+        $extension = Path::getExtension($path, true);
         if ('php' === $extension || 'composer.json' === basename($path)) {
             return true;
         }
 
-        if (str_starts_with($path, $rootPath.'/assets/')) {
+        if (str_starts_with($path, 'assets/')) {
             return true;
         }
         if ('xml' === $extension) {
-            return str_starts_with($path, $rootPath.'/config/');
+            return str_starts_with($path, 'config/');
         }
         if (\in_array($extension, ['json', 'xlf', 'xliff'], true)) {
-            return str_contains($path, '/translations/');
+            return str_contains('/'.$path, '/translations/');
         }
         if (!\in_array($extension, ['yaml', 'yml'], true)) {
             return false;
         }
 
-        return str_starts_with($path, $rootPath.'/config/') || str_contains($path, '/translations/');
+        return str_starts_with($path, 'config/') || str_contains('/'.$path, '/translations/');
     }
 }

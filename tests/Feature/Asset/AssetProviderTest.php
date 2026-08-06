@@ -22,7 +22,7 @@ final class AssetProviderTest extends TestCase
     public function testProvidesAssetsAndImportmapEntrypoints(): void
     {
         $converter = new PositionConverter();
-        $extractor = new AssetExtractor($converter);
+        $extractor = new AssetExtractor($converter, new UriToPathConverter());
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);

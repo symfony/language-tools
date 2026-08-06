@@ -6,8 +6,10 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\TrustStatus;
+use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
@@ -37,6 +39,7 @@ final class ProjectRuntimeRefresherTest extends TestCase
         yield 'package YAML' => ['file:///workspace/config/packages/framework.yaml', RuntimeRefreshMode::Clear];
         yield 'package XML' => ['file:///workspace/config/packages/framework.xml', RuntimeRefreshMode::Clear];
         yield 'bundle metadata' => ['file:///workspace/composer.json', RuntimeRefreshMode::Clear];
+        yield 'nested bundle metadata' => ['file:///workspace/packages/app/composer.json', RuntimeRefreshMode::Clear];
         yield 'mapped asset' => ['file:///workspace/assets/app.js', RuntimeRefreshMode::Clear];
         yield 'translation YAML' => ['file:///workspace/translations/messages.en.yaml', RuntimeRefreshMode::Warmup];
         yield 'translation JSON' => ['file:///workspace/translations/messages.en.json', RuntimeRefreshMode::Warmup];
@@ -86,6 +89,7 @@ final class ProjectRuntimeRefresherTest extends TestCase
         return [
             new ProjectRuntimeRefresher(
                 $projects,
+                new ProjectPathResolver(new UriToPathConverter()),
                 $workspaceTrust,
                 $scheduler,
                 new ProjectIndexStatusRegistry(),

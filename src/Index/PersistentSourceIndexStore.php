@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Index;
 
 use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Project\Project;
 
 final class PersistentSourceIndexStore implements SourceIndexStoreInterface
@@ -66,7 +67,7 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface
 
     private function path(Project $project): string
     {
-        return $project->rootPath().'/var/symfony-lsp/'.$this->serverVersion.'/index/source.json';
+        return Path::join($project->rootPath(), 'var/symfony-lsp', $this->serverVersion, 'index/source.json');
     }
 
     /**

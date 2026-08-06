@@ -5,13 +5,16 @@ namespace Symfony\Lsp\Feature\Stimulus;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 
 final class StimulusExtractor
 {
     private const LIFECYCLE_METHODS = ['connect', 'constructor', 'disconnect', 'initialize'];
 
-    public function __construct(private readonly PositionConverter $converter)
-    {
+    public function __construct(
+        private readonly PositionConverter $converter,
+        private readonly ProjectPathResolver $pathResolver,
+    ) {
     }
 
     public function extract(Project $project, string $uri, string $languageId, string $text): StimulusSourceFacts
@@ -229,13 +232,11 @@ final class StimulusExtractor
 
     private function controllerName(Project $project, string $uri): ?string
     {
-        $path = rawurldecode((string) parse_url($uri, \PHP_URL_PATH));
-        $root = rtrim(str_replace('\\', '/', $project->rootPath()), '/').'/assets/controllers/';
-        $path = str_replace('\\', '/', $path);
-        if (!str_starts_with($path, $root)) {
+        $path = $this->pathResolver->relative($project, $uri);
+        if (null === $path || !str_starts_with($path, 'assets/controllers/')) {
             return null;
         }
-        $relative = substr($path, \strlen($root));
+        $relative = substr($path, \strlen('assets/controllers/'));
         if (!preg_match('/^(.*?)(?:_|-)controller\.[jt]s$/', $relative, $match)) {
             return null;
         }

@@ -55,12 +55,16 @@ function bridgeConfigurationSection(SymfonyLspBridgeContext $context): ?array
     usort($bundles, static fn (array $left, array $right): int => $left['alias'] <=> $right['alias']);
     sort($warnings);
     $resources = [];
-    $configDir = rtrim($project, '/\\').'/config';
+    $configDir = Symfony\Component\Filesystem\Path::join($project, 'config');
     if (is_dir($configDir)) {
-        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($configDir, FilesystemIterator::SKIP_DOTS)) as $file) {
-            if ($file->isFile() && in_array(strtolower($file->getExtension()), ['php', 'xml', 'yaml', 'yml'], true)) {
-                $resources[] = $file->getPathname();
-            }
+        $finder = (new Symfony\Component\Finder\Finder())
+            ->files()
+            ->in($configDir)
+            ->ignoreDotFiles(false)
+            ->ignoreVCS(false)
+            ->name('/\.(?:php|xml|yaml|yml)$/i');
+        foreach ($finder as $file) {
+            $resources[] = $file->getPathname();
         }
     }
     sort($resources);
