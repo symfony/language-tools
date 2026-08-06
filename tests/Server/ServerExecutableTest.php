@@ -2,40 +2,43 @@
 
 namespace Symfony\Lsp\Tests\Server;
 
+use Amp\Process\Process;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Path;
+
+use function Amp\async;
+use function Amp\ByteStream\buffer;
+use function Amp\Future\await;
 
 final class ServerExecutableTest extends TestCase
 {
     public function testReportsUnhandledServerFailuresToStandardError(): void
     {
-        $process = proc_open(
-            [\dirname(__DIR__, 2).'/bin/symfony-lsp'],
-            [
-                ['pipe', 'r'],
-                ['pipe', 'w'],
-                ['pipe', 'w'],
-            ],
-            $pipes,
-            \dirname(__DIR__, 2),
-            [...getenv(), 'SYMFONY_LSP_TREE_SITTER' => \PHP_BINARY],
-            ['bypass_shell' => true],
+        $environment = getenv();
+        $root = \dirname(__DIR__, 2);
+        $process = Process::start(
+            [Path::join($root, 'bin/symfony-lsp')],
+            workingDirectory: $root,
+            environment: [...$environment, 'SYMFONY_LSP_TREE_SITTER' => \PHP_BINARY],
+            options: ['bypass_shell' => true],
         );
-        self::assertIsResource($process);
+        $futures = [
+            'stdout' => async(static fn (): string => buffer($process->getStdout())),
+            'stderr' => async(static fn (): string => buffer($process->getStderr())),
+            'exitCode' => async(static fn (): int => $process->join()),
+        ];
 
-        fwrite($pipes[0], "Broken\r\n\r\n");
-        fclose($pipes[0]);
-        $output = stream_get_contents($pipes[1]);
-        fclose($pipes[1]);
-        $errorOutput = stream_get_contents($pipes[2]);
-        fclose($pipes[2]);
+        $process->getStdin()->write("Broken\r\n\r\n");
+        $process->getStdin()->end();
+        /** @var array{stdout: string, stderr: string, exitCode: int} $result */
+        $result = await($futures);
 
-        self::assertSame(1, proc_close($process));
-        self::assertSame('', $output);
-        self::assertIsString($errorOutput);
+        self::assertSame(1, $result['exitCode']);
+        self::assertSame('', $result['stdout']);
         self::assertMatchesRegularExpression(
             '{^Symfony LSP failed: .+ at (?:src|vendor)/.+:\d+: .+\n$}',
-            $errorOutput,
+            $result['stderr'],
         );
-        self::assertStringContainsString('A JSON-RPC message header is malformed.', $errorOutput);
+        self::assertStringContainsString('A JSON-RPC message header is malformed.', $result['stderr']);
     }
 }

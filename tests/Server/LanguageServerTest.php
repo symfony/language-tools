@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Server;
 use Amp\ByteStream\ReadableBuffer;
 use Fabpot\JsonRpc\ContentLengthJsonRpcTransport;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Server\LanguageServerFactory;
 use Symfony\Lsp\Server\ServerVersion;
 use Symfony\Lsp\Tests\Support\CapturingWritableStream;
@@ -195,23 +196,6 @@ final class LanguageServerTest extends TestCase
 
     private function removeDirectory(string $directory): void
     {
-        if (!is_dir($directory)) {
-            return;
-        }
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST,
-        );
-        foreach ($iterator as $file) {
-            if (!$file instanceof \SplFileInfo) {
-                continue;
-            }
-            if ($file->isDir()) {
-                @rmdir($file->getPathname());
-            } else {
-                @unlink($file->getPathname());
-            }
-        }
-        @rmdir($directory);
+        (new Filesystem())->remove($directory);
     }
 }

@@ -2,6 +2,19 @@
 
 namespace Symfony\Lsp\Tools;
 
+use Amp\ByteStream\ReadableStream;
+use Amp\ByteStream\WritableStream;
+use Amp\Process\Process;
+use Amp\Process\ProcessException;
+
+use function Amp\async;
+use function Amp\ByteStream\buffer;
+use function Amp\ByteStream\getStderr;
+use function Amp\ByteStream\getStdout;
+use function Amp\ByteStream\pipe;
+use function Amp\Future\await;
+use function Amp\Future\awaitAll;
+
 final class ReleaseCommand
 {
     private const EXPECTED_RELEASE_FILES = [
@@ -322,17 +335,7 @@ final class ReleaseCommand
     private function run(array $command, ?string $workingDirectory = null): void
     {
         fwrite(\STDOUT, '$ '.$this->formatCommand($command)."\n");
-        $process = proc_open(
-            $command,
-            [\STDIN, \STDOUT, \STDERR],
-            $pipes,
-            $workingDirectory,
-            options: ['bypass_shell' => true],
-        );
-        if (!\is_resource($process)) {
-            throw new \RuntimeException('Unable to start command: '.$this->formatCommand($command));
-        }
-        $status = proc_close($process);
+        [$status] = $this->execute($command, $workingDirectory, true);
         if (0 !== $status) {
             throw new \RuntimeException(\sprintf('Command failed with status %d: %s', $status, $this->formatCommand($command)));
         }
@@ -364,31 +367,57 @@ final class ReleaseCommand
      */
     private function captureResult(array $command, ?string $workingDirectory): array
     {
-        $process = proc_open(
-            $command,
-            [
-                ['file', '/dev/null', 'r'],
-                ['pipe', 'w'],
-                ['pipe', 'w'],
-            ],
-            $pipes,
-            $workingDirectory,
-            options: ['bypass_shell' => true],
-        );
-        if (!\is_resource($process)) {
-            throw new \RuntimeException('Unable to start command: '.$this->formatCommand($command));
+        return $this->execute($command, $workingDirectory, false);
+    }
+
+    /**
+     * @param list<string> $command
+     *
+     * @return array{int, string, string}
+     */
+    private function execute(array $command, ?string $workingDirectory, bool $streamOutput): array
+    {
+        try {
+            $process = Process::start(
+                $command,
+                workingDirectory: $workingDirectory,
+                options: ['bypass_shell' => true],
+            );
+        } catch (ProcessException $error) {
+            throw new \RuntimeException('Unable to start command: '.$this->formatCommand($command), previous: $error);
         }
 
-        $output = stream_get_contents($pipes[1]);
-        fclose($pipes[1]);
-        $errorOutput = stream_get_contents($pipes[2]);
-        fclose($pipes[2]);
-        $status = proc_close($process);
-        if (false === $output || false === $errorOutput) {
-            throw new \RuntimeException('Unable to read command output: '.$this->formatCommand($command));
+        $process->getStdin()->close();
+        $stdout = $streamOutput ? getStdout() : null;
+        $stderr = $streamOutput ? getStderr() : null;
+        $futures = [
+            'stdout' => async(fn (): string => $this->processOutput($process->getStdout(), $stdout)),
+            'stderr' => async(fn (): string => $this->processOutput($process->getStderr(), $stderr)),
+            'exitCode' => async(static fn (): int => $process->join()),
+        ];
+
+        try {
+            /** @var array{stdout: string, stderr: string, exitCode: int} $result */
+            $result = await($futures);
+        } catch (\Throwable $error) {
+            $process->kill();
+            awaitAll($futures);
+
+            throw new \RuntimeException('Unable to run command: '.$this->formatCommand($command), previous: $error);
         }
 
-        return [$status, $output, $errorOutput];
+        return [$result['exitCode'], $result['stdout'], $result['stderr']];
+    }
+
+    private function processOutput(ReadableStream $source, ?WritableStream $destination): string
+    {
+        if (null === $destination) {
+            return buffer($source);
+        }
+
+        pipe($source, $destination);
+
+        return '';
     }
 
     /** @param list<string> $command */

@@ -21,4 +21,14 @@ final class SidecarTreeSitterParserTest extends TestCase
         self::assertFalse($tree->hasError());
         self::assertSame("'article_show'", $tree->text($tree->nodesOfType('string')[0], $source));
     }
+
+    public function testReportsSidecarFailures(): void
+    {
+        $parser = new SidecarTreeSitterParser(\PHP_BINARY, new TreeSitterResultDecoder());
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Tree-sitter sidecar failed');
+
+        $parser->parse('missing-script.php', '');
+    }
 }

@@ -2,6 +2,14 @@
 
 namespace Symfony\Lsp\Parser\TreeSitter;
 
+use Amp\Process\Process;
+use Amp\Process\ProcessException;
+
+use function Amp\async;
+use function Amp\ByteStream\buffer;
+use function Amp\Future\await;
+use function Amp\Future\awaitAll;
+
 final class SidecarTreeSitterParser implements TreeSitterParserInterface
 {
     public function __construct(
@@ -16,45 +24,44 @@ final class SidecarTreeSitterParser implements TreeSitterParserInterface
             throw new \RuntimeException('The Symfony LSP Tree-sitter sidecar is not executable.');
         }
 
-        $process = proc_open(
-            [$this->executable, $language],
-            [
-                ['pipe', 'r'],
-                ['pipe', 'w'],
-                ['pipe', 'w'],
-            ],
-            $pipes,
-            options: ['bypass_shell' => true],
-        );
-        if (!\is_resource($process)) {
-            throw new \RuntimeException('Unable to start the Symfony LSP Tree-sitter sidecar.');
+        try {
+            $process = Process::start([$this->executable, $language], options: ['bypass_shell' => true]);
+        } catch (ProcessException $error) {
+            throw new \RuntimeException('Unable to start the Symfony LSP Tree-sitter sidecar.', previous: $error);
         }
 
-        $written = 0;
-        while ($written < \strlen($source)) {
-            $bytes = fwrite($pipes[0], substr($source, $written));
-            if (false === $bytes || 0 === $bytes) {
-                fclose($pipes[0]);
-                proc_terminate($process);
-                proc_close($process);
+        $futures = [
+            'stdout' => async(static fn (): string => buffer($process->getStdout())),
+            'stderr' => async(static fn (): string => buffer($process->getStderr())),
+            'exitCode' => async(static fn (): int => $process->join()),
+        ];
 
-                throw new \RuntimeException('Unable to send source to the Symfony LSP Tree-sitter sidecar.');
-            }
-            $written += $bytes;
-        }
-        fclose($pipes[0]);
+        try {
+            $process->getStdin()->write($source);
+            $process->getStdin()->end();
+        } catch (\Throwable $error) {
+            $process->kill();
+            awaitAll($futures);
 
-        $output = stream_get_contents($pipes[1]);
-        fclose($pipes[1]);
-        $error = stream_get_contents($pipes[2]);
-        fclose($pipes[2]);
-        $status = proc_close($process);
-        if (0 !== $status || false === $output) {
-            throw new \RuntimeException('The Symfony LSP Tree-sitter sidecar failed: '.trim(false === $error ? '' : $error));
+            throw new \RuntimeException('Unable to send source to the Symfony LSP Tree-sitter sidecar.', previous: $error);
         }
 
         try {
-            $result = json_decode($output, true, flags: \JSON_THROW_ON_ERROR);
+            /** @var array{stdout: string, stderr: string, exitCode: int} $result */
+            $result = await($futures);
+        } catch (\Throwable $error) {
+            $process->kill();
+            awaitAll($futures);
+
+            throw new \RuntimeException('The Symfony LSP Tree-sitter sidecar failed.', previous: $error);
+        }
+
+        if (0 !== $result['exitCode']) {
+            throw new \RuntimeException('The Symfony LSP Tree-sitter sidecar failed: '.trim($result['stderr']));
+        }
+
+        try {
+            $result = json_decode($result['stdout'], true, flags: \JSON_THROW_ON_ERROR);
         } catch (\JsonException $exception) {
             throw new \RuntimeException('The Symfony LSP Tree-sitter sidecar returned invalid JSON.', previous: $exception);
         }
