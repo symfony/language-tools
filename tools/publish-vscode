@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+    echo "Usage: publish-vscode VSIX_DIRECTORY" >&2
+    exit 2
+fi
+
+vsix_directory="$1"
+attempts="${VSCE_PUBLISH_ATTEMPTS:-3}"
+retry_delay="${VSCE_PUBLISH_RETRY_DELAY:-15}"
+if [[ ! "$attempts" =~ ^[1-9][0-9]*$ || ! "$retry_delay" =~ ^[0-9]+$ ]]; then
+    echo "Publish attempts must be positive and retry delay must be non-negative." >&2
+    exit 2
+fi
+options=(publish --azure-credential --skip-duplicate)
+if [[ "${PRERELEASE:-false}" = true ]]; then
+    options+=(--pre-release)
+fi
+
+shopt -s nullglob
+packages=("$vsix_directory"/*.vsix)
+if [[ ${#packages[@]} -eq 0 ]]; then
+    echo "No VSIX packages found in $vsix_directory." >&2
+    exit 1
+fi
+
+for package in "${packages[@]}"; do
+    published=false
+    for ((attempt = 1; attempt <= attempts; ++attempt)); do
+        if npx vsce "${options[@]}" --packagePath "$package"; then
+            published=true
+            break
+        fi
+        if ((attempt < attempts)); then
+            echo "Publishing $(basename "$package") failed on attempt $attempt; retrying." >&2
+            sleep "$retry_delay"
+        fi
+    done
+    if [[ "$published" != true ]]; then
+        echo "Unable to publish $(basename "$package") after $attempts attempts." >&2
+        exit 1
+    fi
+done

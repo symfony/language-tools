@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Retry individual Marketplace package publications after transient failures
+- Show failed workflow logs and recovery commands during releases
+
 ## 0.3.3 (2026-08-06)
 
 - Support stable and prerelease GitHub and Marketplace releases

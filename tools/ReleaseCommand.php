@@ -275,7 +275,14 @@ final class ReleaseCommand
             throw new \RuntimeException(\sprintf('No %s workflow appeared for %s.', $workflow, $commit));
         }
 
-        $this->run(['gh', 'run', 'watch', $runId, '--exit-status'], $this->root);
+        if (0 === $this->runStatus(['gh', 'run', 'watch', $runId, '--exit-status'], $this->root)) {
+            return;
+        }
+
+        fwrite(\STDERR, "\nFailed workflow logs:\n");
+        $this->runStatus(['gh', 'run', 'view', $runId, '--log-failed'], $this->root);
+
+        throw new \RuntimeException(\sprintf('Workflow %s failed. Rerun it with "gh run rerun %s --failed", then resume the release.', $workflow, $runId));
     }
 
     private function assertRequirements(): void
@@ -330,11 +337,18 @@ final class ReleaseCommand
     /** @param list<string> $command */
     private function run(array $command, ?string $workingDirectory = null): void
     {
-        fwrite(\STDOUT, '$ '.$this->formatCommand($command)."\n");
-        $status = $this->interactiveProcessRunner->run($command, $workingDirectory);
+        $status = $this->runStatus($command, $workingDirectory);
         if (0 !== $status) {
             throw new \RuntimeException(\sprintf('Command failed with status %d: %s', $status, $this->formatCommand($command)));
         }
+    }
+
+    /** @param list<string> $command */
+    private function runStatus(array $command, ?string $workingDirectory = null): int
+    {
+        fwrite(\STDOUT, '$ '.$this->formatCommand($command)."\n");
+
+        return $this->interactiveProcessRunner->run($command, $workingDirectory);
     }
 
     /** @param list<string> $command */

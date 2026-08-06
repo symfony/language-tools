@@ -127,10 +127,4 @@ jobs:
               working-directory: editor/vscode
               env:
                   PRERELEASE: ${{ steps.release.outputs.prerelease }}
-              run: |
-                  options=(publish --azure-credential --skip-duplicate)
-                  if [[ "$PRERELEASE" = true ]]; then
-                      options+=(--pre-release)
-                  fi
-                  npx vsce "${options[@]}" \
-                      --packagePath "$VSIX_DIRECTORY"/*.vsix
+              run: ../../tools/publish-vscode "$VSIX_DIRECTORY"
