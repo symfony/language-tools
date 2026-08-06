@@ -40,13 +40,43 @@ final class NativeProcessRunnerTest extends TestCase
         ], __DIR__, $cancellation->getCancellation());
     }
 
-    public function testEnforcesOutputLimit(): void
+    public function testDrainsStandardOutputAndErrorConcurrently(): void
     {
-        $runner = new NativeProcessRunner(maximumOutputBytes: 2);
+        $result = (new NativeProcessRunner())->run([
+            \PHP_BINARY,
+            '-r',
+            'fwrite(STDOUT, str_repeat("a", 1000000)); fwrite(STDERR, str_repeat("b", 1000000));',
+        ], __DIR__);
+
+        self::assertSame(1000000, \strlen($result->stdout()));
+        self::assertSame(1000000, \strlen($result->stderr()));
+    }
+
+    public function testEnforcesCombinedOutputLimit(): void
+    {
+        $runner = new NativeProcessRunner(maximumOutputBytes: 8);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('output limit');
 
-        $runner->run([\PHP_BINARY, '-r', 'echo "large";'], __DIR__);
+        $runner->run([\PHP_BINARY, '-r', 'fwrite(STDOUT, "12345"); fwrite(STDERR, "67890");'], __DIR__);
+    }
+
+    public function testReportsStartFailures(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Unable to start the project bridge.');
+
+        (new NativeProcessRunner())->run([\PHP_BINARY, '-r', ''], __DIR__.'/missing');
+    }
+
+    public function testEnforcesTimeout(): void
+    {
+        $runner = new NativeProcessRunner(timeout: 0.01);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('timed out');
+
+        $runner->run([\PHP_BINARY, '-r', 'sleep(10);'], __DIR__);
     }
 }

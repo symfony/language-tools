@@ -2,9 +2,17 @@
 
 namespace Symfony\Lsp\Runtime;
 
+use Amp\ByteStream\ReadableStream;
 use Amp\Cancellation;
+use Amp\CompositeCancellation;
+use Amp\DeferredCancellation;
+use Amp\Process\Process;
+use Amp\Process\ProcessException;
+use Amp\TimeoutCancellation;
 
-use function Amp\delay;
+use function Amp\async;
+use function Amp\Future\await;
+use function Amp\Future\awaitAll;
 
 final class NativeProcessRunner implements ProcessRunnerInterface
 {
@@ -20,63 +28,69 @@ final class NativeProcessRunner implements ProcessRunnerInterface
     public function run(array $command, string $workingDirectory, ?Cancellation $cancellation = null): ProcessResult
     {
         $cancellation?->throwIfRequested();
-        $pipes = [];
-        $process = proc_open($command, [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ], $pipes, $workingDirectory, null, ['bypass_shell' => true]);
-        if (!\is_resource($process)) {
-            throw new \RuntimeException('Unable to start the project bridge.');
-        }
-
-        fclose($pipes[0]);
-        stream_set_blocking($pipes[1], false);
-        stream_set_blocking($pipes[2], false);
-        $stdout = '';
-        $stderr = '';
-        $startedAt = microtime(true);
+        $timeout = new TimeoutCancellation($this->timeout);
+        $outputLimit = new DeferredCancellation();
+        $operationCancellation = new CompositeCancellation(...array_filter([
+            $cancellation,
+            $timeout,
+            $outputLimit->getCancellation(),
+        ]));
 
         try {
-            while (true) {
-                $status = proc_get_status($process);
-                $stdout .= stream_get_contents($pipes[1]);
-                $stderr .= stream_get_contents($pipes[2]);
+            $process = Process::start(
+                $command,
+                workingDirectory: $workingDirectory,
+                options: ['bypass_shell' => true],
+                cancellation: $operationCancellation,
+            );
+        } catch (ProcessException $error) {
+            throw new \RuntimeException('Unable to start the project bridge.', previous: $error);
+        }
 
-                if (\strlen($stdout) + \strlen($stderr) > $this->maximumOutputBytes) {
-                    proc_terminate($process, 9);
-                    throw new \RuntimeException('The project bridge exceeded the output limit.');
-                }
+        $process->getStdin()->close();
+        $outputBytes = 0;
+        $futures = [
+            'stdout' => async(function () use ($process, $operationCancellation, $outputLimit, &$outputBytes): string {
+                return $this->read($process->getStdout(), $operationCancellation, $outputLimit, $outputBytes);
+            }),
+            'stderr' => async(function () use ($process, $operationCancellation, $outputLimit, &$outputBytes): string {
+                return $this->read($process->getStderr(), $operationCancellation, $outputLimit, $outputBytes);
+            }),
+            'exitCode' => async(static fn (): int => $process->join($operationCancellation)),
+        ];
 
-                if (!$status['running']) {
-                    $exitCode = $status['exitcode'];
-                    break;
-                }
+        try {
+            /** @var array{stdout: string, stderr: string, exitCode: int} $result */
+            $result = await($futures);
+        } catch (\Throwable $error) {
+            $process->kill();
+            awaitAll($futures);
 
-                if (microtime(true) - $startedAt >= $this->timeout) {
-                    proc_terminate($process, 9);
-                    throw new \RuntimeException('The project bridge timed out.');
-                }
-
-                delay(0.001, cancellation: $cancellation);
+            if ($outputLimit->isCancelled()) {
+                throw new \RuntimeException('The project bridge exceeded the output limit.', previous: $error);
+            }
+            if ($timeout->isRequested()) {
+                throw new \RuntimeException('The project bridge timed out.', previous: $error);
             }
 
-            $stdout .= stream_get_contents($pipes[1]);
-            $stderr .= stream_get_contents($pipes[2]);
-        } catch (\Throwable $error) {
-            proc_terminate($process, 9);
-
             throw $error;
-        } finally {
-            fclose($pipes[1]);
-            fclose($pipes[2]);
-            $closeExitCode = proc_close($process);
         }
 
-        if ($exitCode < 0) {
-            $exitCode = $closeExitCode;
+        return new ProcessResult($result['exitCode'], $result['stdout'], $result['stderr']);
+    }
+
+    private function read(ReadableStream $stream, Cancellation $cancellation, DeferredCancellation $outputLimit, int &$outputBytes): string
+    {
+        $output = '';
+        while (null !== $chunk = $stream->read($cancellation)) {
+            $outputBytes += \strlen($chunk);
+            if ($outputBytes > $this->maximumOutputBytes) {
+                $outputLimit->cancel();
+                throw new \RuntimeException('The project bridge exceeded the output limit.');
+            }
+            $output .= $chunk;
         }
 
-        return new ProcessResult($exitCode, $stdout, $stderr);
+        return $output;
     }
 }
