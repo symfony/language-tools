@@ -2,6 +2,7 @@
 <?php
 
 use Symfony\Lsp\Server\LanguageServerFactory;
+use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Server\ServerVersion;
 
 use function Amp\ByteStream\getStderr;
@@ -35,10 +36,12 @@ if (!function_exists('symfony_lsp_tree_sitter_parse')) {
     }
 }
 
+$errorOutput = getStderr();
+$logger = new ServerLogger($errorOutput);
 try {
-    $exitCode = (new LanguageServerFactory())->create(getStdin(), getStdout(), getStderr())->run();
+    $exitCode = (new LanguageServerFactory())->create(getStdin(), getStdout(), $errorOutput)->run();
 } catch (\Throwable $error) {
-    fwrite(\STDERR, \sprintf("Symfony LSP failed: %s: %s\n", $error::class, $error->getMessage()));
+    $logger->fatal($error);
     exit(1);
 }
 

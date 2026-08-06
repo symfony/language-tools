@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { State } from 'vscode-languageclient/node';
-import { serverEnvironment } from '../../src/extension';
+import { serverEnvironment, serverSidecarPath, serverStartupMessage } from '../../src/extension';
 import { indexStatusPollingEnabled } from '../../src/indexStatus';
 import {
     completions,
@@ -40,7 +40,12 @@ async function testBundledSidecarEnvironment(): Promise<void> {
     await fs.promises.mkdir(directory, { recursive: true });
     await fs.promises.writeFile(sidecarPath, '');
     try {
+        assert.equal(serverSidecarPath(serverPath), sidecarPath);
         assert.equal(serverEnvironment(serverPath)?.SYMFONY_LSP_TREE_SITTER, sidecarPath);
+        assert.equal(
+            serverStartupMessage('1.2.3', serverPath, sidecarPath, 'bundled'),
+            `Symfony LSP extension 1.2.3 starting on ${process.platform}-${process.arch}; server (bundled): ${serverPath}; Tree-sitter sidecar: ${sidecarPath}.`,
+        );
     } finally {
         await fs.promises.rm(directory, { force: true, recursive: true });
     }

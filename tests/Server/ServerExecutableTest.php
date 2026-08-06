@@ -32,7 +32,10 @@ final class ServerExecutableTest extends TestCase
         self::assertSame(1, proc_close($process));
         self::assertSame('', $output);
         self::assertIsString($errorOutput);
-        self::assertStringStartsWith('Symfony LSP failed: ', $errorOutput);
+        self::assertMatchesRegularExpression(
+            '{^Symfony LSP failed: .+ at (?:src|vendor)/.+:\d+: .+\n$}',
+            $errorOutput,
+        );
         self::assertStringContainsString('A JSON-RPC message header is malformed.', $errorOutput);
     }
 }

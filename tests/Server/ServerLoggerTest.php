@@ -8,6 +8,19 @@ use Symfony\Lsp\Tests\Support\CapturingWritableStream;
 
 final class ServerLoggerTest extends TestCase
 {
+    public function testReportsFatalErrorsWithLocationAndRedaction(): void
+    {
+        $output = new CapturingWritableStream();
+        $logger = new ServerLogger($output);
+
+        $logger->fatal(new \RuntimeException('secret=exposed'));
+
+        self::assertMatchesRegularExpression(
+            '{^Symfony LSP failed: RuntimeException at tests/Server/ServerLoggerTest\.php:\d+: secret=\[redacted\]\n$}',
+            $output->contents(),
+        );
+    }
+
     public function testTrafficLoggingIsDisabledByDefaultAndRecursivelyRedactsContent(): void
     {
         $output = new CapturingWritableStream();

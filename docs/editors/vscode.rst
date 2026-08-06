@@ -166,9 +166,15 @@ Troubleshooting
 ---------------
 
 Open ``View > Output`` and select ``Symfony LSP`` to inspect extension and
-protocol messages. An unexpected process failure is reported on a line starting
-with ``Symfony LSP failed:``; index status polling stops when the language client
-is no longer running. If the server doesn't start, verify that:
+protocol messages. Startup records identify the extension and server versions,
+platform, resolved executable and Tree-sitter sidecar. An uncaught PHP failure
+is reported on a ``Symfony LSP failed:`` line with its class, source location and
+redacted message; index status polling stops when the language client is no
+longer running.
+
+If the process exits without a ``Symfony LSP failed:`` line, inspect the
+platform's native crash reports. On macOS, they are stored under
+``~/Library/Logs/DiagnosticReports``. If the server doesn't start, verify that:
 
 * the installed extension package matches the extension host's platform;
 * a configured ``symfonyLsp.serverPath`` points to an executable file;

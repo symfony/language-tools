@@ -39,6 +39,17 @@ final class ServerLogger implements TrafficLoggerInterface
         $this->write('[error] '.$message."\n");
     }
 
+    public function fatal(\Throwable $error): void
+    {
+        $this->write(\sprintf(
+            "Symfony LSP failed: %s at %s:%d: %s\n",
+            $error::class,
+            $this->relativeFile($error->getFile()),
+            $error->getLine(),
+            $this->redactString($error->getMessage()),
+        ));
+    }
+
     private function traffic(string $direction, string $line): void
     {
         if ('off' === $this->trace) {
@@ -74,6 +85,14 @@ final class ServerLogger implements TrafficLoggerInterface
     private function redactString(string $value): string
     {
         return preg_replace('/\b(password|passwd|secret|token|authorization|credential|cookie|api[_-]?key|private[_-]?key)\s*[=:]\s*[^\s,;]+/i', '$1=[redacted]', $value) ?? '[redacted]';
+    }
+
+    private function relativeFile(string $file): string
+    {
+        $root = str_replace('\\', '/', \dirname(__DIR__, 2)).'/';
+        $file = str_replace('\\', '/', $file);
+
+        return str_starts_with($file, $root) ? substr($file, \strlen($root)) : $file;
     }
 
     private function write(string $message): void

@@ -23,6 +23,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
     }
 
+    const sidecarPath = serverSidecarPath(serverPath);
     const serverOptions: ServerOptions = {
         command: serverPath,
         options: {
@@ -32,6 +33,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     };
     const outputChannel = vscode.window.createOutputChannel('Symfony LSP', { log: true });
     context.subscriptions.push(outputChannel);
+    const extensionVersion = 'string' === typeof context.extension.packageJSON.version
+        ? context.extension.packageJSON.version
+        : 'unknown';
+    const bundledServerDirectory = path.resolve(context.extensionPath, 'server') + path.sep;
+    const serverKind = configuredServerPath
+        ? 'configured'
+        : serverPath.startsWith(bundledServerDirectory) ? 'bundled' : 'development';
+    outputChannel.info(serverStartupMessage(extensionVersion, serverPath, sidecarPath, serverKind));
     const clientOptions: LanguageClientOptions = {
         documentSelector: [
             { scheme: 'file', language: 'php' },
@@ -74,6 +83,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
     context.subscriptions.push(client);
     await client.start();
+    const serverVersion = client.initializeResult?.serverInfo?.version;
+    outputChannel.info(`Symfony LSP server ${'string' === typeof serverVersion ? serverVersion : 'unknown'} initialized.`);
 
     const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
     const statusController = new IndexStatusController(client, statusBar, outputChannel);
@@ -98,13 +109,30 @@ function findServerPath(extensionPath: string): string | undefined {
     return candidates.find(fs.existsSync);
 }
 
-export function serverEnvironment(serverPath: string): NodeJS.ProcessEnv | undefined {
+export function serverSidecarPath(serverPath: string): string | undefined {
     const executable = 'win32' === process.platform ? 'symfony-lsp-tree-sitter.exe' : 'symfony-lsp-tree-sitter';
     const sidecarPath = path.resolve(path.dirname(serverPath), executable);
 
-    return fs.existsSync(sidecarPath)
-        ? { ...process.env, SYMFONY_LSP_TREE_SITTER: sidecarPath }
-        : undefined;
+    return fs.existsSync(sidecarPath) ? sidecarPath : undefined;
+}
+
+export function serverEnvironment(serverPath: string): NodeJS.ProcessEnv | undefined {
+    const sidecarPath = serverSidecarPath(serverPath);
+
+    return sidecarPath ? { ...process.env, SYMFONY_LSP_TREE_SITTER: sidecarPath } : undefined;
+}
+
+export function serverStartupMessage(
+    extensionVersion: string,
+    serverPath: string,
+    sidecarPath: string | undefined,
+    serverKind: 'bundled' | 'configured' | 'development',
+): string {
+    return [
+        `Symfony LSP extension ${extensionVersion} starting on ${process.platform}-${process.arch};`,
+        `server (${serverKind}): ${serverPath};`,
+        `Tree-sitter sidecar: ${sidecarPath ?? 'not resolved'}.`,
+    ].join(' ');
 }
 
 function workspaceDirectory(): string | undefined {
