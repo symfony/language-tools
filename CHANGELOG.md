@@ -8,6 +8,7 @@
 - Require PHP 8.4.1 or later
 - Stop VS Code index status polling and report failures when the server stops
 - Preserve terminal behavior for commands run by the release tool
+- Retry transient Symfony release metadata failures in compatibility checks
 
 ## 0.3.2 (2026-08-05)
 

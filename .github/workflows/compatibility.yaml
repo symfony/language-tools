@@ -15,7 +15,7 @@ jobs:
             - name: Read Symfony release metadata
               id: versions
               run: |
-                  versions="$(curl -fsSL --retry 3 https://symfony.com/releases.json | jq -cer '
+                  versions="$(curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 https://symfony.com/releases.json | jq -cer '
                       .supported_versions
                       | if type == "array"
                           and length > 0
