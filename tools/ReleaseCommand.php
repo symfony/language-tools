@@ -2,16 +2,11 @@
 
 namespace Symfony\Lsp\Tools;
 
-use Amp\ByteStream\ReadableStream;
-use Amp\ByteStream\WritableStream;
 use Amp\Process\Process;
 use Amp\Process\ProcessException;
 
 use function Amp\async;
 use function Amp\ByteStream\buffer;
-use function Amp\ByteStream\getStderr;
-use function Amp\ByteStream\getStdout;
-use function Amp\ByteStream\pipe;
 use function Amp\Future\await;
 use function Amp\Future\awaitAll;
 
@@ -33,6 +28,7 @@ final class ReleaseCommand
     public function __construct(
         private string $root,
         private ReleaseMetadataUpdater $metadataUpdater,
+        private InteractiveProcessRunner $interactiveProcessRunner,
     ) {
     }
 
@@ -335,7 +331,7 @@ final class ReleaseCommand
     private function run(array $command, ?string $workingDirectory = null): void
     {
         fwrite(\STDOUT, '$ '.$this->formatCommand($command)."\n");
-        [$status] = $this->execute($command, $workingDirectory, true);
+        $status = $this->interactiveProcessRunner->run($command, $workingDirectory);
         if (0 !== $status) {
             throw new \RuntimeException(\sprintf('Command failed with status %d: %s', $status, $this->formatCommand($command)));
         }
@@ -367,7 +363,7 @@ final class ReleaseCommand
      */
     private function captureResult(array $command, ?string $workingDirectory): array
     {
-        return $this->execute($command, $workingDirectory, false);
+        return $this->execute($command, $workingDirectory);
     }
 
     /**
@@ -375,7 +371,7 @@ final class ReleaseCommand
      *
      * @return array{int, string, string}
      */
-    private function execute(array $command, ?string $workingDirectory, bool $streamOutput): array
+    private function execute(array $command, ?string $workingDirectory): array
     {
         try {
             $process = Process::start(
@@ -388,11 +384,9 @@ final class ReleaseCommand
         }
 
         $process->getStdin()->close();
-        $stdout = $streamOutput ? getStdout() : null;
-        $stderr = $streamOutput ? getStderr() : null;
         $futures = [
-            'stdout' => async(fn (): string => $this->processOutput($process->getStdout(), $stdout)),
-            'stderr' => async(fn (): string => $this->processOutput($process->getStderr(), $stderr)),
+            'stdout' => async(static fn (): string => buffer($process->getStdout())),
+            'stderr' => async(static fn (): string => buffer($process->getStderr())),
             'exitCode' => async(static fn (): int => $process->join()),
         ];
 
@@ -407,17 +401,6 @@ final class ReleaseCommand
         }
 
         return [$result['exitCode'], $result['stdout'], $result['stderr']];
-    }
-
-    private function processOutput(ReadableStream $source, ?WritableStream $destination): string
-    {
-        if (null === $destination) {
-            return buffer($source);
-        }
-
-        pipe($source, $destination);
-
-        return '';
     }
 
     /** @param list<string> $command */

@@ -2,10 +2,12 @@
 <?php
 
 require \dirname(__DIR__).'/vendor/autoload.php';
+require __DIR__.'/InteractiveProcessRunner.php';
 require __DIR__.'/ReleaseMetadataUpdater.php';
 require __DIR__.'/ReleaseVersion.php';
 require __DIR__.'/ReleaseCommand.php';
 
+use Symfony\Lsp\Tools\InteractiveProcessRunner;
 use Symfony\Lsp\Tools\ReleaseCommand;
 use Symfony\Lsp\Tools\ReleaseMetadataUpdater;
 
@@ -47,6 +49,7 @@ try {
     $command = new ReleaseCommand(
         dirname(__DIR__),
         new ReleaseMetadataUpdater(),
+        new InteractiveProcessRunner(),
     );
     $command->release($version);
 } catch (Throwable $error) {

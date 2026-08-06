@@ -7,6 +7,7 @@
 - Use Symfony components for service wiring and filesystem operations
 - Require PHP 8.4.1 or later
 - Stop VS Code index status polling and report failures when the server stops
+- Preserve terminal behavior for commands run by the release tool
 
 ## 0.3.2 (2026-08-05)
 
