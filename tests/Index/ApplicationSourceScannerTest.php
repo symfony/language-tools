@@ -12,6 +12,7 @@ use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Environment\EnvironmentSourceIndexer;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
+use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceFileChange;
@@ -51,14 +52,19 @@ final class ApplicationSourceScannerTest extends TestCase
         self::assertSame(1, $firstProvider->extractions);
         self::assertSame(0, $firstProvider->restores);
 
+        $cachePath = $this->temporaryDirectory.'/var/symfony-lsp/test/index/source.json';
+        /** @var array{entries: array<string, array{runtimeStructure?: ?string, providers: array<string, string>}>} $cache */
+        $cache = json_decode((string) file_get_contents($cachePath), true, 512, \JSON_THROW_ON_ERROR);
+        unset($cache['entries']['src/Controller.php']['runtimeStructure']);
+        file_put_contents($cachePath, json_encode($cache, \JSON_THROW_ON_ERROR));
+
         $secondProvider = new RecordingSourceIndexProvider();
         $this->scanner($secondProvider)->indexAll();
 
         self::assertSame(0, $secondProvider->extractions);
         self::assertSame(1, $secondProvider->restores);
 
-        $cachePath = $this->temporaryDirectory.'/var/symfony-lsp/test/index/source.json';
-        /** @var array{entries: array<string, array{providers: array<string, string>}>} $cache */
+        /** @var array{entries: array<string, array{runtimeStructure?: ?string, providers: array<string, string>}>} $cache */
         $cache = json_decode((string) file_get_contents($cachePath), true, 512, \JSON_THROW_ON_ERROR);
         $cache['entries']['src/Controller.php']['providers']['recording'] = 'invalid';
         file_put_contents($cachePath, json_encode($cache, \JSON_THROW_ON_ERROR));
@@ -88,31 +94,35 @@ final class ApplicationSourceScannerTest extends TestCase
     {
         $firstPath = $this->temporaryDirectory.'/src/First.php';
         $secondPath = $this->temporaryDirectory.'/src/Second.php';
-        file_put_contents($firstPath, '<?php final class FirstVersion {}');
+        file_put_contents($firstPath, '<?php final class FirstVersion { public function value(): int { return 1; } }');
         file_put_contents($secondPath, '<?php final class Second {}');
         $provider = new RecordingSourceIndexProvider();
         $scanner = $this->scanner($provider);
         $scanner->indexAll();
         $provider->replacements = [];
 
-        file_put_contents($firstPath, '<?php final class NewFirstVersion {}');
+        file_put_contents($firstPath, '<?php final class FirstVersion { public function value(): int { return 2; } }');
         $firstUri = 'file://'.$firstPath;
-        self::assertSame(SourceFileChange::Changed, $scanner->refreshAfterSave(['textDocument' => ['uri' => $firstUri]]));
+        self::assertSame(SourceFileChange::ContentOnly, $scanner->refreshAfterSave(['textDocument' => ['uri' => $firstUri]]));
 
         self::assertSame([$firstUri], $provider->replacements);
         self::assertCount(2, $provider->sources);
-        self::assertSame(hash('sha256', '<?php final class NewFirstVersion {}'), $provider->sources[$firstUri]);
+        self::assertSame(hash('sha256', '<?php final class FirstVersion { public function value(): int { return 2; } }'), $provider->sources[$firstUri]);
+
+        file_put_contents($firstPath, '<?php final class NewFirstVersion { public function value(): int { return 2; } }');
+        self::assertSame(SourceFileChange::FactsChanged, $scanner->refreshAfterSave(['textDocument' => ['uri' => $firstUri]]));
+        self::assertSame([$firstUri, $firstUri], $provider->replacements);
 
         touch($firstPath, time() + 1);
         self::assertSame(SourceFileChange::Unchanged, $scanner->refreshAfterSave(['textDocument' => ['uri' => $firstUri]]));
-        self::assertSame([$firstUri], $provider->replacements);
+        self::assertSame([$firstUri, $firstUri], $provider->replacements);
 
         $secondUri = 'file://'.$secondPath;
         unlink($secondPath);
         $scanner->refreshUri($secondUri, true);
 
         self::assertSame([$secondUri], $provider->removals);
-        self::assertSame([$firstUri => hash('sha256', '<?php final class NewFirstVersion {}')], $provider->sources);
+        self::assertSame([$firstUri => hash('sha256', '<?php final class NewFirstVersion { public function value(): int { return 2; } }')], $provider->sources);
     }
 
     private function scanner(SourceIndexProviderInterface $provider): ApplicationSourceScanner
@@ -124,6 +134,7 @@ final class ApplicationSourceScannerTest extends TestCase
             new NullProgressReporter(),
             new PersistentSourceIndexStore('test', new Filesystem()),
             new SourceIndexPayloadCodec(),
+            new PhpRuntimeStructureHasher(),
             new UriToPathConverter(),
             [$provider],
         );

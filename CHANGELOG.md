@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Skip index refreshes when saved source content is unchanged
+- Skip runtime refreshes for changes limited to ordinary PHP method bodies
 
 ## 0.3.4 (2026-08-06)
 

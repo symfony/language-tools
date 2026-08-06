@@ -68,10 +68,10 @@ Each ``SourceIndexProviderInterface`` implementation participates in a scan:
 
 The persistent source index lives under
 ``var/symfony-lsp/<server-version>/index/`` in the application. Entries include
-file size, modification time, content hash, language ID and one serialized
-payload per provider. ``SourceIndexPayloadCodec`` permits only explicitly
-listed source-fact classes. A missing provider payload, invalid class or corrupt
-entry causes a transparent rebuild.
+file size, modification time, content hash, language ID, runtime-relevant PHP
+structure and one serialized payload per provider. ``SourceIndexPayloadCodec``
+permits only explicitly listed source-fact classes. A missing provider payload,
+invalid class or corrupt entry causes a transparent rebuild.
 
 Open documents are authoritative. Opening or changing a document overlays its
 facts without writing the persistent cache or booting the application. Saving
@@ -101,8 +101,10 @@ Runtime Refresh
 ---------------
 
 Saving or watching relevant PHP and configuration files marks runtime metadata
-stale and schedules a refresh. Notifications for unchanged indexed contents are
-ignored. ``DebouncedRuntimeRefreshScheduler`` collapses nearby changes,
+stale and schedules a refresh. Changes limited to method bodies in ordinary PHP
+application classes update source facts without refreshing runtime metadata.
+PHP sources that can execute while runtime metadata is built remain fully
+tracked. ``DebouncedRuntimeRefreshScheduler`` collapses nearby changes,
 serializes refreshes per project and queues one replacement when changes arrive
 during an active refresh.
 

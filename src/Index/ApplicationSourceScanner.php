@@ -39,7 +39,7 @@ final class ApplicationSourceScanner
     /** @var list<SourceIndexProviderInterface> */
     private array $providers;
 
-    /** @var array<string, array<string, array{size: int, modifiedAt: int, hash: string, languageId: string, providers: array<string, string>}>> */
+    /** @var array<string, array<string, array{size: int, modifiedAt: int, hash: string, languageId: string, runtimeStructure: ?string, providers: array<string, string>}>> */
     private array $entries = [];
 
     /** @param iterable<SourceIndexProviderInterface> $providers */
@@ -50,6 +50,7 @@ final class ApplicationSourceScanner
         private readonly ProgressReporterInterface $progress,
         private readonly SourceIndexStoreInterface $store,
         private readonly SourceIndexPayloadCodec $codec,
+        private readonly PhpRuntimeStructureHasher $runtimeStructureHasher,
         private readonly UriToPathConverter $uriToPathConverter,
         iterable $providers,
     ) {
@@ -168,6 +169,7 @@ final class ApplicationSourceScanner
         $projectKey = $project->rootPath();
         $indexed = \array_key_exists($projectKey, $this->entries);
         $entries = $indexed ? $this->entries[$projectKey] : $this->store->load($project);
+        $sourceFileChange = SourceFileChange::FactsChanged;
         if ($deleted || !is_file($path)) {
             if (!isset($entries[$relativePath])) {
                 return SourceFileChange::Untracked;
@@ -191,23 +193,27 @@ final class ApplicationSourceScanner
 
             $document = new SourceDocument($uri, $languageId, $text);
             $payloads = [];
+            $runtimeStructure = $this->runtimeStructureHasher->hash($relativePath, $text);
+            if (null !== $runtimeStructure && $runtimeStructure === ($cachedEntry['runtimeStructure'] ?? null)) {
+                $sourceFileChange = SourceFileChange::ContentOnly;
+            }
             foreach ($this->providers as $provider) {
                 $payloads[$provider->name()] = $this->codec->encode($provider->replace($project, $document));
             }
-            $entries[$relativePath] = $this->entry($path, $languageId, $hash, $payloads);
+            $entries[$relativePath] = $this->entry($path, $languageId, $hash, $runtimeStructure, $payloads);
         }
 
         $this->entries[$projectKey] = $entries;
         $this->store->save($project, $entries);
         $this->statuses->sourceReady($project);
 
-        return SourceFileChange::Changed;
+        return $sourceFileChange;
     }
 
     /**
-     * @param array<string, array{size: int, modifiedAt: int, hash: string, languageId: string, providers: array<string, string>}> $cached
+     * @param array<string, array{size: int, modifiedAt: int, hash: string, languageId: string, runtimeStructure: ?string, providers: array<string, string>}> $cached
      *
-     * @return array<string, array{size: int, modifiedAt: int, hash: string, languageId: string, providers: array<string, string>}>
+     * @return array<string, array{size: int, modifiedAt: int, hash: string, languageId: string, runtimeStructure: ?string, providers: array<string, string>}>
      */
     private function scan(Project $project, array $cached, ?Cancellation $cancellation): array
     {
@@ -254,7 +260,8 @@ final class ApplicationSourceScanner
             foreach ($this->providers as $provider) {
                 $payloads[$provider->name()] = $this->codec->encode($provider->index($project, $document));
             }
-            $entries[$relativePath] = $this->entry($path, $languageId, hash('sha256', $text), $payloads);
+            $runtimeStructure = $this->runtimeStructureHasher->hash($relativePath, $text);
+            $entries[$relativePath] = $this->entry($path, $languageId, hash('sha256', $text), $runtimeStructure, $payloads);
         }
 
         foreach ($this->providers as $provider) {
@@ -298,7 +305,7 @@ final class ApplicationSourceScanner
     }
 
     /**
-     * @param array{size: int, modifiedAt: int, hash: string, languageId: string, providers: array<string, string>} $entry
+     * @param array{size: int, modifiedAt: int, hash: string, languageId: string, runtimeStructure: ?string, providers: array<string, string>} $entry
      */
     private function isFresh(string $path, string $languageId, array $entry): bool
     {
@@ -310,9 +317,9 @@ final class ApplicationSourceScanner
     /**
      * @param array<string, string> $providers
      *
-     * @return array{size: int, modifiedAt: int, hash: string, languageId: string, providers: array<string, string>}
+     * @return array{size: int, modifiedAt: int, hash: string, languageId: string, runtimeStructure: ?string, providers: array<string, string>}
      */
-    private function entry(string $path, string $languageId, string $hash, array $providers): array
+    private function entry(string $path, string $languageId, string $hash, ?string $runtimeStructure, array $providers): array
     {
         $size = filesize($path);
         $modifiedAt = filemtime($path);
@@ -325,6 +332,7 @@ final class ApplicationSourceScanner
             'modifiedAt' => $modifiedAt,
             'hash' => $hash,
             'languageId' => $languageId,
+            'runtimeStructure' => $runtimeStructure,
             'providers' => $providers,
         ];
     }

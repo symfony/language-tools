@@ -45,6 +45,7 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface
             if (!\is_string($relativePath) || !$this->validEntry($entry)) {
                 continue;
             }
+            $entry['runtimeStructure'] ??= null;
             $entries[$relativePath] = $entry;
         }
 
@@ -71,7 +72,7 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface
     }
 
     /**
-     * @phpstan-assert-if-true array{size: int, modifiedAt: int, hash: string, languageId: string, providers: array<string, string>} $entry
+     * @phpstan-assert-if-true array{size: int, modifiedAt: int, hash: string, languageId: string, runtimeStructure?: ?string, providers: array<string, string>} $entry
      */
     private function validEntry(mixed $entry): bool
     {
@@ -81,6 +82,7 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface
             || !\is_string($entry['hash'] ?? null)
             || 64 !== \strlen($entry['hash'])
             || !\is_string($entry['languageId'] ?? null)
+            || (null !== ($entry['runtimeStructure'] ?? null) && !\is_string($entry['runtimeStructure']))
             || !\is_array($entry['providers'] ?? null)
         ) {
             return false;

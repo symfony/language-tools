@@ -4,7 +4,8 @@ namespace Symfony\Lsp\Index;
 
 enum SourceFileChange
 {
-    case Changed;
+    case ContentOnly;
+    case FactsChanged;
     case Unchanged;
     case Untracked;
 }

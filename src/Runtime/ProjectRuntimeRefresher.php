@@ -37,7 +37,7 @@ final class ProjectRuntimeRefresher
 
     public function refreshUri(string $uri, SourceFileChange $sourceFileChange): void
     {
-        if (SourceFileChange::Unchanged === $sourceFileChange) {
+        if (SourceFileChange::ContentOnly === $sourceFileChange || SourceFileChange::Unchanged === $sourceFileChange) {
             return;
         }
 

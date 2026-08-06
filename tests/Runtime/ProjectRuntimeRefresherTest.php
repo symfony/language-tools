@@ -24,7 +24,7 @@ final class ProjectRuntimeRefresherTest extends TestCase
     {
         [$refresher, $scheduler] = $this->refresher(TrustStatus::Trusted);
 
-        $refresher->refreshAfterSave(['textDocument' => ['uri' => $uri]], SourceFileChange::Changed);
+        $refresher->refreshAfterSave(['textDocument' => ['uri' => $uri]], SourceFileChange::FactsChanged);
 
         self::assertSame(['/workspace'], $scheduler->projects);
         self::assertSame([$expectedMode], $scheduler->modes);
@@ -53,7 +53,7 @@ final class ProjectRuntimeRefresherTest extends TestCase
 
         $refresher->refreshAfterSave([
             'textDocument' => ['uri' => 'file:///workspace/src/Controller.php'],
-        ], SourceFileChange::Changed);
+        ], SourceFileChange::FactsChanged);
 
         self::assertSame([], $scheduler->projects);
     }
@@ -63,18 +63,18 @@ final class ProjectRuntimeRefresherTest extends TestCase
     {
         [$refresher, $scheduler] = $this->refresher(TrustStatus::Trusted);
 
-        $refresher->refreshAfterSave(['textDocument' => ['uri' => $uri]], SourceFileChange::Changed);
+        $refresher->refreshAfterSave(['textDocument' => ['uri' => $uri]], SourceFileChange::FactsChanged);
 
         self::assertSame([], $scheduler->projects);
     }
 
-    public function testDoesNotRefreshAfterSavingUnchangedSource(): void
+    public function testDoesNotRefreshWhenRuntimeStructureIsUnchanged(): void
     {
         [$refresher, $scheduler] = $this->refresher(TrustStatus::Trusted);
+        $params = ['textDocument' => ['uri' => 'file:///workspace/src/Service.php']];
 
-        $refresher->refreshAfterSave([
-            'textDocument' => ['uri' => 'file:///workspace/src/Controller.php'],
-        ], SourceFileChange::Unchanged);
+        $refresher->refreshAfterSave($params, SourceFileChange::ContentOnly);
+        $refresher->refreshAfterSave($params, SourceFileChange::Unchanged);
 
         self::assertSame([], $scheduler->projects);
     }
