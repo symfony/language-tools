@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 (2026-08-07)
 
 - Skip runtime refreshes for changes limited to ordinary PHP method bodies
 
