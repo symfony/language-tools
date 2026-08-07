@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Normalize structured JSON-RPC values at the LSP boundary
 - Retry failed release workflows once automatically
 - Reuse fresh debug caches during runtime refreshes
 

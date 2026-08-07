@@ -15,10 +15,10 @@ final class LanguageServerTest extends TestCase
     public function testLifecycleTranscript(): void
     {
         $input = new ReadableBuffer(
-            $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => []]).
-            $this->frame(['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []]).
-            $this->frame(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'shutdown', 'params' => []]).
-            $this->frame(['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []])
+            $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => new \stdClass()]).
+            $this->frame(['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => new \stdClass()]).
+            $this->frame(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'shutdown']).
+            $this->frame(['jsonrpc' => '2.0', 'method' => 'exit'])
         );
         $output = new CapturingWritableStream();
 
