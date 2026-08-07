@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 (2026-08-07)
 
 - Refresh only runtime domains affected by source changes when their dependencies are known
 - Use associative-array JSON-RPC decoding from json-rpc-peer
