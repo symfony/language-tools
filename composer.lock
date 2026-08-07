@@ -507,12 +507,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/fabpot/json-rpc-peer.git",
-                "reference": "5cc7d1df473737e8beed8d849086672570e3bae1"
+                "reference": "ab6975b9eb95aa041887289023dd58e04be52ff8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/fabpot/json-rpc-peer/zipball/5cc7d1df473737e8beed8d849086672570e3bae1",
-                "reference": "5cc7d1df473737e8beed8d849086672570e3bae1",
+                "url": "https://api.github.com/repos/fabpot/json-rpc-peer/zipball/ab6975b9eb95aa041887289023dd58e04be52ff8",
+                "reference": "ab6975b9eb95aa041887289023dd58e04be52ff8",
                 "shasum": ""
             },
             "require": {
@@ -572,7 +572,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-08-06T21:35:02+00:00"
+            "time": "2026-08-07T08:25:54+00:00"
         },
         {
             "name": "fabpot/tolerant-php-parser",

@@ -22,7 +22,6 @@ use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\IndexCommandHandler;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
-use Symfony\Lsp\Protocol\JsonRpcValueNormalizer;
 use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
 
 use function Amp\async;
@@ -48,7 +47,6 @@ final class LanguageServer
         private readonly ApplicationSourceScanner $sourceScanner,
         private readonly IndexCommandHandler $indexCommandHandler,
         private readonly UriToPathConverter $uriToPathConverter,
-        private readonly JsonRpcValueNormalizer $jsonRpcValueNormalizer,
         private readonly ServerLogger $logger,
         private readonly WorkDoneProgressReporter $progress,
         private readonly string $version,
@@ -65,43 +63,29 @@ final class LanguageServer
 
     private function registerHandlers(): void
     {
-        $this->onRequest('initialize', $this->initialize(...));
-        $this->onNotification('initialized', $this->initialized(...));
-        $this->onNotification('textDocument/didOpen', $this->openDocument(...));
-        $this->onNotification('textDocument/didChange', $this->changeDocument(...));
-        $this->onNotification('textDocument/didClose', $this->closeDocument(...));
-        $this->onNotification('textDocument/didSave', $this->saveDocument(...));
-        $this->onNotification('workspace/didChangeConfiguration', $this->changeConfiguration(...));
-        $this->onNotification('workspace/didChangeWorkspaceFolders', $this->changeWorkspaceFolders(...));
-        $this->onNotification('workspace/didChangeWatchedFiles', $this->changeWatchedFiles(...));
-        $this->onNotification('$/setTrace', $this->setTrace(...));
-        $this->onRequest('textDocument/completion', $this->guarded($this->completionProviders->complete(...)));
-        $this->onRequest('textDocument/codeAction', $this->guarded($this->codeActionProviders->actions(...)));
-        $this->onRequest('textDocument/codeLens', $this->guarded($this->codeLensProviders->codeLenses(...)));
-        $this->onRequest('textDocument/hover', $this->guarded($this->hoverProviders->hover(...)));
-        $this->onRequest('textDocument/definition', $this->guarded($this->definitionProviders->definition(...)));
-        $this->onRequest('textDocument/documentLink', $this->guarded($this->documentLinkProviders->links(...)));
-        $this->onRequest('textDocument/references', $this->guarded($this->referencesProviders->references(...)));
-        $this->onRequest('textDocument/prepareRename', $this->guarded($this->renameProviders->prepare(...)));
-        $this->onRequest('textDocument/rename', $this->guarded($this->renameProviders->rename(...)));
-        $this->onRequest('workspace/executeCommand', $this->executeCommand(...));
-        $this->onRequest('shutdown', $this->shutdown(...));
-        $this->onNotification('exit', $this->exit(...));
+        $this->dispatcher->onRequest('initialize', $this->initialize(...));
+        $this->dispatcher->onNotification('initialized', $this->initialized(...));
+        $this->dispatcher->onNotification('textDocument/didOpen', $this->openDocument(...));
+        $this->dispatcher->onNotification('textDocument/didChange', $this->changeDocument(...));
+        $this->dispatcher->onNotification('textDocument/didClose', $this->closeDocument(...));
+        $this->dispatcher->onNotification('textDocument/didSave', $this->saveDocument(...));
+        $this->dispatcher->onNotification('workspace/didChangeConfiguration', $this->changeConfiguration(...));
+        $this->dispatcher->onNotification('workspace/didChangeWorkspaceFolders', $this->changeWorkspaceFolders(...));
+        $this->dispatcher->onNotification('workspace/didChangeWatchedFiles', $this->changeWatchedFiles(...));
+        $this->dispatcher->onNotification('$/setTrace', $this->setTrace(...));
+        $this->dispatcher->onRequest('textDocument/completion', $this->guarded($this->completionProviders->complete(...)));
+        $this->dispatcher->onRequest('textDocument/codeAction', $this->guarded($this->codeActionProviders->actions(...)));
+        $this->dispatcher->onRequest('textDocument/codeLens', $this->guarded($this->codeLensProviders->codeLenses(...)));
+        $this->dispatcher->onRequest('textDocument/hover', $this->guarded($this->hoverProviders->hover(...)));
+        $this->dispatcher->onRequest('textDocument/definition', $this->guarded($this->definitionProviders->definition(...)));
+        $this->dispatcher->onRequest('textDocument/documentLink', $this->guarded($this->documentLinkProviders->links(...)));
+        $this->dispatcher->onRequest('textDocument/references', $this->guarded($this->referencesProviders->references(...)));
+        $this->dispatcher->onRequest('textDocument/prepareRename', $this->guarded($this->renameProviders->prepare(...)));
+        $this->dispatcher->onRequest('textDocument/rename', $this->guarded($this->renameProviders->rename(...)));
+        $this->dispatcher->onRequest('workspace/executeCommand', $this->executeCommand(...));
+        $this->dispatcher->onRequest('shutdown', $this->shutdown(...));
+        $this->dispatcher->onNotification('exit', $this->exit(...));
         $this->dispatcher->onCancel('$/cancelRequest', 'id');
-    }
-
-    private function onRequest(string $method, callable $handler): void
-    {
-        $this->dispatcher->onRequest($method, function (array|\stdClass|null $params, Cancellation $cancellation) use ($handler): mixed {
-            return $handler($this->jsonRpcValueNormalizer->normalizeParams($params), $cancellation);
-        });
-    }
-
-    private function onNotification(string $method, callable $handler): void
-    {
-        $this->dispatcher->onNotification($method, function (array|\stdClass|null $params) use ($handler): void {
-            $handler($this->jsonRpcValueNormalizer->normalizeParams($params));
-        });
     }
 
     /**
@@ -287,10 +271,7 @@ final class LanguageServer
         return $this->indexCommandHandler->execute($params, $cancellation);
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     */
-    private function shutdown(array $params): null
+    private function shutdown(): null
     {
         if (!$this->state->isInitialized()) {
             throw new JsonRpcException(JsonRpcError::INVALID_REQUEST, 'The server has not been initialized.');
@@ -301,10 +282,7 @@ final class LanguageServer
         return null;
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     */
-    private function exit(array $params): void
+    private function exit(): void
     {
         $this->state->requestExit();
     }

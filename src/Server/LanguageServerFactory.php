@@ -7,6 +7,7 @@ use Amp\ByteStream\WritableStream;
 use Fabpot\JsonRpc\ContentLengthJsonRpcTransport;
 use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcPeer;
+use Fabpot\JsonRpc\JsonRpcValueDecoding;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
@@ -29,7 +30,11 @@ final class LanguageServerFactory
     {
         $version = $this->serverVersion->value();
         $logger = new ServerLogger($errorOutput);
-        $peer = new JsonRpcPeer(new ContentLengthJsonRpcTransport($input, $output), $logger);
+        $peer = new JsonRpcPeer(
+            new ContentLengthJsonRpcTransport($input, $output),
+            trafficLogger: $logger,
+            valueDecoding: JsonRpcValueDecoding::AssociativeArrays,
+        );
         $dispatcher = new JsonRpcDispatcher($peer);
         $dispatcher->onUnhandledError(static function (\Throwable $error) use ($logger): void {
             $logger->error($error);
