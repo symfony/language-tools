@@ -145,10 +145,11 @@ applications. It then:
    and waits for regular CI again.
 
 The command never changes ``resources/version`` and never moves a published
-tag. Rerun the same command after a network interruption; it resumes a prepared
-commit or a tag that already reached the remote. Fix a local or pre-tag CI
-failure and rerun the same version. Once the tag reaches the remote, any fix
-requires a new version.
+tag. It automatically reruns failed workflow jobs once and reports the failed
+logs if the rerun also fails. Rerun the same command after a network
+interruption; it resumes a prepared commit or a tag that already reached the
+remote. Fix a local or pre-tag CI failure and rerun the same version. Once the
+tag reaches the remote, any fix requires a new version.
 
 Release Workflow
 ----------------

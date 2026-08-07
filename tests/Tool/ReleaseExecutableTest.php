@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Tool;
 
 use Amp\Process\Process;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
@@ -26,13 +27,16 @@ final class ReleaseExecutableTest extends TestCase
         self::assertSame("Required command not found: git.\n", $result['stderr']);
     }
 
-    public function testReportsWorkflowFailureDetailsAndRecoveryCommand(): void
+    /** @param list<string> $expectedCalls */
+    #[DataProvider('workflowRetryProvider')]
+    public function testRetriesFailedWorkflowOnce(int $watchFailures, ?string $expectedError, array $expectedCalls): void
     {
         $root = \dirname(__DIR__, 2);
         $directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-'.bin2hex(random_bytes(8)));
         $bin = Path::join($directory, 'bin');
         (new Filesystem())->mkdir($bin);
         $calls = Path::join($directory, 'calls');
+        $watches = Path::join($directory, 'watches');
         $gh = Path::join($bin, 'gh');
         file_put_contents($gh, <<<'BASH'
             #!/usr/bin/env bash
@@ -40,7 +44,13 @@ final class ReleaseExecutableTest extends TestCase
             echo "$*" >> "$GH_CALLS"
             case "$1 $2" in
                 "run list") echo 123 ;;
-                "run watch") exit 1 ;;
+                "run watch")
+                    count=0
+                    if [[ -f "$GH_WATCHES" ]]; then read -r count < "$GH_WATCHES"; fi
+                    count=$((count + 1))
+                    echo "$count" > "$GH_WATCHES"
+                    if ((count <= GH_WATCH_FAILURES)); then exit 1; fi
+                    ;;
                 "run view") echo "The workflow failed because the remote service timed out." ;;
             esac
             BASH);
@@ -59,7 +69,6 @@ final class ReleaseExecutableTest extends TestCase
             $method = (new ReflectionClass($command))->getMethod('waitForWorkflow');
             try {
                 $method->invoke($command, 'release.yaml', 'commit');
-                exit(2);
             } catch (RuntimeException $error) {
                 fwrite(STDERR, $error->getMessage()."\n");
             }
@@ -69,19 +78,51 @@ final class ReleaseExecutableTest extends TestCase
             $environment = getenv();
             $environment['PATH'] = $bin.\PATH_SEPARATOR.($environment['PATH'] ?? '');
             $environment['GH_CALLS'] = $calls;
+            $environment['GH_WATCHES'] = $watches;
+            $environment['GH_WATCH_FAILURES'] = (string) $watchFailures;
             $result = $this->runProcess([\PHP_BINARY, '-r', $php, $root], $environment);
 
             self::assertSame(0, $result['exitCode'], $result['stderr']);
             self::assertStringContainsString('The workflow failed because the remote service timed out.', $result['stdout']);
             self::assertStringContainsString("Failed workflow logs:\n", $result['stderr']);
-            self::assertStringContainsString('Workflow release.yaml failed. Rerun it with "gh run rerun 123 --failed", then resume the release.', $result['stderr']);
-            $arguments = file($calls, \FILE_IGNORE_NEW_LINES | \FILE_SKIP_EMPTY_LINES);
-            self::assertIsArray($arguments);
-            self::assertSame('run watch 123 --exit-status', $arguments[1]);
-            self::assertSame('run view 123 --log-failed', $arguments[2]);
+            self::assertStringContainsString("Rerunning failed workflow jobs once...\n", $result['stderr']);
+            if (null === $expectedError) {
+                self::assertStringNotContainsString('Workflow release.yaml failed after one automatic rerun.', $result['stderr']);
+            } else {
+                self::assertStringContainsString($expectedError, $result['stderr']);
+            }
+            self::assertSame($expectedCalls, file($calls, \FILE_IGNORE_NEW_LINES | \FILE_SKIP_EMPTY_LINES));
         } finally {
             (new Filesystem())->remove($directory);
         }
+    }
+
+    /** @return iterable<string, array{int, string|null, list<string>}> */
+    public static function workflowRetryProvider(): iterable
+    {
+        yield 'transient failure' => [
+            1,
+            null,
+            [
+                'run list --workflow=release.yaml --commit=commit --event=push --limit=1 --json=databaseId --jq=.[0].databaseId // empty',
+                'run watch 123 --exit-status',
+                'run view 123 --log-failed',
+                'run rerun 123 --failed',
+                'run watch 123 --exit-status',
+            ],
+        ];
+        yield 'repeated failure' => [
+            2,
+            'Workflow release.yaml failed after one automatic rerun. Inspect it with "gh run view 123 --web" before resuming the release.',
+            [
+                'run list --workflow=release.yaml --commit=commit --event=push --limit=1 --json=databaseId --jq=.[0].databaseId // empty',
+                'run watch 123 --exit-status',
+                'run view 123 --log-failed',
+                'run rerun 123 --failed',
+                'run watch 123 --exit-status',
+                'run view 123 --log-failed',
+            ],
+        ];
     }
 
     /**

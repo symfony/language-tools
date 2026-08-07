@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Retry failed release workflows once automatically
 - Reuse fresh debug caches during runtime refreshes
 
 ## 0.4.0 (2026-08-07)

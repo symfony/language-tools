@@ -275,14 +275,21 @@ final class ReleaseCommand
             throw new \RuntimeException(\sprintf('No %s workflow appeared for %s.', $workflow, $commit));
         }
 
-        if (0 === $this->runStatus(['gh', 'run', 'watch', $runId, '--exit-status'], $this->root)) {
-            return;
+        for ($attempt = 0; $attempt < 2; ++$attempt) {
+            if (0 === $this->runStatus(['gh', 'run', 'watch', $runId, '--exit-status'], $this->root)) {
+                return;
+            }
+
+            fwrite(\STDERR, "\nFailed workflow logs:\n");
+            $this->runStatus(['gh', 'run', 'view', $runId, '--log-failed'], $this->root);
+
+            if (0 === $attempt) {
+                fwrite(\STDERR, "\nRerunning failed workflow jobs once...\n");
+                $this->run(['gh', 'run', 'rerun', $runId, '--failed'], $this->root);
+            }
         }
 
-        fwrite(\STDERR, "\nFailed workflow logs:\n");
-        $this->runStatus(['gh', 'run', 'view', $runId, '--log-failed'], $this->root);
-
-        throw new \RuntimeException(\sprintf('Workflow %s failed. Rerun it with "gh run rerun %s --failed", then resume the release.', $workflow, $runId));
+        throw new \RuntimeException(\sprintf('Workflow %s failed after one automatic rerun. Inspect it with "gh run view %s --web" before resuming the release.', $workflow, $runId));
     }
 
     private function assertRequirements(): void
