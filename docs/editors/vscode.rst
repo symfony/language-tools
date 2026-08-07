@@ -43,7 +43,7 @@ from the repository root:
 
     $ make -C editor/vscode
 
-This creates ``editor/vscode/symfony-lsp-0.4.0.vsix``. Source builds don't
+This creates ``editor/vscode/symfony-lsp-0.4.2.vsix``. Source builds don't
 contain a standalone server; configure ``symfonyLsp.serverPath`` before
 installing this package.
 

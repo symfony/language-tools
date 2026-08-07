@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.2 (2026-08-07)
 
 - Normalize structured JSON-RPC values at the LSP boundary
 - Retry failed release workflows once automatically
