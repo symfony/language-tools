@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reuse fresh debug caches during runtime refreshes
+
 ## 0.4.0 (2026-08-07)
 
 - Skip runtime refreshes for changes limited to ordinary PHP method bodies

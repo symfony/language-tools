@@ -108,10 +108,11 @@ tracked. ``DebouncedRuntimeRefreshScheduler`` collapses nearby changes,
 serializes refreshes per project and queues one replacement when changes arrive
 during an active refresh.
 
-Most runtime-affecting changes clear the selected application's normal cache
-before loading a new snapshot. Translation resource changes use cache warmup
-instead. Source overlays remain immediately available while runtime metadata is
-stale.
+In debug mode, the bridge boots against the existing cache so Symfony's resource
+freshness checks can reuse it or rebuild it as needed. Non-debug refreshes clear
+the selected application's normal cache because Symfony disables freshness
+checks there. Translation resource changes use cache warmup instead. Source
+overlays remain immediately available while runtime metadata is stale.
 
 A failed first load marks runtime indexing as failed. A failed refresh after a
 valid snapshot keeps the previous snapshot and marks it stale. Successful

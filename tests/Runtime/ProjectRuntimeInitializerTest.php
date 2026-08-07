@@ -92,7 +92,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
     }
 
-    public function testClearsTheNormalProjectCacheBeforeRefreshingMetadata(): void
+    public function testClearsTheNormalNonDebugProjectCacheBeforeRefreshingMetadata(): void
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
@@ -128,6 +128,54 @@ final class ProjectRuntimeInitializerTest extends TestCase
             '--no-debug',
         ], $processRunner->commands[0]);
         self::assertStringEndsWith('/bridge.php', $processRunner->commands[1][1]);
+    }
+
+    public function testWarmsTheDebugProjectCacheWhenRequested(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $processRunner = new CapturingProcessRunner(
+            new ProcessResult(0, '', ''),
+            new ProcessResult(0, json_encode(['schemaVersion' => 1, 'sections' => []], \JSON_THROW_ON_ERROR), ''),
+        );
+        $initializer = new ProjectRuntimeInitializer(
+            new BridgeInstaller($source, 'test', new Filesystem()),
+            $processRunner,
+            new RuntimeSnapshotLoaderRegistry([]),
+            new RuntimeConfiguration(),
+        );
+
+        $initializer->initialize(
+            new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0'),
+            RuntimeRefreshMode::Warmup,
+        );
+
+        self::assertSame('cache:warmup', $processRunner->commands[0][2]);
+        self::assertStringEndsWith('/bridge.php', $processRunner->commands[1][1]);
+    }
+
+    public function testLetsTheDebugKernelRefreshItsCache(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $processRunner = new CapturingProcessRunner(
+            new ProcessResult(0, json_encode(['schemaVersion' => 1, 'sections' => []], \JSON_THROW_ON_ERROR), ''),
+        );
+        $initializer = new ProjectRuntimeInitializer(
+            new BridgeInstaller($source, 'test', new Filesystem()),
+            $processRunner,
+            new RuntimeSnapshotLoaderRegistry([]),
+            new RuntimeConfiguration(),
+        );
+
+        $initializer->initialize(
+            new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0'),
+            RuntimeRefreshMode::Clear,
+        );
+
+        self::assertCount(1, $processRunner->commands);
+        self::assertStringEndsWith('/bridge.php', $processRunner->commands[0][1]);
+        self::assertContains('--debug=1', $processRunner->commands[0]);
     }
 
     public function testLoadsAvailableSectionsBeforeReportingSectionErrors(): void
