@@ -507,28 +507,33 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/fabpot/json-rpc-peer.git",
-                "reference": "1b133b893f28b07e1ce3c90789d041e1edfdcec5"
+                "reference": "5cc7d1df473737e8beed8d849086672570e3bae1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/fabpot/json-rpc-peer/zipball/1b133b893f28b07e1ce3c90789d041e1edfdcec5",
-                "reference": "1b133b893f28b07e1ce3c90789d041e1edfdcec5",
+                "url": "https://api.github.com/repos/fabpot/json-rpc-peer/zipball/5cc7d1df473737e8beed8d849086672570e3bae1",
+                "reference": "5cc7d1df473737e8beed8d849086672570e3bae1",
                 "shasum": ""
             },
             "require": {
+                "amphp/amp": "^3",
                 "amphp/byte-stream": "^2",
                 "php": ">=8.4"
+            },
+            "conflict": {
+                "amphp/websocket": "<2.0 || >=3.0",
+                "psr/log": "<1.0 || >=4.0"
             },
             "require-dev": {
                 "amphp/websocket": "^2",
                 "php-cs-fixer/shim": "^3.93",
                 "phpstan/phpstan": "^2.1",
-                "phpunit/phpunit": "^12",
-                "psr/log": "^1.1|^2|^3"
+                "phpunit/phpunit": "^13.2",
+                "psr/log": "^1|^2|^3"
             },
             "suggest": {
-                "amphp/websocket": "To exchange JSON-RPC messages over WebSocket connections.",
-                "psr/log": "To forward JSON-RPC traffic to a PSR-3 logger."
+                "amphp/websocket": "To exchange JSON-RPC messages over WebSocket connections (requires ^2).",
+                "psr/log": "To forward JSON-RPC traffic to a PSR-3 logger (requires ^1|^2|^3)."
             },
             "default-branch": true,
             "type": "library",
@@ -567,7 +572,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-07-30T14:41:03+00:00"
+            "time": "2026-08-06T21:35:02+00:00"
         },
         {
             "name": "fabpot/tolerant-php-parser",
@@ -1789,16 +1794,16 @@
         },
         {
             "name": "php-cs-fixer/shim",
-            "version": "v3.95.17",
+            "version": "v3.95.18",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHP-CS-Fixer/shim.git",
-                "reference": "fe9462e0b3e59b33ee076f6eda626b474b8cf363"
+                "reference": "9b815f2ba5c581faaaec1386dcda4c16d511e6bb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHP-CS-Fixer/shim/zipball/fe9462e0b3e59b33ee076f6eda626b474b8cf363",
-                "reference": "fe9462e0b3e59b33ee076f6eda626b474b8cf363",
+                "url": "https://api.github.com/repos/PHP-CS-Fixer/shim/zipball/9b815f2ba5c581faaaec1386dcda4c16d511e6bb",
+                "reference": "9b815f2ba5c581faaaec1386dcda4c16d511e6bb",
                 "shasum": ""
             },
             "require": {
@@ -1835,17 +1840,17 @@
             "description": "A tool to automatically fix PHP code style",
             "support": {
                 "issues": "https://github.com/PHP-CS-Fixer/shim/issues",
-                "source": "https://github.com/PHP-CS-Fixer/shim/tree/v3.95.17"
+                "source": "https://github.com/PHP-CS-Fixer/shim/tree/v3.95.18"
             },
-            "time": "2026-07-24T13:55:04+00:00"
+            "time": "2026-07-30T15:46:28+00:00"
         },
         {
             "name": "phpstan/phpstan",
-            "version": "2.2.7",
+            "version": "2.2.8",
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/692db47b9dddb0487934e5236e77d48594aef921",
-                "reference": "692db47b9dddb0487934e5236e77d48594aef921",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/e285254e60f33c21902efef4a926ca0987c06804",
+                "reference": "e285254e60f33c21902efef4a926ca0987c06804",
                 "shasum": ""
             },
             "require": {
@@ -1901,7 +1906,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-07-29T17:39:32+00:00"
+            "time": "2026-08-04T22:21:45+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
