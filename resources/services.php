@@ -135,7 +135,7 @@ return static function (ContainerConfigurator $container): void {
     $services->load('Symfony\\Lsp\\Parser\\', '../src/Parser/**/*{Parser,Decoder}.php');
     $services->load('Symfony\\Lsp\\Project\\', '../src/Project/*{Discovery,Registry,Resolver,Settings,Converter,Configuration,Trust,Manager}.php');
     $services->load('Symfony\\Lsp\\Runtime\\', '../src/Runtime/*{Installer,Runner,Initializer,Refresher,Scheduler,Configuration,Registry,Planner}.php');
-    $services->load('Symfony\\Lsp\\Server\\', '../src/Server/*{Server,Logger,State,Reporter}.php');
+    $services->load('Symfony\\Lsp\\Server\\', '../src/Server/*{Server,Logger,State,Reporter,Watcher}.php');
 
     $services->set(Parser::class);
     $services->set(Filesystem::class);

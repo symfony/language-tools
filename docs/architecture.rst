@@ -40,11 +40,13 @@ and runtime snapshot loaders are collected through tagged iterators.
 During ``initialize`` and ``initialized``:
 
 1. The server negotiates position encoding and reads initialization options.
-2. ``ProjectDiscovery`` searches workspace folders for ``composer.json`` files
+2. The server registers Symfony source and metadata file watchers when the
+   client supports dynamic watched-file registration.
+3. ``ProjectDiscovery`` searches workspace folders for ``composer.json`` files
    requiring ``symfony/framework-bundle``.
-3. Explicit ``projectRoots`` replace automatic recursive discovery when set.
-4. The source scanner starts for every discovered project.
-5. Runtime indexing starts only after workspace trust is granted.
+4. Explicit ``projectRoots`` replace automatic recursive discovery when set.
+5. The source scanner starts for every discovered project.
+6. Runtime indexing starts only after workspace trust is granted.
 
 A document belongs to the most specific containing project. Project settings,
 runtime status, source indexes and runtime indexes remain isolated by project

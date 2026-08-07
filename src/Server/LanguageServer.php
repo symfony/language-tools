@@ -33,6 +33,7 @@ final class LanguageServer
         private readonly JsonRpcDispatcher $dispatcher,
         private readonly ServerState $state,
         private readonly WorkspaceConfiguration $workspaceConfiguration,
+        private readonly WorkspaceFileWatcher $workspaceFileWatcher,
         private readonly DocumentSynchronizer $documentSynchronizer,
         private readonly CompletionProviderRegistry $completionProviders,
         private readonly CodeActionProviderRegistry $codeActionProviders,
@@ -100,6 +101,7 @@ final class LanguageServer
         }
 
         $this->progress->initialize($params);
+        $this->workspaceFileWatcher->initialize($params);
         $this->workspaceConfiguration->initialize($params);
         $initializationOptions = $params['initializationOptions'] ?? null;
         if (\is_array($initializationOptions) && \is_string($initializationOptions['trace'] ?? null)) {
@@ -253,6 +255,7 @@ final class LanguageServer
     private function initialized(array $params): void
     {
         async(function (): void {
+            $this->workspaceFileWatcher->register();
             $this->workspaceConfiguration->refreshProjectSettings();
             $this->sourceScanner->indexAll();
             $this->workspaceConfiguration->requestWorkspaceTrust();
