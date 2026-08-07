@@ -15,12 +15,12 @@ final class StatusRuntimeInitializer implements RuntimeInitializerInterface
     ) {
     }
 
-    public function initialize(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Reuse, ?Cancellation $cancellation = null): void
+    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
     {
         $this->statuses->runtimeIndexing($project);
 
         try {
-            $this->initializer->initialize($project, $mode, $cancellation);
+            $this->initializer->initialize($project, $plan, $cancellation);
             $this->statuses->runtimeReady($project);
         } catch (CancelledException $error) {
             $this->statuses->runtimeStale($project);

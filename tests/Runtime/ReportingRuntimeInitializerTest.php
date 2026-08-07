@@ -9,7 +9,7 @@ use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\ReportingRuntimeInitializer;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
-use Symfony\Lsp\Runtime\RuntimeRefreshMode;
+use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 
 final class ReportingRuntimeInitializerTest extends TestCase
 {
@@ -20,16 +20,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $statuses->runtimeReady($project);
         $statuses->runtimeFailed($project, new \RuntimeException('failed'));
-        $initializer = new ReportingRuntimeInitializer(
-            new class implements RuntimeInitializerInterface {
-                public function initialize(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Reuse, ?Cancellation $cancellation = null): void
-                {
-                    throw new \RuntimeException('secret=value');
-                }
-            },
-            $client,
-            $statuses,
-        );
+        $initializer = new ReportingRuntimeInitializer($this->failingInitializer(), $client, $statuses);
 
         $initializer->initialize($project);
 
@@ -48,16 +39,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
         $statuses = new ProjectIndexStatusRegistry();
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $statuses->runtimeFailed($project, new \RuntimeException('failed'));
-        $initializer = new ReportingRuntimeInitializer(
-            new class implements RuntimeInitializerInterface {
-                public function initialize(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Reuse, ?Cancellation $cancellation = null): void
-                {
-                    throw new \RuntimeException('secret=value');
-                }
-            },
-            $client,
-            $statuses,
-        );
+        $initializer = new ReportingRuntimeInitializer($this->failingInitializer(), $client, $statuses);
 
         $initializer->initialize($project);
 
@@ -65,6 +47,16 @@ final class ReportingRuntimeInitializerTest extends TestCase
             'Symfony LSP could not initialize runtime metadata for "/workspace". Static-only features remain active.',
             $client->notifications[0]['params']['message'],
         );
+    }
+
+    private function failingInitializer(): RuntimeInitializerInterface
+    {
+        return new class implements RuntimeInitializerInterface {
+            public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+            {
+                throw new \RuntimeException('secret=value');
+            }
+        };
     }
 }
 

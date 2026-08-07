@@ -18,6 +18,7 @@ use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 use Symfony\Lsp\Runtime\RuntimeRefreshMode;
+use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 use Symfony\Lsp\Runtime\StatusRuntimeInitializer;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
 use Symfony\Lsp\Tests\Support\NullProgressReporter;
@@ -94,7 +95,7 @@ final class IndexCommandHandlerTest extends TestCase
         ]);
         self::assertSame('test', $runtimeConfiguration->environment($project));
         self::assertSame('test', $switched[0]['environment'] ?? null);
-        self::assertSame(RuntimeRefreshMode::Clear, $runtime->modes[1]);
+        self::assertSame(RuntimeRefreshMode::Clear, $runtime->plans[1]->mode());
 
         $workspaceTrust->set($project, TrustStatus::Untrusted);
         $untrusted = $handler->execute([
@@ -110,12 +111,12 @@ final class RecordingRuntimeInitializer implements RuntimeInitializerInterface
     /** @var list<string> */
     public array $projects = [];
 
-    /** @var list<RuntimeRefreshMode> */
-    public array $modes = [];
+    /** @var list<RuntimeRefreshPlan> */
+    public array $plans = [];
 
-    public function initialize(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Reuse, ?Cancellation $cancellation = null): void
+    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
     {
         $this->projects[] = $project->rootPath();
-        $this->modes[] = $mode;
+        $this->plans[] = $plan ?? new RuntimeRefreshPlan();
     }
 }

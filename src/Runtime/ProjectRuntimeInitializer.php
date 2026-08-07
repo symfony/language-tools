@@ -15,18 +15,22 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
     ) {
     }
 
-    public function initialize(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Reuse, ?Cancellation $cancellation = null): void
+    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
     {
+        $plan ??= new RuntimeRefreshPlan();
         $debug = $this->configuration->debug($project);
-        if (RuntimeRefreshMode::Warmup === $mode || (RuntimeRefreshMode::Clear === $mode && !$debug)) {
-            $command = RuntimeRefreshMode::Clear === $mode ? 'cache:clear' : 'cache:warmup';
+        if ($plan->preservesContainer() && !$debug) {
+            $plan = new RuntimeRefreshPlan(RuntimeRefreshMode::Clear);
+        }
+        $mode = $plan->mode();
+        if (RuntimeRefreshMode::Clear === $mode && !$debug) {
             $result = $this->processRunner->run([
                 ...$this->configuration->phpCommand($project),
                 $this->configuration->consolePath($project),
-                $command,
+                'cache:clear',
                 '--env='.$this->configuration->environment($project),
                 '--no-interaction',
-                ...($debug ? [] : ['--no-debug']),
+                '--no-debug',
             ], $project->rootPath(), $cancellation);
             if (0 !== $result->exitCode()) {
                 throw new \RuntimeException(\sprintf('The project cache command failed with status %d: %s', $result->exitCode(), trim($result->stderr())));
@@ -34,6 +38,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         }
 
         $cancellation?->throwIfRequested();
+        $sections = $plan->sections() ?? $this->snapshotLoaders->sections();
         $bridge = $this->bridgeInstaller->install($project);
         $result = $this->processRunner->run([
             ...$this->configuration->phpCommand($project),
@@ -41,7 +46,8 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             '--project='.$project->rootPath(),
             '--environment='.$this->configuration->environment($project),
             '--debug='.($debug ? '1' : '0'),
-            '--sections='.implode(',', $this->snapshotLoaders->sections()),
+            '--sections='.implode(',', $sections),
+            ...($plan->preservesContainer() ? ['--targeted-refresh=1'] : []),
         ], $project->rootPath(), $cancellation);
 
         if (0 !== $result->exitCode()) {

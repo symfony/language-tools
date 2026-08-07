@@ -109,10 +109,15 @@ serializes refreshes per project and queues one replacement when changes arrive
 during an active refresh.
 
 In debug mode, the bridge boots against the existing cache so Symfony's resource
-freshness checks can reuse it or rebuild it as needed. Non-debug refreshes clear
-the selected application's normal cache because Symfony disables freshness
-checks there. Translation resource changes use cache warmup instead. Source
-overlays remain immediately available while runtime metadata is stale.
+freshness checks can reuse it or rebuild it as needed. A runtime refresh planner
+maps changed source-fact domains to cache maintenance, container reuse and the
+bridge sections that need replacement. Known independent changes such as routes,
+assets and Stimulus preserve the dependency injection container, while each
+subsystem performs its own resource checks. Plans queued together merge their
+sections and use the strongest cache policy. Unknown or ambiguous changes fall
+back to a full refresh. Non-debug refreshes clear the selected application's
+normal cache because Symfony disables freshness checks there. Source overlays
+remain immediately available while runtime metadata is stale.
 
 A failed first load marks runtime indexing as failed. A failed refresh after a
 valid snapshot keeps the previous snapshot and marks it stale. Successful

@@ -22,7 +22,7 @@ require __DIR__.'/bridge/sections/stimulus.php';
 require __DIR__.'/bridge/sections/configuration.php';
 require __DIR__.'/bridge/sections/environment.php';
 
-$options = getopt('', ['project:', 'environment::', 'debug::', 'sections::']);
+$options = getopt('', ['project:', 'environment::', 'debug::', 'sections::', 'targeted-refresh::']);
 $project = $options['project'] ?? null;
 if (!is_string($project) || '' === $project) {
     fwrite(STDERR, "The --project option is required.\n");
@@ -61,6 +61,8 @@ $requestedSections = $options['sections'] ?? '';
 $requestedSections = is_string($requestedSections)
     ? array_values(array_filter(explode(',', $requestedSections)))
     : [];
+$targetedRefreshOption = $options['targeted-refresh'] ?? '0';
+$targetedRefresh = !in_array($targetedRefreshOption, ['0', 'false'], true);
 
 if (class_exists(Symfony\Component\Runtime\SymfonyRuntime::class)) {
     new Symfony\Component\Runtime\SymfonyRuntime([
@@ -75,7 +77,7 @@ if (class_exists(Symfony\Component\Runtime\SymfonyRuntime::class)) {
     );
 }
 
-$context = new SymfonyLspBridgeContext($project, $environment, $debug);
+$context = new SymfonyLspBridgeContext($project, $environment, $debug, $targetedRefresh);
 $sections = [];
 foreach ($requestedSections as $sectionName) {
     try {

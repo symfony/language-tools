@@ -10,6 +10,7 @@ use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 use Symfony\Lsp\Runtime\RuntimeRefreshMode;
+use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 
 final class IndexCommandHandler
 {
@@ -49,7 +50,7 @@ final class IndexCommandHandler
                 $cancellation?->throwIfRequested();
                 $this->configuration->setEnvironment($project, $environment);
                 if ($this->configuration->runtimeIndexing($project) && TrustStatus::Trusted === $this->workspaceTrust->status($project)) {
-                    $this->runtimeInitializer->initialize($project, RuntimeRefreshMode::Clear, $cancellation);
+                    $this->runtimeInitializer->initialize($project, new RuntimeRefreshPlan(RuntimeRefreshMode::Clear), $cancellation);
                 }
             }
         } elseif (self::REFRESH_COMMAND === $command) {

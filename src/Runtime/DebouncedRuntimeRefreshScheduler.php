@@ -10,14 +10,14 @@ final class DebouncedRuntimeRefreshScheduler implements RuntimeRefreshSchedulerI
     /** @var array<string, string> */
     private array $watchers = [];
 
-    /** @var array<string, RuntimeRefreshMode> */
-    private array $pendingModes = [];
+    /** @var array<string, RuntimeRefreshPlan> */
+    private array $pendingPlans = [];
 
     /** @var array<string, true> */
     private array $running = [];
 
-    /** @var array<string, RuntimeRefreshMode> */
-    private array $queuedModes = [];
+    /** @var array<string, RuntimeRefreshPlan> */
+    private array $queuedPlans = [];
 
     public function __construct(
         private readonly RuntimeInitializerInterface $runtimeInitializer,
@@ -28,44 +28,45 @@ final class DebouncedRuntimeRefreshScheduler implements RuntimeRefreshSchedulerI
         }
     }
 
-    public function schedule(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Clear): void
+    public function schedule(Project $project, ?RuntimeRefreshPlan $plan = null): void
     {
+        $plan ??= new RuntimeRefreshPlan(RuntimeRefreshMode::Clear);
         $key = $project->rootPath();
-        $this->pendingModes[$key] = isset($this->pendingModes[$key])
-            ? $this->pendingModes[$key]->combine($mode)
-            : $mode;
+        $this->pendingPlans[$key] = isset($this->pendingPlans[$key])
+            ? $this->pendingPlans[$key]->combine($plan)
+            : $plan;
         if (isset($this->watchers[$key])) {
             EventLoop::cancel($this->watchers[$key]);
         }
 
         $this->watchers[$key] = EventLoop::delay($this->delay, function () use ($key, $project): void {
             unset($this->watchers[$key]);
-            $mode = $this->pendingModes[$key] ?? RuntimeRefreshMode::Reuse;
-            unset($this->pendingModes[$key]);
-            $this->run($project, $mode);
+            $plan = $this->pendingPlans[$key] ?? new RuntimeRefreshPlan();
+            unset($this->pendingPlans[$key]);
+            $this->run($project, $plan);
         });
     }
 
-    private function run(Project $project, RuntimeRefreshMode $mode): void
+    private function run(Project $project, RuntimeRefreshPlan $plan): void
     {
         $key = $project->rootPath();
         if (isset($this->running[$key])) {
-            $this->queuedModes[$key] = isset($this->queuedModes[$key])
-                ? $this->queuedModes[$key]->combine($mode)
-                : $mode;
+            $this->queuedPlans[$key] = isset($this->queuedPlans[$key])
+                ? $this->queuedPlans[$key]->combine($plan)
+                : $plan;
 
             return;
         }
 
         $this->running[$key] = true;
         try {
-            $this->runtimeInitializer->initialize($project, $mode);
+            $this->runtimeInitializer->initialize($project, $plan);
         } finally {
             unset($this->running[$key]);
-            $queuedMode = $this->queuedModes[$key] ?? null;
-            unset($this->queuedModes[$key]);
-            if (null !== $queuedMode) {
-                EventLoop::queue(fn () => $this->run($project, $queuedMode));
+            $queuedPlan = $this->queuedPlans[$key] ?? null;
+            unset($this->queuedPlans[$key]);
+            if (null !== $queuedPlan) {
+                EventLoop::queue(fn () => $this->run($project, $queuedPlan));
             }
         }
     }

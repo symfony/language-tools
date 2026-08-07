@@ -17,7 +17,7 @@ use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Project\WorkspaceTrustManager;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
-use Symfony\Lsp\Runtime\RuntimeRefreshMode;
+use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 
 final class WorkspaceConfigurationTest extends TestCase
 {
@@ -118,7 +118,7 @@ final class WorkspaceConfigurationTest extends TestCase
     private function runtimeInitializer(): RuntimeInitializerInterface
     {
         return new class implements RuntimeInitializerInterface {
-            public function initialize(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Reuse, ?Cancellation $cancellation = null): void
+            public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
             {
             }
         };

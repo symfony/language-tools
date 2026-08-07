@@ -11,7 +11,7 @@ use Symfony\Lsp\Project\TrustStatus;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Project\WorkspaceTrustManager;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
-use Symfony\Lsp\Runtime\RuntimeRefreshMode;
+use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 
 final class WorkspaceTrustManagerTest extends TestCase
 {
@@ -79,7 +79,7 @@ final class CapturingRuntimeInitializer implements RuntimeInitializerInterface
     /** @var list<string> */
     public array $projects = [];
 
-    public function initialize(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Reuse, ?Cancellation $cancellation = null): void
+    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
     {
         $this->projects[] = $project->rootPath();
     }

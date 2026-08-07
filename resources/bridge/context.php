@@ -10,6 +10,7 @@ final class SymfonyLspBridgeContext
         private string $project,
         private string $environment,
         private bool $debug,
+        private bool $targetedRefresh,
     ) {
     }
 
@@ -42,9 +43,28 @@ final class SymfonyLspBridgeContext
             if (!class_exists($kernelClass)) {
                 throw new RuntimeException('The default App\\Kernel class was not found.');
             }
-            $kernel = new $kernelClass($this->environment, $this->debug);
-            if (method_exists($kernel, 'boot')) {
-                $kernel->boot();
+            $tracking = $_SERVER['SYMFONY_DISABLE_RESOURCE_TRACKING'] ?? null;
+            if ($this->targetedRefresh) {
+                $skipAll = filter_var($tracking, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if (true !== $skipAll) {
+                    $skipped = null === $skipAll ? explode(',', (string) $tracking) : [];
+                    $skipped[] = Symfony\Component\Config\Resource\DirectoryResource::class;
+                    $skipped[] = Symfony\Component\Config\Resource\FileResource::class;
+                    $skipped[] = Symfony\Component\Config\Resource\ReflectionClassResource::class;
+                    $_SERVER['SYMFONY_DISABLE_RESOURCE_TRACKING'] = implode(',', array_unique($skipped));
+                }
+            }
+            try {
+                $kernel = new $kernelClass($this->environment, $this->debug);
+                if (method_exists($kernel, 'boot')) {
+                    $kernel->boot();
+                }
+            } finally {
+                if (null === $tracking) {
+                    unset($_SERVER['SYMFONY_DISABLE_RESOURCE_TRACKING']);
+                } else {
+                    $_SERVER['SYMFONY_DISABLE_RESOURCE_TRACKING'] = $tracking;
+                }
             }
             $this->kernel = $kernel;
 

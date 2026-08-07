@@ -19,6 +19,7 @@ final class ProjectRuntimeRefresher
         private readonly RuntimeRefreshSchedulerInterface $refreshScheduler,
         private readonly ProjectIndexStatusRegistry $statuses,
         private readonly RuntimeConfiguration $configuration,
+        private readonly RuntimeRefreshPlanner $planner,
     ) {
     }
 
@@ -37,10 +38,6 @@ final class ProjectRuntimeRefresher
 
     public function refreshUri(string $uri, SourceFileChange $sourceFileChange): void
     {
-        if (SourceFileChange::ContentOnly === $sourceFileChange || SourceFileChange::Unchanged === $sourceFileChange) {
-            return;
-        }
-
         $project = $this->projects->forDocumentUri($uri);
         $path = null === $project ? null : $this->pathResolver->relative($project, $uri);
         if (null === $project
@@ -52,13 +49,13 @@ final class ProjectRuntimeRefresher
             return;
         }
 
-        $this->statuses->runtimeStale($project);
-        $this->refreshScheduler->schedule($project, $this->refreshMode($path));
-    }
+        $plan = $this->planner->plan($path, $sourceFileChange);
+        if (null === $plan) {
+            return;
+        }
 
-    private function refreshMode(string $path): RuntimeRefreshMode
-    {
-        return str_contains('/'.$path, '/translations/') ? RuntimeRefreshMode::Warmup : RuntimeRefreshMode::Clear;
+        $this->statuses->runtimeStale($project);
+        $this->refreshScheduler->schedule($project, $plan);
     }
 
     private function affectsRuntime(string $path): bool

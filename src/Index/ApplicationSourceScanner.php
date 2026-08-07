@@ -147,7 +147,7 @@ final class ApplicationSourceScanner
     {
         $textDocument = $params['textDocument'] ?? null;
         if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
-            return SourceFileChange::Untracked;
+            return SourceFileChange::untracked();
         }
 
         return $this->refreshUri($textDocument['uri']);
@@ -158,47 +158,55 @@ final class ApplicationSourceScanner
         $project = $this->projects->forDocumentUri($uri);
         $path = $this->uriToPathConverter->convert($uri);
         if (null === $project || null === $path || !$this->belongsToProject($project, $path)) {
-            return SourceFileChange::Untracked;
+            return SourceFileChange::untracked();
         }
 
         $relativePath = $this->relativePath($project, $path);
         if (null === $relativePath) {
-            return SourceFileChange::Untracked;
+            return SourceFileChange::untracked();
         }
 
         $projectKey = $project->rootPath();
         $indexed = \array_key_exists($projectKey, $this->entries);
         $entries = $indexed ? $this->entries[$projectKey] : $this->store->load($project);
-        $sourceFileChange = SourceFileChange::FactsChanged;
+        $sourceFileChange = SourceFileChange::factsChanged([]);
         if ($deleted || !is_file($path)) {
             if (!isset($entries[$relativePath])) {
-                return SourceFileChange::Untracked;
+                return SourceFileChange::untracked();
             }
             foreach ($this->providers as $provider) {
                 $provider->remove($project, $uri);
             }
             unset($entries[$relativePath]);
         } elseif (null === $languageId = $this->languageId($path)) {
-            return SourceFileChange::Untracked;
+            return SourceFileChange::untracked();
         } else {
             $text = file_get_contents($path);
             if (false === $text) {
-                return SourceFileChange::Untracked;
+                return SourceFileChange::untracked();
             }
             $hash = hash('sha256', $text);
             $cachedEntry = $entries[$relativePath] ?? null;
             if ($indexed && null !== $cachedEntry && $languageId === $cachedEntry['languageId'] && $hash === $cachedEntry['hash']) {
-                return SourceFileChange::Unchanged;
+                return SourceFileChange::unchanged();
             }
 
             $document = new SourceDocument($uri, $languageId, $text);
             $payloads = [];
+            $changedProviders = [];
             $runtimeStructure = $this->runtimeStructureHasher->hash($relativePath, $text);
             if (null !== $runtimeStructure && $runtimeStructure === ($cachedEntry['runtimeStructure'] ?? null)) {
-                $sourceFileChange = SourceFileChange::ContentOnly;
+                $sourceFileChange = SourceFileChange::contentOnly();
             }
             foreach ($this->providers as $provider) {
-                $payloads[$provider->name()] = $this->codec->encode($provider->replace($project, $document));
+                $name = $provider->name();
+                $payloads[$name] = $this->codec->encode($provider->replace($project, $document));
+                if ($payloads[$name] !== ($cachedEntry['providers'][$name] ?? null)) {
+                    $changedProviders[] = $name;
+                }
+            }
+            if ($sourceFileChange->requiresRuntimeRefresh()) {
+                $sourceFileChange = SourceFileChange::factsChanged($changedProviders);
             }
             $entries[$relativePath] = $this->entry($path, $languageId, $hash, $runtimeStructure, $payloads);
         }

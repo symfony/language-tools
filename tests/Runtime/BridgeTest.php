@@ -59,7 +59,7 @@ final class BridgeTest extends TestCase
         $this->writeRouteApplication();
 
         exec(\sprintf(
-            '%s %s --project=%s --sections=routes 2>&1',
+            '%s %s --project=%s --sections=routes --targeted-refresh=1 2>&1',
             escapeshellarg(\PHP_BINARY),
             escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
             escapeshellarg($this->temporaryDirectory),

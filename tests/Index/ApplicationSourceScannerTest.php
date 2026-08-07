@@ -15,7 +15,6 @@ use Symfony\Lsp\Index\PersistentSourceIndexStore;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Index\SourceFileChange;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Project\Project;
@@ -76,6 +75,33 @@ final class ApplicationSourceScannerTest extends TestCase
         self::assertSame(0, $thirdProvider->restores);
     }
 
+    public function testReportsChangesLimitedToRouteFacts(): void
+    {
+        $path = $this->temporaryDirectory.'/src/Controller.php';
+        file_put_contents($path, '<?php final class FirstController {}');
+        $scanner = $this->scanner(new RecordingSourceIndexProvider('routes'));
+        $scanner->indexAll();
+
+        file_put_contents($path, '<?php final class SecondController {}');
+
+        self::assertSame(['routes'], $scanner->refreshUri('file://'.$path)->domains());
+    }
+
+    public function testReportsEveryChangedSourceDomain(): void
+    {
+        $path = $this->temporaryDirectory.'/src/Service.php';
+        file_put_contents($path, '<?php final class FirstService {}');
+        $scanner = $this->scanner(
+            new RecordingSourceIndexProvider('events'),
+            new RecordingSourceIndexProvider('messenger'),
+        );
+        $scanner->indexAll();
+
+        file_put_contents($path, '<?php final class SecondService {}');
+
+        self::assertSame(['events', 'messenger'], $scanner->refreshUri('file://'.$path)->domains());
+    }
+
     public function testPersistentFactsNeverContainEnvironmentValues(): void
     {
         file_put_contents($this->temporaryDirectory.'/.env', "APP_SECRET=canary-value\n");
@@ -103,18 +129,18 @@ final class ApplicationSourceScannerTest extends TestCase
 
         file_put_contents($firstPath, '<?php final class FirstVersion { public function value(): int { return 2; } }');
         $firstUri = 'file://'.$firstPath;
-        self::assertSame(SourceFileChange::ContentOnly, $scanner->refreshAfterSave(['textDocument' => ['uri' => $firstUri]]));
+        self::assertFalse($scanner->refreshAfterSave(['textDocument' => ['uri' => $firstUri]])->requiresRuntimeRefresh());
 
         self::assertSame([$firstUri], $provider->replacements);
         self::assertCount(2, $provider->sources);
         self::assertSame(hash('sha256', '<?php final class FirstVersion { public function value(): int { return 2; } }'), $provider->sources[$firstUri]);
 
         file_put_contents($firstPath, '<?php final class NewFirstVersion { public function value(): int { return 2; } }');
-        self::assertSame(SourceFileChange::FactsChanged, $scanner->refreshAfterSave(['textDocument' => ['uri' => $firstUri]]));
+        self::assertSame(['recording'], $scanner->refreshAfterSave(['textDocument' => ['uri' => $firstUri]])->domains());
         self::assertSame([$firstUri, $firstUri], $provider->replacements);
 
         touch($firstPath, time() + 1);
-        self::assertSame(SourceFileChange::Unchanged, $scanner->refreshAfterSave(['textDocument' => ['uri' => $firstUri]]));
+        self::assertFalse($scanner->refreshAfterSave(['textDocument' => ['uri' => $firstUri]])->requiresRuntimeRefresh());
         self::assertSame([$firstUri, $firstUri], $provider->replacements);
 
         $secondUri = 'file://'.$secondPath;
@@ -125,7 +151,7 @@ final class ApplicationSourceScannerTest extends TestCase
         self::assertSame([$firstUri => hash('sha256', '<?php final class NewFirstVersion { public function value(): int { return 2; } }')], $provider->sources);
     }
 
-    private function scanner(SourceIndexProviderInterface $provider): ApplicationSourceScanner
+    private function scanner(SourceIndexProviderInterface ...$providers): ApplicationSourceScanner
     {
         return new ApplicationSourceScanner(
             $this->projects,
@@ -136,7 +162,7 @@ final class ApplicationSourceScannerTest extends TestCase
             new SourceIndexPayloadCodec(),
             new PhpRuntimeStructureHasher(),
             new UriToPathConverter(),
-            [$provider],
+            $providers,
         );
     }
 }
@@ -155,9 +181,13 @@ final class RecordingSourceIndexProvider implements SourceIndexProviderInterface
     /** @var array<string, string> */
     public array $sources = [];
 
+    public function __construct(private readonly string $name = 'recording')
+    {
+    }
+
     public function name(): string
     {
-        return 'recording';
+        return $this->name;
     }
 
     public function begin(Project $project): void

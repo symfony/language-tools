@@ -13,9 +13,9 @@ final class ObservedRuntimeInitializer implements RuntimeInitializerInterface
     ) {
     }
 
-    public function initialize(Project $project, RuntimeRefreshMode $mode = RuntimeRefreshMode::Reuse, ?Cancellation $cancellation = null): void
+    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
     {
-        $this->initializer->initialize($project, $mode, $cancellation);
+        $this->initializer->initialize($project, $plan, $cancellation);
         $this->observer->refreshed($project);
     }
 }
