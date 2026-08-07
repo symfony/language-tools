@@ -25,6 +25,23 @@ The source and runtime targets require a warm application cache. Run the command
 twice when measuring a clean checkout and retain both results when investigating
 a cold-start regression.
 
+Incremental Runtime Refreshes
+-----------------------------
+
+The runtime refresh benchmark starts a real Language Server Protocol process and
+edits the fixture resources for every runtime metadata section:
+
+.. code-block:: terminal
+
+    $ composer runtime-refresh:benchmark
+
+It waits for each save-triggered refresh, verifies the requested bridge section,
+checks whether the plan preserved or rebuilt the container, and compares bridge
+generations when the fixture exposes the changed value. Independent route,
+translation, asset and Stimulus refreshes must finish below 1 second. Refreshes
+that rebuild the container must finish below 3 seconds. Every edit is restored
+before the next case. The PHP quality workflow enforces these budgets.
+
 A standalone release executable can be measured against another application:
 
 .. code-block:: terminal

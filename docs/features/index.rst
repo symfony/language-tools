@@ -174,8 +174,9 @@ root; changes received during a refresh queue one replacement. In debug mode,
 the bridge lets Symfony's resource freshness checks reuse or rebuild the cache.
 When changed source facts identify independent runtime domains, the bridge
 refreshes only those domains and preserves the dependency injection container
-when safe. Unknown or ambiguous changes use a full refresh. Non-debug refreshes
-clear the cache before creating a replacement snapshot.
+when safe. Refreshes that cannot preserve the container clear its cache before
+creating a replacement snapshot. Unknown or ambiguous changes use a full
+refresh.
 
 The last valid metadata remains available when a refresh fails. Open-document
 diagnostics are republished after a successful refresh. Clients that support

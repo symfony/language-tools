@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Rebuild containers directly for refresh plans that cannot safely reuse them
+- Benchmark save-triggered refresh latency for every runtime metadata section
+
 ## 0.5.0 (2026-08-07)
 
 - Refresh only runtime domains affected by source changes when their dependencies are known

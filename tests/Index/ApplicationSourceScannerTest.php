@@ -102,6 +102,19 @@ final class ApplicationSourceScannerTest extends TestCase
         self::assertSame(['events', 'messenger'], $scanner->refreshUri('file://'.$path)->domains());
     }
 
+    public function testLeavesNewFilesForPathBasedRuntimePlanning(): void
+    {
+        $scanner = $this->scanner(new RecordingSourceIndexProvider('routes'));
+        $scanner->indexAll();
+        $path = $this->temporaryDirectory.'/src/NewController.php';
+        file_put_contents($path, '<?php final class NewController {}');
+
+        $change = $scanner->refreshUri('file://'.$path);
+
+        self::assertTrue($change->requiresRuntimeRefresh());
+        self::assertSame([], $change->domains());
+    }
+
     public function testPersistentFactsNeverContainEnvironmentValues(): void
     {
         file_put_contents($this->temporaryDirectory.'/.env', "APP_SECRET=canary-value\n");

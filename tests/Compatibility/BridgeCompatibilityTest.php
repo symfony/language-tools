@@ -21,6 +21,7 @@ final class BridgeCompatibilityTest extends TestCase
             '--environment=test',
             '--debug=1',
             '--sections=routes,container,twig,translations,configuration,environment,messenger,events,security,assets,stimulus',
+            '--rebuild-container=1',
         ], $project);
 
         $snapshot = $process->stdout();

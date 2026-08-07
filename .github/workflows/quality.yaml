@@ -21,6 +21,8 @@ jobs:
               run: composer tree-sitter:build-sidecar
             - name: Run unit tests
               run: composer test
+            - name: Benchmark runtime refreshes
+              run: composer runtime-refresh:benchmark
             - name: Run static analysis
               run: composer phpstan
             - name: Check coding standards

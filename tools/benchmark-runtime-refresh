@@ -1,0 +1,427 @@
+#!/usr/bin/env php
+<?php
+
+function writeMessage($stream, array $message): void
+{
+    $json = json_encode($message, \JSON_THROW_ON_ERROR);
+    fwrite($stream, 'Content-Length: '.strlen($json)."\r\n\r\n".$json);
+    fflush($stream);
+}
+
+function readMessage($stream, float $timeout): ?array
+{
+    $read = [$stream];
+    $write = null;
+    $except = null;
+    $seconds = max(0, (int) $timeout);
+    $microseconds = max(0, (int) (($timeout - $seconds) * 1_000_000));
+    if (0 === stream_select($read, $write, $except, $seconds, $microseconds)) {
+        return null;
+    }
+
+    $length = null;
+    while (false !== $line = fgets($stream)) {
+        if ("\r\n" === $line) {
+            break;
+        }
+        if (preg_match('/^Content-Length: (\d+)\r\n$/i', $line, $matches)) {
+            $length = (int) $matches[1];
+        }
+    }
+    if (null === $length) {
+        throw new RuntimeException('Invalid LSP response header.');
+    }
+
+    $json = '';
+    while (strlen($json) < $length) {
+        $chunk = fread($stream, $length - strlen($json));
+        if (false === $chunk || '' === $chunk) {
+            throw new RuntimeException('Incomplete LSP response body.');
+        }
+        $json .= $chunk;
+    }
+
+    return json_decode($json, true, flags: \JSON_THROW_ON_ERROR);
+}
+
+function response($input, $output, int $id, float $timeout): array
+{
+    $deadline = microtime(true) + $timeout;
+    while (microtime(true) < $deadline) {
+        $message = readMessage($output, max(0.0, min(1.0, $deadline - microtime(true))));
+        if (null === $message) {
+            continue;
+        }
+        if (isset($message['method'], $message['id'])) {
+            writeMessage($input, ['jsonrpc' => '2.0', 'id' => $message['id'], 'result' => null]);
+            continue;
+        }
+        if (($message['id'] ?? null) === $id) {
+            return $message;
+        }
+    }
+
+    throw new RuntimeException(sprintf('Timed out waiting for LSP response %d.', $id));
+}
+
+function request($input, $output, int &$id, string $method, array $params): array
+{
+    ++$id;
+    writeMessage($input, ['jsonrpc' => '2.0', 'id' => $id, 'method' => $method, 'params' => $params]);
+
+    return response($input, $output, $id, 30.0);
+}
+
+function status($input, $output, int &$id): array
+{
+    $response = request($input, $output, $id, 'workspace/executeCommand', ['command' => 'symfony.indexStatus']);
+    $status = $response['result'][0] ?? null;
+    if (!is_array($status)) {
+        throw new RuntimeException('The LSP returned an invalid index status.');
+    }
+
+    return $status;
+}
+
+function awaitReady($input, $output, int &$id, float $timeout): void
+{
+    $deadline = microtime(true) + $timeout;
+    do {
+        $status = status($input, $output, $id);
+        $state = $status['runtime']['state'] ?? null;
+        if ('ready' === $state) {
+            return;
+        }
+        if ('failed' === $state || ('stale' === $state && isset($status['runtime']['error']))) {
+            throw new RuntimeException('Runtime indexing failed: '.($status['runtime']['error'] ?? 'unknown error'));
+        }
+        usleep(10_000);
+    } while (microtime(true) < $deadline);
+
+    throw new RuntimeException('Timed out waiting for runtime indexing.');
+}
+
+function awaitRefresh($input, $output, int &$id, float $timeout): void
+{
+    $deadline = microtime(true) + $timeout;
+    $started = false;
+    do {
+        $status = status($input, $output, $id);
+        $state = $status['runtime']['state'] ?? null;
+        if ('failed' === $state || ('stale' === $state && isset($status['runtime']['error']))) {
+            throw new RuntimeException('Runtime indexing failed: '.($status['runtime']['error'] ?? 'unknown error'));
+        }
+        if (\in_array($state, ['indexing', 'stale'], true)) {
+            $started = true;
+        } elseif ('ready' === $state && $started) {
+            return;
+        }
+        usleep(10_000);
+    } while (microtime(true) < $deadline);
+
+    throw new RuntimeException('Timed out waiting for a runtime refresh.');
+}
+
+function projectUri(string $path): string
+{
+    return 'file://'.str_replace('%2F', '/', rawurlencode($path));
+}
+
+function bridgeGeneration(string $bridge, string $project, string $section): ?string
+{
+    $command = [\PHP_BINARY, $bridge, '--project='.$project, '--environment=dev', '--debug=1', '--sections='.$section];
+    $process = proc_open($command, [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes, options: ['bypass_shell' => true]);
+    if (!is_resource($process)) {
+        throw new RuntimeException('Unable to start the project bridge.');
+    }
+    fclose($pipes[0]);
+    $stdout = stream_get_contents($pipes[1]);
+    $stderr = stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    if (0 !== proc_close($process)) {
+        throw new RuntimeException('The project bridge failed: '.trim($stderr));
+    }
+    $result = json_decode($stdout, true, flags: \JSON_THROW_ON_ERROR);
+    $generation = $result['sections'][$section]['generation'] ?? null;
+
+    return is_string($generation) ? $generation : null;
+}
+
+if (4 !== $argc) {
+    fwrite(\STDERR, "Usage: benchmark-runtime-refresh <server> <project> <tree-sitter-sidecar>\n");
+    exit(2);
+}
+
+$server = realpath($argv[1]);
+$project = realpath($argv[2]);
+$sidecar = realpath($argv[3]);
+$bridge = realpath(__DIR__.'/../resources/bridge.php');
+if (false === $server || false === $project || false === $sidecar || false === $bridge) {
+    throw new InvalidArgumentException('The server, project, sidecar, and bridge must exist.');
+}
+
+$cases = [
+    [
+        'name' => 'routes',
+        'file' => 'config/routes.yaml',
+        'replace' => ['fixture_home:', 'fixture_home_benchmark:'],
+        'section' => 'routes',
+        'preserveContainer' => true,
+        'generationChanges' => true,
+        'budgetSeconds' => 1.0,
+    ],
+    [
+        'name' => 'translations',
+        'file' => 'translations/messages.en.yaml',
+        'append' => "\nbenchmark.message: Runtime refresh benchmark\n",
+        'section' => 'translations',
+        'preserveContainer' => true,
+        'generationChanges' => true,
+        'budgetSeconds' => 1.0,
+    ],
+    [
+        'name' => 'assets',
+        'file' => 'assets/runtime_refresh_benchmark.js',
+        'create' => "export default 'runtime-refresh-benchmark';\n",
+        'section' => 'assets',
+        'preserveContainer' => true,
+        'generationChanges' => true,
+        'budgetSeconds' => 1.0,
+    ],
+    [
+        'name' => 'stimulus',
+        'file' => 'assets/controllers/search_controller.js',
+        'replace' => ["    open() {", "    benchmarkAction() {\n    }\n\n    open() {"],
+        'section' => 'stimulus',
+        'preserveContainer' => true,
+        'generationChanges' => true,
+        'budgetSeconds' => 1.0,
+    ],
+    [
+        'name' => 'container',
+        'file' => 'config/services.yaml',
+        'replace' => ['app.fixture_name:', 'app.fixture_label:'],
+        'section' => 'container',
+        'preserveContainer' => false,
+        'generationChanges' => true,
+        'budgetSeconds' => 3.0,
+    ],
+    [
+        'name' => 'events',
+        'file' => 'src/EventListener/NotifyCustomer.php',
+        'replace' => ['priority: 10', 'priority: 11'],
+        'section' => 'events',
+        'preserveContainer' => false,
+        'generationChanges' => true,
+        'budgetSeconds' => 3.0,
+    ],
+    [
+        'name' => 'messenger',
+        'file' => 'src/MessageHandler/PingHandler.php',
+        'replace' => ["bus: 'command.bus'", "bus: 'event.bus'"],
+        'section' => 'messenger',
+        'preserveContainer' => false,
+        'generationChanges' => true,
+        'budgetSeconds' => 3.0,
+    ],
+    [
+        'name' => 'security',
+        'file' => 'config/packages/security.yaml',
+        'replace' => ['ROLE_ADMIN: ROLE_USER', 'ROLE_BENCHMARK: ROLE_USER'],
+        'section' => 'security',
+        'preserveContainer' => false,
+        'generationChanges' => true,
+        'budgetSeconds' => 3.0,
+    ],
+    [
+        'name' => 'twig',
+        'file' => 'src/Twig/Components/Search.php',
+        'replace' => ["name: 'Search'", "name: 'BenchmarkSearch'"],
+        'section' => 'twig',
+        'preserveContainer' => false,
+        'generationChanges' => false,
+        'budgetSeconds' => 3.0,
+    ],
+    [
+        'name' => 'metadata',
+        'file' => 'src/Entity/Product.php',
+        'replace' => [
+            '#[ORM\\Column(length: 255)]',
+            "#[\\Symfony\\Component\\Validator\\Constraints\\NotBlank]\n    #[ORM\\Column(length: 255)]",
+        ],
+        'section' => 'metadata',
+        'preserveContainer' => false,
+        'generationChanges' => false,
+        'budgetSeconds' => 3.0,
+    ],
+    [
+        'name' => 'environment',
+        'file' => 'src/Environment/CustomEnvVarProcessor.php',
+        'replace' => ["'fixture_upper'", "'fixture_benchmark'"],
+        'section' => 'environment',
+        'preserveContainer' => false,
+        'generationChanges' => true,
+        'budgetSeconds' => 3.0,
+    ],
+    [
+        'name' => 'configuration',
+        'file' => 'config/packages/framework.yaml',
+        'replace' => ['default_locale: en', 'default_locale: fr'],
+        'section' => 'configuration',
+        'preserveContainer' => false,
+        'generationChanges' => false,
+        'budgetSeconds' => 3.0,
+    ],
+];
+
+$probeDirectory = $project.'/var/symfony-lsp/runtime-refresh-benchmark';
+if (file_exists($probeDirectory)) {
+    throw new RuntimeException('The runtime refresh benchmark is already running.');
+}
+mkdir($probeDirectory, 0777, true);
+$commandLog = $probeDirectory.'/commands.log';
+$phpWrapper = $probeDirectory.'/php';
+file_put_contents($phpWrapper, "#!/bin/sh\nfor argument do\ncase \"\$argument\" in\n--rebuild-container=*|--targeted-refresh=*|--sections=*) printf '%s\\n' \"\$argument\" >> ".escapeshellarg($commandLog).";;\nesac\ndone\nexec ".escapeshellarg(\PHP_BINARY)." \"\$@\"\n");
+chmod($phpWrapper, 0755);
+file_put_contents($commandLog, '');
+
+$environment = [...getenv(), 'SYMFONY_LSP_TREE_SITTER' => $sidecar];
+$process = proc_open([$server], [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes, env_vars: $environment, options: ['bypass_shell' => true]);
+if (!is_resource($process)) {
+    unlink($commandLog);
+    unlink($phpWrapper);
+    rmdir($probeDirectory);
+
+    throw new RuntimeException('Unable to start Symfony LSP.');
+}
+
+$id = 1;
+$results = [];
+$failed = false;
+$activeCase = null;
+try {
+    $rootUri = projectUri($project);
+    writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $id, 'method' => 'initialize', 'params' => [
+        'processId' => null,
+        'rootUri' => $rootUri,
+        'workspaceFolders' => [['uri' => $rootUri, 'name' => basename($project)]],
+        'capabilities' => new stdClass(),
+        'initializationOptions' => ['workspaceTrust' => true, 'runtimeIndexing' => true, 'phpCommand' => [$phpWrapper]],
+    ]]);
+    response($pipes[0], $pipes[1], $id, 30.0);
+    writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []]);
+    awaitReady($pipes[0], $pipes[1], $id, 30.0);
+
+    foreach ($cases as $case) {
+        $activeCase = $case;
+        $path = $project.'/'.$case['file'];
+        $original = is_file($path) ? file_get_contents($path) : null;
+        if (false === $original) {
+            throw new RuntimeException('Unable to read '.$case['file'].'.');
+        }
+        $activeCase['original'] = $original;
+        $beforeGeneration = bridgeGeneration($bridge, $project, $case['section']);
+        file_put_contents($commandLog, '');
+
+        if (isset($case['create'])) {
+            if (null !== $original) {
+                throw new RuntimeException($case['file'].' already exists.');
+            }
+            is_dir(dirname($path)) || mkdir(dirname($path), 0777, true);
+            file_put_contents($path, $case['create']);
+        } elseif (isset($case['append'])) {
+            file_put_contents($path, $original.$case['append']);
+        } else {
+            [$search, $replacement] = $case['replace'];
+            if (1 !== substr_count($original, $search)) {
+                throw new RuntimeException($case['name'].' benchmark replacement did not match exactly once.');
+            }
+            file_put_contents($path, str_replace($search, $replacement, $original));
+        }
+
+        $startedAt = hrtime(true);
+        writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'textDocument/didSave', 'params' => [
+            'textDocument' => ['uri' => projectUri($path)],
+        ]]);
+        try {
+            awaitRefresh($pipes[0], $pipes[1], $id, 30.0);
+        } catch (Throwable $error) {
+            throw new RuntimeException($case['name'].': '.$error->getMessage(), 0, $error);
+        }
+        $seconds = (hrtime(true) - $startedAt) / 1_000_000_000;
+
+        $commands = file($commandLog, \FILE_IGNORE_NEW_LINES | \FILE_SKIP_EMPTY_LINES) ?: [];
+        $containerPreserved = !in_array('--rebuild-container=1', $commands, true)
+            && in_array('--targeted-refresh=1', $commands, true);
+        $requestedSections = [];
+        foreach ($commands as $command) {
+            if (str_starts_with($command, '--sections=')) {
+                array_push($requestedSections, ...explode(',', substr($command, \strlen('--sections='))));
+            }
+        }
+        $requestedSections = array_values(array_unique($requestedSections));
+        $afterGeneration = bridgeGeneration($bridge, $project, $case['section']);
+        $generationChanged = $beforeGeneration !== $afterGeneration;
+        $timePassed = $seconds < $case['budgetSeconds'];
+        $containerPassed = $containerPreserved === $case['preserveContainer'];
+        $generationPassed = !$case['generationChanges'] || $generationChanged;
+        $sectionPassed = in_array($case['section'], $requestedSections, true);
+        $passed = $timePassed && $containerPassed && $generationPassed && $sectionPassed;
+        $failed = $failed || !$passed;
+        $results[] = [
+            'name' => $case['name'],
+            'milliseconds' => round($seconds * 1000, 2),
+            'budgetMilliseconds' => $case['budgetSeconds'] * 1000,
+            'containerPreserved' => $containerPreserved,
+            'expectedContainerPreserved' => $case['preserveContainer'],
+            'requestedSections' => $requestedSections,
+            'generationChanged' => $generationChanged,
+            'generationChangeRequired' => $case['generationChanges'],
+            'passed' => $passed,
+        ];
+
+        if (null === $original) {
+            unlink($path);
+        } else {
+            file_put_contents($path, $original);
+        }
+        writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'textDocument/didSave', 'params' => [
+            'textDocument' => ['uri' => projectUri($path)],
+        ]]);
+        awaitRefresh($pipes[0], $pipes[1], $id, 30.0);
+        $activeCase = null;
+    }
+} finally {
+    if (is_array($activeCase)) {
+        $path = $project.'/'.$activeCase['file'];
+        if (null === ($activeCase['original'] ?? null)) {
+            is_file($path) && unlink($path);
+        } else {
+            file_put_contents($path, $activeCase['original']);
+        }
+    }
+    try {
+        request($pipes[0], $pipes[1], $id, 'shutdown', []);
+        writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []]);
+    } catch (Throwable) {
+    }
+    fclose($pipes[0]);
+    fclose($pipes[1]);
+    $stderr = stream_get_contents($pipes[2]);
+    fclose($pipes[2]);
+    $exitCode = proc_close($process);
+    is_file($commandLog) && unlink($commandLog);
+    is_file($phpWrapper) && unlink($phpWrapper);
+    is_dir($probeDirectory) && rmdir($probeDirectory);
+}
+
+$result = [
+    'cases' => $results,
+    'allPassed' => !$failed,
+    'serverExitCode' => $exitCode,
+    'serverError' => '' === trim($stderr) ? null : trim($stderr),
+];
+echo json_encode($result, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR)."\n";
+
+exit($failed || 0 !== $exitCode ? 1 : 0);

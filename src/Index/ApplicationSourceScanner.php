@@ -191,6 +191,9 @@ final class ApplicationSourceScanner
                 return SourceFileChange::unchanged();
             }
 
+            if (null === $cachedEntry) {
+                $sourceFileChange = SourceFileChange::untracked();
+            }
             $document = new SourceDocument($uri, $languageId, $text);
             $payloads = [];
             $changedProviders = [];
@@ -205,7 +208,7 @@ final class ApplicationSourceScanner
                     $changedProviders[] = $name;
                 }
             }
-            if ($sourceFileChange->requiresRuntimeRefresh()) {
+            if (null !== $cachedEntry && $sourceFileChange->requiresRuntimeRefresh()) {
                 $sourceFileChange = SourceFileChange::factsChanged($changedProviders);
             }
             $entries[$relativePath] = $this->entry($path, $languageId, $hash, $runtimeStructure, $payloads);

@@ -54,6 +54,24 @@ final class BridgeTest extends TestCase
         yield 'prerelease' => ['42.7.0-RC1'];
     }
 
+    public function testRebuildsContainerCacheBeforeLoadingSections(): void
+    {
+        $this->writeRouteApplication();
+        mkdir($this->temporaryDirectory.'/var/cache', 0777, true);
+        file_put_contents($this->temporaryDirectory.'/var/cache/marker', 'stale');
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=routes --rebuild-container=1 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        self::assertSame(0, $exitCode, implode("\n", $output));
+        self::assertFileDoesNotExist($this->temporaryDirectory.'/var/cache/marker');
+        @rmdir($this->temporaryDirectory.'/var');
+    }
+
     public function testNormalizesStructuredRouteOutput(): void
     {
         $this->writeRouteApplication();
@@ -458,6 +476,8 @@ final class BridgeTest extends TestCase
             final class Kernel
             {
                 public function __construct(string $environment, bool $debug) {}
+                public function getCacheDir(): string { return dirname(__DIR__).'/var/cache'; }
+                public function getBuildDir(): string { return $this->getCacheDir(); }
                 public function shutdown(): void {}
             }
             namespace Symfony\Bundle\FrameworkBundle\Console;

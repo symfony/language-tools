@@ -11,6 +11,7 @@ final class SymfonyLspBridgeContext
         private string $environment,
         private bool $debug,
         private bool $targetedRefresh,
+        private bool $rebuildContainer,
     ) {
     }
 
@@ -56,6 +57,17 @@ final class SymfonyLspBridgeContext
             }
             try {
                 $kernel = new $kernelClass($this->environment, $this->debug);
+                if ($this->rebuildContainer) {
+                    $directories = [];
+                    foreach (['getCacheDir', 'getBuildDir'] as $method) {
+                        if (method_exists($kernel, $method) && is_string($directory = $kernel->$method())) {
+                            $directories[] = $directory;
+                        }
+                    }
+                    foreach (array_unique($directories) as $directory) {
+                        $this->removeDirectory($directory);
+                    }
+                }
                 if (method_exists($kernel, 'boot')) {
                     $kernel->boot();
                 }
@@ -73,6 +85,24 @@ final class SymfonyLspBridgeContext
             $this->kernelError = $error;
             throw $error;
         }
+    }
+
+    private function removeDirectory(string $directory): void
+    {
+        if (is_link($directory) || is_file($directory)) {
+            @unlink($directory);
+
+            return;
+        }
+        if (!is_dir($directory)) {
+            return;
+        }
+        foreach (scandir($directory) ?: [] as $entry) {
+            if ('.' !== $entry && '..' !== $entry) {
+                $this->removeDirectory($directory.DIRECTORY_SEPARATOR.$entry);
+            }
+        }
+        @rmdir($directory);
     }
 
     public function addError(string $section, string $message): void

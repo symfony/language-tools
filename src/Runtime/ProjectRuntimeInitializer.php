@@ -23,20 +23,6 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             $plan = new RuntimeRefreshPlan(RuntimeRefreshMode::Clear);
         }
         $mode = $plan->mode();
-        if (RuntimeRefreshMode::Clear === $mode && !$debug) {
-            $result = $this->processRunner->run([
-                ...$this->configuration->phpCommand($project),
-                $this->configuration->consolePath($project),
-                'cache:clear',
-                '--env='.$this->configuration->environment($project),
-                '--no-interaction',
-                '--no-debug',
-            ], $project->rootPath(), $cancellation);
-            if (0 !== $result->exitCode()) {
-                throw new \RuntimeException(\sprintf('The project cache command failed with status %d: %s', $result->exitCode(), trim($result->stderr())));
-            }
-        }
-
         $cancellation?->throwIfRequested();
         $sections = $plan->sections() ?? $this->snapshotLoaders->sections();
         $bridge = $this->bridgeInstaller->install($project);
@@ -48,6 +34,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             '--debug='.($debug ? '1' : '0'),
             '--sections='.implode(',', $sections),
             ...($plan->preservesContainer() ? ['--targeted-refresh=1'] : []),
+            ...(RuntimeRefreshMode::Clear === $mode ? ['--rebuild-container=1'] : []),
         ], $project->rootPath(), $cancellation);
 
         if (0 !== $result->exitCode()) {
