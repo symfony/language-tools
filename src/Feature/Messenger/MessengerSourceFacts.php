@@ -7,9 +7,14 @@ final class MessengerSourceFacts
     /**
      * @param list<MessengerSourceSymbol> $symbols
      * @param array<string, list<string>> $parents
+     * @param list<string>                $handlers
      */
-    public function __construct(private readonly string $uri, private readonly array $symbols, private readonly array $parents = [])
-    {
+    public function __construct(
+        private readonly string $uri,
+        private readonly array $symbols,
+        private readonly array $parents = [],
+        private readonly array $handlers = [],
+    ) {
     }
 
     public function uri(): string
@@ -27,5 +32,11 @@ final class MessengerSourceFacts
     public function parents(): array
     {
         return $this->parents;
+    }
+
+    /** @return list<string> */
+    public function handlers(): array
+    {
+        return $this->handlers;
     }
 }

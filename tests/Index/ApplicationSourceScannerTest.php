@@ -2,14 +2,19 @@
 
 namespace Symfony\Lsp\Tests\Index;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Feature\Environment\EnvironmentExtractor;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Environment\EnvironmentSourceIndexer;
+use Symfony\Lsp\Feature\Security\SecurityExtractor;
+use Symfony\Lsp\Feature\Security\SecuritySourceIndexer;
+use Symfony\Lsp\Feature\Security\SecuritySourceIndexRegistry;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
@@ -17,6 +22,9 @@ use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -102,6 +110,50 @@ final class ApplicationSourceScannerTest extends TestCase
         self::assertSame(['events', 'messenger'], $scanner->refreshUri('file://'.$path)->domains());
     }
 
+    #[DataProvider('referenceChangeProvider')]
+    public function testReportsOnlyRuntimeRelevantReferenceChanges(string $relativePath, bool $requiresRuntimeRefresh): void
+    {
+        $path = $this->temporaryDirectory.'/'.$relativePath;
+        if (!is_dir(\dirname($path))) {
+            mkdir(\dirname($path), 0777, true);
+        }
+        $source = <<<'PHP'
+<?php
+use Symfony\Component\Security\Http\Attribute\IsGranted;
+final class Controller
+{
+    public function index(): void {}
+}
+PHP;
+        file_put_contents($path, $source);
+        $scanner = $this->scanner($this->securityIndexer());
+        $scanner->indexAll();
+
+        file_put_contents($path, str_replace('    public function index()', "    #[IsGranted('ROLE_ADMIN')]\n    public function index()", $source));
+
+        self::assertSame($requiresRuntimeRefresh, $scanner->refreshUri('file://'.$path)->requiresRuntimeRefresh());
+    }
+
+    /** @return iterable<string, array{string, bool}> */
+    public static function referenceChangeProvider(): iterable
+    {
+        yield 'ordinary source' => ['src/Controller.php', false];
+        yield 'executed source' => ['src/EventSubscriber/Controller.php', true];
+    }
+
+    public function testKeepsConfigurationReferenceChangesForRuntimePlanning(): void
+    {
+        $path = $this->temporaryDirectory.'/config/packages/security.yaml';
+        mkdir(\dirname($path), 0777, true);
+        file_put_contents($path, "security:\n  access_control:\n    - { path: ^/admin, roles: ROLE_ADMIN }\n");
+        $scanner = $this->scanner($this->securityIndexer());
+        $scanner->indexAll();
+
+        file_put_contents($path, "security:\n  access_control:\n    - { path: ^/admin, roles: ROLE_SUPER_ADMIN }\n");
+
+        self::assertTrue($scanner->refreshUri('file://'.$path)->requiresRuntimeRefresh());
+    }
+
     public function testLeavesNewFilesForPathBasedRuntimePlanning(): void
     {
         $scanner = $this->scanner(new RecordingSourceIndexProvider('routes'));
@@ -162,6 +214,19 @@ final class ApplicationSourceScannerTest extends TestCase
 
         self::assertSame([$secondUri], $provider->removals);
         self::assertSame([$firstUri => hash('sha256', '<?php final class NewFirstVersion { public function value(): int { return 2; } }')], $provider->sources);
+    }
+
+    private function securityIndexer(): SecuritySourceIndexer
+    {
+        $converter = new PositionConverter();
+
+        return new SecuritySourceIndexer(
+            new SecuritySourceIndexRegistry(),
+            new SecurityExtractor($converter, new YamlConfigurationParser(
+                $converter,
+                new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+            )),
+        );
     }
 
     private function scanner(SourceIndexProviderInterface ...$providers): ApplicationSourceScanner
@@ -237,6 +302,15 @@ final class RecordingSourceIndexProvider implements SourceIndexProviderInterface
         $this->sources[$document->uri()] = $hash;
 
         return $hash;
+    }
+
+    public function runtimeDeclarations(mixed $data): array
+    {
+        if (!\is_string($data)) {
+            throw new \UnexpectedValueException();
+        }
+
+        return [$data];
     }
 
     public function remove(Project $project, string $uri): void

@@ -55,6 +55,18 @@ final class EnvironmentSourceIndexer implements SourceIndexProviderInterface
         return $facts;
     }
 
+    public function runtimeDeclarations(mixed $data): array
+    {
+        if (!$data instanceof EnvironmentSourceFacts) {
+            throw new \UnexpectedValueException('The environment source facts are invalid.');
+        }
+
+        return [
+            ...$data->declarations(),
+            ...$data->references(),
+        ];
+    }
+
     public function remove(Project $project, string $uri): void
     {
         $this->indexes->forProject($project)->removeSource($uri);

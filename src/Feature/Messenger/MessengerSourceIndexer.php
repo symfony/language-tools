@@ -55,6 +55,19 @@ final class MessengerSourceIndexer implements SourceIndexProviderInterface
         return $facts;
     }
 
+    public function runtimeDeclarations(mixed $data): array
+    {
+        if (!$data instanceof MessengerSourceFacts) {
+            throw new \UnexpectedValueException('The Messenger source facts are invalid.');
+        }
+
+        return [
+            ...array_filter($data->symbols(), static fn (MessengerSourceSymbol $symbol): bool => $symbol->isDeclaration()),
+            $data->parents(),
+            $data->handlers(),
+        ];
+    }
+
     public function remove(Project $project, string $uri): void
     {
         $this->indexes->forProject($project)->removeSource($uri);

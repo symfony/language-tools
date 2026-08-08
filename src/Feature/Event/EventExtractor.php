@@ -62,13 +62,15 @@ final class EventExtractor
         $symbols = [];
         $invalidListenerMethods = [];
         [$namespace, $imports] = $this->phpNames($text);
+        preg_match_all('/#\[\s*(?:[\\\\A-Za-z_][\\\\A-Za-z0-9_]*\\\\)*AsEventListener\b(?:\([^)]*\))?\s*\]/s', $text, $listenerAttributes);
+        $listeners = $listenerAttributes[0];
 
         preg_match_all('/AsEventListener\s*\(([^)]*)\)/s', $text, $attributes, \PREG_OFFSET_CAPTURE);
         foreach ($attributes[1] as [$arguments, $argumentsOffset]) {
             if (preg_match('/\bevent\s*:\s*["\']([^"\']+)/', $arguments, $match, \PREG_OFFSET_CAPTURE)) {
-                $symbols[] = $this->symbol($match[1][0], $uri, $text, $argumentsOffset + $match[1][1]);
+                $symbols[] = $this->symbol($match[1][0], $uri, $text, $argumentsOffset + $match[1][1], true);
             } elseif (preg_match('/\bevent\s*:\s*([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)::class/', $arguments, $match, \PREG_OFFSET_CAPTURE)) {
-                $symbols[] = $this->symbol($this->resolvePhpName($match[1][0], $namespace, $imports), $uri, $text, $argumentsOffset + $match[1][1], \strlen($match[1][0]));
+                $symbols[] = $this->symbol($this->resolvePhpName($match[1][0], $namespace, $imports), $uri, $text, $argumentsOffset + $match[1][1], true, \strlen($match[1][0]));
             }
         }
 
@@ -77,14 +79,14 @@ final class EventExtractor
         foreach ($dispatches[3] as $index => [$name, $offset]) {
             $variable = '' !== $dispatches[2][$index][0] ? $dispatches[2][$index][0] : $dispatches[1][$index][0];
             if (isset($dispatchers[$variable])) {
-                $symbols[] = $this->symbol($this->resolvePhpName($name, $namespace, $imports), $uri, $text, $offset, \strlen($name));
+                $symbols[] = $this->symbol($this->resolvePhpName($name, $namespace, $imports), $uri, $text, $offset, false, \strlen($name));
             }
         }
         preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:addListener\s*\(\s*|dispatch\s*\([^,\r\n]+,\s*)["\']([^"\']+)/', $text, $namedEvents, \PREG_OFFSET_CAPTURE);
         foreach ($namedEvents[3] as $index => [$name, $offset]) {
             $variable = '' !== $namedEvents[2][$index][0] ? $namedEvents[2][$index][0] : $namedEvents[1][$index][0];
             if (isset($dispatchers[$variable])) {
-                $symbols[] = $this->symbol($name, $uri, $text, $offset);
+                $symbols[] = $this->symbol($name, $uri, $text, $offset, false);
             }
         }
 
@@ -95,11 +97,11 @@ final class EventExtractor
             $body = substr($text, $open + 1, $close - $open - 1);
             preg_match_all('/["\']([^"\']+)["\']\s*=>/', $body, $stringEvents, \PREG_OFFSET_CAPTURE);
             foreach ($stringEvents[1] as [$name, $offset]) {
-                $symbols[] = $this->symbol($name, $uri, $text, $open + 1 + $offset);
+                $symbols[] = $this->symbol($name, $uri, $text, $open + 1 + $offset, true);
             }
             preg_match_all('/([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)::class\s*=>/', $body, $classEvents, \PREG_OFFSET_CAPTURE);
             foreach ($classEvents[1] as [$name, $offset]) {
-                $symbols[] = $this->symbol($this->resolvePhpName($name, $namespace, $imports), $uri, $text, $open + 1 + $offset, \strlen($name));
+                $symbols[] = $this->symbol($this->resolvePhpName($name, $namespace, $imports), $uri, $text, $open + 1 + $offset, true, \strlen($name));
             }
         }
 
@@ -118,7 +120,7 @@ final class EventExtractor
             }
         }
 
-        return new EventSourceFacts($uri, $this->unique($symbols), $invalidListenerMethods);
+        return new EventSourceFacts($uri, $this->unique($symbols), $invalidListenerMethods, $listeners);
     }
 
     private function yamlCompletionPrefix(string $text): ?string
@@ -165,7 +167,7 @@ final class EventExtractor
                 $listenerIndent = \strlen($tag[1]);
                 if (preg_match('/\bevent\s*:\s*["\']?([A-Za-z0-9_.\\\\-]+)/', $tag[2], $event, \PREG_OFFSET_CAPTURE)) {
                     $offset = $lineOffset + (int) strpos($line, $tag[2]) + $event[1][1];
-                    $symbols[] = $this->symbol($event[1][0], $uri, $text, $offset);
+                    $symbols[] = $this->symbol($event[1][0], $uri, $text, $offset, true);
                 }
                 continue;
             }
@@ -178,16 +180,16 @@ final class EventExtractor
                 continue;
             }
             if (preg_match('/^\s*event\s*:\s*["\']?([A-Za-z0-9_.\\\\-]+)/', $line, $event, \PREG_OFFSET_CAPTURE)) {
-                $symbols[] = $this->symbol($event[1][0], $uri, $text, $lineOffset + $event[1][1]);
+                $symbols[] = $this->symbol($event[1][0], $uri, $text, $lineOffset + $event[1][1], true);
             }
         }
 
         return $symbols;
     }
 
-    private function symbol(string $name, string $uri, string $text, int $offset, ?int $length = null): EventSourceSymbol
+    private function symbol(string $name, string $uri, string $text, int $offset, bool $declaration, ?int $length = null): EventSourceSymbol
     {
-        return new EventSourceSymbol(ltrim($name, '\\'), $uri, new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + ($length ?? \strlen($name)))));
+        return new EventSourceSymbol(ltrim($name, '\\'), $uri, new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + ($length ?? \strlen($name)))), $declaration);
     }
 
     /** @return array{string, array<string, string>} */

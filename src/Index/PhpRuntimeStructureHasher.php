@@ -11,7 +11,7 @@ final class PhpRuntimeStructureHasher
         if (!str_ends_with($relativePath, '.php')) {
             return null;
         }
-        if ($this->isExecutedSource($relativePath, $text)) {
+        if ($this->requiresFullRuntimeTracking($relativePath, $text)) {
             return hash('sha256', $text);
         }
 
@@ -50,8 +50,12 @@ final class PhpRuntimeStructureHasher
         return hash('sha256', $structure);
     }
 
-    private function isExecutedSource(string $relativePath, string $text): bool
+    public function requiresFullRuntimeTracking(string $relativePath, string $text): bool
     {
+        if (!str_ends_with($relativePath, '.php')) {
+            return false;
+        }
+
         foreach (['config/', 'src/DependencyInjection/', 'src/EventSubscriber/', 'src/Form/', 'src/Twig/', 'src/Validator/'] as $prefix) {
             if (str_starts_with($relativePath, $prefix)) {
                 return true;

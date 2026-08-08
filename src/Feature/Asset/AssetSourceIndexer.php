@@ -54,6 +54,15 @@ final class AssetSourceIndexer implements SourceIndexProviderInterface
         return $facts;
     }
 
+    public function runtimeDeclarations(mixed $data): array
+    {
+        if (!$data instanceof AssetSourceFacts) {
+            throw new \UnexpectedValueException('The asset source facts are invalid.');
+        }
+
+        return array_values(array_filter($data->symbols(), static fn (AssetSourceSymbol $symbol): bool => $symbol->isDeclaration()));
+    }
+
     public function remove(Project $project, string $uri): void
     {
         $this->indexes->forProject($project)->removeSource($uri);

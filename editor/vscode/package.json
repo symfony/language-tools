@@ -122,7 +122,7 @@
           "type": "boolean",
           "default": true,
           "scope": "resource",
-          "description": "Enable kernel debug mode during runtime indexing."
+          "description": "Enable kernel debug mode, which is required for runtime indexing."
         },
         "symfonyLsp.runtimeIndexing": {
           "type": "boolean",

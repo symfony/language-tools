@@ -7,11 +7,13 @@ final class EventSourceFacts
     /**
      * @param list<EventSourceSymbol>          $symbols
      * @param list<InvalidEventListenerMethod> $invalidListenerMethods
+     * @param list<string>                     $listeners
      */
     public function __construct(
         private readonly string $uri,
         private readonly array $symbols,
         private readonly array $invalidListenerMethods = [],
+        private readonly array $listeners = [],
     ) {
     }
 
@@ -30,5 +32,11 @@ final class EventSourceFacts
     public function invalidListenerMethods(): array
     {
         return $this->invalidListenerMethods;
+    }
+
+    /** @return list<string> */
+    public function listeners(): array
+    {
+        return $this->listeners;
     }
 }

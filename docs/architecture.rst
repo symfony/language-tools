@@ -85,9 +85,9 @@ Runtime Indexing
 
 Runtime indexing executes application code and therefore requires workspace
 trust. ``BridgeInstaller`` writes a content-addressed bridge bundle under the
-application's ``var/symfony-lsp/<server-version>/`` directory. The bridge is
-compatible with every supported Symfony branch and uses the configured PHP
-command, environment and debug mode.
+application's ``var/symfony-lsp/<server-version>/`` directory. Runtime indexing
+requires debug mode. The bridge is compatible with every supported Symfony
+branch and uses the configured PHP command and environment.
 
 One bridge process boots one ``App\\Kernel`` and loads every requested section.
 Sections use structured Symfony commands or public runtime APIs, then normalize
@@ -103,10 +103,12 @@ Runtime Refresh
 ---------------
 
 Saving or watching relevant PHP and configuration files marks runtime metadata
-stale and schedules a refresh. Changes limited to method bodies in ordinary PHP
-application classes update source facts without refreshing runtime metadata.
-PHP sources that can execute while runtime metadata is built remain fully
-tracked. ``DebouncedRuntimeRefreshScheduler`` collapses nearby changes,
+stale and schedules a refresh. Source providers distinguish runtime declarations
+from references, so reference-only changes update source facts without
+refreshing runtime metadata. Changes limited to method bodies in ordinary PHP
+application classes behave the same way. PHP sources that can execute while
+runtime metadata is built remain fully tracked.
+``DebouncedRuntimeRefreshScheduler`` collapses nearby changes,
 serializes refreshes per project and queues one replacement when changes arrive
 during an active refresh.
 

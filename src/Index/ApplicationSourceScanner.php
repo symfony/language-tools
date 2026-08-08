@@ -196,20 +196,34 @@ final class ApplicationSourceScanner
             }
             $document = new SourceDocument($uri, $languageId, $text);
             $payloads = [];
+            $factsChanged = false;
             $changedProviders = [];
+            $requiresFullRuntimeTracking = $this->runtimeStructureHasher->requiresFullRuntimeTracking($relativePath, $text);
             $runtimeStructure = $this->runtimeStructureHasher->hash($relativePath, $text);
             if (null !== $runtimeStructure && $runtimeStructure === ($cachedEntry['runtimeStructure'] ?? null)) {
                 $sourceFileChange = SourceFileChange::contentOnly();
             }
             foreach ($this->providers as $provider) {
                 $name = $provider->name();
-                $payloads[$name] = $this->codec->encode($provider->replace($project, $document));
-                if ($payloads[$name] !== ($cachedEntry['providers'][$name] ?? null)) {
-                    $changedProviders[] = $name;
+                $data = $provider->replace($project, $document);
+                $payloads[$name] = $this->codec->encode($data);
+                $previousPayload = $cachedEntry['providers'][$name] ?? null;
+                if ($payloads[$name] === $previousPayload) {
+                    continue;
                 }
+                $factsChanged = true;
+                if (\is_string($previousPayload)) {
+                    $previousData = $this->codec->decode($previousPayload);
+                    if ($this->codec->encode($provider->runtimeDeclarations($data)) === $this->codec->encode($provider->runtimeDeclarations($previousData))) {
+                        continue;
+                    }
+                }
+                $changedProviders[] = $name;
             }
             if (null !== $cachedEntry && $sourceFileChange->requiresRuntimeRefresh()) {
-                $sourceFileChange = SourceFileChange::factsChanged($changedProviders);
+                $sourceFileChange = 'php' === $languageId && !$requiresFullRuntimeTracking && $factsChanged && [] === $changedProviders
+                    ? SourceFileChange::contentOnly()
+                    : SourceFileChange::factsChanged($changedProviders);
             }
             $entries[$relativePath] = $this->entry($path, $languageId, $hash, $runtimeStructure, $payloads);
         }

@@ -55,6 +55,15 @@ final class SecuritySourceIndexer implements SourceIndexProviderInterface
         return $facts;
     }
 
+    public function runtimeDeclarations(mixed $data): array
+    {
+        if (!$data instanceof SecuritySourceFacts) {
+            throw new \UnexpectedValueException('The security source facts are invalid.');
+        }
+
+        return array_values(array_filter($data->symbols(), static fn (SecuritySourceSymbol $symbol): bool => $symbol->isDeclaration()));
+    }
+
     public function remove(Project $project, string $uri): void
     {
         $this->indexes->forProject($project)->removeSource($uri);

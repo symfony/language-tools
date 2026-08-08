@@ -66,6 +66,15 @@ final class TemplateSourceIndexer implements SourceIndexProviderInterface
         return $facts;
     }
 
+    public function runtimeDeclarations(mixed $data): array
+    {
+        if (!$data instanceof TemplateSourceFacts) {
+            throw new \UnexpectedValueException('The template source facts are invalid.');
+        }
+
+        return null === $data->declaration() ? [] : [$data->declaration()];
+    }
+
     public function remove(Project $project, string $uri): void
     {
         $this->indexes->forProject($project)->removeSource($uri);

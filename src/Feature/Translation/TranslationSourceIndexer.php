@@ -55,6 +55,15 @@ final class TranslationSourceIndexer implements SourceIndexProviderInterface
         return $facts;
     }
 
+    public function runtimeDeclarations(mixed $data): array
+    {
+        if (!$data instanceof TranslationSourceFacts) {
+            throw new \UnexpectedValueException('The translation source facts are invalid.');
+        }
+
+        return $data->declarations();
+    }
+
     public function remove(Project $project, string $uri): void
     {
         $this->indexes->forProject($project)->removeSource($uri);

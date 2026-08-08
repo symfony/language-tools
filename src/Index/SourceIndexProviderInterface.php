@@ -19,6 +19,9 @@ interface SourceIndexProviderInterface
 
     public function replace(Project $project, SourceDocument $document): mixed;
 
+    /** @return list<mixed> */
+    public function runtimeDeclarations(mixed $data): array;
+
     public function remove(Project $project, string $uri): void;
 
     public function overlay(Project $project, Document $document): void;

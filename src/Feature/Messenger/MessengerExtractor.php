@@ -16,6 +16,7 @@ final class MessengerExtractor
         /** @var list<MessengerSourceSymbol> $symbols */
         $symbols = [];
         $parents = [];
+        $handlers = [];
         if ('yaml' === $languageId) {
             array_push($symbols, ...$this->yamlSymbols($uri, $text));
         }
@@ -31,6 +32,8 @@ final class MessengerExtractor
             }
         }
         if ('php' === $languageId) {
+            preg_match_all('/#\[\s*(?:[\\\\A-Za-z_][\\\\A-Za-z0-9_]*\\\\)*AsMessageHandler\b(?:\([^)]*\))?\s*\]/s', $text, $handlerAttributes);
+            $handlers = $handlerAttributes[0];
             preg_match_all('/AsMessageHandler\s*\(([^)]*)\)/s', $text, $attributes, \PREG_OFFSET_CAPTURE);
             foreach ($attributes[1] as [$arguments, $argumentsOffset]) {
                 foreach ([
@@ -69,7 +72,7 @@ final class MessengerExtractor
             }
         }
 
-        return new MessengerSourceFacts($uri, $this->unique($symbols), $parents);
+        return new MessengerSourceFacts($uri, $this->unique($symbols), $parents, $handlers);
     }
 
     /** @return list<MessengerSourceSymbol> */

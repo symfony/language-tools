@@ -71,6 +71,23 @@ final class DependencyInjectionSourceIndexer implements SourceIndexProviderInter
         return $facts;
     }
 
+    public function runtimeDeclarations(mixed $data): array
+    {
+        if (null === $data) {
+            return [];
+        }
+        if (!$data instanceof DependencyInjectionSourceFacts) {
+            throw new \UnexpectedValueException('The dependency injection source facts are invalid.');
+        }
+
+        return [
+            ...$data->services(),
+            ...$data->parameters(),
+            ...$data->references(),
+            ...$data->classes(),
+        ];
+    }
+
     public function remove(Project $project, string $uri): void
     {
         $this->indexes->forProject($project)->removeSource($uri);

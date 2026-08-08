@@ -120,7 +120,7 @@ final class RuntimeConfiguration
     {
         $runtimeIndexing = $this->setting($project, 'runtimeIndexing', $this->runtimeIndexing);
 
-        return \is_bool($runtimeIndexing) ? $runtimeIndexing : $this->runtimeIndexing;
+        return $this->debug($project) && (\is_bool($runtimeIndexing) ? $runtimeIndexing : $this->runtimeIndexing);
     }
 
     /** @return list<string> */

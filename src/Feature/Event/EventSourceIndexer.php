@@ -55,6 +55,18 @@ final class EventSourceIndexer implements SourceIndexProviderInterface
         return $facts;
     }
 
+    public function runtimeDeclarations(mixed $data): array
+    {
+        if (!$data instanceof EventSourceFacts) {
+            throw new \UnexpectedValueException('The event source facts are invalid.');
+        }
+
+        return [
+            ...array_filter($data->symbols(), static fn (EventSourceSymbol $symbol): bool => $symbol->isDeclaration()),
+            ...$data->listeners(),
+        ];
+    }
+
     public function remove(Project $project, string $uri): void
     {
         $this->indexes->forProject($project)->removeSource($uri);

@@ -54,6 +54,18 @@ final class TwigComponentSourceIndexer implements SourceIndexProviderInterface
         return $facts;
     }
 
+    public function runtimeDeclarations(mixed $data): array
+    {
+        if (!$data instanceof TwigComponentSourceFacts) {
+            throw new \UnexpectedValueException('The Twig component source facts are invalid.');
+        }
+
+        return [
+            ...$data->components(),
+            ...array_filter($data->events(), static fn (LiveComponentEvent $event): bool => $event->isDeclaration()),
+        ];
+    }
+
     public function remove(Project $project, string $uri): void
     {
         $this->indexes->forProject($project)->removeSource($uri);

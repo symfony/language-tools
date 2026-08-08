@@ -51,6 +51,14 @@ YAML;
         );
         $phpFacts = (new MessengerExtractor(new PositionConverter()))->extract('file:///workspace/src/Example.php', 'php', "<?php\nfoo(bus: 'not_messenger');\n\$dispatcher->dispatch(new NotAMessage());\n");
         self::assertSame([], $phpFacts->symbols());
+
+        $handlerFacts = (new MessengerExtractor(new PositionConverter()))->extract(
+            'file:///workspace/src/Handler.php',
+            'php',
+            "<?php\n#[AsMessageHandler(bus: 'command.bus')]\nfinal class Handler {}\n",
+        );
+        self::assertSame(["#[AsMessageHandler(bus: 'command.bus')]"], $handlerFacts->handlers());
+        self::assertFalse($handlerFacts->symbols()[0]->isDeclaration());
     }
 
     public function testCompletesHoversNavigatesDiagnosesAndProvidesCodeLenses(): void

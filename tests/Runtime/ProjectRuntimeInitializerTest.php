@@ -68,7 +68,6 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $configuration->configure([
             'phpCommand' => ['project-php', '--flag'],
             'environment' => 'test',
-            'debug' => false,
         ]);
         $initializer = new ProjectRuntimeInitializer(
             new BridgeInstaller($source, 'test', new Filesystem()),
@@ -88,41 +87,28 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame('project-php', $processRunner->command[0]);
         self::assertSame('--flag', $processRunner->command[1]);
         self::assertSame('--environment=test', $processRunner->command[4]);
-        self::assertSame('--debug=0', $processRunner->command[5]);
+        self::assertSame('--debug=1', $processRunner->command[5]);
         self::assertSame('--sections=routes,container', $processRunner->command[6]);
         self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
     }
 
-    public function testRebuildsTheNormalNonDebugProjectCacheWhileRefreshingMetadata(): void
+    public function testRejectsRuntimeIndexingWithoutDebugMode(): void
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
-        $processRunner = new CapturingProcessRunner(
-            new ProcessResult(0, json_encode(['schemaVersion' => 1, 'sections' => []], \JSON_THROW_ON_ERROR), ''),
-        );
         $configuration = new RuntimeConfiguration();
-        $configuration->configure([
-            'phpCommand' => ['project-php'],
-            'consolePath' => 'app-console',
-            'environment' => 'test',
-            'debug' => false,
-        ]);
+        $configuration->configure(['debug' => false]);
         $initializer = new ProjectRuntimeInitializer(
             new BridgeInstaller($source, 'test', new Filesystem()),
-            $processRunner,
+            new CapturingProcessRunner(new ProcessResult(0, '', '')),
             new RuntimeSnapshotLoaderRegistry([]),
             $configuration,
         );
 
-        $initializer->initialize(
-            new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0'),
-            new RuntimeRefreshPlan(RuntimeRefreshMode::Clear),
-        );
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Runtime indexing requires Symfony debug mode.');
 
-        self::assertCount(1, $processRunner->commands);
-        self::assertStringEndsWith('/bridge.php', $processRunner->commands[0][1]);
-        self::assertContains('--debug=0', $processRunner->commands[0]);
-        self::assertContains('--rebuild-container=1', $processRunner->commands[0]);
+        $initializer->initialize(new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0'));
     }
 
     public function testRebuildsTheDebugContainerWhenRequiredByThePlan(): void
@@ -171,31 +157,6 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertCount(1, $processRunner->commands);
         self::assertContains('--sections=routes', $processRunner->commands[0]);
         self::assertContains('--targeted-refresh=1', $processRunner->commands[0]);
-    }
-
-    public function testFallsBackToAFullTargetedRefreshWithoutDebugResourceChecks(): void
-    {
-        $source = $this->temporaryDirectory.'/source.php';
-        file_put_contents($source, '<?php');
-        $processRunner = new CapturingProcessRunner(
-            new ProcessResult(0, json_encode(['schemaVersion' => 1, 'sections' => []], \JSON_THROW_ON_ERROR), ''),
-        );
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure(['debug' => false]);
-        $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test', new Filesystem()),
-            $processRunner,
-            new RuntimeSnapshotLoaderRegistry([]),
-            $configuration,
-        );
-
-        $initializer->initialize(
-            new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0'),
-            new RuntimeRefreshPlan(RuntimeRefreshMode::Reuse, ['routes'], true),
-        );
-
-        self::assertContains('--rebuild-container=1', $processRunner->commands[0]);
-        self::assertNotContains('--targeted-refresh=1', $processRunner->commands[0]);
     }
 
     public function testLoadsAvailableSectionsBeforeReportingSectionErrors(): void

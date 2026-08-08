@@ -9,7 +9,7 @@ use Symfony\Lsp\Project\Project;
 
 final class PersistentSourceIndexStore implements SourceIndexStoreInterface
 {
-    private const SCHEMA_VERSION = 2;
+    private const SCHEMA_VERSION = 3;
 
     public function __construct(private readonly string $serverVersion, private readonly Filesystem $filesystem)
     {

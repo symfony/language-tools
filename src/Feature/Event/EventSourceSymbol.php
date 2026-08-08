@@ -10,6 +10,7 @@ final class EventSourceSymbol
         private readonly string $name,
         private readonly string $uri,
         private readonly Range $range,
+        private readonly bool $declaration,
     ) {
     }
 
@@ -26,5 +27,10 @@ final class EventSourceSymbol
     public function range(): Range
     {
         return $this->range;
+    }
+
+    public function isDeclaration(): bool
+    {
+        return $this->declaration;
     }
 }

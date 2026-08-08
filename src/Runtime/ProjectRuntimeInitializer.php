@@ -17,11 +17,10 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
 
     public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
     {
-        $plan ??= new RuntimeRefreshPlan();
-        $debug = $this->configuration->debug($project);
-        if ($plan->preservesContainer() && !$debug) {
-            $plan = new RuntimeRefreshPlan(RuntimeRefreshMode::Clear);
+        if (!$this->configuration->debug($project)) {
+            throw new \RuntimeException('Runtime indexing requires Symfony debug mode.');
         }
+        $plan ??= new RuntimeRefreshPlan();
         $mode = $plan->mode();
         $cancellation?->throwIfRequested();
         $sections = $plan->sections() ?? $this->snapshotLoaders->sections();
@@ -31,7 +30,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             $bridge,
             '--project='.$project->rootPath(),
             '--environment='.$this->configuration->environment($project),
-            '--debug='.($debug ? '1' : '0'),
+            '--debug=1',
             '--sections='.implode(',', $sections),
             ...($plan->preservesContainer() ? ['--targeted-refresh=1'] : []),
             ...(RuntimeRefreshMode::Clear === $mode ? ['--rebuild-container=1'] : []),

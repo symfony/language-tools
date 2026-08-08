@@ -70,6 +70,15 @@ final class ProjectRouteSourceIndexer implements SourceIndexProviderInterface
         return $facts;
     }
 
+    public function runtimeDeclarations(mixed $data): array
+    {
+        if (!$data instanceof RouteSourceFacts) {
+            throw new \UnexpectedValueException('The route source facts are invalid.');
+        }
+
+        return $data->declarations();
+    }
+
     public function remove(Project $project, string $uri): void
     {
         $this->declarationIndexes->forProject($project)->removeSource($uri);

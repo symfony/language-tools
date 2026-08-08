@@ -68,6 +68,7 @@ final class WorkspaceConfigurationTest extends TestCase
         self::assertSame('app-console', $runtimeConfiguration->consolePath());
         self::assertSame('test', $runtimeConfiguration->environment());
         self::assertFalse($runtimeConfiguration->debug());
+        self::assertFalse($runtimeConfiguration->runtimeIndexing());
         self::assertSame('utf-8', $configuration->positionEncoding());
     }
 

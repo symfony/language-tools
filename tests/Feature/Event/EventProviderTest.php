@@ -52,6 +52,8 @@ PHP;
             ['App\\Event\\OrderPlaced', 'legacy.order_placed'],
             array_values(array_unique(array_map(static fn ($symbol): string => $symbol->name(), $facts->symbols()))),
         );
+        self::assertSame(2, \count(array_filter($facts->symbols(), static fn ($symbol): bool => $symbol->isDeclaration())));
+        self::assertSame(3, \count(array_filter($facts->symbols(), static fn ($symbol): bool => !$symbol->isDeclaration())));
 
         $yaml = <<<'YAML'
 services:

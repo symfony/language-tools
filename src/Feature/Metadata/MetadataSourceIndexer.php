@@ -54,6 +54,15 @@ final class MetadataSourceIndexer implements SourceIndexProviderInterface
         return $facts;
     }
 
+    public function runtimeDeclarations(mixed $data): array
+    {
+        if (!$data instanceof MetadataSourceFacts) {
+            throw new \UnexpectedValueException('The metadata source facts are invalid.');
+        }
+
+        return array_values(array_filter($data->symbols(), static fn (MetadataSourceSymbol $symbol): bool => $symbol->isDeclaration()));
+    }
+
     public function remove(Project $project, string $uri): void
     {
         $this->indexes->forProject($project)->removeSource($uri);

@@ -140,9 +140,10 @@ For example, use ``["symfony", "php"]`` for Symfony CLI or
 Symfony application. ``symfonyLsp.consolePath`` selects the project console
 used for normal cache maintenance.
 
-``symfonyLsp.environment`` and ``symfonyLsp.debug`` select the Symfony runtime
-whose effective metadata is indexed. ``symfonyLsp.runtimeIndexing`` can disable
-application execution even in a trusted workspace.
+``symfonyLsp.environment`` selects the Symfony runtime whose effective metadata
+is indexed. Runtime indexing requires ``symfonyLsp.debug`` to be ``true``.
+``symfonyLsp.runtimeIndexing`` can disable application execution even in a
+trusted workspace.
 
 ``symfonyLsp.projectRoots`` can list application roots relative to the
 workspace folder or as absolute paths. Leave it empty to discover nested

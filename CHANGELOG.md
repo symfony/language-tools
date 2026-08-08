@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Skip runtime refreshes for reference-only source changes and require debug mode for runtime indexing
 - Prevent JSON-RPC listener deadlocks after watched Composer file changes
 - Add a self-installing Neovim client with status and index controls
 - Register watched workspace files through the LSP protocol

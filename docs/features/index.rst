@@ -118,9 +118,10 @@ for navigating between related declarations.
 Runtime Indexing and Trust
 --------------------------
 
-Runtime indexing boots ``App\\Kernel`` and executes application code. Enable it
-only for workspaces that you trust. One kernel is shared by all sections in a
-snapshot, then shut down before the snapshot is returned. The project bridge
+Runtime indexing boots ``App\\Kernel`` and executes application code. It is
+available only in debug mode and for workspaces that you trust. One kernel is
+shared by all sections in a snapshot, then shut down before the snapshot is
+returned. The project bridge
 runs structured Symfony commands to obtain effective metadata:
 
 * ``debug:router --format=json --show-aliases``;
@@ -170,9 +171,10 @@ Runtime Metadata Refresh
 
 Saving relevant PHP, YAML, XML, translation or bundle metadata resources
 schedules a debounced runtime refresh. Refreshes are serialized per application
-root; changes received during a refresh queue one replacement. In debug mode,
-the bridge lets Symfony's resource freshness checks reuse or rebuild the cache.
-When changed source facts identify independent runtime domains, the bridge
+root; changes received during a refresh queue one replacement. Reference-only
+source changes do not schedule runtime work. The bridge lets Symfony's debug
+resource freshness checks reuse or rebuild the cache. When changed source facts
+identify independent runtime domains, the bridge
 refreshes only those domains and preserves the dependency injection container
 when safe. Refreshes that cannot preserve the container clear its cache before
 creating a replacement snapshot. Unknown or ambiguous changes use a full

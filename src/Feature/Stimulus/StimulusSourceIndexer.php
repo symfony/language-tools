@@ -54,6 +54,15 @@ final class StimulusSourceIndexer implements SourceIndexProviderInterface
         return $facts;
     }
 
+    public function runtimeDeclarations(mixed $data): array
+    {
+        if (!$data instanceof StimulusSourceFacts) {
+            throw new \UnexpectedValueException('The Stimulus source facts are invalid.');
+        }
+
+        return $data->declarations();
+    }
+
     public function remove(Project $project, string $uri): void
     {
         $this->indexes->forProject($project)->removeSource($uri);

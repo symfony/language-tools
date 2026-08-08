@@ -54,6 +54,19 @@ final class DoctrineSourceIndexer implements SourceIndexProviderInterface
         return $facts;
     }
 
+    public function runtimeDeclarations(mixed $data): array
+    {
+        if (!$data instanceof DoctrineSourceFacts) {
+            throw new \UnexpectedValueException('The Doctrine source facts are invalid.');
+        }
+
+        return [
+            ...$data->entities(),
+            ...$data->repositories(),
+            ...array_filter($data->symbols(), static fn (DoctrineSourceSymbol $symbol): bool => $symbol->isDeclaration()),
+        ];
+    }
+
     public function remove(Project $project, string $uri): void
     {
         $this->indexes->forProject($project)->removeSource($uri);
