@@ -53,7 +53,11 @@ final class WorkspaceFileWatcherTest extends TestCase
                     ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => '.env*']],
                     ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => 'composer.{json,lock}']],
                     ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => 'custom-package/**/'.$sourcePattern]],
+                    ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => 'custom-package'], 'kind' => 5],
+                    ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => 'custom-package/**'], 'kind' => 5],
                     ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => 'src/**/'.$sourcePattern]],
+                    ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => 'src'], 'kind' => 5],
+                    ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => 'src/**'], 'kind' => 5],
                 ]],
             ]]],
         ]], $client->requests);

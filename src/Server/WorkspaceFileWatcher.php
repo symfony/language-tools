@@ -8,6 +8,7 @@ use Symfony\Lsp\Project\ProjectRegistry;
 
 final class WorkspaceFileWatcher
 {
+    private const DIRECTORY_CHANGE_KIND = 1 | 4;
     private const EXCLUDED_DIRECTORIES = ['.git', 'node_modules', 'var', 'vendor'];
     private const SOURCE_PATTERN = '*.{php,twig,yaml,yml,json,xml,xlf,xliff,css,js,mjs,ts,svg,png,jpg,jpeg,gif,webp,woff,woff2,ttf,otf,wasm}';
 
@@ -71,7 +72,7 @@ final class WorkspaceFileWatcher
         }
     }
 
-    /** @return list<array{globPattern: string|array{baseUri: string, pattern: string}}> */
+    /** @return list<array{globPattern: string|array{baseUri: string, pattern: string}, kind?: int}> */
     private function watchers(): array
     {
         if (!$this->relativePatternSupported) {
@@ -89,16 +90,23 @@ final class WorkspaceFileWatcher
             $watchers[] = $this->relative($project, 'composer.{json,lock}');
             foreach ($this->sourceDirectories($project) as $directory) {
                 $watchers[] = $this->relative($project, $directory.'/**/'.self::SOURCE_PATTERN);
+                $watchers[] = $this->relative($project, $directory, self::DIRECTORY_CHANGE_KIND);
+                $watchers[] = $this->relative($project, $directory.'/**', self::DIRECTORY_CHANGE_KIND);
             }
         }
 
         return $watchers;
     }
 
-    /** @return array{globPattern: array{baseUri: string, pattern: string}} */
-    private function relative(Project $project, string $pattern): array
+    /** @return array{globPattern: array{baseUri: string, pattern: string}, kind?: int} */
+    private function relative(Project $project, string $pattern, ?int $kind = null): array
     {
-        return ['globPattern' => ['baseUri' => $project->rootUri(), 'pattern' => $pattern]];
+        $watcher = ['globPattern' => ['baseUri' => $project->rootUri(), 'pattern' => $pattern]];
+        if (null !== $kind) {
+            $watcher['kind'] = $kind;
+        }
+
+        return $watcher;
     }
 
     /** @return list<string> */

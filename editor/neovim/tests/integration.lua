@@ -7,6 +7,8 @@ local notifications = {}
 local route_file_contents
 
 vim.opt.runtimepath:prepend(repo)
+-- Exercise Neovim's recursive directory watcher on every platform
+require('vim.lsp._watchfiles')._watchfunc = require('vim._watch').watchdirs
 vim.notify = function(message, level, options)
   table.insert(notifications, {
     message = tostring(message),
