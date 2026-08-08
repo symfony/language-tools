@@ -15,6 +15,7 @@ final class ReleaseMetadataUpdaterTest extends TestCase
     {
         $this->directory = \dirname(__DIR__, 2).'/var/tests/release-metadata-'.bin2hex(random_bytes(6));
         mkdir($this->directory.'/docs/editors', 0777, true);
+        mkdir($this->directory.'/lua/symfony_lsp', 0777, true);
     }
 
     protected function tearDown(): void
@@ -34,6 +35,8 @@ final class ReleaseMetadataUpdaterTest extends TestCase
         );
         self::assertSame("Install 0.3.1\n", file_get_contents($this->directory.'/docs/index.rst'));
         self::assertSame("Build 0.3.1\n", file_get_contents($this->directory.'/docs/editors/vscode.rst'));
+        self::assertSame("Configure 0.3.1\n", file_get_contents($this->directory.'/docs/editors/neovim.rst'));
+        self::assertSame("return '0.3.1'\n", file_get_contents($this->directory.'/lua/symfony_lsp/version.lua'));
     }
 
     public function testDoesNotPartiallyUpdateInvalidMetadata(): void
@@ -50,6 +53,7 @@ final class ReleaseMetadataUpdaterTest extends TestCase
         } finally {
             self::assertSame($changelog, file_get_contents($this->directory.'/CHANGELOG.md'));
             self::assertSame("Install 0.3.0\n", file_get_contents($this->directory.'/docs/index.rst'));
+            self::assertSame("return '0.3.0'\n", file_get_contents($this->directory.'/lua/symfony_lsp/version.lua'));
         }
     }
 
@@ -76,6 +80,8 @@ final class ReleaseMetadataUpdaterTest extends TestCase
         );
         file_put_contents($this->directory.'/docs/index.rst', "Install 0.3.0\n");
         file_put_contents($this->directory.'/docs/editors/vscode.rst', "Build 0.3.0\n");
+        file_put_contents($this->directory.'/docs/editors/neovim.rst', "Configure 0.3.0\n");
+        file_put_contents($this->directory.'/lua/symfony_lsp/version.lua', "return '0.3.0'\n");
     }
 
     private function removeDirectory(string $directory): void

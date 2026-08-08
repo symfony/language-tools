@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add a self-installing Neovim client with status and index controls
 - Register watched workspace files through the LSP protocol
 - Rebuild containers directly for refresh plans that cannot safely reuse them
 - Benchmark save-triggered refresh latency for every runtime metadata section

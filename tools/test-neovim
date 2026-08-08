@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+
+NVIM=${1:-${NVIM:-nvim}}
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+VERSION=$("$NVIM" --version | head -n 1 | tr ' /' '__')
+STATE="$ROOT/var/neovim-tests/$VERSION"
+
+rm -rf "$STATE"
+mkdir -p "$STATE/config" "$STATE/data" "$STATE/state" "$STATE/cache"
+
+run_test() {
+    XDG_CONFIG_HOME="$STATE/config" \
+    XDG_DATA_HOME="$STATE/data" \
+    XDG_STATE_HOME="$STATE/state" \
+    XDG_CACHE_HOME="$STATE/cache" \
+        "$NVIM" --headless --clean -l "$ROOT/$1"
+}
+
+cd "$ROOT"
+run_test editor/neovim/tests/unit.lua
+run_test editor/neovim/tests/integration.lua
+SYMFONY_LSP_PLUGIN_SOURCE="file://$ROOT"
+SYMFONY_LSP_PLUGIN_REVISION=$(git rev-parse HEAD)
+export SYMFONY_LSP_PLUGIN_SOURCE SYMFONY_LSP_PLUGIN_REVISION
+run_test editor/neovim/tests/package.lua

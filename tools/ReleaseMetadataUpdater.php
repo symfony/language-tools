@@ -25,7 +25,14 @@ final class ReleaseMetadataUpdater
         }
         $updates[$changelogPath] = $changelog;
 
-        foreach (['docs/index.rst', 'docs/editors/vscode.rst'] as $relativePath) {
+        $neovimVersionPath = $root.'/lua/symfony_lsp/version.lua';
+        $neovimVersion = $this->read($neovimVersionPath);
+        if ("return '{$currentVersion}'\n" !== $neovimVersion) {
+            throw new \RuntimeException('The Neovim plugin version does not match the current release.');
+        }
+        $updates[$neovimVersionPath] = "return '{$version}'\n";
+
+        foreach (['docs/index.rst', 'docs/editors/vscode.rst', 'docs/editors/neovim.rst'] as $relativePath) {
             $path = $root.'/'.$relativePath;
             $contents = $this->read($path);
             if (!str_contains($contents, $currentVersion)) {

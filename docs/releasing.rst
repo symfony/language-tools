@@ -2,9 +2,9 @@ Releasing Symfony LSP
 =====================
 
 Symfony LSP releases contain standalone server binaries for each supported
-platform, matching Tree-sitter sidecars, self-contained VS Code extensions and
-a checksum manifest. The GitHub release workflow builds and publishes them from
-a version tag.
+platform, matching Tree-sitter sidecars, self-contained VS Code extensions, a
+first-party Neovim plugin and a checksum manifest. The GitHub release workflow
+builds and publishes them from a version tag.
 
 Release Invariants
 ------------------
@@ -12,7 +12,7 @@ Release Invariants
 A release must satisfy these rules:
 
 * the tag points to a commit that passed every regular CI workflow;
-* the VS Code package version matches the tag;
+* the VS Code package and Neovim plugin versions match the tag;
 * ``resources/version`` remains ``dev`` in source control;
 * release jobs derive the server and protocol version from the tag;
 * the server and sidecar from one release stay together;
@@ -133,12 +133,11 @@ applications. It then:
 
 1. moves the ``Unreleased`` entries under the dated version heading;
 2. updates the VS Code package and lock file without creating an npm tag;
-3. updates versioned examples in ``docs/index.rst`` and
-   ``docs/editors/vscode.rst``;
+3. updates the Neovim plugin version and versioned documentation examples;
 4. verifies that only release metadata files changed and commits them;
 5. pushes ``main`` with an explicit refspec;
-6. waits for ``PHP quality``, ``Symfony compatibility`` and
-   ``VS Code integration``;
+6. waits for ``PHP quality``, ``Symfony compatibility``,
+   ``VS Code integration`` and ``Neovim integration``;
 7. creates and pushes the version tag only after those workflows pass;
 8. waits for the complete GitHub and Marketplace release workflow;
 9. creates the empty ``Unreleased`` section, pushes that post-release commit
@@ -214,6 +213,20 @@ Run the extracted release binaries against all eight Symfonycorp applications:
 Require ready source and runtime indexes, no request errors, no server errors
 and a successful server exit for every application. Compare response counts and
 latency with the development build when a packaged result differs.
+
+Neovim Verification
+-------------------
+
+Install the tagged repository with ``vim.pack`` or lazy.nvim in a disposable
+Neovim profile. Remove any previous Symfony LSP installation from that profile,
+then call ``require('symfony_lsp').setup()``. Confirm that the plugin downloads
+the archive matching the current platform, verifies its checksum and starts the
+same server version as the plugin.
+
+Run ``:checkhealth symfony_lsp``, ``:SymfonyLspIndexStatus`` and a code lens.
+Confirm that the statusline component reaches the ready state, the index
+commands return project status and the code lens opens its locations in the
+quickfix list.
 
 VS Code Verification
 --------------------

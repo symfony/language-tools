@@ -108,6 +108,26 @@ configuration forwarding, document associations or end-to-end feature changes:
 The test downloads an isolated VS Code build and disables other extensions to
 keep results deterministic.
 
+Neovim Integration
+~~~~~~~~~~~~~~~~~~
+
+Check Lua formatting, then run the unit tests and headless editor integration
+tests with Neovim 0.11.3 or later:
+
+.. code-block:: terminal
+
+    $ stylua --check lsp lua editor/neovim/tests
+    $ ./tools/test-neovim /path/to/nvim
+
+Set ``SYMFONY_LSP_TREE_SITTER`` to a built sidecar when the source executable
+can't load the native parser extension. The Neovim suite covers installer
+checksums, package installation, client lifecycle, UTF-8 positions,
+workspace trust, runtime configuration, watched files, language features, code
+lenses, index commands and statusline rendering.
+
+CI runs the suite against the minimum supported Neovim and the current stable
+release. It also checks every Lua source with StyLua.
+
 Performance
 ~~~~~~~~~~~
 
@@ -160,6 +180,8 @@ Validation by Change Type
       - Parser fixtures, native extension tests, sidecar build and smoke test
     * - VS Code extension
       - TypeScript check and Extension Development Host tests
+    * - Neovim plugin
+      - StyLua check and headless tests on the supported version matrix
     * - Release packaging
       - Full CI, checksums, packaged smoke test and packaged dogfood matrix
     * - Documentation only
@@ -173,7 +195,8 @@ Every pushed commit and pull request runs:
 * ``PHP quality`` for PHPUnit, PHPStan, coding standards and both Tree-sitter
   builds;
 * ``Symfony compatibility`` for every supported Symfony branch;
-* ``VS Code integration`` for the Extension Development Host suite.
+* ``VS Code integration`` for the Extension Development Host suite;
+* ``Neovim integration`` for Lua formatting and the headless editor suite.
 
 A green local suite doesn't replace CI. Wait for all workflows before tagging a
 release. The release workflow adds platform packaging and smoke tests only when

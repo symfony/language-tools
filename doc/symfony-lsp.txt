@@ -1,0 +1,139 @@
+*symfony-lsp.txt*              Symfony LSP for Neovim
+
+==============================================================================
+CONTENTS                                                    *symfony-lsp-contents*
+
+1. Introduction                                      |symfony-lsp-introduction|
+2. Setup                                                    |symfony-lsp-setup|
+3. Options                                                |symfony-lsp-options|
+4. Commands                                              |symfony-lsp-commands|
+5. Statusline                                          |symfony-lsp-statusline|
+6. Health                                                  |symfony-lsp-health|
+
+==============================================================================
+INTRODUCTION                                            *symfony-lsp-introduction*
+
+Symfony LSP provides Symfony-aware completion, hover, navigation, references,
+diagnostics, code actions, rename support and code lenses alongside a general
+PHP language server. The first-party plugin supports Neovim 0.11.3 or later.
+
+The plugin installs the matching server and Tree-sitter sidecar from the
+Symfony LSP GitHub release. It verifies the release checksum before using the
+archive.
+
+==============================================================================
+SETUP                                                          *symfony-lsp-setup*
+
+Install this repository with a plugin manager and call:
+
+>lua
+    require('symfony_lsp').setup()
+<
+
+The default setup installs a missing server automatically and enables the
+`symfony_lsp` configuration through |vim.lsp.enable()|. Set an explicit trust
+decision only for projects whose code may be executed:
+
+>lua
+    require('symfony_lsp').setup({
+      workspace_trust = true,
+    })
+<
+
+The setup function may only be called once per Neovim process.
+
+==============================================================================
+OPTIONS                                                      *symfony-lsp-options*
+
+`auto_install` ~
+    (`boolean`, default: `true`) Download a missing server automatically.
+
+`cmd` ~
+    (`string|string[]`) Use this server command instead of the managed server.
+
+`cmd_env` ~
+    (`table`) Environment passed to the server process.
+
+`workspace_trust` ~
+    (`boolean?`) Trust or reject application execution. When omitted, the
+    server asks before runtime indexing.
+
+`settings` ~
+    (`table`) Symfony project settings. Supported keys are `phpCommand`,
+    `consolePath`, `environment`, `debug`, `runtimeIndexing`, `projectRoots`
+    and `translationDiagnostics`.
+
+`project_roots` ~
+    (`string[]`) Explicit project roots used instead of recursive discovery.
+
+`trace` ~
+    (`"off"|"messages"|"verbose"`, default: `"off"`) Redacted protocol
+    tracing written to the Neovim LSP log.
+
+`statusline` ~
+    (`boolean`, default: `false`) Append the Symfony component to Neovim's
+    native statusline.
+
+`status` ~
+    (`table`) Status controller options. `poll_interval` is expressed in
+    milliseconds. `icons` replaces the ready, indexing, stale, failed and
+    installing labels.
+
+`data_dir` ~
+    (`string`) Directory containing managed server versions. The default is
+    `stdpath('data') .. '/symfony-lsp'`.
+
+`download_base_url` ~
+    (`string`) Release download base URL used by the managed installer.
+
+==============================================================================
+COMMANDS                                                    *symfony-lsp-commands*
+
+:SymfonyLspInstall[!] ~
+    Install the server version matching the plugin. Use `!` to replace an
+    existing installation.
+
+:SymfonyLspRefreshIndex ~
+    Rebuild source and runtime indexes for the active project.
+
+:SymfonyLspIndexStatus ~
+    Display source, runtime, environment and trust state for every discovered
+    project.
+
+:SymfonyLspSwitchEnvironment [environment] ~
+    Select the Symfony environment and rebuild runtime metadata. Omitting the
+    argument opens an input prompt.
+
+Neovim maps `grx` to |vim.lsp.codelens.run()|. Symfony code lenses put their
+locations in the quickfix list.
+
+==============================================================================
+STATUSLINE                                                  *symfony-lsp-statusline*
+
+`require('symfony_lsp').statusline()` returns a statusline component for the
+project containing the active buffer. It returns an empty string before a
+Symfony client or installation is active.
+
+Enable native statusline integration with `statusline = true`, or pass the
+function to a statusline plugin:
+
+>lua
+    require('lualine').setup({
+      sections = {
+        lualine_x = {
+          require('symfony_lsp').statusline,
+        },
+      },
+    })
+<
+
+==============================================================================
+HEALTH                                                          *symfony-lsp-health*
+
+Run `:checkhealth symfony_lsp` to inspect the Neovim version, current platform,
+installer commands, managed server and active client.
+
+For complete installation and troubleshooting documentation, see:
+https://github.com/symfony/lsp/blob/main/docs/editors/neovim.rst
+
+vim:tw=78:ts=8:noet:ft=help:norl:

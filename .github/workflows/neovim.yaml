@@ -1,0 +1,46 @@
+name: Neovim integration
+
+on:
+    pull_request:
+    push:
+    workflow_dispatch:
+
+jobs:
+    format:
+        name: Lua formatting
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: JohnnyMorganz/stylua-action@v5
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  version: 2.5.2
+                  args: --check lsp lua editor/neovim/tests
+
+    headless:
+        name: Neovim ${{ matrix.neovim }}
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                neovim: ['0.11.3', '0.12.4']
+        steps:
+            - uses: actions/checkout@v7
+            - uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.4'
+                  coverage: none
+            - uses: ramsey/composer-install@v4
+            - name: Build the Tree-sitter sidecar
+              run: |
+                  sidecar="$(./tools/build-tree-sitter-sidecar | tail -n 1)"
+                  echo "SYMFONY_LSP_TREE_SITTER=$sidecar" >> "$GITHUB_ENV"
+            - name: Install the compatibility application
+              working-directory: tests/Fixtures/RuntimeApplication
+              run: composer update --no-interaction --no-progress --with-all-dependencies
+            - uses: rhysd/action-setup-vim@v1
+              with:
+                  neovim: true
+                  version: v${{ matrix.neovim }}
+            - name: Run Neovim tests
+              run: ./tools/test-neovim

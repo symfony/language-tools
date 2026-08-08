@@ -14,14 +14,17 @@ final class ReleaseCommand
 {
     private const EXPECTED_RELEASE_FILES = [
         'CHANGELOG.md',
+        'docs/editors/neovim.rst',
         'docs/editors/vscode.rst',
         'docs/index.rst',
         'editor/vscode/package-lock.json',
         'editor/vscode/package.json',
+        'lua/symfony_lsp/version.lua',
     ];
     private const REGULAR_WORKFLOWS = [
         'quality.yaml',
         'compatibility.yaml',
+        'neovim.yaml',
         'vscode.yaml',
     ];
 
@@ -137,6 +140,9 @@ final class ReleaseCommand
         $this->run(['composer', 'cs-check'], $this->root);
         $this->run(['npm', 'ci'], $this->root.'/editor/vscode');
         $this->run(['npm', 'run', 'check'], $this->root.'/editor/vscode');
+        $stylua = getenv('STYLUA') ?: 'stylua';
+        $this->run([$stylua, '--check', 'lsp', 'lua', 'editor/neovim/tests'], $this->root);
+        $this->run([$this->root.'/tools/test-neovim'], $this->root);
         $this->run(['composer', 'server:benchmark'], $this->root);
         $this->run(['composer', 'tree-sitter:build-sidecar'], $this->root);
 
@@ -167,7 +173,10 @@ final class ReleaseCommand
         if (!str_contains($changelog, \sprintf('## %s (', $version)) || str_contains($changelog, '## Unreleased')) {
             throw new \RuntimeException('The changelog is not prepared for the release.');
         }
-        foreach (['docs/index.rst', 'docs/editors/vscode.rst'] as $path) {
+        if ("return '{$version}'\n" !== $this->read($this->root.'/lua/symfony_lsp/version.lua')) {
+            throw new \RuntimeException('The Neovim plugin version does not match the release.');
+        }
+        foreach (['docs/index.rst', 'docs/editors/vscode.rst', 'docs/editors/neovim.rst'] as $path) {
             if (!str_contains($this->read($this->root.'/'.$path), $version)) {
                 throw new \RuntimeException(\sprintf('%s does not reference version %s.', $path, $version));
             }
@@ -299,6 +308,11 @@ final class ReleaseCommand
                 throw new \RuntimeException(\sprintf('Required command not found: %s.', $command));
             }
         }
+        foreach ([getenv('NVIM') ?: 'nvim', getenv('STYLUA') ?: 'stylua'] as $command) {
+            if (!$this->succeeds([$command, '--version'], $this->root)) {
+                throw new \RuntimeException(\sprintf('Required command not found: %s.', $command));
+            }
+        }
     }
 
     private function assertCleanMainBranch(): void
@@ -317,6 +331,9 @@ final class ReleaseCommand
         $version = \is_array($package) ? ($package['version'] ?? null) : null;
         if (!\is_string($version)) {
             throw new \RuntimeException('The VS Code package has no version.');
+        }
+        if ("return '{$version}'\n" !== $this->read($this->root.'/lua/symfony_lsp/version.lua')) {
+            throw new \RuntimeException('The Neovim plugin and VS Code package versions differ.');
         }
 
         return $version;

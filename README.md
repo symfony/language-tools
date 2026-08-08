@@ -20,6 +20,17 @@ code --install-extension symfonycorp.symfony-lsp
 
 Add `--pre-release` to install a version with a prerelease suffix.
 
+Neovim 0.11.3 or later can install the first-party plugin and matching server
+directly from this repository:
+
+```lua
+vim.pack.add({ 'https://github.com/symfony/lsp' })
+require('symfony_lsp').setup()
+```
+
+See the [Neovim guide](docs/editors/neovim.rst) for lazy.nvim, workspace trust,
+index commands, statuslines, custom settings and troubleshooting.
+
 Standalone server archives for Linux, macOS, and Windows are available from
 [GitHub Releases](https://github.com/symfony/lsp/releases). Each archive contains
 the language server and its matching Tree-sitter sidecar.
@@ -39,8 +50,8 @@ release procedures.
 
 ## Development
 
-A source checkout requires PHP 8.4 or later, Composer 2, Node.js, npm, and a C
-build toolchain:
+A source checkout requires PHP 8.4 or later, Composer 2, Node.js, npm, Neovim
+0.11.3 or later, StyLua and a C build toolchain:
 
 ```console
 composer install
@@ -48,6 +59,8 @@ composer tree-sitter:build
 composer test
 composer phpstan
 composer cs-check
+stylua --check lsp lua editor/neovim/tests
+./tools/test-neovim
 ```
 
 ## License
