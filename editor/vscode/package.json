@@ -3,7 +3,7 @@
   "displayName": "Symfony LSP",
   "publisher": "symfonycorp",
   "description": "Symfony-aware completion, navigation and diagnostics through Symfony LSP",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "license": "MIT",
   "icon": "images/icon.png",
   "repository": {

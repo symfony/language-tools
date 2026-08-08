@@ -19,7 +19,7 @@ setup function:
 
 The first setup downloads the server and Tree-sitter sidecar for the current
 platform from the matching GitHub release. The plugin currently installs Symfony
-LSP 0.5.0. It verifies the archive against the release's ``SHA256SUMS`` before
+LSP 0.6.0. It verifies the archive against the release's ``SHA256SUMS`` before
 installing it under Neovim's data directory. Updating the plugin after a new
 server release installs that server without replacing older installations.
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 (2026-08-08)
 
 - Skip runtime refreshes for reference-only source changes and require debug mode for runtime indexing
 - Prevent JSON-RPC listener deadlocks after watched Composer file changes
