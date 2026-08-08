@@ -207,6 +207,7 @@ final class LanguageServer
     {
         async(function () use ($params): void {
             $this->workspaceConfiguration->changeWorkspaceFolders($params);
+            $this->workspaceFileWatcher->refresh();
             $this->workspaceConfiguration->refreshProjectSettings();
             $this->sourceScanner->indexAll();
             $this->workspaceConfiguration->requestWorkspaceTrust();
@@ -236,6 +237,7 @@ final class LanguageServer
 
         if ($rediscover) {
             $this->workspaceConfiguration->rediscoverProjects();
+            $this->workspaceFileWatcher->refresh();
             $this->sourceScanner->indexAll();
             $this->workspaceConfiguration->requestWorkspaceTrust();
         }
