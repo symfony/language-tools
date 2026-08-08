@@ -33,6 +33,7 @@ edits the fixture resources for every runtime metadata section:
 
 .. code-block:: terminal
 
+    $ composer tree-sitter:build-sidecar
     $ composer runtime-refresh:benchmark
 
 It waits for each save-triggered refresh, verifies the requested bridge section,

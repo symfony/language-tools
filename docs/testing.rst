@@ -152,7 +152,7 @@ cross-file features, bridge changes, parser changes and releases:
 
     $ ./tools/dogfood-symfonycorp \
         ./bin/symfony-lsp \
-        ./build/symfony-lsp-tree-sitter \
+        ./var/build/tree_sitter_cli/symfony-lsp-tree-sitter \
         ../../symfonycorp
 
 See :doc:`Dogfooding Symfony LSP </dogfooding>` for the project list, harness

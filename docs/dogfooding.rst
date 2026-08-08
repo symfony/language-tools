@@ -43,7 +43,7 @@ Run every application against the development server:
 
     $ ./tools/dogfood-symfonycorp \
         ./bin/symfony-lsp \
-        ./build/symfony-lsp-tree-sitter \
+        ./var/build/tree_sitter_cli/symfony-lsp-tree-sitter \
         ../../symfonycorp
 
 The optional final argument selects the Symfony environment. It defaults to
@@ -53,7 +53,7 @@ The optional final argument selects the Symfony environment. It defaults to
 
     $ ./tools/dogfood-symfonycorp \
         ./bin/symfony-lsp \
-        ./build/symfony-lsp-tree-sitter \
+        ./var/build/tree_sitter_cli/symfony-lsp-tree-sitter \
         ../../symfonycorp \
         test
 
@@ -71,7 +71,7 @@ Use the lower-level harness while developing a provider:
 
     $ ./tools/dogfood-server \
         ./bin/symfony-lsp \
-        ./build/symfony-lsp-tree-sitter \
+        ./var/build/tree_sitter_cli/symfony-lsp-tree-sitter \
         ../../symfonycorp/symfony.com
 
 Its optional final argument also selects the Symfony environment. The command

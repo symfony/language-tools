@@ -145,6 +145,7 @@ final class ReleaseCommand
         $this->run([$this->root.'/tools/test-neovim'], $this->root);
         $this->run(['composer', 'server:benchmark'], $this->root);
         $this->run(['composer', 'tree-sitter:build-sidecar'], $this->root);
+        $this->run(['composer', 'runtime-refresh:benchmark'], $this->root);
 
         $dogfoodRoot = realpath($this->root.'/../../symfonycorp');
         if (false === $dogfoodRoot) {
@@ -153,7 +154,7 @@ final class ReleaseCommand
         $this->run([
             $this->root.'/tools/dogfood-symfonycorp',
             $this->root.'/bin/symfony-lsp',
-            $this->root.'/build/symfony-lsp-tree-sitter',
+            $this->root.'/var/build/tree_sitter_cli/symfony-lsp-tree-sitter',
             $dogfoodRoot,
         ], $this->root);
     }
