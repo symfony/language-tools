@@ -128,8 +128,8 @@ Marketplace channel. Type the version again at the confirmation prompt. Pass
 ``--yes`` only for an intentional non-interactive invocation.
 
 Before changing release metadata, the command runs PHPUnit, PHPStan, coding
-standards, the VS Code checks, the server benchmark and all eight Symfonycorp
-applications. It then:
+standards, the VS Code and Neovim checks, the server benchmark and all eight
+Symfonycorp applications. It then:
 
 1. moves the ``Unreleased`` entries under the dated version heading;
 2. updates the VS Code package and lock file without creating an npm tag;
