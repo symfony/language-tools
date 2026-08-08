@@ -13,20 +13,15 @@ setup function:
 
 .. code-block:: lua
 
-    vim.pack.add({
-        {
-            src = 'https://github.com/symfony/lsp',
-            version = 'v0.5.0',
-        },
-    })
+    vim.pack.add({ 'https://github.com/symfony/lsp' })
 
     require('symfony_lsp').setup()
 
 The first setup downloads the server and Tree-sitter sidecar for the current
-platform from the matching GitHub release. The plugin verifies the archive
-against the release's ``SHA256SUMS`` before installing it under Neovim's data
-directory. Updating the plugin to a new release installs that release's server
-without replacing older installations.
+platform from the matching GitHub release. The plugin currently installs Symfony
+LSP 0.5.0. It verifies the archive against the release's ``SHA256SUMS`` before
+installing it under Neovim's data directory. Updating the plugin after a new
+server release installs that server without replacing older installations.
 
 Automatic installation requires ``curl`` and ``tar``. Linux also requires
 ``sha256sum``, macOS requires ``shasum`` and Windows requires ``certutil``.
@@ -42,7 +37,6 @@ Add this plugin specification when using `lazy.nvim`_:
 
     {
         'symfony/lsp',
-        version = '0.5.0',
         config = function()
             require('symfony_lsp').setup()
         end,
