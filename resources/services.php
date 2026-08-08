@@ -1,5 +1,6 @@
 <?php
 
+use Amp\Sync\LocalKeyedMutex;
 use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcPeer;
 use Microsoft\PhpParser\Parser;
@@ -58,6 +59,7 @@ use Symfony\Lsp\Runtime\RuntimeRefreshObserverInterface;
 use Symfony\Lsp\Runtime\RuntimeRefreshSchedulerInterface;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
+use Symfony\Lsp\Runtime\SerializedRuntimeInitializer;
 use Symfony\Lsp\Runtime\StatusRuntimeInitializer;
 use Symfony\Lsp\Server\LanguageServer;
 use Symfony\Lsp\Server\ServerLogger;
@@ -139,6 +141,7 @@ return static function (ContainerConfigurator $container): void {
 
     $services->set(Parser::class);
     $services->set(Filesystem::class);
+    $services->set(LocalKeyedMutex::class);
     $services->set(JsonRpcPeer::class)->synthetic()->public();
     $services->set(JsonRpcDispatcher::class)->synthetic()->public();
     $services->set(ServerLogger::class)->synthetic()->public();
@@ -160,7 +163,10 @@ return static function (ContainerConfigurator $container): void {
         ->arg('$initializer', service(ProgressRuntimeInitializer::class));
     $services->get(ObservedRuntimeInitializer::class)
         ->arg('$initializer', service(ReportingRuntimeInitializer::class));
-    $services->alias(RuntimeInitializerInterface::class, ObservedRuntimeInitializer::class);
+    $services->get(SerializedRuntimeInitializer::class)
+        ->arg('$initializer', service(ObservedRuntimeInitializer::class))
+        ->arg('$mutex', service(LocalKeyedMutex::class));
+    $services->alias(RuntimeInitializerInterface::class, SerializedRuntimeInitializer::class);
 
     $registries = [
         CompletionProviderRegistry::class => 'lsp.provider.completion',
