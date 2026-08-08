@@ -60,6 +60,21 @@ status.update(1, {
   {
     root = root .. '/project',
     environment = 'test',
+    runtimeEnabled = false,
+    trusted = true,
+    source = { state = 'ready' },
+    runtime = { state = 'idle' },
+  },
+})
+assert_same('Symfony static', status.statusline())
+assert_same(
+  root .. '/project: source ready, runtime disabled, environment test',
+  status.describe(status.current())
+)
+status.update(1, {
+  {
+    root = root .. '/project',
+    environment = 'test',
     runtimeEnabled = true,
     trusted = true,
     source = { state = 'ready' },
