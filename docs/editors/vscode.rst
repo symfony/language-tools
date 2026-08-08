@@ -168,8 +168,8 @@ Troubleshooting
 Open ``View > Output`` and select ``Symfony LSP`` to inspect extension and
 protocol messages. Startup records identify the extension and server versions,
 platform, resolved executable and Tree-sitter sidecar. An uncaught PHP failure
-is reported on a ``Symfony LSP failed:`` line with its class, source location and
-redacted message; index status polling stops when the language client is no
+is reported on a ``Symfony LSP failed:`` line with its class, source location
+and redacted message; index status polling stops when the language client is no
 longer running.
 
 If the process exits without a ``Symfony LSP failed:`` line, inspect the

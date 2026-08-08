@@ -138,11 +138,11 @@ A complete integration can touch these locations:
 * bridge section registration in ``resources/bridge.php``.
 
 After its namespace is added to the ordered feature groups, classes ending in
-``Provider``, ``Handler``, ``Extractor``, ``Indexer``, ``Registry``, ``Resolver``,
-``Loader``, ``Publisher`` or ``Parser`` are loaded as feature services.
-Implemented provider interfaces,
-``SourceIndexProviderInterface`` and ``RuntimeSnapshotLoaderInterface`` determine
-their registry tags.
+``Provider``, ``Handler``, ``Extractor``, ``Indexer``, ``Registry``,
+``Resolver``, ``Loader``, ``Publisher`` or ``Parser`` are loaded as feature
+services.
+Implemented provider interfaces, ``SourceIndexProviderInterface`` and
+``RuntimeSnapshotLoaderInterface``, determine their registry tags.
 
 Search for a similar completed feature and follow its data flow, but keep the
 new domain model independent.
