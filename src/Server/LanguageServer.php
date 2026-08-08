@@ -235,12 +235,16 @@ final class LanguageServer
             }
         }
 
-        if ($rediscover) {
+        if (!$rediscover) {
+            return;
+        }
+
+        async(function (): void {
             $this->workspaceConfiguration->rediscoverProjects();
             $this->workspaceFileWatcher->refresh();
             $this->sourceScanner->indexAll();
             $this->workspaceConfiguration->requestWorkspaceTrust();
-        }
+        })->ignore();
     }
 
     /** @param array<array-key, mixed> $params */

@@ -3,12 +3,15 @@
 namespace Symfony\Lsp\Tests\Server;
 
 use Amp\ByteStream\ReadableBuffer;
+use Amp\ByteStream\ReadableIterableStream;
 use Fabpot\JsonRpc\ContentLengthJsonRpcTransport;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Server\LanguageServerFactory;
 use Symfony\Lsp\Server\ServerVersion;
 use Symfony\Lsp\Tests\Support\CapturingWritableStream;
+
+use function Amp\delay;
 
 final class LanguageServerTest extends TestCase
 {
@@ -109,6 +112,39 @@ final class LanguageServerTest extends TestCase
             self::assertCount(1, glob($root.'/var/symfony-lsp/'.$version.'/*/bridge.php') ?: []);
         } finally {
             $this->removeDirectory($root.'/var/symfony-lsp/'.$version);
+        }
+    }
+
+    public function testWatchedComposerChangeCanCreateProgressWithoutDeadlockingListener(): void
+    {
+        $root = realpath(\dirname(__DIR__).'/Fixtures/RuntimeApplication');
+        self::assertIsString($root);
+        $frames = [
+            $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => [
+                'rootUri' => 'file://'.$root,
+                'capabilities' => ['window' => ['workDoneProgress' => true]],
+                'initializationOptions' => ['runtimeIndexing' => false],
+            ]]),
+            $this->frame(['jsonrpc' => '2.0', 'method' => 'workspace/didChangeWatchedFiles', 'params' => [
+                'changes' => [['uri' => 'file://'.$root.'/composer.json', 'type' => 2]],
+            ]]),
+            $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'result' => null]),
+            $this->frame(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'shutdown']),
+            $this->frame(['jsonrpc' => '2.0', 'method' => 'exit']),
+        ];
+        $input = new ReadableIterableStream((static function () use ($frames): \Generator {
+            foreach ($frames as $frame) {
+                yield $frame;
+                delay(0);
+            }
+        })());
+        $output = new CapturingWritableStream();
+
+        try {
+            self::assertSame(0, (new LanguageServerFactory())->create($input, $output)->run());
+            self::assertContains('window/workDoneProgress/create', array_column($this->decodeFrames($output->contents()), 'method'));
+        } finally {
+            $this->removeDirectory($root.'/var/symfony-lsp/dev');
         }
     }
 

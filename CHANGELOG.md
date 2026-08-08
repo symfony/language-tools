@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Prevent JSON-RPC listener deadlocks after watched Composer file changes
 - Add a self-installing Neovim client with status and index controls
 - Register watched workspace files through the LSP protocol
 - Rebuild containers directly for refresh plans that cannot safely reuse them
