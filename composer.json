@@ -42,6 +42,7 @@
         "tree-sitter:build-sidecar": "./tools/build-tree-sitter-sidecar",
         "tree-sitter:benchmark": "./tools/php-with-tree-sitter tools/benchmark-tree-sitter.php",
         "php-parser:benchmark": "php tools/benchmark-php-parser.php",
+        "runtime-fixture:install": "composer update --working-dir=tests/Fixtures/RuntimeApplication --no-interaction --no-progress --with-all-dependencies",
         "server:benchmark": "./tools/benchmark-server bin/symfony-lsp tests/Fixtures/RuntimeApplication",
         "runtime-refresh:benchmark": "./tools/benchmark-runtime-refresh bin/symfony-lsp tests/Fixtures/RuntimeApplication var/build/tree_sitter_cli/symfony-lsp-tree-sitter",
         "test": "./tools/php-with-tree-sitter vendor/bin/phpunit --no-progress",

@@ -7,6 +7,7 @@ and run:
 
 .. code-block:: terminal
 
+    $ composer runtime-fixture:install
     $ composer tree-sitter:build
     $ composer server:benchmark
 
@@ -33,6 +34,7 @@ edits the fixture resources for every runtime metadata section:
 
 .. code-block:: terminal
 
+    $ composer runtime-fixture:install
     $ composer tree-sitter:build-sidecar
     $ composer runtime-refresh:benchmark
 

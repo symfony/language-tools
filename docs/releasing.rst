@@ -127,9 +127,10 @@ prerelease. The suffix selects the corresponding GitHub and Visual Studio
 Marketplace channel. Type the version again at the confirmation prompt. Pass
 ``--yes`` only for an intentional non-interactive invocation.
 
-Before changing release metadata, the command runs PHPUnit, PHPStan, coding
-standards, the VS Code and Neovim checks, the server and runtime refresh
-benchmarks and all eight Symfonycorp applications. It then:
+Before changing release metadata, the command installs the runtime fixture and
+runs PHPUnit, PHPStan, coding standards, the VS Code and Neovim checks, the
+server and runtime refresh benchmarks and all eight Symfonycorp applications.
+It then:
 
 1. moves the ``Unreleased`` entries under the dated version heading;
 2. updates the VS Code package and lock file without creating an npm tag;

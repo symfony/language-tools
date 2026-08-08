@@ -143,6 +143,7 @@ final class ReleaseCommand
         $stylua = getenv('STYLUA') ?: 'stylua';
         $this->run([$stylua, '--check', 'lsp', 'lua', 'editor/neovim/tests'], $this->root);
         $this->run([$this->root.'/tools/test-neovim'], $this->root);
+        $this->run(['composer', 'runtime-fixture:install'], $this->root);
         $this->run(['composer', 'server:benchmark'], $this->root);
         $this->run(['composer', 'tree-sitter:build-sidecar'], $this->root);
         $this->run(['composer', 'runtime-refresh:benchmark'], $this->root);

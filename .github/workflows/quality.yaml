@@ -15,6 +15,8 @@ jobs:
                   php-version: '8.4'
                   coverage: none
             - uses: ramsey/composer-install@v4
+            - name: Install the runtime fixture
+              run: composer runtime-fixture:install
             - name: Build the Tree-sitter extension
               run: composer tree-sitter:build
             - name: Build the Tree-sitter sidecar
