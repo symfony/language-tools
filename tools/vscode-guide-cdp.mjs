@@ -100,6 +100,12 @@ if ('evaluate' === action) {
     await send('Input.dispatchKeyEvent', { type: 'keyUp', ...params });
 } else if ('text' === action) {
     await send('Input.insertText', { text: arguments_[0] });
+} else if ('mouse' === action) {
+    await send('Input.dispatchMouseEvent', {
+        type: 'mouseMoved',
+        x: Number(arguments_[0]),
+        y: Number(arguments_[1]),
+    });
 } else if ('close' === action) {
     const closed = new Promise((resolve) => socket.addEventListener('close', resolve, { once: true }));
     await Promise.race([send('Browser.close'), closed]);
