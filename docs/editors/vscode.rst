@@ -6,7 +6,9 @@ trust, file associations and project settings. It requires VS Code 1.91 or
 later.
 
 The screenshot-based `visual VS Code guide`_ walks through installation,
-indexing and core features with the public Symfony Demo application.
+indexing and core features with the public Symfony Demo application. The
+`visual feature catalog`_ demonstrates every supported integration and editor
+workflow.
 
 Installing the Extension
 ------------------------
@@ -189,3 +191,4 @@ Run ``composer install`` after updating server dependencies. Rebuild and
 reinstall the VSIX after updating the extension.
 
 .. _`visual VS Code guide`: ../vscode-guide/index.html
+.. _`visual feature catalog`: ../vscode-guide/features.html

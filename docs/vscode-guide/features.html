@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A complete visual catalog of Symfony LSP features in VS Code.">
+    <title>Symfony LSP Visual Feature Catalog</title>
+    <link rel="stylesheet" href="guide.css">
+</head>
+<body>
+    <a class="skip-link" href="#catalog">Skip to the feature catalog</a>
+
+    <header class="site-header">
+        <div class="topbar">
+            <a class="brand" href="../../README.md">
+                <span class="brand-mark" aria-hidden="true">Sf</span>
+                <span>Symfony LSP</span>
+            </a>
+            <nav class="topnav" aria-label="Documentation links">
+                <a href="index.html">Getting started</a>
+                <a href="../features/index.rst">Feature reference</a>
+            </nav>
+        </div>
+
+        <div class="hero">
+            <div>
+                <p class="eyebrow">Complete visual catalog</p>
+                <h1>Every Symfony feature, in your editor</h1>
+                <p class="hero-copy">
+                    See every supported integration and editor workflow through
+                    reproducible VS Code captures.
+                </p>
+                <div class="hero-actions">
+                    <a class="button button-primary" href="#workflows">Explore workflows</a>
+                    <a class="button" href="#coverage">View the coverage matrix</a>
+                </div>
+            </div>
+
+            <aside class="hero-card" aria-label="Catalog coverage">
+                <p>Visual coverage</p>
+                <ul>
+                    <li>Every supported integration</li>
+                    <li>Every principal LSP capability</li>
+                    <li>Code actions and code lenses</li>
+                    <li>Runtime and static indexing modes</li>
+                </ul>
+            </aside>
+        </div>
+    </header>
+
+    <main id="catalog" class="catalog-shell">
+        <section class="catalog-intro" aria-labelledby="catalog-intro-title">
+            <div>
+                <p class="eyebrow">Coverage definition</p>
+                <h2 id="catalog-intro-title" class="section-title">Complete without becoming a test report</h2>
+                <p>
+                    Every “Yes” in the public support matrix is represented by an
+                    integration example and a visual explanation of its editor workflow.
+                    Parser variations and defensive edge cases remain covered by automated
+                    tests and the detailed reference documentation.
+                </p>
+            </div>
+            <div class="catalog-stats" aria-label="Coverage statistics">
+                <div class="catalog-stat"><strong>13</strong><span>Integrations</span></div>
+                <div class="catalog-stat"><strong>65</strong><span>Supported combinations</span></div>
+                <div class="catalog-stat"><strong>30</strong><span>Captured states</span></div>
+            </div>
+        </section>
+
+        <section id="workflows" class="catalog-section" aria-labelledby="workflows-title">
+            <div class="catalog-section-header">
+                <p class="eyebrow">Editor workflows</p>
+                <h2 id="workflows-title" class="section-title">What each capability looks like</h2>
+                <p>
+                    The same VS Code gestures apply across routes, services, templates,
+                    translations and every other recognized Symfony value.
+                </p>
+            </div>
+
+            <div class="workflow-grid">
+                <article class="workflow-card">
+                    <a href="images/route-completion.webp"><img src="images/route-completion.webp" width="1440" height="900" alt="Route names offered in the VS Code completion menu"></a>
+                    <div class="workflow-copy"><h3>Completion</h3><p>Suggestions come from effective runtime metadata and indexed application source.</p></div>
+                </article>
+                <article class="workflow-card">
+                    <a href="images/route-hover.webp"><img src="images/route-hover.webp" width="1440" height="900" loading="lazy" alt="Detailed route metadata in a VS Code hover card"></a>
+                    <div class="workflow-copy"><h3>Hover</h3><p>Inspect framework metadata without leaving the current call site.</p></div>
+                </article>
+                <article class="workflow-card">
+                    <a href="images/definition.webp"><img src="images/definition.webp" width="1440" height="900" loading="lazy" alt="A template definition displayed in the VS Code peek view"></a>
+                    <div class="workflow-copy"><h3>Definition and Document Links</h3><p>Open declarations directly or preview a target in the inline peek view.</p></div>
+                </article>
+                <article class="workflow-card">
+                    <a href="images/references.webp"><img src="images/references.webp" width="1440" height="900" loading="lazy" alt="Route usages collected in the VS Code references peek view"></a>
+                    <div class="workflow-copy"><h3>Find All References</h3><p>Collect declarations and static usages across PHP, Twig and configuration.</p></div>
+                </article>
+                <article class="workflow-card">
+                    <a href="images/rename.webp"><img src="images/rename.webp" width="1440" height="900" loading="lazy" alt="The inline VS Code rename field on a route name"></a>
+                    <div class="workflow-copy"><h3>Rename</h3><p>Update application-owned declarations and every statically recognized reference.</p></div>
+                </article>
+                <article class="workflow-card">
+                    <a href="images/diagnostics.webp"><img src="images/diagnostics.webp" width="1440" height="900" loading="lazy" alt="A missing Symfony parameter shown in the VS Code Problems panel"></a>
+                    <div class="workflow-copy"><h3>Diagnostics</h3><p>High-confidence errors appear inline and in the standard Problems panel.</p></div>
+                </article>
+                <article class="workflow-card">
+                    <a href="images/quick-fix.webp"><img src="images/quick-fix.webp" width="1440" height="900" loading="lazy" alt="A quick fix offering to add a missing route parameter"></a>
+                    <div class="workflow-copy"><h3>Quick Fixes</h3><p>Apply safe edits for missing route parameters, templates and translations.</p></div>
+                </article>
+                <article class="workflow-card">
+                    <a href="images/code-lenses.webp"><img src="images/code-lenses.webp" width="1440" height="900" loading="lazy" alt="A Messenger handler count displayed as a code lens above a class"></a>
+                    <div class="workflow-copy"><h3>Code Lenses</h3><p>Navigate relationships for Messenger, events, Twig components, Stimulus and Doctrine.</p></div>
+                </article>
+            </div>
+        </section>
+
+        <section id="integrations" class="catalog-section" aria-labelledby="integrations-title">
+            <div class="catalog-section-header">
+                <p class="eyebrow">Integration gallery</p>
+                <h2 id="integrations-title" class="section-title">Symfony-specific intelligence</h2>
+                <p>
+                    Each card shows real data returned by Symfony LSP. Capability badges
+                    correspond exactly to the supported combinations in the matrix below.
+                </p>
+            </div>
+
+            <div class="integration-list">
+                <article id="routing" class="integration-card">
+                    <a href="images/route-completion.webp"><img src="images/route-completion.webp" width="1440" height="900" loading="lazy" alt="Effective Symfony route completion in a controller"></a>
+                    <div class="integration-copy">
+                        <h3>Routing</h3>
+                        <p>Complete route names and parameters, inspect paths and controllers, navigate declarations and keep static usages synchronized.</p>
+                        <ul class="capabilities"><li class="capability">Completion</li><li class="capability">Hover</li><li class="capability">Definition</li><li class="capability">References</li><li class="capability">Rename</li><li class="capability">Diagnostics</li><li class="capability capability-extra">Document links</li><li class="capability capability-extra">Quick fixes</li></ul>
+                        <div class="gallery-pair"><a href="images/route-hover.webp"><img src="images/route-hover.webp" width="1440" height="900" loading="lazy" alt="Route hover metadata"></a><a href="images/quick-fix.webp"><img src="images/quick-fix.webp" width="1440" height="900" loading="lazy" alt="Missing route parameter quick fix"></a></div>
+                    </div>
+                </article>
+
+                <article id="dependency-injection" class="integration-card">
+                    <a href="images/dependency-injection.webp"><img src="images/dependency-injection.webp" width="1440" height="900" loading="lazy" alt="Dependency injection service completion in YAML"></a>
+                    <div class="integration-copy"><h3>Dependency Injection</h3><p>Work with effective services, aliases, autowiring types and parameter names without exposing parameter values.</p><ul class="capabilities"><li class="capability">Completion</li><li class="capability">Hover</li><li class="capability">Definition</li><li class="capability">References</li><li class="capability">Rename</li><li class="capability">Diagnostics</li></ul></div>
+                </article>
+
+                <article id="twig" class="integration-card">
+                    <a href="images/twig-templates.webp"><img src="images/twig-templates.webp" width="1440" height="900" loading="lazy" alt="Twig template name completion in PHP"></a>
+                    <div class="integration-copy">
+                        <h3>Twig Templates, Variables and Components</h3>
+                        <p>Resolve template names, render variables, component classes, public properties and Live Component metadata.</p>
+                        <ul class="capabilities"><li class="capability">Completion</li><li class="capability">Hover</li><li class="capability">Definition</li><li class="capability">References</li><li class="capability">Diagnostics</li><li class="capability capability-extra">Document links</li><li class="capability capability-extra">Quick fixes</li><li class="capability capability-extra">Code lenses</li></ul>
+                        <div class="gallery-pair"><a href="images/twig-components.webp"><img src="images/twig-components.webp" width="1440" height="900" loading="lazy" alt="Twig component hover metadata"></a><a href="images/live-components.webp"><img src="images/live-components.webp" width="1440" height="900" loading="lazy" alt="Live Component action hover metadata"></a></div>
+                    </div>
+                </article>
+
+                <article id="translations" class="integration-card">
+                    <a href="images/translations.webp"><img src="images/translations.webp" width="1440" height="900" loading="lazy" alt="Translation message, domain and locale details in a hover"></a>
+                    <div class="integration-copy"><h3>Translations</h3><p>Complete keys, domains, locales and placeholders across PHP and Twig, then navigate or rename source messages.</p><ul class="capabilities"><li class="capability">Completion</li><li class="capability">Hover</li><li class="capability">Definition</li><li class="capability">References</li><li class="capability">Rename</li><li class="capability">Diagnostics</li><li class="capability capability-extra">Quick fixes</li></ul></div>
+                </article>
+
+                <article id="environment" class="integration-card">
+                    <a href="images/environment.webp"><img src="images/environment.webp" width="1440" height="900" loading="lazy" alt="Environment variable metadata without its value"></a>
+                    <div class="integration-copy"><h3>Environment Variables</h3><p>Complete names and processors, inspect type-safe processor chains and navigate declarations without revealing values.</p><ul class="capabilities"><li class="capability">Completion</li><li class="capability">Hover</li><li class="capability">Definition</li><li class="capability">References</li><li class="capability">Diagnostics</li></ul></div>
+                </article>
+
+                <article id="configuration" class="integration-card">
+                    <a href="images/configuration.webp"><img src="images/configuration.webp" width="1440" height="900" loading="lazy" alt="Framework bundle configuration keys offered in completion"></a>
+                    <div class="integration-copy"><h3>Bundle Configuration</h3><p>Use the selected environment's public configuration trees for keys, types, enum values, defaults and deprecations.</p><ul class="capabilities"><li class="capability">Completion</li><li class="capability">Hover</li><li class="capability">Diagnostics</li><li class="capability capability-extra">Import links</li></ul></div>
+                </article>
+
+                <article id="messenger" class="integration-card">
+                    <a href="images/messenger.webp"><img src="images/messenger.webp" width="1440" height="900" loading="lazy" alt="Messenger transport metadata in a hover"></a>
+                    <div class="integration-copy">
+                        <h3>Messenger</h3>
+                        <p>Connect buses, transports, routed messages, dispatch sites and effective handlers.</p>
+                        <ul class="capabilities"><li class="capability">Completion</li><li class="capability">Hover</li><li class="capability">Definition</li><li class="capability">References</li><li class="capability">Diagnostics</li><li class="capability capability-extra">Code lenses</li></ul>
+                        <div class="gallery-pair"><a href="images/code-lenses.webp"><img src="images/code-lenses.webp" width="1440" height="900" loading="lazy" alt="Messenger relationship code lens"></a></div>
+                    </div>
+                </article>
+
+                <article id="events" class="integration-card">
+                    <a href="images/events.webp"><img src="images/events.webp" width="1440" height="900" loading="lazy" alt="Symfony event and listener metadata in a hover"></a>
+                    <div class="integration-copy"><h3>Events and Listeners</h3><p>Move between dispatch sites, event classes, subscribers and effective listeners with ordered priority metadata.</p><ul class="capabilities"><li class="capability">Completion</li><li class="capability">Hover</li><li class="capability">Definition</li><li class="capability">References</li><li class="capability">Diagnostics</li><li class="capability capability-extra">Code lenses</li></ul></div>
+                </article>
+
+                <article id="security" class="integration-card">
+                    <a href="images/security.webp"><img src="images/security.webp" width="1440" height="900" loading="lazy" alt="Security roles offered in completion"></a>
+                    <div class="integration-copy"><h3>Security</h3><p>Understand firewalls, providers, roles, hierarchy, authenticators, voters and authorization checks.</p><ul class="capabilities"><li class="capability">Completion</li><li class="capability">Hover</li><li class="capability">Definition</li><li class="capability">References</li><li class="capability">Diagnostics</li></ul></div>
+                </article>
+
+                <article id="metadata" class="integration-card">
+                    <a href="images/form-options.webp"><img src="images/form-options.webp" width="1440" height="900" loading="lazy" alt="Symfony form options offered in completion"></a>
+                    <div class="integration-copy">
+                        <h3>Forms, Validation and Serializer Metadata</h3>
+                        <p>Complete form options, validation constraints, mapped properties and serializer groups from runtime and source metadata.</p>
+                        <ul class="capabilities"><li class="capability">Completion</li><li class="capability">Hover</li><li class="capability">Definition</li><li class="capability">References</li><li class="capability">Diagnostics</li></ul>
+                        <div class="gallery-pair"><a href="images/validation.webp"><img src="images/validation.webp" width="1440" height="900" loading="lazy" alt="Validation constraint options in completion"></a><a href="images/serializer.webp"><img src="images/serializer.webp" width="1440" height="900" loading="lazy" alt="Serializer groups in completion"></a></div>
+                    </div>
+                </article>
+
+                <article id="assets" class="integration-card">
+                    <a href="images/assets.webp"><img src="images/assets.webp" width="1440" height="900" loading="lazy" alt="AssetMapper asset metadata in a hover"></a>
+                    <div class="integration-copy"><h3>AssetMapper and Importmaps</h3><p>Resolve logical asset paths and importmap entrypoints to application or vendor source files.</p><ul class="capabilities"><li class="capability">Completion</li><li class="capability">Hover</li><li class="capability">Definition</li><li class="capability">References</li><li class="capability">Diagnostics</li><li class="capability capability-extra">Document links</li></ul></div>
+                </article>
+
+                <article id="stimulus" class="integration-card">
+                    <a href="images/stimulus.webp"><img src="images/stimulus.webp" width="1440" height="900" loading="lazy" alt="Stimulus controller action metadata in a hover"></a>
+                    <div class="integration-copy">
+                        <h3>Stimulus and Live Components</h3>
+                        <p>Connect controllers, actions, targets, values and outlets with Live Component properties, actions and events.</p>
+                        <ul class="capabilities"><li class="capability">Completion</li><li class="capability">Hover</li><li class="capability">Definition</li><li class="capability">References</li><li class="capability">Diagnostics</li><li class="capability capability-extra">Document links</li><li class="capability capability-extra">Code lenses</li></ul>
+                        <div class="gallery-pair"><a href="images/live-components.webp"><img src="images/live-components.webp" width="1440" height="900" loading="lazy" alt="Live Component action metadata"></a></div>
+                    </div>
+                </article>
+
+                <article id="doctrine" class="integration-card">
+                    <a href="images/doctrine.webp"><img src="images/doctrine.webp" width="1440" height="900" loading="lazy" alt="Doctrine mapped fields offered in repository completion"></a>
+                    <div class="integration-copy">
+                        <h3>Doctrine Entities and Repositories</h3>
+                        <p>Complete mapped fields and navigate entity, repository, association and form metadata relationships.</p>
+                        <ul class="capabilities"><li class="capability">Completion</li><li class="capability">Hover</li><li class="capability">Definition</li><li class="capability">References</li><li class="capability capability-extra">Code lenses</li></ul>
+                        <div class="gallery-pair"><a href="images/doctrine-code-lens.webp"><img src="images/doctrine-code-lens.webp" width="1440" height="900" loading="lazy" alt="Doctrine entity repository code lens"></a></div>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <section id="lifecycle" class="catalog-section" aria-labelledby="lifecycle-title">
+            <div class="catalog-section-header">
+                <p class="eyebrow">Project lifecycle</p>
+                <h2 id="lifecycle-title" class="section-title">Indexing stays visible and controllable</h2>
+                <p>Trusted runtime metadata and source-only operation use the same editor integration with an explicit status.</p>
+            </div>
+            <div class="workflow-grid">
+                <article class="workflow-card"><a href="images/project-ready.webp"><img src="images/project-ready.webp" width="1440" height="900" loading="lazy" alt="Trusted source and runtime indexes ready in the dev environment"></a><div class="workflow-copy"><h3>Runtime Ready</h3><p>The status item identifies the selected environment when both indexes are ready.</p></div></article>
+                <article class="workflow-card"><a href="images/static-mode.webp"><img src="images/static-mode.webp" width="1440" height="900" loading="lazy" alt="Symfony LSP status showing static-only mode"></a><div class="workflow-copy"><h3>Static-only Mode</h3><p>Source-backed features remain available without executing the application.</p></div></article>
+                <article class="workflow-card"><a href="images/command-palette.webp"><img src="images/command-palette.webp" width="1440" height="900" loading="lazy" alt="Symfony LSP commands in the VS Code Command Palette"></a><div class="workflow-copy"><h3>Index Commands</h3><p>Refresh, inspect status or switch environments from the Command Palette.</p></div></article>
+                <article class="workflow-card"><a href="images/switch-environment.webp"><img src="images/switch-environment.webp" width="1440" height="900" loading="lazy" alt="Prompt for selecting the Symfony runtime environment"></a><div class="workflow-copy"><h3>Environment Switching</h3><p>Select another Symfony environment and rebuild its effective runtime metadata.</p></div></article>
+            </div>
+        </section>
+
+        <section id="coverage" class="catalog-section" aria-labelledby="coverage-title">
+            <div class="catalog-section-header">
+                <p class="eyebrow">Support matrix</p>
+                <h2 id="coverage-title" class="section-title">All 65 supported combinations</h2>
+                <p>Each check links to the visual integration example that demonstrates its Symfony-specific data.</p>
+            </div>
+            <div class="coverage-wrap">
+                <table class="coverage-table">
+                    <thead><tr><th scope="col">Integration</th><th scope="col">Completion</th><th scope="col">Hover</th><th scope="col">Definition</th><th scope="col">References</th><th scope="col">Rename</th><th scope="col">Diagnostics</th></tr></thead>
+                    <tbody>
+                        <tr><td>Routing</td><td><a class="coverage-yes" href="#routing" aria-label="Routing completion supported">✓</a></td><td><a class="coverage-yes" href="#routing" aria-label="Routing hover supported">✓</a></td><td><a class="coverage-yes" href="#routing" aria-label="Routing definition supported">✓</a></td><td><a class="coverage-yes" href="#routing" aria-label="Routing references supported">✓</a></td><td><a class="coverage-yes" href="#routing" aria-label="Routing rename supported">✓</a></td><td><a class="coverage-yes" href="#routing" aria-label="Routing diagnostics supported">✓</a></td></tr>
+                        <tr><td>Dependency injection</td><td><a class="coverage-yes" href="#dependency-injection" aria-label="Dependency injection completion supported">✓</a></td><td><a class="coverage-yes" href="#dependency-injection" aria-label="Dependency injection hover supported">✓</a></td><td><a class="coverage-yes" href="#dependency-injection" aria-label="Dependency injection definition supported">✓</a></td><td><a class="coverage-yes" href="#dependency-injection" aria-label="Dependency injection references supported">✓</a></td><td><a class="coverage-yes" href="#dependency-injection" aria-label="Dependency injection rename supported">✓</a></td><td><a class="coverage-yes" href="#dependency-injection" aria-label="Dependency injection diagnostics supported">✓</a></td></tr>
+                        <tr><td>Twig template names</td><td><a class="coverage-yes" href="#twig" aria-label="Twig completion supported">✓</a></td><td><a class="coverage-yes" href="#twig" aria-label="Twig hover supported">✓</a></td><td><a class="coverage-yes" href="#twig" aria-label="Twig definition supported">✓</a></td><td><a class="coverage-yes" href="#twig" aria-label="Twig references supported">✓</a></td><td><span class="coverage-no">·</span></td><td><a class="coverage-yes" href="#twig" aria-label="Twig diagnostics supported">✓</a></td></tr>
+                        <tr><td>Translations</td><td><a class="coverage-yes" href="#translations" aria-label="Translation completion supported">✓</a></td><td><a class="coverage-yes" href="#translations" aria-label="Translation hover supported">✓</a></td><td><a class="coverage-yes" href="#translations" aria-label="Translation definition supported">✓</a></td><td><a class="coverage-yes" href="#translations" aria-label="Translation references supported">✓</a></td><td><a class="coverage-yes" href="#translations" aria-label="Translation rename supported">✓</a></td><td><a class="coverage-yes" href="#translations" aria-label="Translation diagnostics supported">✓</a></td></tr>
+                        <tr><td>Environment variables</td><td><a class="coverage-yes" href="#environment" aria-label="Environment completion supported">✓</a></td><td><a class="coverage-yes" href="#environment" aria-label="Environment hover supported">✓</a></td><td><a class="coverage-yes" href="#environment" aria-label="Environment definition supported">✓</a></td><td><a class="coverage-yes" href="#environment" aria-label="Environment references supported">✓</a></td><td><span class="coverage-no">·</span></td><td><a class="coverage-yes" href="#environment" aria-label="Environment diagnostics supported">✓</a></td></tr>
+                        <tr><td>Bundle configuration</td><td><a class="coverage-yes" href="#configuration" aria-label="Configuration completion supported">✓</a></td><td><a class="coverage-yes" href="#configuration" aria-label="Configuration hover supported">✓</a></td><td><span class="coverage-no">·</span></td><td><span class="coverage-no">·</span></td><td><span class="coverage-no">·</span></td><td><a class="coverage-yes" href="#configuration" aria-label="Configuration diagnostics supported">✓</a></td></tr>
+                        <tr><td>Messenger</td><td><a class="coverage-yes" href="#messenger" aria-label="Messenger completion supported">✓</a></td><td><a class="coverage-yes" href="#messenger" aria-label="Messenger hover supported">✓</a></td><td><a class="coverage-yes" href="#messenger" aria-label="Messenger definition supported">✓</a></td><td><a class="coverage-yes" href="#messenger" aria-label="Messenger references supported">✓</a></td><td><span class="coverage-no">·</span></td><td><a class="coverage-yes" href="#messenger" aria-label="Messenger diagnostics supported">✓</a></td></tr>
+                        <tr><td>Events</td><td><a class="coverage-yes" href="#events" aria-label="Events completion supported">✓</a></td><td><a class="coverage-yes" href="#events" aria-label="Events hover supported">✓</a></td><td><a class="coverage-yes" href="#events" aria-label="Events definition supported">✓</a></td><td><a class="coverage-yes" href="#events" aria-label="Events references supported">✓</a></td><td><span class="coverage-no">·</span></td><td><a class="coverage-yes" href="#events" aria-label="Events diagnostics supported">✓</a></td></tr>
+                        <tr><td>Security</td><td><a class="coverage-yes" href="#security" aria-label="Security completion supported">✓</a></td><td><a class="coverage-yes" href="#security" aria-label="Security hover supported">✓</a></td><td><a class="coverage-yes" href="#security" aria-label="Security definition supported">✓</a></td><td><a class="coverage-yes" href="#security" aria-label="Security references supported">✓</a></td><td><span class="coverage-no">·</span></td><td><a class="coverage-yes" href="#security" aria-label="Security diagnostics supported">✓</a></td></tr>
+                        <tr><td>Forms, validation, and serializer metadata</td><td><a class="coverage-yes" href="#metadata" aria-label="Metadata completion supported">✓</a></td><td><a class="coverage-yes" href="#metadata" aria-label="Metadata hover supported">✓</a></td><td><a class="coverage-yes" href="#metadata" aria-label="Metadata definition supported">✓</a></td><td><a class="coverage-yes" href="#metadata" aria-label="Metadata references supported">✓</a></td><td><span class="coverage-no">·</span></td><td><a class="coverage-yes" href="#metadata" aria-label="Metadata diagnostics supported">✓</a></td></tr>
+                        <tr><td>AssetMapper and importmaps</td><td><a class="coverage-yes" href="#assets" aria-label="Assets completion supported">✓</a></td><td><a class="coverage-yes" href="#assets" aria-label="Assets hover supported">✓</a></td><td><a class="coverage-yes" href="#assets" aria-label="Assets definition supported">✓</a></td><td><a class="coverage-yes" href="#assets" aria-label="Assets references supported">✓</a></td><td><span class="coverage-no">·</span></td><td><a class="coverage-yes" href="#assets" aria-label="Assets diagnostics supported">✓</a></td></tr>
+                        <tr><td>Stimulus and Live Components</td><td><a class="coverage-yes" href="#stimulus" aria-label="Stimulus completion supported">✓</a></td><td><a class="coverage-yes" href="#stimulus" aria-label="Stimulus hover supported">✓</a></td><td><a class="coverage-yes" href="#stimulus" aria-label="Stimulus definition supported">✓</a></td><td><a class="coverage-yes" href="#stimulus" aria-label="Stimulus references supported">✓</a></td><td><span class="coverage-no">·</span></td><td><a class="coverage-yes" href="#stimulus" aria-label="Stimulus diagnostics supported">✓</a></td></tr>
+                        <tr><td>Doctrine entities and repositories</td><td><a class="coverage-yes" href="#doctrine" aria-label="Doctrine completion supported">✓</a></td><td><a class="coverage-yes" href="#doctrine" aria-label="Doctrine hover supported">✓</a></td><td><a class="coverage-yes" href="#doctrine" aria-label="Doctrine definition supported">✓</a></td><td><a class="coverage-yes" href="#doctrine" aria-label="Doctrine references supported">✓</a></td><td><span class="coverage-no">·</span></td><td><span class="coverage-no">·</span></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="catalog-note">A dot marks an intentionally unsupported combination. See the feature reference for recognized syntax contexts and limitations.</p>
+        </section>
+
+        <section class="next-steps" aria-labelledby="catalog-next-title">
+            <h2 id="catalog-next-title">Start with the guided walkthrough</h2>
+            <p>Install the extension and reproduce the routing examples with the public Symfony Demo application.</p>
+            <div class="next-links"><a href="index.html">Open the Getting Started guide</a><a href="../features/index.rst">Read the complete reference</a></div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <p>Symfony LSP · Complete visual feature catalog</p>
+            <div class="footer-links"><a href="index.html">Getting started</a><a href="https://github.com/symfony/lsp">Source</a><a href="../features/index.rst">Feature reference</a></div>
+        </div>
+    </footer>
+</body>
+</html>

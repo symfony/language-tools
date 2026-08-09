@@ -36,7 +36,7 @@ require_command() {
     fi
 }
 
-for command in "$code_command" composer curl git magick node; do
+for command in "$code_command" composer curl git magick node php tar; do
     require_command "$command"
 done
 if ! node -e 'process.exit("function" === typeof WebSocket ? 0 : 1)'; then
@@ -206,27 +206,151 @@ node "$cdp" "$demo_port" screenshot "$raw/project-ready.png"
 
 case "$(uname -s)" in
     Darwin)
-        word_select_modifiers=9
         palette_modifiers=12
         ;;
     *)
-        word_select_modifiers=10
         palette_modifiers=10
         ;;
 esac
 
-open_location "$demo_profile" "$demo_extensions" "$controller:$route_line:$route_close_column"
-sleep 1
-node "$cdp" "$demo_port" key "$word_select_modifiers" ArrowLeft ArrowLeft 37
-node "$cdp" "$demo_port" text 'blog_'
-sleep 1
-completion_visible=$(node "$cdp" "$demo_port" evaluate 'Array.from(document.querySelectorAll(".suggest-widget.visible .monaco-list-row")).some((element) => element.innerText.includes("blog_index"))')
+location_after() {
+    php -r '$text = file_get_contents($argv[1]); $offset = strpos($text, $argv[2]); if (false === $offset) { fwrite(STDERR, "Needle not found: ".$argv[2]."\n"); exit(1); } $offset += strlen($argv[2]); $before = substr($text, 0, $offset); $line = substr_count($before, "\n") + 1; $last = strrpos($before, "\n"); $column = strlen(false === $last ? $before : substr($before, $last + 1)) + 1; echo $line.":".$column;' "$1" "$2"
+}
+
+location_inside() {
+    php -r '$text = file_get_contents($argv[1]); $lineOffset = strpos($text, $argv[2]); $symbolOffset = strpos($argv[2], $argv[3]); if (false === $lineOffset || false === $symbolOffset) { fwrite(STDERR, "Symbol not found: ".$argv[3]."\n"); exit(1); } $offset = $lineOffset + $symbolOffset + intdiv(strlen($argv[3]), 2); $before = substr($text, 0, $offset); $line = substr_count($before, "\n") + 1; $last = strrpos($before, "\n"); $column = strlen(false === $last ? $before : substr($before, $last + 1)) + 1; echo $line.":".$column;' "$1" "$2" "$3"
+}
+
+json_string() {
+    node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$1"
+}
+
+close_active_editor() {
+    node "$cdp" "$1" evaluate 'document.querySelector(".tab.active a[aria-label^=Close]")?.click(); true' >/dev/null
+    sleep 1
+}
+
+capture_completion() {
+    local port="$1" profile="$2" extensions="$3" name="$4" file="$5" needle="$6" expected="$7"
+    local location expected_json
+    location=$(location_after "$file" "$needle")
+    expected_json=$(json_string "$expected")
+    open_location "$profile" "$extensions" "$file:$location"
+    sleep 1
+    local completion_visible
+    completion_visible=$(node "$cdp" "$port" evaluate "Array.from(document.querySelectorAll('.suggest-widget.visible .monaco-list-row')).some((element) => element.textContent.includes($expected_json))")
+    if [[ "$completion_visible" != true ]]; then
+        node "$cdp" "$port" key 2 ' ' Space 32
+    fi
+    node "$cdp" "$port" wait-screenshot "Array.from(document.querySelectorAll('.suggest-widget.visible .monaco-list-row')).some((element) => element.textContent.includes($expected_json))" "$raw/$name.png" 30
+    node "$cdp" "$port" key 0 Escape Escape 27
+    close_active_editor "$port"
+}
+
+capture_hover() {
+    local port="$1" profile="$2" extensions="$3" name="$4" file="$5" line_needle="$6" symbol="$7" expected="$8"
+    local location expected_json
+    location=$(location_inside "$file" "$line_needle" "$symbol")
+    expected_json=$(json_string "$expected")
+    open_location "$profile" "$extensions" "$file:$location"
+    sleep 1
+    node "$cdp" "$port" key "$palette_modifiers" P KeyP 80
+    sleep 1
+    node "$cdp" "$port" text 'Show or Focus Hover'
+    sleep 1
+    node "$cdp" "$port" key 0 Enter Enter 13
+    node "$cdp" "$port" wait-screenshot "Array.from(document.querySelectorAll('.monaco-hover:not(.hidden)')).some((element) => element.textContent.includes($expected_json))" "$raw/$name.png" 30
+    node "$cdp" "$port" key 0 Escape Escape 27
+    close_active_editor "$port"
+}
+
+capture_code_lens() {
+    local port="$1" profile="$2" extensions="$3" name="$4" file="$5" expected="$6"
+    local expected_json
+    expected_json=$(json_string "$expected")
+    open_location "$profile" "$extensions" "$file:1:1"
+    node "$cdp" "$port" wait-screenshot "document.body.innerText.includes($expected_json)" "$raw/$name.png" 30
+    close_active_editor "$port"
+}
+
+capture_diagnostics() {
+    local port="$1" profile="$2" extensions="$3" name="$4" file="$5" expected="$6"
+    local expected_json
+    expected_json=$(json_string "$expected")
+    open_location "$profile" "$extensions" "$file:1:1"
+    node "$cdp" "$port" wait 'Array.from(document.querySelectorAll("a[aria-label^=Errors]")).some((element) => !element.getAttribute("aria-label").includes("No Problems"))' 30
+    node "$cdp" "$port" evaluate 'document.querySelector("a[aria-label^=Errors]")?.click(); true' >/dev/null
+    node "$cdp" "$port" wait-screenshot "document.body.innerText.includes('PROBLEMS') && document.body.innerText.includes($expected_json)" "$raw/$name.png" 30
+    node "$cdp" "$port" evaluate 'document.querySelector("a[aria-label^=\"Hide Panel\"]")?.click(); true' >/dev/null
+    close_active_editor "$port"
+}
+
+capture_quick_fix() {
+    local port="$1" profile="$2" extensions="$3" name="$4" file="$5" line_needle="$6" symbol="$7" expected="$8"
+    local location expected_json
+    location=$(location_inside "$file" "$line_needle" "$symbol")
+    expected_json=$(json_string "$expected")
+    open_location "$profile" "$extensions" "$file:$location"
+    node "$cdp" "$port" wait 'Array.from(document.querySelectorAll("a[aria-label^=Errors]")).some((element) => !element.getAttribute("aria-label").includes("No Problems"))' 30
+    node "$cdp" "$port" key "$palette_modifiers" P KeyP 80
+    sleep 1
+    node "$cdp" "$port" text 'Quick Fix...'
+    sleep 1
+    node "$cdp" "$port" key 0 Enter Enter 13
+    node "$cdp" "$port" wait-screenshot "document.body.innerText.includes($expected_json)" "$raw/$name.png" 30
+    node "$cdp" "$port" key 0 Escape Escape 27
+    close_active_editor "$port"
+}
+
+capture_references() {
+    local port="$1" profile="$2" extensions="$3" name="$4" file="$5" line_needle="$6" symbol="$7" expected="$8"
+    local location expected_json
+    location=$(location_inside "$file" "$line_needle" "$symbol")
+    expected_json=$(json_string "$expected")
+    open_location "$profile" "$extensions" "$file:$location"
+    node "$cdp" "$port" key 8 F12 F12 123
+    node "$cdp" "$port" wait-screenshot "document.querySelector('.peekview-widget') && document.body.innerText.includes($expected_json)" "$raw/$name.png" 30
+    node "$cdp" "$port" key 0 Escape Escape 27
+    close_active_editor "$port"
+}
+
+capture_rename() {
+    local port="$1" profile="$2" extensions="$3" name="$4" file="$5" line_needle="$6" symbol="$7"
+    local location
+    location=$(location_inside "$file" "$line_needle" "$symbol")
+    open_location "$profile" "$extensions" "$file:$location"
+    node "$cdp" "$port" key 0 F2 F2 113
+    node "$cdp" "$port" wait-screenshot 'Array.from(document.querySelectorAll("input")).some((element) => "fixture_home" === element.value)' "$raw/$name.png" 30
+    node "$cdp" "$port" key 0 Escape Escape 27
+    close_active_editor "$port"
+}
+
+capture_peek_definition() {
+    local port="$1" profile="$2" extensions="$3" name="$4" file="$5" line_needle="$6" symbol="$7" expected="$8"
+    local location expected_json
+    location=$(location_inside "$file" "$line_needle" "$symbol")
+    expected_json=$(json_string "$expected")
+    open_location "$profile" "$extensions" "$file:$location"
+    node "$cdp" "$port" key 1 F12 F12 123
+    node "$cdp" "$port" wait-screenshot "document.querySelector('.peekview-widget') && document.body.innerText.includes($expected_json)" "$raw/$name.png" 30
+    node "$cdp" "$port" key 0 Escape Escape 27
+    close_active_editor "$port"
+}
+
+close_active_editor "$demo_port"
+php -r '$path = $argv[1]; $contents = file_get_contents($path); $quote = chr(39); $contents = str_replace("redirectToRoute(".$quote."blog_index".$quote.")", "redirectToRoute(".$quote."blog_".$quote.")", $contents, $count); if (1 !== $count) { fwrite(STDERR, "Unable to prepare the route completion example.\n"); exit(1); } file_put_contents($path, $contents);' "$controller"
+route_completion_location=$(location_after "$controller" "redirectToRoute('blog_")
+open_location "$demo_profile" "$demo_extensions" "$controller:$route_completion_location"
+node "$cdp" "$demo_port" wait 'Array.from(document.querySelectorAll(".view-line")).some((element) => element.innerText.includes("redirectToRoute(\u0027blog_\u0027)"))' 15
+completion_visible=$(node "$cdp" "$demo_port" evaluate 'Array.from(document.querySelectorAll(".suggest-widget.visible .monaco-list-row")).some((element) => element.textContent.includes("blog_index"))')
 if [[ "$completion_visible" != true ]]; then
     node "$cdp" "$demo_port" key 2 ' ' Space 32
 fi
-node "$cdp" "$demo_port" wait-screenshot 'Array.from(document.querySelectorAll(".suggest-widget.visible .monaco-list-row")).some((element) => element.innerText.includes("blog_index"))' "$raw/route-completion.png" 30
-node "$cdp" "$demo_port" key 0 Enter Enter 13
-node "$cdp" "$demo_port" wait 'Array.from(document.querySelectorAll(".view-line")).some((element) => element.innerText.includes("redirectToRoute(\u0027blog_index\u0027)"))' 15
+node "$cdp" "$demo_port" wait-screenshot 'Array.from(document.querySelectorAll(".suggest-widget.visible .monaco-list-row")).some((element) => element.textContent.includes("blog_index"))' "$raw/route-completion.png" 30
+node "$cdp" "$demo_port" key 0 Escape Escape 27
+close_active_editor "$demo_port"
+git -C "$demo" restore src/Controller/SecurityController.php
+sleep 2
 
 open_location "$demo_profile" "$demo_extensions" "$controller:$route_line:$route_hover_column"
 sleep 1
@@ -235,19 +359,112 @@ sleep 1
 node "$cdp" "$demo_port" text 'Show or Focus Hover'
 sleep 1
 node "$cdp" "$demo_port" key 0 Enter Enter 13
-node "$cdp" "$demo_port" wait-screenshot 'Array.from(document.querySelectorAll(".monaco-hover:not(.hidden)")).some((element) => element.innerText.includes("App\\Controller\\BlogController::index"))' "$raw/route-hover.png" 30
+node "$cdp" "$demo_port" wait-screenshot 'Array.from(document.querySelectorAll(".monaco-hover:not(.hidden)")).some((element) => element.textContent.includes("App\\Controller\\BlogController::index"))' "$raw/route-hover.png" 30
 
 node "$cdp" "$demo_port" key 0 Escape Escape 27
 node "$cdp" "$demo_port" key "$palette_modifiers" P KeyP 80
 sleep 1
 node "$cdp" "$demo_port" text 'Symfony LSP:'
 node "$cdp" "$demo_port" wait-screenshot 'document.body.innerText.includes("Symfony LSP: Refresh Index") && document.body.innerText.includes("Symfony LSP: Switch Environment")' "$raw/command-palette.png" 15
+node "$cdp" "$demo_port" key 0 Escape Escape 27
 
-for name in install-extension project-ready route-completion route-hover command-palette; do
-    magick "$raw/$name.png" -strip -resize '1440x>' -quality 84 "$rendered/$name.webp"
+mkdir -p "$demo/.visual-guide" "$demo/src/VisualGuide"
+cp "$root/docs/vscode-guide/scenarios/demo/form.php" "$demo/.visual-guide/form.php"
+cp "$root/docs/vscode-guide/scenarios/demo/validation.php" "$demo/.visual-guide/validation.php"
+cp "$root/docs/vscode-guide/scenarios/demo/serializer.php" "$demo/.visual-guide/serializer.php"
+cp "$root/docs/vscode-guide/scenarios/demo/serializer-groups.php" "$demo/src/VisualGuide/SerializerGroups.php"
+node "$cdp" "$demo_port" key "$palette_modifiers" P KeyP 80
+sleep 1
+node "$cdp" "$demo_port" text 'Symfony LSP: Refresh Index'
+sleep 1
+node "$cdp" "$demo_port" key 0 Enter Enter 13
+sleep 2
+node "$cdp" "$demo_port" wait 'Array.from(document.querySelectorAll(".statusbar-item")).some((element) => element.getAttribute("aria-label")?.includes("source ready, runtime ready"))' 120
+
+capture_completion "$demo_port" "$demo_profile" "$demo_extensions" form-options "$demo/.visual-guide/form.php" "['req" required
+capture_completion "$demo_port" "$demo_profile" "$demo_extensions" validation "$demo/.visual-guide/validation.php" 'Length(ma' max
+capture_completion "$demo_port" "$demo_profile" "$demo_extensions" serializer "$demo/.visual-guide/serializer.php" "['ad" admin
+node "$cdp" "$demo_port" close >/dev/null
+
+lab="$state/runtime-application"
+lab_profile="$state/lab-profile"
+mkdir -p "$lab" "$lab_profile/User"
+git archive HEAD tests/Fixtures/RuntimeApplication | tar -x -C "$lab" --strip-components=3
+mkdir -p "$lab/.visual-guide"
+cp "$root"/docs/vscode-guide/scenarios/runtime/* "$lab/.visual-guide/"
+printf '%s\n' '' 'fixture_article:' '    path: /fixture/{slug}' '    controller: App\\Controller\\HomeController' '    methods: [GET]' >>"$lab/config/routes.yaml"
+printf '%s\n' '{"extensions.ignoreRecommendations": true, "git.openRepositoryInParentFolders": "never", "symfonyLsp.translationDiagnostics": true}' >"$lab_profile/User/settings.json"
+composer install --working-dir="$lab" --no-interaction --no-progress --prefer-dist
+php "$lab/bin/console" cache:clear --env=dev >/dev/null
+
+lab_port=$(available_port)
+while [[ "$lab_port" == "$install_port" || "$lab_port" == "$demo_port" ]]; do
+    lab_port=$(available_port)
+done
+ports+=("$lab_port")
+"$code_command" \
+    --user-data-dir "$lab_profile" \
+    --extensions-dir "$demo_extensions" \
+    --remote-debugging-port="$lab_port" \
+    --new-window \
+    "$lab" \
+    -g "$lab/.visual-guide/dependency-injection.yaml:1:1" \
+    >"$state/lab-vscode.log" 2>&1 &
+launchers+=("$!")
+wait_for_cdp "$lab_port"
+node "$cdp" "$lab_port" wait 'document.title.includes("dependency-injection.yaml")' 45
+node "$cdp" "$lab_port" evaluate "$clean_ui" >/dev/null
+sleep 2
+node "$cdp" "$lab_port" evaluate "$clean_ui" >/dev/null
+node "$cdp" "$lab_port" wait 'Array.from(document.querySelectorAll(".statusbar-item")).some((element) => element.getAttribute("aria-label")?.includes("source ready, runtime ready"))' 120
+
+capture_completion "$lab_port" "$lab_profile" "$demo_extensions" dependency-injection "$lab/.visual-guide/dependency-injection.yaml" '@app.fixture_contr' app.fixture_controller
+capture_completion "$lab_port" "$lab_profile" "$demo_extensions" twig-templates "$lab/.visual-guide/templates.php" "fixture.html.t" fixture.html.twig
+capture_hover "$lab_port" "$lab_profile" "$demo_extensions" translations "$lab/.visual-guide/translations.php" "trans('fixture.message')" fixture.message 'Fixture translation'
+capture_hover "$lab_port" "$lab_profile" "$demo_extensions" environment "$lab/.visual-guide/environment.yaml" 'fixture_upper:APP_SECRET' APP_SECRET 'Expected type'
+capture_completion "$lab_port" "$lab_profile" "$demo_extensions" configuration "$lab/.visual-guide/configuration.yaml" '    rout' router
+capture_hover "$lab_port" "$lab_profile" "$demo_extensions" messenger "$lab/config/packages/framework.yaml" 'App\Message\Ping: async' async 'Messenger transport'
+capture_code_lens "$lab_port" "$lab_profile" "$demo_extensions" code-lenses "$lab/src/Message/Ping.php" '1 Messenger handler'
+capture_hover "$lab_port" "$lab_profile" "$demo_extensions" events "$lab/src/Event/OrderPlacedDispatcher.php" 'dispatch(new OrderPlaced())' OrderPlaced 'NotifyCustomer::onOrderPlaced'
+capture_completion "$lab_port" "$lab_profile" "$demo_extensions" security "$lab/.visual-guide/security.php" "IsGranted('ROLE_A" ROLE_ADMIN
+capture_hover "$lab_port" "$lab_profile" "$demo_extensions" assets "$lab/.visual-guide/assets.html.twig" "asset('app.js')" app.js 'AssetMapper asset'
+capture_hover "$lab_port" "$lab_profile" "$demo_extensions" stimulus "$lab/.visual-guide/stimulus.html.twig" 'click->search#open' open 'Stimulus action'
+capture_hover "$lab_port" "$lab_profile" "$demo_extensions" live-components "$lab/.visual-guide/twig-component.html.twig" 'data-live-action-param="submit"' submit 'Live action'
+capture_completion "$lab_port" "$lab_profile" "$demo_extensions" doctrine "$lab/.visual-guide/doctrine.php" "findBy(['na" name
+capture_code_lens "$lab_port" "$lab_profile" "$demo_extensions" doctrine-code-lens "$lab/src/Entity/Product.php" 'Repository:'
+capture_hover "$lab_port" "$lab_profile" "$demo_extensions" twig-components "$lab/.visual-guide/twig-component.html.twig" '<twig:Search' Search 'Properties:'
+capture_diagnostics "$lab_port" "$lab_profile" "$demo_extensions" diagnostics "$lab/.visual-guide/diagnostics.yaml" missing.parameter
+capture_quick_fix "$lab_port" "$lab_profile" "$demo_extensions" quick-fix "$lab/.visual-guide/route-actions.php" "generateUrl('fixture_article')" fixture_article 'Add missing route parameter'
+capture_references "$lab_port" "$lab_profile" "$demo_extensions" references "$lab/.visual-guide/references.php" "generateUrl('fixture_home')" fixture_home routes.yaml
+capture_rename "$lab_port" "$lab_profile" "$demo_extensions" rename "$lab/.visual-guide/references.php" "generateUrl('fixture_home')" fixture_home
+capture_peek_definition "$lab_port" "$lab_profile" "$demo_extensions" definition "$lab/.visual-guide/templates.php" "render('fixture.html.twig')" fixture.html.twig fixture.message
+
+open_location "$lab_profile" "$demo_extensions" "$lab/src/Controller/HomeController.php:1:1"
+node "$cdp" "$lab_port" key "$palette_modifiers" P KeyP 80
+sleep 1
+node "$cdp" "$lab_port" text 'Symfony LSP: Switch Environment'
+sleep 1
+node "$cdp" "$lab_port" key 0 Enter Enter 13
+node "$cdp" "$lab_port" wait-screenshot 'document.querySelector(".quick-input-widget") && document.body.innerText.includes("Symfony environment used for runtime indexing")' "$raw/switch-environment.png" 30
+node "$cdp" "$lab_port" key 0 Escape Escape 27
+
+printf '%s\n' '{"extensions.ignoreRecommendations": true, "git.openRepositoryInParentFolders": "never", "symfonyLsp.runtimeIndexing": false}' >"$lab_profile/User/settings.json"
+node "$cdp" "$lab_port" key "$palette_modifiers" P KeyP 80
+sleep 1
+node "$cdp" "$lab_port" text 'Developer: Reload Window'
+sleep 1
+node "$cdp" "$lab_port" key 0 Enter Enter 13
+sleep 5
+node "$cdp" "$lab_port" wait 'Array.from(document.querySelectorAll(".statusbar-item")).some((element) => element.innerText.includes("Symfony: static"))' 120
+node "$cdp" "$lab_port" screenshot "$raw/static-mode.png"
+
+for source in "$raw"/*.png; do
+    name=$(basename "$source" .png)
+    magick "$source" -strip -resize '1440x>' -quality 84 "$rendered/$name.webp"
     install -m 0644 "$rendered/$name.webp" "$images/$name.webp"
 done
 
+node "$root/tools/check-vscode-guide.mjs"
 printf '\nUpdated screenshots:\n'
 magick identify "$images"/*.webp
 printf '\nEvery isolated VS Code window will now be closed.\n'
