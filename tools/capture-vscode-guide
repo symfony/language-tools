@@ -1,0 +1,253 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cdp="$root/tools/vscode-guide-cdp.mjs"
+images="$root/docs/vscode-guide/images"
+code_command="${CODE:-code}"
+demo_repository="${SYMFONY_DEMO_REPOSITORY:-https://github.com/symfony/demo.git}"
+demo_revision="${SYMFONY_DEMO_REVISION:-HEAD}"
+extension='symfonycorp.symfony-lsp'
+keep_state="${KEEP_VSCODE_GUIDE_STATE:-0}"
+
+if [[ "${1:-}" == --help ]]; then
+    printf '%s\n' \
+        'Usage: tools/capture-vscode-guide' \
+        '' \
+        'Rebuild the VS Code screenshots under docs/vscode-guide/images/.' \
+        'The script uses isolated VS Code profiles and closes every window it opens.' \
+        '' \
+        'Environment variables:' \
+        '  CODE                           VS Code command, defaults to code' \
+        '  SYMFONY_DEMO_REPOSITORY        Demo Git repository' \
+        '  SYMFONY_DEMO_REVISION          Demo branch, tag or revision' \
+        '  KEEP_VSCODE_GUIDE_STATE=1      Keep temporary files for debugging'
+    exit 0
+fi
+if [[ $# -ne 0 ]]; then
+    echo 'Usage: tools/capture-vscode-guide' >&2
+    exit 2
+fi
+
+require_command() {
+    if ! command -v "$1" >/dev/null 2>&1; then
+        echo "Required command not found: $1" >&2
+        exit 1
+    fi
+}
+
+for command in "$code_command" composer curl git magick node; do
+    require_command "$command"
+done
+if ! node -e 'process.exit("function" === typeof WebSocket ? 0 : 1)'; then
+    echo 'Node.js with the global WebSocket API is required.' >&2
+    exit 1
+fi
+
+mkdir -p "$root/var"
+state=$(mktemp -d "$root/var/vscode-guide-capture.XXXXXX")
+demo="$state/symfony-demo"
+raw="$state/raw"
+rendered="$state/rendered"
+install_profile="$state/install-profile"
+install_extensions="$state/install-extensions"
+demo_profile="$state/demo-profile"
+demo_extensions="$state/demo-extensions"
+mkdir -p "$raw" "$rendered" "$install_profile" "$install_extensions" "$demo_profile/User" "$demo_extensions"
+printf '%s\n' '{"extensions.ignoreRecommendations": true}' >"$demo_profile/User/settings.json"
+
+ports=()
+launchers=()
+
+close_vscode() {
+    local port
+    set +e
+    for port in "${ports[@]}"; do
+        if curl -fsS --max-time 1 "http://127.0.0.1:$port/json/version" >/dev/null 2>&1; then
+            node "$cdp" "$port" close >/dev/null 2>&1
+        fi
+    done
+    local deadline=$((SECONDS + 10))
+    for port in "${ports[@]}"; do
+        while curl -fsS --max-time 1 "http://127.0.0.1:$port/json/version" >/dev/null 2>&1 && ((SECONDS < deadline)); do
+            sleep 1
+        done
+    done
+    local launcher
+    for launcher in "${launchers[@]}"; do
+        if kill -0 "$launcher" >/dev/null 2>&1; then
+            kill "$launcher" >/dev/null 2>&1
+        fi
+    done
+    if [[ "$keep_state" == 1 ]]; then
+        echo "Temporary state kept at $state"
+    else
+        local attempt
+        for attempt in 1 2 3 4 5; do
+            rm -rf "$state"
+            [[ ! -e "$state" ]] && break
+            sleep 1
+        done
+    fi
+}
+trap close_vscode EXIT INT TERM
+
+available_port() {
+    node -e 'const net = require("node:net"); const server = net.createServer(); server.listen(0, "127.0.0.1", () => { console.log(server.address().port); server.close(); });'
+}
+
+wait_for_cdp() {
+    local port="$1"
+    local deadline=$((SECONDS + 45))
+    until curl -fsS --max-time 1 "http://127.0.0.1:$port/json/version" >/dev/null 2>&1; do
+        if ((SECONDS >= deadline)); then
+            echo "VS Code did not open its debugging endpoint on port $port." >&2
+            return 1
+        fi
+        sleep 1
+    done
+}
+
+open_location() {
+    local profile="$1"
+    local extensions="$2"
+    local path="$3"
+    "$code_command" --user-data-dir "$profile" --extensions-dir "$extensions" --reuse-window -g "$path"
+}
+
+clean_ui='(() => {
+    document.querySelector("button.onboarding-a-close-btn")?.click();
+    const trust = Array.from(document.querySelectorAll("button")).find((button) => button.innerText.includes("Yes, I trust the authors"));
+    trust?.click();
+    const secondary = document.querySelector("a[aria-label^=\"Toggle Secondary Side Bar\"]");
+    if (secondary?.classList.contains("checked")) secondary.click();
+    document.querySelector("a[aria-label^=\"Clear Notification\"]")?.click();
+    return true;
+})()'
+
+install_port=$(available_port)
+ports+=("$install_port")
+"$code_command" \
+    --user-data-dir "$install_profile" \
+    --extensions-dir "$install_extensions" \
+    --remote-debugging-port="$install_port" \
+    --new-window \
+    --open-url "vscode:extension/$extension" \
+    >"$state/install-vscode.log" 2>&1 &
+launchers+=("$!")
+wait_for_cdp "$install_port"
+sleep 5
+node "$cdp" "$install_port" wait 'document.title.includes("Extension: Symfony LSP") && document.body.innerText.includes("symfonycorp.symfony-lsp") && document.body.innerText.includes("Install")' 45
+node "$cdp" "$install_port" evaluate "$clean_ui" >/dev/null
+sleep 1
+node "$cdp" "$install_port" evaluate "$clean_ui" >/dev/null
+node "$cdp" "$install_port" screenshot "$raw/install-extension.png"
+node "$cdp" "$install_port" close >/dev/null
+
+printf 'Cloning Symfony Demo...\n'
+git clone --depth 1 "$demo_repository" "$demo"
+if [[ "$demo_revision" != HEAD ]]; then
+    git -C "$demo" fetch --depth 1 origin "$demo_revision"
+    git -C "$demo" checkout --detach FETCH_HEAD
+fi
+composer install --working-dir="$demo" --no-interaction --no-progress --prefer-dist
+if git -C "$demo" ls-files --error-unmatch .env.local.demo >/dev/null 2>&1; then
+    git -C "$demo" restore .env.local.demo
+fi
+printf '/config/reference.php\n' >>"$demo/.git/info/exclude"
+"$demo/bin/console" about --env=dev >/dev/null
+
+controller="$demo/src/Controller/SecurityController.php"
+route_name='blog_index'
+route_match=$(grep -nF "redirectToRoute('$route_name')" "$controller" | head -n 1 || true)
+ready_match=$(grep -nF "generateUrl('admin_index')" "$controller" | head -n 1 || true)
+if [[ -z "$route_match" || -z "$ready_match" ]]; then
+    echo 'Symfony Demo no longer contains the expected SecurityController examples.' >&2
+    exit 1
+fi
+route_line=${route_match%%:*}
+route_source=${route_match#*:}
+route_prefix=${route_source%%$route_name*}
+route_close_column=$((${#route_prefix} + ${#route_name} + 1))
+route_hover_column=$((route_close_column - 5))
+ready_line=${ready_match%%:*}
+ready_source=${ready_match#*:}
+ready_prefix=${ready_source%%admin_index*}
+ready_column=$((${#ready_prefix} + 5))
+
+"$code_command" \
+    --user-data-dir "$demo_profile" \
+    --extensions-dir "$demo_extensions" \
+    --install-extension "$extension" \
+    --force
+
+demo_port=$(available_port)
+while [[ "$demo_port" == "$install_port" ]]; do
+    demo_port=$(available_port)
+done
+ports+=("$demo_port")
+"$code_command" \
+    --user-data-dir "$demo_profile" \
+    --extensions-dir "$demo_extensions" \
+    --remote-debugging-port="$demo_port" \
+    --new-window \
+    "$demo" \
+    -g "$controller:$ready_line:$ready_column" \
+    >"$state/demo-vscode.log" 2>&1 &
+launchers+=("$!")
+wait_for_cdp "$demo_port"
+node "$cdp" "$demo_port" wait 'document.title.includes("symfony-demo")' 45
+node "$cdp" "$demo_port" evaluate "$clean_ui" >/dev/null
+sleep 2
+node "$cdp" "$demo_port" evaluate "$clean_ui" >/dev/null
+node "$cdp" "$demo_port" wait 'Array.from(document.querySelectorAll(".statusbar-item")).some((element) => element.getAttribute("aria-label")?.includes("source ready, runtime ready"))' 120
+node "$cdp" "$demo_port" evaluate "$clean_ui" >/dev/null
+node "$cdp" "$demo_port" screenshot "$raw/project-ready.png"
+
+case "$(uname -s)" in
+    Darwin)
+        word_select_modifiers=9
+        palette_modifiers=12
+        ;;
+    *)
+        word_select_modifiers=10
+        palette_modifiers=10
+        ;;
+esac
+
+open_location "$demo_profile" "$demo_extensions" "$controller:$route_line:$route_close_column"
+sleep 1
+node "$cdp" "$demo_port" key "$word_select_modifiers" ArrowLeft ArrowLeft 37
+node "$cdp" "$demo_port" text 'blog_'
+sleep 1
+completion_visible=$(node "$cdp" "$demo_port" evaluate 'Array.from(document.querySelectorAll(".suggest-widget.visible .monaco-list-row")).some((element) => element.innerText.includes("blog_index"))')
+if [[ "$completion_visible" != true ]]; then
+    node "$cdp" "$demo_port" key 2 ' ' Space 32
+fi
+node "$cdp" "$demo_port" wait-screenshot 'Array.from(document.querySelectorAll(".suggest-widget.visible .monaco-list-row")).some((element) => element.innerText.includes("blog_index"))' "$raw/route-completion.png" 30
+node "$cdp" "$demo_port" key 0 Enter Enter 13
+node "$cdp" "$demo_port" wait 'Array.from(document.querySelectorAll(".view-line")).some((element) => element.innerText.includes("redirectToRoute(\u0027blog_index\u0027)"))' 15
+
+open_location "$demo_profile" "$demo_extensions" "$controller:$route_line:$route_hover_column"
+sleep 1
+node "$cdp" "$demo_port" key "$palette_modifiers" P KeyP 80
+sleep 1
+node "$cdp" "$demo_port" text 'Show or Focus Hover'
+sleep 1
+node "$cdp" "$demo_port" key 0 Enter Enter 13
+node "$cdp" "$demo_port" wait-screenshot 'Array.from(document.querySelectorAll(".monaco-hover:not(.hidden)")).some((element) => element.innerText.includes("App\\Controller\\BlogController::index"))' "$raw/route-hover.png" 30
+
+node "$cdp" "$demo_port" key 0 Escape Escape 27
+node "$cdp" "$demo_port" key "$palette_modifiers" P KeyP 80
+sleep 1
+node "$cdp" "$demo_port" text 'Symfony LSP:'
+node "$cdp" "$demo_port" wait-screenshot 'document.body.innerText.includes("Symfony LSP: Refresh Index") && document.body.innerText.includes("Symfony LSP: Switch Environment")' "$raw/command-palette.png" 15
+
+for name in install-extension project-ready route-completion route-hover command-palette; do
+    magick "$raw/$name.png" -strip -resize '1440x>' -quality 84 "$rendered/$name.webp"
+    install -m 0644 "$rendered/$name.webp" "$images/$name.webp"
+done
+
+printf '\nUpdated screenshots:\n'
+magick identify "$images"/*.webp
+printf '\nEvery isolated VS Code window will now be closed.\n'
