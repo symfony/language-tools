@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.6.0 (2026-08-08)
 
 - Serialize runtime refreshes across watched changes and index commands
