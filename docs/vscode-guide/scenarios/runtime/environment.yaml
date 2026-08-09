@@ -1,3 +1,0 @@
-parameters:
-    processor: '%env(fixture_upper:APP_SECRET)%'
-    missing_processor: '%env(unknown:APP_SECRET)%'

@@ -12,8 +12,10 @@ The script:
 
 * opens the Symfony LSP Marketplace page in an empty VS Code profile;
 * clones Symfony Demo and installs its Composer dependencies under ``var/``;
-* builds a feature lab from the public runtime application fixture;
-* installs Symfony LSP in isolated VS Code profiles;
+* builds a feature lab from the project's runtime application fixture;
+* temporarily edits real application files to create incomplete editor states;
+* adds one serializer-group scenario because neither application exposes one;
+* installs Symfony LSP and ``whatwedo.twig`` in isolated VS Code profiles;
 * waits for source and runtime indexing;
 * reproduces every integration and editor workflow in the visual catalog;
 * optimizes the screenshots as WebP images;

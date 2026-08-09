@@ -9,3 +9,5 @@ final class SerializerGroups
     #[Groups(['admin'])]
     public string $email;
 }
+
+$context = ['groups' => ['ad']];

@@ -1,3 +1,0 @@
-<?php
-
-$context = ['groups' => ['ad']];

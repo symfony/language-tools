@@ -1,4 +1,0 @@
-services:
-    app.visual_consumer:
-        arguments:
-            - '%missing.parameter%'

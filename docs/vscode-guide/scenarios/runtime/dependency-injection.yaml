@@ -1,7 +1,0 @@
-services:
-    app.visual_consumer:
-        arguments:
-            - '@app.fixture_contr'
-            - '@app.fixture_controller'
-            - '%app.fixture_name%'
-            - '%missing.parameter%'
