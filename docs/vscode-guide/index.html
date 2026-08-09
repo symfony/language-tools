@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A visual, step-by-step guide to using Symfony LSP in VS Code with the Symfony Demo application.">
+    <title>Using Symfony LSP in VS Code</title>
+    <link rel="stylesheet" href="guide.css">
+</head>
+<body>
+    <a class="skip-link" href="#guide">Skip to the guide</a>
+
+    <header class="site-header">
+        <div class="topbar">
+            <a class="brand" href="../../README.md">
+                <span class="brand-mark" aria-hidden="true">Sf</span>
+                <span>Symfony LSP</span>
+            </a>
+            <nav class="topnav" aria-label="Documentation links">
+                <a href="../editors/vscode.rst">VS Code reference</a>
+                <a href="../features/index.rst">All integrations</a>
+            </nav>
+        </div>
+
+        <div class="hero">
+            <div>
+                <p class="eyebrow">Visual guide · VS Code</p>
+                <h1>Make VS Code understand Symfony</h1>
+                <p class="hero-copy">
+                    Install Symfony LSP, index the public Symfony Demo application and
+                    try completion, hover and navigation in a real project.
+                </p>
+                <div class="hero-actions">
+                    <a class="button button-primary" href="#install">Start the guide</a>
+                    <a class="button" href="https://marketplace.visualstudio.com/items?itemName=symfonycorp.symfony-lsp">Open the Marketplace</a>
+                </div>
+            </div>
+
+            <aside class="hero-card" aria-label="Before you begin">
+                <p>You will need</p>
+                <ul>
+                    <li>VS Code 1.91 or later</li>
+                    <li>PHP 8.4 or later for Symfony Demo</li>
+                    <li>Composer and Git</li>
+                    <li>About ten minutes</li>
+                </ul>
+            </aside>
+        </div>
+    </header>
+
+    <main id="guide" class="page-shell">
+        <aside class="guide-nav" aria-label="Guide steps">
+            <div class="guide-nav-inner">
+                <p>On this page</p>
+                <ol>
+                    <li><a href="#install">Install the extension</a></li>
+                    <li><a href="#demo">Set up Symfony Demo</a></li>
+                    <li><a href="#index">Wait for indexing</a></li>
+                    <li><a href="#completion">Complete a route</a></li>
+                    <li><a href="#hover">Inspect and navigate</a></li>
+                    <li><a href="#explore">Explore integrations</a></li>
+                    <li><a href="#commands">Manage the index</a></li>
+                </ol>
+            </div>
+        </aside>
+
+        <div class="guide-content">
+            <section class="intro" aria-labelledby="what-you-get">
+                <h2 id="what-you-get">Symfony knowledge beside your PHP tools</h2>
+                <p>
+                    Symfony LSP adds framework-specific completion, hover, navigation,
+                    references, rename, diagnostics and code actions. Keep your general
+                    PHP language server enabled for PHP types, methods and syntax checks.
+                </p>
+                <div class="note-grid">
+                    <div class="note-card">
+                        <strong>First-party package</strong>
+                        <span>The extension includes the matching server for your platform.</span>
+                    </div>
+                    <div class="note-card">
+                        <strong>Project aware</strong>
+                        <span>It combines your source files with metadata from the selected environment.</span>
+                    </div>
+                    <div class="note-card">
+                        <strong>Safe by default</strong>
+                        <span>Application code runs only when runtime indexing is enabled and trusted.</span>
+                    </div>
+                </div>
+            </section>
+
+            <ol class="steps">
+                <li id="install" class="step">
+                    <div class="step-header">
+                        <div>
+                            <span class="step-kicker">One-time setup</span>
+                            <h2>Install Symfony LSP</h2>
+                        </div>
+                    </div>
+                    <div class="step-body">
+                        <p>
+                            Open the Extensions view with <kbd>Ctrl</kbd> + <kbd>Shift</kbd> +
+                            <kbd>X</kbd> on Windows or Linux, or <kbd>Cmd</kbd> +
+                            <kbd>Shift</kbd> + <kbd>X</kbd> on macOS. Search for
+                            <strong>Symfony LSP</strong>, verify that the publisher is
+                            <strong>Symfony</strong> and select <strong>Install</strong>.
+                        </p>
+                        <div class="code-block" role="region" aria-label="Install Symfony LSP from a terminal">
+                            <span class="code-label">Terminal alternative</span>
+                            <pre><code>code --install-extension symfonycorp.symfony-lsp</code></pre>
+                        </div>
+                        <div class="callout">
+                            <strong>No server path is needed.</strong> Marketplace packages contain
+                            the language server and Tree-sitter sidecar for the extension host's platform.
+                        </div>
+
+                        <figure class="shot">
+                            <span class="pin pin-install" aria-hidden="true">1</span>
+                            <a href="images/install-extension.webp" aria-label="Open the extension installation screenshot at full size">
+                                <img src="images/install-extension.webp" width="1440" height="960" alt="Symfony LSP in the VS Code Marketplace with its Install button visible">
+                            </a>
+                            <figcaption>
+                                <span class="marker" aria-hidden="true">1</span>
+                                Select Install on the extension published by Symfony. The page also shows
+                                the extension identifier, version and repository link.
+                            </figcaption>
+                        </figure>
+                    </div>
+                </li>
+
+                <li id="demo" class="step">
+                    <div class="step-header">
+                        <div>
+                            <span class="step-kicker">Public example</span>
+                            <h2>Set up Symfony Demo</h2>
+                        </div>
+                    </div>
+                    <div class="step-body">
+                        <p>
+                            The screenshots use the public
+                            <a href="https://github.com/symfony/demo">Symfony Demo application</a>.
+                            Clone it, install its dependencies and open the application root in VS Code:
+                        </p>
+                        <div class="code-block" role="region" aria-label="Set up Symfony Demo">
+                            <span class="code-label">Terminal</span>
+                            <pre><code>git clone https://github.com/symfony/demo.git symfony-demo
+cd symfony-demo/
+composer install
+code .</code></pre>
+                        </div>
+                        <p>
+                            If VS Code asks whether you trust the authors, review the folder and select
+                            <strong>Yes, I trust the authors</strong>. Runtime indexing boots the Symfony
+                            kernel, so leave an unknown workspace untrusted. An untrusted application still
+                            gets source-only features.
+                        </p>
+                        <div class="callout callout-warning">
+                            <strong>Open the project root.</strong> The Explorer should show
+                            <code>composer.json</code>, <code>bin/console</code>, <code>src/</code> and
+                            <code>templates/</code> at the top level.
+                        </div>
+                    </div>
+                </li>
+
+                <li id="index" class="step">
+                    <div class="step-header">
+                        <div>
+                            <span class="step-kicker">Project discovery</span>
+                            <h2>Wait for both indexes</h2>
+                        </div>
+                    </div>
+                    <div class="step-body">
+                        <p>
+                            Open a PHP file such as
+                            <code>src/Controller/SecurityController.php</code>. Symfony LSP first scans
+                            application source, then reads effective metadata from the <code>dev</code>
+                            environment. Progress appears in the VS Code status bar.
+                        </p>
+                        <p>
+                            Continue when the lower-left status item reads <strong>Symfony: dev</strong>
+                            with a check mark. Select that item at any time to see the source and runtime
+                            index states.
+                        </p>
+                        <div class="callout">
+                            <strong>What the status means:</strong> <code>Symfony: dev</code> means both
+                            indexes are ready for the selected environment. <code>Symfony: static</code>
+                            means runtime indexing is unavailable, disabled or not trusted.
+                        </div>
+
+                        <figure class="shot">
+                            <span class="pin pin-status" aria-hidden="true">2</span>
+                            <a href="images/project-ready.webp" aria-label="Open the ready project screenshot at full size">
+                                <img src="images/project-ready.webp" width="1440" height="900" loading="lazy" alt="Symfony Demo open in VS Code with Symfony dev shown in the lower-left status bar">
+                            </a>
+                            <figcaption>
+                                <span class="marker" aria-hidden="true">2</span>
+                                The check mark next to Symfony: dev confirms that source and trusted runtime
+                                metadata are ready for the active Symfony Demo file.
+                            </figcaption>
+                        </figure>
+                    </div>
+                </li>
+
+                <li id="completion" class="step">
+                    <div class="step-header">
+                        <div>
+                            <span class="step-kicker">First feature</span>
+                            <h2>Complete a real route name</h2>
+                        </div>
+                    </div>
+                    <div class="step-body">
+                        <p>
+                            In <code>src/Controller/SecurityController.php</code>, find the call to
+                            <code>redirectToRoute('blog_index')</code>. Replace the route name with
+                            <code>blog_</code>, keep the cursor after the underscore and invoke completion.
+                        </p>
+                        <div class="key-row" aria-label="Completion keyboard shortcuts">
+                            <span><kbd>Ctrl</kbd> + <kbd>Space</kbd> Show suggestions</span>
+                            <span><kbd>↑</kbd> <kbd>↓</kbd> Choose a route</span>
+                            <span><kbd>Enter</kbd> Insert it</span>
+                        </div>
+                        <p>
+                            The list contains effective routes from Symfony's router, not words collected
+                            from the current file. Choose <code>blog_index</code> to restore the original
+                            route. This works in recognized controller and router calls as well as Twig's
+                            <code>path()</code> and <code>url()</code> functions.
+                        </p>
+
+                        <figure class="shot">
+                            <span class="pin pin-completion" aria-hidden="true">3</span>
+                            <a href="images/route-completion.webp" aria-label="Open the route completion screenshot at full size">
+                                <img src="images/route-completion.webp" width="1440" height="900" loading="lazy" alt="VS Code route completion list showing blog routes in Symfony Demo">
+                            </a>
+                            <figcaption>
+                                <span class="marker" aria-hidden="true">3</span>
+                                Typing blog_ narrows the effective route collection to matching routes.
+                                The selected item also shows the route path when available.
+                            </figcaption>
+                        </figure>
+                    </div>
+                </li>
+
+                <li id="hover" class="step">
+                    <div class="step-header">
+                        <div>
+                            <span class="step-kicker">Understand and move</span>
+                            <h2>Inspect the route, then navigate</h2>
+                        </div>
+                    </div>
+                    <div class="step-body">
+                        <p>
+                            Pause the pointer over <code>blog_index</code>. The hover card shows its path,
+                            HTTP methods, defaults, requirements and controller. You can inspect a route
+                            without leaving the call site or opening the Symfony profiler.
+                        </p>
+                        <div class="key-row" aria-label="Navigation keyboard shortcuts">
+                            <span><kbd>F12</kbd> Go to Definition</span>
+                            <span><kbd>Cmd</kbd> + click on macOS</span>
+                            <span><kbd>Ctrl</kbd> + click on Windows or Linux</span>
+                            <span><kbd>Shift</kbd> + <kbd>F12</kbd> Find All References</span>
+                        </div>
+                        <p>
+                            Go to Definition opens the matching <code>#[Route]</code> declaration in
+                            <code>src/Controller/BlogController.php</code>. Find All References lists static
+                            PHP and Twig usages. The same workflow applies to templates, translations,
+                            services, parameters and other supported Symfony values.
+                        </p>
+
+                        <figure class="shot">
+                            <span class="pin pin-hover" aria-hidden="true">4</span>
+                            <a href="images/route-hover.webp" aria-label="Open the route hover screenshot at full size">
+                                <img src="images/route-hover.webp" width="1440" height="900" loading="lazy" alt="VS Code hover card showing metadata for the blog_index route">
+                            </a>
+                            <figcaption>
+                                <span class="marker" aria-hidden="true">4</span>
+                                Hover combines the route's effective runtime details with the source location
+                                that Go to Definition can open.
+                            </figcaption>
+                        </figure>
+                    </div>
+                </li>
+
+                <li id="explore" class="step">
+                    <div class="step-header">
+                        <div>
+                            <span class="step-kicker">Practice trail</span>
+                            <h2>Try the other integrations</h2>
+                        </div>
+                    </div>
+                    <div class="step-body">
+                        <p>
+                            Symfony Demo contains realistic examples across PHP, Twig, YAML, translations,
+                            Doctrine and Symfony UX. Use these files to learn the same completion, hover and
+                            navigation loop:
+                        </p>
+                        <div class="practice-grid">
+                            <div class="practice-card">
+                                <strong>Templates</strong>
+                                <p>Hover <code>blog/post_show.html.twig</code> in <code>BlogController.php</code>, then press <kbd>F12</kbd>.</p>
+                            </div>
+                            <div class="practice-card">
+                                <strong>Twig routes</strong>
+                                <p>Open <code>templates/blog/index.html.twig</code> and complete <code>path('blog_')</code>.</p>
+                            </div>
+                            <div class="practice-card">
+                                <strong>Translations</strong>
+                                <p>Hover <code>paginator.previous</code> in the same Twig file and open its translation resource.</p>
+                            </div>
+                            <div class="practice-card">
+                                <strong>Dependency injection</strong>
+                                <p>In <code>config/services.yaml</code>, complete service references after <code>@</code> or parameters after <code>%</code>.</p>
+                            </div>
+                            <div class="practice-card">
+                                <strong>Doctrine</strong>
+                                <p>Move between <code>Post</code> and <code>PostRepository</code> with their entity and repository code lenses.</p>
+                            </div>
+                            <div class="practice-card">
+                                <strong>Diagnostics</strong>
+                                <p>Temporarily type a missing route or template name, inspect the error and undo the edit.</p>
+                            </div>
+                        </div>
+                        <div class="callout">
+                            <strong>Twig editing is complementary.</strong> Symfony LSP supplies Symfony-aware
+                            data. A Twig extension can still provide syntax highlighting, formatting and
+                            generic Twig completion.
+                        </div>
+                    </div>
+                </li>
+
+                <li id="commands" class="step">
+                    <div class="step-header">
+                        <div>
+                            <span class="step-kicker">Day-to-day controls</span>
+                            <h2>Manage the index from VS Code</h2>
+                        </div>
+                    </div>
+                    <div class="step-body">
+                        <p>
+                            Open the Command Palette with <kbd>Ctrl</kbd> + <kbd>Shift</kbd> +
+                            <kbd>P</kbd> on Windows or Linux, or <kbd>Cmd</kbd> + <kbd>Shift</kbd> +
+                            <kbd>P</kbd> on macOS. Type <strong>Symfony LSP:</strong> to see all commands.
+                        </p>
+                        <ul>
+                            <li><strong>Refresh Index</strong> rebuilds source and trusted runtime indexes.</li>
+                            <li><strong>Show Index Status</strong> reports each discovered Symfony application.</li>
+                            <li><strong>Switch Environment</strong> selects another environment and rebuilds its runtime metadata.</li>
+                        </ul>
+                        <p>
+                            Normal saves update the relevant source entry and schedule runtime refreshes when
+                            needed. Use Refresh Index after a large external change or when troubleshooting,
+                            not after every edit.
+                        </p>
+
+                        <figure class="shot">
+                            <span class="pin pin-palette" aria-hidden="true">5</span>
+                            <a href="images/command-palette.webp" aria-label="Open the Symfony LSP commands screenshot at full size">
+                                <img src="images/command-palette.webp" width="1440" height="900" loading="lazy" alt="VS Code Command Palette listing the three Symfony LSP index commands">
+                            </a>
+                            <figcaption>
+                                <span class="marker" aria-hidden="true">5</span>
+                                All index controls are grouped under Symfony LSP in the Command Palette.
+                            </figcaption>
+                        </figure>
+                    </div>
+                </li>
+            </ol>
+
+            <section id="configuration" class="reference-section" aria-labelledby="configuration-title">
+                <p class="eyebrow">Reference</p>
+                <h2 id="configuration-title" class="section-title">Configuration you may need</h2>
+                <p>
+                    Symfony Demo works with the defaults. Add project-specific values to
+                    <code>.vscode/settings.json</code> only when your application needs them:
+                </p>
+                <div class="code-block" role="region" aria-label="Example VS Code workspace settings">
+                    <span class="code-label">.vscode/settings.json</span>
+                    <pre><code>{
+    "symfonyLsp.phpCommand": ["php"],
+    "symfonyLsp.consolePath": "bin/console",
+    "symfonyLsp.environment": "dev",
+    "symfonyLsp.debug": true,
+    "symfonyLsp.runtimeIndexing": true,
+    "symfonyLsp.translationDiagnostics": false,
+    "php.suggest.basic": false
+}</code></pre>
+                </div>
+                <table class="settings-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Setting</th>
+                            <th scope="col">When to change it</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>symfonyLsp.phpCommand</td>
+                            <td>Use <code>["symfony", "php"]</code>, a container command or another PHP launcher required by the project.</td>
+                        </tr>
+                        <tr>
+                            <td>symfonyLsp.consolePath</td>
+                            <td>Change it when the Symfony console is not <code>bin/console</code>.</td>
+                        </tr>
+                        <tr>
+                            <td>symfonyLsp.environment</td>
+                            <td>Select the environment whose effective routes, services and other metadata you want.</td>
+                        </tr>
+                        <tr>
+                            <td>symfonyLsp.runtimeIndexing</td>
+                            <td>Disable application execution while retaining source-only features.</td>
+                        </tr>
+                        <tr>
+                            <td>symfonyLsp.translationDiagnostics</td>
+                            <td>Enable missing translation-key diagnostics when the effective catalogue is complete.</td>
+                        </tr>
+                        <tr>
+                            <td>php.suggest.basic</td>
+                            <td>Optionally disable VS Code's basic word suggestions while keeping your PHP language server enabled.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section id="troubleshooting" class="reference-section" aria-labelledby="troubleshooting-title">
+                <p class="eyebrow">If something is missing</p>
+                <h2 id="troubleshooting-title" class="section-title">Troubleshooting checklist</h2>
+                <ul class="troubleshooting">
+                    <li>
+                        <strong>No Symfony status item appears</strong>
+                        <span>Open the application root and verify that <code>composer.json</code> requires <code>symfony/framework-bundle</code>.</span>
+                    </li>
+                    <li>
+                        <strong>The status stays on Symfony: static</strong>
+                        <span>Trust the workspace if appropriate, keep debug mode enabled and verify that runtime indexing is enabled.</span>
+                    </li>
+                    <li>
+                        <strong>Runtime features return no results</strong>
+                        <span>Run <code>composer install</code>, verify <code>vendor/autoload.php</code> and make sure the configured PHP command can boot <code>App\Kernel</code>.</span>
+                    </li>
+                    <li>
+                        <strong>The status shows a warning or error</strong>
+                        <span>Select the status item for details, then open <strong>View &gt; Output</strong> and choose <strong>Symfony LSP</strong>.</span>
+                    </li>
+                    <li>
+                        <strong>Twig has Symfony data but no colors or formatting</strong>
+                        <span>Install a dedicated Twig syntax or formatting extension. Symfony LSP deliberately focuses on framework-aware features.</span>
+                    </li>
+                    <li>
+                        <strong>Changes are not reflected</strong>
+                        <span>Save the file, then run <strong>Symfony LSP: Refresh Index</strong> if the status does not recover.</span>
+                    </li>
+                </ul>
+            </section>
+
+            <section class="next-steps" aria-labelledby="next-steps-title">
+                <h2 id="next-steps-title">You are ready to use Symfony LSP</h2>
+                <p>
+                    Repeat the same loop throughout your application: type a known Symfony value,
+                    inspect its metadata, navigate to its declaration and use diagnostics while editing.
+                </p>
+                <div class="next-links">
+                    <a href="../features/routing.rst">Routing</a>
+                    <a href="../features/dependency-injection.rst">Dependency injection</a>
+                    <a href="../features/templates.rst">Twig templates</a>
+                    <a href="../features/translations.rst">Translations</a>
+                    <a href="../features/doctrine.rst">Doctrine</a>
+                    <a href="../features/index.rst">Every integration</a>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <p>Symfony LSP · Visual VS Code guide using Symfony Demo</p>
+            <div class="footer-links">
+                <a href="https://github.com/symfony/lsp">Source</a>
+                <a href="https://github.com/symfony/demo">Symfony Demo</a>
+                <a href="../editors/vscode.rst">Full VS Code reference</a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

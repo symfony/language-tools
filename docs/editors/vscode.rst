@@ -5,6 +5,9 @@ The bundled VS Code extension configures the Symfony LSP client, workspace
 trust, file associations and project settings. It requires VS Code 1.91 or
 later.
 
+The screenshot-based `visual VS Code guide`_ walks through installation,
+indexing and core features with the public Symfony Demo application.
+
 Installing the Extension
 ------------------------
 
@@ -184,3 +187,5 @@ platform's native crash reports. On macOS, they are stored under
 
 Run ``composer install`` after updating server dependencies. Rebuild and
 reinstall the VSIX after updating the extension.
+
+.. _`visual VS Code guide`: ../vscode-guide/index.html
