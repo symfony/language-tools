@@ -821,7 +821,7 @@ pre code {
 }
 
 .catalog-shell {
-    width: min(1180px, calc(100% - 3rem));
+    width: min(1380px, calc(100% - 3rem));
     margin-inline: auto;
     padding-block: 4.5rem 7rem;
 }
@@ -885,8 +885,8 @@ pre code {
 
 .workflow-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
 }
 
 .workflow-card,
@@ -931,28 +931,15 @@ pre code {
 
 .integration-card {
     display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(20rem, 0.85fr);
-    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr);
     scroll-margin-top: 2rem;
 }
 
 .integration-card > a {
-    align-self: center;
     background: #171717;
 }
 
-.integration-card:nth-child(even) > a {
-    order: 2;
-}
-
-.integration-card:nth-child(even) .integration-copy {
-    order: 1;
-}
-
 .integration-copy {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
     padding: 1.6rem;
 }
 
@@ -984,8 +971,8 @@ pre code {
 
 .gallery-pair {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.7rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
     margin-top: 1rem;
 }
 
@@ -993,10 +980,6 @@ pre code {
     overflow: hidden;
     border: 1px solid var(--line);
     border-radius: 0.65rem;
-}
-
-.gallery-pair a:only-child {
-    grid-column: 1 / -1;
 }
 
 .gallery-pair img {
@@ -1084,14 +1067,8 @@ pre code {
         max-width: 34rem;
     }
 
-    .catalog-intro,
-    .integration-card {
+    .catalog-intro {
         grid-template-columns: 1fr;
-    }
-
-    .integration-card:nth-child(even) > a,
-    .integration-card:nth-child(even) .integration-copy {
-        order: initial;
     }
 
     .page-shell {

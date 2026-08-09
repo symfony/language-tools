@@ -9,6 +9,7 @@ const guide = path.join(root, 'docs/vscode-guide');
 const reference = await fs.readFile(path.join(root, 'docs/features/index.rst'), 'utf8');
 const catalog = await fs.readFile(path.join(guide, 'features.html'), 'utf8');
 const gettingStarted = await fs.readFile(path.join(guide, 'index.html'), 'utf8');
+const stylesheet = await fs.readFile(path.join(guide, 'guide.css'), 'utf8');
 
 const referenceSection = reference.split('Supported Integrations\n----------------------')[1]?.split('Runtime Indexing and Trust')[0];
 if (!referenceSection) {
@@ -73,6 +74,14 @@ if (0 < missing.length || 0 < unused.length) {
 }
 if (30 !== imageFiles.length) {
     throw new Error(`Expected 30 visual captures, found ${imageFiles.length}`);
+}
+
+for (const selector of ['.workflow-grid', '.integration-card', '.gallery-pair']) {
+    const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rules = [...stylesheet.matchAll(new RegExp(`${escapedSelector}\\s*\\{([^}]*)}`, 'g'))];
+    if (!rules.some((rule) => rule[1].includes('grid-template-columns: minmax(0, 1fr)'))) {
+        throw new Error(`${selector} must keep screenshots in a readable single-column layout`);
+    }
 }
 
 console.log(`Visual guide covers ${referenceRows.length} integrations, ${supported} supported combinations and ${imageFiles.length} captures.`);
