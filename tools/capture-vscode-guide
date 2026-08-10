@@ -138,7 +138,7 @@ ports+=("$install_port")
 launchers+=("$!")
 wait_for_cdp "$install_port"
 sleep 5
-node "$cdp" "$install_port" wait 'document.title.includes("Extension: Symfony LSP") && document.body.innerText.includes("symfonycorp.symfony-lsp") && document.body.innerText.includes("Install")' 45
+node "$cdp" "$install_port" wait 'document.title.includes("Extension: Symfony LSP") && document.body.innerText.includes("symfonycorp.symfony-lsp") && document.body.innerText.includes("Install")' 90
 node "$cdp" "$install_port" evaluate "$clean_ui" >/dev/null
 sleep 1
 node "$cdp" "$install_port" evaluate "$clean_ui" >/dev/null
@@ -326,6 +326,40 @@ show_completion() {
     return 1
 }
 
+show_hover() {
+    local port="$1" expression="$2" attempt
+    for attempt in 1 2 3; do
+        open_command_palette "$port"
+        node "$cdp" "$port" text 'Show or Focus Hover'
+        sleep 1
+        node "$cdp" "$port" key 0 Enter Enter 13
+        if node "$cdp" "$port" wait "$expression" 10; then
+            return
+        fi
+        node "$cdp" "$port" key 0 Escape Escape 27
+        sleep 2
+    done
+    echo 'Unable to open the expected hover.' >&2
+    return 1
+}
+
+show_environment_picker() {
+    local port="$1" expression="$2" attempt
+    for attempt in 1 2 3; do
+        open_command_palette "$port"
+        node "$cdp" "$port" text 'Symfony LSP: Switch Environment'
+        sleep 1
+        node "$cdp" "$port" key 0 Enter Enter 13
+        if node "$cdp" "$port" wait "$expression" 10; then
+            return
+        fi
+        node "$cdp" "$port" key 0 Escape Escape 27
+        sleep 2
+    done
+    echo 'Unable to open the environment picker.' >&2
+    return 1
+}
+
 capture_completion() {
     local port="$1" profile="$2" extensions="$3" name="$4" file="$5" needle="$6" expected="$7" expected_detail="${8:-}"
     local location expected_json
@@ -351,11 +385,7 @@ capture_hover() {
     open_location "$profile" "$extensions" "$file:$location"
     sleep 1
     move_pointer "$port"
-    open_command_palette "$port"
-    node "$cdp" "$port" text 'Show or Focus Hover'
-    sleep 1
-    node "$cdp" "$port" key 0 Enter Enter 13
-    node "$cdp" "$port" wait "Array.from(document.querySelectorAll('.monaco-hover:not(.hidden)')).some((element) => element.textContent.includes($expected_json))" 30
+    show_hover "$port" "Array.from(document.querySelectorAll('.monaco-hover:not(.hidden)')).some((element) => element.textContent.includes($expected_json))"
     dismiss_notifications "$port"
     node "$cdp" "$port" screenshot "$raw/$name.png"
     node "$cdp" "$port" key 0 Escape Escape 27
@@ -472,11 +502,7 @@ sleep 2
 open_location "$demo_profile" "$demo_extensions" "$controller:$route_line:$route_hover_column"
 sleep 2
 move_pointer "$demo_port"
-open_command_palette "$demo_port"
-node "$cdp" "$demo_port" text 'Show or Focus Hover'
-sleep 1
-node "$cdp" "$demo_port" key 0 Enter Enter 13
-node "$cdp" "$demo_port" wait 'Array.from(document.querySelectorAll(".monaco-hover:not(.hidden)")).some((element) => element.textContent.includes("App\\Controller\\BlogController::index"))' 30
+show_hover "$demo_port" 'Array.from(document.querySelectorAll(".monaco-hover:not(.hidden)")).some((element) => element.textContent.includes("App\\Controller\\BlogController::index"))'
 dismiss_notifications "$demo_port"
 node "$cdp" "$demo_port" screenshot "$raw/route-hover.png"
 
@@ -575,13 +601,18 @@ replace_once "$lab_home_controller" "#[IsGranted('ROLE_ADMIN')]" "#[IsGranted('R
 capture_completion "$lab_port" "$lab_profile" "$demo_extensions" security "$lab_home_controller" "IsGranted('ROLE_A" ROLE_ADMIN
 replace_once "$lab_home_controller" "#[IsGranted('ROLE_A')]" "#[IsGranted('ROLE_ADMIN')]"
 
+home_method=$'    public function __invoke(): Response\n    {\n        return new Response(\'Symfony LSP compatibility fixture\');\n    }'
+home_translation=$'    public function __invoke(\\Symfony\\Contracts\\Translation\\TranslatorInterface $translator): Response\n    {\n        $translator->trans(\'fixture.message\');\n\n        return new Response(\'Symfony LSP compatibility fixture\');\n    }'
+replace_once "$lab_home_controller" "$home_method" "$home_translation"
+capture_hover "$lab_port" "$lab_profile" "$demo_extensions" translations "$lab_home_controller" "trans('fixture.message')" fixture.message 'Fixture translation'
+replace_once "$lab_home_controller" "$home_translation" "$home_method"
+
 capture_hover "$lab_port" "$lab_profile" "$demo_extensions" messenger "$lab/src/Message/Ping.php" 'final class Ping' Ping 'Messenger message'
 capture_code_lens "$lab_port" "$lab_profile" "$demo_extensions" code-lenses "$lab/src/Message/Ping.php" '1 Messenger handler'
 capture_hover "$lab_port" "$lab_profile" "$demo_extensions" events "$lab/src/Event/OrderPlacedDispatcher.php" 'dispatch(new OrderPlaced())' OrderPlaced 'NotifyCustomer::onOrderPlaced'
 replace_once "$lab_template" "asset('app.js')" "asset('app.j')"
 capture_completion "$lab_port" "$lab_profile" "$demo_extensions" assets "$lab_template" "asset('app.j" app.js
 replace_once "$lab_template" "asset('app.j')" "asset('app.js')"
-capture_hover "$lab_port" "$lab_profile" "$demo_extensions" translations "$lab_template" "'fixture.message'|trans" fixture.message 'Fixture translation'
 capture_hover "$lab_port" "$lab_profile" "$demo_extensions" stimulus "$lab_template" 'click->search#open' open 'Stimulus action'
 capture_hover "$lab_port" "$lab_profile" "$demo_extensions" live-components "$lab_template" 'data-live-action-param="submit"' submit 'Live action'
 capture_code_lens "$lab_port" "$lab_profile" "$demo_extensions" doctrine-code-lens "$lab/src/Entity/Product.php" 'Repository:'
@@ -593,11 +624,7 @@ replace_once "$lab_services" "$service_diagnostic" "$service_class"
 refresh_index "$lab_port"
 
 open_location "$lab_profile" "$demo_extensions" "$lab/src/Controller/HomeController.php:1:1"
-open_command_palette "$lab_port"
-node "$cdp" "$lab_port" text 'Symfony LSP: Switch Environment'
-sleep 1
-node "$cdp" "$lab_port" key 0 Enter Enter 13
-node "$cdp" "$lab_port" wait 'document.querySelector(".quick-input-widget") && document.body.innerText.includes("Symfony environment used for runtime indexing")' 30
+show_environment_picker "$lab_port" 'document.querySelector(".quick-input-widget") && document.body.innerText.includes("Symfony environment used for runtime indexing")'
 dismiss_notifications "$lab_port"
 node "$cdp" "$lab_port" screenshot "$raw/switch-environment.png"
 node "$cdp" "$lab_port" key 0 Escape Escape 27
