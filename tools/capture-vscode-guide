@@ -168,7 +168,11 @@ finish_captures() {
     local updated=()
     for source in "$raw"/*.png; do
         name=$(basename "$source" .png)
-        magick "$source" -strip -resize '1440x>' -quality 84 "$rendered/$name.webp"
+        if [[ "$name" == install-extension ]]; then
+            magick "$source" -strip -resize '1440x>' -crop '1440x480+0+0' +repage -quality 84 "$rendered/$name.webp"
+        else
+            magick "$source" -strip -resize '1440x>' -quality 84 "$rendered/$name.webp"
+        fi
         install -m 0644 "$rendered/$name.webp" "$images/$name.webp"
         updated+=("$images/$name.webp")
     done
@@ -229,7 +233,7 @@ if is_selected install-extension; then
     node "$cdp" "$install_port" evaluate "$clean_ui" >/dev/null
     sleep 1
     node "$cdp" "$install_port" evaluate "$clean_ui" >/dev/null
-    node "$cdp" "$install_port" mouse 1320 780
+    node "$cdp" "$install_port" mouse 1320 420
     node "$cdp" "$install_port" wait '0 === document.querySelectorAll(".monaco-hover:not(.hidden)").length' 5
     node "$cdp" "$install_port" screenshot "$raw/install-extension.png"
     node "$cdp" "$install_port" close >/dev/null

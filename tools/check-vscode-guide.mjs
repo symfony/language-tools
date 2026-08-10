@@ -90,6 +90,10 @@ const targetImages = captureTargets.map((target) => `${target}.webp`).sort();
 if (0 < duplicateTargets.length || targetImages.join(',') !== imageFiles.join(',')) {
     throw new Error(`Capture targets differ from visual guide images. Duplicates: ${duplicateTargets.join(', ') || 'none'}`);
 }
+if (!gettingStarted.includes('<img src="images/install-extension.webp" width="1440" height="480"')) {
+    throw new Error('The installation screenshot must use its compact dimensions');
+}
+
 for (const selector of ['.workflow-grid', '.integration-card', '.gallery-pair']) {
     const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const rules = [...stylesheet.matchAll(new RegExp(`${escapedSelector}\\s*\\{([^}]*)}`, 'g'))];
