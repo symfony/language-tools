@@ -10,6 +10,7 @@ const reference = await fs.readFile(path.join(root, 'docs/features/index.rst'), 
 const catalog = await fs.readFile(path.join(guide, 'features.html'), 'utf8');
 const gettingStarted = await fs.readFile(path.join(guide, 'index.html'), 'utf8');
 const stylesheet = await fs.readFile(path.join(guide, 'guide.css'), 'utf8');
+const captureScript = await fs.readFile(path.join(root, 'tools/capture-vscode-guide'), 'utf8');
 
 const referenceSection = reference.split('Supported Integrations\n----------------------')[1]?.split('Runtime Indexing and Trust')[0];
 if (!referenceSection) {
@@ -76,6 +77,19 @@ if (30 !== imageFiles.length) {
     throw new Error(`Expected 30 visual captures, found ${imageFiles.length}`);
 }
 
+const captureTargets = ['install', 'demo', 'runtime'].flatMap((group) => {
+    const targets = captureScript.match(new RegExp(`^${group}_targets=\\(([^)]+)\\)$`, 'm'))?.[1];
+    if (!targets) {
+        throw new Error(`Unable to find the ${group} screenshot targets`);
+    }
+
+    return targets.split(/\s+/);
+});
+const duplicateTargets = captureTargets.filter((target, index) => captureTargets.indexOf(target) !== index);
+const targetImages = captureTargets.map((target) => `${target}.webp`).sort();
+if (0 < duplicateTargets.length || targetImages.join(',') !== imageFiles.join(',')) {
+    throw new Error(`Capture targets differ from visual guide images. Duplicates: ${duplicateTargets.join(', ') || 'none'}`);
+}
 for (const selector of ['.workflow-grid', '.integration-card', '.gallery-pair']) {
     const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const rules = [...stylesheet.matchAll(new RegExp(`${escapedSelector}\\s*\\{([^}]*)}`, 'g'))];

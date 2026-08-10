@@ -8,6 +8,16 @@ The capture script rebuilds every screenshot used by ``index.html`` and
 
     $ ./tools/capture-vscode-guide
 
+Pass one or more screenshot names to update only those captures. The
+``install``, ``demo`` and ``runtime`` groups update their related captures.
+List all names with ``--list``:
+
+.. code-block:: terminal
+
+    $ ./tools/capture-vscode-guide route-hover translations
+    $ ./tools/capture-vscode-guide demo
+    $ ./tools/capture-vscode-guide --list
+
 The script:
 
 * opens the Symfony LSP Marketplace page in an empty VS Code profile;

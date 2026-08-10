@@ -11,11 +11,55 @@ extension='symfonycorp.symfony-lsp'
 twig_extension='whatwedo.twig'
 keep_state="${KEEP_VSCODE_GUIDE_STATE:-0}"
 
+install_targets=(install-extension)
+demo_targets=(project-ready route-completion route-hover command-palette form-options validation configuration twig-templates doctrine quick-fix references rename definition serializer)
+runtime_targets=(dependency-injection environment security translations messenger code-lenses events assets stimulus live-components doctrine-code-lens twig-components diagnostics switch-environment static-mode)
+all_targets=("${install_targets[@]}" "${demo_targets[@]}" "${runtime_targets[@]}")
+selected_targets=()
+
+add_targets() {
+    local target selected
+    for target in "$@"; do
+        if ((${#selected_targets[@]})); then
+            for selected in "${selected_targets[@]}"; do
+                [[ "$selected" == "$target" ]] && continue 2
+            done
+        fi
+        selected_targets+=("$target")
+    done
+}
+
+is_known_target() {
+    local target
+    for target in "${all_targets[@]}"; do
+        [[ "$target" == "$1" ]] && return 0
+    done
+    return 1
+}
+
+is_selected() {
+    local target
+    for target in "${selected_targets[@]}"; do
+        [[ "$target" == "$1" ]] && return 0
+    done
+    return 1
+}
+
+any_selected() {
+    local target
+    for target in "$@"; do
+        is_selected "$target" && return 0
+    done
+    return 1
+}
+
 if [[ "${1:-}" == --help ]]; then
     printf '%s\n' \
-        'Usage: tools/capture-vscode-guide' \
+        'Usage: tools/capture-vscode-guide [TARGET ...]' \
         '' \
-        'Rebuild the VS Code screenshots under docs/vscode-guide/images/.' \
+        'Rebuild all VS Code screenshots, named screenshots or capture groups.' \
+        'Groups: all, install, demo, runtime.' \
+        'Use --list to print every screenshot target.' \
         'The script uses isolated VS Code profiles and closes every window it opens.' \
         '' \
         'Environment variables:' \
@@ -25,10 +69,34 @@ if [[ "${1:-}" == --help ]]; then
         '  KEEP_VSCODE_GUIDE_STATE=1      Keep temporary files for debugging'
     exit 0
 fi
-if [[ $# -ne 0 ]]; then
-    echo 'Usage: tools/capture-vscode-guide' >&2
-    exit 2
+if [[ "${1:-}" == --list ]]; then
+    printf '%s\n' "${all_targets[@]}"
+    exit 0
 fi
+if [[ $# -eq 0 ]]; then
+    add_targets "${all_targets[@]}"
+else
+    for target in "$@"; do
+        case "$target" in
+            all) add_targets "${all_targets[@]}" ;;
+            install) add_targets "${install_targets[@]}" ;;
+            demo) add_targets "${demo_targets[@]}" ;;
+            runtime) add_targets "${runtime_targets[@]}" ;;
+            *)
+                if ! is_known_target "$target"; then
+                    echo "Unknown screenshot target: $target" >&2
+                    exit 2
+                fi
+                add_targets "$target"
+                ;;
+        esac
+    done
+fi
+
+need_demo=false
+need_runtime=false
+any_selected "${demo_targets[@]}" && need_demo=true
+any_selected "${runtime_targets[@]}" && need_runtime=true
 
 require_command() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -59,6 +127,8 @@ printf '%s\n' '{"extensions.ignoreRecommendations": true, "git.enabled": false}'
 
 ports=()
 launchers=()
+install_port=''
+demo_port=''
 
 close_vscode() {
     local port
@@ -93,6 +163,22 @@ close_vscode() {
 }
 trap close_vscode EXIT INT TERM
 
+finish_captures() {
+    local source name
+    local updated=()
+    for source in "$raw"/*.png; do
+        name=$(basename "$source" .png)
+        magick "$source" -strip -resize '1440x>' -quality 84 "$rendered/$name.webp"
+        install -m 0644 "$rendered/$name.webp" "$images/$name.webp"
+        updated+=("$images/$name.webp")
+    done
+
+    node "$root/tools/check-vscode-guide.mjs"
+    printf '\nUpdated screenshots:\n'
+    magick identify "${updated[@]}"
+    printf '\nEvery isolated VS Code window will now be closed.\n'
+}
+
 available_port() {
     node -e 'const net = require("node:net"); const server = net.createServer(); server.listen(0, "127.0.0.1", () => { console.log(server.address().port); server.close(); });'
 }
@@ -126,29 +212,44 @@ clean_ui='(() => {
     return true;
 })()'
 
-install_port=$(available_port)
-ports+=("$install_port")
-"$code_command" \
-    --user-data-dir "$install_profile" \
-    --extensions-dir "$install_extensions" \
-    --remote-debugging-port="$install_port" \
-    --new-window \
-    --open-url "vscode:extension/$extension" \
-    >"$state/install-vscode.log" 2>&1 &
-launchers+=("$!")
-wait_for_cdp "$install_port"
-sleep 5
-node "$cdp" "$install_port" wait 'document.title.includes("Extension: Symfony LSP") && document.body.innerText.includes("symfonycorp.symfony-lsp") && document.body.innerText.includes("Install")' 90
-node "$cdp" "$install_port" evaluate "$clean_ui" >/dev/null
-sleep 1
-node "$cdp" "$install_port" evaluate "$clean_ui" >/dev/null
-node "$cdp" "$install_port" mouse 1320 780
-node "$cdp" "$install_port" wait '0 === document.querySelectorAll(".monaco-hover:not(.hidden)").length' 5
-node "$cdp" "$install_port" screenshot "$raw/install-extension.png"
-node "$cdp" "$install_port" close >/dev/null
+if is_selected install-extension; then
+    install_port=$(available_port)
+    ports+=("$install_port")
+    "$code_command" \
+        --user-data-dir "$install_profile" \
+        --extensions-dir "$install_extensions" \
+        --remote-debugging-port="$install_port" \
+        --new-window \
+        --open-url "vscode:extension/$extension" \
+        >"$state/install-vscode.log" 2>&1 &
+    launchers+=("$!")
+    wait_for_cdp "$install_port"
+    sleep 5
+    node "$cdp" "$install_port" wait 'document.title.includes("Extension: Symfony LSP") && document.body.innerText.includes("symfonycorp.symfony-lsp") && document.body.innerText.includes("Install")' 90
+    node "$cdp" "$install_port" evaluate "$clean_ui" >/dev/null
+    sleep 1
+    node "$cdp" "$install_port" evaluate "$clean_ui" >/dev/null
+    node "$cdp" "$install_port" mouse 1320 780
+    node "$cdp" "$install_port" wait '0 === document.querySelectorAll(".monaco-hover:not(.hidden)").length' 5
+    node "$cdp" "$install_port" screenshot "$raw/install-extension.png"
+    node "$cdp" "$install_port" close >/dev/null
+fi
 
-printf 'Cloning Symfony Demo...\n'
-git clone --depth 1 "$demo_repository" "$demo"
+if [[ "$need_demo" != true && "$need_runtime" != true ]]; then
+    finish_captures
+    exit 0
+fi
+
+"$code_command" \
+    --user-data-dir "$demo_profile" \
+    --extensions-dir "$demo_extensions" \
+    --install-extension "$extension" \
+    --install-extension "$twig_extension" \
+    --force
+
+if [[ "$need_demo" == true ]]; then
+    printf 'Cloning Symfony Demo...\n'
+    git clone --depth 1 "$demo_repository" "$demo"
 if [[ "$demo_revision" != HEAD ]]; then
     git -C "$demo" fetch --depth 1 origin "$demo_revision"
     git -C "$demo" checkout --detach FETCH_HEAD
@@ -178,13 +279,6 @@ ready_source=${ready_match#*:}
 ready_prefix=${ready_source%%admin_index*}
 ready_column=$((${#ready_prefix} + 5))
 
-"$code_command" \
-    --user-data-dir "$demo_profile" \
-    --extensions-dir "$demo_extensions" \
-    --install-extension "$extension" \
-    --install-extension "$twig_extension" \
-    --force
-
 demo_port=$(available_port)
 while [[ "$demo_port" == "$install_port" ]]; do
     demo_port=$(available_port)
@@ -206,9 +300,12 @@ sleep 2
 node "$cdp" "$demo_port" evaluate "$clean_ui" >/dev/null
 node "$cdp" "$demo_port" wait 'Array.from(document.querySelectorAll(".statusbar-item")).some((element) => element.getAttribute("aria-label")?.includes("source ready, runtime ready"))' 120
 node "$cdp" "$demo_port" evaluate "$clean_ui" >/dev/null
-node "$cdp" "$demo_port" mouse 1320 780
-node "$cdp" "$demo_port" wait '0 === document.querySelectorAll(".monaco-hover:not(.hidden)").length' 5
-node "$cdp" "$demo_port" screenshot "$raw/project-ready.png"
+if is_selected project-ready; then
+    node "$cdp" "$demo_port" mouse 1320 780
+    node "$cdp" "$demo_port" wait '0 === document.querySelectorAll(".monaco-hover:not(.hidden)").length' 5
+    node "$cdp" "$demo_port" screenshot "$raw/project-ready.png"
+fi
+fi
 
 case "$(uname -s)" in
     Darwin)
@@ -362,6 +459,7 @@ show_environment_picker() {
 
 capture_completion() {
     local port="$1" profile="$2" extensions="$3" name="$4" file="$5" needle="$6" expected="$7" expected_detail="${8:-}"
+    is_selected "$name" || return 0
     local location expected_json
     location=$(location_after "$file" "$needle")
     expected_json=$(json_string "$expected")
@@ -379,6 +477,7 @@ capture_completion() {
 
 capture_hover() {
     local port="$1" profile="$2" extensions="$3" name="$4" file="$5" line_needle="$6" symbol="$7" expected="$8"
+    is_selected "$name" || return 0
     local location expected_json
     location=$(location_inside "$file" "$line_needle" "$symbol")
     expected_json=$(json_string "$expected")
@@ -394,6 +493,7 @@ capture_hover() {
 
 capture_code_lens() {
     local port="$1" profile="$2" extensions="$3" name="$4" file="$5" expected="$6"
+    is_selected "$name" || return 0
     local expected_json
     expected_json=$(json_string "$expected")
     open_location "$profile" "$extensions" "$file:1:1"
@@ -406,6 +506,7 @@ capture_code_lens() {
 
 capture_diagnostics() {
     local port="$1" profile="$2" extensions="$3" name="$4" file="$5" expected="$6"
+    is_selected "$name" || return 0
     local expected_json
     expected_json=$(json_string "$expected")
     open_location "$profile" "$extensions" "$file:1:1"
@@ -421,6 +522,7 @@ capture_diagnostics() {
 
 capture_quick_fix() {
     local port="$1" profile="$2" extensions="$3" name="$4" file="$5" line_needle="$6" symbol="$7" expected="$8"
+    is_selected "$name" || return 0
     local location expected_json
     location=$(location_inside "$file" "$line_needle" "$symbol")
     expected_json=$(json_string "$expected")
@@ -440,6 +542,7 @@ capture_quick_fix() {
 
 capture_references() {
     local port="$1" profile="$2" extensions="$3" name="$4" file="$5" line_needle="$6" symbol="$7" expected="$8"
+    is_selected "$name" || return 0
     local location expected_json
     location=$(location_inside "$file" "$line_needle" "$symbol")
     expected_json=$(json_string "$expected")
@@ -455,6 +558,7 @@ capture_references() {
 
 capture_rename() {
     local port="$1" profile="$2" extensions="$3" name="$4" file="$5" line_needle="$6" symbol="$7" expected="$8"
+    is_selected "$name" || return 0
     local location expected_json
     location=$(location_inside "$file" "$line_needle" "$symbol")
     expected_json=$(json_string "$expected")
@@ -471,6 +575,7 @@ capture_rename() {
 
 capture_peek_definition() {
     local port="$1" profile="$2" extensions="$3" name="$4" file="$5" line_needle="$6" symbol="$7" expected="$8"
+    is_selected "$name" || return 0
     local location expected_json
     location=$(location_inside "$file" "$line_needle" "$symbol")
     expected_json=$(json_string "$expected")
@@ -484,75 +589,98 @@ capture_peek_definition() {
     close_active_editor "$port"
 }
 
-close_active_editor "$demo_port"
-php -r '$path = $argv[1]; $contents = file_get_contents($path); $quote = chr(39); $contents = str_replace("redirectToRoute(".$quote."blog_index".$quote.")", "redirectToRoute(".$quote."blog_".$quote.")", $contents, $count); if (1 !== $count) { fwrite(STDERR, "Unable to prepare the route completion example.\n"); exit(1); } file_put_contents($path, $contents);' "$controller"
-route_completion_location=$(location_after "$controller" "redirectToRoute('blog_")
-open_location "$demo_profile" "$demo_extensions" "$controller:$route_completion_location"
-node "$cdp" "$demo_port" wait 'Array.from(document.querySelectorAll(".view-line")).some((element) => element.innerText.includes("redirectToRoute(\u0027blog_\u0027)"))' 15
-sleep 2
-show_completion "$demo_port" 'Array.from(document.querySelectorAll(".suggest-widget.visible .monaco-list-row")).some((element) => element.textContent.includes("blog_index"))'
-focus_completion "$demo_port" blog_index
-dismiss_notifications "$demo_port"
-node "$cdp" "$demo_port" screenshot "$raw/route-completion.png"
-node "$cdp" "$demo_port" key 0 Escape Escape 27
-close_active_editor "$demo_port"
-git -C "$demo" restore src/Controller/SecurityController.php
-sleep 2
+if [[ "$need_demo" == true ]]; then
+if is_selected route-completion; then
+    close_active_editor "$demo_port"
+    php -r '$path = $argv[1]; $contents = file_get_contents($path); $quote = chr(39); $contents = str_replace("redirectToRoute(".$quote."blog_index".$quote.")", "redirectToRoute(".$quote."blog_".$quote.")", $contents, $count); if (1 !== $count) { fwrite(STDERR, "Unable to prepare the route completion example.\n"); exit(1); } file_put_contents($path, $contents);' "$controller"
+    route_completion_location=$(location_after "$controller" "redirectToRoute('blog_")
+    open_location "$demo_profile" "$demo_extensions" "$controller:$route_completion_location"
+    node "$cdp" "$demo_port" wait 'Array.from(document.querySelectorAll(".view-line")).some((element) => element.innerText.includes("redirectToRoute(\u0027blog_\u0027)"))' 15
+    sleep 2
+    show_completion "$demo_port" 'Array.from(document.querySelectorAll(".suggest-widget.visible .monaco-list-row")).some((element) => element.textContent.includes("blog_index"))'
+    focus_completion "$demo_port" blog_index
+    dismiss_notifications "$demo_port"
+    node "$cdp" "$demo_port" screenshot "$raw/route-completion.png"
+    node "$cdp" "$demo_port" key 0 Escape Escape 27
+    close_active_editor "$demo_port"
+    git -C "$demo" restore src/Controller/SecurityController.php
+    sleep 2
+fi
 
-open_location "$demo_profile" "$demo_extensions" "$controller:$route_line:$route_hover_column"
-sleep 2
-move_pointer "$demo_port"
-show_hover "$demo_port" 'Array.from(document.querySelectorAll(".monaco-hover:not(.hidden)")).some((element) => element.textContent.includes("App\\Controller\\BlogController::index"))'
-dismiss_notifications "$demo_port"
-node "$cdp" "$demo_port" screenshot "$raw/route-hover.png"
+if is_selected route-hover; then
+    open_location "$demo_profile" "$demo_extensions" "$controller:$route_line:$route_hover_column"
+    sleep 2
+    move_pointer "$demo_port"
+    show_hover "$demo_port" 'Array.from(document.querySelectorAll(".monaco-hover:not(.hidden)")).some((element) => element.textContent.includes("App\\Controller\\BlogController::index"))'
+    dismiss_notifications "$demo_port"
+    node "$cdp" "$demo_port" screenshot "$raw/route-hover.png"
+    node "$cdp" "$demo_port" key 0 Escape Escape 27
+fi
 
-node "$cdp" "$demo_port" key 0 Escape Escape 27
-move_pointer "$demo_port"
-open_command_palette "$demo_port"
-node "$cdp" "$demo_port" text 'Symfony LSP:'
-node "$cdp" "$demo_port" wait 'document.body.innerText.includes("Symfony LSP: Refresh Index") && document.body.innerText.includes("Symfony LSP: Switch Environment")' 15
-dismiss_notifications "$demo_port"
-node "$cdp" "$demo_port" screenshot "$raw/command-palette.png"
-node "$cdp" "$demo_port" key 0 Escape Escape 27
+if is_selected command-palette; then
+    move_pointer "$demo_port"
+    open_command_palette "$demo_port"
+    node "$cdp" "$demo_port" text 'Symfony LSP:'
+    node "$cdp" "$demo_port" wait 'document.body.innerText.includes("Symfony LSP: Refresh Index") && document.body.innerText.includes("Symfony LSP: Switch Environment")' 15
+    dismiss_notifications "$demo_port"
+    node "$cdp" "$demo_port" screenshot "$raw/command-palette.png"
+    node "$cdp" "$demo_port" key 0 Escape Escape 27
+fi
 
 demo_admin_controller="$demo/src/Controller/Admin/BlogController.php"
 demo_blog_controller="$demo/src/Controller/BlogController.php"
 demo_comment_entity="$demo/src/Entity/Comment.php"
 demo_configuration="$demo/config/packages/property_info.yaml"
-refresh_index "$demo_port"
+if any_selected form-options validation configuration twig-templates doctrine quick-fix references rename definition serializer; then
+    refresh_index "$demo_port"
+fi
 
-replace_once "$demo_admin_controller" "        \$form = \$this->createForm(PostType::class, \$post);" "        \$form = \$this->createForm(PostType::class, \$post, ['req']);"
-capture_completion "$demo_port" "$demo_profile" "$demo_extensions" form-options "$demo_admin_controller" "['req" required
-replace_once "$demo_admin_controller" "        \$form = \$this->createForm(PostType::class, \$post, ['req']);" "        \$form = \$this->createForm(PostType::class, \$post);"
+if is_selected form-options; then
+    replace_once "$demo_admin_controller" "        \$form = \$this->createForm(PostType::class, \$post);" "        \$form = \$this->createForm(PostType::class, \$post, ['req']);"
+    capture_completion "$demo_port" "$demo_profile" "$demo_extensions" form-options "$demo_admin_controller" "['req" required
+    replace_once "$demo_admin_controller" "        \$form = \$this->createForm(PostType::class, \$post, ['req']);" "        \$form = \$this->createForm(PostType::class, \$post);"
+fi
 
 capture_completion "$demo_port" "$demo_profile" "$demo_extensions" validation "$demo_comment_entity" 'Length(min: 5, ma' max 'Constraint option'
 
-replace_once "$demo_configuration" $'framework:\n    property_info:\n        with_constructor_extractor: true\n' $'framework:\n    router: { utf8: true }\n'
-capture_completion "$demo_port" "$demo_profile" "$demo_extensions" configuration "$demo_configuration" '    rout' router
-replace_once "$demo_configuration" $'framework:\n    router: { utf8: true }\n' $'framework:\n    property_info:\n        with_constructor_extractor: true\n'
+if is_selected configuration; then
+    replace_once "$demo_configuration" $'framework:\n    property_info:\n        with_constructor_extractor: true\n' $'framework:\n    router: { utf8: true }\n'
+    capture_completion "$demo_port" "$demo_profile" "$demo_extensions" configuration "$demo_configuration" '    rout' router
+    replace_once "$demo_configuration" $'framework:\n    router: { utf8: true }\n' $'framework:\n    property_info:\n        with_constructor_extractor: true\n'
+fi
 
-replace_once "$controller" "        return \$this->render('security/login.html.twig', [" "        return \$this->render('security/login.html.t', ["
-capture_completion "$demo_port" "$demo_profile" "$demo_extensions" twig-templates "$controller" "render('security/login.html.t" security/login.html.twig
-replace_once "$controller" "        return \$this->render('security/login.html.t', [" "        return \$this->render('security/login.html.twig', ["
+if is_selected twig-templates; then
+    replace_once "$controller" "        return \$this->render('security/login.html.twig', [" "        return \$this->render('security/login.html.t', ["
+    capture_completion "$demo_port" "$demo_profile" "$demo_extensions" twig-templates "$controller" "render('security/login.html.t" security/login.html.twig
+    replace_once "$controller" "        return \$this->render('security/login.html.t', [" "        return \$this->render('security/login.html.twig', ["
+fi
 
-replace_once "$demo_admin_controller" "\$authorPosts = \$posts->findBy(['author' => \$user]" "\$authorPosts = \$posts->findBy(['au' => \$user]"
-capture_completion "$demo_port" "$demo_profile" "$demo_extensions" doctrine "$demo_admin_controller" "findBy(['au" author
-replace_once "$demo_admin_controller" "\$authorPosts = \$posts->findBy(['au' => \$user]" "\$authorPosts = \$posts->findBy(['author' => \$user]"
+if is_selected doctrine; then
+    replace_once "$demo_admin_controller" "\$authorPosts = \$posts->findBy(['author' => \$user]" "\$authorPosts = \$posts->findBy(['au' => \$user]"
+    capture_completion "$demo_port" "$demo_profile" "$demo_extensions" doctrine "$demo_admin_controller" "findBy(['au" author
+    replace_once "$demo_admin_controller" "\$authorPosts = \$posts->findBy(['au' => \$user]" "\$authorPosts = \$posts->findBy(['author' => \$user]"
+fi
 
-replace_once "$demo_blog_controller" "return \$this->redirectToRoute('blog_post', ['slug' => \$post->getSlug()], Response::HTTP_SEE_OTHER);" "return \$this->redirectToRoute('blog_post', [], Response::HTTP_SEE_OTHER);"
-capture_quick_fix "$demo_port" "$demo_profile" "$demo_extensions" quick-fix "$demo_blog_controller" "redirectToRoute('blog_post', []" blog_post 'Add missing route parameter'
-replace_once "$demo_blog_controller" "return \$this->redirectToRoute('blog_post', [], Response::HTTP_SEE_OTHER);" "return \$this->redirectToRoute('blog_post', ['slug' => \$post->getSlug()], Response::HTTP_SEE_OTHER);"
+if is_selected quick-fix; then
+    replace_once "$demo_blog_controller" "return \$this->redirectToRoute('blog_post', ['slug' => \$post->getSlug()], Response::HTTP_SEE_OTHER);" "return \$this->redirectToRoute('blog_post', [], Response::HTTP_SEE_OTHER);"
+    capture_quick_fix "$demo_port" "$demo_profile" "$demo_extensions" quick-fix "$demo_blog_controller" "redirectToRoute('blog_post', []" blog_post 'Add missing route parameter'
+    replace_once "$demo_blog_controller" "return \$this->redirectToRoute('blog_post', [], Response::HTTP_SEE_OTHER);" "return \$this->redirectToRoute('blog_post', ['slug' => \$post->getSlug()], Response::HTTP_SEE_OTHER);"
+fi
 
 capture_references "$demo_port" "$demo_profile" "$demo_extensions" references "$controller" "redirectToRoute('blog_index')" blog_index BlogController.php
 capture_rename "$demo_port" "$demo_profile" "$demo_extensions" rename "$controller" "redirectToRoute('blog_index')" blog_index blog_index
 capture_peek_definition "$demo_port" "$demo_profile" "$demo_extensions" definition "$controller" "render('security/login.html.twig', [" security/login.html.twig base.html.twig
 
-mkdir -p "$demo/src/VisualGuide"
-cp "$root/docs/vscode-guide/scenarios/demo/serializer-groups.php" "$demo/src/VisualGuide/SerializerGroups.php"
-refresh_index "$demo_port"
-capture_completion "$demo_port" "$demo_profile" "$demo_extensions" serializer "$demo/src/VisualGuide/SerializerGroups.php" "['groups' => ['ad" admin
+if is_selected serializer; then
+    mkdir -p "$demo/src/VisualGuide"
+    cp "$root/docs/vscode-guide/scenarios/demo/serializer-groups.php" "$demo/src/VisualGuide/SerializerGroups.php"
+    refresh_index "$demo_port"
+    capture_completion "$demo_port" "$demo_profile" "$demo_extensions" serializer "$demo/src/VisualGuide/SerializerGroups.php" "['groups' => ['ad" admin
+fi
 node "$cdp" "$demo_port" close >/dev/null
+fi
 
+if [[ "$need_runtime" == true ]]; then
 lab="$state/runtime-application"
 lab_profile="$state/lab-profile"
 mkdir -p "$lab" "$lab_profile/User"
@@ -590,63 +718,69 @@ service_class='        class: App\Controller\HomeController'
 service_completion=$'        class: App\\Controller\\HomeController\n        arguments: ['\''@app.fixture_contr'\'']'
 service_diagnostic=$'        class: App\\Controller\\HomeController\n        arguments: ['\''%missing.parameter%'\'']'
 
-replace_once "$lab_services" "$service_class" "$service_completion"
-capture_completion "$lab_port" "$lab_profile" "$demo_extensions" dependency-injection "$lab_services" '@app.fixture_contr' app.fixture_controller
-replace_once "$lab_services" "$service_completion" "$service_class"
-refresh_index "$lab_port"
+if is_selected dependency-injection; then
+    replace_once "$lab_services" "$service_class" "$service_completion"
+    capture_completion "$lab_port" "$lab_profile" "$demo_extensions" dependency-injection "$lab_services" '@app.fixture_contr' app.fixture_controller
+    replace_once "$lab_services" "$service_completion" "$service_class"
+    refresh_index "$lab_port"
+fi
 
 capture_hover "$lab_port" "$lab_profile" "$demo_extensions" environment "$lab_framework" '%env(APP_SECRET)%' APP_SECRET 'Environment variable'
 
-replace_once "$lab_home_controller" "#[IsGranted('ROLE_ADMIN')]" "#[IsGranted('ROLE_A')]"
-capture_completion "$lab_port" "$lab_profile" "$demo_extensions" security "$lab_home_controller" "IsGranted('ROLE_A" ROLE_ADMIN
-replace_once "$lab_home_controller" "#[IsGranted('ROLE_A')]" "#[IsGranted('ROLE_ADMIN')]"
+if is_selected security; then
+    replace_once "$lab_home_controller" "#[IsGranted('ROLE_ADMIN')]" "#[IsGranted('ROLE_A')]"
+    capture_completion "$lab_port" "$lab_profile" "$demo_extensions" security "$lab_home_controller" "IsGranted('ROLE_A" ROLE_ADMIN
+    replace_once "$lab_home_controller" "#[IsGranted('ROLE_A')]" "#[IsGranted('ROLE_ADMIN')]"
+fi
 
-home_method=$'    public function __invoke(): Response\n    {\n        return new Response(\'Symfony LSP compatibility fixture\');\n    }'
-home_translation=$'    public function __invoke(\\Symfony\\Contracts\\Translation\\TranslatorInterface $translator): Response\n    {\n        $translator->trans(\'fixture.message\');\n\n        return new Response(\'Symfony LSP compatibility fixture\');\n    }'
-replace_once "$lab_home_controller" "$home_method" "$home_translation"
-capture_hover "$lab_port" "$lab_profile" "$demo_extensions" translations "$lab_home_controller" "trans('fixture.message')" fixture.message 'Fixture translation'
-replace_once "$lab_home_controller" "$home_translation" "$home_method"
+if is_selected translations; then
+    home_method=$'    public function __invoke(): Response\n    {\n        return new Response(\'Symfony LSP compatibility fixture\');\n    }'
+    home_translation=$'    public function __invoke(\\Symfony\\Contracts\\Translation\\TranslatorInterface $translator): Response\n    {\n        $translator->trans(\'fixture.message\');\n\n        return new Response(\'Symfony LSP compatibility fixture\');\n    }'
+    replace_once "$lab_home_controller" "$home_method" "$home_translation"
+    capture_hover "$lab_port" "$lab_profile" "$demo_extensions" translations "$lab_home_controller" "trans('fixture.message')" fixture.message 'Fixture translation'
+    replace_once "$lab_home_controller" "$home_translation" "$home_method"
+fi
 
 capture_hover "$lab_port" "$lab_profile" "$demo_extensions" messenger "$lab/src/Message/Ping.php" 'final class Ping' Ping 'Messenger message'
 capture_code_lens "$lab_port" "$lab_profile" "$demo_extensions" code-lenses "$lab/src/Message/Ping.php" '1 Messenger handler'
 capture_hover "$lab_port" "$lab_profile" "$demo_extensions" events "$lab/src/Event/OrderPlacedDispatcher.php" 'dispatch(new OrderPlaced())' OrderPlaced 'NotifyCustomer::onOrderPlaced'
-replace_once "$lab_template" "asset('app.js')" "asset('app.j')"
-capture_completion "$lab_port" "$lab_profile" "$demo_extensions" assets "$lab_template" "asset('app.j" app.js
-replace_once "$lab_template" "asset('app.j')" "asset('app.js')"
+if is_selected assets; then
+    replace_once "$lab_template" "asset('app.js')" "asset('app.j')"
+    capture_completion "$lab_port" "$lab_profile" "$demo_extensions" assets "$lab_template" "asset('app.j" app.js
+    replace_once "$lab_template" "asset('app.j')" "asset('app.js')"
+fi
 capture_hover "$lab_port" "$lab_profile" "$demo_extensions" stimulus "$lab_template" 'click->search#open' open 'Stimulus action'
 capture_hover "$lab_port" "$lab_profile" "$demo_extensions" live-components "$lab_template" 'data-live-action-param="submit"' submit 'Live action'
 capture_code_lens "$lab_port" "$lab_profile" "$demo_extensions" doctrine-code-lens "$lab/src/Entity/Product.php" 'Repository:'
 capture_hover "$lab_port" "$lab_profile" "$demo_extensions" twig-components "$lab_template" '<twig:Search' Search 'Properties:'
 
-replace_once "$lab_services" "$service_class" "$service_diagnostic"
-capture_diagnostics "$lab_port" "$lab_profile" "$demo_extensions" diagnostics "$lab_services" missing.parameter
-replace_once "$lab_services" "$service_diagnostic" "$service_class"
-refresh_index "$lab_port"
+if is_selected diagnostics; then
+    replace_once "$lab_services" "$service_class" "$service_diagnostic"
+    capture_diagnostics "$lab_port" "$lab_profile" "$demo_extensions" diagnostics "$lab_services" missing.parameter
+    replace_once "$lab_services" "$service_diagnostic" "$service_class"
+    refresh_index "$lab_port"
+fi
 
-open_location "$lab_profile" "$demo_extensions" "$lab/src/Controller/HomeController.php:1:1"
-show_environment_picker "$lab_port" 'document.querySelector(".quick-input-widget") && document.body.innerText.includes("Symfony environment used for runtime indexing")'
-dismiss_notifications "$lab_port"
-node "$cdp" "$lab_port" screenshot "$raw/switch-environment.png"
-node "$cdp" "$lab_port" key 0 Escape Escape 27
+if is_selected switch-environment; then
+    open_location "$lab_profile" "$demo_extensions" "$lab/src/Controller/HomeController.php:1:1"
+    show_environment_picker "$lab_port" 'document.querySelector(".quick-input-widget") && document.body.innerText.includes("Symfony environment used for runtime indexing")'
+    dismiss_notifications "$lab_port"
+    node "$cdp" "$lab_port" screenshot "$raw/switch-environment.png"
+    node "$cdp" "$lab_port" key 0 Escape Escape 27
+fi
 
-printf '%s\n' '{"extensions.ignoreRecommendations": true, "git.enabled": false, "symfonyLsp.runtimeIndexing": false}' >"$lab_profile/User/settings.json"
-open_command_palette "$lab_port"
-node "$cdp" "$lab_port" text 'Developer: Reload Window'
-sleep 1
-node "$cdp" "$lab_port" key 0 Enter Enter 13
-sleep 5
-node "$cdp" "$lab_port" wait 'Array.from(document.querySelectorAll(".statusbar-item")).some((element) => element.innerText.includes("Symfony: static"))' 120
-move_pointer "$lab_port"
-dismiss_notifications "$lab_port"
-node "$cdp" "$lab_port" screenshot "$raw/static-mode.png"
+if is_selected static-mode; then
+    printf '%s\n' '{"extensions.ignoreRecommendations": true, "git.enabled": false, "symfonyLsp.runtimeIndexing": false}' >"$lab_profile/User/settings.json"
+    open_command_palette "$lab_port"
+    node "$cdp" "$lab_port" text 'Developer: Reload Window'
+    sleep 1
+    node "$cdp" "$lab_port" key 0 Enter Enter 13
+    sleep 5
+    node "$cdp" "$lab_port" wait 'Array.from(document.querySelectorAll(".statusbar-item")).some((element) => element.innerText.includes("Symfony: static"))' 120
+    move_pointer "$lab_port"
+    dismiss_notifications "$lab_port"
+    node "$cdp" "$lab_port" screenshot "$raw/static-mode.png"
+fi
+fi
 
-for source in "$raw"/*.png; do
-    name=$(basename "$source" .png)
-    magick "$source" -strip -resize '1440x>' -quality 84 "$rendered/$name.webp"
-    install -m 0644 "$rendered/$name.webp" "$images/$name.webp"
-done
-
-node "$root/tools/check-vscode-guide.mjs"
-printf '\nUpdated screenshots:\n'
-magick identify "$images"/*.webp
-printf '\nEvery isolated VS Code window will now be closed.\n'
+finish_captures
