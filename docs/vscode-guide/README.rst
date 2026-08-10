@@ -1,16 +1,22 @@
 Updating the Visual Guide
 =========================
 
-The capture script rebuilds every screenshot used by ``index.html`` and
-``features.html``. Run it from the repository root:
+By default, the capture script rebuilds every screenshot used by ``index.html``
+and ``features.html``. Run it from the repository root:
 
 .. code-block:: terminal
 
     $ ./tools/capture-vscode-guide
 
-Pass one or more screenshot names to update only those captures. The
-``install``, ``demo`` and ``runtime`` groups update their related captures.
-List all names with ``--list``:
+Pass one or more screenshot names to update only those captures. Capture groups
+are also available:
+
+* ``all`` updates every capture, as does running the script without a target;
+* ``install`` updates the Marketplace capture;
+* ``demo`` updates the Symfony Demo captures;
+* ``runtime`` updates the runtime application fixture captures.
+
+List all screenshot names with ``--list``:
 
 .. code-block:: terminal
 
