@@ -12,6 +12,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         private readonly ProcessRunnerInterface $processRunner,
         private readonly RuntimeSnapshotLoaderRegistry $snapshotLoaders,
         private readonly RuntimeConfiguration $configuration,
+        private readonly ContainerPathMapper $pathMapper,
     ) {
     }
 
@@ -27,8 +28,8 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         $bridge = $this->bridgeInstaller->install($project);
         $result = $this->processRunner->run([
             ...$this->configuration->phpCommand($project),
-            $bridge,
-            '--project='.$project->rootPath(),
+            $this->pathMapper->toContainer($project, $bridge),
+            '--project='.$this->pathMapper->toContainer($project, $project->rootPath()),
             '--environment='.$this->configuration->environment($project),
             '--debug=1',
             '--sections='.implode(',', $sections),

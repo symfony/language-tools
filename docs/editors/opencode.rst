@@ -100,6 +100,7 @@ initialization options. Use it to override the default runtime configuration:
                 "initialization": {
                     "workspaceTrust": true,
                     "phpCommand": ["symfony", "php"],
+                    "containerProjectRoot": "",
                     "consolePath": "bin/console",
                     "environment": "dev",
                     "debug": true,
@@ -114,10 +115,10 @@ initialization options. Use it to override the default runtime configuration:
         }
     }
 
-``phpCommand``, ``consolePath``, ``environment``, ``debug``,
-``runtimeIndexing``, ``projectRoots`` and ``trace`` have the same behavior as
-their VS Code counterparts. The ``env`` object configures environment variables
-for the server process.
+``phpCommand``, ``containerProjectRoot``, ``consolePath``, ``environment``,
+``debug``, ``runtimeIndexing``, ``projectRoots`` and ``trace`` have the same
+behavior as their VS Code counterparts, including `Docker support`_. The
+``env`` object configures environment variables for the server process.
 
 Troubleshooting
 ---------------
@@ -143,4 +144,5 @@ See the `OpenCode LSP documentation`_ for its custom language server settings
 and debugging commands.
 
 .. _`standalone guide`: ../index.rst#installing-a-standalone-release
+.. _`Docker support`: ../docker.rst
 .. _`OpenCode LSP documentation`: https://opencode.ai/docs/lsp/

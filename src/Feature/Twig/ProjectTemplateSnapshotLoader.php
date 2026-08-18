@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
 
 final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterface
@@ -15,6 +16,7 @@ final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterf
     public function __construct(
         private readonly TemplateIndexRegistry $indexes,
         private readonly UriToPathConverter $uriToPathConverter,
+        private readonly ContainerPathMapper $pathMapper,
     ) {
     }
 
@@ -37,9 +39,10 @@ final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterf
             if (!\is_array($loaderPath) || !\is_string($loaderPath['namespace'] ?? null) || !\is_string($loaderPath['path'] ?? null)) {
                 continue;
             }
-            $path = Path::isAbsolute($loaderPath['path'])
-                ? Path::canonicalize($loaderPath['path'])
-                : Path::join($project->rootPath(), $loaderPath['path']);
+            $path = $this->pathMapper->toHost($project, $loaderPath['path']);
+            $path = Path::isAbsolute($path)
+                ? Path::canonicalize($path)
+                : Path::join($project->rootPath(), $path);
             if (!is_dir($path)) {
                 continue;
             }

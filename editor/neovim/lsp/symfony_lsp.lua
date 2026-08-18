@@ -26,6 +26,7 @@ return {
   },
   init_options = {
     phpCommand = { 'php' },
+    containerProjectRoot = '',
     consolePath = 'bin/console',
     environment = 'dev',
     debug = true,
@@ -36,6 +37,7 @@ return {
   settings = {
     symfonyLsp = {
       phpCommand = { 'php' },
+      containerProjectRoot = '',
       consolePath = 'bin/console',
       environment = 'dev',
       debug = true,

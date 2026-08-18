@@ -3,12 +3,15 @@
 namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
 
 final class ProjectStimulusSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
-    public function __construct(private readonly StimulusIndexRegistry $indexes)
-    {
+    public function __construct(
+        private readonly StimulusIndexRegistry $indexes,
+        private readonly ContainerPathMapper $pathMapper,
+    ) {
     }
 
     public function section(): string
@@ -30,7 +33,7 @@ final class ProjectStimulusSnapshotLoader implements RuntimeSnapshotLoaderInterf
             }
             $controllers[] = new StimulusController(
                 $item['name'],
-                $item['sourcePath'],
+                $this->pathMapper->toHost($project, $item['sourcePath']),
                 true === ($item['lazy'] ?? false),
                 true === ($item['vendor'] ?? false),
                 $this->strings($item['actions'] ?? []),

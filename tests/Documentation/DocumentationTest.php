@@ -12,7 +12,7 @@ final class DocumentationTest extends TestCase
     public function testFeatureTableLinksToEveryIntegrationPage(): void
     {
         $index = (string) file_get_contents(self::ROOT.'/docs/features/index.rst');
-        preg_match_all('/^\.\. _`[^`]+`: ([^\s]+\.rst)$/m', $index, $matches);
+        preg_match_all('/^\.\. _`[^`]+`: ([^\s\/]+\.rst)$/m', $index, $matches);
 
         $pages = [];
         foreach ((new Finder())->files()->in(self::ROOT.'/docs/features')->name('*.rst')->notName('index.rst') as $file) {

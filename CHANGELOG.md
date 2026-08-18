@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Support Docker-only applications by mapping project paths through the new containerProjectRoot setting
+
 ## 0.9.1 (2026-08-18)
 
 - Support OpenCode as a custom LSP client on Linux and macOS

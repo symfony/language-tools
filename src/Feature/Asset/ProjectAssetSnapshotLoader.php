@@ -3,12 +3,15 @@
 namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
 
 final class ProjectAssetSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
-    public function __construct(private readonly AssetIndexRegistry $indexes)
-    {
+    public function __construct(
+        private readonly AssetIndexRegistry $indexes,
+        private readonly ContainerPathMapper $pathMapper,
+    ) {
     }
 
     public function section(): string
@@ -28,7 +31,7 @@ final class ProjectAssetSnapshotLoader implements RuntimeSnapshotLoaderInterface
             if (!\is_array($item) || !\is_string($item['logicalPath'] ?? null) || !\is_string($item['sourcePath'] ?? null)) {
                 continue;
             }
-            $assets[] = new Asset($item['logicalPath'], $item['sourcePath'], true === ($item['vendor'] ?? false));
+            $assets[] = new Asset($item['logicalPath'], $this->pathMapper->toHost($project, $item['sourcePath']), true === ($item['vendor'] ?? false));
         }
         $entries = [];
         foreach (\is_array($section['importMap'] ?? null) ? $section['importMap'] : [] as $item) {

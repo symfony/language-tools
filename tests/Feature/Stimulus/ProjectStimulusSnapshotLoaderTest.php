@@ -7,6 +7,8 @@ use Symfony\Lsp\Feature\Stimulus\ProjectStimulusSnapshotLoader;
 use Symfony\Lsp\Feature\Stimulus\StimulusController;
 use Symfony\Lsp\Feature\Stimulus\StimulusIndexRegistry;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Runtime\ContainerPathMapper;
+use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 final class ProjectStimulusSnapshotLoaderTest extends TestCase
 {
@@ -14,7 +16,7 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $indexes = new StimulusIndexRegistry();
-        (new ProjectStimulusSnapshotLoader($indexes))->load($project, ['sections' => ['stimulus' => [
+        (new ProjectStimulusSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration())))->load($project, ['sections' => ['stimulus' => [
             'complete' => true,
             'controllers' => [[
                 'name' => 'search',
@@ -40,5 +42,27 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
         self::assertSame(['url'], $controller->values());
         self::assertSame(['dialog'], $controller->outlets());
         self::assertSame(['loading'], $controller->classes());
+    }
+
+    public function testMapsContainerSourcePathsToTheHost(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $configuration = new RuntimeConfiguration();
+        $configuration->configure(['containerProjectRoot' => '/app']);
+        $indexes = new StimulusIndexRegistry();
+        (new ProjectStimulusSnapshotLoader($indexes, new ContainerPathMapper($configuration)))->load($project, ['sections' => ['stimulus' => [
+            'complete' => true,
+            'controllers' => [[
+                'name' => 'search',
+                'sourcePath' => '/app/assets/controllers/search_controller.js',
+                'lazy' => false,
+                'vendor' => false,
+            ]],
+        ]]]);
+
+        self::assertSame(
+            '/workspace/assets/controllers/search_controller.js',
+            $indexes->forProject($project)->controller('search')?->sourcePath(),
+        );
     }
 }

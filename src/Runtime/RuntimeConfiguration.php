@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Runtime;
 
+use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Project\Project;
 
 final class RuntimeConfiguration
@@ -9,6 +10,7 @@ final class RuntimeConfiguration
     /** @var non-empty-list<string> */
     private array $phpCommand = ['php'];
     private string $consolePath = 'bin/console';
+    private ?string $containerProjectRoot = null;
     private string $environment = 'dev';
     private bool $debug = true;
     private bool $runtimeIndexing = true;
@@ -42,6 +44,11 @@ final class RuntimeConfiguration
         $consolePath = $initializationOptions['consolePath'] ?? null;
         if (\is_string($consolePath) && '' !== $consolePath) {
             $this->consolePath = $consolePath;
+        }
+
+        $containerProjectRoot = $initializationOptions['containerProjectRoot'] ?? null;
+        if (\is_string($containerProjectRoot) && Path::isAbsolute($containerProjectRoot)) {
+            $this->containerProjectRoot = Path::canonicalize($containerProjectRoot);
         }
 
         $environment = $initializationOptions['environment'] ?? null;
@@ -93,6 +100,16 @@ final class RuntimeConfiguration
         }
 
         return [] === $validated ? $this->phpCommand : $validated;
+    }
+
+    public function containerProjectRoot(?Project $project = null): ?string
+    {
+        $root = $this->setting($project, 'containerProjectRoot', $this->containerProjectRoot);
+        if (!\is_string($root) || !Path::isAbsolute($root)) {
+            $root = $this->containerProjectRoot;
+        }
+
+        return null === $root ? null : Path::canonicalize($root);
     }
 
     public function consolePath(?Project $project = null): string

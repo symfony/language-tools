@@ -184,8 +184,11 @@ If a runtime-backed feature returns no results, verify that:
 * ``vendor/autoload.php`` exists;
 * the application kernel boots in the configured environment;
 * the configured PHP command is compatible with the application;
+* ``containerProjectRoot`` matches the container-side project path when the
+  PHP command runs in Docker (see `Docker support`_);
 * runtime indexing is enabled and the workspace is trusted.
 
+.. _`Docker support`: ../docker.rst
 .. _`Routing`: routing.rst
 .. _`Dependency injection`: dependency-injection.rst
 .. _`Twig template names`: templates.rst

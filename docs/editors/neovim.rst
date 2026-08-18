@@ -69,6 +69,7 @@ Override the built-in configuration before enabling the language server:
     vim.lsp.config('symfony_lsp', {
         init_options = {
             phpCommand = { 'php' },
+            containerProjectRoot = '',
             consolePath = 'bin/console',
             environment = 'dev',
             debug = true,
@@ -79,6 +80,7 @@ Override the built-in configuration before enabling the language server:
         settings = {
             symfonyLsp = {
                 phpCommand = { 'php' },
+                containerProjectRoot = '',
                 consolePath = 'bin/console',
                 environment = 'dev',
                 debug = true,
@@ -92,12 +94,13 @@ Override the built-in configuration before enabling the language server:
     vim.lsp.enable('symfony_lsp')
 
 ``phpCommand`` is the argument list used to inspect the Symfony application.
-For example, use ``{ 'symfony', 'php' }`` with Symfony CLI.
+For example, use ``{ 'symfony', 'php' }`` with Symfony CLI, or a Docker
+command with ``containerProjectRoot`` as described in `Docker support`_.
 
-``consolePath``, ``environment``, ``debug``, ``runtimeIndexing``,
-``projectRoots``, ``trace`` and ``translationDiagnostics`` have the same
-behavior as their VS Code counterparts. Restart the language client after
-changing its configuration.
+``containerProjectRoot``, ``consolePath``, ``environment``, ``debug``,
+``runtimeIndexing``, ``projectRoots``, ``trace`` and
+``translationDiagnostics`` have the same behavior as their VS Code
+counterparts. Restart the language client after changing its configuration.
 
 Set the ``SYMFONY_LSP_MEMORY_LIMIT`` environment variable to change the
 server's PHP memory limit for large projects:
@@ -126,4 +129,5 @@ protocol traffic to Neovim's LSP log. Restore it to ``off`` after
 troubleshooting.
 
 .. _`standalone guide`: ../index.rst#installing-a-standalone-release
+.. _`Docker support`: ../docker.rst
 .. _`nvim-lspconfig`: https://github.com/neovim/nvim-lspconfig

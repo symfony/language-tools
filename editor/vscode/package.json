@@ -115,6 +115,12 @@
           "scope": "resource",
           "description": "Command and arguments used to run the project bridge."
         },
+        "symfonyLsp.containerProjectRoot": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Absolute project root as seen by the PHP command when it runs in a Docker container. Leave empty when the PHP command runs on this machine."
+        },
         "symfonyLsp.consolePath": {
           "type": "string",
           "default": "bin/console",

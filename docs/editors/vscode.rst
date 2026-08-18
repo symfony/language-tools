@@ -84,6 +84,7 @@ workspace's ``.vscode/settings.json`` file:
     {
         "symfonyLsp.memoryLimit": "",
         "symfonyLsp.phpCommand": ["php"],
+        "symfonyLsp.containerProjectRoot": "",
         "symfonyLsp.consolePath": "bin/console",
         "symfonyLsp.environment": "dev",
         "symfonyLsp.debug": true,
@@ -109,6 +110,9 @@ for runtime indexing and static-only behavior.
 ``symfonyLsp.phpCommand`` is the argument array used to inspect the Symfony
 application. For example, use ``["symfony", "php"]`` for Symfony CLI. The
 command must be compatible with the Symfony application.
+``symfonyLsp.containerProjectRoot`` supports a ``phpCommand`` that runs in a
+Docker container: set it to the absolute project path inside the container.
+See `Docker support`_ for the complete setup.
 ``symfonyLsp.consolePath`` selects the project console used for normal cache
 maintenance.
 
@@ -155,4 +159,5 @@ the platform's native crash reports. On macOS, they are stored under
 * the workspace settings contain a valid project PHP command.
 
 .. _`Symfony integrations`: ../features/index.rst
+.. _`Docker support`: ../docker.rst
 .. _`Marketplace overview`: https://marketplace.visualstudio.com/items?itemName=symfony.language-tools

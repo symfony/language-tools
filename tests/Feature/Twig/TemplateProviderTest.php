@@ -30,6 +30,8 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Runtime\ContainerPathMapper;
+use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 final class TemplateProviderTest extends TestCase
 {
@@ -184,7 +186,7 @@ final class TemplateProviderTest extends TestCase
         $indexes = new TemplateIndexRegistry();
 
         try {
-            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter()))->load($project, ['sections' => ['twig' => [
+            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper(new RuntimeConfiguration())))->load($project, ['sections' => ['twig' => [
                 'complete' => true,
                 'paths' => [['namespace' => '(None)', 'path' => $root.'/templates']],
             ]]]);
@@ -192,6 +194,30 @@ final class TemplateProviderTest extends TestCase
             self::assertSame('file://'.$root.'/templates/index.html', $indexes->forProject($project)->get('index.html')?->uri());
         } finally {
             @unlink($root.'/templates/index.html');
+            @rmdir($root.'/templates');
+            @rmdir($root);
+        }
+    }
+
+    public function testIndexesTemplatesFromContainerLoaderPaths(): void
+    {
+        $root = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
+        mkdir($root.'/templates', 0777, true);
+        file_put_contents($root.'/templates/index.html.twig', 'Hello');
+        $project = new Project($root, 'file://'.$root, '^8.0');
+        $configuration = new RuntimeConfiguration();
+        $configuration->configure(['containerProjectRoot' => '/app']);
+        $indexes = new TemplateIndexRegistry();
+
+        try {
+            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper($configuration)))->load($project, ['sections' => ['twig' => [
+                'complete' => true,
+                'paths' => [['namespace' => '(None)', 'path' => '/app/templates']],
+            ]]]);
+
+            self::assertSame('file://'.$root.'/templates/index.html.twig', $indexes->forProject($project)->get('index.html.twig')?->uri());
+        } finally {
+            @unlink($root.'/templates/index.html.twig');
             @rmdir($root.'/templates');
             @rmdir($root);
         }
@@ -211,7 +237,7 @@ final class TemplateProviderTest extends TestCase
         $indexes = new TemplateIndexRegistry();
 
         try {
-            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter()))->load($project, ['sections' => ['twig' => [
+            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper(new RuntimeConfiguration())))->load($project, ['sections' => ['twig' => [
                 'complete' => true,
                 'paths' => [['namespace' => '(None)', 'path' => $root.'/templates']],
             ]]]);

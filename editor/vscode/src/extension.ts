@@ -61,6 +61,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         initializationOptions: {
             workspaceTrust: vscode.workspace.isTrusted,
             phpCommand: configuration.get<string[]>('phpCommand', ['php']),
+            containerProjectRoot: configuration.get<string>('containerProjectRoot', ''),
             consolePath: configuration.get<string>('consolePath', 'bin/console'),
             environment: configuration.get<string>('environment', 'dev'),
             debug: configuration.get<boolean>('debug', true),

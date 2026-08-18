@@ -13,6 +13,7 @@ use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\BridgeInstaller;
+use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\ProcessResult;
 use Symfony\Lsp\Runtime\ProcessRunnerInterface;
 use Symfony\Lsp\Runtime\ProjectRuntimeInitializer;
@@ -77,6 +78,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 new ProjectServiceSnapshotLoader($serviceIndexes, $parameterIndexes),
             ]),
             $configuration,
+            new ContainerPathMapper($configuration),
         );
 
         $initializer->initialize($project);
@@ -92,6 +94,38 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
     }
 
+    public function testMapsBridgeArgumentsToTheContainerProjectRoot(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $processRunner = new CapturingProcessRunner(new ProcessResult(0, json_encode([
+            'schemaVersion' => 1,
+            'sections' => [],
+        ], \JSON_THROW_ON_ERROR), ''));
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $configuration = new RuntimeConfiguration();
+        $configuration->configure([
+            'phpCommand' => ['docker', 'compose', 'exec', '-T', 'php', 'php'],
+            'containerProjectRoot' => '/app',
+        ]);
+        $initializer = new ProjectRuntimeInitializer(
+            new BridgeInstaller($source, 'test', new Filesystem()),
+            $processRunner,
+            new RuntimeSnapshotLoaderRegistry([]),
+            $configuration,
+            new ContainerPathMapper($configuration),
+        );
+
+        $initializer->initialize($project);
+
+        self::assertSame(['docker', 'compose', 'exec', '-T', 'php', 'php'], \array_slice($processRunner->command, 0, 6));
+        self::assertStringStartsWith('/app/var/symfony-lsp/test/', $processRunner->command[6]);
+        self::assertStringEndsWith('/bridge.php', $processRunner->command[6]);
+        self::assertSame('--project=/app', $processRunner->command[7]);
+        self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
+        self::assertFileExists($this->temporaryDirectory.substr($processRunner->command[6], \strlen('/app')));
+    }
+
     public function testRejectsRuntimeIndexingWithoutDebugMode(): void
     {
         $source = $this->temporaryDirectory.'/source.php';
@@ -103,6 +137,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             new CapturingProcessRunner(new ProcessResult(0, '', '')),
             new RuntimeSnapshotLoaderRegistry([]),
             $configuration,
+            new ContainerPathMapper($configuration),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -123,6 +158,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             $processRunner,
             new RuntimeSnapshotLoaderRegistry([]),
             new RuntimeConfiguration(),
+            new ContainerPathMapper(new RuntimeConfiguration()),
         );
 
         $initializer->initialize(
@@ -147,6 +183,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             $processRunner,
             new RuntimeSnapshotLoaderRegistry([]),
             new RuntimeConfiguration(),
+            new ContainerPathMapper(new RuntimeConfiguration()),
         );
 
         $initializer->initialize(
@@ -183,6 +220,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 new ProjectServiceSnapshotLoader($serviceIndexes, new ParameterIndexRegistry()),
             ]),
             new RuntimeConfiguration(),
+            new ContainerPathMapper(new RuntimeConfiguration()),
         );
 
         $routeIndexes->forProject($project)->replace(new Route('existing', '/existing', [], [], null, null));
@@ -208,6 +246,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 new ProjectRouteSnapshotLoader(new RouteIndexRegistry()),
             ]),
             new RuntimeConfiguration(),
+            new ContainerPathMapper(new RuntimeConfiguration()),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -241,6 +280,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             )),
             new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($indexes)]),
             new RuntimeConfiguration(),
+            new ContainerPathMapper(new RuntimeConfiguration()),
         );
 
         $initializer->initialize($project);
@@ -261,6 +301,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             )),
             new RuntimeSnapshotLoaderRegistry([]),
             new RuntimeConfiguration(),
+            new ContainerPathMapper(new RuntimeConfiguration()),
         );
 
         $this->expectException(\RuntimeException::class);

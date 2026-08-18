@@ -41,7 +41,8 @@ Requirements
 The language server supports the maintained Symfony versions listed in
 Symfony's `release metadata`_. Your application must have its Composer
 dependencies installed and provide a PHP command compatible with its Symfony
-version.
+version. The PHP command doesn't have to run on your machine: applications
+that run in a container are officially supported through `Docker support`_.
 
 .. _`installing a release`:
 
@@ -125,4 +126,5 @@ locally built parser extension on Unix systems. Verify that it starts:
 .. _`Neovim`: editors/neovim.rst
 .. _`OpenCode`: editors/opencode.rst
 .. _`supported integrations`: features/index.rst
+.. _`Docker support`: docker.rst
 .. _`release metadata`: https://symfony.com/releases.json
