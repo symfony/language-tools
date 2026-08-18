@@ -18,7 +18,9 @@ use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class RouteDiagnosticPublisherTest extends TestCase
 {
@@ -197,6 +199,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $client,
             $documents,
             $projects,
+            new ProjectPathResolver(new UriToPathConverter()),
             [new RouteDiagnosticPublisher(
                 $documents,
                 $projects,
@@ -269,6 +272,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 $client,
                 $documents,
                 $projects,
+                new ProjectPathResolver(new UriToPathConverter()),
                 [new RouteDiagnosticPublisher(
                     $documents,
                     $projects,

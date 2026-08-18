@@ -20,7 +20,7 @@ use function Amp\delay;
  */
 final class ApplicationSourceScanner
 {
-    private const EXCLUDED_DIRECTORIES = [
+    public const EXCLUDED_DIRECTORIES = [
         '.git',
         'node_modules',
         'var',

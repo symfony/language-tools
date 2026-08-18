@@ -4,7 +4,9 @@ namespace Symfony\Lsp\Feature;
 
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Runtime\RuntimeRefreshObserverInterface;
 
@@ -15,6 +17,7 @@ final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterfac
         private readonly ClientInterface $client,
         private readonly DocumentStore $documents,
         private readonly ProjectRegistry $projects,
+        private readonly ProjectPathResolver $pathResolver,
         private readonly iterable $providers,
     ) {
     }
@@ -31,6 +34,16 @@ final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterfac
 
         $document = $this->documents->get($textDocument['uri']);
         if (null === $document) {
+            return;
+        }
+
+        if ($this->isDependencyOwned($document->uri())) {
+            $this->client->notify('textDocument/publishDiagnostics', [
+                'uri' => $document->uri(),
+                'version' => $document->version(),
+                'diagnostics' => [],
+            ]);
+
             return;
         }
 
@@ -88,5 +101,25 @@ final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterfac
             'uri' => $textDocument['uri'],
             'diagnostics' => [],
         ]);
+    }
+
+    private function isDependencyOwned(string $uri): bool
+    {
+        $project = $this->projects->forDocumentUri($uri);
+        if (null === $project) {
+            return false;
+        }
+        $relativePath = $this->pathResolver->relative($project, $uri);
+        if (null === $relativePath) {
+            return false;
+        }
+
+        foreach (explode('/', $relativePath) as $segment) {
+            if (\in_array($segment, ApplicationSourceScanner::EXCLUDED_DIRECTORIES, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
