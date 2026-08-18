@@ -3,7 +3,7 @@
   "displayName": "Symfony Language Tools",
   "publisher": "symfony",
   "description": "Symfony-aware completion, navigation and diagnostics for Symfony applications",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "license": "MIT",
   "icon": "images/icon.png",
   "repository": {
