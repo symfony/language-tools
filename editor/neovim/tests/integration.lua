@@ -1,7 +1,7 @@
 local repo = vim.fn.getcwd()
 local fixture = repo .. '/tests/Fixtures/RuntimeApplication'
 local route_file = fixture .. '/config/routes.yaml'
-local test_directory = fixture .. '/var/neovim-e2e'
+local test_directory = fixture .. '/src/NeovimE2e'
 local consumer_file = test_directory .. '/RouteConsumer.php'
 local route_file_contents
 
@@ -147,7 +147,7 @@ local function test()
   phase('checking language features')
   local consumer = [[<?php
 
-namespace App;
+namespace App\NeovimE2e;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 
