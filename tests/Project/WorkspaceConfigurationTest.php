@@ -61,6 +61,7 @@ final class WorkspaceConfigurationTest extends TestCase
                 'consolePath' => 'app-console',
                 'environment' => 'test',
                 'debug' => false,
+                'bridgeTimeout' => 90,
             ],
         ]);
 
@@ -71,6 +72,7 @@ final class WorkspaceConfigurationTest extends TestCase
         self::assertSame('test', $runtimeConfiguration->environment());
         self::assertFalse($runtimeConfiguration->debug());
         self::assertFalse($runtimeConfiguration->runtimeIndexing());
+        self::assertSame(90.0, $runtimeConfiguration->bridgeTimeout());
         self::assertSame('utf-8', $configuration->positionEncoding());
     }
 

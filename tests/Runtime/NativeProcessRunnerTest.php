@@ -70,13 +70,13 @@ final class NativeProcessRunnerTest extends TestCase
         (new NativeProcessRunner())->run([\PHP_BINARY, '-r', ''], __DIR__.'/missing');
     }
 
-    public function testEnforcesTimeout(): void
+    public function testEnforcesTheOperationTimeout(): void
     {
-        $runner = new NativeProcessRunner(timeout: 0.01);
+        $runner = new NativeProcessRunner();
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('timed out');
+        $this->expectExceptionMessage('The project bridge timed out after 0.01 seconds.');
 
-        $runner->run([\PHP_BINARY, '-r', 'sleep(10);'], __DIR__);
+        $runner->run([\PHP_BINARY, '-r', 'sleep(10);'], __DIR__, timeout: 0.01);
     }
 }

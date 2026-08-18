@@ -145,6 +145,13 @@
           "scope": "resource",
           "description": "Enable trusted runtime indexing."
         },
+        "symfonyLsp.bridgeTimeout": {
+          "type": "number",
+          "default": 60,
+          "minimum": 1,
+          "scope": "resource",
+          "description": "Maximum number of seconds allowed for each project bridge run."
+        },
         "symfonyLsp.projectRoots": {
           "type": "array",
           "items": {

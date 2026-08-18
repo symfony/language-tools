@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Make the project bridge timeout configurable for large applications
 - Tolerate console noise around the debug:router JSON output when loading the routes section
 - Suppress diagnostics in dependency-owned files such as vendor bundle templates
 - Recognize bundle-provided Twig components through runtime metadata before reporting unknown components

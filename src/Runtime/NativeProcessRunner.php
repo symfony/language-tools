@@ -17,22 +17,26 @@ use function Amp\Future\awaitAll;
 final class NativeProcessRunner implements ProcessRunnerInterface
 {
     public function __construct(
-        private readonly float $timeout = 10.0,
+        private readonly float $timeout = 60.0,
         private readonly int $maximumOutputBytes = 16777216,
     ) {
-        if ($timeout <= 0 || $maximumOutputBytes < 1) {
+        if ($timeout <= 0 || !\is_finite($timeout) || $maximumOutputBytes < 1) {
             throw new \InvalidArgumentException('Process limits must be positive.');
         }
     }
 
-    public function run(array $command, string $workingDirectory, ?Cancellation $cancellation = null): ProcessResult
+    public function run(array $command, string $workingDirectory, ?Cancellation $cancellation = null, ?float $timeout = null): ProcessResult
     {
         $cancellation?->throwIfRequested();
-        $timeout = new TimeoutCancellation($this->timeout);
+        $timeout ??= $this->timeout;
+        if ($timeout <= 0 || !\is_finite($timeout)) {
+            throw new \InvalidArgumentException('Process limits must be positive.');
+        }
+        $timeoutCancellation = new TimeoutCancellation($timeout);
         $outputLimit = new DeferredCancellation();
         $operationCancellation = new CompositeCancellation(...array_filter([
             $cancellation,
-            $timeout,
+            $timeoutCancellation,
             $outputLimit->getCancellation(),
         ]));
 
@@ -69,8 +73,8 @@ final class NativeProcessRunner implements ProcessRunnerInterface
             if ($outputLimit->isCancelled()) {
                 throw new \RuntimeException('The project bridge exceeded the output limit.', previous: $error);
             }
-            if ($timeout->isRequested()) {
-                throw new \RuntimeException('The project bridge timed out.', previous: $error);
+            if ($timeoutCancellation->isRequested()) {
+                throw new \RuntimeException(\sprintf('The project bridge timed out after %s seconds.', $timeout), previous: $error);
             }
 
             throw $error;

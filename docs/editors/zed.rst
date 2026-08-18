@@ -73,6 +73,7 @@ Configure startup options and project settings under the
                     "environment": "dev",
                     "debug": true,
                     "runtimeIndexing": true,
+                    "bridgeTimeout": 60,
                     "projectRoots": [],
                     "trace": "off"
                 },
@@ -83,6 +84,7 @@ Configure startup options and project settings under the
                     "environment": "dev",
                     "debug": true,
                     "runtimeIndexing": true,
+                    "bridgeTimeout": 60,
                     "translationDiagnostics": false
                 }
             }
@@ -94,7 +96,7 @@ For example, use ``["symfony", "php"]`` with Symfony CLI, or a Docker command
 with ``containerProjectRoot`` as described in `Docker support`_.
 
 ``containerProjectRoot``, ``consolePath``, ``environment``, ``debug``,
-``runtimeIndexing``, ``projectRoots``, ``trace`` and
+``runtimeIndexing``, ``bridgeTimeout``, ``projectRoots``, ``trace`` and
 ``translationDiagnostics`` have the same behavior as their VS Code
 counterparts. Restart the language server after changing initialization
 options.

@@ -112,6 +112,7 @@ local function test()
   assert(client.offset_encoding == 'utf-8', client.offset_encoding)
   assert(client.server_info.name == 'Symfony Language Tools')
   assert(client.settings.symfonyLsp.phpCommand[1] == 'php')
+  assert(client.settings.symfonyLsp.bridgeTimeout == 60)
   assert(client.settings.symfonyLsp.translationDiagnostics)
   wait_for('watched-file registration', function()
     local registrations = client.registrations['workspace/didChangeWatchedFiles'] or {}

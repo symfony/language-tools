@@ -105,6 +105,7 @@ initialization options. Use it to override the default runtime configuration:
                     "environment": "dev",
                     "debug": true,
                     "runtimeIndexing": true,
+                    "bridgeTimeout": 60,
                     "projectRoots": [],
                     "trace": "off"
                 },
@@ -116,8 +117,9 @@ initialization options. Use it to override the default runtime configuration:
     }
 
 ``phpCommand``, ``containerProjectRoot``, ``consolePath``, ``environment``,
-``debug``, ``runtimeIndexing``, ``projectRoots`` and ``trace`` have the same
-behavior as their VS Code counterparts, including `Docker support`_. The
+``debug``, ``runtimeIndexing``, ``bridgeTimeout``, ``projectRoots`` and
+``trace`` have the same behavior as their VS Code counterparts, including
+`Docker support`_. The
 ``env`` object configures environment variables for the server process.
 
 Troubleshooting

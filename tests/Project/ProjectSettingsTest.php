@@ -26,6 +26,7 @@ final class ProjectSettingsTest extends TestCase
 
         self::assertTrue($configuration->missingKeyDiagnostics($project));
         self::assertSame('test', $runtime->environment($project));
+        self::assertSame(120.0, $runtime->bridgeTimeout($project));
         self::assertSame([
             'items' => [[
                 'scopeUri' => 'file:///workspace',
@@ -44,7 +45,7 @@ final class ProjectSettingsClient implements ClientInterface
     {
         $this->params = $params;
 
-        return [['translationDiagnostics' => true, 'environment' => 'test']];
+        return [['translationDiagnostics' => true, 'environment' => 'test', 'bridgeTimeout' => 120]];
     }
 
     public function notify(string $method, array $params): void
