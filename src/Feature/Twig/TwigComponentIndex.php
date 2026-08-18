@@ -168,6 +168,12 @@ final class TwigComponentIndex
         return isset($this->runtimeNames[$name]);
     }
 
+    /** @return list<string> */
+    public function runtimeNames(): array
+    {
+        return array_keys($this->runtimeNames);
+    }
+
     public function anonymousTemplateDirectory(): string
     {
         return $this->anonymousTemplateDirectory;

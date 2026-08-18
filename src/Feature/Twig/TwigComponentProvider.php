@@ -54,7 +54,12 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
             $detail = \sprintf('Property of Twig component %s', $component->name());
         } elseif (preg_match('/<twig:([A-Za-z_][A-Za-z0-9_:.-]*)?$/', $before, $match)) {
             $prefix = $match[1] ?? '';
-            $values = array_map(static fn (TwigComponent $component): string => $component->name(), $index->components());
+            $values = array_values(array_unique([
+                ...array_map(static fn (TwigComponent $component): string => $component->name(), $index->components()),
+                ...$index->runtimeNames(),
+                ...$this->anonymousComponentNames($index->anonymousTemplateDirectory(), $this->templates->forProject($project)),
+            ]));
+            sort($values);
             $detail = 'Symfony Twig component';
         } else {
             return null;
@@ -201,6 +206,39 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
         }
 
         return $diagnostics;
+    }
+
+    /**
+     * Reverses the ComponentTemplateFinder anonymous template rules into component names.
+     *
+     * @return list<string>
+     */
+    private function anonymousComponentNames(string $directory, TemplateIndex $templates): array
+    {
+        $names = [];
+        $directory = rtrim($directory, '/').'/';
+        foreach ($templates->matching('') as $template) {
+            $templateName = $template->name();
+            if (str_starts_with($templateName, $directory)) {
+                $path = substr($templateName, \strlen($directory));
+            } elseif (str_starts_with($templateName, '@') && \is_int($marker = strpos($templateName, '/components/'))) {
+                $path = substr($templateName, 1, $marker - 1).'/'.substr($templateName, $marker + \strlen('/components/'));
+            } else {
+                continue;
+            }
+            foreach (['/index.html.twig', '.html.twig'] as $suffix) {
+                if (!str_ends_with($path, $suffix)) {
+                    continue;
+                }
+                $name = str_replace('/', ':', substr($path, 0, -\strlen($suffix)));
+                if ('' !== $name) {
+                    $names[] = $name;
+                }
+                break;
+            }
+        }
+
+        return array_values(array_unique($names));
     }
 
     // Mirrors the template candidates of the ComponentTemplateFinder anonymous resolution.

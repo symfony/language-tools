@@ -41,7 +41,9 @@ includes, inheritance or arbitrary PHP expressions.
 Twig Components
 ---------------
 
-Component names and public properties are completed in ``<twig:...>`` tags.
+Component names and public properties are completed in ``<twig:...>`` tags,
+including bundle-provided and anonymous component names found in runtime
+metadata.
 Hover shows the component class, template, and public properties. Go to
 Definition opens the component class and anonymous component template. Find All
 References and code lenses expose statically recognized component usages.

@@ -210,6 +210,39 @@ final class TemplateProviderTest extends TestCase
         self::assertNull($withIncompleteRuntimeNames);
     }
 
+    public function testCompletesBundleProvidedAndAnonymousComponentNames(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $converter = new PositionConverter();
+        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver());
+        $completionUri = 'file:///workspace/templates/completion.html.twig';
+        $completionText = '<twig:';
+        $documents = new DocumentStore();
+        $documents->open(new Document($completionUri, 'twig', 1, $completionText));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project]);
+        $indexes = new TwigComponentIndexRegistry();
+        $indexes->forProject($project)->replaceRuntime(true, ['ux:icon'], 'components');
+        $templateIndexes = new TemplateIndexRegistry();
+        $range = new Range(new Position(0, 0), new Position(0, 0));
+        $templateIndexes->forProject($project)->replaceRuntime(
+            true,
+            new TemplateDeclaration('components/Alert.html.twig', 'file:///workspace/templates/components/Alert.html.twig', $range),
+            new TemplateDeclaration('components/Card/index.html.twig', 'file:///workspace/templates/components/Card/index.html.twig', $range),
+            new TemplateDeclaration('@acme/components/badge.html.twig', 'file:///workspace/vendor/acme/bundle/templates/components/badge.html.twig', $range),
+            new TemplateDeclaration('page.html.twig', 'file:///workspace/templates/page.html.twig', $range),
+        );
+        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, $templateIndexes, $extractor);
+
+        $position = $converter->toPosition($completionText, \strlen($completionText));
+        $items = $provider->complete([
+            'textDocument' => ['uri' => $completionUri],
+            'position' => ['line' => $position->line(), 'character' => $position->character()],
+        ]);
+
+        self::assertSame(['Alert', 'Card', 'acme:badge', 'ux:icon'], array_column($items ?? [], 'label'));
+    }
+
     public function testResolvesBundleTemplateNames(): void
     {
         $resolver = $this->templateNameResolver();
