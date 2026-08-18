@@ -2,8 +2,29 @@ name: VS Code integration
 
 on:
     pull_request:
+        paths-ignore:
+            - CHANGELOG.md
+            - LICENSE
+            - README.md
+            - SECURITY.md
+            - box.json
+            - docs/**
+            - editor/neovim/**
     push:
+        branches: [main]
+        paths-ignore:
+            - CHANGELOG.md
+            - LICENSE
+            - README.md
+            - SECURITY.md
+            - box.json
+            - docs/**
+            - editor/neovim/**
     workflow_dispatch:
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
     extension-host:

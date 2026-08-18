@@ -2,8 +2,33 @@ name: Symfony compatibility
 
 on:
     pull_request:
+        paths:
+            - .github/workflows/compatibility.yaml
+            - composer.json
+            - composer.lock
+            - phpunit.xml.dist
+            - resources/bridge.php
+            - resources/bridge/**
+            - src/Runtime/**
+            - tests/Compatibility/**
+            - tests/Fixtures/RuntimeApplication/**
     push:
+        branches: [main]
+        paths:
+            - .github/workflows/compatibility.yaml
+            - composer.json
+            - composer.lock
+            - phpunit.xml.dist
+            - resources/bridge.php
+            - resources/bridge/**
+            - src/Runtime/**
+            - tests/Compatibility/**
+            - tests/Fixtures/RuntimeApplication/**
     workflow_dispatch:
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
     supported_versions:

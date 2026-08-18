@@ -2,8 +2,35 @@ name: PHP quality
 
 on:
     pull_request:
+        paths-ignore:
+            - CHANGELOG.md
+            - LICENSE
+            - README.md
+            - SECURITY.md
+            - box.json
+            - editor/neovim/**
+            - editor/vscode/images/**
+            - editor/vscode/src/**
+            - editor/vscode/test/**
+            - editor/vscode/*.md
     push:
+        branches: [main]
+        paths-ignore:
+            - CHANGELOG.md
+            - LICENSE
+            - README.md
+            - SECURITY.md
+            - box.json
+            - editor/neovim/**
+            - editor/vscode/images/**
+            - editor/vscode/src/**
+            - editor/vscode/test/**
+            - editor/vscode/*.md
     workflow_dispatch:
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
     quality:

@@ -2,8 +2,33 @@ name: Neovim integration
 
 on:
     pull_request:
+        paths-ignore:
+            - CHANGELOG.md
+            - LICENSE
+            - README.md
+            - SECURITY.md
+            - THIRD_PARTY_LICENSES/**
+            - THIRD_PARTY_NOTICES.md
+            - box.json
+            - docs/**
+            - editor/vscode/**
     push:
+        branches: [main]
+        paths-ignore:
+            - CHANGELOG.md
+            - LICENSE
+            - README.md
+            - SECURITY.md
+            - THIRD_PARTY_LICENSES/**
+            - THIRD_PARTY_NOTICES.md
+            - box.json
+            - docs/**
+            - editor/vscode/**
     workflow_dispatch:
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
     format:
