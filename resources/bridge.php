@@ -130,7 +130,6 @@ foreach ($requestedSections as $sectionName) {
 try {
     $context->shutdown();
 } catch (Throwable) {
-    $context->addError('runtime');
 }
 
 $result = [

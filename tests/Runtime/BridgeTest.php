@@ -483,6 +483,43 @@ final class BridgeTest extends TestCase
         self::assertSame(['routes', 'container', 'environment'], array_keys($result['sections']));
     }
 
+    public function testKeepsCollectedSectionsWhenKernelShutdownFails(): void
+    {
+        $this->writeRouteApplication();
+        $autoload = $this->temporaryDirectory.'/vendor/autoload.php';
+        $contents = str_replace(
+            'public function shutdown(): void {}',
+            'public function shutdown(): void { throw new \\RuntimeException(\'CANARY_SHUTDOWN_EXCEPTION\'); }',
+            (string) file_get_contents($autoload),
+            $count,
+        );
+        self::assertSame(1, $count);
+        file_put_contents($autoload, $contents);
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=routes 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $snapshot = implode("\n", $output);
+        self::assertSame(0, $exitCode, $snapshot);
+        self::assertStringNotContainsString('CANARY_SHUTDOWN_EXCEPTION', $snapshot);
+        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null);
+        $sections = $result['sections'] ?? null;
+        self::assertIsArray($sections);
+        $routes = $sections['routes'] ?? null;
+        self::assertIsArray($routes);
+        $items = $routes['items'] ?? null;
+        self::assertIsArray($items);
+        $homepage = $items[2] ?? null;
+        self::assertIsArray($homepage);
+        self::assertSame('homepage', $homepage['name'] ?? null);
+    }
+
     public function testExportsPublicBundleConfigurationTrees(): void
     {
         $this->writeConfigurationApplication();

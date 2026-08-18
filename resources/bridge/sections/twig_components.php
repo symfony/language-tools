@@ -10,7 +10,7 @@ function bridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
     if (!class_exists(Symfony\Component\Console\Input\ArrayInput::class)
         || !class_exists(Symfony\Component\Console\Output\BufferedOutput::class)
     ) {
-        $context->addError('twig_components', 'Symfony Console is unavailable.');
+        $context->addError('twig_components');
     } else {
         try {
             $kernel = $context->kernel();
@@ -86,8 +86,8 @@ function bridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
                 'anonymousTemplateDirectory' => $anonymousTemplateDirectory,
                 'warnings' => $warnings,
             ];
-        } catch (Throwable $error) {
-            $context->addError('twig_components', $error->getMessage());
+        } catch (Throwable) {
+            $context->addError('twig_components');
         }
     }
 
