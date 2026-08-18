@@ -12,6 +12,7 @@ on:
             - box.json
             - docs/**
             - editor/vscode/**
+            - editor/zed/**
     push:
         branches: [main]
         paths-ignore:
@@ -23,6 +24,7 @@ on:
             - box.json
             - docs/**
             - editor/vscode/**
+            - editor/zed/**
     workflow_dispatch:
 
 concurrency:

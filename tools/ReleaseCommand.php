@@ -23,6 +23,7 @@ final class ReleaseCommand
         'compatibility.yaml',
         'neovim.yaml',
         'vscode.yaml',
+        'zed.yaml',
     ];
 
     public function __construct(
@@ -146,6 +147,8 @@ final class ReleaseCommand
             'editor/neovim',
         ], $this->root);
         $this->run([$this->root.'/editor/neovim/test'], $this->root);
+        $this->run(['rustup', 'target', 'add', 'wasm32-wasip2'], $this->root);
+        $this->run([$this->root.'/editor/zed/test'], $this->root);
         $this->run(['composer', 'runtime-fixture:install'], $this->root);
         $this->run(['composer', 'server:benchmark'], $this->root);
         $this->run(['composer', 'runtime-refresh:benchmark'], $this->root);
@@ -291,7 +294,7 @@ final class ReleaseCommand
 
     private function assertRequirements(): void
     {
-        foreach (['git', 'gh', 'composer', 'npm'] as $command) {
+        foreach (['git', 'gh', 'composer', 'npm', 'cargo', 'rustup', 'python3'] as $command) {
             if (!$this->succeeds(['/usr/bin/env', $command, '--version'], $this->root)) {
                 throw new \RuntimeException(\sprintf('Required command not found: %s.', $command));
             }

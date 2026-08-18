@@ -10,6 +10,7 @@ on:
             - box.json
             - docs/**
             - editor/neovim/**
+            - editor/zed/**
     push:
         branches: [main]
         paths-ignore:
@@ -19,6 +20,7 @@ on:
             - box.json
             - docs/**
             - editor/neovim/**
+            - editor/zed/**
     workflow_dispatch:
 
 concurrency:

@@ -25,8 +25,8 @@ For a Docker Compose service named ``php`` that mounts the project at
         "symfonyLsp.containerProjectRoot": "/app"
     }
 
-The same options exist in every client: see `Neovim`_ and `OpenCode`_ for
-their configuration syntax.
+The same options exist in every client: see `Neovim`_, `Zed`_ and `OpenCode`_
+for their configuration syntax.
 
 Start the container before opening your project. The server writes a small
 bridge script under ``var/symfony-lsp/``, runs it through ``phpCommand`` and
@@ -66,4 +66,5 @@ Good to Know
   sees, and share the project files between both sides.
 
 .. _`Neovim`: editors/neovim.rst
+.. _`Zed`: editors/zed.rst
 .. _`OpenCode`: editors/opencode.rst

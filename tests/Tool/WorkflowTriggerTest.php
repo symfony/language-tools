@@ -36,5 +36,6 @@ final class WorkflowTriggerTest extends TestCase
         yield 'Symfony compatibility' => ['compatibility.yaml'];
         yield 'Neovim integration' => ['neovim.yaml'];
         yield 'VS Code integration' => ['vscode.yaml'];
+        yield 'Zed integration' => ['zed.yaml'];
     }
 }

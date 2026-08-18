@@ -1,0 +1,28 @@
+id = "symfony-language-tools"
+name = "Symfony Language Tools"
+description = "Symfony-aware completion, navigation, references and diagnostics on Linux and macOS. Windows is not supported."
+version = "0.1.0"
+schema_version = 1
+authors = ["Fabien Potencier"]
+repository = "https://github.com/symfony/language-tools"
+
+[language_servers.symfony-language-tools]
+name = "Symfony Language Tools"
+languages = [
+    "PHP",
+    "Twig",
+    "YAML",
+    "JSON",
+    "XML",
+    "JavaScript",
+    "TypeScript",
+]
+
+[language_servers.symfony-language-tools.language_ids]
+PHP = "php"
+Twig = "twig"
+YAML = "yaml"
+JSON = "json"
+XML = "xml"
+JavaScript = "javascript"
+TypeScript = "typescript"

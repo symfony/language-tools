@@ -9,6 +9,7 @@ on:
             - SECURITY.md
             - box.json
             - editor/neovim/**
+            - editor/zed/**
             - editor/vscode/images/**
             - editor/vscode/src/**
             - editor/vscode/test/**
@@ -21,6 +22,7 @@ on:
             - SECURITY.md
             - box.json
             - editor/neovim/**
+            - editor/zed/**
             - editor/vscode/images/**
             - editor/vscode/src/**
             - editor/vscode/test/**

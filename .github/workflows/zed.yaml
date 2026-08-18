@@ -1,0 +1,28 @@
+name: Zed integration
+
+on:
+    pull_request:
+        paths:
+            - .github/workflows/zed.yaml
+            - editor/zed/**
+    push:
+        branches: [main]
+        paths:
+            - .github/workflows/zed.yaml
+            - CHANGELOG.md
+            - editor/zed/**
+    workflow_dispatch:
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+    extension:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - name: Install the WebAssembly target
+              run: rustup target add wasm32-wasip2
+            - name: Test the Zed extension
+              run: ./editor/zed/test

@@ -18,6 +18,8 @@ corresponding page for installation, configuration and troubleshooting:
   needed;
 * `Neovim`_: install the server with Mason or from a standalone release, then
   enable it through ``nvim-lspconfig``;
+* `Zed`_: install the extension to download and run the server automatically on
+  Linux and macOS;
 * `OpenCode`_: install the standalone server, then configure it as a custom
   language server for Symfony-aware diagnostics and navigation.
 
@@ -49,9 +51,9 @@ that run in a container are officially supported through `Docker support`_.
 Installing a Standalone Release
 -------------------------------
 
-The VS Code extension bundles the language server, so this section only
-applies to other editors. Download the archive for your platform from the
-GitHub release:
+The VS Code extension bundles the language server, and the Zed extension
+downloads it automatically. For a manual installation or a custom binary,
+download the archive for your platform from the GitHub release:
 
 * ``linux-x64`` or ``linux-arm64``;
 * ``macos-x64`` or ``macos-arm64``;
@@ -124,6 +126,7 @@ locally built parser extension on Unix systems. Verify that it starts:
 
 .. _`VS Code`: editors/vscode.rst
 .. _`Neovim`: editors/neovim.rst
+.. _`Zed`: editors/zed.rst
 .. _`OpenCode`: editors/opencode.rst
 .. _`supported integrations`: features/index.rst
 .. _`Docker support`: docker.rst

@@ -36,6 +36,15 @@ vim.lsp.enable('symfony_lsp')
 See the [Neovim guide](docs/editors/neovim.rst) for installation, workspace
 trust, configuration and troubleshooting.
 
+### Zed
+
+Install the Symfony Language Tools extension from Zed's Extensions page. The
+extension downloads the latest stable server automatically and runs alongside
+a general PHP language server on Linux and macOS. Windows is not supported.
+
+See the [Zed guide](docs/editors/zed.rst) for installation, workspace trust,
+configuration and troubleshooting.
+
 ### OpenCode
 
 Install `symfony-lsp` from a standalone release, then configure it as a custom
@@ -71,6 +80,7 @@ compatible with its Symfony version.
 - [Supported Symfony integrations](docs/features/index.rst)
 - [Visual Studio Code guide](docs/editors/vscode.rst)
 - [Neovim guide](docs/editors/neovim.rst)
+- [Zed guide](docs/editors/zed.rst)
 - [OpenCode guide](docs/editors/opencode.rst)
 - [Standalone server guide](docs/index.rst)
 - [Changelog](CHANGELOG.md)

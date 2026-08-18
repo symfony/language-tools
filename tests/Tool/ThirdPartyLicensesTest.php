@@ -52,6 +52,22 @@ final class ThirdPartyLicensesTest extends TestCase
         self::assertSame($expected, $this->licenseFiles('vscode'));
     }
 
+    public function testDistributesZedExtensionLicenses(): void
+    {
+        self::assertSame(
+            $this->normalizedContents(self::ROOT.'/LICENSE'),
+            $this->normalizedContents(self::ROOT.'/editor/zed/LICENSE'),
+        );
+        self::assertGreaterThan(
+            10000,
+            (int) filesize(self::ROOT.'/editor/zed/THIRD_PARTY_LICENSES/zed_extension_api/LICENSE-APACHE'),
+        );
+        self::assertStringContainsString(
+            'zed_extension_api | Apache License 2.0',
+            (string) file_get_contents(self::ROOT.'/editor/zed/THIRD_PARTY_NOTICES.md'),
+        );
+    }
+
     public function testDistributesNativeDependencyLicenses(): void
     {
         $expected = [
