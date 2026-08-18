@@ -173,7 +173,7 @@ function bridgeStimulusController(string $projectRoot, string $name, string $sou
     return [
         'name' => $name,
         'sourcePath' => $sourcePath,
-        'lazy' => $lazy ?? 1 === preg_match('/\/\*!?\s*stimulusFetch:\s*\'lazy\'\s*\*\//i', $contents),
+        'lazy' => $lazy ?? 1 === preg_match('/(?:\/\*!?\s*stimulusFetch:\s*[\'"]lazy[\'"]\s*\*\/|\/\/\s*stimulusFetch:\s*[\'"]lazy[\'"])\s*(?:export\s+(?:default\s+)?)?(?:abstract\s+)?class\b/i', $contents),
         'vendor' => !Symfony\Component\Filesystem\Path::isBasePath($root, $sourcePath) || str_contains('/'.$sourcePath, '/vendor/'),
         ...$metadata,
     ];

@@ -9,6 +9,7 @@ use Symfony\Lsp\Project\ProjectPathResolver;
 
 final class StimulusExtractor
 {
+    private const LAZY_COMMENT_PATTERN = '/(?:\/\*!?\s*stimulusFetch:\s*[\'"]lazy[\'"]\s*\*\/|\/\/\s*stimulusFetch:\s*[\'"]lazy[\'"])\s*(?:export\s+(?:default\s+)?)?(?:abstract\s+)?class\b/i';
     private const LIFECYCLE_METHODS = ['connect', 'constructor', 'disconnect', 'initialize'];
 
     public function __construct(
@@ -105,7 +106,7 @@ final class StimulusExtractor
             $uri,
             $this->range($text, $offset, \strlen('export default class')),
             $members,
-            1 === preg_match('/\/\*!?\s*stimulusFetch:\s*\'lazy\'\s*\*\//i', $text),
+            1 === preg_match(self::LAZY_COMMENT_PATTERN, $text),
         )];
     }
 
