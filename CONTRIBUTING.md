@@ -93,6 +93,34 @@ details, create a reproduction when useful, analyze logs, or explain the exact
 problem. Include whatever findings add useful context about your real setup or
 use case.
 
+An agent working in the affected project can often collect this context itself.
+Tell it which action and file trigger the problem, then let it inspect relevant
+Composer metadata, editor settings, project structure, and source files.
+
+The server writes logs and errors to standard error. The editor or LSP client
+decides where to expose or store them. Useful starting points include:
+
+- **Visual Studio Code:** Open `View > Output` and select
+  `Symfony Language Tools`. Temporarily set `symfonyLsp.trace` to `messages` or
+  `verbose` for redacted protocol details, reproduce the problem, then restore
+  it to `off`. See the
+  [VS Code troubleshooting guide](docs/editors/vscode.rst#troubleshooting).
+- **Neovim:** Run `:checkhealth vim.lsp`. The command
+  `:lua print(vim.lsp.log.get_filename())` prints the LSP log path. Set `trace`
+  to `messages` or `verbose` temporarily when protocol details may help. See the
+  [Neovim troubleshooting guide](docs/editors/neovim.rst#troubleshooting).
+- **OpenCode:** Run `opencode debug config` to inspect the resolved
+  configuration, `opencode debug lsp diagnostics <file>` for an affected file,
+  and `opencode debug paths` to locate its logs. See the
+  [OpenCode troubleshooting guide](docs/editors/opencode.rst#troubleshooting).
+- **Other clients:** Inspect the client's language server log or captured
+  standard error, and include its startup command and configuration when useful.
+
+If the agent cannot access the editor interface, paste the relevant output into
+the conversation or save it in a temporary file the agent can read. Tracing
+redacts common sensitive fields, but review all output before sharing it.
+Relevant excerpts are usually more useful than a complete log.
+
 Root-cause analysis is also welcome but not required. If you or an agent
 investigated the code, findings such as a suspected cause, affected components,
 constraints, or ways to validate a change can help guide the implementation.
