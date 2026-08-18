@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.11.0 (2026-08-18)
 
 - Make the project bridge timeout configurable for large applications
 - Keep collected runtime metadata when kernel shutdown fails
