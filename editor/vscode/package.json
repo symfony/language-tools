@@ -2,7 +2,7 @@
   "name": "language-tools",
   "displayName": "Symfony Language Tools",
   "publisher": "symfony",
-  "description": "Symfony-aware completion, navigation and diagnostics for Symfony applications",
+  "description": "Official VS Code extension for Symfony",
   "version": "0.11.0",
   "license": "MIT",
   "icon": "images/icon.png",
