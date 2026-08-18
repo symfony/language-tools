@@ -75,6 +75,14 @@ compatible with its Symfony version.
 - [Standalone server guide](docs/index.rst)
 - [Changelog](CHANGELOG.md)
 
+## Contributing
+
+This repository uses an issue-first contribution model and does not accept
+external pull requests. Read the [contribution guide](CONTRIBUTING.md) before
+reporting a bug or requesting a feature. If you use an agent, point it to the
+guide and ask it to help prepare the issue using whatever context is most
+relevant to your setup, configuration, and use case.
+
 ## Security
 
 Read the [security policy](SECURITY.md) to report a potential vulnerability
