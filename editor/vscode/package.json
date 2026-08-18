@@ -147,7 +147,7 @@
         },
         "symfonyLsp.bridgeTimeout": {
           "type": "number",
-          "default": 60,
+          "default": 300,
           "minimum": 1,
           "scope": "resource",
           "description": "Maximum number of seconds allowed for each project bridge run."

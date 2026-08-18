@@ -105,7 +105,7 @@ initialization options. Use it to override the default runtime configuration:
                     "environment": "dev",
                     "debug": true,
                     "runtimeIndexing": true,
-                    "bridgeTimeout": 60,
+                    "bridgeTimeout": 300,
                     "projectRoots": [],
                     "trace": "off"
                 },

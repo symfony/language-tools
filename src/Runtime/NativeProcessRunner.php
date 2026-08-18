@@ -17,10 +17,10 @@ use function Amp\Future\awaitAll;
 final class NativeProcessRunner implements ProcessRunnerInterface
 {
     public function __construct(
-        private readonly float $timeout = 60.0,
+        private readonly float $timeout = 300.0,
         private readonly int $maximumOutputBytes = 16777216,
     ) {
-        if ($timeout <= 0 || !\is_finite($timeout) || $maximumOutputBytes < 1) {
+        if ($timeout <= 0 || !is_finite($timeout) || $maximumOutputBytes < 1) {
             throw new \InvalidArgumentException('Process limits must be positive.');
         }
     }
@@ -29,7 +29,7 @@ final class NativeProcessRunner implements ProcessRunnerInterface
     {
         $cancellation?->throwIfRequested();
         $timeout ??= $this->timeout;
-        if ($timeout <= 0 || !\is_finite($timeout)) {
+        if ($timeout <= 0 || !is_finite($timeout)) {
             throw new \InvalidArgumentException('Process limits must be positive.');
         }
         $timeoutCancellation = new TimeoutCancellation($timeout);

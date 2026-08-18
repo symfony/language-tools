@@ -14,7 +14,7 @@ final class RuntimeConfiguration
     private string $environment = 'dev';
     private bool $debug = true;
     private bool $runtimeIndexing = true;
-    private float $bridgeTimeout = 60.0;
+    private float $bridgeTimeout = 300.0;
 
     /** @var list<string> */
     private array $projectRoots = [];
@@ -68,7 +68,7 @@ final class RuntimeConfiguration
         }
 
         $bridgeTimeout = $initializationOptions['bridgeTimeout'] ?? null;
-        if ((\is_int($bridgeTimeout) || \is_float($bridgeTimeout)) && $bridgeTimeout > 0 && \is_finite((float) $bridgeTimeout)) {
+        if ((\is_int($bridgeTimeout) || \is_float($bridgeTimeout)) && $bridgeTimeout > 0 && is_finite((float) $bridgeTimeout)) {
             $this->bridgeTimeout = (float) $bridgeTimeout;
         }
 
@@ -150,7 +150,7 @@ final class RuntimeConfiguration
     {
         $timeout = $this->setting($project, 'bridgeTimeout', $this->bridgeTimeout);
 
-        return (\is_int($timeout) || \is_float($timeout)) && $timeout > 0 && \is_finite((float) $timeout)
+        return (\is_int($timeout) || \is_float($timeout)) && $timeout > 0 && is_finite((float) $timeout)
             ? (float) $timeout
             : $this->bridgeTimeout;
     }

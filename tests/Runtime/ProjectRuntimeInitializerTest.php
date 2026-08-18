@@ -171,6 +171,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertCount(1, $processRunner->commands);
         self::assertContains('--debug=1', $processRunner->commands[0]);
         self::assertContains('--rebuild-container=1', $processRunner->commands[0]);
+        self::assertSame(300.0, $processRunner->timeout);
     }
 
     public function testRefreshesOnlyPlannedSectionsAgainstTheExistingContainer(): void

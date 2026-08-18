@@ -89,7 +89,7 @@ workspace's ``.vscode/settings.json`` file:
         "symfonyLsp.environment": "dev",
         "symfonyLsp.debug": true,
         "symfonyLsp.runtimeIndexing": true,
-        "symfonyLsp.bridgeTimeout": 60,
+        "symfonyLsp.bridgeTimeout": 300,
         "symfonyLsp.projectRoots": [],
         "symfonyLsp.trace": "off",
         "symfonyLsp.translationDiagnostics": false,
@@ -121,8 +121,8 @@ maintenance.
 is indexed. Runtime indexing requires ``symfonyLsp.debug`` to be ``true``.
 ``symfonyLsp.runtimeIndexing`` can disable application execution even in a
 trusted workspace. ``symfonyLsp.bridgeTimeout`` sets the maximum duration in
-seconds of each application bridge run; increase it when a large application
-needs more than the default 60 seconds to collect runtime metadata.
+seconds of each application bridge run; increase it when an application needs
+more than the default 300 seconds to collect runtime metadata.
 
 ``symfonyLsp.projectRoots`` can list application roots relative to the
 workspace folder or as absolute paths. Leave it empty to discover nested

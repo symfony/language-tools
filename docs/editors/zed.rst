@@ -73,7 +73,7 @@ Configure startup options and project settings under the
                     "environment": "dev",
                     "debug": true,
                     "runtimeIndexing": true,
-                    "bridgeTimeout": 60,
+                    "bridgeTimeout": 300,
                     "projectRoots": [],
                     "trace": "off"
                 },
@@ -84,7 +84,7 @@ Configure startup options and project settings under the
                     "environment": "dev",
                     "debug": true,
                     "runtimeIndexing": true,
-                    "bridgeTimeout": 60,
+                    "bridgeTimeout": 300,
                     "translationDiagnostics": false
                 }
             }
