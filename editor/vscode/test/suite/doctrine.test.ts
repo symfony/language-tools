@@ -68,7 +68,9 @@ function configure($builder, ProductRepository $products): void
         (result) => (result ?? []).some((item) => item.command?.title.includes('Repository:')),
         'Doctrine entity repository code lens',
     );
-    assert.ok(entityLenses.some((item) => item.command?.title.includes('ProductRepository')));
+    const entityLens = entityLenses.find((item) => item.command?.title.includes('ProductRepository'));
+    assert.ok(entityLens?.command);
+    await vscode.commands.executeCommand(entityLens.command.command, ...(entityLens.command.arguments ?? []));
 
     const repository = await open('src/Repository/ProductRepository.php');
     const entityPosition = positionInside(repository, 'Product::class', 'Product');

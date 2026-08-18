@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Open VS Code code lenses with native URI, position and location arguments
+
 ## 0.11.0 (2026-08-18)
 
 - Make the project bridge timeout configurable for large applications

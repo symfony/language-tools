@@ -8,6 +8,11 @@ import {
     ServerOptions,
     TransportKind,
 } from 'vscode-languageclient/node';
+import type {
+    Location as ProtocolLocation,
+    Position as ProtocolPosition,
+    Protocol2CodeConverter,
+} from 'vscode-languageclient/node';
 import { IndexStatusController } from './indexStatus';
 
 let client: LanguageClient | undefined;
@@ -44,6 +49,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         ? 'configured'
         : serverPath.startsWith(bundledServerDirectory) ? 'bundled' : 'development';
     outputChannel.info(serverStartupMessage(extensionVersion, serverPath, serverKind, useSocketTransport() ? 'socket' : 'stdio'));
+    let protocolConverter: Protocol2CodeConverter;
     const clientOptions: LanguageClientOptions = {
         documentSelector: [
             { scheme: 'file', language: 'php' },
@@ -58,6 +64,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         ],
         outputChannel,
         traceOutputChannel: outputChannel,
+        middleware: {
+            provideCodeLenses: async (document, token, next) => {
+                const codeLenses = await next(document, token);
+
+                return codeLenses?.map((codeLens) => convertReferenceCodeLens(codeLens, protocolConverter));
+            },
+        },
         initializationOptions: {
             workspaceTrust: vscode.workspace.isTrusted,
             phpCommand: configuration.get<string[]>('phpCommand', ['php']),
@@ -81,6 +94,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         serverOptions,
         clientOptions,
     );
+    protocolConverter = client.protocol2CodeConverter;
     context.subscriptions.push(client);
     await client.start();
     const serverVersion = client.initializeResult?.serverInfo?.version;
@@ -132,6 +146,21 @@ export function serverStartupMessage(
 
 export function useSocketTransport(): boolean {
     return 'win32' === process.platform;
+}
+
+function convertReferenceCodeLens(codeLens: vscode.CodeLens, converter: Protocol2CodeConverter): vscode.CodeLens {
+    const command = codeLens.command;
+    if ('editor.action.showReferences' !== command?.command || 3 !== command.arguments?.length) {
+        return codeLens;
+    }
+    const [uri, position, locations] = command.arguments as [string, ProtocolPosition, ProtocolLocation[]];
+    command.arguments = [
+        converter.asUri(uri),
+        converter.asPosition(position),
+        locations.map((location) => converter.asLocation(location)),
+    ];
+
+    return codeLens;
 }
 
 function findFreePort(): Promise<number> {
