@@ -5,6 +5,7 @@
 - Detect lazy Stimulus controllers declared with attached line comments or double-quoted block comments
 - Support Docker-only applications by mapping project paths through the new containerProjectRoot setting
 - Support Zed on Linux and macOS through an auto-installing extension
+- Run Zed validation with the active Rustup toolchain and no Python dependency
 
 ## 0.9.1 (2026-08-18)
 

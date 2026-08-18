@@ -27,6 +27,44 @@ final class ReleaseExecutableTest extends TestCase
         self::assertSame("Required command not found: git.\n", $result['stderr']);
     }
 
+    public function testAcceptsCargoFromRustupWithoutPythonOrStandaloneCargo(): void
+    {
+        $root = \dirname(__DIR__, 2);
+        $directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-'.bin2hex(random_bytes(8)));
+        $bin = Path::join($directory, 'bin');
+        (new Filesystem())->mkdir($bin);
+        foreach (['gh', 'composer', 'npm', 'nvim', 'stylua'] as $command) {
+            $path = Path::join($bin, $command);
+            file_put_contents($path, "#!/bin/bash\nexit 0\n");
+            chmod($path, 0755);
+        }
+        $git = Path::join($bin, 'git');
+        file_put_contents($git, <<<'BASH'
+            #!/bin/bash
+            if [[ "$*" == "branch --show-current" ]]; then echo feature; fi
+            BASH);
+        chmod($git, 0755);
+        $rustup = Path::join($bin, 'rustup');
+        file_put_contents($rustup, <<<'BASH'
+            #!/bin/bash
+            if [[ "$*" == "which cargo" ]]; then echo /toolchain/bin/cargo; fi
+            BASH);
+        chmod($rustup, 0755);
+
+        try {
+            $result = $this->runProcess(
+                [\PHP_BINARY, Path::join($root, 'tools/release'), '0.0.0', '--yes'],
+                [...getenv(), 'PATH' => $bin],
+            );
+
+            self::assertSame(1, $result['exitCode']);
+            self::assertSame('', $result['stdout']);
+            self::assertSame("Releases must run from main.\n", $result['stderr']);
+        } finally {
+            (new Filesystem())->remove($directory);
+        }
+    }
+
     /** @param list<string> $expectedCalls */
     #[DataProvider('workflowRetryProvider')]
     public function testRetriesFailedWorkflowOnce(int $watchFailures, ?string $expectedError, array $expectedCalls): void

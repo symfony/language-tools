@@ -294,10 +294,13 @@ final class ReleaseCommand
 
     private function assertRequirements(): void
     {
-        foreach (['git', 'gh', 'composer', 'npm', 'cargo', 'rustup', 'python3'] as $command) {
+        foreach (['git', 'gh', 'composer', 'npm', 'rustup'] as $command) {
             if (!$this->succeeds(['/usr/bin/env', $command, '--version'], $this->root)) {
                 throw new \RuntimeException(\sprintf('Required command not found: %s.', $command));
             }
+        }
+        if (!$this->succeeds(['rustup', 'which', 'cargo'], $this->root)) {
+            throw new \RuntimeException('Required Rustup Cargo toolchain not found.');
         }
         foreach ([getenv('NVIM') ?: 'nvim', getenv('STYLUA') ?: 'stylua'] as $command) {
             if (!$this->succeeds([$command, '--version'], $this->root)) {

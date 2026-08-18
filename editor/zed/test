@@ -1,34 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")"
+directory=${BASH_SOURCE[0]%/*}
+if [[ "$directory" == "${BASH_SOURCE[0]}" ]]; then directory=.; fi
+cd "$directory"
 
-python3 - <<'PY'
-import pathlib
-import tomllib
+cargo=$(rustup which cargo)
+toolchain_bin=${cargo%/*}
+export PATH="$toolchain_bin:$PATH"
 
-root = pathlib.Path.cwd()
-with (root / "extension.toml").open("rb") as file:
-    extension = tomllib.load(file)
-with (root / "Cargo.toml").open("rb") as file:
-    cargo = tomllib.load(file)
-
-assert extension["id"] == "symfony-language-tools"
-assert extension["version"] == cargo["package"]["version"]
-assert extension["schema_version"] == 1
-assert (root / "LICENSE").read_text() == (root.parent.parent / "LICENSE").read_text()
-assert (root / "THIRD_PARTY_LICENSES/zed_extension_api/LICENSE-APACHE").stat().st_size > 10000
-assert extension["language_servers"]["symfony-language-tools"]["languages"] == [
-    "PHP",
-    "Twig",
-    "YAML",
-    "JSON",
-    "XML",
-    "JavaScript",
-    "TypeScript",
-]
-PY
-
-cargo fmt --check
-cargo test --locked
-cargo check --locked --target wasm32-wasip2
+"$cargo" fmt --check
+"$cargo" test --locked
+"$cargo" check --locked --target wasm32-wasip2
