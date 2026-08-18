@@ -66,6 +66,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             environment: configuration.get<string>('environment', 'dev'),
             debug: configuration.get<boolean>('debug', true),
             runtimeIndexing: configuration.get<boolean>('runtimeIndexing', true),
+            runtimeTimeout: configuration.get<number>('runtimeTimeout', 10.0),
             projectRoots: configuration.get<string[]>('projectRoots', []),
             trace: configuration.get<string>('trace', 'off'),
         },

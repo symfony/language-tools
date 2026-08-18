@@ -25,14 +25,14 @@ final class NativeProcessRunner implements ProcessRunnerInterface
         }
     }
 
-    public function run(array $command, string $workingDirectory, ?Cancellation $cancellation = null): ProcessResult
+    public function run(array $command, string $workingDirectory, ?Cancellation $cancellation = null, ?float $timeout = null): ProcessResult
     {
         $cancellation?->throwIfRequested();
-        $timeout = new TimeoutCancellation($this->timeout);
+        $timeoutCancellation = new TimeoutCancellation($timeout ?? $this->timeout);
         $outputLimit = new DeferredCancellation();
         $operationCancellation = new CompositeCancellation(...array_filter([
             $cancellation,
-            $timeout,
+            $timeoutCancellation,
             $outputLimit->getCancellation(),
         ]));
 
@@ -69,7 +69,7 @@ final class NativeProcessRunner implements ProcessRunnerInterface
             if ($outputLimit->isCancelled()) {
                 throw new \RuntimeException('The project bridge exceeded the output limit.', previous: $error);
             }
-            if ($timeout->isRequested()) {
+            if ($timeoutCancellation->isRequested()) {
                 throw new \RuntimeException('The project bridge timed out.', previous: $error);
             }
 

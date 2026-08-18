@@ -78,6 +78,7 @@ The defaults work for standard projects. Add settings to
 | `symfonyLsp.consolePath` | The Symfony console is not `bin/console`. |
 | `symfonyLsp.environment` | Index another environment than `dev`. |
 | `symfonyLsp.runtimeIndexing` | Disable application execution while keeping source-only features. |
+| `symfonyLsp.runtimeTimeout` | Maximum time in seconds allowed for the project bridge during runtime indexing. |
 | `symfonyLsp.translationDiagnostics` | Enable missing translation-key diagnostics. |
 | `php.suggest.basic` | Disable VS Code's word suggestions while keeping your PHP language server. |
 

@@ -79,4 +79,13 @@ final class NativeProcessRunnerTest extends TestCase
 
         $runner->run([\PHP_BINARY, '-r', 'sleep(10);'], __DIR__);
     }
+
+    public function testOverridesTimeoutPerRun(): void
+    {
+        $runner = new NativeProcessRunner(timeout: 10.0);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('timed out');
+
+        $runner->run([\PHP_BINARY, '-r', 'sleep(10);'], __DIR__, timeout: 0.01);
+    }
 }

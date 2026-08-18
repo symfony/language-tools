@@ -14,6 +14,7 @@ final class RuntimeConfiguration
     private string $environment = 'dev';
     private bool $debug = true;
     private bool $runtimeIndexing = true;
+    private float $runtimeTimeout = 10.0;
 
     /** @var list<string> */
     private array $projectRoots = [];
@@ -64,6 +65,11 @@ final class RuntimeConfiguration
         $runtimeIndexing = $initializationOptions['runtimeIndexing'] ?? null;
         if (\is_bool($runtimeIndexing)) {
             $this->runtimeIndexing = $runtimeIndexing;
+        }
+
+        $runtimeTimeout = $initializationOptions['runtimeTimeout'] ?? null;
+        if ((\is_int($runtimeTimeout) || \is_float($runtimeTimeout)) && $runtimeTimeout > 0) {
+            $this->runtimeTimeout = (float) $runtimeTimeout;
         }
 
         $projectRoots = $initializationOptions['projectRoots'] ?? null;
@@ -138,6 +144,15 @@ final class RuntimeConfiguration
         $runtimeIndexing = $this->setting($project, 'runtimeIndexing', $this->runtimeIndexing);
 
         return $this->debug($project) && (\is_bool($runtimeIndexing) ? $runtimeIndexing : $this->runtimeIndexing);
+    }
+
+    public function runtimeTimeout(?Project $project = null): float
+    {
+        $runtimeTimeout = $this->setting($project, 'runtimeTimeout', $this->runtimeTimeout);
+
+        return (\is_int($runtimeTimeout) || \is_float($runtimeTimeout)) && $runtimeTimeout > 0
+            ? (float) $runtimeTimeout
+            : $this->runtimeTimeout;
     }
 
     /** @return list<string> */

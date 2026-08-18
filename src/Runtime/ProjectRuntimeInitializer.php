@@ -35,7 +35,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             '--sections='.implode(',', $sections),
             ...($plan->preservesContainer() ? ['--targeted-refresh=1'] : []),
             ...(RuntimeRefreshMode::Clear === $mode ? ['--rebuild-container=1'] : []),
-        ], $project->rootPath(), $cancellation);
+        ], $project->rootPath(), $cancellation, $this->configuration->runtimeTimeout($project));
 
         if (0 !== $result->exitCode()) {
             throw new \RuntimeException(\sprintf('The project bridge failed with status %d.', $result->exitCode()).$this->failureDetail($result));
