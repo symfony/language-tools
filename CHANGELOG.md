@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.2 (2026-08-18)
 
 - Detect lazy Stimulus controllers declared with attached line comments or double-quoted block comments
 - Support Docker-only applications by mapping project paths through the new containerProjectRoot setting
