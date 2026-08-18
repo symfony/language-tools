@@ -245,6 +245,170 @@ final class BridgeTest extends TestCase
         ]], $result['errors']);
     }
 
+    public function testEnumeratesRuntimeTwigComponentNames(): void
+    {
+        $this->writeTwigComponentApplication();
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=twig_components 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $snapshot = implode("\n", $output);
+        self::assertSame(0, $exitCode, $snapshot);
+        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors']);
+        self::assertIsArray($result['sections'] ?? null);
+        $section = $result['sections']['twig_components'] ?? null;
+        self::assertIsArray($section);
+        self::assertTrue($section['complete']);
+        self::assertSame(['Alert', 'Form:Input', 'acme:Badge', 'ux:icon'], $section['names']);
+        self::assertSame('components', $section['anonymousTemplateDirectory']);
+        self::assertSame([], $section['warnings']);
+    }
+
+    public function testReportsIncompleteTwigComponentNamesInsteadOfGuessing(): void
+    {
+        $this->writeTwigComponentApplication(withUnnameableComponent: true);
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=twig_components 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $snapshot = implode("\n", $output);
+        self::assertSame(0, $exitCode, $snapshot);
+        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($result);
+        self::assertIsArray($result['sections'] ?? null);
+        $section = $result['sections']['twig_components'] ?? null;
+        self::assertIsArray($section);
+        self::assertFalse($section['complete']);
+        self::assertSame(['Alert', 'Form:Input', 'acme:Badge', 'ux:icon'], $section['names']);
+    }
+
+    public function testOmitsTheTwigComponentsSectionWithoutTheComponentPackage(): void
+    {
+        $this->writeRouteApplication();
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=twig_components 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $snapshot = implode("\n", $output);
+        self::assertSame(0, $exitCode, $snapshot);
+        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors']);
+        $sections = $result['sections'] ?? [];
+        self::assertIsArray($sections);
+        self::assertArrayNotHasKey('twig_components', $sections);
+    }
+
+    private function writeTwigComponentApplication(bool $withUnnameableComponent = false): void
+    {
+        $unnameable = $withUnnameableComponent
+            ? '"Vendor\\\\Hidden\\\\Component": {"class": "Vendor\\\\Hidden\\\\Component", "tags": [{"name": "twig.component", "parameters": {"expose_public_props": true}}]},'
+            : '';
+        file_put_contents($this->temporaryDirectory.'/vendor/autoload.php', str_replace(
+            '__UNNAMEABLE__',
+            $unnameable,
+            <<<'PHP'
+            <?php
+            namespace Composer;
+            final class InstalledVersions
+            {
+                public static function getPrettyVersion(string $package): ?string
+                {
+                    return '8.0.6';
+                }
+            }
+            namespace Symfony\Component\Console\Input;
+            final class ArrayInput
+            {
+                public function __construct(public array $arguments) {}
+            }
+            namespace Symfony\Component\Console\Output;
+            final class BufferedOutput
+            {
+                private string $contents = '';
+                public function write(string $contents): void { $this->contents .= $contents; }
+                public function fetch(): string { return $this->contents; }
+            }
+            namespace Symfony\UX\TwigComponent;
+            final class ComponentFactory
+            {
+            }
+            namespace App;
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function shutdown(): void {}
+            }
+            namespace Symfony\Bundle\FrameworkBundle\Console;
+            final class Application
+            {
+                public function __construct(object $kernel) {}
+                public function setAutoExit(bool $autoExit): void {}
+                public function run(object $input, object $output): int
+                {
+                    $output->write("\n ! [NOTE] Some deprecation notice written to the console output.\n\n");
+                    if ('debug:config' === ($input->arguments['command'] ?? null)) {
+                        $output->write(json_encode(['twig_component' => [
+                            'defaults' => [
+                                'App\\Twig\\Components\\' => ['template_directory' => 'components', 'name_prefix' => ''],
+                                'Acme\\Ui\\' => ['template_directory' => 'ui', 'name_prefix' => 'acme'],
+                            ],
+                            'anonymous_template_directory' => 'components',
+                        ]], JSON_THROW_ON_ERROR));
+
+                        return 0;
+                    }
+
+                    $output->write(<<<'JSON'
+                        {
+                            "definitions": {
+                                __UNNAMEABLE__
+                                "App\\Twig\\Components\\Alert": {
+                                    "class": "App\\Twig\\Components\\Alert",
+                                    "tags": [{"name": "twig.component", "parameters": {"expose_public_props": true}}]
+                                },
+                                "App\\Twig\\Components\\Form\\Input": {
+                                    "class": "App\\Twig\\Components\\Form\\Input",
+                                    "tags": [{"name": "twig.component", "parameters": {"expose_public_props": true}}]
+                                },
+                                "Acme\\Ui\\Badge": {
+                                    "class": "Acme\\Ui\\Badge",
+                                    "tags": [{"name": "twig.component", "parameters": {"expose_public_props": true}}]
+                                },
+                                "ux_icons.twig_component": {
+                                    "class": "Symfony\\UX\\Icons\\Twig\\UXIconComponent",
+                                    "tags": [
+                                        {"name": "twig.component", "parameters": {"key": "ux:icon", "template": "@UXIcons/Icon.html.twig"}},
+                                        {"name": "kernel.reset", "parameters": {"method": "reset"}}
+                                    ]
+                                }
+                            },
+                            "aliases": [],
+                            "services": []
+                        }
+                        JSON);
+
+                    return 0;
+                }
+            }
+            PHP,
+        ));
+    }
+
     public function testNormalizesContainerMetadataWithoutExportingParameterValues(): void
     {
         $this->writeContainerApplication();

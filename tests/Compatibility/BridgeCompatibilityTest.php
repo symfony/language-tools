@@ -20,7 +20,7 @@ final class BridgeCompatibilityTest extends TestCase
             '--project='.$project,
             '--environment=test',
             '--debug=1',
-            '--sections=routes,container,twig,translations,configuration,environment,messenger,events,security,assets,stimulus',
+            '--sections=routes,container,twig,twig_components,translations,configuration,environment,messenger,events,security,assets,stimulus',
             '--rebuild-container=1',
         ], $project);
 

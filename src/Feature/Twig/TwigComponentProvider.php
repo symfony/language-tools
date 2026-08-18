@@ -21,6 +21,7 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
         private readonly ProjectRegistry $projects,
         private readonly PositionConverter $converter,
         private readonly TwigComponentIndexRegistry $indexes,
+        private readonly TemplateIndexRegistry $templates,
         private readonly TwigComponentExtractor $extractor,
     ) {
     }
@@ -174,23 +175,55 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
             return null;
         }
         $index = $this->indexes->forProject($project);
-        if (!$index->isComplete()) {
+        if (!$index->isComplete() || !$index->isRuntimeComplete()) {
+            return null;
+        }
+        $templates = $this->templates->forProject($project);
+        if (!$templates->isComplete()) {
             return null;
         }
         $diagnostics = [];
         foreach ($this->extractor->extract($project, $document->uri(), 'twig', $document->text())->references() as $reference) {
-            if (null === $index->get($reference->name())) {
-                $diagnostics[] = [
-                    'range' => $this->range($reference->range()),
-                    'severity' => 1,
-                    'source' => 'symfony',
-                    'code' => 'twig_component.not_found',
-                    'message' => \sprintf('Twig component "%s" does not exist.', $reference->name()),
-                ];
+            $name = $reference->name();
+            if (null !== $index->get($name)
+                || $index->hasRuntimeName($name)
+                || $this->anonymousTemplateExists($index->anonymousTemplateDirectory(), $templates, $name)
+            ) {
+                continue;
             }
+            $diagnostics[] = [
+                'range' => $this->range($reference->range()),
+                'severity' => 1,
+                'source' => 'symfony',
+                'code' => 'twig_component.not_found',
+                'message' => \sprintf('Twig component "%s" does not exist.', $name),
+            ];
         }
 
         return $diagnostics;
+    }
+
+    // Mirrors the template candidates of the ComponentTemplateFinder anonymous resolution.
+    private function anonymousTemplateExists(string $directory, TemplateIndex $templates, string $name): bool
+    {
+        $path = str_replace(':', '/', $name);
+        $directory = rtrim($directory, '/');
+        $candidates = [
+            $directory.'/'.$path.'.html.twig',
+            $directory.'/'.$path.'/index.html.twig',
+        ];
+        $parts = explode('/', $path, 2);
+        if (2 === \count($parts)) {
+            $candidates[] = '@'.$parts[0].'/components/'.$parts[1].'.html.twig';
+            $candidates[] = '@'.$parts[0].'/components/'.$parts[1].'/index.html.twig';
+        }
+        foreach ($candidates as $candidate) {
+            if (null !== $templates->get($candidate)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function codeLenses(array $params): ?array

@@ -17,7 +17,7 @@ final class RuntimeRefreshPlanner
         'security' => ['security', 'container'],
         'stimulus' => ['stimulus'],
         'translations' => ['translations'],
-        'twig_components_v2' => ['twig', 'container'],
+        'twig_components_v2' => ['twig', 'twig_components', 'container'],
     ];
 
     public function plan(string $path, SourceFileChange $change): ?RuntimeRefreshPlan

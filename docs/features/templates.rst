@@ -50,7 +50,9 @@ Symfony Language Tools recognizes ``#[AsTwigComponent]`` and
 ``#[AsLiveComponent]`` classes, templates under ``templates/components/``,
 ``<twig:...>`` tags and static ``component()`` function calls. Live Component
 properties and actions are included in component metadata. Unknown static
-component names are reported after project files have been analyzed.
+component names are reported once project files have been analyzed and runtime
+metadata lists the registered component names, so components provided by
+bundles are recognized.
 
 Stimulus controllers and Live Component actions and events are documented in
 `Stimulus and Live Components`_.

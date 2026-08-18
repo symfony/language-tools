@@ -9,6 +9,10 @@ final class TwigComponentIndex
     /** @var array<string, TwigComponentSourceFacts> */
     private array $overlays = [];
     private bool $complete = false;
+    private bool $runtimeComplete = false;
+    /** @var array<string, true> */
+    private array $runtimeNames = [];
+    private string $anonymousTemplateDirectory = 'components';
 
     public function replace(TwigComponentSourceFacts ...$sources): void
     {
@@ -144,6 +148,29 @@ final class TwigComponentIndex
     public function isComplete(): bool
     {
         return $this->complete;
+    }
+
+    /** @param list<string> $names */
+    public function replaceRuntime(bool $complete, array $names, string $anonymousTemplateDirectory): void
+    {
+        $this->runtimeComplete = $complete;
+        $this->runtimeNames = array_fill_keys($names, true);
+        $this->anonymousTemplateDirectory = $anonymousTemplateDirectory;
+    }
+
+    public function isRuntimeComplete(): bool
+    {
+        return $this->runtimeComplete;
+    }
+
+    public function hasRuntimeName(string $name): bool
+    {
+        return isset($this->runtimeNames[$name]);
+    }
+
+    public function anonymousTemplateDirectory(): string
+    {
+        return $this->anonymousTemplateDirectory;
     }
 
     /** @return list<TwigComponentSourceFacts> */

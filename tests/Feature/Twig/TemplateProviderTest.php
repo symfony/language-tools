@@ -129,7 +129,10 @@ final class TemplateProviderTest extends TestCase
         $documents->open(new Document($classUri, 'php', 1, $classText));
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
-        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, $extractor);
+        $indexes->forProject($project)->replaceRuntime(true, [], 'components');
+        $templateIndexes = new TemplateIndexRegistry();
+        $templateIndexes->forProject($project)->replaceRuntime(true);
+        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, $templateIndexes, $extractor);
         $completionPosition = $converter->toPosition($completionText, \strlen($completionText));
         self::assertSame(['Alert'], array_column($provider->complete([
             'textDocument' => ['uri' => $completionUri],
@@ -160,6 +163,51 @@ final class TemplateProviderTest extends TestCase
             'textDocument' => ['uri' => $templateUri],
             'position' => ['line' => $variablePosition->line(), 'character' => $variablePosition->character()],
         ]) ?? [], 'label'));
+    }
+
+    public function testDiagnosesUnknownComponentsOnlyWithCompleteRuntimeMetadata(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $converter = new PositionConverter();
+        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver());
+        $usageUri = 'file:///workspace/templates/page.html.twig';
+        $usageText = "<twig:ux:icon name=\"x\" />\n<twig:Alert />\n<twig:Card />\n<twig:acme:badge />\n<twig:Unknown />";
+        $documents = new DocumentStore();
+        $documents->open(new Document($usageUri, 'twig', 1, $usageText));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project]);
+        $indexes = new TwigComponentIndexRegistry();
+        $indexes->forProject($project)->replace(
+            $extractor->extract($project, $usageUri, 'twig', $usageText),
+        );
+        $templateIndexes = new TemplateIndexRegistry();
+        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, $templateIndexes, $extractor);
+        $params = ['textDocument' => ['uri' => $usageUri]];
+
+        $withoutRuntimeMetadata = $provider->diagnostics($params);
+        self::assertNull($withoutRuntimeMetadata);
+
+        $indexes->forProject($project)->replaceRuntime(true, ['ux:icon'], 'components');
+        $withoutTemplateMetadata = $provider->diagnostics($params);
+        self::assertNull($withoutTemplateMetadata);
+
+        $range = new Range(new Position(0, 0), new Position(0, 0));
+        $templateIndexes->forProject($project)->replaceRuntime(
+            true,
+            new TemplateDeclaration('components/Alert.html.twig', 'file:///workspace/templates/components/Alert.html.twig', $range),
+            new TemplateDeclaration('components/Card/index.html.twig', 'file:///workspace/templates/components/Card/index.html.twig', $range),
+            new TemplateDeclaration('@acme/components/badge.html.twig', 'file:///workspace/vendor/acme/bundle/templates/components/badge.html.twig', $range),
+        );
+        $diagnostics = $provider->diagnostics($params);
+        self::assertIsArray($diagnostics);
+        self::assertSame(
+            ['Twig component "Unknown" does not exist.'],
+            array_column($diagnostics, 'message'),
+        );
+
+        $indexes->forProject($project)->replaceRuntime(false, [], 'components');
+        $withIncompleteRuntimeNames = $provider->diagnostics($params);
+        self::assertNull($withIncompleteRuntimeNames);
     }
 
     public function testResolvesBundleTemplateNames(): void

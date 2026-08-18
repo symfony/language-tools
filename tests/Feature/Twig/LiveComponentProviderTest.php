@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Twig\LiveComponentEventProvider;
+use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TemplateNameResolver;
 use Symfony\Lsp\Feature\Twig\TwigComponentExtractor;
 use Symfony\Lsp\Feature\Twig\TwigComponentIndexRegistry;
@@ -66,7 +67,7 @@ final class LiveComponentProviderTest extends TestCase
             $extractor->extract($project, $templateUri, 'twig', $templateText),
             $extractor->extract($project, $usageUri, 'twig', $usageText),
         );
-        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, $extractor);
+        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, new TemplateIndexRegistry(), $extractor);
 
         self::assertSame(['submit'], array_column($provider->complete($this->params($converter, $completionUri, $completionText, \strlen($completionText))) ?? [], 'label'));
         $nestedActionOffset = strpos($templateText, 'submit') + \strlen('sub');
