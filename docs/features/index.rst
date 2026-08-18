@@ -123,9 +123,9 @@ for navigating between related declarations.
 Workspace Trust
 ---------------
 
-Runtime indexing boots the application kernel and executes application code. It is
-available only in debug mode and for workspaces that you trust. Do not enable it
-for a project whose code you would not run from the command line.
+Runtime indexing boots the application kernel and executes application code.
+It is available only in debug mode and for workspaces that you trust. Do not
+enable it for a project whose code you would not run from the command line.
 
 Without runtime indexing, Symfony Language Tools continues to provide features
 derived from project files. Suggestions that depend on the effective router,
