@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.9.1 (2026-08-18)
 
 - Support OpenCode as a custom LSP client on Linux and macOS
