@@ -702,6 +702,7 @@ final class BridgeTest extends TestCase
                 public function setAutoExit(bool $autoExit): void {}
                 public function run(object $input, object $output): int
                 {
+                    $output->write("\n ! [NOTE] Some deprecation notice written to the console output.\n\n");
                     $output->write(json_encode([
                         'article_legacy' => [
                             'alias' => 'article_show',
@@ -726,6 +727,7 @@ final class BridgeTest extends TestCase
                             'requirements' => ['id' => '\\d+'],
                         ],
                     ], JSON_THROW_ON_ERROR));
+                    $output->write("\nTrailing console noise after the payload.\n");
 
                     return 0;
                 }

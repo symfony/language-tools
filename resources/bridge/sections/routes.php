@@ -13,7 +13,7 @@ function bridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
             $kernel = $context->kernel();
             $application = new Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
             $application->setAutoExit(false);
-            $input = new Symfony\Component\Console\Input\ArrayInput([
+            $routes = runJsonCommand($application, [
                 'command' => 'debug:router',
                 '--format' => 'json',
                 '--show-aliases' => true,
@@ -21,16 +21,6 @@ function bridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
                 '--no-debug' => $noDebug,
                 '--no-interaction' => true,
             ]);
-            $output = new Symfony\Component\Console\Output\BufferedOutput();
-            $exitCode = $application->run($input, $output);
-            if (0 !== $exitCode) {
-                throw new RuntimeException(sprintf('debug:router exited with status %d.', $exitCode));
-            }
-
-            $routes = json_decode($output->fetch(), true, 512, JSON_THROW_ON_ERROR);
-            if (!is_array($routes)) {
-                throw new RuntimeException('debug:router did not return a JSON object or array.');
-            }
 
             $items = [];
             foreach ($routes as $name => $route) {
