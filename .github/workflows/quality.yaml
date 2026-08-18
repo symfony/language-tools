@@ -16,7 +16,6 @@ on:
     push:
         branches: [main]
         paths-ignore:
-            - CHANGELOG.md
             - LICENSE
             - README.md
             - SECURITY.md

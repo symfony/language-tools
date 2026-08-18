@@ -16,6 +16,7 @@ on:
         branches: [main]
         paths:
             - .github/workflows/compatibility.yaml
+            - CHANGELOG.md
             - composer.json
             - composer.lock
             - phpunit.xml.dist
