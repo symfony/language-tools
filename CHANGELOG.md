@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ignore Twig syntax inside verbatim blocks
 - Support Twig documentation comments and typed template variables
 - Keep project bridge error output out of language server logs
 - Redact project PHP commands from protocol traces

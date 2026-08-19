@@ -25,6 +25,11 @@ final class TwigCommentParser
                     continue;
                 }
                 if ('{%' === substr($source, $offset, 2)) {
+                    if (null !== $verbatim = $this->verbatim($source, $offset, $length)) {
+                        [$contentStart, $contentEnd, $offset] = $verbatim;
+                        $this->maskRange($masked, $source, $contentStart, $contentEnd);
+                        continue;
+                    }
                     $state = 'block';
                     $brackets = [];
                     $offset += 2;
@@ -70,6 +75,21 @@ final class TwigCommentParser
         }
 
         return $masked;
+    }
+
+    /** @return array{int, int, int}|null */
+    private function verbatim(string $source, int $offset, int $end): ?array
+    {
+        if (!preg_match('/\{%[-~]?\s*verbatim\s*[-~]?%\}/A', $source, $opening, \PREG_OFFSET_CAPTURE, $offset)) {
+            return null;
+        }
+        $contentStart = $offset + \strlen($opening[0][0]);
+        if (!preg_match('/\{%[-~]?\s*endverbatim\s*[-~]?%\}/', $source, $closing, \PREG_OFFSET_CAPTURE, $contentStart)) {
+            return [$contentStart, $end, $end];
+        }
+        $contentEnd = $closing[0][1];
+
+        return [$contentStart, $contentEnd, $contentEnd + \strlen($closing[0][0])];
     }
 
     private function stringEnd(string &$masked, string $source, int $offset, int $end): int

@@ -63,6 +63,12 @@ final class TwigDocumentParserTest extends TestCase
                 value
             } suffix" }}
             TWIG];
+        yield 'verbatim content' => [<<<'TWIG'
+            {% verbatim %}
+                {{ invalid ??? syntax }}
+                {% anything unbalanced(
+            {% endverbatim %}
+            TWIG];
     }
 
     public function testPreservesUnclosedCommentErrors(): void

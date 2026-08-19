@@ -26,6 +26,9 @@ final class TwigRouteReferenceExtractorTest extends TestCase
                 ## path('interpolation_documented')
                 value
             }" }}
+            {%- verbatim -%}
+                {{ path('verbatim_ignored') }}
+            {%- endverbatim -%}
             {{ path(route_name('ignored')) }}
             <a href="{{ path('article_show', {'id': article.id}) }}">Show</a>
             <a href="{{ url("homepage") }}">Home</a>
@@ -38,5 +41,15 @@ final class TwigRouteReferenceExtractorTest extends TestCase
         ));
         self::assertSame(['id'], $references[0]->providedParameters());
         self::assertSame([], $references[1]->providedParameters());
+    }
+
+    public function testIgnoresUnclosedVerbatimContent(): void
+    {
+        $references = (new TwigRouteReferenceExtractor(new PositionConverter(), new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())))->extract(<<<'TWIG'
+            {% verbatim %}
+                {{ path('ignored') }}
+            TWIG);
+
+        self::assertSame([], $references);
     }
 }

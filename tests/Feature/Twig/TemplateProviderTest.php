@@ -48,6 +48,9 @@ final class TemplateProviderTest extends TestCase
                 ## include('documented.html.twig')
                 article: 'string',
             } %}
+            {% verbatim %}
+                {{ include('verbatim.html.twig') }}
+            {% endverbatim %}
             {{ include(template_name('ignored.html.twig')) }}
             {% extends 'base.html.twig' %}
             {{ include('card.html.twig') }}
