@@ -5,11 +5,13 @@ namespace Symfony\Lsp\Tests\Project;
 use Amp\Cancellation;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Client\ClientInterface;
+use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\TrustStatus;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Project\WorkspaceTrustManager;
+use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 
@@ -19,9 +21,10 @@ final class WorkspaceTrustManagerTest extends TestCase
     {
         $client = new CapturingClient(null);
         $trust = new WorkspaceTrust();
-        $runtimeInitializer = new CapturingRuntimeInitializer();
+        $statuses = new ProjectIndexStatusRegistry();
+        $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
         $registry = $this->registry($project = new Project('/workspace', 'file:///workspace', '^8.0'));
-        $manager = new WorkspaceTrustManager($client, $trust, $runtimeInitializer);
+        $manager = new WorkspaceTrustManager($client, $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration());
 
         $manager->applyInitializationOptions([
             'initializationOptions' => ['workspaceTrust' => true],
@@ -37,9 +40,10 @@ final class WorkspaceTrustManagerTest extends TestCase
     {
         $client = new CapturingClient(['title' => 'Trust and enable runtime indexing']);
         $trust = new WorkspaceTrust();
-        $runtimeInitializer = new CapturingRuntimeInitializer();
+        $statuses = new ProjectIndexStatusRegistry();
+        $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
         $registry = $this->registry($project = new Project('/workspace', 'file:///workspace', '^8.0'));
-        $manager = new WorkspaceTrustManager($client, $trust, $runtimeInitializer);
+        $manager = new WorkspaceTrustManager($client, $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration());
 
         $manager->requestUnknownDecisions($registry);
 
@@ -55,14 +59,52 @@ final class WorkspaceTrustManagerTest extends TestCase
     public function testKeepsStaticOnlyModeWhenTrustIsDeclined(): void
     {
         $trust = new WorkspaceTrust();
-        $runtimeInitializer = new CapturingRuntimeInitializer();
+        $statuses = new ProjectIndexStatusRegistry();
+        $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
         $registry = $this->registry($project = new Project('/workspace', 'file:///workspace', '^8.0'));
-        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer);
+        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration());
 
         $manager->requestUnknownDecisions($registry);
 
         self::assertSame(TrustStatus::Untrusted, $trust->status($project));
         self::assertSame([], $runtimeInitializer->projects);
+    }
+
+    public function testRetriesFailedRuntimeInitialization(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $registry = $this->registry($project);
+        $trust = new WorkspaceTrust();
+        $trust->set($project, TrustStatus::Trusted);
+        $statuses = new ProjectIndexStatusRegistry();
+        $runtimeInitializer = new CapturingRuntimeInitializer($statuses, [false, true]);
+        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration());
+
+        $manager->requestUnknownDecisions($registry);
+        $manager->requestUnknownDecisions($registry);
+
+        self::assertSame(['/workspace', '/workspace'], $runtimeInitializer->projects);
+        self::assertSame('ready', $statuses->status($project)['runtime']['state']);
+    }
+
+    public function testRestartsRuntimeAfterConfigurationAndProjectLifecycleChanges(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $trust = new WorkspaceTrust();
+        $trust->set($project, TrustStatus::Trusted);
+        $statuses = new ProjectIndexStatusRegistry();
+        $configuration = new RuntimeConfiguration();
+        $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
+        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, $configuration);
+
+        $manager->requestUnknownDecisions($this->registry($project));
+        $manager->requestUnknownDecisions($this->registry($project));
+        $configuration->setEnvironment($project, 'test');
+        $manager->requestUnknownDecisions($this->registry($project));
+        $replacement = new Project('/workspace', 'file:///workspace', '^8.0');
+        $manager->requestUnknownDecisions($this->registry($replacement));
+
+        self::assertSame(['/workspace', '/workspace', '/workspace'], $runtimeInitializer->projects);
     }
 
     private function registry(Project $project): ProjectRegistry
@@ -79,9 +121,21 @@ final class CapturingRuntimeInitializer implements RuntimeInitializerInterface
     /** @var list<string> */
     public array $projects = [];
 
+    /** @param list<bool> $results */
+    public function __construct(
+        private readonly ProjectIndexStatusRegistry $statuses,
+        private array $results = [],
+    ) {
+    }
+
     public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
     {
         $this->projects[] = $project->rootPath();
+        if (false === (array_shift($this->results) ?? true)) {
+            $this->statuses->runtimeFailed($project);
+        } else {
+            $this->statuses->runtimeReady($project);
+        }
     }
 }
 

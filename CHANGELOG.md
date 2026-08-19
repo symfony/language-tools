@@ -6,6 +6,7 @@
 - Redact project PHP commands from protocol traces
 - Keep open dependency files out of application source indexes
 - Keep rename and code action edits inside application-owned files
+- Retry runtime indexing after failures and relevant configuration changes
 
 ## 0.12.0 (2026-08-19)
 

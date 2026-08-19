@@ -51,15 +51,16 @@ final class WorkspaceConfiguration
 
     public function requestWorkspaceTrust(): void
     {
-        if (!$this->runtimeConfiguration->runtimeIndexing()) {
-            return;
+        $runtimeProjects = [];
+        foreach ($this->projectRegistry->all() as $project) {
+            if ($this->runtimeConfiguration->runtimeIndexing($project)) {
+                $runtimeProjects[] = $project;
+            } else {
+                $this->workspaceTrustManager->invalidateRuntime($project);
+            }
         }
-
         $projects = new ProjectRegistry();
-        $projects->replace(array_values(array_filter(
-            $this->projectRegistry->all(),
-            fn (Project $project): bool => $this->runtimeConfiguration->runtimeIndexing($project),
-        )));
+        $projects->replace($runtimeProjects);
         $this->workspaceTrustManager->requestUnknownDecisions($projects);
     }
 
