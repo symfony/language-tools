@@ -5,6 +5,7 @@
 - Keep project bridge error output out of language server logs
 - Redact project PHP commands from protocol traces
 - Keep open dependency files out of application source indexes
+- Keep rename and code action edits inside application-owned files
 
 ## 0.12.0 (2026-08-19)
 

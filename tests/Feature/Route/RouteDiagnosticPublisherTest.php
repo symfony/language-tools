@@ -162,7 +162,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $diagnosticProvider = new RouteDiagnosticPublisher($documents, $projects, $indexes, $phpExtractor, $twigExtractor);
             $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
-            $provider = new RouteCodeActionProvider($documents, $projects, $converter, $indexes, $phpExtractor, $twigExtractor);
+            $provider = new RouteCodeActionProvider($documents, $projects, $converter, $indexes, $phpExtractor, $twigExtractor, new ProjectPathResolver(new UriToPathConverter()));
 
             $actions = $provider->actions([
                 'textDocument' => ['uri' => $uri],

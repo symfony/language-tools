@@ -7,6 +7,7 @@ use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 
@@ -19,6 +20,7 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
         private readonly TranslationExtractor $extractor,
         private readonly TranslationIndexRegistry $indexes,
         private readonly UriToPathConverter $uriToPathConverter,
+        private readonly ProjectPathResolver $pathResolver,
     ) {
     }
 
@@ -31,7 +33,7 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
         }
         $document = $this->documents->get($textDocument['uri']);
         $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $document || null === $project) {
+        if (null === $document || null === $project || !$this->pathResolver->isApplicationOwned($project, $document->uri())) {
             return null;
         }
 
@@ -55,6 +57,10 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
                 if (null === $target) {
                     continue;
                 }
+                $targetUri = $this->uri($target);
+                if (!$this->pathResolver->isApplicationOwned($project, $targetUri)) {
+                    continue;
+                }
                 $contents = file_get_contents($target);
                 if (false === $contents) {
                     continue;
@@ -68,7 +74,7 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
                     'diagnostics' => [$diagnostic],
                     'isPreferred' => true,
                     'edit' => ['documentChanges' => [[
-                        'textDocument' => ['uri' => $this->uri($target), 'version' => null],
+                        'textDocument' => ['uri' => $targetUri, 'version' => null],
                         'edits' => [[
                             'range' => [
                                 'start' => ['line' => $position->line(), 'character' => $position->character()],

@@ -6,6 +6,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 
 final class DependencyInjectionRenameHandler implements RenameProviderInterface
 {
@@ -15,6 +16,7 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
         private readonly DependencyInjectionSourceIndexRegistry $sourceIndexes,
         private readonly ServiceIndexRegistry $serviceIndexes,
         private readonly ParameterIndexRegistry $parameterIndexes,
+        private readonly ProjectPathResolver $pathResolver,
     ) {
     }
 
@@ -55,13 +57,17 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
         $index = $this->sourceIndexes->forProject($project);
         $locations = [];
         foreach ($index->references($symbol->kind(), $symbol->name()) as $reference) {
-            $locations[] = [$reference->uri(), $reference->range()];
+            if ($this->pathResolver->isApplicationOwned($project, $reference->uri())) {
+                $locations[] = [$reference->uri(), $reference->range()];
+            }
         }
         $declarations = DependencyInjectionSymbolKind::Service === $symbol->kind()
             ? $index->serviceDeclarations($symbol->name())
             : $index->parameterDeclarations($symbol->name());
         foreach ($declarations as $declaration) {
-            $locations[] = [$declaration->uri(), $declaration->range()];
+            if ($this->pathResolver->isApplicationOwned($project, $declaration->uri())) {
+                $locations[] = [$declaration->uri(), $declaration->range()];
+            }
         }
 
         $editsByUri = [];
@@ -109,6 +115,9 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
         }
 
         [$document, $project, $position] = $request;
+        if (!$this->pathResolver->isApplicationOwned($project, $document->uri())) {
+            return null;
+        }
         $symbol = $this->symbolResolver->resolve(
             $document->uri(),
             $document->languageId(),
@@ -123,9 +132,14 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
     {
         $index = $this->sourceIndexes->forProject($project);
 
-        return DependencyInjectionSymbolKind::Service === $symbol->kind()
-            ? [] !== $index->serviceDeclarations($symbol->name())
-            : [] !== $index->parameterDeclarations($symbol->name());
+        $declarations = DependencyInjectionSymbolKind::Service === $symbol->kind()
+            ? $index->serviceDeclarations($symbol->name())
+            : $index->parameterDeclarations($symbol->name());
+
+        return [] !== array_filter(
+            $declarations,
+            fn (ServiceDeclaration|ParameterDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri()),
+        );
     }
 
     private function validName(DependencyInjectionSymbolKind $kind, string $name): bool

@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Feature\Twig;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
@@ -348,7 +349,7 @@ final class TemplateProviderTest extends TestCase
         $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $extractor, $indexes);
         $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
         self::assertIsArray($diagnostics);
-        $provider = new TemplateCodeActionProvider($documents, $projects, $extractor, $indexes, new UriToPathConverter());
+        $provider = new TemplateCodeActionProvider($documents, $projects, $extractor, $indexes, new UriToPathConverter(), new ProjectPathResolver(new UriToPathConverter()));
 
         $actions = $provider->actions([
             'textDocument' => ['uri' => $uri],
@@ -364,6 +365,42 @@ final class TemplateProviderTest extends TestCase
         self::assertIsArray($action['edit']['documentChanges'] ?? null);
         self::assertIsArray($action['edit']['documentChanges'][0]);
         self::assertSame('file:///workspace/templates/missing.html.twig', $action['edit']['documentChanges'][0]['uri'] ?? null);
+    }
+
+    public function testDoesNotCreateTemplatesThroughExternalSymlinks(): void
+    {
+        $directory = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
+        $root = $directory.'/project';
+        mkdir($root.'/src', 0777, true);
+        mkdir($root.'/templates', 0777, true);
+        mkdir($directory.'/external', 0777, true);
+        symlink($directory.'/external', $root.'/templates/external');
+        $converter = new UriToPathConverter();
+        $uri = $converter->toUri($root.'/src/Controller.php');
+        $text = "<?php \$this->render('external/missing.html.twig');";
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project($root, $converter->toUri($root), '^8.0')]);
+        $indexes = new TemplateIndexRegistry();
+        $indexes->forProject($project)->replaceRuntime(true);
+        $positionConverter = new PositionConverter();
+        $extractor = new TemplateReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
+        $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $positionConverter, $extractor, $indexes);
+
+        try {
+            $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
+            self::assertIsArray($diagnostics);
+            $provider = new TemplateCodeActionProvider($documents, $projects, $extractor, $indexes, $converter, new ProjectPathResolver($converter));
+
+            self::assertSame([], $provider->actions([
+                'textDocument' => ['uri' => $uri],
+                'range' => $diagnostics[0]['range'],
+                'context' => ['diagnostics' => $diagnostics],
+            ]));
+        } finally {
+            (new Filesystem())->remove($directory);
+        }
     }
 
     public function testCompletesAndLinksTemplateNames(): void

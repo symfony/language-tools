@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Twig;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 
@@ -16,6 +17,7 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
         private readonly TemplateReferenceExtractor $extractor,
         private readonly TemplateIndexRegistry $indexes,
         private readonly UriToPathConverter $uriToPathConverter,
+        private readonly ProjectPathResolver $pathResolver,
     ) {
     }
 
@@ -28,7 +30,7 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
         }
         $document = $this->documents->get($textDocument['uri']);
         $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $document || null === $project) {
+        if (null === $document || null === $project || !$this->pathResolver->isApplicationOwned($project, $document->uri())) {
             return null;
         }
 
@@ -52,6 +54,10 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
                 if (null === $path || is_file($path)) {
                     continue;
                 }
+                $uri = $this->uriToPathConverter->toUri($path);
+                if (!$this->pathResolver->isApplicationOwned($project, $uri)) {
+                    continue;
+                }
                 $actions[] = [
                     'title' => \sprintf('Create template "%s"', $reference->name()),
                     'kind' => 'quickfix',
@@ -59,7 +65,7 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
                     'isPreferred' => true,
                     'edit' => ['documentChanges' => [[
                         'kind' => 'create',
-                        'uri' => $this->uriToPathConverter->toUri($path),
+                        'uri' => $uri,
                     ]]],
                 ];
                 break;

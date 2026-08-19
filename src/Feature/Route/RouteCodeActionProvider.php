@@ -6,6 +6,7 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 
 final class RouteCodeActionProvider implements CodeActionProviderInterface
@@ -17,6 +18,7 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
         private readonly RouteIndexRegistry $indexes,
         private readonly RouteReferenceExtractor $phpExtractor,
         private readonly TwigRouteReferenceExtractor $twigExtractor,
+        private readonly ProjectPathResolver $pathResolver,
     ) {
     }
 
@@ -29,7 +31,11 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
         }
         $document = $this->documents->get($textDocument['uri']);
         $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $document || null === $project || !\in_array($document->languageId(), ['php', 'twig'], true)) {
+        if (null === $document
+            || null === $project
+            || !$this->pathResolver->isApplicationOwned($project, $document->uri())
+            || !\in_array($document->languageId(), ['php', 'twig'], true)
+        ) {
             return null;
         }
         $references = 'twig' === $document->languageId()

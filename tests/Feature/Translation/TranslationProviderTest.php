@@ -14,6 +14,7 @@ use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationMessage;
 use Symfony\Lsp\Feature\Translation\TranslationProvider;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 
@@ -80,7 +81,7 @@ final class TranslationProviderTest extends TestCase
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
-            $actions = (new TranslationCodeActionProvider($documents, $projects, $converter, $extractor, $indexes, new UriToPathConverter()))->actions([
+            $actions = (new TranslationCodeActionProvider($documents, $projects, $converter, $extractor, $indexes, new UriToPathConverter(), new ProjectPathResolver(new UriToPathConverter())))->actions([
                 'textDocument' => ['uri' => $uri],
                 'range' => $diagnostics[0]['range'],
                 'context' => ['diagnostics' => $diagnostics],

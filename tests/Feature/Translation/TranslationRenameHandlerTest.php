@@ -11,6 +11,7 @@ use Symfony\Lsp\Feature\Translation\TranslationExtractor;
 use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationRenameHandler;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 
@@ -38,6 +39,7 @@ final class TranslationRenameHandlerTest extends TestCase
             $converter,
             $extractor,
             $indexes,
+            new ProjectPathResolver(new UriToPathConverter()),
         );
         $position = $converter->toPosition($reference, strpos($reference, 'article.title') + 1);
 

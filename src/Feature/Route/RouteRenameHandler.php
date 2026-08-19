@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Route;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\RenameProviderInterface;
+use Symfony\Lsp\Project\ProjectPathResolver;
 
 final class RouteRenameHandler implements RenameProviderInterface
 {
@@ -14,6 +15,7 @@ final class RouteRenameHandler implements RenameProviderInterface
         private readonly RouteReferenceIndexRegistry $referenceIndexes,
         private readonly RouteDeclarationIndexRegistry $declarationIndexes,
         private readonly RouteIndexRegistry $routeIndexes,
+        private readonly ProjectPathResolver $pathResolver,
     ) {
     }
 
@@ -59,13 +61,25 @@ final class RouteRenameHandler implements RenameProviderInterface
             return null;
         }
 
+        $declarations = $this->declarationIndexes->forProject($project)->find($symbol->name());
+        if ([] === array_filter(
+            $declarations,
+            fn (RouteDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri()),
+        )) {
+            return null;
+        }
+
         /** @var array<string, list<array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, newText: string, annotationId: string}>> $editsByUri */
         $editsByUri = [];
         foreach ($this->referenceIndexes->forProject($project)->find($symbol->name()) as $reference) {
-            $editsByUri[$reference->uri()][] = self::edit($reference->range(), $newName);
+            if ($this->pathResolver->isApplicationOwned($project, $reference->uri())) {
+                $editsByUri[$reference->uri()][] = self::edit($reference->range(), $newName);
+            }
         }
-        foreach ($this->declarationIndexes->forProject($project)->find($symbol->name()) as $declaration) {
-            $editsByUri[$declaration->uri()][] = self::edit($declaration->range(), $newName);
+        foreach ($declarations as $declaration) {
+            if ($this->pathResolver->isApplicationOwned($project, $declaration->uri())) {
+                $editsByUri[$declaration->uri()][] = self::edit($declaration->range(), $newName);
+            }
         }
         ksort($editsByUri);
 
@@ -102,7 +116,9 @@ final class RouteRenameHandler implements RenameProviderInterface
         }
 
         [$document, $project, $position] = $request;
-        if (!\in_array($document->languageId(), ['php', 'twig', 'yaml'], true)) {
+        if (!$this->pathResolver->isApplicationOwned($project, $document->uri())
+            || !\in_array($document->languageId(), ['php', 'twig', 'yaml'], true)
+        ) {
             return null;
         }
 

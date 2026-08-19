@@ -7,6 +7,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 
 final class TranslationRenameHandler implements RenameProviderInterface
 {
@@ -15,6 +16,7 @@ final class TranslationRenameHandler implements RenameProviderInterface
         private readonly PositionConverter $converter,
         private readonly TranslationExtractor $extractor,
         private readonly TranslationIndexRegistry $indexes,
+        private readonly ProjectPathResolver $pathResolver,
     ) {
     }
 
@@ -25,7 +27,11 @@ final class TranslationRenameHandler implements RenameProviderInterface
             return null;
         }
         [$reference, $project] = $resolved;
-        if ([] === $this->indexes->forProject($project)->declarations($reference->domain(), $reference->key())) {
+        $declarations = $this->indexes->forProject($project)->declarations($reference->domain(), $reference->key());
+        if ([] === array_filter(
+            $declarations,
+            fn (TranslationDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri()),
+        )) {
             return null;
         }
 
@@ -43,7 +49,10 @@ final class TranslationRenameHandler implements RenameProviderInterface
         [$reference, $project] = $resolved;
         $index = $this->indexes->forProject($project);
         $declarations = $index->declarations($reference->domain(), $reference->key());
-        if ([] === $declarations
+        if ([] === array_filter(
+            $declarations,
+            fn (TranslationDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri()),
+        )
             || [] !== $index->declarations($reference->domain(), $newName)
             || [] !== $index->messages($reference->domain(), $newName)
         ) {
@@ -57,10 +66,14 @@ final class TranslationRenameHandler implements RenameProviderInterface
 
         $byUri = [];
         foreach ($index->references($reference->domain(), $reference->key()) as $item) {
-            $byUri[$item->uri()][] = $this->edit($item->range(), $newName);
+            if ($this->pathResolver->isApplicationOwned($project, $item->uri())) {
+                $byUri[$item->uri()][] = $this->edit($item->range(), $newName);
+            }
         }
         foreach ($declarations as $item) {
-            $byUri[$item->uri()][] = $this->edit($item->range(), $declarationText);
+            if ($this->pathResolver->isApplicationOwned($project, $item->uri())) {
+                $byUri[$item->uri()][] = $this->edit($item->range(), $declarationText);
+            }
         }
         ksort($byUri);
         $changes = [];
@@ -90,6 +103,9 @@ final class TranslationRenameHandler implements RenameProviderInterface
             return null;
         }
         [$document, $project, $position] = $request;
+        if (!$this->pathResolver->isApplicationOwned($project, $document->uri())) {
+            return null;
+        }
         $offset = $this->converter->toByteOffset($document->text(), $position);
         $facts = $this->extractor->extract($document->uri(), $document->languageId(), $document->text());
         foreach ($facts->declarations() as $declaration) {

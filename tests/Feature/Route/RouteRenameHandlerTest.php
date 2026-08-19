@@ -27,6 +27,7 @@ use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 
@@ -125,6 +126,7 @@ final class RouteRenameHandlerTest extends TestCase
             $references,
             $declarations,
             $routes,
+            new ProjectPathResolver(new UriToPathConverter()),
         );
 
         $edit = $handler->rename([
@@ -179,11 +181,18 @@ final class RouteRenameHandlerTest extends TestCase
             new Range(new Position(10, 20), new Position(10, 32)),
         ));
         $references = new RouteReferenceIndexRegistry();
-        $references->forProject($project)->replace(new RouteReferenceLocation(
-            'article_show',
-            $uri,
-            new Range(new Position(5, 28), new Position(5, 40)),
-        ));
+        $references->forProject($project)->replace(
+            new RouteReferenceLocation(
+                'article_show',
+                $uri,
+                new Range(new Position(5, 28), new Position(5, 40)),
+            ),
+            new RouteReferenceLocation(
+                'article_show',
+                'file:///workspace/vendor/acme/Consumer.php',
+                new Range(new Position(5, 28), new Position(5, 40)),
+            ),
+        );
         $routes = new RouteIndexRegistry();
         $routes->forProject($project)->replace(
             new Route('article_show', '/article/{id}', [], [], null, null),
@@ -203,6 +212,7 @@ final class RouteRenameHandlerTest extends TestCase
             $references,
             $declarations,
             $routes,
+            new ProjectPathResolver(new UriToPathConverter()),
         );
 
         return [$handler, [

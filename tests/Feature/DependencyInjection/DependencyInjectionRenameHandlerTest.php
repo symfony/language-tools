@@ -18,7 +18,9 @@ use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class DependencyInjectionRenameHandlerTest extends TestCase
 {
@@ -53,6 +55,7 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
             $sourceIndexes,
             new ServiceIndexRegistry(),
             new ParameterIndexRegistry(),
+            new ProjectPathResolver(new UriToPathConverter()),
         );
         $position = $converter->toPosition($yaml, strpos($yaml, 'app.mailer') + 1);
         $params = [
@@ -112,6 +115,7 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
             $sourceIndexes,
             new ServiceIndexRegistry(),
             new ParameterIndexRegistry(),
+            new ProjectPathResolver(new UriToPathConverter()),
         );
         $position = $converter->toPosition($text, strpos($text, 'app.storage_dir') + 1);
 
