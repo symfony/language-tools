@@ -35,6 +35,10 @@ Variable completion and hover are available in Twig templates for Twig globals
 and literal keys passed by PHP ``render()`` and ``renderView()`` calls. Twig
 component templates also expose public component properties.
 
+Variables declared by Twig's ``types`` tag are completed with their declared
+type and required or optional status. Documentation comments attached to type
+declarations are included in completion details and hover.
+
 Symfony Language Tools doesn't infer values propagated through dynamic arrays,
 includes, inheritance or arbitrary PHP expressions.
 

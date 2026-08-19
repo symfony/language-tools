@@ -8,6 +8,9 @@ use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigTypeDeclaration;
+use Symfony\Lsp\Parser\Twig\TwigTypeDeclarationParser;
 use Symfony\Lsp\Project\Project;
 
 final class TwigVariableProvider implements CompletionProviderInterface, HoverProviderInterface
@@ -18,6 +21,8 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
         private readonly TemplateIndexRegistry $indexes,
         private readonly TwigComponentIndexRegistry $componentIndexes,
         private readonly TemplateNameResolver $nameResolver,
+        private readonly TwigTypeDeclarationParser $typeDeclarationParser,
+        private readonly TwigCommentParser $commentParser,
     ) {
     }
 
@@ -32,19 +37,20 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
             return null;
         }
         $cursor = $this->converter->toByteOffset($document->text(), $position);
-        $before = substr($document->text(), 0, $cursor);
+        $before = substr($this->commentParser->mask($document->text()), 0, $cursor);
         if (!preg_match('/(?:{{|{%)[^}\n]*?([A-Za-z_][A-Za-z0-9_]*)?$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
         $prefix = $match[1][0] ?? '';
         $start = $cursor - \strlen($prefix);
         $startPosition = $this->converter->toPosition($document->text(), $start);
+        $declarations = $this->typeDeclarations($document);
         $items = [];
-        foreach ($this->variables($project, $template) as $variable) {
+        foreach ($this->variables($project, $template, $declarations) as $variable) {
             if (!str_starts_with($variable, $prefix)) {
                 continue;
             }
-            $items[] = [
+            $item = [
                 'label' => $variable,
                 'kind' => 6,
                 'detail' => 'Symfony Twig variable',
@@ -56,6 +62,18 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
                     'newText' => $variable,
                 ],
             ];
+            if (isset($declarations[$variable])) {
+                $declaration = $declarations[$variable];
+                $item['detail'] = \sprintf(
+                    'Twig variable: %s (%s)',
+                    $declaration->type(),
+                    $declaration->optional() ? 'optional' : 'required',
+                );
+                if (null !== $documentation = $declaration->documentation()) {
+                    $item['documentation'] = ['kind' => 'markdown', 'value' => $documentation];
+                }
+            }
+            $items[] = $item;
         }
 
         return $items;
@@ -72,8 +90,23 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
             return null;
         }
         $name = $this->word($document, $position);
-        if (null === $name || !\in_array($name, $this->variables($project, $template), true)) {
+        $declarations = $this->typeDeclarations($document);
+        if (null === $name || !\in_array($name, $this->variables($project, $template, $declarations), true)) {
             return null;
+        }
+        if (isset($declarations[$name])) {
+            $declaration = $declarations[$name];
+            $value = \sprintf(
+                "Twig variable: `%s`\n\nDeclared type: `%s`\n\n%s template variable",
+                $this->markdownCode($name),
+                $this->markdownCode($declaration->type()),
+                $declaration->optional() ? 'Optional' : 'Required',
+            );
+            if (null !== $documentation = $declaration->documentation()) {
+                $value .= "\n\n".$documentation;
+            }
+
+            return ['contents' => ['kind' => 'markdown', 'value' => $value]];
         }
         $source = $this->indexes->forProject($project)->isGlobal($name) ? 'Twig global' : 'render context';
 
@@ -84,8 +117,12 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
         )]];
     }
 
-    /** @return list<string> */
-    private function variables(Project $project, string $template): array
+    /**
+     * @param array<string, TwigTypeDeclaration> $declarations
+     *
+     * @return list<string>
+     */
+    private function variables(Project $project, string $template, array $declarations): array
     {
         $variables = $this->indexes->forProject($project)->variables($template);
         foreach ($this->componentIndexes->forProject($project)->components() as $component) {
@@ -93,10 +130,27 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
                 array_push($variables, ...$component->properties());
             }
         }
+        array_push($variables, ...array_keys($declarations));
         $variables = array_values(array_unique($variables));
         sort($variables);
 
         return $variables;
+    }
+
+    /** @return array<string, TwigTypeDeclaration> */
+    private function typeDeclarations(Document $document): array
+    {
+        $declarations = [];
+        foreach ($this->typeDeclarationParser->parse($document->text()) as $declaration) {
+            $declarations[$declaration->name()] = $declaration;
+        }
+
+        return $declarations;
+    }
+
+    private function markdownCode(string $value): string
+    {
+        return str_replace('`', '\\`', $value);
     }
 
     private function word(Document $document, Position $position): ?string

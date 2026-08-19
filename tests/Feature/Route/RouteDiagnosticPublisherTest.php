@@ -16,6 +16,7 @@ use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -158,7 +159,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $indexes->forProject($project)->replace(new Route('article_show', '/article/{id}', ['GET'], [], null, null));
             $converter = new PositionConverter();
             $phpExtractor = new RouteReferenceExtractor($converter);
-            $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
+            $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()));
             $diagnosticProvider = new RouteDiagnosticPublisher($documents, $projects, $indexes, $phpExtractor, $twigExtractor);
             $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
@@ -248,7 +249,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 $projects,
                 new RouteIndexRegistry(),
                 new RouteReferenceExtractor($positionConverter),
-                new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
+                new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
             )],
         );
 
@@ -323,7 +324,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                     $projects,
                     $routeIndexes,
                     new RouteReferenceExtractor($positionConverter),
-                    new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
+                    new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
                 )],
             ),
             $client,

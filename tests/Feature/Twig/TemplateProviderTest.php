@@ -26,7 +26,9 @@ use Symfony\Lsp\Feature\Twig\TwigComponentProvider;
 use Symfony\Lsp\Feature\Twig\TwigVariableProvider;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
+use Symfony\Lsp\Parser\Twig\TwigTypeDeclarationParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -38,9 +40,14 @@ final class TemplateProviderTest extends TestCase
 {
     public function testExtractsValidReferencesAroundMalformedTwigWithoutMatchingComments(): void
     {
-        $extractor = new TemplateReferenceExtractor(new PositionConverter(), new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
+        $extractor = new TemplateReferenceExtractor(new PositionConverter(), new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()));
         $references = $extractor->extract('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
             {# {% include 'ignored.html.twig' %} #}
+            {## {% include 'documented-outer.html.twig' %} ##}
+            {% types {
+                ## include('documented.html.twig')
+                article: 'string',
+            } %}
             {{ include(template_name('ignored.html.twig')) }}
             {% extends 'base.html.twig' %}
             {{ include('card.html.twig') }}
@@ -56,7 +63,7 @@ final class TemplateProviderTest extends TestCase
     public function testCompletesRenderContextVariablesAndTwigGlobals(): void
     {
         $converter = new PositionConverter();
-        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
+        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()));
         $reference = $extractor->extract(
             'file:///workspace/src/Controller.php',
             'php',
@@ -73,7 +80,16 @@ final class TemplateProviderTest extends TestCase
         $indexes = new TemplateIndexRegistry();
         $indexes->forProject($project)->replaceReferences($reference);
         $indexes->forProject($project)->replaceGlobals(['app']);
-        $provider = new TwigVariableProvider(new DocumentContextResolver($documents, $projects), $converter, $indexes, new TwigComponentIndexRegistry(), $this->templateNameResolver());
+        $commentParser = new TwigCommentParser();
+        $provider = new TwigVariableProvider(
+            new DocumentContextResolver($documents, $projects),
+            $converter,
+            $indexes,
+            new TwigComponentIndexRegistry(),
+            $this->templateNameResolver(),
+            new TwigTypeDeclarationParser($commentParser),
+            $commentParser,
+        );
         $position = $converter->toPosition($text, strpos($text, 'art') + 3);
 
         self::assertSame(['article'], array_column($provider->complete([
@@ -89,6 +105,62 @@ final class TemplateProviderTest extends TestCase
         self::assertIsArray($hover['contents'] ?? null);
         self::assertIsString($hover['contents']['value'] ?? null);
         self::assertStringContainsString('Twig global', $hover['contents']['value']);
+    }
+
+    public function testCompletesAndDescribesVariablesDeclaredByTypesTags(): void
+    {
+        $uri = 'file:///workspace/templates/article/show.html.twig';
+        $text = <<<'TWIG'
+            {% types {
+                ## The article to display.
+                article: 'App\\Entity\\Article',
+
+                ## Whether to highlight the article.
+                featured?: 'boolean',
+            } %}
+            {{ arti }}
+            {{ featured }}
+            TWIG;
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'twig', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $converter = new PositionConverter();
+        $commentParser = new TwigCommentParser();
+        $provider = new TwigVariableProvider(
+            new DocumentContextResolver($documents, $projects),
+            $converter,
+            new TemplateIndexRegistry(),
+            new TwigComponentIndexRegistry(),
+            $this->templateNameResolver(),
+            new TwigTypeDeclarationParser($commentParser),
+            $commentParser,
+        );
+        $completionPosition = $converter->toPosition($text, strrpos($text, 'arti') + \strlen('arti'));
+        $items = $provider->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $completionPosition->line(), 'character' => $completionPosition->character()],
+        ]);
+
+        self::assertIsArray($items);
+        self::assertCount(1, $items);
+        self::assertSame('article', $items[0]['label'] ?? null);
+        self::assertSame('Twig variable: App\Entity\Article (required)', $items[0]['detail'] ?? null);
+        self::assertSame(
+            ['kind' => 'markdown', 'value' => 'The article to display.'],
+            $items[0]['documentation'] ?? null,
+        );
+
+        $hoverPosition = $converter->toPosition($text, strrpos($text, 'featured') + 1);
+        self::assertSame([
+            'contents' => [
+                'kind' => 'markdown',
+                'value' => "Twig variable: `featured`\n\nDeclared type: `boolean`\n\nOptional template variable\n\nWhether to highlight the article.",
+            ],
+        ], $provider->hover([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $hoverPosition->line(), 'character' => $hoverPosition->character()],
+        ]));
     }
 
     public function testIndexesAndProvidesTwigComponents(): void
@@ -158,7 +230,16 @@ final class TemplateProviderTest extends TestCase
         self::assertCount(1, $lenses);
         self::assertIsArray($lenses[0]['command'] ?? null);
         self::assertSame('1 Twig component usage', $lenses[0]['command']['title'] ?? null);
-        $variableProvider = new TwigVariableProvider(new DocumentContextResolver($documents, $projects), $converter, new TemplateIndexRegistry(), $indexes, $this->templateNameResolver());
+        $commentParser = new TwigCommentParser();
+        $variableProvider = new TwigVariableProvider(
+            new DocumentContextResolver($documents, $projects),
+            $converter,
+            new TemplateIndexRegistry(),
+            $indexes,
+            $this->templateNameResolver(),
+            new TwigTypeDeclarationParser($commentParser),
+            $commentParser,
+        );
         $variablePosition = $converter->toPosition($componentTemplateText, strpos($componentTemplateText, 'ti') + 2);
         self::assertSame(['title'], array_column($variableProvider->complete([
             'textDocument' => ['uri' => $templateUri],
@@ -345,7 +426,7 @@ final class TemplateProviderTest extends TestCase
         $indexes = new TemplateIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true);
         $converter = new PositionConverter();
-        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
+        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()));
         $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $extractor, $indexes);
         $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
         self::assertIsArray($diagnostics);
@@ -385,7 +466,7 @@ final class TemplateProviderTest extends TestCase
         $indexes = new TemplateIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true);
         $positionConverter = new PositionConverter();
-        $extractor = new TemplateReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
+        $extractor = new TemplateReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()));
         $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $positionConverter, $extractor, $indexes);
 
         try {
@@ -454,7 +535,7 @@ final class TemplateProviderTest extends TestCase
             new Range(new Position(0, 0), new Position(0, 0)),
         ));
         $converter = new PositionConverter();
-        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
+        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()));
         $resolver = new DocumentContextResolver($documents, $projects);
 
         return [

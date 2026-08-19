@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Support Twig documentation comments and typed template variables
 - Keep project bridge error output out of language server logs
 - Redact project PHP commands from protocol traces
 - Keep open dependency files out of application source indexes

@@ -21,6 +21,7 @@ use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\Project;
@@ -96,7 +97,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
             new YamlRouteDeclarationExtractor($positionConverter),
             new RouteReferenceExtractor($positionConverter),
-            new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
+            new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
             new ProjectPathResolver(new UriToPathConverter()),
         );
         $scanner = new ApplicationSourceScanner(
