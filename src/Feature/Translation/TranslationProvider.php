@@ -11,6 +11,7 @@ use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -24,6 +25,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         private readonly TranslationIndexRegistry $indexes,
         private readonly TranslationExtractor $extractor,
         private readonly TranslationConfigurationRegistry $configuration,
+        private readonly TwigCommentParser $commentParser,
     ) {
     }
 
@@ -37,7 +39,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         [$document, $project, $position] = $request;
         $context = TranslationCompletionContext::create(
             $document->languageId(),
-            $document->text(),
+            'twig' === $document->languageId() ? $this->commentParser->mask($document->text()) : $document->text(),
             $position,
             $this->converter,
         );

@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\UriToPathConverter;
 
 final class TranslationExtractor
@@ -11,6 +12,7 @@ final class TranslationExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly UriToPathConverter $uriToPathConverter,
+        private readonly TwigCommentParser $commentParser,
     ) {
     }
 
@@ -18,7 +20,8 @@ final class TranslationExtractor
     {
         $metadata = $this->resourceMetadata($uri);
         $declarations = null === $metadata ? [] : $this->declarations($uri, $text, ...$metadata);
-        $references = \in_array($languageId, ['php', 'twig'], true) ? $this->references($uri, $languageId, $text) : [];
+        $referenceText = 'twig' === $languageId ? $this->commentParser->mask($text) : $text;
+        $references = \in_array($languageId, ['php', 'twig'], true) ? $this->references($uri, $languageId, $referenceText) : [];
 
         return new TranslationSourceFacts($uri, $declarations, $references);
     }

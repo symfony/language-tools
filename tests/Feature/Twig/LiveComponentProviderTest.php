@@ -13,6 +13,7 @@ use Symfony\Lsp\Feature\Twig\TemplateNameResolver;
 use Symfony\Lsp\Feature\Twig\TwigComponentExtractor;
 use Symfony\Lsp\Feature\Twig\TwigComponentIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigComponentProvider;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -24,7 +25,8 @@ final class LiveComponentProviderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
-        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())));
+        $commentParser = new TwigCommentParser();
+        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), $commentParser);
         $classUri = 'file:///workspace/src/Twig/Components/Search.php';
         $classText = <<<'PHP'
             <?php
@@ -67,7 +69,7 @@ final class LiveComponentProviderTest extends TestCase
             $extractor->extract($project, $templateUri, 'twig', $templateText),
             $extractor->extract($project, $usageUri, 'twig', $usageText),
         );
-        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, new TemplateIndexRegistry(), $extractor);
+        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, new TemplateIndexRegistry(), $extractor, $commentParser);
 
         self::assertSame(['submit'], array_column($provider->complete($this->params($converter, $completionUri, $completionText, \strlen($completionText))) ?? [], 'label'));
         $nestedActionOffset = strpos($templateText, 'submit') + \strlen('sub');

@@ -19,6 +19,7 @@ use Symfony\Lsp\Feature\Security\SecurityUserProvider;
 use Symfony\Lsp\Feature\Security\SecurityVoter;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -28,7 +29,7 @@ final class SecurityProviderTest extends TestCase
     public function testExtractsOnlyRecognizedSecuritySymbols(): void
     {
         $converter = new PositionConverter();
-        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))));
+        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TwigCommentParser());
         $php = <<<'PHP'
 <?php
 namespace App;
@@ -95,7 +96,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class AdminController {}
 PHP;
         $twigUri = 'file:///workspace/templates/admin.html.twig';
-        $twig = "{% if is_granted('ROLE_ADMIN') %}{{ logout_path('missing') }}{% endif %}";
+        $twig = "{## Use is_granted('ROLE_DOCUMENTED') and logout_path('documented') in examples. #}\n{% if is_granted('ROLE_ADMIN') %}{{ logout_path('missing') }}{% endif %}";
         $completionUri = 'file:///workspace/src/Completion.php';
         $completion = "<?php\nuse Symfony\\Component\\Security\\Http\\Attribute\\IsGranted;\n#[IsGranted('ROLE_A')]\nfinal class Completion {}\n";
         $documents = new DocumentStore();
@@ -105,7 +106,7 @@ PHP;
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))));
+        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TwigCommentParser());
         $indexes = new SecurityIndexRegistry();
         $indexes->forProject($project)->replace(
             [new SecurityFirewall('main', 'users', true, false, true, ['App\\Security\\Authenticator'])],

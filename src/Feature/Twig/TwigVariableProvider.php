@@ -89,7 +89,7 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
         if ('twig' !== $document->languageId() || null === $template = $this->nameResolver->resolve($project, $document->uri())) {
             return null;
         }
-        $name = $this->word($document, $position);
+        $name = $this->word($this->commentParser->mask($document->text()), $position);
         $declarations = $this->typeDeclarations($document);
         if (null === $name || !\in_array($name, $this->variables($project, $template, $declarations), true)) {
             return null;
@@ -153,19 +153,19 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
         return str_replace('`', '\\`', $value);
     }
 
-    private function word(Document $document, Position $position): ?string
+    private function word(string $text, Position $position): ?string
     {
-        $offset = $this->converter->toByteOffset($document->text(), $position);
+        $offset = $this->converter->toByteOffset($text, $position);
         $start = $offset;
-        while ($start > 0 && 1 === preg_match('/[A-Za-z0-9_]/', $document->text()[$start - 1])) {
+        while ($start > 0 && 1 === preg_match('/[A-Za-z0-9_]/', $text[$start - 1])) {
             --$start;
         }
         $end = $offset;
-        $length = \strlen($document->text());
-        while ($end < $length && 1 === preg_match('/[A-Za-z0-9_]/', $document->text()[$end])) {
+        $length = \strlen($text);
+        while ($end < $length && 1 === preg_match('/[A-Za-z0-9_]/', $text[$end])) {
             ++$end;
         }
-        $word = substr($document->text(), $start, $end - $start);
+        $word = substr($text, $start, $end - $start);
 
         return 1 === preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $word) ? $word : null;
     }

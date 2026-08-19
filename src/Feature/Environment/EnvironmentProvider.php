@@ -12,6 +12,7 @@ use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -27,6 +28,7 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         private readonly PositionConverter $converter,
         private readonly EnvironmentIndexRegistry $indexes,
         private readonly EnvironmentExtractor $extractor,
+        private readonly TwigCommentParser $commentParser,
     ) {
     }
 
@@ -38,7 +40,8 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         }
         [$document, $project, $position] = $request;
         $cursor = $this->converter->toByteOffset($document->text(), $position);
-        if (!preg_match('/%env\(([^)]*)$/', substr($document->text(), 0, $cursor), $match, \PREG_OFFSET_CAPTURE)) {
+        $text = 'twig' === $document->languageId() ? $this->commentParser->mask($document->text()) : $document->text();
+        if (!preg_match('/%env\(([^)]*)$/', substr($text, 0, $cursor), $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
         $expression = $match[1][0];

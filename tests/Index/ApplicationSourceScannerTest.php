@@ -30,6 +30,7 @@ use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\Project;
@@ -217,7 +218,7 @@ PHP;
         $indexes = new EnvironmentIndexRegistry();
         $this->scanner(new EnvironmentSourceIndexer(
             $indexes,
-            new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter()),
+            new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser()),
         ))->indexAll();
 
         self::assertSame(['APP_SECRET'], $indexes->forProject($this->project)->names());
@@ -431,10 +432,14 @@ PHP;
 
         return new SecuritySourceIndexer(
             new SecuritySourceIndexRegistry(),
-            new SecurityExtractor($converter, new YamlConfigurationParser(
+            new SecurityExtractor(
                 $converter,
-                new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
-            )),
+                new YamlConfigurationParser(
+                    $converter,
+                    new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+                ),
+                new TwigCommentParser(),
+            ),
         );
     }
 

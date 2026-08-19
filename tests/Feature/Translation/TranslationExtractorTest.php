@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Feature\Translation;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Translation\TranslationExtractor;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\UriToPathConverter;
 
 final class TranslationExtractorTest extends TestCase
@@ -28,6 +29,16 @@ final class TranslationExtractorTest extends TestCase
             ['article.title', 'messages', ['name']],
             ['admin.title', 'admin', []],
         ], array_map(static fn ($item): array => [$item->key(), $item->domain(), $item->placeholders()], $references->references()));
+    }
+
+    public function testIgnoresTwigReferencesInsideDocumentationComments(): void
+    {
+        $references = $this->extractor()->extract('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+            {## Use t('documented.translation') in examples. #}
+            {{ t('page.title') }}
+            TWIG)->references();
+
+        self::assertSame(['page.title'], array_map(static fn ($item): string => $item->key(), $references));
     }
 
     public function testToleratesIncompleteJsonAndXliffResources(): void
@@ -97,6 +108,6 @@ final class TranslationExtractorTest extends TestCase
 
     private function extractor(): TranslationExtractor
     {
-        return new TranslationExtractor(new PositionConverter(), new UriToPathConverter());
+        return new TranslationExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser());
     }
 }

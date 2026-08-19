@@ -13,6 +13,7 @@ use Symfony\Lsp\Feature\Translation\TranslationExtractor;
 use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationMessage;
 use Symfony\Lsp\Feature\Translation\TranslationProvider;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -57,6 +58,16 @@ final class TranslationProviderTest extends TestCase
         self::assertSame('name%', $result[0]['textEdit']['newText']);
     }
 
+    public function testIgnoresCompletionInsideTwigDocumentationComments(): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        $text = "{## Use t('article.ti') in examples. #}";
+        [$provider, $converter] = $this->provider($uri, $text, 'twig');
+        $position = $converter->toPosition($text, strpos($text, 'article.ti') + \strlen('article.ti'));
+
+        self::assertNull($provider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]]));
+    }
+
     public function testAddsMissingTranslationToTheOnlyDomainResource(): void
     {
         $root = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
@@ -70,13 +81,14 @@ final class TranslationProviderTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project($root, 'file://'.$root, '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new TranslationExtractor($converter, new UriToPathConverter());
+        $commentParser = new TwigCommentParser();
+        $extractor = new TranslationExtractor($converter, new UriToPathConverter(), $commentParser);
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true);
         $indexes->forProject($project)->replaceSources($extractor->extract('file://'.$translationPath, 'yaml', "existing: Existing\n"));
         $configuration = new TranslationConfigurationRegistry();
         $configuration->configure($project, true);
-        $provider = new TranslationProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $indexes, $extractor, $configuration);
+        $provider = new TranslationProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $indexes, $extractor, $configuration, $commentParser);
 
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -115,18 +127,19 @@ final class TranslationProviderTest extends TestCase
     }
 
     /** @return array{TranslationProvider, PositionConverter, TranslationConfigurationRegistry, Project} */
-    private function provider(string $uri, string $text): array
+    private function provider(string $uri, string $text, string $languageId = 'php'): array
     {
         $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 1, $text));
+        $documents->open(new Document($uri, $languageId, 1, $text));
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new TranslationExtractor($converter, new UriToPathConverter());
+        $commentParser = new TwigCommentParser();
+        $extractor = new TranslationExtractor($converter, new UriToPathConverter(), $commentParser);
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true, new TranslationMessage('article.title', 'messages', 'en', 'Article %name%'));
         $configuration = new TranslationConfigurationRegistry();
 
-        return [new TranslationProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $indexes, $extractor, $configuration), $converter, $configuration, $project];
+        return [new TranslationProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $indexes, $extractor, $configuration, $commentParser), $converter, $configuration, $project];
     }
 }

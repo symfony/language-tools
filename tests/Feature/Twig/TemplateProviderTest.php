@@ -161,13 +161,19 @@ final class TemplateProviderTest extends TestCase
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $hoverPosition->line(), 'character' => $hoverPosition->character()],
         ]));
+        $commentPosition = $converter->toPosition($text, strpos($text, 'article to display') + 1);
+        self::assertNull($provider->hover([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $commentPosition->line(), 'character' => $commentPosition->character()],
+        ]));
     }
 
     public function testIndexesAndProvidesTwigComponents(): void
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
-        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver());
+        $commentParser = new TwigCommentParser();
+        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver(), $commentParser);
         $classUri = 'file:///workspace/src/Twig/Alert.php';
         $classText = <<<'PHP'
             <?php
@@ -180,7 +186,7 @@ final class TemplateProviderTest extends TestCase
             PHP;
         $templateUri = 'file:///workspace/templates/components/Alert.html.twig';
         $usageUri = 'file:///workspace/templates/page.html.twig';
-        $usageText = '<twig:Alert title="Hello" />';
+        $usageText = "{## Use <twig:Documented /> or component('Documented') in examples. #}\n<twig:Alert title=\"Hello\" />";
         $indexes = new TwigComponentIndexRegistry();
         $indexes->forProject($project)->replace(
             $extractor->extract($project, $classUri, 'php', $classText),
@@ -205,14 +211,22 @@ final class TemplateProviderTest extends TestCase
         $indexes->forProject($project)->replaceRuntime(true, [], 'components');
         $templateIndexes = new TemplateIndexRegistry();
         $templateIndexes->forProject($project)->replaceRuntime(true);
-        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, $templateIndexes, $extractor);
+        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, $templateIndexes, $extractor, $commentParser);
         $completionPosition = $converter->toPosition($completionText, \strlen($completionText));
         self::assertSame(['Alert'], array_column($provider->complete([
             'textDocument' => ['uri' => $completionUri],
             'position' => ['line' => $completionPosition->line(), 'character' => $completionPosition->character()],
         ]) ?? [], 'label'));
+        $commentUri = 'file:///workspace/templates/comment.html.twig';
+        $commentText = '{## Use <twig:Al in examples. #}';
+        $documents->open(new Document($commentUri, 'twig', 1, $commentText));
+        $commentPosition = $converter->toPosition($commentText, strpos($commentText, 'Al') + 2);
+        self::assertNull($provider->complete([
+            'textDocument' => ['uri' => $commentUri],
+            'position' => ['line' => $commentPosition->line(), 'character' => $commentPosition->character()],
+        ]));
 
-        $usagePosition = $converter->toPosition($usageText, strpos($usageText, 'Alert') + 1);
+        $usagePosition = $converter->toPosition($usageText, strrpos($usageText, 'Alert') + 1);
         $params = [
             'textDocument' => ['uri' => $usageUri],
             'position' => ['line' => $usagePosition->line(), 'character' => $usagePosition->character()],
@@ -251,9 +265,10 @@ final class TemplateProviderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
-        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver());
+        $commentParser = new TwigCommentParser();
+        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver(), $commentParser);
         $usageUri = 'file:///workspace/templates/page.html.twig';
-        $usageText = "<twig:ux:icon name=\"x\" />\n<twig:Alert />\n<twig:Card />\n<twig:acme:badge />\n<twig:Unknown />";
+        $usageText = "{## Use <twig:Documented /> in examples. #}\n<twig:ux:icon name=\"x\" />\n<twig:Alert />\n<twig:Card />\n<twig:acme:badge />\n<twig:Unknown />";
         $documents = new DocumentStore();
         $documents->open(new Document($usageUri, 'twig', 1, $usageText));
         $projects = new ProjectRegistry();
@@ -263,7 +278,7 @@ final class TemplateProviderTest extends TestCase
             $extractor->extract($project, $usageUri, 'twig', $usageText),
         );
         $templateIndexes = new TemplateIndexRegistry();
-        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, $templateIndexes, $extractor);
+        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, $templateIndexes, $extractor, $commentParser);
         $params = ['textDocument' => ['uri' => $usageUri]];
 
         $withoutRuntimeMetadata = $provider->diagnostics($params);
@@ -296,7 +311,8 @@ final class TemplateProviderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
-        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver());
+        $commentParser = new TwigCommentParser();
+        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver(), $commentParser);
         $completionUri = 'file:///workspace/templates/completion.html.twig';
         $completionText = '<twig:';
         $documents = new DocumentStore();
@@ -314,7 +330,7 @@ final class TemplateProviderTest extends TestCase
             new TemplateDeclaration('@acme/components/badge.html.twig', 'file:///workspace/vendor/acme/bundle/templates/components/badge.html.twig', $range),
             new TemplateDeclaration('page.html.twig', 'file:///workspace/templates/page.html.twig', $range),
         );
-        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, $templateIndexes, $extractor);
+        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, $templateIndexes, $extractor, $commentParser);
 
         $position = $converter->toPosition($completionText, \strlen($completionText));
         $items = $provider->complete([

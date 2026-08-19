@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 
@@ -15,6 +16,7 @@ final class StimulusExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly ProjectPathResolver $pathResolver,
+        private readonly TwigCommentParser $commentParser,
     ) {
     }
 
@@ -24,7 +26,7 @@ final class StimulusExtractor
             return new StimulusSourceFacts($uri, $this->javascriptDeclarations($project, $uri, $text), $this->javascriptReferences($uri, $text));
         }
         if ('twig' === $languageId) {
-            return new StimulusSourceFacts($uri, [], $this->twigReferences($uri, $text));
+            return new StimulusSourceFacts($uri, [], $this->twigReferences($uri, $this->commentParser->mask($text)));
         }
 
         return new StimulusSourceFacts($uri, [], []);
@@ -35,7 +37,7 @@ final class StimulusExtractor
         if ('twig' !== $languageId) {
             return null;
         }
-        $before = substr($text, 0, $offset);
+        $before = substr($this->commentParser->mask($text), 0, $offset);
         if (preg_match('/\bstimulus_(?:action|target)\s*\(\s*([\'"])([^\'"]+)\1\s*,\s*([\'"])([^\'"]*)$/s', $before, $match)) {
             return new StimulusCompletionContext(
                 str_contains($match[0], 'stimulus_action') ? StimulusMemberKind::Action : StimulusMemberKind::Target,

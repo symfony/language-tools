@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\UriToPathConverter;
 
 final class AssetExtractor
@@ -11,13 +12,14 @@ final class AssetExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly UriToPathConverter $uriToPathConverter,
+        private readonly TwigCommentParser $commentParser,
     ) {
     }
 
     public function extract(string $uri, string $languageId, string $text): AssetSourceFacts
     {
         $symbols = match ($languageId) {
-            'twig' => $this->twigSymbols($uri, $text),
+            'twig' => $this->twigSymbols($uri, $this->commentParser->mask($text)),
             'php' => 'importmap.php' === basename($this->uriToPathConverter->convert($uri) ?? '') ? $this->importMapSymbols($uri, $text) : [],
             default => [],
         };
@@ -30,7 +32,7 @@ final class AssetExtractor
         if ('twig' !== $languageId) {
             return null;
         }
-        $before = substr($text, 0, $offset);
+        $before = substr($this->commentParser->mask($text), 0, $offset);
         if (preg_match('/\basset\s*\(\s*["\']([A-Za-z0-9_@.\/-]*)$/s', $before, $match, \PREG_OFFSET_CAPTURE)) {
             return $this->context(AssetSymbolKind::Asset, $match[1][0], $text, $match[1][1]);
         }

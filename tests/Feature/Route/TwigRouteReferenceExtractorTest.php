@@ -22,6 +22,10 @@ final class TwigRouteReferenceExtractorTest extends TestCase
                 ## path('documented')
                 article: 'string',
             } %}
+            {{ "#{
+                ## path('interpolation_documented')
+                value
+            }" }}
             {{ path(route_name('ignored')) }}
             <a href="{{ path('article_show', {'id': article.id}) }}">Show</a>
             <a href="{{ url("homepage") }}">Home</a>

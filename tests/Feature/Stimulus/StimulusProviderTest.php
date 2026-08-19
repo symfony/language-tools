@@ -12,6 +12,7 @@ use Symfony\Lsp\Feature\Stimulus\StimulusExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusIndexRegistry;
 use Symfony\Lsp\Feature\Stimulus\StimulusProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusSourceIndexRegistry;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -23,7 +24,7 @@ final class StimulusProviderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
-        $extractor = new StimulusExtractor($converter, new ProjectPathResolver(new UriToPathConverter()));
+        $extractor = new StimulusExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), new TwigCommentParser());
         $controllerUri = 'file:///workspace/assets/controllers/search_controller.js';
         $controllerText = <<<'JS'
             import { Controller } from '@hotwired/stimulus';

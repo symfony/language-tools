@@ -11,6 +11,7 @@ use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -23,6 +24,7 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
         private readonly TwigComponentIndexRegistry $indexes,
         private readonly TemplateIndexRegistry $templates,
         private readonly TwigComponentExtractor $extractor,
+        private readonly TwigCommentParser $commentParser,
     ) {
     }
 
@@ -37,7 +39,7 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
             return null;
         }
         $cursor = $this->converter->toByteOffset($document->text(), $position);
-        $before = substr($document->text(), 0, $cursor);
+        $before = substr($this->commentParser->mask($document->text()), 0, $cursor);
         $index = $this->indexes->forProject($project);
         $liveActionContext = $this->liveActionCompletionContext($project, $document->uri(), $before);
         if (null !== $liveActionContext) {

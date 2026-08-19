@@ -57,6 +57,12 @@ final class TwigDocumentParserTest extends TestCase
             }}
             TWIG];
         yield 'hash in string' => ["{{ 'value # not a comment' }}"];
+        yield 'documentation comment in string interpolation' => [<<<'TWIG'
+            {{ "prefix #{
+                ## Documentation in an interpolation.
+                value
+            } suffix" }}
+            TWIG];
     }
 
     public function testPreservesUnclosedCommentErrors(): void

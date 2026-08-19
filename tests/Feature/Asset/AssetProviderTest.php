@@ -13,6 +13,7 @@ use Symfony\Lsp\Feature\Asset\AssetIndexRegistry;
 use Symfony\Lsp\Feature\Asset\AssetProvider;
 use Symfony\Lsp\Feature\Asset\AssetSourceIndexRegistry;
 use Symfony\Lsp\Feature\Asset\ImportMapEntry;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -22,7 +23,7 @@ final class AssetProviderTest extends TestCase
     public function testProvidesAssetsAndImportmapEntrypoints(): void
     {
         $converter = new PositionConverter();
-        $extractor = new AssetExtractor($converter, new UriToPathConverter());
+        $extractor = new AssetExtractor($converter, new UriToPathConverter(), new TwigCommentParser());
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -51,6 +52,7 @@ final class AssetProviderTest extends TestCase
             PHP;
         $usageUri = 'file:///workspace/templates/layout.html.twig';
         $usageText = <<<'TWIG'
+            {## Use asset('documented.svg') and importmap('documented') when needed. #}
             <img src="{{ asset('images/logo.svg') }}">
             {{ importmap(['app', 'missing']) }}
             {{ asset('legacy/logo.svg', 'legacy') }}
@@ -84,6 +86,12 @@ final class AssetProviderTest extends TestCase
         $entryCompletionText = "{{ importmap(['ap";
         $documents->open(new Document($entryCompletionUri, 'twig', 1, $entryCompletionText));
         self::assertSame(['app'], $this->completionLabels($provider, $converter, $entryCompletionUri, $entryCompletionText));
+
+        $commentUri = 'file:///workspace/templates/comment.html.twig';
+        $commentText = "{## {{ asset('images/lo') }} #}";
+        $documents->open(new Document($commentUri, 'twig', 1, $commentText));
+        $commentOffset = strpos($commentText, 'images/lo') + \strlen('images/lo');
+        self::assertNull($provider->complete($this->params($converter, $commentUri, $commentText, $commentOffset)));
 
         $assetOffset = strpos($usageText, 'images/logo.svg') + 2;
         $assetParams = $this->params($converter, $usageUri, $usageText, $assetOffset);

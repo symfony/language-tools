@@ -6,18 +6,22 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\ConfigurationOccurrence;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 
 final class SecurityExtractor
 {
-    public function __construct(private readonly PositionConverter $converter, private readonly YamlConfigurationParser $yaml)
-    {
+    public function __construct(
+        private readonly PositionConverter $converter,
+        private readonly YamlConfigurationParser $yaml,
+        private readonly TwigCommentParser $commentParser,
+    ) {
     }
 
     public function extract(string $uri, string $languageId, string $text): SecuritySourceFacts
     {
         $symbols = match ($languageId) {
             'php' => $this->phpSymbols($uri, $text),
-            'twig' => $this->twigSymbols($uri, $text),
+            'twig' => $this->twigSymbols($uri, $this->commentParser->mask($text)),
             'yaml' => $this->yamlSymbols($uri, $text),
             default => [],
         };
@@ -27,7 +31,7 @@ final class SecurityExtractor
 
     public function completionContext(string $languageId, string $text, int $offset): ?SecurityCompletionContext
     {
-        $before = substr($text, 0, $offset);
+        $before = substr('twig' === $languageId ? $this->commentParser->mask($text) : $text, 0, $offset);
         if ('twig' === $languageId && preg_match('/\bis_granted\s*\(\s*["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
             return $this->context(SecuritySymbolKind::Role, $match[1][0], $text, $match[1][1]);
         }

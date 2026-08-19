@@ -9,8 +9,6 @@ final class TwigCommentParser
         $masked = $source;
         $length = \strlen($source);
         $state = 'data';
-        $quote = null;
-        $escaped = false;
         $brackets = [];
 
         for ($offset = 0; $offset < $length;) {
@@ -18,6 +16,7 @@ final class TwigCommentParser
                 if ('{#' === substr($source, $offset, 2)) {
                     $end = strpos($source, '#}', $offset + 2);
                     if (false === $end) {
+                        $this->maskRange($masked, $source, $offset + 2, $length);
                         break;
                     }
                     $end += 2;
@@ -42,18 +41,6 @@ final class TwigCommentParser
             }
 
             $character = $source[$offset];
-            if (null !== $quote) {
-                if ($escaped) {
-                    $escaped = false;
-                } elseif ('\\' === $character) {
-                    $escaped = true;
-                } elseif ($quote === $character) {
-                    $quote = null;
-                }
-                ++$offset;
-                continue;
-            }
-
             $closingDelimiter = 'block' === $state ? '%}' : '}}';
             if ([] === $brackets && $closingDelimiter === substr($source, $offset, 2)) {
                 $state = 'data';
@@ -61,8 +48,7 @@ final class TwigCommentParser
                 continue;
             }
             if ('\'' === $character || '"' === $character) {
-                $quote = $character;
-                ++$offset;
+                $offset = $this->stringEnd($masked, $source, $offset, $length);
                 continue;
             }
             if ('#' === $character) {
@@ -84,6 +70,62 @@ final class TwigCommentParser
         }
 
         return $masked;
+    }
+
+    private function stringEnd(string &$masked, string $source, int $offset, int $end): int
+    {
+        $quote = $source[$offset++];
+        while ($offset < $end) {
+            if ('\\' === $source[$offset]) {
+                $offset += 2;
+                continue;
+            }
+            if ($quote === $source[$offset]) {
+                return $offset + 1;
+            }
+            if ('"' === $quote && '#{' === substr($source, $offset, 2)) {
+                $offset = $this->interpolationEnd($masked, $source, $offset + 2, $end);
+                continue;
+            }
+            ++$offset;
+        }
+
+        return $end;
+    }
+
+    private function interpolationEnd(string &$masked, string $source, int $offset, int $end): int
+    {
+        $brackets = ['}'];
+        while ($offset < $end) {
+            $character = $source[$offset];
+            if ('\'' === $character || '"' === $character) {
+                $offset = $this->stringEnd($masked, $source, $offset, $end);
+                continue;
+            }
+            if ('#' === $character) {
+                $lineEnd = $offset + strcspn($source, "\r\n", $offset);
+                $this->maskRange($masked, $source, $offset, $lineEnd);
+                $offset = $lineEnd;
+                continue;
+            }
+            if ('(' === $character) {
+                $brackets[] = ')';
+            } elseif ('[' === $character) {
+                $brackets[] = ']';
+            } elseif ('{' === $character) {
+                $brackets[] = '}';
+            } elseif ($character === $brackets[array_key_last($brackets)]) {
+                array_pop($brackets);
+                ++$offset;
+                if ([] === $brackets) {
+                    return $offset;
+                }
+                continue;
+            }
+            ++$offset;
+        }
+
+        return $end;
     }
 
     private function maskRange(string &$masked, string $source, int $start, int $end): void

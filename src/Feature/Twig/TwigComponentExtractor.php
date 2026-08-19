@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 
 final class TwigComponentExtractor
@@ -11,6 +12,7 @@ final class TwigComponentExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly TemplateNameResolver $templateNameResolver,
+        private readonly TwigCommentParser $commentParser,
     ) {
     }
 
@@ -81,6 +83,7 @@ final class TwigComponentExtractor
                 }
             }
         } elseif ('twig' === $languageId) {
+            $text = $this->commentParser->mask($text);
             $name = $this->anonymousName($project, $uri);
             if (null !== $name) {
                 $components[] = new TwigComponent($name, $uri, $this->range($text, 0, 0), template: $this->templateName($project, $uri));
