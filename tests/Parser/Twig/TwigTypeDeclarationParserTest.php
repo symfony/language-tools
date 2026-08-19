@@ -48,4 +48,18 @@ final class TwigTypeDeclarationParserTest extends TestCase
             $declarations,
         ));
     }
+
+    public function testRecoversAroundUnclosedDirectives(): void
+    {
+        $parser = new TwigTypeDeclarationParser(new TwigCommentParser());
+
+        self::assertSame(['title'], array_map(
+            static fn (TwigTypeDeclaration $declaration): string => $declaration->name(),
+            $parser->parse("{{ unfinished\n{% types title: 'string' %}"),
+        ));
+        self::assertSame(['title'], array_map(
+            static fn (TwigTypeDeclaration $declaration): string => $declaration->name(),
+            $parser->parse("{% types { title: 'string'"),
+        ));
+    }
 }

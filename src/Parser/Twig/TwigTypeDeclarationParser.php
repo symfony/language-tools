@@ -28,10 +28,7 @@ final class TwigTypeDeclarationParser
         while ($offset < $length && false !== $start = strpos($masked, '{', $offset)) {
             if ('{{' === substr($masked, $start, 2)) {
                 $end = $this->directiveEnd($masked, $start + 2, '}}');
-                if (null === $end) {
-                    break;
-                }
-                $offset = $end + 2;
+                $offset = null === $end ? $start + 2 : $end + 2;
                 continue;
             }
             if ('{%' !== substr($masked, $start, 2)) {
@@ -41,7 +38,13 @@ final class TwigTypeDeclarationParser
 
             $end = $this->directiveEnd($masked, $start + 2, '%}');
             if (null === $end) {
-                break;
+                $tag = $this->tag($masked, $start + 2, $length);
+                if ('types' === ($tag[0] ?? null)) {
+                    array_push($declarations, ...$this->declarations($source, $tag[1], $length));
+                    break;
+                }
+                $offset = $start + 2;
+                continue;
             }
             $tag = $this->tag($masked, $start + 2, $end);
             if (null !== $tag) {
