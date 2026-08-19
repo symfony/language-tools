@@ -44,6 +44,30 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
         self::assertSame('article_edit', $declarations[1]->name());
     }
 
+    public function testExtractsCanonicalNameFromInternationalizedRouteAttribute(): void
+    {
+        $text = <<<'PHP'
+            <?php
+            use Symfony\Component\Routing\Attribute\Route;
+
+            final class HomeController
+            {
+                #[Route(path: ['en' => '/en', 'fr' => '/fr'], name: 'app_home')]
+                public function index(): void
+                {
+                }
+            }
+            PHP;
+
+        $declarations = (new PhpRouteDeclarationExtractor(new PositionConverter(), new TolerantPhpParser(new Parser())))->extract(
+            'file:///workspace/src/HomeController.php',
+            $text,
+        );
+
+        self::assertCount(1, $declarations);
+        self::assertSame('app_home', $declarations[0]->name());
+    }
+
     public function testResolvesRouteImportsAndIgnoresUnrelatedAttributes(): void
     {
         $text = <<<'PHP'

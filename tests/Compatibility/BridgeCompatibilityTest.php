@@ -48,7 +48,15 @@ final class BridgeCompatibilityTest extends TestCase
         $assets = $this->section($result['sections'], 'assets');
         $stimulus = $this->section($result['sections'], 'stimulus');
 
-        self::assertContains('fixture_home', array_column(\is_array($routes['items'] ?? null) ? $routes['items'] : [], 'name'));
+        $routeItems = \is_array($routes['items'] ?? null) ? $routes['items'] : [];
+        self::assertContains('fixture_home', array_column($routeItems, 'name'));
+        $localizedRoutes = array_values(array_filter(
+            $routeItems,
+            static fn (mixed $route): bool => \is_array($route)
+                && \is_string($route['name'] ?? null)
+                && str_starts_with($route['name'], 'fixture_localized.'),
+        ));
+        self::assertSame(['fixture_localized', 'fixture_localized'], array_column($localizedRoutes, 'canonical'));
         self::assertContains('App\\Environment\\CustomEnvVarProcessor', array_column(\is_array($container['items'] ?? null) ? $container['items'] : [], 'class'));
         self::assertContains('fixture.message', array_column(\is_array($translations['items'] ?? null) ? $translations['items'] : [], 'key'));
         self::assertContains('framework', array_column(\is_array($configuration['bundles'] ?? null) ? $configuration['bundles'] : [], 'alias'));

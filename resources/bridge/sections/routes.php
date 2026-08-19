@@ -44,6 +44,12 @@ function bridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
                         $requirements[$key] = (string) $value;
                     }
                 }
+                $canonical = null;
+                $canonicalDefault = $defaults['_canonical_route'] ?? null;
+                $locale = $defaults['_locale'] ?? null;
+                if (is_string($canonicalDefault) && is_string($locale) && $name === $canonicalDefault.'.'.$locale) {
+                    $canonical = $canonicalDefault;
+                }
                 $alias = is_string($route['alias'] ?? null)
                     ? $route['alias']
                     : (is_string($route['aliasFor'] ?? null) ? $route['aliasFor'] : null);
@@ -61,6 +67,7 @@ function bridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
                         static fn (mixed $key): bool => is_string($key),
                     )),
                     'requirements' => $requirements,
+                    'canonical' => $canonical,
                     'alias' => $alias,
                 ];
             }

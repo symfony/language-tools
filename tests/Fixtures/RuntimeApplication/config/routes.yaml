@@ -2,3 +2,10 @@ fixture_home:
     path: /fixture
     controller: App\Controller\HomeController
     methods: [GET]
+
+fixture_localized:
+    path:
+        en: /localized
+        fr: /localisee
+    controller: App\Controller\HomeController
+    methods: [GET]

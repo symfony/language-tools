@@ -6,15 +6,26 @@ final class RouteIndex
 {
     /** @var array<string, Route> */
     private array $routes = [];
+
+    /** @var array<string, Route> */
+    private array $completionRoutes = [];
+
     private bool $complete = false;
 
     public function replace(Route ...$routes): void
     {
         $this->routes = [];
+        $this->completionRoutes = [];
         foreach ($routes as $route) {
             $this->routes[$route->name()] = $route;
+            $completionName = $route->canonicalName() ?? $route->name();
+            $this->routes[$completionName] ??= $route;
+            if ($completionName === $route->name() || !isset($this->completionRoutes[$completionName])) {
+                $this->completionRoutes[$completionName] = $route;
+            }
         }
         ksort($this->routes);
+        ksort($this->completionRoutes);
         $this->complete = true;
     }
 
@@ -28,10 +39,14 @@ final class RouteIndex
      */
     public function matching(string $prefix): array
     {
-        return array_values(array_filter(
-            $this->routes,
-            static fn (Route $route): bool => str_starts_with($route->name(), $prefix),
-        ));
+        $routes = [];
+        foreach ($this->completionRoutes as $name => $route) {
+            if (str_starts_with($name, $prefix)) {
+                $routes[] = $route;
+            }
+        }
+
+        return $routes;
     }
 
     public function get(string $name): ?Route

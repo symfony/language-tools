@@ -186,6 +186,7 @@ final class BridgeTest extends TestCase
                 'controller' => null,
                 'defaults' => [],
                 'requirements' => [],
+                'canonical' => null,
                 'alias' => 'article_show',
             ],
             [
@@ -197,6 +198,7 @@ final class BridgeTest extends TestCase
                 'controller' => 'App\\Controller\\ArticleController::show',
                 'defaults' => ['_controller'],
                 'requirements' => ['id' => '\\d+'],
+                'canonical' => null,
                 'alias' => null,
             ],
             [
@@ -208,6 +210,31 @@ final class BridgeTest extends TestCase
                 'controller' => null,
                 'defaults' => [],
                 'requirements' => [],
+                'canonical' => null,
+                'alias' => null,
+            ],
+            [
+                'name' => 'localized_home.en',
+                'path' => '/en',
+                'methods' => ['GET'],
+                'schemes' => [],
+                'host' => null,
+                'controller' => 'App\\Controller\\HomeController',
+                'defaults' => ['_locale', '_canonical_route', '_controller'],
+                'requirements' => [],
+                'canonical' => 'localized_home',
+                'alias' => null,
+            ],
+            [
+                'name' => 'localized_home.fr',
+                'path' => '/fr',
+                'methods' => ['GET'],
+                'schemes' => [],
+                'host' => null,
+                'controller' => 'App\\Controller\\HomeController',
+                'defaults' => ['_locale', '_canonical_route', '_controller'],
+                'requirements' => [],
+                'canonical' => 'localized_home',
                 'alias' => null,
             ],
         ], $result['sections']['routes']['items']);
@@ -926,6 +953,28 @@ final class BridgeTest extends TestCase
                             'host' => 'ANY',
                             'defaults' => ['_controller' => 'App\\Controller\\ArticleController::show'],
                             'requirements' => ['id' => '\\d+'],
+                        ],
+                        'localized_home.en' => [
+                            'path' => '/en',
+                            'method' => 'GET',
+                            'scheme' => 'ANY',
+                            'host' => 'ANY',
+                            'defaults' => [
+                                '_locale' => 'en',
+                                '_canonical_route' => 'localized_home',
+                                '_controller' => 'App\\Controller\\HomeController',
+                            ],
+                        ],
+                        'localized_home.fr' => [
+                            'path' => '/fr',
+                            'method' => 'GET',
+                            'scheme' => 'ANY',
+                            'host' => 'ANY',
+                            'defaults' => [
+                                '_locale' => 'fr',
+                                '_canonical_route' => 'localized_home',
+                                '_controller' => 'App\\Controller\\HomeController',
+                            ],
                         ],
                     ], JSON_THROW_ON_ERROR));
                     $output->write("\nTrailing console noise after the payload.\n");

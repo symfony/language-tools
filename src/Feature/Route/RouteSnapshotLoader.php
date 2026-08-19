@@ -37,6 +37,7 @@ final class RouteSnapshotLoader
                 $this->strings($item['defaults'] ?? null),
                 $this->stringMap($item['requirements'] ?? null),
                 \is_string($item['alias'] ?? null) ? $item['alias'] : null,
+                \is_string($item['canonical'] ?? null) ? $item['canonical'] : null,
             );
         }
 

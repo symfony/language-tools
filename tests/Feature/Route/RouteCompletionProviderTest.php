@@ -31,6 +31,28 @@ final class RouteCompletionProviderTest extends TestCase
         ], (new RouteCompletionProvider($index))->complete('article_'));
     }
 
+    public function testCompletesInternationalizedRoutesWithCanonicalNames(): void
+    {
+        $index = new RouteIndex();
+        (new RouteSnapshotLoader($index))->load([
+            'sections' => [
+                'routes' => [
+                    'complete' => true,
+                    'items' => [
+                        ['name' => 'app_home.en', 'canonical' => 'app_home', 'path' => '/en'],
+                        ['name' => 'app_home.fr', 'canonical' => 'app_home', 'path' => '/fr'],
+                    ],
+                ],
+            ],
+        ]);
+
+        self::assertSame([
+            ['label' => 'app_home', 'kind' => 12, 'detail' => '/en'],
+        ], (new RouteCompletionProvider($index))->complete('app_'));
+        self::assertSame('app_home.en', $index->get('app_home')?->name());
+        self::assertSame('app_home.fr', $index->get('app_home.fr')?->name());
+    }
+
     public function testIgnoresMalformedSnapshotEntries(): void
     {
         $index = new RouteIndex();

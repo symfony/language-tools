@@ -20,6 +20,7 @@ final class Route
         private readonly array $defaults = [],
         private readonly array $requirements = [],
         private readonly ?string $alias = null,
+        private readonly ?string $canonicalName = null,
     ) {
     }
 
@@ -74,6 +75,11 @@ final class Route
     public function alias(): ?string
     {
         return $this->alias;
+    }
+
+    public function canonicalName(): ?string
+    {
+        return $this->canonicalName;
     }
 
     /**

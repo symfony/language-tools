@@ -41,7 +41,8 @@ Place the cursor after a route-name prefix and invoke completion:
     }
 
 The suggestions come from the effective route collection for the configured
-Symfony environment.
+Symfony environment. Internationalized routes use their canonical names without
+locale suffixes.
 
 Route Parameter Completion
 --------------------------

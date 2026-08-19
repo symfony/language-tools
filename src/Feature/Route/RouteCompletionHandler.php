@@ -117,7 +117,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
             static fn (string $parameter): array => [
                 'label' => $parameter,
                 'kind' => 10,
-                'detail' => \sprintf('Parameter of route %s', $route->name()),
+                'detail' => \sprintf('Parameter of route %s', $route->canonicalName() ?? $route->name()),
             ],
             array_values(array_filter(
                 $route->parameters(),

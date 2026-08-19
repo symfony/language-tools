@@ -56,6 +56,37 @@ final class RouteDiagnosticPublisherTest extends TestCase
         ]], $client->notifications[0]['params']['diagnostics']);
     }
 
+    public function testAcceptsCanonicalInternationalizedRouteNames(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        [$publisher, $client] = $this->publisher(
+            $uri,
+            <<<'PHP'
+                <?php
+                class HomeController extends AbstractController
+                {
+                    public function index(): void
+                    {
+                        $this->generateUrl('app_home');
+                    }
+                }
+                PHP,
+            new Route(
+                name: 'app_home.en',
+                path: '/en',
+                methods: ['GET'],
+                schemes: [],
+                host: null,
+                controller: null,
+                canonicalName: 'app_home',
+            ),
+        );
+
+        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+
+        self::assertSame([], $client->notifications[0]['params']['diagnostics']);
+    }
+
     public function testDiagnosesMissingRequiredRouteParameters(): void
     {
         $uri = 'file:///workspace/src/Controller.php';

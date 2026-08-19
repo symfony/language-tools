@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Complete internationalized routes with their canonical names
 - Open VS Code code lenses with native URI, position and location arguments
 
 ## 0.11.0 (2026-08-18)
