@@ -16,13 +16,19 @@ final class RouteIndex
     {
         $this->routes = [];
         $this->completionRoutes = [];
+        $localizedRoutes = [];
         foreach ($routes as $route) {
             $this->routes[$route->name()] = $route;
-            $completionName = $route->canonicalName() ?? $route->name();
-            $this->routes[$completionName] ??= $route;
-            if ($completionName === $route->name() || !isset($this->completionRoutes[$completionName])) {
-                $this->completionRoutes[$completionName] = $route;
+            if (null === $canonicalName = $route->canonicalName()) {
+                $this->completionRoutes[$route->name()] = $route;
+            } else {
+                $localizedRoutes[$canonicalName][] = $route;
             }
+        }
+        foreach ($localizedRoutes as $canonicalName => $variants) {
+            $route = $this->aggregate($canonicalName, $variants);
+            $this->routes[$canonicalName] = $route;
+            $this->completionRoutes[$canonicalName] = $route;
         }
         ksort($this->routes);
         ksort($this->completionRoutes);
@@ -52,5 +58,67 @@ final class RouteIndex
     public function get(string $name): ?Route
     {
         return $this->routes[$name] ?? null;
+    }
+
+    /**
+     * @param non-empty-list<Route> $variants
+     */
+    private function aggregate(string $name, array $variants): Route
+    {
+        $first = $variants[0];
+        $path = $first->path();
+        $host = $first->host();
+        $controller = $first->controller();
+        $alias = $first->alias();
+        $methods = [];
+        $schemes = [];
+        $defaults = [];
+        $requirements = $first->requirements();
+        $parameters = [];
+        $requiredParameters = $first->requiredParameters();
+        foreach ($variants as $variant) {
+            if ($path !== $variant->path()) {
+                $path = null;
+            }
+            if ($host !== $variant->host()) {
+                $host = null;
+            }
+            if ($controller !== $variant->controller()) {
+                $controller = null;
+            }
+            if ($alias !== $variant->alias()) {
+                $alias = null;
+            }
+            $methods = array_merge($methods, $variant->methods());
+            $schemes = array_merge($schemes, $variant->schemes());
+            $defaults = array_merge($defaults, $variant->defaults());
+            $requirements = array_intersect_assoc($requirements, $variant->requirements());
+            $parameters = array_merge($parameters, $variant->parameters());
+            $requiredParameters = array_intersect($requiredParameters, $variant->requiredParameters());
+        }
+        $methods = array_values(array_unique($methods));
+        $schemes = array_values(array_unique($schemes));
+        $defaults = array_values(array_unique($defaults));
+        $parameters = array_values(array_unique($parameters));
+        $requiredParameters = array_values($requiredParameters);
+        sort($methods);
+        sort($schemes);
+        sort($defaults);
+        sort($parameters);
+        sort($requiredParameters);
+
+        return new Route(
+            $name,
+            $path,
+            $methods,
+            $schemes,
+            $host,
+            $controller,
+            $defaults,
+            $requirements,
+            $alias,
+            parameters: $parameters,
+            requiredParameters: $requiredParameters,
+        );
     }
 }

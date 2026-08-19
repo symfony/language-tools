@@ -56,7 +56,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
         ]], $client->notifications[0]['params']['diagnostics']);
     }
 
-    public function testAcceptsCanonicalInternationalizedRouteNames(): void
+    public function testHandlesCanonicalAndConcreteInternationalizedRouteNames(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
         [$publisher, $client] = $this->publisher(
@@ -68,18 +68,30 @@ final class RouteDiagnosticPublisherTest extends TestCase
                     public function index(): void
                     {
                         $this->generateUrl('app_home');
+                        $this->generateUrl('app_home.fr', ['french' => 'bonjour']);
                     }
                 }
                 PHP,
-            new Route(
-                name: 'app_home.en',
-                path: '/en',
-                methods: ['GET'],
-                schemes: [],
-                host: null,
-                controller: null,
-                canonicalName: 'app_home',
-            ),
+            [
+                new Route(
+                    name: 'app_home.en',
+                    path: '/en/{english}',
+                    methods: ['GET'],
+                    schemes: [],
+                    host: null,
+                    controller: null,
+                    canonicalName: 'app_home',
+                ),
+                new Route(
+                    name: 'app_home.fr',
+                    path: '/fr/{french}',
+                    methods: ['GET'],
+                    schemes: [],
+                    host: null,
+                    controller: null,
+                    canonicalName: 'app_home',
+                ),
+            ],
         );
 
         $publisher->publish(['textDocument' => ['uri' => $uri]]);
@@ -279,12 +291,14 @@ final class RouteDiagnosticPublisherTest extends TestCase
     }
 
     /**
+     * @param Route|list<Route>|null $route
+     *
      * @return array{DiagnosticProviderRegistry, DiagnosticClient, Project}
      */
     private function publisher(
         string $uri,
         string $text,
-        ?Route $route = null,
+        Route|array|null $route = null,
         string $languageId = 'php',
     ): array {
         $client = new DiagnosticClient();
@@ -293,9 +307,9 @@ final class RouteDiagnosticPublisherTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $routeIndexes = new RouteIndexRegistry();
-        $routeIndexes->forProject($project)->replace(
+        $routeIndexes->forProject($project)->replace(...(\is_array($route) ? $route : [
             $route ?? new Route('article_show', '/article', ['GET'], [], null, null),
-        );
+        ]));
         $positionConverter = new PositionConverter();
 
         return [

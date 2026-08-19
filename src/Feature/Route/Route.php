@@ -9,6 +9,8 @@ final class Route
      * @param list<string>          $schemes
      * @param list<string>          $defaults
      * @param array<string, string> $requirements
+     * @param list<string>|null     $parameters
+     * @param list<string>|null     $requiredParameters
      */
     public function __construct(
         private readonly string $name,
@@ -21,6 +23,8 @@ final class Route
         private readonly array $requirements = [],
         private readonly ?string $alias = null,
         private readonly ?string $canonicalName = null,
+        private readonly ?array $parameters = null,
+        private readonly ?array $requiredParameters = null,
     ) {
     }
 
@@ -87,6 +91,10 @@ final class Route
      */
     public function parameters(): array
     {
+        if (null !== $this->parameters) {
+            return $this->parameters;
+        }
+
         preg_match_all('/\{([A-Za-z_][A-Za-z0-9_]*)/', ($this->host ?? '').($this->path ?? ''), $matches);
 
         return array_values(array_unique($matches[1]));
@@ -97,6 +105,6 @@ final class Route
      */
     public function requiredParameters(): array
     {
-        return array_values(array_diff($this->parameters(), $this->defaults));
+        return $this->requiredParameters ?? array_values(array_diff($this->parameters(), $this->defaults));
     }
 }

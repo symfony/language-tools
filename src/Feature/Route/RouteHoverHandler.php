@@ -41,7 +41,7 @@ final class RouteHoverHandler implements HoverProviderInterface
             return null;
         }
 
-        $details = [\sprintf('`%s`', $route->canonicalName() ?? $route->name())];
+        $details = [\sprintf('`%s`', $route->name())];
         if (null !== $route->alias()) {
             $details[] = \sprintf('Alias of: `%s`', $route->alias());
         }

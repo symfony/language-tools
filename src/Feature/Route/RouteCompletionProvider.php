@@ -16,7 +16,7 @@ final class RouteCompletionProvider
     {
         return array_map(
             static fn (Route $route): array => [
-                'label' => $route->canonicalName() ?? $route->name(),
+                'label' => $route->name(),
                 'kind' => 12,
                 'detail' => $route->path() ?? 'Symfony route',
             ],

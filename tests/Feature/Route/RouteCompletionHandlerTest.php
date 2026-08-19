@@ -51,6 +51,43 @@ final class RouteCompletionHandlerTest extends TestCase
         ]) ?? [], 'label'));
     }
 
+    public function testCompletesParametersFromAllInternationalizedRouteVariants(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = <<<'PHP'
+            <?php
+            class DemoController extends AbstractController
+            {
+                public function index(): void
+                {
+                    $this->generateUrl('app_home', ['locale_']);
+                }
+            }
+            PHP;
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $indexes = new RouteIndexRegistry();
+        $indexes->forProject($project)->replace(
+            new Route('app_home.en', '/en/{locale_en}', [], [], null, null, canonicalName: 'app_home'),
+            new Route('app_home.fr', '/fr/{locale_fr}', [], [], null, null, canonicalName: 'app_home'),
+        );
+        $converter = new PositionConverter();
+        $cursor = strpos($text, "locale_']") + \strlen('locale_');
+        $position = $converter->toPosition($text, $cursor);
+        $handler = new RouteCompletionHandler(
+            new DocumentContextResolver($documents, $projects),
+            $converter,
+            $indexes,
+        );
+
+        self::assertSame(['locale_en', 'locale_fr'], array_column($handler->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line(), 'character' => $position->character()],
+        ]) ?? [], 'label'));
+    }
+
     public function testCompletesRouteNamesInTwigFunctions(): void
     {
         $uri = 'file:///workspace/templates/article.html.twig';

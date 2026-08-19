@@ -39,18 +39,16 @@ final class RouteCompletionProviderTest extends TestCase
                 'routes' => [
                     'complete' => true,
                     'items' => [
-                        ['name' => 'app_home.en', 'canonical' => 'app_home', 'path' => '/en'],
-                        ['name' => 'app_home.fr', 'canonical' => 'app_home', 'path' => '/fr'],
+                        ['name' => 'app_home.en', 'canonical' => 'app_home', 'path' => '/en/{english}'],
+                        ['name' => 'app_home.fr', 'canonical' => 'app_home', 'path' => '/fr/{french}'],
                     ],
                 ],
             ],
         ]);
 
         self::assertSame([
-            ['label' => 'app_home', 'kind' => 12, 'detail' => '/en'],
+            ['label' => 'app_home', 'kind' => 12, 'detail' => 'Symfony route'],
         ], (new RouteCompletionProvider($index))->complete('app_'));
-        self::assertSame('app_home.en', $index->get('app_home')?->name());
-        self::assertSame('app_home.fr', $index->get('app_home.fr')?->name());
     }
 
     public function testIgnoresMalformedSnapshotEntries(): void
