@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Twig;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 
 final class TemplateCompletionHandler implements CompletionProviderInterface
 {
@@ -12,6 +13,7 @@ final class TemplateCompletionHandler implements CompletionProviderInterface
         private readonly DocumentContextResolver $resolver,
         private readonly PositionConverter $converter,
         private readonly TemplateIndexRegistry $indexes,
+        private readonly TwigCommentParser $commentParser,
     ) {
     }
 
@@ -22,7 +24,8 @@ final class TemplateCompletionHandler implements CompletionProviderInterface
             return null;
         }
         [$document, $project, $position] = $request;
-        $context = TemplateCompletionContext::create($document->languageId(), $document->text(), $position, $this->converter);
+        $text = 'twig' === $document->languageId() ? $this->commentParser->mask($document->text()) : $document->text();
+        $context = TemplateCompletionContext::create($document->languageId(), $text, $position, $this->converter);
         if (null === $context) {
             return null;
         }

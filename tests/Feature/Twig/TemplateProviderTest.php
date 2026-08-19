@@ -537,6 +537,18 @@ final class TemplateProviderTest extends TestCase
         );
     }
 
+    public function testIgnoresTemplateCompletionInsideDocumentationComments(): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        $text = "{## Use include('article/sh') in examples. #}";
+        [$completion, , $converter] = $this->providers($uri, 'twig', $text);
+        $position = $converter->toPosition($text, strpos($text, 'article/sh') + \strlen('article/sh'));
+
+        self::assertNull($completion->complete(['textDocument' => ['uri' => $uri], 'position' => [
+            'line' => $position->line(), 'character' => $position->character(),
+        ]]));
+    }
+
     public function testNavigatesReferencesAndDiagnosesMissingTemplates(): void
     {
         $uri = 'file:///workspace/templates/page.html.twig';
@@ -571,11 +583,12 @@ final class TemplateProviderTest extends TestCase
             new Range(new Position(0, 0), new Position(0, 0)),
         ));
         $converter = new PositionConverter();
-        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()));
+        $commentParser = new TwigCommentParser();
+        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser));
         $resolver = new DocumentContextResolver($documents, $projects);
 
         return [
-            new TemplateCompletionHandler($resolver, $converter, $indexes),
+            new TemplateCompletionHandler($resolver, $converter, $indexes, $commentParser),
             new TemplateNavigationProvider($resolver, $documents, $projects, $converter, $extractor, $indexes),
             $converter,
         ];
