@@ -20,6 +20,7 @@ final class TwigTypeDeclarationParserTest extends TestCase
 
                 # This regular comment is not documentation.
                 featured?: 'boolean',
+                future: 'App\Entity\Article',
                 incomplete,
 
                 ## The current page.
@@ -34,6 +35,7 @@ final class TwigTypeDeclarationParserTest extends TestCase
         self::assertSame([
             ['article', 'App\Entity\Article', false, "The article to display.\nIncludes its author and publication date."],
             ['featured', 'boolean', true, null],
+            ['future', 'App\Entity\Article', false, null],
             ['page', 'positive-int', true, 'The current page.'],
             ['title', 'string', false, null],
         ], array_map(
