@@ -121,12 +121,6 @@
           "scope": "resource",
           "description": "Absolute project root as seen by the PHP command when it runs in a Docker container. Leave empty when the PHP command runs on this machine."
         },
-        "symfonyLsp.consolePath": {
-          "type": "string",
-          "default": "bin/console",
-          "scope": "resource",
-          "description": "Project console path used for cache maintenance."
-        },
         "symfonyLsp.environment": {
           "type": "string",
           "default": "dev",

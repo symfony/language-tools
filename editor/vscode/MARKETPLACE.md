@@ -75,7 +75,6 @@ The defaults work for standard projects. Add settings to
 | Setting | When to change it |
 | --- | --- |
 | `symfonyLsp.phpCommand` | Use `["symfony", "php"]`, a container command or another PHP launcher. |
-| `symfonyLsp.consolePath` | The Symfony console is not `bin/console`. |
 | `symfonyLsp.environment` | Index another environment than `dev`. |
 | `symfonyLsp.runtimeIndexing` | Disable application execution while keeping source-only features. |
 | `symfonyLsp.bridgeTimeout` | Allow an application more than five minutes to collect runtime metadata. |

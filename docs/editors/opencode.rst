@@ -101,7 +101,6 @@ initialization options. Use it to override the default runtime configuration:
                     "workspaceTrust": true,
                     "phpCommand": ["symfony", "php"],
                     "containerProjectRoot": "",
-                    "consolePath": "bin/console",
                     "environment": "dev",
                     "debug": true,
                     "runtimeIndexing": true,
@@ -116,8 +115,8 @@ initialization options. Use it to override the default runtime configuration:
         }
     }
 
-``phpCommand``, ``containerProjectRoot``, ``consolePath``, ``environment``,
-``debug``, ``runtimeIndexing``, ``bridgeTimeout``, ``projectRoots`` and
+``phpCommand``, ``containerProjectRoot``, ``environment``, ``debug``,
+``runtimeIndexing``, ``bridgeTimeout``, ``projectRoots`` and
 ``trace`` have the same behavior as their VS Code counterparts, including
 `Docker support`_. The
 ``env`` object configures environment variables for the server process.

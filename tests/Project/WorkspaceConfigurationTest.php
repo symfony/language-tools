@@ -59,7 +59,6 @@ final class WorkspaceConfigurationTest extends TestCase
             'capabilities' => ['general' => ['positionEncodings' => ['utf-8', 'utf-16']]],
             'initializationOptions' => [
                 'phpCommand' => ['symfony', 'php'],
-                'consolePath' => 'app-console',
                 'environment' => 'test',
                 'debug' => false,
                 'bridgeTimeout' => 90,
@@ -69,7 +68,6 @@ final class WorkspaceConfigurationTest extends TestCase
         self::assertCount(1, $registry->all());
         self::assertSame('^8.0', $registry->all()[0]->frameworkBundleConstraint());
         self::assertSame(['symfony', 'php'], $runtimeConfiguration->phpCommand());
-        self::assertSame('app-console', $runtimeConfiguration->consolePath());
         self::assertSame('test', $runtimeConfiguration->environment());
         self::assertFalse($runtimeConfiguration->debug());
         self::assertFalse($runtimeConfiguration->runtimeIndexing());

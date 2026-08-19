@@ -9,7 +9,6 @@ final class RuntimeConfiguration
 {
     /** @var non-empty-list<string> */
     private array $phpCommand = ['php'];
-    private string $consolePath = 'bin/console';
     private ?string $containerProjectRoot = null;
     private string $environment = 'dev';
     private bool $debug = true;
@@ -40,11 +39,6 @@ final class RuntimeConfiguration
             if ([] !== $validatedCommand) {
                 $this->phpCommand = $validatedCommand;
             }
-        }
-
-        $consolePath = $initializationOptions['consolePath'] ?? null;
-        if (\is_string($consolePath) && '' !== $consolePath) {
-            $this->consolePath = $consolePath;
         }
 
         $containerProjectRoot = $initializationOptions['containerProjectRoot'] ?? null;
@@ -116,13 +110,6 @@ final class RuntimeConfiguration
         }
 
         return null === $root ? null : Path::canonicalize($root);
-    }
-
-    public function consolePath(?Project $project = null): string
-    {
-        $path = $this->setting($project, 'consolePath', $this->consolePath);
-
-        return \is_string($path) && '' !== $path ? $path : $this->consolePath;
     }
 
     public function environment(?Project $project = null): string

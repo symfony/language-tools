@@ -85,7 +85,6 @@ workspace's ``.vscode/settings.json`` file:
         "symfonyLsp.memoryLimit": "",
         "symfonyLsp.phpCommand": ["php"],
         "symfonyLsp.containerProjectRoot": "",
-        "symfonyLsp.consolePath": "bin/console",
         "symfonyLsp.environment": "dev",
         "symfonyLsp.debug": true,
         "symfonyLsp.runtimeIndexing": true,
@@ -114,8 +113,6 @@ command must be compatible with the Symfony application.
 ``symfonyLsp.containerProjectRoot`` supports a ``phpCommand`` that runs in a
 Docker container: set it to the absolute project path inside the container.
 See `Docker support`_ for the complete setup.
-``symfonyLsp.consolePath`` selects the project console used for normal cache
-maintenance.
 
 ``symfonyLsp.environment`` selects the Symfony runtime whose effective metadata
 is indexed. Runtime indexing requires ``symfonyLsp.debug`` to be ``true``.

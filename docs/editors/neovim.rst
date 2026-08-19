@@ -70,7 +70,6 @@ Override the built-in configuration before enabling the language server:
         init_options = {
             phpCommand = { 'php' },
             containerProjectRoot = '',
-            consolePath = 'bin/console',
             environment = 'dev',
             debug = true,
             runtimeIndexing = true,
@@ -82,7 +81,6 @@ Override the built-in configuration before enabling the language server:
             symfonyLsp = {
                 phpCommand = { 'php' },
                 containerProjectRoot = '',
-                consolePath = 'bin/console',
                 environment = 'dev',
                 debug = true,
                 runtimeIndexing = true,
@@ -99,8 +97,8 @@ Override the built-in configuration before enabling the language server:
 For example, use ``{ 'symfony', 'php' }`` with Symfony CLI, or a Docker
 command with ``containerProjectRoot`` as described in `Docker support`_.
 
-``containerProjectRoot``, ``consolePath``, ``environment``, ``debug``,
-``runtimeIndexing``, ``bridgeTimeout``, ``projectRoots``, ``trace`` and
+``containerProjectRoot``, ``environment``, ``debug``, ``runtimeIndexing``,
+``bridgeTimeout``, ``projectRoots``, ``trace`` and
 ``translationDiagnostics`` have the same behavior as their VS Code
 counterparts. Restart the language client after changing its configuration.
 

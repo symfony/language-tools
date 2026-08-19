@@ -69,7 +69,6 @@ Configure startup options and project settings under the
                 "initialization_options": {
                     "phpCommand": ["php"],
                     "containerProjectRoot": "",
-                    "consolePath": "bin/console",
                     "environment": "dev",
                     "debug": true,
                     "runtimeIndexing": true,
@@ -80,7 +79,6 @@ Configure startup options and project settings under the
                 "settings": {
                     "phpCommand": ["php"],
                     "containerProjectRoot": "",
-                    "consolePath": "bin/console",
                     "environment": "dev",
                     "debug": true,
                     "runtimeIndexing": true,
@@ -95,8 +93,8 @@ Configure startup options and project settings under the
 For example, use ``["symfony", "php"]`` with Symfony CLI, or a Docker command
 with ``containerProjectRoot`` as described in `Docker support`_.
 
-``containerProjectRoot``, ``consolePath``, ``environment``, ``debug``,
-``runtimeIndexing``, ``bridgeTimeout``, ``projectRoots``, ``trace`` and
+``containerProjectRoot``, ``environment``, ``debug``, ``runtimeIndexing``,
+``bridgeTimeout``, ``projectRoots``, ``trace`` and
 ``translationDiagnostics`` have the same behavior as their VS Code
 counterparts. Restart the language server after changing initialization
 options.
