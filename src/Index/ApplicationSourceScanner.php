@@ -99,6 +99,11 @@ final class ApplicationSourceScanner
                 $entries = $this->scan($project, [], $cancellation);
             }
             $this->entries[$project->rootPath()] = $entries;
+            foreach ($this->documents->all() as $document) {
+                if ($this->projects->forDocumentUri($document->uri())?->rootPath() === $project->rootPath()) {
+                    $this->updateOpenDocument(['textDocument' => ['uri' => $document->uri()]]);
+                }
+            }
             $this->statuses->sourceReady($project);
         } catch (CancelledException $error) {
             $progressMessage = 'Source indexing canceled';
@@ -186,13 +191,23 @@ final class ApplicationSourceScanner
         if (null === $relativePath) {
             return SourceFileChange::untracked();
         }
-        if ($this->gitignoreExcluded($project->rootPath(), $path)) {
-            return SourceFileChange::ignored();
-        }
 
         $projectKey = $project->rootPath();
         $indexed = \array_key_exists($projectKey, $this->entries);
         $entries = $indexed ? $this->entries[$projectKey] : $this->store->loadMetadata($project);
+        if ($this->gitignoreExcluded($project->rootPath(), $path)) {
+            if (isset($entries[$relativePath])) {
+                foreach ($this->providers as $provider) {
+                    $provider->remove($project, $uri);
+                }
+                unset($entries[$relativePath]);
+                $this->store->appendDeletion($project, $relativePath);
+                $this->entries[$projectKey] = $entries;
+                $this->statuses->sourceReady($project);
+            }
+
+            return SourceFileChange::ignored();
+        }
         $sourceFileChange = SourceFileChange::factsChanged([]);
         if ($deleted || !is_file($path)) {
             if (!isset($entries[$relativePath])) {

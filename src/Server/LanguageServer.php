@@ -224,6 +224,7 @@ final class LanguageServer
 
         $rediscover = false;
         $refreshWatchers = false;
+        $rescanSources = false;
         foreach ($changes as $change) {
             if (!\is_array($change) || !\is_string($change['uri'] ?? null) || !\is_int($change['type'] ?? null)) {
                 continue;
@@ -231,23 +232,29 @@ final class LanguageServer
             $deleted = 3 === $change['type'];
             $sourceFileChange = $this->sourceScanner->refreshUri($change['uri'], $deleted);
             $this->projectRuntimeRefresher->refreshUri($change['uri'], $sourceFileChange);
-            if ('composer.json' === basename($this->uriToPathConverter->convert($change['uri']) ?? '')) {
+            $basename = basename($this->uriToPathConverter->convert($change['uri']) ?? '');
+            if ('composer.json' === $basename) {
                 $rediscover = true;
+            }
+            if ('.gitignore' === $basename) {
+                $rescanSources = true;
             }
             if ($this->workspaceFileWatcher->requiresRefreshForChange($change['uri'], $change['type'])) {
                 $refreshWatchers = true;
             }
         }
 
-        if (!$rediscover && !$refreshWatchers) {
+        if (!$rediscover && !$refreshWatchers && !$rescanSources) {
             return;
         }
 
-        async(function () use ($rediscover): void {
+        async(function () use ($rediscover, $refreshWatchers): void {
             if ($rediscover) {
                 $this->workspaceConfiguration->rediscoverProjects();
             }
-            $this->workspaceFileWatcher->refresh();
+            if ($rediscover || $refreshWatchers) {
+                $this->workspaceFileWatcher->refresh();
+            }
             $this->sourceScanner->indexAll();
             if ($rediscover) {
                 $this->workspaceConfiguration->requestWorkspaceTrust();

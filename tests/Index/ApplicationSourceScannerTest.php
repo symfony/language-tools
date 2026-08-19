@@ -280,6 +280,24 @@ PHP;
         self::assertArrayNotHasKey('file://'.$path, $provider->sources);
     }
 
+    public function testRemovesPreviouslyIndexedFilesWhenTheyBecomeGitignored(): void
+    {
+        mkdir($this->temporaryDirectory.'/.git');
+        $path = $this->temporaryDirectory.'/src/Controller.php';
+        $uri = 'file://'.$path;
+        file_put_contents($path, '<?php final class Controller {}');
+        $provider = new RecordingSourceIndexProvider();
+        $scanner = $this->scanner($provider);
+        $scanner->indexAll();
+        file_put_contents($this->temporaryDirectory.'/.gitignore', "/src/Controller.php\n");
+
+        $change = $scanner->refreshUri($uri);
+
+        self::assertFalse($change->requiresRuntimeRefresh());
+        self::assertSame([$uri], $provider->removals);
+        self::assertArrayNotHasKey($uri, $provider->sources);
+    }
+
     public function testDoesNotOverlayOpenDependencyOwnedFiles(): void
     {
         mkdir($this->temporaryDirectory.'/vendor');

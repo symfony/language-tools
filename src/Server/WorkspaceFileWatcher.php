@@ -82,6 +82,7 @@ final class WorkspaceFileWatcher
             return [
                 ['globPattern' => '**/'.self::SOURCE_PATTERN],
                 ['globPattern' => '**/.env*'],
+                ['globPattern' => '**/.gitignore'],
                 ['globPattern' => '**/composer.{json,lock}'],
             ];
         }
@@ -90,10 +91,12 @@ final class WorkspaceFileWatcher
         foreach ($this->projects->all() as $project) {
             $watchers[] = $this->relative($project, self::SOURCE_PATTERN);
             $watchers[] = $this->relative($project, '.env*');
+            $watchers[] = $this->relative($project, '.gitignore');
             $watchers[] = $this->relative($project, 'composer.{json,lock}');
             $watchers[] = $this->relative($project, '*', self::DIRECTORY_CHANGE_KIND);
             foreach ($this->sourceDirectories($project) as $directory) {
                 $watchers[] = $this->relative($project, $directory.'/**/'.self::SOURCE_PATTERN);
+                $watchers[] = $this->relative($project, $directory.'/**/.gitignore');
                 $watchers[] = $this->relative($project, $directory, self::DIRECTORY_CHANGE_KIND);
                 $watchers[] = $this->relative($project, $directory.'/**', self::DIRECTORY_CHANGE_KIND);
             }

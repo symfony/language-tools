@@ -8,6 +8,7 @@
 - Keep rename and code action edits inside application-owned files
 - Retry runtime indexing after failures and relevant configuration changes
 - Watch source files added under new top-level project directories
+- Remove source facts when files become gitignored
 
 ## 0.12.0 (2026-08-19)
 
