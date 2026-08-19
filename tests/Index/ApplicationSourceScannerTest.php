@@ -280,6 +280,21 @@ PHP;
         self::assertArrayNotHasKey('file://'.$path, $provider->sources);
     }
 
+    public function testDoesNotOverlayOpenDependencyOwnedFiles(): void
+    {
+        mkdir($this->temporaryDirectory.'/vendor');
+        $uri = 'file://'.$this->temporaryDirectory.'/vendor/Dependency.php';
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, '<?php final class Dependency {}'));
+        $provider = new RecordingSourceIndexProvider();
+
+        $this->scannerWithDocuments($documents, $provider)->updateOpenDocument([
+            'textDocument' => ['uri' => $uri],
+        ]);
+
+        self::assertSame([], $provider->overlays);
+    }
+
     public function testIndexesReadableSourcesAroundUnreadableDirectories(): void
     {
         if ('Windows' === \PHP_OS_FAMILY || (\function_exists('posix_geteuid') && 0 === posix_geteuid())) {
@@ -407,9 +422,14 @@ PHP;
 
     private function scanner(SourceIndexProviderInterface ...$providers): ApplicationSourceScanner
     {
+        return $this->scannerWithDocuments(new DocumentStore(), ...$providers);
+    }
+
+    private function scannerWithDocuments(DocumentStore $documents, SourceIndexProviderInterface ...$providers): ApplicationSourceScanner
+    {
         return new ApplicationSourceScanner(
             $this->projects,
-            new DocumentStore(),
+            $documents,
             new ProjectIndexStatusRegistry(),
             new NullProgressReporter(),
             new PersistentSourceIndexStore('test', new Filesystem()),
@@ -515,6 +535,9 @@ final class RecordingSourceIndexProvider implements SourceIndexProviderInterface
     /** @var list<string> */
     public array $removals = [];
 
+    /** @var list<string> */
+    public array $overlays = [];
+
     /** @var array<string, string> */
     public array $sources = [];
 
@@ -580,6 +603,7 @@ final class RecordingSourceIndexProvider implements SourceIndexProviderInterface
 
     public function overlay(Project $project, Document $document): void
     {
+        $this->overlays[] = $document->uri();
     }
 
     public function removeOverlay(Project $project, string $uri): void

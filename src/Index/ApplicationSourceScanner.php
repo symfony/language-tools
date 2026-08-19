@@ -124,7 +124,15 @@ final class ApplicationSourceScanner
 
         $document = $this->documents->get($textDocument['uri']);
         $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $document || null === $project) {
+        $path = $this->uriToPathConverter->convert($textDocument['uri']);
+        if (null === $document || null === $project || null === $path) {
+            return;
+        }
+        if (!$this->belongsToProject($project, $path) || $this->gitignoreExcluded($project->rootPath(), $path)) {
+            foreach ($this->providers as $provider) {
+                $provider->removeOverlay($project, $document->uri());
+            }
+
             return;
         }
 
