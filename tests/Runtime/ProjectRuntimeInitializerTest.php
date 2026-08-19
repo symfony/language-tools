@@ -238,13 +238,13 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertNull($routeIndexes->forProject($project)->get('replacement'));
     }
 
-    public function testRejectsFailedBridgeExecution(): void
+    public function testRejectsFailedBridgeExecutionWithoutExposingErrorOutput(): void
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
         $initializer = new ProjectRuntimeInitializer(
             new BridgeInstaller($source, 'test', new Filesystem()),
-            new CapturingProcessRunner(new ProcessResult(1, '', "PHP Fatal error: boot failed\n")),
+            new CapturingProcessRunner(new ProcessResult(1, '', "CANARY_SECRET_RUNTIME_OUTPUT\n")),
             new RuntimeSnapshotLoaderRegistry([
                 new ProjectRouteSnapshotLoader(new RouteIndexRegistry()),
             ]),
@@ -252,14 +252,16 @@ final class ProjectRuntimeInitializerTest extends TestCase
             new ContainerPathMapper(new RuntimeConfiguration()),
         );
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('The project bridge failed with status 1. Bridge error output: PHP Fatal error: boot failed');
-
-        $initializer->initialize(new Project(
-            $this->temporaryDirectory,
-            'file://'.$this->temporaryDirectory,
-            '^8.0',
-        ));
+        try {
+            $initializer->initialize(new Project(
+                $this->temporaryDirectory,
+                'file://'.$this->temporaryDirectory,
+                '^8.0',
+            ));
+            self::fail('The failed bridge execution was accepted.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('The project bridge failed with status 1.', $error->getMessage());
+        }
     }
 
     public function testLoadsTheSnapshotWhenStrayOutputSurroundsThePayload(): void
@@ -291,7 +293,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame('homepage', $indexes->forProject($project)->get('homepage')?->name());
     }
 
-    public function testReportsBridgeErrorOutputWhenThePayloadIsMissing(): void
+    public function testRejectsMissingPayloadWithoutExposingErrorOutput(): void
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
@@ -300,21 +302,23 @@ final class ProjectRuntimeInitializerTest extends TestCase
             new CapturingProcessRunner(new ProcessResult(
                 0,
                 "Deprecated: something is deprecated in vendor/lib.php on line 1\n",
-                "PHP Deprecated: something is deprecated in vendor/lib.php on line 1\n",
+                "CANARY_SECRET_RUNTIME_OUTPUT\n",
             )),
             new RuntimeSnapshotLoaderRegistry([]),
             new RuntimeConfiguration(),
             new ContainerPathMapper(new RuntimeConfiguration()),
         );
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('The project bridge returned invalid JSON. Bridge error output: PHP Deprecated: something is deprecated in vendor/lib.php on line 1');
-
-        $initializer->initialize(new Project(
-            $this->temporaryDirectory,
-            'file://'.$this->temporaryDirectory,
-            '^8.0',
-        ));
+        try {
+            $initializer->initialize(new Project(
+                $this->temporaryDirectory,
+                'file://'.$this->temporaryDirectory,
+                '^8.0',
+            ));
+            self::fail('The missing bridge payload was accepted.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('The project bridge returned invalid JSON.', $error->getMessage());
+        }
     }
 }
 

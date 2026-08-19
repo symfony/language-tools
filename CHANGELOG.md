@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Keep project bridge error output out of language server logs
+
 ## 0.12.0 (2026-08-19)
 
 - Complete internationalized routes with their canonical names

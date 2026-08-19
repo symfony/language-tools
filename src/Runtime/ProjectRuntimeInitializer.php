@@ -38,7 +38,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         ], $project->rootPath(), $cancellation, $this->configuration->bridgeTimeout($project));
 
         if (0 !== $result->exitCode()) {
-            throw new \RuntimeException(\sprintf('The project bridge failed with status %d.', $result->exitCode()).$this->failureDetail($result));
+            throw new \RuntimeException(\sprintf('The project bridge failed with status %d.', $result->exitCode()));
         }
 
         $snapshot = $this->decodeSnapshot($result);
@@ -97,19 +97,6 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             }
         }
 
-        throw new \RuntimeException('The project bridge returned invalid JSON.'.$this->failureDetail($result));
-    }
-
-    private function failureDetail(ProcessResult $result): string
-    {
-        $stderr = trim($result->stderr());
-        if ('' === $stderr) {
-            return '';
-        }
-        if (\strlen($stderr) > 1000) {
-            $stderr = substr($stderr, 0, 1000).'...';
-        }
-
-        return ' Bridge error output: '.$stderr;
+        throw new \RuntimeException('The project bridge returned invalid JSON.');
     }
 }
