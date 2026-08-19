@@ -223,6 +223,7 @@ final class LanguageServer
         }
 
         $rediscover = false;
+        $refreshWatchers = false;
         foreach ($changes as $change) {
             if (!\is_array($change) || !\is_string($change['uri'] ?? null) || !\is_int($change['type'] ?? null)) {
                 continue;
@@ -233,17 +234,24 @@ final class LanguageServer
             if ('composer.json' === basename($this->uriToPathConverter->convert($change['uri']) ?? '')) {
                 $rediscover = true;
             }
+            if ($this->workspaceFileWatcher->requiresRefreshForChange($change['uri'], $change['type'])) {
+                $refreshWatchers = true;
+            }
         }
 
-        if (!$rediscover) {
+        if (!$rediscover && !$refreshWatchers) {
             return;
         }
 
-        async(function (): void {
-            $this->workspaceConfiguration->rediscoverProjects();
+        async(function () use ($rediscover): void {
+            if ($rediscover) {
+                $this->workspaceConfiguration->rediscoverProjects();
+            }
             $this->workspaceFileWatcher->refresh();
             $this->sourceScanner->indexAll();
-            $this->workspaceConfiguration->requestWorkspaceTrust();
+            if ($rediscover) {
+                $this->workspaceConfiguration->requestWorkspaceTrust();
+            }
         })->ignore();
     }
 

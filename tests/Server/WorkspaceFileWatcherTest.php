@@ -7,6 +7,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Server\WorkspaceFileWatcher;
 
 final class WorkspaceFileWatcherTest extends TestCase
@@ -32,7 +33,7 @@ final class WorkspaceFileWatcherTest extends TestCase
     public function testRegistersApplicationDirectoriesForRelativePatternClients(): void
     {
         $client = new WorkspaceFileWatcherClient();
-        $watcher = new WorkspaceFileWatcher($client, $this->projects);
+        $watcher = new WorkspaceFileWatcher($client, $this->projects, new UriToPathConverter());
         $watcher->initialize(['capabilities' => ['workspace' => ['didChangeWatchedFiles' => [
             'dynamicRegistration' => true,
             'relativePatternSupport' => true,
@@ -52,6 +53,7 @@ final class WorkspaceFileWatcherTest extends TestCase
                     ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => $sourcePattern]],
                     ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => '.env*']],
                     ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => 'composer.{json,lock}']],
+                    ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => '*'], 'kind' => 5],
                     ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => 'custom-package/**/'.$sourcePattern]],
                     ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => 'custom-package'], 'kind' => 5],
                     ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => 'custom-package/**'], 'kind' => 5],
@@ -63,10 +65,20 @@ final class WorkspaceFileWatcherTest extends TestCase
         ]], $client->requests);
     }
 
+    public function testDetectsNewTopLevelSourceDirectories(): void
+    {
+        $watcher = new WorkspaceFileWatcher(new WorkspaceFileWatcherClient(), $this->projects, new UriToPathConverter());
+        mkdir($this->directory.'/module');
+
+        self::assertTrue($watcher->requiresRefreshForChange('file://'.$this->directory.'/module', 1));
+        self::assertFalse($watcher->requiresRefreshForChange('file://'.$this->directory.'/vendor', 1));
+        self::assertFalse($watcher->requiresRefreshForChange('file://'.$this->directory.'/module', 2));
+    }
+
     public function testFallsBackToWorkspaceGlobsWithoutRelativePatternSupport(): void
     {
         $client = new WorkspaceFileWatcherClient();
-        $watcher = new WorkspaceFileWatcher($client, $this->projects);
+        $watcher = new WorkspaceFileWatcher($client, $this->projects, new UriToPathConverter());
         $watcher->initialize(['capabilities' => ['workspace' => ['didChangeWatchedFiles' => ['dynamicRegistration' => true]]]]);
 
         $watcher->register();
@@ -88,7 +100,7 @@ final class WorkspaceFileWatcherTest extends TestCase
     public function testRefreshesRegistrationAfterProjectDiscoveryChanges(): void
     {
         $client = new WorkspaceFileWatcherClient();
-        $watcher = new WorkspaceFileWatcher($client, $this->projects);
+        $watcher = new WorkspaceFileWatcher($client, $this->projects, new UriToPathConverter());
         $watcher->initialize(['capabilities' => ['workspace' => ['didChangeWatchedFiles' => [
             'dynamicRegistration' => true,
             'relativePatternSupport' => true,
@@ -113,7 +125,7 @@ final class WorkspaceFileWatcherTest extends TestCase
     public function testDoesNotRegisterForUnsupportedClients(): void
     {
         $client = new WorkspaceFileWatcherClient();
-        $watcher = new WorkspaceFileWatcher($client, $this->projects);
+        $watcher = new WorkspaceFileWatcher($client, $this->projects, new UriToPathConverter());
         $watcher->initialize(['capabilities' => ['workspace' => ['didChangeWatchedFiles' => ['dynamicRegistration' => false]]]]);
 
         $watcher->register();

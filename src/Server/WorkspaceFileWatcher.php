@@ -2,9 +2,11 @@
 
 namespace Symfony\Lsp\Server;
 
+use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class WorkspaceFileWatcher
 {
@@ -19,6 +21,7 @@ final class WorkspaceFileWatcher
     public function __construct(
         private readonly ClientInterface $client,
         private readonly ProjectRegistry $projects,
+        private readonly UriToPathConverter $uriToPathConverter,
     ) {
     }
 
@@ -88,6 +91,7 @@ final class WorkspaceFileWatcher
             $watchers[] = $this->relative($project, self::SOURCE_PATTERN);
             $watchers[] = $this->relative($project, '.env*');
             $watchers[] = $this->relative($project, 'composer.{json,lock}');
+            $watchers[] = $this->relative($project, '*', self::DIRECTORY_CHANGE_KIND);
             foreach ($this->sourceDirectories($project) as $directory) {
                 $watchers[] = $this->relative($project, $directory.'/**/'.self::SOURCE_PATTERN);
                 $watchers[] = $this->relative($project, $directory, self::DIRECTORY_CHANGE_KIND);
@@ -96,6 +100,28 @@ final class WorkspaceFileWatcher
         }
 
         return $watchers;
+    }
+
+    public function requiresRefreshForChange(string $uri, int $changeType): bool
+    {
+        if (1 !== $changeType) {
+            return false;
+        }
+        $path = $this->uriToPathConverter->convert($uri);
+        if (null === $path || !is_dir($path)) {
+            return false;
+        }
+        $path = Path::canonicalize($path);
+        foreach ($this->projects->all() as $project) {
+            if (Path::canonicalize($project->rootPath()) === \dirname($path)
+                && !\in_array(basename($path), self::EXCLUDED_DIRECTORIES, true)
+                && preg_match('/^[A-Za-z0-9_.-]+$/D', basename($path))
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @return array{globPattern: array{baseUri: string, pattern: string}, kind?: int} */
