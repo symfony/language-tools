@@ -68,7 +68,7 @@ final class ServerLogger implements TrafficLoggerInterface
 
     private function redact(mixed $value, ?string $key = null): mixed
     {
-        if (null !== $key && (\in_array(strtolower($key), ['text', 'value'], true) || preg_match('/password|passwd|secret|token|authorization|credential|cookie|api.?key|private.?key/i', $key))) {
+        if (null !== $key && (\in_array(strtolower($key), ['text', 'value', 'phpcommand'], true) || preg_match('/password|passwd|secret|token|authorization|credential|cookie|api.?key|private.?key/i', $key))) {
             return '[redacted]';
         }
         if (!\is_array($value)) {

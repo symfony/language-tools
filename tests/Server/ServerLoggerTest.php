@@ -32,6 +32,9 @@ final class ServerLoggerTest extends TestCase
                     'uri' => 'file:///workspace/.env',
                     'text' => 'APP_SECRET=exposed',
                 ],
+                'initializationOptions' => [
+                    'phpCommand' => ['runner', '--token', 'command-secret'],
+                ],
                 'token' => 'exposed',
             ],
         ], \JSON_THROW_ON_ERROR);
@@ -44,6 +47,7 @@ final class ServerLoggerTest extends TestCase
 
         self::assertStringContainsString('file:///workspace/.env', $output->contents());
         self::assertStringNotContainsString('exposed', $output->contents());
-        self::assertSame(2, substr_count($output->contents(), '[redacted]'));
+        self::assertStringNotContainsString('command-secret', $output->contents());
+        self::assertSame(3, substr_count($output->contents(), '[redacted]'));
     }
 }

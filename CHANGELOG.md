@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Keep project bridge error output out of language server logs
+- Redact project PHP commands from protocol traces
 
 ## 0.12.0 (2026-08-19)
 
