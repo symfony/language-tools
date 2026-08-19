@@ -117,9 +117,11 @@ final class TemplateProviderTest extends TestCase
 
                 ## Whether to highlight the article.
                 featured?: 'boolean',
+                café: 'string',
             } %}
             {{ arti }}
             {{ featured }}
+            {{ café }}
             TWIG;
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'twig', 1, $text));
@@ -150,6 +152,24 @@ final class TemplateProviderTest extends TestCase
             ['kind' => 'markdown', 'value' => 'The article to display.'],
             $items[0]['documentation'] ?? null,
         );
+
+        $unicodePosition = $converter->toPosition($text, strrpos($text, 'café') + \strlen('café'));
+        $unicodeItems = $provider->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $unicodePosition->line(), 'character' => $unicodePosition->character()],
+        ]);
+        self::assertIsArray($unicodeItems);
+        self::assertSame(['café'], array_column($unicodeItems, 'label'));
+        self::assertSame('Twig variable: string (required)', $unicodeItems[0]['detail'] ?? null);
+        self::assertSame([
+            'contents' => [
+                'kind' => 'markdown',
+                'value' => "Twig variable: `café`\n\nDeclared type: `string`\n\nRequired template variable",
+            ],
+        ], $provider->hover([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $unicodePosition->line(), 'character' => $unicodePosition->character()],
+        ]));
 
         $hoverPosition = $converter->toPosition($text, strrpos($text, 'featured') + 1);
         self::assertSame([

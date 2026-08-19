@@ -38,7 +38,7 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
         }
         $cursor = $this->converter->toByteOffset($document->text(), $position);
         $before = substr($this->commentParser->mask($document->text()), 0, $cursor);
-        if (!preg_match('/(?:{{|{%)[^}\n]*?([A-Za-z_][A-Za-z0-9_]*)?$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
+        if (!preg_match('/(?:{{|{%)[^}\n]*?([A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*)?$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
         $prefix = $match[1][0] ?? '';
@@ -157,16 +157,16 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
     {
         $offset = $this->converter->toByteOffset($text, $position);
         $start = $offset;
-        while ($start > 0 && 1 === preg_match('/[A-Za-z0-9_]/', $text[$start - 1])) {
+        while ($start > 0 && 1 === preg_match('/[A-Za-z0-9_\x7f-\xff]/', $text[$start - 1])) {
             --$start;
         }
         $end = $offset;
         $length = \strlen($text);
-        while ($end < $length && 1 === preg_match('/[A-Za-z0-9_]/', $text[$end])) {
+        while ($end < $length && 1 === preg_match('/[A-Za-z0-9_\x7f-\xff]/', $text[$end])) {
             ++$end;
         }
         $word = substr($text, $start, $end - $start);
 
-        return 1 === preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $word) ? $word : null;
+        return 1 === preg_match('/^[A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*$/', $word) ? $word : null;
     }
 }
