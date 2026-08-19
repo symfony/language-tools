@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.12.0 (2026-08-19)
 
 - Complete internationalized routes with their canonical names
 - Open VS Code code lenses with native URI, position and location arguments
