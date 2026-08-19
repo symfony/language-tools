@@ -29,6 +29,25 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
         self::assertSame('ui', $index->anonymousTemplateDirectory());
     }
 
+    public function testClearsRuntimeNamesWhenTheIntegrationIsUnavailable(): void
+    {
+        $indexes = new TwigComponentIndexRegistry();
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $loader = new ProjectTwigComponentSnapshotLoader($indexes);
+        $indexes->forProject($project)->replaceRuntime(true, ['stale_component'], 'ui');
+
+        $loader->load($project, ['sections' => ['twig_components' => [
+            'complete' => true,
+            'names' => [],
+            'anonymousTemplateDirectory' => 'components',
+        ]]]);
+
+        $index = $indexes->forProject($project);
+        self::assertTrue($index->isRuntimeComplete());
+        self::assertSame([], $index->runtimeNames());
+        self::assertSame('components', $index->anonymousTemplateDirectory());
+    }
+
     public function testKeepsIncompleteSectionsConservative(): void
     {
         $indexes = new TwigComponentIndexRegistry();

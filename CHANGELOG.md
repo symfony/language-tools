@@ -9,6 +9,7 @@
 - Retry runtime indexing after failures and relevant configuration changes
 - Watch source files added under new top-level project directories
 - Remove source facts when files become gitignored
+- Clear runtime Twig component names when the integration is unavailable
 
 ## 0.12.0 (2026-08-19)
 

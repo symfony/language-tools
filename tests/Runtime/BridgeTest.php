@@ -319,7 +319,7 @@ final class BridgeTest extends TestCase
         self::assertSame(['Alert', 'Form:Input', 'acme:Badge', 'ux:icon'], $section['names']);
     }
 
-    public function testOmitsTheTwigComponentsSectionWithoutTheComponentPackage(): void
+    public function testClearsTheTwigComponentsSectionWithoutTheComponentPackage(): void
     {
         $this->writeRouteApplication();
 
@@ -337,7 +337,14 @@ final class BridgeTest extends TestCase
         self::assertSame([], $result['errors']);
         $sections = $result['sections'] ?? [];
         self::assertIsArray($sections);
-        self::assertArrayNotHasKey('twig_components', $sections);
+        $section = $sections['twig_components'] ?? null;
+        self::assertIsArray($section);
+        self::assertSame([
+            'complete' => true,
+            'names' => [],
+            'anonymousTemplateDirectory' => 'components',
+            'warnings' => [],
+        ], array_diff_key($section, ['generation' => true]));
     }
 
     private function writeTwigComponentApplication(bool $withUnnameableComponent = false): void

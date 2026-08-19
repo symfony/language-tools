@@ -3,7 +3,15 @@
 function bridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
 {
     if (!class_exists(Symfony\UX\TwigComponent\ComponentFactory::class)) {
-        return null;
+        $section = [
+            'complete' => true,
+            'names' => [],
+            'anonymousTemplateDirectory' => 'components',
+            'warnings' => [],
+        ];
+        $section['generation'] = hash('sha256', json_encode($section, JSON_THROW_ON_ERROR));
+
+        return $section;
     }
     $environment = $context->environment();
     $noDebug = !$context->debug();
