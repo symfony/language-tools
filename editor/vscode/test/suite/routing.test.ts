@@ -20,6 +20,8 @@ export const routingTests: TestCase[] = [
 async function testRouteLanguageFeatures(): Promise<void> {
     const contents = `<?php
 
+use Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController;
+
 final class RouteConsumer extends AbstractController
 {
     public function test(): void
