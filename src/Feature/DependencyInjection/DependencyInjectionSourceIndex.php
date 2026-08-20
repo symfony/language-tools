@@ -10,32 +10,43 @@ final class DependencyInjectionSourceIndex
     /** @var array<string, DependencyInjectionSourceFacts> */
     private array $overlays = [];
 
+    /** @var array<string, list<PhpClassDeclaration>>|null */
+    private ?array $classDeclarations = null;
+
+    /** @var array<string, bool> */
+    private array $subclasses = [];
+
     public function replace(DependencyInjectionSourceFacts ...$sources): void
     {
         $this->sources = [];
         foreach ($sources as $source) {
             $this->sources[$source->uri()] = $source;
         }
+        $this->invalidateClasses();
     }
 
     public function replaceSource(DependencyInjectionSourceFacts $source): void
     {
         $this->sources[$source->uri()] = $source;
+        $this->invalidateClasses();
     }
 
     public function removeSource(string $uri): void
     {
         unset($this->sources[$uri]);
+        $this->invalidateClasses();
     }
 
     public function overlay(DependencyInjectionSourceFacts $source): void
     {
         $this->overlays[$source->uri()] = $source;
+        $this->invalidateClasses();
     }
 
     public function removeOverlay(string $uri): void
     {
         unset($this->overlays[$uri]);
+        $this->invalidateClasses();
     }
 
     /** @return list<ServiceDeclaration> */
@@ -86,37 +97,54 @@ final class DependencyInjectionSourceIndex
     /** @return list<PhpClassDeclaration> */
     public function classDeclarations(string $className): array
     {
-        $declarations = [];
-        foreach ($this->sources() as $source) {
-            foreach ($source->classes() as $declaration) {
-                if (0 === strcasecmp(ltrim($declaration->className(), '\\'), ltrim($className, '\\'))) {
-                    $declarations[] = $declaration;
+        if (null === $this->classDeclarations) {
+            $this->classDeclarations = [];
+            foreach ($this->sources() as $source) {
+                foreach ($source->classes() as $declaration) {
+                    $this->classDeclarations[strtolower(ltrim($declaration->className(), '\\'))][] = $declaration;
                 }
             }
         }
 
-        return $declarations;
+        return $this->classDeclarations[strtolower(ltrim($className, '\\'))] ?? [];
     }
 
     public function isSubclassOf(string $className, string $parentClassName): bool
     {
         $className = ltrim($className, '\\');
         $parentClassName = ltrim($parentClassName, '\\');
+        $parentKey = strtolower($parentClassName);
         $visited = [];
 
-        while (!isset($visited[strtolower($className)])) {
-            if (0 === strcasecmp($className, $parentClassName)) {
-                return true;
+        while (true) {
+            $classKey = strtolower($className);
+            $cacheKey = $classKey.'|'.$parentKey;
+            if (isset($this->subclasses[$cacheKey])) {
+                $result = $this->subclasses[$cacheKey];
+                break;
             }
-            $visited[strtolower($className)] = true;
+            if (0 === strcasecmp($className, $parentClassName)) {
+                $result = true;
+                break;
+            }
+            if (isset($visited[$classKey])) {
+                $result = false;
+                break;
+            }
+            $visited[$classKey] = true;
             $declarations = $this->classDeclarations($className);
             if (1 !== \count($declarations) || null === $className = $declarations[0]->parentClassName()) {
-                return false;
+                $result = false;
+                break;
             }
             $className = ltrim($className, '\\');
         }
 
-        return false;
+        foreach (array_keys($visited) as $classKey) {
+            $this->subclasses[$classKey.'|'.$parentKey] = $result;
+        }
+
+        return $result;
     }
 
     /** @return list<string> */
@@ -162,6 +190,12 @@ final class DependencyInjectionSourceIndex
         }
 
         return $declarations;
+    }
+
+    private function invalidateClasses(): void
+    {
+        $this->classDeclarations = null;
+        $this->subclasses = [];
     }
 
     /** @return list<DependencyInjectionSourceFacts> */

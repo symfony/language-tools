@@ -113,8 +113,8 @@ final class RouteReferenceExtractor
         if (null === $className) {
             return true;
         }
-        if (null !== $classIndex && $classIndex->isSubclassOf($className, self::ABSTRACT_CONTROLLER)) {
-            return true;
+        if (null !== $classIndex && [] !== $classIndex->classDeclarations($className)) {
+            return $classIndex->isSubclassOf($className, self::ABSTRACT_CONTROLLER);
         }
 
         $types = [];
@@ -123,12 +123,17 @@ final class RouteReferenceExtractor
         }
         $visited = [];
         while (!isset($visited[strtolower($className)])) {
-            if (self::ABSTRACT_CONTROLLER === ltrim($className, '\\') || 'AbstractController' === ltrim($className, '\\')) {
+            $className = ltrim($className, '\\');
+            if (0 === strcasecmp(self::ABSTRACT_CONTROLLER, $className)) {
                 return true;
             }
-            $visited[strtolower($className)] = true;
-            $type = $types[strtolower(ltrim($className, '\\'))] ?? null;
-            if (null === $type || null === $className = $type->parentClassName()) {
+            $classKey = strtolower($className);
+            $type = $types[$classKey] ?? null;
+            if (null === $type) {
+                return 0 === strcasecmp('AbstractController', $className);
+            }
+            $visited[$classKey] = true;
+            if (null === $className = $type->parentClassName()) {
                 return false;
             }
         }

@@ -7,7 +7,11 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexer;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
 use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
@@ -47,6 +51,8 @@ final class ProjectRouteSourceIndexerTest extends TestCase
 
     protected function tearDown(): void
     {
+        @unlink($this->temporaryDirectory.'/src/BaseController.php');
+        @unlink($this->temporaryDirectory.'/src/ConsumerController.php');
         @unlink($this->temporaryDirectory.'/src/Controller.php');
         @unlink($this->temporaryDirectory.'/config/routes/admin.yaml');
         @unlink($this->temporaryDirectory.'/templates/navigation.html.twig');
@@ -57,6 +63,76 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         @rmdir($this->temporaryDirectory.'/templates');
         @rmdir($this->temporaryDirectory.'/vendor');
         @rmdir($this->temporaryDirectory);
+    }
+
+    public function testResolvesRouteReferencesThroughIndexedControllerHierarchy(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/src/BaseController.php', <<<'PHP'
+            <?php
+            namespace App\Controller;
+
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+
+            abstract class BaseController extends AbstractController
+            {
+            }
+            PHP);
+        file_put_contents($this->temporaryDirectory.'/src/ConsumerController.php', <<<'PHP'
+            <?php
+            namespace App\Controller;
+
+            final class ConsumerController extends BaseController
+            {
+                public function index(): void
+                {
+                    $this->redirectToRoute('article_show');
+                }
+            }
+            PHP);
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project(
+            $this->temporaryDirectory,
+            'file://'.$this->temporaryDirectory,
+            '^8.0',
+        )]);
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $referenceIndexes = new RouteReferenceIndexRegistry($classIndexes);
+        $positionConverter = new PositionConverter();
+        $parser = new TolerantPhpParser(new Parser());
+        $scanner = new ApplicationSourceScanner(
+            $projects,
+            new DocumentStore(),
+            new ProjectIndexStatusRegistry(),
+            new NullProgressReporter(),
+            new InMemorySourceIndexStore(),
+            new SourceIndexPayloadCodec(),
+            new PhpRuntimeStructureHasher(),
+            new UriToPathConverter(),
+            new GitignoreMatcher(),
+            [
+                new ProjectRouteSourceIndexer(
+                    new RouteDeclarationIndexRegistry(),
+                    $referenceIndexes,
+                    new PhpRouteDeclarationExtractor($positionConverter, $parser),
+                    new YamlRouteDeclarationExtractor($positionConverter),
+                    new RouteReferenceExtractor($positionConverter, $parser),
+                    new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
+                    new ProjectPathResolver(new UriToPathConverter()),
+                ),
+                new DependencyInjectionSourceIndexer(
+                    $classIndexes,
+                    new YamlDependencyInjectionExtractor($positionConverter),
+                    new PhpAutowireReferenceExtractor($positionConverter, $parser),
+                    new PhpClassDeclarationExtractor($positionConverter, $parser),
+                ),
+            ],
+        );
+
+        $scanner->indexAll();
+        self::assertCount(1, $referenceIndexes->forProject($project)->find('article_show'));
+
+        $scanner->indexAll();
+        self::assertCount(1, $referenceIndexes->forProject($project)->find('article_show'));
     }
 
     public function testIndexesApplicationPhpAndExcludesVendor(): void
