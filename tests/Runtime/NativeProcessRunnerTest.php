@@ -42,7 +42,7 @@ final class NativeProcessRunnerTest extends TestCase
 
     public function testDrainsStandardOutputAndErrorConcurrently(): void
     {
-        $result = (new NativeProcessRunner())->run([
+        $result = (new NativeProcessRunner(maximumErrorOutputBytes: 1000000))->run([
             \PHP_BINARY,
             '-r',
             'fwrite(STDOUT, str_repeat("a", 1000000)); fwrite(STDERR, str_repeat("b", 1000000));',
@@ -52,14 +52,29 @@ final class NativeProcessRunnerTest extends TestCase
         self::assertSame(1000000, \strlen($result->stderr()));
     }
 
-    public function testEnforcesCombinedOutputLimit(): void
+    public function testEnforcesStandardOutputLimit(): void
     {
         $runner = new NativeProcessRunner(maximumOutputBytes: 8);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('output limit');
 
-        $runner->run([\PHP_BINARY, '-r', 'fwrite(STDOUT, "12345"); fwrite(STDERR, "67890");'], __DIR__);
+        $runner->run([\PHP_BINARY, '-r', 'fwrite(STDOUT, "123456789");'], __DIR__);
+    }
+
+    public function testTruncatesErrorOutputWithoutStoppingTheProcess(): void
+    {
+        $runner = new NativeProcessRunner(maximumOutputBytes: 8, maximumErrorOutputBytes: 4);
+
+        $result = $runner->run([
+            \PHP_BINARY,
+            '-r',
+            'fwrite(STDERR, "123456789"); fwrite(STDOUT, "payload");',
+        ], __DIR__);
+
+        self::assertSame(0, $result->exitCode());
+        self::assertSame('payload', $result->stdout());
+        self::assertSame('1234', $result->stderr());
     }
 
     public function testReportsStartFailures(): void

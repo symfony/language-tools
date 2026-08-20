@@ -19,8 +19,9 @@ final class NativeProcessRunner implements ProcessRunnerInterface
     public function __construct(
         private readonly float $timeout = 300.0,
         private readonly int $maximumOutputBytes = 16777216,
+        private readonly int $maximumErrorOutputBytes = 65536,
     ) {
-        if ($timeout <= 0 || !is_finite($timeout) || $maximumOutputBytes < 1) {
+        if ($timeout <= 0 || !is_finite($timeout) || $maximumOutputBytes < 1 || $maximumErrorOutputBytes < 1) {
             throw new \InvalidArgumentException('Process limits must be positive.');
         }
     }
@@ -52,13 +53,12 @@ final class NativeProcessRunner implements ProcessRunnerInterface
         }
 
         $process->getStdin()->close();
-        $outputBytes = 0;
         $futures = [
-            'stdout' => async(function () use ($process, $operationCancellation, $outputLimit, &$outputBytes): string {
-                return $this->read($process->getStdout(), $operationCancellation, $outputLimit, $outputBytes);
+            'stdout' => async(function () use ($process, $operationCancellation, $outputLimit): string {
+                return $this->read($process->getStdout(), $operationCancellation, $this->maximumOutputBytes, $outputLimit);
             }),
-            'stderr' => async(function () use ($process, $operationCancellation, $outputLimit, &$outputBytes): string {
-                return $this->read($process->getStderr(), $operationCancellation, $outputLimit, $outputBytes);
+            'stderr' => async(function () use ($process, $operationCancellation): string {
+                return $this->read($process->getStderr(), $operationCancellation, $this->maximumErrorOutputBytes);
             }),
             'exitCode' => async(static fn (): int => $process->join($operationCancellation)),
         ];
@@ -83,16 +83,23 @@ final class NativeProcessRunner implements ProcessRunnerInterface
         return new ProcessResult($result['exitCode'], $result['stdout'], $result['stderr']);
     }
 
-    private function read(ReadableStream $stream, Cancellation $cancellation, DeferredCancellation $outputLimit, int &$outputBytes): string
+    private function read(ReadableStream $stream, Cancellation $cancellation, int $maximumBytes, ?DeferredCancellation $outputLimit = null): string
     {
         $output = '';
+        $outputBytes = 0;
         while (null !== $chunk = $stream->read($cancellation)) {
-            $outputBytes += \strlen($chunk);
-            if ($outputBytes > $this->maximumOutputBytes) {
+            $chunkBytes = \strlen($chunk);
+            if (null !== $outputLimit && $outputBytes + $chunkBytes > $maximumBytes) {
                 $outputLimit->cancel();
                 throw new \RuntimeException('The project bridge exceeded the output limit.');
             }
-            $output .= $chunk;
+
+            $remainingBytes = $maximumBytes - $outputBytes;
+            if ($remainingBytes > 0) {
+                $chunk = substr($chunk, 0, $remainingBytes);
+                $output .= $chunk;
+                $outputBytes += \strlen($chunk);
+            }
         }
 
         return $output;
