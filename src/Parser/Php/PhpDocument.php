@@ -5,13 +5,15 @@ namespace Symfony\Lsp\Parser\Php;
 final class PhpDocument
 {
     /**
-     * @param list<PhpAttribute>  $attributes
-     * @param list<PhpMethodCall> $methodCalls
-     * @param list<PhpDiagnostic> $diagnostics
+     * @param list<PhpAttribute>       $attributes
+     * @param list<PhpMethodCall>      $methodCalls
+     * @param list<PhpTypeDeclaration> $typeDeclarations
+     * @param list<PhpDiagnostic>      $diagnostics
      */
     public function __construct(
         private readonly array $attributes,
         private readonly array $methodCalls,
+        private readonly array $typeDeclarations,
         private readonly array $diagnostics,
     ) {
     }
@@ -26,6 +28,12 @@ final class PhpDocument
     public function methodCalls(): array
     {
         return $this->methodCalls;
+    }
+
+    /** @return list<PhpTypeDeclaration> */
+    public function typeDeclarations(): array
+    {
+        return $this->typeDeclarations;
     }
 
     /** @return list<PhpDiagnostic> */

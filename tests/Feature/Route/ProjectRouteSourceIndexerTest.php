@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
 use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
@@ -88,7 +89,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             '^8.0',
         )]);
         $indexes = new RouteDeclarationIndexRegistry();
-        $referenceIndexes = new RouteReferenceIndexRegistry();
+        $referenceIndexes = new RouteReferenceIndexRegistry(new DependencyInjectionSourceIndexRegistry());
         $positionConverter = new PositionConverter();
         $documents = new DocumentStore();
         $indexer = new ProjectRouteSourceIndexer(
@@ -96,7 +97,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             $referenceIndexes,
             new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
             new YamlRouteDeclarationExtractor($positionConverter),
-            new RouteReferenceExtractor($positionConverter),
+            new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser())),
             new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
             new ProjectPathResolver(new UriToPathConverter()),
         );

@@ -2,14 +2,20 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
+use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -39,11 +45,7 @@ final class RouteCompletionHandlerTest extends TestCase
         $converter = new PositionConverter();
         $cursor = strpos($text, "'s']") + 2;
         $position = $converter->toPosition($text, $cursor);
-        $handler = new RouteCompletionHandler(
-            new DocumentContextResolver($documents, $projects),
-            $converter,
-            $indexes,
-        );
+        $handler = $this->handler($documents, $projects, $converter, $indexes);
 
         self::assertSame(['slug'], array_column($handler->complete([
             'textDocument' => ['uri' => $uri],
@@ -76,11 +78,7 @@ final class RouteCompletionHandlerTest extends TestCase
         $converter = new PositionConverter();
         $cursor = strpos($text, "locale_']") + \strlen('locale_');
         $position = $converter->toPosition($text, $cursor);
-        $handler = new RouteCompletionHandler(
-            new DocumentContextResolver($documents, $projects),
-            $converter,
-            $indexes,
-        );
+        $handler = $this->handler($documents, $projects, $converter, $indexes);
 
         self::assertSame(['locale_en', 'locale_fr'], array_column($handler->complete([
             'textDocument' => ['uri' => $uri],
@@ -104,11 +102,7 @@ final class RouteCompletionHandlerTest extends TestCase
         $converter = new PositionConverter();
         $cursor = strpos($text, 'article_') + \strlen('article_');
         $position = $converter->toPosition($text, $cursor);
-        $handler = new RouteCompletionHandler(
-            new DocumentContextResolver($documents, $projects),
-            $converter,
-            $indexes,
-        );
+        $handler = $this->handler($documents, $projects, $converter, $indexes);
 
         self::assertSame(['article_show'], array_column($handler->complete([
             'textDocument' => ['uri' => $uri],
@@ -131,13 +125,58 @@ final class RouteCompletionHandlerTest extends TestCase
         $converter = new PositionConverter();
         $cursor = strpos($text, "'s')") + 2;
         $position = $converter->toPosition($text, $cursor);
-        $handler = new RouteCompletionHandler(
-            new DocumentContextResolver($documents, $projects),
-            $converter,
-            $indexes,
-        );
+        $handler = $this->handler($documents, $projects, $converter, $indexes);
 
         self::assertSame(['slug'], array_column($handler->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line(), 'character' => $position->character()],
+        ]) ?? [], 'label'));
+    }
+
+    public function testCompletesRoutesThroughAProjectControllerBaseClass(): void
+    {
+        $baseUri = 'file:///workspace/src/Controller/BaseController.php';
+        $base = <<<'PHP'
+            <?php
+            namespace App\Controller;
+
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+
+            abstract class BaseController extends AbstractController
+            {
+            }
+            PHP;
+        $uri = 'file:///workspace/src/Controller/DemoController.php';
+        $text = <<<'PHP'
+            <?php
+            namespace App\Controller;
+
+            final class DemoController extends BaseController
+            {
+                public function index(): void
+                {
+                    $this->redirectToRoute('article_');
+                }
+            }
+            PHP;
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $indexes = new RouteIndexRegistry();
+        $indexes->forProject($project)->replace(new Route('article_show', '/article/{id}', [], [], null, null));
+        $converter = new PositionConverter();
+        $parser = new TolerantPhpParser(new Parser());
+        $classExtractor = new PhpClassDeclarationExtractor($converter, $parser);
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $classIndexes->forProject($project)->replace(
+            new DependencyInjectionSourceFacts($baseUri, classes: $classExtractor->extract($baseUri, $base)),
+            new DependencyInjectionSourceFacts($uri, classes: $classExtractor->extract($uri, $text)),
+        );
+        $position = $converter->toPosition($text, strpos($text, 'article_') + \strlen('article_'));
+        $handler = $this->handler($documents, $projects, $converter, $indexes, $classIndexes);
+
+        self::assertSame(['article_show'], array_column($handler->complete([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line(), 'character' => $position->character()],
         ]) ?? [], 'label'));
@@ -169,11 +208,7 @@ final class RouteCompletionHandlerTest extends TestCase
         $converter = new PositionConverter();
         $cursor = strpos($text, 'article_') + \strlen('article_');
         $position = $converter->toPosition($text, $cursor);
-        $handler = new RouteCompletionHandler(
-            new DocumentContextResolver($documents, $projects),
-            $converter,
-            $indexes,
-        );
+        $handler = $this->handler($documents, $projects, $converter, $indexes);
 
         self::assertSame([[
             'label' => 'article_edit',
@@ -190,5 +225,21 @@ final class RouteCompletionHandlerTest extends TestCase
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line(), 'character' => $position->character()],
         ]));
+    }
+
+    private function handler(
+        DocumentStore $documents,
+        ProjectRegistry $projects,
+        PositionConverter $converter,
+        RouteIndexRegistry $indexes,
+        ?DependencyInjectionSourceIndexRegistry $classIndexes = null,
+    ): RouteCompletionHandler {
+        return new RouteCompletionHandler(
+            new DocumentContextResolver($documents, $projects),
+            $converter,
+            $indexes,
+            $classIndexes ?? new DependencyInjectionSourceIndexRegistry(),
+            new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser())),
+        );
     }
 }

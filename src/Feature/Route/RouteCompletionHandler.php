@@ -6,6 +6,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 
 final class RouteCompletionHandler implements CompletionProviderInterface
 {
@@ -13,6 +14,8 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         private readonly DocumentContextResolver $documentContextResolver,
         private readonly PositionConverter $positionConverter,
         private readonly RouteIndexRegistry $routeIndexes,
+        private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
+        private readonly RouteReferenceExtractor $phpReferenceExtractor,
     ) {
     }
 
@@ -70,10 +73,13 @@ final class RouteCompletionHandler implements CompletionProviderInterface
                 $routeContext->replacementRange(),
             );
         }
+        $classIndex = $this->classIndexes->forProject($project);
+        $isSymfonyReceiver = fn (string $source): bool => $this->phpReferenceExtractor->isSymfonyReceiver($source, $classIndex);
         $parameterContext = RouteParameterCompletionContext::fromPhp(
             $document->text(),
             $position,
             $this->positionConverter,
+            $isSymfonyReceiver,
         );
         if (null !== $parameterContext) {
             $route = $routeIndex->get($parameterContext->routeName());
@@ -95,6 +101,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
             $document->text(),
             $position,
             $this->positionConverter,
+            $isSymfonyReceiver,
         );
         if (null === $routeContext) {
             return null;

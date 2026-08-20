@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 
 final class RouteHoverHandler implements HoverProviderInterface
@@ -12,6 +13,8 @@ final class RouteHoverHandler implements HoverProviderInterface
         private readonly DocumentContextResolver $documentContextResolver,
         private readonly PositionConverter $positionConverter,
         private readonly RouteIndexRegistry $routeIndexes,
+        private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
+        private readonly RouteReferenceExtractor $phpReferenceExtractor,
         private readonly TwigRouteReferenceExtractor $twigReferenceExtractor,
     ) {
     }
@@ -36,7 +39,7 @@ final class RouteHoverHandler implements HoverProviderInterface
         $offset = $this->positionConverter->toByteOffset($document->text(), $position);
         $reference = 'twig' === $document->languageId()
             ? $this->twigReferenceExtractor->at($document->text(), $offset)
-            : (new RouteReferenceExtractor($this->positionConverter))->at($document->text(), $offset);
+            : $this->phpReferenceExtractor->at($document->text(), $offset, $this->classIndexes->forProject($project));
         if (null === $reference || null === $route = $this->routeIndexes->forProject($project)->get($reference->name())) {
             return null;
         }

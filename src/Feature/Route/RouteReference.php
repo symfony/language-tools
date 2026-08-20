@@ -13,6 +13,7 @@ final class RouteReference
         private readonly string $name,
         private readonly Range $range,
         private readonly ?array $providedParameters = null,
+        private readonly ?string $controllerClass = null,
     ) {
     }
 
@@ -32,5 +33,10 @@ final class RouteReference
     public function providedParameters(): ?array
     {
         return $this->providedParameters;
+    }
+
+    public function controllerClass(): ?string
+    {
+        return $this->controllerClass;
     }
 }

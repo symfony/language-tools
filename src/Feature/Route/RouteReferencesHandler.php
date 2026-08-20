@@ -33,7 +33,7 @@ final class RouteReferencesHandler implements ReferencesProviderInterface
             return null;
         }
 
-        $symbol = $this->symbolResolver->resolve($document->uri(), $document->text(), $position);
+        $symbol = $this->symbolResolver->resolve($project, $document->uri(), $document->text(), $position);
         if (null === $symbol) {
             return null;
         }

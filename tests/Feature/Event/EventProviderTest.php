@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\Event;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -17,6 +18,7 @@ use Symfony\Lsp\Feature\Event\EventIndexRegistry;
 use Symfony\Lsp\Feature\Event\EventListener;
 use Symfony\Lsp\Feature\Event\EventProvider;
 use Symfony\Lsp\Feature\Event\EventSourceIndexRegistry;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -124,7 +126,7 @@ PHP;
             $extractor->extract($listenerUri, 'php', $listener),
             $extractor->extract($dispatcherUri, 'php', $dispatcher),
         );
-        $classExtractor = new PhpClassDeclarationExtractor($converter);
+        $classExtractor = new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser()));
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
         $classIndexes->forProject($project)->replace(
             new DependencyInjectionSourceFacts($eventUri, classes: $classExtractor->extract($eventUri, $event)),

@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
+
 final class RouteReferenceIndex
 {
     /** @var list<RouteReferenceLocation> */
@@ -9,6 +11,11 @@ final class RouteReferenceIndex
 
     /** @var array<string, list<RouteReferenceLocation>> */
     private array $overlays = [];
+
+    public function __construct(
+        private readonly DependencyInjectionSourceIndex $classIndex,
+    ) {
+    }
 
     public function replace(RouteReferenceLocation ...$references): void
     {
@@ -46,18 +53,27 @@ final class RouteReferenceIndex
     {
         $references = [];
         foreach ($this->references as $reference) {
-            if ($reference->name() === $name && !isset($this->overlays[$reference->uri()])) {
+            if ($reference->name() === $name && !isset($this->overlays[$reference->uri()]) && $this->isSupported($reference)) {
                 $references[] = $reference;
             }
         }
         foreach ($this->overlays as $overlayReferences) {
             foreach ($overlayReferences as $reference) {
-                if ($reference->name() === $name) {
+                if ($reference->name() === $name && $this->isSupported($reference)) {
                     $references[] = $reference;
                 }
             }
         }
 
         return $references;
+    }
+
+    private function isSupported(RouteReferenceLocation $reference): bool
+    {
+        return null === $reference->controllerClass()
+            || $this->classIndex->isSubclassOf(
+                $reference->controllerClass(),
+                'Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController',
+            );
     }
 }

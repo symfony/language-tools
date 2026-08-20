@@ -72,7 +72,7 @@ final class DependencyInjectionNavigationTest extends TestCase
         $converter = new PositionConverter();
         $yamlExtractor = new YamlDependencyInjectionExtractor($converter);
         $autowireExtractor = new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser()));
-        $classExtractor = new PhpClassDeclarationExtractor($converter);
+        $classExtractor = new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser()));
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace(
             $yamlExtractor->extract($yamlUri, $yaml),

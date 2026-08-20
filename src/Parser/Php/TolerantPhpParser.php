@@ -5,10 +5,15 @@ namespace Symfony\Lsp\Parser\Php;
 use Microsoft\PhpParser\DiagnosticsProvider;
 use Microsoft\PhpParser\Node;
 use Microsoft\PhpParser\Node\Attribute;
+use Microsoft\PhpParser\Node\ClassBaseClause;
 use Microsoft\PhpParser\Node\Expression\ArgumentExpression;
 use Microsoft\PhpParser\Node\Expression\CallExpression;
 use Microsoft\PhpParser\Node\Expression\MemberAccessExpression;
 use Microsoft\PhpParser\Node\QualifiedName;
+use Microsoft\PhpParser\Node\Statement\ClassDeclaration;
+use Microsoft\PhpParser\Node\Statement\EnumDeclaration;
+use Microsoft\PhpParser\Node\Statement\InterfaceDeclaration;
+use Microsoft\PhpParser\Node\Statement\TraitDeclaration;
 use Microsoft\PhpParser\Node\StringLiteral;
 use Microsoft\PhpParser\Parser;
 use Microsoft\PhpParser\Token;
@@ -25,6 +30,7 @@ final class TolerantPhpParser implements PhpParserInterface
         $root = $this->parser->parseSourceFile($source);
         $attributes = [];
         $methodCalls = [];
+        $typeDeclarations = [];
 
         foreach ($root->getDescendantNodes() as $node) {
             if ($node instanceof Attribute) {
@@ -34,6 +40,8 @@ final class TolerantPhpParser implements PhpParserInterface
                 if (null !== $call) {
                     $methodCalls[] = $call;
                 }
+            } elseif ($node instanceof ClassDeclaration || $node instanceof InterfaceDeclaration || $node instanceof TraitDeclaration || $node instanceof EnumDeclaration) {
+                $typeDeclarations[] = $this->typeDeclaration($node, $source);
             }
         }
 
@@ -46,7 +54,28 @@ final class TolerantPhpParser implements PhpParserInterface
             );
         }
 
-        return new PhpDocument($attributes, $methodCalls, $diagnostics);
+        return new PhpDocument($attributes, $methodCalls, $typeDeclarations, $diagnostics);
+    }
+
+    private function typeDeclaration(ClassDeclaration|InterfaceDeclaration|TraitDeclaration|EnumDeclaration $declaration, string $source): PhpTypeDeclaration
+    {
+        $parentClassName = null;
+        if ($declaration instanceof ClassDeclaration) {
+            $classBaseClause = get_object_vars($declaration)['classBaseClause'] ?? null;
+            if ($classBaseClause instanceof ClassBaseClause) {
+                $parentClassName = $classBaseClause->baseClass->getResolvedName();
+            }
+        }
+
+        return new PhpTypeDeclaration(
+            (string) $declaration->getNamespacedName(),
+            null === $parentClassName ? null : (string) $parentClassName,
+            $declaration->name->getStartPosition(),
+            $declaration->name->getEndPosition(),
+            $declaration->getStartPosition(),
+            $declaration->getEndPosition(),
+            $declaration instanceof ClassDeclaration,
+        );
     }
 
     private function attribute(Attribute $attribute, string $source): PhpAttribute

@@ -2,10 +2,14 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
 use Symfony\Lsp\Feature\Route\RouteCompletionContext;
+use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 
 final class RouteCompletionContextTest extends TestCase
 {
@@ -17,10 +21,12 @@ final class RouteCompletionContextTest extends TestCase
         $php = str_replace('|', '', $php);
         $converter = new PositionConverter();
 
+        $extractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()));
         $context = RouteCompletionContext::fromPhp(
             $php,
             $converter->toPosition($php, $cursor),
             $converter,
+            static fn (string $source): bool => $extractor->isSymfonyReceiver($source, new DependencyInjectionSourceIndex()),
         );
 
         self::assertSame($prefix, $context?->prefix());
@@ -92,10 +98,12 @@ final class RouteCompletionContextTest extends TestCase
         $cursor = strpos($php, "')");
         self::assertIsInt($cursor);
 
+        $extractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()));
         self::assertNull(RouteCompletionContext::fromPhp(
             $php,
             $converter->toPosition($php, $cursor),
             $converter,
+            static fn (string $source): bool => $extractor->isSymfonyReceiver($source, new DependencyInjectionSourceIndex()),
         ));
     }
 }

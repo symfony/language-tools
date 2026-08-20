@@ -10,6 +10,9 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
 use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
@@ -31,10 +34,23 @@ final class RouteDefinitionHandlerTest extends TestCase
 {
     public function testNavigatesFromRouteReferenceToAttributeName(): void
     {
+        $baseUri = 'file:///workspace/src/BaseController.php';
+        $base = <<<'PHP'
+            <?php
+            namespace App\Controller;
+
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+
+            abstract class BaseController extends AbstractController
+            {
+            }
+            PHP;
         $uri = 'file:///workspace/src/ConsumerController.php';
         $text = <<<'PHP'
             <?php
-            class ConsumerController extends AbstractController
+            namespace App\Controller;
+
+            class ConsumerController extends BaseController
             {
                 public function index(): void
                 {
@@ -55,15 +71,22 @@ final class RouteDefinitionHandlerTest extends TestCase
         $converter = new PositionConverter();
         $cursor = strpos($text, 'article_show') + 3;
         $position = $converter->toPosition($text, $cursor);
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $classExtractor = new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser()));
+        $classIndexes->forProject($project)->replace(
+            new DependencyInjectionSourceFacts($baseUri, classes: $classExtractor->extract($baseUri, $base)),
+            new DependencyInjectionSourceFacts($uri, classes: $classExtractor->extract($uri, $text)),
+        );
         $handler = new RouteDefinitionHandler(
             new DocumentContextResolver($documents, $projects),
             new RouteSymbolResolver(
                 $converter,
-                new RouteReferenceExtractor($converter),
+                new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser())),
                 new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
                 new PhpRouteDeclarationExtractor($converter, new TolerantPhpParser(new Parser())),
                 new YamlRouteDeclarationExtractor($converter),
                 new UriToPathConverter(),
+                $classIndexes,
             ),
             $declarations,
         );

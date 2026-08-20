@@ -10,6 +10,7 @@ final class RouteReferenceLocation
         private readonly string $name,
         private readonly string $uri,
         private readonly Range $range,
+        private readonly ?string $controllerClass = null,
     ) {
     }
 
@@ -26,5 +27,10 @@ final class RouteReferenceLocation
     public function range(): Range
     {
         return $this->range;
+    }
+
+    public function controllerClass(): ?string
+    {
+        return $this->controllerClass;
     }
 }

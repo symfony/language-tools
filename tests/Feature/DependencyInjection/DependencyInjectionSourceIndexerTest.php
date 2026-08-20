@@ -69,7 +69,7 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
                 $indexes,
                 new YamlDependencyInjectionExtractor($converter),
                 new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser())),
-                new PhpClassDeclarationExtractor($converter),
+                new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser())),
             )],
         );
 

@@ -5,6 +5,8 @@ namespace Symfony\Lsp\Feature\Route;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
 
 final class RouteSymbolResolver
@@ -16,16 +18,17 @@ final class RouteSymbolResolver
         private readonly PhpRouteDeclarationExtractor $phpDeclarationExtractor,
         private readonly YamlRouteDeclarationExtractor $yamlDeclarationExtractor,
         private readonly UriToPathConverter $uriToPathConverter,
+        private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
     ) {
     }
 
-    public function resolve(string $uri, string $text, Position $position): ?RouteSymbol
+    public function resolve(Project $project, string $uri, string $text, Position $position): ?RouteSymbol
     {
         $offset = $this->positionConverter->toByteOffset($text, $position);
         $extension = Path::getExtension($this->uriToPathConverter->convert($uri) ?? '', true);
         $reference = 'twig' === $extension
             ? $this->twigReferenceExtractor->at($text, $offset)
-            : $this->phpReferenceExtractor->at($text, $offset);
+            : $this->phpReferenceExtractor->at($text, $offset, $this->classIndexes->forProject($project));
         if (null !== $reference) {
             return new RouteSymbol($reference->name(), $reference->range());
         }

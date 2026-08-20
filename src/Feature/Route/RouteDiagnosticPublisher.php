@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -12,6 +13,7 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
         private readonly DocumentStore $documents,
         private readonly ProjectRegistry $projects,
         private readonly RouteIndexRegistry $routeIndexes,
+        private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly RouteReferenceExtractor $phpReferenceExtractor,
         private readonly TwigRouteReferenceExtractor $twigReferenceExtractor,
     ) {
@@ -43,7 +45,7 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
         $diagnostics = [];
         $references = 'twig' === $document->languageId()
             ? $this->twigReferenceExtractor->extract($document->text())
-            : $this->phpReferenceExtractor->extract($document->text());
+            : $this->phpReferenceExtractor->extract($document->text(), $this->classIndexes->forProject($project));
         foreach ($references as $reference) {
             $range = [
                 'start' => [

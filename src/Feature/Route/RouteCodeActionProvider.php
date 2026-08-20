@@ -6,6 +6,7 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -16,6 +17,7 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
         private readonly ProjectRegistry $projects,
         private readonly PositionConverter $converter,
         private readonly RouteIndexRegistry $indexes,
+        private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly RouteReferenceExtractor $phpExtractor,
         private readonly TwigRouteReferenceExtractor $twigExtractor,
         private readonly ProjectPathResolver $pathResolver,
@@ -40,7 +42,7 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
         }
         $references = 'twig' === $document->languageId()
             ? $this->twigExtractor->extract($document->text())
-            : $this->phpExtractor->extract($document->text());
+            : $this->phpExtractor->extract($document->text(), $this->classIndexes->forProject($project));
         $actions = [];
         foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
             if (!\is_array($diagnostic) || 'route.missing_parameters' !== ($diagnostic['code'] ?? null)) {

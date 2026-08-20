@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\Messenger;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -19,6 +20,7 @@ use Symfony\Lsp\Feature\Messenger\MessengerMessage;
 use Symfony\Lsp\Feature\Messenger\MessengerProvider;
 use Symfony\Lsp\Feature\Messenger\MessengerSourceIndexRegistry;
 use Symfony\Lsp\Feature\Messenger\MessengerTransport;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -104,7 +106,7 @@ YAML;
         );
         $sourceIndexes = new MessengerSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($extractor->extract($yamlUri, 'yaml', $yaml), $extractor->extract($messageUri, 'php', $message), $extractor->extract($controllerUri, 'php', $controller));
-        $classExtractor = new PhpClassDeclarationExtractor($converter);
+        $classExtractor = new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser()));
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
         $classIndexes->forProject($project)->replace(
             new DependencyInjectionSourceFacts($messageUri, classes: $classExtractor->extract($messageUri, $message)),

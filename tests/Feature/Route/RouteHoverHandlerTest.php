@@ -2,15 +2,21 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteHoverHandler;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
+use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -22,10 +28,23 @@ final class RouteHoverHandlerTest extends TestCase
 {
     public function testDescribesRuntimeRoute(): void
     {
+        $baseUri = 'file:///workspace/src/BaseController.php';
+        $base = <<<'PHP'
+            <?php
+            namespace App\Controller;
+
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+
+            abstract class BaseController extends AbstractController
+            {
+            }
+            PHP;
         $uri = 'file:///workspace/src/Controller.php';
         $text = <<<'PHP'
             <?php
-            class DemoController extends AbstractController
+            namespace App\Controller;
+
+            class DemoController extends BaseController
             {
                 public function index(): void
                 {
@@ -51,10 +70,18 @@ final class RouteHoverHandlerTest extends TestCase
         $converter = new PositionConverter();
         $offset = strpos($text, 'article_show') + 3;
         $position = $converter->toPosition($text, $offset);
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $classExtractor = new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser()));
+        $classIndexes->forProject($project)->replace(
+            new DependencyInjectionSourceFacts($baseUri, classes: $classExtractor->extract($baseUri, $base)),
+            new DependencyInjectionSourceFacts($uri, classes: $classExtractor->extract($uri, $text)),
+        );
         $handler = new RouteHoverHandler(
             new DocumentContextResolver($documents, $projects),
             $converter,
             $indexes,
+            $classIndexes,
+            new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser())),
             new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
         );
 

@@ -10,6 +10,9 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
 use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
@@ -50,22 +53,34 @@ final class RouteReferencesHandlerTest extends TestCase
             $uri,
             new Range(new Position(2, 32), new Position(2, 44)),
         ));
-        $references = new RouteReferenceIndexRegistry();
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $positionConverter = new PositionConverter();
+        $classExtractor = new PhpClassDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser()));
+        $baseUri = 'file:///workspace/src/BaseController.php';
+        $base = '<?php namespace App\\Controller; use Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController; abstract class BaseController extends AbstractController {}';
+        $consumerUri = 'file:///workspace/src/Navigation.php';
+        $consumer = '<?php namespace App\\Controller; final class DemoController extends BaseController {}';
+        $classIndexes->forProject($project)->replace(
+            new DependencyInjectionSourceFacts($baseUri, classes: $classExtractor->extract($baseUri, $base)),
+            new DependencyInjectionSourceFacts($consumerUri, classes: $classExtractor->extract($consumerUri, $consumer)),
+        );
+        $references = new RouteReferenceIndexRegistry($classIndexes);
         $references->forProject($project)->replace(new RouteReferenceLocation(
             'article_list',
-            'file:///workspace/src/Navigation.php',
+            $consumerUri,
             new Range(new Position(12, 20), new Position(12, 32)),
+            'App\\Controller\\DemoController',
         ));
-        $positionConverter = new PositionConverter();
         $handler = new RouteReferencesHandler(
             new DocumentContextResolver($documents, $projects),
             new RouteSymbolResolver(
                 $positionConverter,
-                new RouteReferenceExtractor($positionConverter),
+                new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser())),
                 new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
                 new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
                 new YamlRouteDeclarationExtractor($positionConverter),
                 new UriToPathConverter(),
+                $classIndexes,
             ),
             $references,
             $declarations,
@@ -73,7 +88,7 @@ final class RouteReferencesHandlerTest extends TestCase
 
         self::assertSame([
             [
-                'uri' => 'file:///workspace/src/Navigation.php',
+                'uri' => $consumerUri,
                 'range' => [
                     'start' => ['line' => 12, 'character' => 20],
                     'end' => ['line' => 12, 'character' => 32],

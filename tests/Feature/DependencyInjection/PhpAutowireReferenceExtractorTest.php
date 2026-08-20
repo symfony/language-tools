@@ -51,7 +51,7 @@ final class PhpAutowireReferenceExtractorTest extends TestCase
             ['App\\Controller\\DemoController'],
             array_map(
                 static fn ($declaration): string => $declaration->className(),
-                (new PhpClassDeclarationExtractor($converter))->extract(
+                (new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser())))->extract(
                     'file:///workspace/src/Controller/DemoController.php',
                     $text,
                 ),

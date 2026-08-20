@@ -13,10 +13,11 @@ final class TolerantPhpParserTest extends TestCase
     {
         $source = <<<'PHP'
             <?php
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
             use Symfony\Component\Routing\Attribute\Route as RoutingRoute;
 
             #[RoutingRoute(path: '/article', name: "article_list")]
-            final class ArticleController
+            final class ArticleController extends AbstractController
             {
             }
 
@@ -34,6 +35,9 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame('$routes', $document->methodCalls()[0]->receiver());
         self::assertSame('add', $document->methodCalls()[0]->method());
         self::assertSame('article_list', $document->methodCalls()[0]->argument(0)?->stringLiteral()?->value());
+        self::assertSame('ArticleController', $document->typeDeclarations()[0]->name());
+        self::assertSame('Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController', $document->typeDeclarations()[0]->parentClassName());
+        self::assertTrue($document->typeDeclarations()[0]->contains((int) strpos($source, 'ArticleController')));
         self::assertSame([], $document->diagnostics());
     }
 

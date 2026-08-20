@@ -10,6 +10,7 @@ final class PhpClassDeclaration
         private readonly string $className,
         private readonly string $uri,
         private readonly Range $range,
+        private readonly ?string $parentClassName = null,
     ) {
     }
 
@@ -26,5 +27,10 @@ final class PhpClassDeclaration
     public function range(): Range
     {
         return $this->range;
+    }
+
+    public function parentClassName(): ?string
+    {
+        return $this->parentClassName;
     }
 }

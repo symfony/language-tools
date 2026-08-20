@@ -118,7 +118,7 @@ final class ProjectRouteSourceIndexer implements SourceIndexProviderInterface
         $declarations = [];
         if ('php' === $languageId) {
             $declarations = $this->phpDeclarationExtractor->extract($uri, $text);
-            $references = $this->phpReferenceExtractor->extract($text);
+            $references = $this->phpReferenceExtractor->extractCandidates($text);
         } elseif ('twig' === $languageId) {
             $references = $this->twigReferenceExtractor->extract($text);
         } elseif ('yaml' === $languageId && $this->isRouteYaml($project, $uri)) {
@@ -133,6 +133,7 @@ final class ProjectRouteSourceIndexer implements SourceIndexProviderInterface
                 $reference->name(),
                 $uri,
                 $reference->range(),
+                $reference->controllerClass(),
             ),
             $references,
         ));

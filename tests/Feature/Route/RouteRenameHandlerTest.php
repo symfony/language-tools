@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
@@ -105,7 +106,8 @@ final class RouteRenameHandlerTest extends TestCase
             $uri,
             new Range(new Position(0, 0), new Position(0, 12)),
         ));
-        $references = new RouteReferenceIndexRegistry();
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $references = new RouteReferenceIndexRegistry($classIndexes);
         $references->forProject($project)->replace(new RouteReferenceLocation(
             'article_show',
             'file:///workspace/src/ConsumerController.php',
@@ -118,11 +120,12 @@ final class RouteRenameHandlerTest extends TestCase
             new DocumentContextResolver($documents, $projects),
             new RouteSymbolResolver(
                 $positionConverter,
-                new RouteReferenceExtractor($positionConverter),
+                new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser())),
                 new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
                 new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
                 new YamlRouteDeclarationExtractor($positionConverter),
                 new UriToPathConverter(),
+                $classIndexes,
             ),
             $references,
             $declarations,
@@ -181,7 +184,8 @@ final class RouteRenameHandlerTest extends TestCase
             'file:///workspace/src/ArticleController.php',
             new Range(new Position(10, 20), new Position(10, 32)),
         ));
-        $references = new RouteReferenceIndexRegistry();
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $references = new RouteReferenceIndexRegistry($classIndexes);
         $references->forProject($project)->replace(
             new RouteReferenceLocation(
                 'article_show',
@@ -204,11 +208,12 @@ final class RouteRenameHandlerTest extends TestCase
             new DocumentContextResolver($documents, $projects),
             new RouteSymbolResolver(
                 $positionConverter,
-                new RouteReferenceExtractor($positionConverter),
+                new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser())),
                 new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
                 new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
                 new YamlRouteDeclarationExtractor($positionConverter),
                 new UriToPathConverter(),
+                $classIndexes,
             ),
             $references,
             $declarations,

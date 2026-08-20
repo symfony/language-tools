@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -12,6 +13,7 @@ final class RouteDocumentLinkHandler implements DocumentLinkProviderInterface
         private readonly DocumentStore $documents,
         private readonly ProjectRegistry $projects,
         private readonly RouteDeclarationIndexRegistry $declarationIndexes,
+        private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly RouteReferenceExtractor $phpReferenceExtractor,
         private readonly TwigRouteReferenceExtractor $twigReferenceExtractor,
     ) {
@@ -37,7 +39,7 @@ final class RouteDocumentLinkHandler implements DocumentLinkProviderInterface
 
         $references = 'twig' === $document->languageId()
             ? $this->twigReferenceExtractor->extract($document->text())
-            : $this->phpReferenceExtractor->extract($document->text());
+            : $this->phpReferenceExtractor->extract($document->text(), $this->classIndexes->forProject($project));
         $links = [];
         foreach ($references as $reference) {
             $declarations = $this->declarationIndexes->forProject($project)->find($reference->name());

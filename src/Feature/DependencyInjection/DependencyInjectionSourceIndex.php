@@ -89,13 +89,34 @@ final class DependencyInjectionSourceIndex
         $declarations = [];
         foreach ($this->sources() as $source) {
             foreach ($source->classes() as $declaration) {
-                if (ltrim($declaration->className(), '\\') === ltrim($className, '\\')) {
+                if (0 === strcasecmp(ltrim($declaration->className(), '\\'), ltrim($className, '\\'))) {
                     $declarations[] = $declaration;
                 }
             }
         }
 
         return $declarations;
+    }
+
+    public function isSubclassOf(string $className, string $parentClassName): bool
+    {
+        $className = ltrim($className, '\\');
+        $parentClassName = ltrim($parentClassName, '\\');
+        $visited = [];
+
+        while (!isset($visited[strtolower($className)])) {
+            if (0 === strcasecmp($className, $parentClassName)) {
+                return true;
+            }
+            $visited[strtolower($className)] = true;
+            $declarations = $this->classDeclarations($className);
+            if (1 !== \count($declarations) || null === $className = $declarations[0]->parentClassName()) {
+                return false;
+            }
+            $className = ltrim($className, '\\');
+        }
+
+        return false;
     }
 
     /** @return list<string> */

@@ -2,11 +2,13 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteCodeActionProvider;
@@ -14,6 +16,7 @@ use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -158,12 +161,13 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $indexes = new RouteIndexRegistry();
             $indexes->forProject($project)->replace(new Route('article_show', '/article/{id}', ['GET'], [], null, null));
             $converter = new PositionConverter();
-            $phpExtractor = new RouteReferenceExtractor($converter);
+            $classIndexes = new DependencyInjectionSourceIndexRegistry();
+            $phpExtractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()));
             $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()));
-            $diagnosticProvider = new RouteDiagnosticPublisher($documents, $projects, $indexes, $phpExtractor, $twigExtractor);
+            $diagnosticProvider = new RouteDiagnosticPublisher($documents, $projects, $indexes, $classIndexes, $phpExtractor, $twigExtractor);
             $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
-            $provider = new RouteCodeActionProvider($documents, $projects, $converter, $indexes, $phpExtractor, $twigExtractor, new ProjectPathResolver(new UriToPathConverter()));
+            $provider = new RouteCodeActionProvider($documents, $projects, $converter, $indexes, $classIndexes, $phpExtractor, $twigExtractor, new ProjectPathResolver(new UriToPathConverter()));
 
             $actions = $provider->actions([
                 'textDocument' => ['uri' => $uri],
@@ -248,7 +252,8 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 $documents,
                 $projects,
                 new RouteIndexRegistry(),
-                new RouteReferenceExtractor($positionConverter),
+                new DependencyInjectionSourceIndexRegistry(),
+                new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser())),
                 new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
             )],
         );
@@ -323,7 +328,8 @@ final class RouteDiagnosticPublisherTest extends TestCase
                     $documents,
                     $projects,
                     $routeIndexes,
-                    new RouteReferenceExtractor($positionConverter),
+                    new DependencyInjectionSourceIndexRegistry(),
+                    new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser())),
                     new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
                 )],
             ),

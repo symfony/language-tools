@@ -16,7 +16,9 @@ to Symfony's controller or routing APIs:
 * ``RouterInterface::generate()``;
 * ``UrlGeneratorInterface::generate()``.
 
-Twig's ``path()`` and ``url()`` functions are also supported. The server avoids
+Controller helpers remain recognized when an application controller inherits
+from ``AbstractController`` through one or more project base classes. Twig's
+``path()`` and ``url()`` functions are also supported. The server avoids
 suggestions when it can't establish that a similarly named method belongs to a
 Symfony API.
 

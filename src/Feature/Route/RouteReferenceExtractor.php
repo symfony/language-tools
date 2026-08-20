@@ -4,9 +4,13 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
+use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
 final class RouteReferenceExtractor
 {
+    private const ABSTRACT_CONTROLLER = 'Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController';
     private const METHODS = [
         'generate',
         'generateUrl',
@@ -15,16 +19,61 @@ final class RouteReferenceExtractor
 
     public function __construct(
         private readonly PositionConverter $positionConverter,
+        private readonly PhpParserInterface $parser,
     ) {
     }
 
     /**
      * @return list<RouteReference>
      */
-    public function extract(string $text): array
+    public function extract(string $text, ?DependencyInjectionSourceIndex $classIndex = null): array
+    {
+        $document = $this->parser->parse($text);
+
+        return array_values(array_filter(
+            $this->extractFromDocument($text, $document),
+            fn (RouteReference $reference): bool => $this->isControllerClass($reference->controllerClass(), $document, $classIndex),
+        ));
+    }
+
+    /**
+     * @return list<RouteReference>
+     */
+    public function extractCandidates(string $text): array
+    {
+        $document = $this->parser->parse($text);
+
+        return $this->extractFromDocument($text, $document);
+    }
+
+    public function isSymfonyReceiver(string $source, DependencyInjectionSourceIndex $classIndex): bool
+    {
+        $document = $this->parser->parse($source);
+        $receiver = RoutePhpReceiver::resolve($source, \strlen($source), $document->typeDeclarations());
+
+        return null !== $receiver && $this->isControllerClass($receiver->controllerClass(), $document, $classIndex);
+    }
+
+    public function at(string $text, int $byteOffset, ?DependencyInjectionSourceIndex $classIndex = null): ?RouteReference
+    {
+        foreach ($this->extract($text, $classIndex) as $reference) {
+            $start = $this->positionConverter->toByteOffset($text, $reference->range()->start());
+            $end = $this->positionConverter->toByteOffset($text, $reference->range()->end());
+            if ($byteOffset >= $start && $byteOffset <= $end) {
+                return $reference;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<RouteReference>
+     */
+    private function extractFromDocument(string $text, PhpDocument $document): array
     {
         preg_match_all(
-            '/(?:->|::)('.implode('|', self::METHODS).')\s*\(\s*([\'\"])([^\'\"]+)\2/s',
+            '/(?:->|::)('.implode('|', self::METHODS).')\s*\(\s*([\'"])([^\'"]+)\2/s',
             $text,
             $matches,
             \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE,
@@ -33,7 +82,13 @@ final class RouteReferenceExtractor
 
         foreach ($matches as $match) {
             $methodOffset = $match[1][1];
-            if (!RoutePhpReceiver::isSymfony(substr($text, 0, $methodOffset - 2))) {
+            $receiverOffset = $methodOffset - 2;
+            $receiver = RoutePhpReceiver::resolve(
+                substr($text, 0, $receiverOffset),
+                $receiverOffset,
+                $document->typeDeclarations(),
+            );
+            if (null === $receiver) {
                 continue;
             }
 
@@ -46,23 +101,39 @@ final class RouteReferenceExtractor
                     $this->positionConverter->toPosition($text, $offset + \strlen($name)),
                 ),
                 $this->providedParameters(substr($text, $match[0][1] + \strlen($match[0][0]))),
+                $receiver->controllerClass(),
             );
         }
 
         return $references;
     }
 
-    public function at(string $text, int $byteOffset): ?RouteReference
+    private function isControllerClass(?string $className, PhpDocument $document, ?DependencyInjectionSourceIndex $classIndex): bool
     {
-        foreach ($this->extract($text) as $reference) {
-            $start = $this->positionConverter->toByteOffset($text, $reference->range()->start());
-            $end = $this->positionConverter->toByteOffset($text, $reference->range()->end());
-            if ($byteOffset >= $start && $byteOffset <= $end) {
-                return $reference;
+        if (null === $className) {
+            return true;
+        }
+        if (null !== $classIndex && $classIndex->isSubclassOf($className, self::ABSTRACT_CONTROLLER)) {
+            return true;
+        }
+
+        $types = [];
+        foreach ($document->typeDeclarations() as $type) {
+            $types[strtolower(ltrim($type->name(), '\\'))] = $type;
+        }
+        $visited = [];
+        while (!isset($visited[strtolower($className)])) {
+            if (self::ABSTRACT_CONTROLLER === ltrim($className, '\\') || 'AbstractController' === ltrim($className, '\\')) {
+                return true;
+            }
+            $visited[strtolower($className)] = true;
+            $type = $types[strtolower(ltrim($className, '\\'))] ?? null;
+            if (null === $type || null === $className = $type->parentClassName()) {
+                return false;
             }
         }
 
-        return null;
+        return false;
     }
 
     /**
@@ -78,7 +149,7 @@ final class RouteReferenceExtractor
             return null;
         }
 
-        preg_match_all('/([\'\"])([^\'\"]+)\1\s*=>/', $parameters[1], $keys);
+        preg_match_all('/([\'"])([^\'"]+)\1\s*=>/', $parameters[1], $keys);
 
         return array_values(array_unique($keys[2]));
     }

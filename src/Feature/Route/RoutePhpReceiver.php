@@ -2,30 +2,48 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
+use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
+
 final class RoutePhpReceiver
 {
-    public static function isSymfony(string $source): bool
+    /**
+     * @param list<PhpTypeDeclaration> $types
+     */
+    public static function resolve(string $source, int $offset, array $types): ?self
     {
         $source = rtrim($source);
 
         if (preg_match('/\$this\s*$/', $source)) {
-            return (bool) preg_match(
-                '/class\s+\w+\s+extends\s+(?:AbstractController|[^\s{]*\\\\AbstractController)\b/s',
-                $source,
-            );
+            foreach ($types as $type) {
+                if ($type->contains($offset)) {
+                    return new self($type->name());
+                }
+            }
+
+            return null;
         }
 
         if (!preg_match('/(?:\$this->|\$)(\w+)\s*$/', $source, $receiver)) {
-            return false;
+            return null;
         }
 
-        return (bool) preg_match(
+        if (!preg_match(
             '/(?:RouterInterface|UrlGeneratorInterface)\s+\$'.preg_quote($receiver[1], '/').'\b/s',
             $source,
-        );
+        )) {
+            return null;
+        }
+
+        return new self(null);
     }
 
-    private function __construct()
+    private function __construct(
+        private readonly ?string $controllerClass,
+    ) {
+    }
+
+    public function controllerClass(): ?string
     {
+        return $this->controllerClass;
     }
 }
