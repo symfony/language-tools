@@ -47,7 +47,7 @@ jobs:
                   if [ "$GITHUB_REF_TYPE" = tag ]; then VERSION="${GITHUB_REF_NAME#v}"; fi
                   printf '%s\n' "$VERSION" > resources/version
                   # Box 4.7.0 cannot compile on Windows.
-                  curl -fsSL https://github.com/box-project/box/releases/download/4.6.7/box.phar -o var/build/release/box.phar
+                  curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 https://github.com/box-project/box/releases/download/4.6.7/box.phar -o var/build/release/box.phar
                   echo 'f49a711985219c9e0ef9faa49a95d8ab47385b8b8966dc5ac0ca10f9ac318e6b  var/build/release/box.phar' | shasum -a 256 -c
                   php var/build/release/box.phar compile --no-parallel
             - name: Trust the preinstalled AWS SAM formula
@@ -56,16 +56,46 @@ jobs:
                   if brew tap | grep -Fxq aws/tap; then
                       brew trust --formula aws/tap/aws-sam-cli
                   fi
-            - name: Build the standalone server
+            - name: Download static-php-cli
+              working-directory: var/build/release
+              run: |
+                  curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 https://github.com/crazywhalecc/static-php-cli/releases/download/2.8.5/spc-${{ matrix.spc }}.tar.gz -o spc.tar.gz
+                  echo '${{ matrix.spc_checksum }}  spc.tar.gz' | shasum -a 256 -c
+                  tar -xzf spc.tar.gz
+            - name: Build the standalone Linux server
+              if: runner.os == 'Linux'
+              env:
+                  ALPINE_IMAGE: alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
+                  EXTENSIONS: ctype,filter,iconv,mbstring,pcntl,phar,posix,tokenizer,zlib
+                  GITHUB_TOKEN: ${{ github.token }}
+                  SPC_DOWNLOAD_RETRIES: 5
+              run: |
+                  docker run --rm \
+                      --env EXTENSIONS \
+                      --env GITHUB_TOKEN \
+                      --env GITHUB_WORKSPACE \
+                      --env SPC_DOWNLOAD_RETRIES \
+                      --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
+                      --workdir "$GITHUB_WORKSPACE/var/build/release" \
+                      "$ALPINE_IMAGE" \
+                      sh -lc '
+                          apk add --no-cache bash ca-certificates curl
+                          ./spc doctor --auto-fix
+                          ./spc download --with-php=8.4 --for-extensions="$EXTENSIONS" --retry="$SPC_DOWNLOAD_RETRIES"
+                          ./spc build "$EXTENSIONS" --build-micro -P "$GITHUB_WORKSPACE/tools/spc-inject-tree-sitter.php"
+                          ./spc micro:combine ../../../build/symfony-lsp.phar -O ../../../build/symfony-lsp
+                          chmod +x ../../../build/symfony-lsp
+                      '
+            - name: Build the standalone macOS server
+              if: runner.os == 'macOS'
               working-directory: var/build/release
               env:
                   EXTENSIONS: ctype,filter,iconv,mbstring,pcntl,phar,posix,tokenizer,zlib
+                  GITHUB_TOKEN: ${{ github.token }}
+                  SPC_DOWNLOAD_RETRIES: 5
               run: |
-                  curl -fsSL https://github.com/crazywhalecc/static-php-cli/releases/download/2.8.5/spc-${{ matrix.spc }}.tar.gz -o spc.tar.gz
-                  echo '${{ matrix.spc_checksum }}  spc.tar.gz' | shasum -a 256 -c
-                  tar -xzf spc.tar.gz
                   ./spc doctor --auto-fix
-                  ./spc download --with-php=8.4 --for-extensions="$EXTENSIONS"
+                  ./spc download --with-php=8.4 --for-extensions="$EXTENSIONS" --retry="$SPC_DOWNLOAD_RETRIES"
                   ./spc build "$EXTENSIONS" --build-micro -P "$GITHUB_WORKSPACE/tools/spc-inject-tree-sitter.php"
                   ./spc micro:combine ../../../build/symfony-lsp.phar -O ../../../build/symfony-lsp
                   chmod +x ../../../build/symfony-lsp
@@ -125,12 +155,14 @@ jobs:
               working-directory: var/build/release
               env:
                   EXTENSIONS: ctype,filter,iconv,mbstring,phar,tokenizer,zlib
+                  GITHUB_TOKEN: ${{ github.token }}
+                  SPC_DOWNLOAD_RETRIES: 5
               run: |
                   Invoke-WebRequest https://github.com/crazywhalecc/static-php-cli/releases/download/2.8.5/spc-windows-x64.exe -OutFile spc.exe
                   if ((Get-FileHash spc.exe -Algorithm SHA256).Hash.ToLower() -ne '425b54ab857e21409c1fd9b818899ffebabd1e2817ef0a0ed5ae8a3d9f5b463b') { throw 'Invalid static-php-cli checksum.' }
                   ./spc.exe doctor --auto-fix
                   if ($LASTEXITCODE -ne 0) { throw 'spc doctor failed.' }
-                  ./spc.exe download --with-php=8.4 --for-extensions="$env:EXTENSIONS"
+                  ./spc.exe download --with-php=8.4 --for-extensions="$env:EXTENSIONS" --retry="$env:SPC_DOWNLOAD_RETRIES"
                   if ($LASTEXITCODE -ne 0) { throw 'spc download failed.' }
                   ./spc.exe build "$env:EXTENSIONS" --build-micro -P "$env:GITHUB_WORKSPACE/tools/spc-inject-tree-sitter.php"
                   if ($LASTEXITCODE -ne 0) { throw 'spc build failed.' }

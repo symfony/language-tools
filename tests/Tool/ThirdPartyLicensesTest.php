@@ -94,6 +94,9 @@ final class ThirdPartyLicensesTest extends TestCase
         self::assertStringContainsString('./spc download --with-php=8.4 --for-extensions="$EXTENSIONS"', $workflow);
         self::assertStringContainsString('./spc build "$EXTENSIONS" --build-micro -P "$GITHUB_WORKSPACE/tools/spc-inject-tree-sitter.php"', $workflow);
         self::assertStringContainsString('./spc.exe build "$env:EXTENSIONS" --build-micro -P "$env:GITHUB_WORKSPACE/tools/spc-inject-tree-sitter.php"', $workflow);
+        self::assertStringContainsString('alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d', $workflow);
+        self::assertStringContainsString('apk add --no-cache bash ca-certificates curl', $workflow);
+        self::assertStringContainsString('SPC_DOWNLOAD_RETRIES: 5', $workflow);
         self::assertStringContainsString('EXTENSIONS: ctype,filter,iconv,mbstring,pcntl,phar,posix,tokenizer,zlib', $workflow);
         self::assertStringContainsString('EXTENSIONS: ctype,filter,iconv,mbstring,phar,tokenizer,zlib', $workflow);
         self::assertSame(2, substr_count($workflow, 'smoke-test-server'));

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Build Linux releases with Alpine's musl toolchain
+- Retry transient release source downloads
+
 ## 0.14.0 (2026-08-20)
 
 - Resume releases after path-filtered CI fixes
