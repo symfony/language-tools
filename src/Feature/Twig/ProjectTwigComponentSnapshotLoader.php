@@ -25,6 +25,10 @@ final class ProjectTwigComponentSnapshotLoader implements RuntimeSnapshotLoaderI
             return;
         }
         $names = array_values(array_filter($section['names'], 'is_string'));
+        $caseInsensitiveNames = array_values(array_filter(
+            \is_array($section['caseInsensitiveNames'] ?? null) ? $section['caseInsensitiveNames'] : [],
+            'is_string',
+        ));
         $directory = \is_string($section['anonymousTemplateDirectory'] ?? null) && '' !== $section['anonymousTemplateDirectory']
             ? $section['anonymousTemplateDirectory']
             : 'components';
@@ -32,6 +36,7 @@ final class ProjectTwigComponentSnapshotLoader implements RuntimeSnapshotLoaderI
             true === ($section['complete'] ?? null),
             $names,
             $directory,
+            $caseInsensitiveNames,
         );
     }
 }

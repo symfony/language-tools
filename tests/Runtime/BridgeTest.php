@@ -293,6 +293,7 @@ final class BridgeTest extends TestCase
         self::assertIsArray($section);
         self::assertTrue($section['complete']);
         self::assertSame(['Alert', 'Form:Input', 'acme:Badge', 'ux:icon'], $section['names']);
+        self::assertSame(['ux:icon'], $section['caseInsensitiveNames']);
         self::assertSame('components', $section['anonymousTemplateDirectory']);
         self::assertSame([], $section['warnings']);
     }
@@ -342,6 +343,7 @@ final class BridgeTest extends TestCase
         self::assertSame([
             'complete' => true,
             'names' => [],
+            'caseInsensitiveNames' => [],
             'anonymousTemplateDirectory' => 'components',
             'warnings' => [],
         ], array_diff_key($section, ['generation' => true]));
@@ -414,6 +416,10 @@ final class BridgeTest extends TestCase
                                     ".ux_icons.twig_icon_runtime": {
                                         "class": "Symfony\\UX\\Icons\\Twig\\UXIconRuntime",
                                         "tags": [{"name": "ux.twig_component.twig_renderer", "parameters": {"key": "ux:icon"}}]
+                                    },
+                                    "invalid.twig_renderer": {
+                                        "class": "Vendor\\InvalidTwigRenderer",
+                                        "tags": [{"name": "ux.twig_component.twig_renderer", "parameters": {"key": "Invalid:Renderer"}}]
                                     }
                                 },
                                 "aliases": [],
@@ -443,7 +449,7 @@ final class BridgeTest extends TestCase
                                 ".ux_icons.twig_component.icon": {
                                     "class": "Symfony\\UX\\Icons\\Twig\\UXIconComponent",
                                     "tags": [
-                                        {"name": "twig.component", "parameters": {"key": "UX:Icon", "template": "@UXIcons/Icon.html.twig"}},
+                                        {"name": "twig.component", "parameters": {"key": "UX:Icon"}},
                                         {"name": "kernel.reset", "parameters": {"method": "reset"}}
                                     ]
                                 }

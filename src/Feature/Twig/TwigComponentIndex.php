@@ -12,6 +12,8 @@ final class TwigComponentIndex
     private bool $runtimeComplete = false;
     /** @var array<string, true> */
     private array $runtimeNames = [];
+    /** @var array<string, true> */
+    private array $caseInsensitiveRuntimeNames = [];
     private string $anonymousTemplateDirectory = 'components';
 
     public function replace(TwigComponentSourceFacts ...$sources): void
@@ -150,11 +152,15 @@ final class TwigComponentIndex
         return $this->complete;
     }
 
-    /** @param list<string> $names */
-    public function replaceRuntime(bool $complete, array $names, string $anonymousTemplateDirectory): void
+    /**
+     * @param list<string> $names
+     * @param list<string> $caseInsensitiveNames
+     */
+    public function replaceRuntime(bool $complete, array $names, string $anonymousTemplateDirectory, array $caseInsensitiveNames = []): void
     {
         $this->runtimeComplete = $complete;
         $this->runtimeNames = array_fill_keys($names, true);
+        $this->caseInsensitiveRuntimeNames = array_fill_keys(array_map('strtolower', $caseInsensitiveNames), true);
         $this->anonymousTemplateDirectory = $anonymousTemplateDirectory;
     }
 
@@ -165,7 +171,7 @@ final class TwigComponentIndex
 
     public function hasRuntimeName(string $name): bool
     {
-        return isset($this->runtimeNames[$name]);
+        return isset($this->runtimeNames[$name]) || isset($this->caseInsensitiveRuntimeNames[strtolower($name)]);
     }
 
     /** @return list<string> */

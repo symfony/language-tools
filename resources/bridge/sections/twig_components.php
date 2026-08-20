@@ -6,6 +6,7 @@ function bridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
         $section = [
             'complete' => true,
             'names' => [],
+            'caseInsensitiveNames' => [],
             'anonymousTemplateDirectory' => 'components',
             'warnings' => [],
         ];
@@ -88,28 +89,32 @@ function bridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
                     $names[$name] = true;
                 }
             }
-            $rendererNames = [];
+            $caseInsensitiveNames = [];
             foreach ($definitionsByTag['ux.twig_component.twig_renderer'] as $definition) {
                 foreach (definitionTagParameters($definition, 'ux.twig_component.twig_renderer') as $parameters) {
-                    if (is_string($parameters['key'] ?? null) && '' !== $parameters['key']) {
-                        $rendererNames[strtolower($parameters['key'])] = $parameters['key'];
+                    $name = is_string($parameters['key'] ?? null) ? $parameters['key'] : null;
+                    if (null !== $name && '' !== $name && strtolower($name) === $name) {
+                        $caseInsensitiveNames[$name] = true;
                     }
                 }
             }
             foreach (array_keys($names) as $name) {
-                if (isset($rendererNames[strtolower($name)])) {
+                if (isset($caseInsensitiveNames[strtolower($name)])) {
                     unset($names[$name]);
                 }
             }
-            foreach ($rendererNames as $name) {
+            foreach ($caseInsensitiveNames as $name => $_) {
                 $names[$name] = true;
             }
             $names = array_keys($names);
             sort($names);
+            $caseInsensitiveNames = array_keys($caseInsensitiveNames);
+            sort($caseInsensitiveNames);
             $section = [
                 'complete' => $complete,
-                'generation' => hash('sha256', json_encode([$complete, $names, $anonymousTemplateDirectory], JSON_THROW_ON_ERROR)),
+                'generation' => hash('sha256', json_encode([$complete, $names, $caseInsensitiveNames, $anonymousTemplateDirectory], JSON_THROW_ON_ERROR)),
                 'names' => $names,
+                'caseInsensitiveNames' => $caseInsensitiveNames,
                 'anonymousTemplateDirectory' => $anonymousTemplateDirectory,
                 'warnings' => $warnings,
             ];

@@ -291,7 +291,7 @@ final class TemplateProviderTest extends TestCase
         $commentParser = new TwigCommentParser();
         $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver(), $commentParser);
         $usageUri = 'file:///workspace/templates/page.html.twig';
-        $usageText = "{## Use <twig:Documented /> in examples. #}\n<twig:ux:icon name=\"x\" />\n<twig:Alert />\n<twig:Card />\n<twig:acme:badge />\n<twig:Unknown />";
+        $usageText = "{## Use <twig:Documented /> in examples. #}\n<twig:ux:icon name=\"x\" />\n<twig:uX:iCoN name=\"x\" />\n<twig:Alert />\n<twig:alert />\n<twig:Card />\n<twig:acme:badge />\n<twig:Unknown />";
         $documents = new DocumentStore();
         $documents->open(new Document($usageUri, 'twig', 1, $usageText));
         $projects = new ProjectRegistry();
@@ -307,7 +307,7 @@ final class TemplateProviderTest extends TestCase
         $withoutRuntimeMetadata = $provider->diagnostics($params);
         self::assertNull($withoutRuntimeMetadata);
 
-        $indexes->forProject($project)->replaceRuntime(true, ['ux:icon'], 'components');
+        $indexes->forProject($project)->replaceRuntime(true, ['ux:icon'], 'components', ['ux:icon']);
         $withoutTemplateMetadata = $provider->diagnostics($params);
         self::assertNull($withoutTemplateMetadata);
 
@@ -321,7 +321,10 @@ final class TemplateProviderTest extends TestCase
         $diagnostics = $provider->diagnostics($params);
         self::assertIsArray($diagnostics);
         self::assertSame(
-            ['Twig component "Unknown" does not exist.'],
+            [
+                'Twig component "alert" does not exist.',
+                'Twig component "Unknown" does not exist.',
+            ],
             array_column($diagnostics, 'message'),
         );
 
