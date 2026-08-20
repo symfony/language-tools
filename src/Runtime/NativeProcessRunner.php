@@ -18,7 +18,7 @@ final class NativeProcessRunner implements ProcessRunnerInterface
 {
     public function __construct(
         private readonly float $timeout = 300.0,
-        private readonly int $maximumOutputBytes = 16777216,
+        private readonly int $maximumOutputBytes = 67108864,
         private readonly int $maximumErrorOutputBytes = 65536,
     ) {
         if ($timeout <= 0 || !is_finite($timeout) || $maximumOutputBytes < 1 || $maximumErrorOutputBytes < 1) {

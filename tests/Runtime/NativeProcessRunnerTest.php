@@ -52,6 +52,17 @@ final class NativeProcessRunnerTest extends TestCase
         self::assertSame(1000000, \strlen($result->stderr()));
     }
 
+    public function testAcceptsLargerStandardOutput(): void
+    {
+        $result = (new NativeProcessRunner())->run([
+            \PHP_BINARY,
+            '-r',
+            'fwrite(STDOUT, str_repeat("a", 16777217));',
+        ], __DIR__);
+
+        self::assertSame(16777217, \strlen($result->stdout()));
+    }
+
     public function testEnforcesStandardOutputLimit(): void
     {
         $runner = new NativeProcessRunner(maximumOutputBytes: 8);
@@ -69,12 +80,12 @@ final class NativeProcessRunnerTest extends TestCase
         $result = $runner->run([
             \PHP_BINARY,
             '-r',
-            'fwrite(STDERR, "123456789"); fwrite(STDOUT, "payload");',
+            'fwrite(STDERR, str_repeat("e", 1000000)); fwrite(STDOUT, "payload");',
         ], __DIR__);
 
         self::assertSame(0, $result->exitCode());
         self::assertSame('payload', $result->stdout());
-        self::assertSame('1234', $result->stderr());
+        self::assertSame('eeee', $result->stderr());
     }
 
     public function testReportsStartFailures(): void
