@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.14.0 (2026-08-20)
 
 - Recognize routing helpers inherited through project controller base classes
 - Support larger project bridge snapshots
