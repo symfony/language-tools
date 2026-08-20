@@ -2,6 +2,7 @@
 
 ## 0.14.0 (2026-08-20)
 
+- Resume releases after path-filtered CI fixes
 - Recognize routing helpers inherited through project controller base classes
 - Support larger project bridge snapshots
 - Tolerate excessive project bridge error output

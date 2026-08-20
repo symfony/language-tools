@@ -135,6 +135,63 @@ final class ReleaseExecutableTest extends TestCase
         }
     }
 
+    public function testDispatchesARegularWorkflowOmittedByPathFiltering(): void
+    {
+        $root = \dirname(__DIR__, 2);
+        $directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-'.bin2hex(random_bytes(8)));
+        $bin = Path::join($directory, 'bin');
+        (new Filesystem())->mkdir($bin);
+        $calls = Path::join($directory, 'calls');
+        $dispatched = Path::join($directory, 'dispatched');
+        $gh = Path::join($bin, 'gh');
+        file_put_contents($gh, <<<'BASH'
+            #!/usr/bin/env bash
+            set -euo pipefail
+            echo "$*" >> "$GH_CALLS"
+            case "$1 $2" in
+                "run list")
+                    if [[ -f "$GH_DISPATCHED" ]]; then echo 456; fi
+                    ;;
+                "workflow run") touch "$GH_DISPATCHED" ;;
+            esac
+            BASH);
+        chmod($gh, 0755);
+        $php = <<<'PHP'
+            $root = $argv[1];
+            require $root.'/vendor/autoload.php';
+            require $root.'/tools/InteractiveProcessRunner.php';
+            require $root.'/tools/ReleaseMetadataUpdater.php';
+            require $root.'/tools/ReleaseCommand.php';
+            $command = new Symfony\Lsp\Tools\ReleaseCommand(
+                $root,
+                new Symfony\Lsp\Tools\ReleaseMetadataUpdater(),
+                new Symfony\Lsp\Tools\InteractiveProcessRunner(),
+                static function (int $seconds): void {},
+            );
+            $method = (new ReflectionClass($command))->getMethod('waitForWorkflow');
+            $method->invoke($command, 'quality.yaml', 'commit', true);
+            PHP;
+
+        try {
+            $environment = getenv();
+            $environment['PATH'] = $bin.\PATH_SEPARATOR.($environment['PATH'] ?? '');
+            $environment['GH_CALLS'] = $calls;
+            $environment['GH_DISPATCHED'] = $dispatched;
+            $result = $this->runProcess([\PHP_BINARY, '-r', $php, $root], $environment);
+
+            self::assertSame(0, $result['exitCode'], $result['stderr']);
+            self::assertStringContainsString("Dispatching quality.yaml for commit...\n", $result['stdout']);
+            self::assertSame([
+                ...array_fill(0, 6, 'run list --workflow=quality.yaml --commit=commit --limit=1 --json=databaseId --jq=.[0].databaseId // empty'),
+                'workflow run quality.yaml --ref main',
+                'run list --workflow=quality.yaml --commit=commit --limit=1 --json=databaseId --jq=.[0].databaseId // empty',
+                'run watch 456 --exit-status',
+            ], file($calls, \FILE_IGNORE_NEW_LINES | \FILE_SKIP_EMPTY_LINES));
+        } finally {
+            (new Filesystem())->remove($directory);
+        }
+    }
+
     /** @return iterable<string, array{int, string|null, list<string>}> */
     public static function workflowRetryProvider(): iterable
     {

@@ -26,11 +26,15 @@ final class ReleaseCommand
         'zed.yaml',
     ];
 
+    private readonly \Closure $sleep;
+
     public function __construct(
         private string $root,
         private ReleaseMetadataUpdater $metadataUpdater,
         private InteractiveProcessRunner $interactiveProcessRunner,
+        ?\Closure $sleep = null,
     ) {
+        $this->sleep = $sleep ?? static fn (int $seconds): int => sleep($seconds);
     }
 
     public function release(string $version): void
@@ -246,30 +250,31 @@ final class ReleaseCommand
     private function waitForRegularWorkflows(string $commit): void
     {
         foreach (self::REGULAR_WORKFLOWS as $workflow) {
-            $this->waitForWorkflow($workflow, $commit);
+            $this->waitForWorkflow($workflow, $commit, true);
         }
     }
 
-    private function waitForWorkflow(string $workflow, string $commit): void
+    private function waitForWorkflow(string $workflow, string $commit, bool $dispatchMissing = false): void
     {
         fwrite(\STDOUT, \sprintf("Waiting for %s on %s...\n", $workflow, $commit));
         $runId = '';
-        for ($attempt = 0; $attempt < 120; ++$attempt) {
-            $runId = $this->capture([
-                'gh',
-                'run',
-                'list',
-                '--workflow='.$workflow,
-                '--commit='.$commit,
-                '--event=push',
-                '--limit=1',
-                '--json=databaseId',
-                '--jq=.[0].databaseId // empty',
-            ], $this->root);
+        for ($attempt = 0, $attempts = $dispatchMissing ? 6 : 120; $attempt < $attempts; ++$attempt) {
+            $runId = $this->workflowRunId($workflow, $commit, $dispatchMissing ? null : 'push');
             if ('' !== $runId) {
                 break;
             }
-            sleep(5);
+            ($this->sleep)(5);
+        }
+        if ('' === $runId && $dispatchMissing) {
+            fwrite(\STDOUT, \sprintf("Dispatching %s for %s...\n", $workflow, $commit));
+            $this->run(['gh', 'workflow', 'run', $workflow, '--ref', 'main'], $this->root);
+            for ($attempt = 0; $attempt < 120; ++$attempt) {
+                $runId = $this->workflowRunId($workflow, $commit);
+                if ('' !== $runId) {
+                    break;
+                }
+                ($this->sleep)(5);
+            }
         }
         if ('' === $runId) {
             throw new \RuntimeException(\sprintf('No %s workflow appeared for %s.', $workflow, $commit));
@@ -290,6 +295,25 @@ final class ReleaseCommand
         }
 
         throw new \RuntimeException(\sprintf('Workflow %s failed after one automatic rerun. Inspect it with "gh run view %s --web" before resuming the release.', $workflow, $runId));
+    }
+
+    private function workflowRunId(string $workflow, string $commit, ?string $event = null): string
+    {
+        $command = [
+            'gh',
+            'run',
+            'list',
+            '--workflow='.$workflow,
+            '--commit='.$commit,
+        ];
+        if (null !== $event) {
+            $command[] = '--event='.$event;
+        }
+        $command[] = '--limit=1';
+        $command[] = '--json=databaseId';
+        $command[] = '--jq=.[0].databaseId // empty';
+
+        return $this->capture($command, $this->root);
     }
 
     private function assertRequirements(): void
