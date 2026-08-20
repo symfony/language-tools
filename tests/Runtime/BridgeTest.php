@@ -407,6 +407,23 @@ final class BridgeTest extends TestCase
                         return 0;
                     }
 
+                    if ('ux.twig_component.twig_renderer' === ($input->arguments['--tag'] ?? null)) {
+                        $output->write(<<<'JSON'
+                            {
+                                "definitions": {
+                                    ".ux_icons.twig_icon_runtime": {
+                                        "class": "Symfony\\UX\\Icons\\Twig\\UXIconRuntime",
+                                        "tags": [{"name": "ux.twig_component.twig_renderer", "parameters": {"key": "ux:icon"}}]
+                                    }
+                                },
+                                "aliases": [],
+                                "services": []
+                            }
+                            JSON);
+
+                        return 0;
+                    }
+
                     $output->write(<<<'JSON'
                         {
                             "definitions": {
@@ -423,10 +440,10 @@ final class BridgeTest extends TestCase
                                     "class": "Acme\\Ui\\Badge",
                                     "tags": [{"name": "twig.component", "parameters": {"expose_public_props": true}}]
                                 },
-                                "ux_icons.twig_component": {
+                                ".ux_icons.twig_component.icon": {
                                     "class": "Symfony\\UX\\Icons\\Twig\\UXIconComponent",
                                     "tags": [
-                                        {"name": "twig.component", "parameters": {"key": "ux:icon", "template": "@UXIcons/Icon.html.twig"}},
+                                        {"name": "twig.component", "parameters": {"key": "UX:Icon", "template": "@UXIcons/Icon.html.twig"}},
                                         {"name": "kernel.reset", "parameters": {"method": "reset"}}
                                     ]
                                 }

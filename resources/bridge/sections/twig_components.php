@@ -51,25 +51,28 @@ function bridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
                 ? $configuration['anonymous_template_directory']
                 : 'components';
 
-            $definitions = [];
-            foreach ([[], ['--show-hidden' => true]] as $visibilityOptions) {
-                $tagged = runJsonCommand($application, [
-                    'command' => 'debug:container',
-                    '--tag' => 'twig.component',
-                    '--format' => 'json',
-                    ...$visibilityOptions,
-                    ...$commandOptions,
-                ]);
-                foreach (is_array($tagged['definitions'] ?? null) ? $tagged['definitions'] : [] as $id => $definition) {
-                    if (is_string($id) && is_array($definition)) {
-                        $definitions[$id] = $definition;
+            $definitionsByTag = [];
+            foreach (['twig.component', 'ux.twig_component.twig_renderer'] as $tag) {
+                $definitionsByTag[$tag] = [];
+                foreach ([[], ['--show-hidden' => true]] as $visibilityOptions) {
+                    $tagged = runJsonCommand($application, [
+                        'command' => 'debug:container',
+                        '--tag' => $tag,
+                        '--format' => 'json',
+                        ...$visibilityOptions,
+                        ...$commandOptions,
+                    ]);
+                    foreach (is_array($tagged['definitions'] ?? null) ? $tagged['definitions'] : [] as $id => $definition) {
+                        if (is_string($id) && is_array($definition)) {
+                            $definitionsByTag[$tag][$id] = $definition;
+                        }
                     }
                 }
             }
             $complete = true;
             $warnings = [];
             $names = [];
-            foreach ($definitions as $definition) {
+            foreach ($definitionsByTag['twig.component'] as $definition) {
                 foreach (definitionTagParameters($definition, 'twig.component') as $parameters) {
                     if (is_string($parameters['key'] ?? null) && '' !== $parameters['key']) {
                         $names[$parameters['key']] = true;
@@ -84,6 +87,22 @@ function bridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
                     }
                     $names[$name] = true;
                 }
+            }
+            $rendererNames = [];
+            foreach ($definitionsByTag['ux.twig_component.twig_renderer'] as $definition) {
+                foreach (definitionTagParameters($definition, 'ux.twig_component.twig_renderer') as $parameters) {
+                    if (is_string($parameters['key'] ?? null) && '' !== $parameters['key']) {
+                        $rendererNames[strtolower($parameters['key'])] = $parameters['key'];
+                    }
+                }
+            }
+            foreach (array_keys($names) as $name) {
+                if (isset($rendererNames[strtolower($name)])) {
+                    unset($names[$name]);
+                }
+            }
+            foreach ($rendererNames as $name) {
+                $names[$name] = true;
             }
             $names = array_keys($names);
             sort($names);

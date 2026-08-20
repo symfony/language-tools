@@ -4,6 +4,7 @@
 
 - Support larger project bridge snapshots
 - Tolerate excessive project bridge error output
+- Recognize custom Twig component renderers
 
 ## 0.13.0 (2026-08-20)
 
