@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.13.0 (2026-08-20)
 
 - Ignore Twig syntax inside verbatim blocks
