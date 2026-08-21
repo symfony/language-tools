@@ -10,6 +10,7 @@ use Fabpot\JsonRpc\ContentLengthJsonRpcTransport;
 use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcPeer;
 use Fabpot\JsonRpc\JsonRpcValueDecoding;
+use Microsoft\PhpParser\Parser;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
@@ -17,9 +18,13 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterTree;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Server\ServerLogger;
 
@@ -32,6 +37,70 @@ if (!function_exists('symfony_lsp_tree_sitter_parse')) {
 
 const SMALL_PROJECT_FILES = 1500;
 const LARGE_PROJECT_FILES = 6000;
+
+final class ParseCallCounter
+{
+    /** @var array<string, array{language: string, bytes: int, calls: int}> */
+    private array $sources = [];
+
+    public function record(string $language, string $source): void
+    {
+        $key = $language.'\0'.hash('sha256', $source);
+        $this->sources[$key] ??= ['language' => $language, 'bytes' => \strlen($source), 'calls' => 0];
+        ++$this->sources[$key]['calls'];
+    }
+
+    /** @return array<string, array{calls: int, uniqueSources: int, duplicateCalls: int, duplicateRatio: float, parsedBytes: int, duplicateBytes: int, maxCallsPerSource: int}> */
+    public function stats(): array
+    {
+        $stats = [];
+        foreach ($this->sources as $source) {
+            $language = $source['language'];
+            $stats[$language] ??= ['calls' => 0, 'uniqueSources' => 0, 'duplicateCalls' => 0, 'duplicateRatio' => 0.0, 'parsedBytes' => 0, 'duplicateBytes' => 0, 'maxCallsPerSource' => 0];
+            $stats[$language]['calls'] += $source['calls'];
+            ++$stats[$language]['uniqueSources'];
+            $stats[$language]['duplicateCalls'] += $source['calls'] - 1;
+            $stats[$language]['parsedBytes'] += $source['bytes'] * $source['calls'];
+            $stats[$language]['duplicateBytes'] += $source['bytes'] * ($source['calls'] - 1);
+            $stats[$language]['maxCallsPerSource'] = max($stats[$language]['maxCallsPerSource'], $source['calls']);
+        }
+        foreach ($stats as &$language) {
+            $language['duplicateRatio'] = 0 === $language['calls'] ? 0.0 : round($language['duplicateCalls'] / $language['calls'], 3);
+        }
+        unset($language);
+        ksort($stats);
+
+        return $stats;
+    }
+}
+
+final class CountingPhpParser implements PhpParserInterface
+{
+    public function __construct(private readonly PhpParserInterface $parser, private readonly ParseCallCounter $counter)
+    {
+    }
+
+    public function parse(string $source): PhpDocument
+    {
+        $this->counter->record('php', $source);
+
+        return $this->parser->parse($source);
+    }
+}
+
+final class CountingTreeSitterParser implements TreeSitterParserInterface
+{
+    public function __construct(private readonly TreeSitterParserInterface $parser, private readonly ParseCallCounter $counter)
+    {
+    }
+
+    public function parse(string $language, string $source): TreeSitterTree
+    {
+        $this->counter->record($language, $source);
+
+        return $this->parser->parse($language, $source);
+    }
+}
 
 function generateProject(string $root, int $target): void
 {
@@ -199,15 +268,19 @@ function generateProject(string $root, int $target): void
 }
 
 /**
- * @return array{0: ApplicationSourceScanner, 1: ProjectIndexStatusRegistry, 2: PersistentSourceIndexStore}
+ * @return array{0: ApplicationSourceScanner, 1: ProjectIndexStatusRegistry, 2: PersistentSourceIndexStore, 3: ?ParseCallCounter}
  */
-function bootScanner(): array
+function bootScanner(bool $countParsers): array
 {
     $resources = dirname(__DIR__).'/resources';
     $container = new ContainerBuilder();
     $container->setParameter('server.version', 'benchmark');
     $container->setParameter('bridge.source', $resources.'/bridge.php');
     (new PhpFileLoader($container, new FileLocator($resources)))->load('services.php');
+    if ($countParsers) {
+        $container->removeAlias(PhpParserInterface::class);
+        $container->register(PhpParserInterface::class)->setSynthetic(true)->setPublic(true);
+    }
     $container->getDefinition(ApplicationSourceScanner::class)->setPublic(true);
     $container->getDefinition(ProjectIndexStatusRegistry::class)->setPublic(true);
     $container->getDefinition(PersistentSourceIndexStore::class)->setPublic(true);
@@ -219,7 +292,14 @@ function bootScanner(): array
     $container->set(JsonRpcPeer::class, $peer);
     $container->set(JsonRpcDispatcher::class, new JsonRpcDispatcher($peer));
     $container->set(ServerLogger::class, new ServerLogger(null));
-    $container->set(TreeSitterParserInterface::class, new NativeTreeSitterParser(new TreeSitterResultDecoder()));
+    $counter = $countParsers ? new ParseCallCounter() : null;
+    $treeSitterParser = new NativeTreeSitterParser(new TreeSitterResultDecoder());
+    if (null === $counter) {
+        $container->set(TreeSitterParserInterface::class, $treeSitterParser);
+    } else {
+        $container->set(TreeSitterParserInterface::class, new CountingTreeSitterParser($treeSitterParser, $counter));
+        $container->set(PhpParserInterface::class, new CountingPhpParser(new TolerantPhpParser(new Parser()), $counter));
+    }
 
     /** @var ApplicationSourceScanner $scanner */
     $scanner = $container->get(ApplicationSourceScanner::class);
@@ -228,15 +308,15 @@ function bootScanner(): array
     /** @var PersistentSourceIndexStore $store */
     $store = $container->get(PersistentSourceIndexStore::class);
 
-    return [$scanner, $statuses, $store];
+    return [$scanner, $statuses, $store, $counter];
 }
 
 /**
  * @return array{milliseconds: float, peakBytes: int, retainedBytes: int, indexedFiles: int, ready: bool}
  */
-function measureScan(Project $project): array
+function measureScan(Project $project, bool $countParsers): array
 {
-    [$scanner, $statuses, $store] = bootScanner();
+    [$scanner, $statuses, $store, $counter] = bootScanner($countParsers);
     gc_collect_cycles();
     $baseline = memory_get_usage();
     memory_reset_peak_usage();
@@ -249,16 +329,22 @@ function measureScan(Project $project): array
     $ready = 'ready' === $statuses->status($project)['source']['state'];
     $indexedFiles = count($store->loadMetadata($project));
 
-    return [
+    $measurement = [
         'milliseconds' => round($milliseconds, 1),
         'peakBytes' => $peak,
         'retainedBytes' => $retained,
         'indexedFiles' => $indexedFiles,
         'ready' => $ready,
     ];
+    if (null !== $counter) {
+        $measurement['parsers'] = $counter->stats();
+    }
+
+    return $measurement;
 }
 
 $fixtureRoot = dirname(__DIR__).'/var/build/source-index-benchmark';
+$countParsers = '1' === getenv('SYMFONY_LSP_PARSER_STATS');
 $measurements = [];
 foreach ([SMALL_PROJECT_FILES, LARGE_PROJECT_FILES] as $target) {
     $root = $fixtureRoot.'/'.$target;
@@ -266,9 +352,9 @@ foreach ([SMALL_PROJECT_FILES, LARGE_PROJECT_FILES] as $target) {
     $root = (string) realpath($root);
     $project = new Project($root, 'file://'.$root, '^7.0');
 
-    $cold = measureScan($project);
+    $cold = measureScan($project, $countParsers);
     gc_collect_cycles();
-    $warm = measureScan($project);
+    $warm = measureScan($project, $countParsers);
     $measurements[] = ['targetFiles' => $target, 'cold' => $cold, 'warm' => $warm];
 }
 
