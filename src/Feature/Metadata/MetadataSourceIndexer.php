@@ -21,6 +21,11 @@ final class MetadataSourceIndexer implements SourceIndexProviderInterface
         return 'metadata';
     }
 
+    public function payloadClasses(): array
+    {
+        return [MetadataSourceFacts::class, MetadataSourceSymbol::class, MetadataSymbolKind::class];
+    }
+
     public function begin(Project $project): void
     {
         $this->facts[$project->rootPath()] = [];

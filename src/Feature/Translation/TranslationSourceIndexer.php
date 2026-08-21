@@ -21,6 +21,11 @@ final class TranslationSourceIndexer implements SourceIndexProviderInterface
         return 'translations';
     }
 
+    public function payloadClasses(): array
+    {
+        return [TranslationDeclaration::class, TranslationReference::class, TranslationSourceFacts::class];
+    }
+
     public function begin(Project $project): void
     {
         $this->facts[$project->rootPath()] = [];

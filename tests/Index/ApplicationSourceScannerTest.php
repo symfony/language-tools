@@ -94,6 +94,23 @@ final class ApplicationSourceScannerTest extends TestCase
 
         self::assertSame(1, $thirdProvider->extractions);
         self::assertSame(0, $thirdProvider->restores);
+
+        $this->rewriteCacheRecord($cachePath, 'src/Controller.php', static function (array $record): array {
+            $range = new Range(new Position(0, 0), new Position(0, 0));
+            $facts = new RouteSourceFacts('file:///src/Controller.php', [new RouteDeclaration('route', 'file:///src/Controller.php', $range)], []);
+            $providers = $record['providers'];
+            \assert(\is_array($providers));
+            $providers['recording'] = base64_encode(str_replace(RouteDeclaration::class, MissingPayloadData::class, serialize($facts)));
+            $record['providers'] = $providers;
+
+            return $record;
+        });
+
+        $fourthProvider = new RecordingSourceIndexProvider();
+        $this->scanner($fourthProvider)->indexAll();
+
+        self::assertSame(1, $fourthProvider->extractions);
+        self::assertSame(0, $fourthProvider->restores);
     }
 
     public function testStoresEmptyFactsAsMarkersAndSkipsTheirRestores(): void
@@ -113,6 +130,56 @@ final class ApplicationSourceScannerTest extends TestCase
         self::assertSame(0, $secondProvider->extractions);
         self::assertSame(1, $secondProvider->restores);
         self::assertSame(['file://'.$this->temporaryDirectory.'/src/Full.php'], $secondProvider->restoredUris);
+    }
+
+    /** @param list<string> $classes */
+    #[DataProvider('invalidPayloadSchemaProvider')]
+    public function testRejectsInvalidPayloadSchemas(array $classes): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        (new SourceIndexPayloadCodec())->validate([new RecordingSourceIndexProvider(payloadClasses: $classes)]);
+    }
+
+    /** @return iterable<string, array{list<string>}> */
+    public static function invalidPayloadSchemaProvider(): iterable
+    {
+        yield 'empty' => [[]];
+        yield 'unknown class' => [['MissingPayloadClass']];
+        yield 'duplicate class' => [[RouteSourceFacts::class, RouteSourceFacts::class]];
+        yield 'shared class' => [[Range::class]];
+    }
+
+    public function testRejectsPayloadClassesOwnedByDifferentProviders(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        (new SourceIndexPayloadCodec())->validate([
+            new ObjectFactsSourceIndexProvider([]),
+            new RecordingSourceIndexProvider(),
+        ]);
+    }
+
+    public function testRejectsUndeclaredRootPayloadClasses(): void
+    {
+        $provider = new RecordingSourceIndexProvider(payloadClasses: [RouteDeclaration::class]);
+        $codec = new SourceIndexPayloadCodec();
+        $codec->validate([$provider]);
+        $this->expectException(\UnexpectedValueException::class);
+
+        $codec->encode($provider->name(), new RouteSourceFacts('file:///source.php', [], []));
+    }
+
+    public function testRejectsIncompletePayloadObjectGraphs(): void
+    {
+        $provider = new RecordingSourceIndexProvider(payloadClasses: [RouteSourceFacts::class]);
+        $codec = new SourceIndexPayloadCodec();
+        $codec->validate([$provider]);
+        $range = new Range(new Position(0, 0), new Position(0, 0));
+        $payload = base64_encode(serialize(new RouteSourceFacts('file:///source.php', [new RouteDeclaration('route', 'file:///source.php', $range)], [])));
+        $this->expectException(\UnexpectedValueException::class);
+
+        $codec->decode($provider->name(), $payload);
     }
 
     public function testReportsContentOnlyChangesWhenEmptyFactsGainNoRuntimeDeclarations(): void
@@ -465,6 +532,10 @@ PHP;
     }
 }
 
+final class MissingPayloadData
+{
+}
+
 final class ObjectFactsSourceIndexProvider implements SourceIndexProviderInterface
 {
     public int $extractions = 0;
@@ -481,6 +552,11 @@ final class ObjectFactsSourceIndexProvider implements SourceIndexProviderInterfa
     public function name(): string
     {
         return 'objectFacts';
+    }
+
+    public function payloadClasses(): array
+    {
+        return [RouteDeclaration::class, RouteSourceFacts::class];
     }
 
     public function begin(Project $project): void
@@ -564,13 +640,19 @@ final class RecordingSourceIndexProvider implements SourceIndexProviderInterface
     /** @var array<string, string> */
     public array $sources = [];
 
-    public function __construct(private readonly string $name = 'recording')
+    /** @param list<string>|null $payloadClasses */
+    public function __construct(private readonly string $name = 'recording', private readonly ?array $payloadClasses = null)
     {
     }
 
     public function name(): string
     {
         return $this->name;
+    }
+
+    public function payloadClasses(): array
+    {
+        return $this->payloadClasses ?? [RouteDeclaration::class, RouteSourceFacts::class];
     }
 
     public function begin(Project $project): void

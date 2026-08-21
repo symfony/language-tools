@@ -21,6 +21,11 @@ final class AssetSourceIndexer implements SourceIndexProviderInterface
         return 'assets';
     }
 
+    public function payloadClasses(): array
+    {
+        return [AssetSourceFacts::class, AssetSourceSymbol::class, AssetSymbolKind::class];
+    }
+
     public function begin(Project $project): void
     {
         $this->facts[$project->rootPath()] = [];

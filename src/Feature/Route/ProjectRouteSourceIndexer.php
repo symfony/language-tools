@@ -33,6 +33,11 @@ final class ProjectRouteSourceIndexer implements SourceIndexProviderInterface
         return 'routes';
     }
 
+    public function payloadClasses(): array
+    {
+        return [RouteDeclaration::class, RouteReferenceLocation::class, RouteSourceFacts::class];
+    }
+
     public function begin(Project $project): void
     {
         $this->declarations[$project->rootPath()] = [];

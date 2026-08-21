@@ -21,6 +21,11 @@ final class DoctrineSourceIndexer implements SourceIndexProviderInterface
         return 'doctrine_v1';
     }
 
+    public function payloadClasses(): array
+    {
+        return [DoctrineEntity::class, DoctrineField::class, DoctrineRepository::class, DoctrineSourceFacts::class, DoctrineSourceSymbol::class, DoctrineSymbolKind::class];
+    }
+
     public function begin(Project $project): void
     {
         $this->facts[$project->rootPath()] = [];

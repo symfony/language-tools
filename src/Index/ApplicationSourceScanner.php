@@ -66,11 +66,7 @@ final class ApplicationSourceScanner
         iterable $providers,
     ) {
         $providers = \is_array($providers) ? array_values($providers) : iterator_to_array($providers, false);
-        $names = array_map(static fn (SourceIndexProviderInterface $provider): string => $provider->name(), $providers);
-        if (\count($names) !== \count(array_unique($names))) {
-            throw new \InvalidArgumentException('Source index provider names must be unique.');
-        }
-
+        $this->codec->validate($providers);
         $this->providers = $providers;
     }
 
@@ -250,7 +246,7 @@ final class ApplicationSourceScanner
             foreach ($this->providers as $provider) {
                 $name = $provider->name();
                 $data = $provider->replace($project, $document);
-                $payloads[$name] = $this->encodePayload($data);
+                $payloads[$name] = $this->encodePayload($provider, $data);
                 $previousPayload = $previousPayloads[$name] ?? null;
                 if ($payloads[$name] === $previousPayload) {
                     continue;
@@ -264,8 +260,8 @@ final class ApplicationSourceScanner
                     }
                 } elseif (\is_string($previousPayload)) {
                     try {
-                        $previousData = $this->codec->decode($previousPayload);
-                        if ($this->codec->encode($provider->runtimeDeclarations($data)) === $this->codec->encode($provider->runtimeDeclarations($previousData))) {
+                        $previousData = $this->codec->decode($name, $previousPayload);
+                        if (serialize($provider->runtimeDeclarations($data)) === serialize($provider->runtimeDeclarations($previousData))) {
                             continue;
                         }
                     } catch (\UnexpectedValueException) {
@@ -366,7 +362,7 @@ final class ApplicationSourceScanner
                         if ('' === $payload) {
                             continue;
                         }
-                        $provider->restore($project, $this->codec->decode($payload));
+                        $provider->restore($project, $this->codec->decode($provider->name(), $payload));
                     }
                 } catch (\Throwable $error) {
                     throw new InvalidSourceIndexEntry(previous: $error);
@@ -383,7 +379,7 @@ final class ApplicationSourceScanner
             $document = new SourceDocument($this->uri($project, $path), $languageId, $text);
             $payloads = [];
             foreach ($this->providers as $provider) {
-                $payloads[$provider->name()] = $this->encodePayload($provider->index($project, $document));
+                $payloads[$provider->name()] = $this->encodePayload($provider, $provider->index($project, $document));
             }
             $runtimeStructure = $this->runtimeStructureHasher->hash($relativePath, $text);
             $entries[$relativePath] = $this->entry($path, $languageId, hash('sha256', $text), $runtimeStructure);
@@ -486,9 +482,9 @@ final class ApplicationSourceScanner
         ];
     }
 
-    private function encodePayload(?SourceFactsInterface $facts): string
+    private function encodePayload(SourceIndexProviderInterface $provider, ?SourceFactsInterface $facts): string
     {
-        return null === $facts || $facts->isEmpty() ? '' : $this->codec->encode($facts);
+        return null === $facts || $facts->isEmpty() ? '' : $this->codec->encode($provider->name(), $facts);
     }
 
     private function belongsToProject(Project $project, string $path): bool

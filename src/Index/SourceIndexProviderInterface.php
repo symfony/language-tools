@@ -9,6 +9,9 @@ interface SourceIndexProviderInterface
 {
     public function name(): string;
 
+    /** @return list<string> */
+    public function payloadClasses(): array;
+
     public function begin(Project $project): void;
 
     public function index(Project $project, SourceDocument $document): ?SourceFactsInterface;

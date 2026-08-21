@@ -29,6 +29,11 @@ final class TemplateSourceIndexer implements SourceIndexProviderInterface
         return 'templates';
     }
 
+    public function payloadClasses(): array
+    {
+        return [TemplateDeclaration::class, TemplateReference::class, TemplateSourceFacts::class];
+    }
+
     public function begin(Project $project): void
     {
         $this->templates[$project->rootPath()] = [];

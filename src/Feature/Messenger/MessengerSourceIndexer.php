@@ -21,6 +21,11 @@ final class MessengerSourceIndexer implements SourceIndexProviderInterface
         return 'messenger';
     }
 
+    public function payloadClasses(): array
+    {
+        return [MessengerSourceFacts::class, MessengerSourceSymbol::class, MessengerSymbolKind::class];
+    }
+
     public function begin(Project $project): void
     {
         $this->facts[$project->rootPath()] = [];

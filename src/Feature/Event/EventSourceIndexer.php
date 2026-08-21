@@ -21,6 +21,11 @@ final class EventSourceIndexer implements SourceIndexProviderInterface
         return 'events';
     }
 
+    public function payloadClasses(): array
+    {
+        return [EventSourceFacts::class, EventSourceSymbol::class, InvalidEventListenerMethod::class];
+    }
+
     public function begin(Project $project): void
     {
         $this->facts[$project->rootPath()] = [];

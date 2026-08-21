@@ -25,6 +25,19 @@ final class DependencyInjectionSourceIndexer implements SourceIndexProviderInter
         return 'dependencyInjection';
     }
 
+    public function payloadClasses(): array
+    {
+        return [
+            DependencyInjectionReference::class,
+            DependencyInjectionSourceFacts::class,
+            DependencyInjectionSymbol::class,
+            DependencyInjectionSymbolKind::class,
+            ParameterDeclaration::class,
+            PhpClassDeclaration::class,
+            ServiceDeclaration::class,
+        ];
+    }
+
     public function begin(Project $project): void
     {
         $this->sources[$project->rootPath()] = [];

@@ -21,6 +21,11 @@ final class EnvironmentSourceIndexer implements SourceIndexProviderInterface
         return 'environment';
     }
 
+    public function payloadClasses(): array
+    {
+        return [EnvironmentDeclaration::class, EnvironmentReference::class, EnvironmentSourceFacts::class];
+    }
+
     public function begin(Project $project): void
     {
         $this->facts[$project->rootPath()] = [];

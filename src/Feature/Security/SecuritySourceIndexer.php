@@ -21,6 +21,11 @@ final class SecuritySourceIndexer implements SourceIndexProviderInterface
         return 'security';
     }
 
+    public function payloadClasses(): array
+    {
+        return [SecuritySourceFacts::class, SecuritySourceSymbol::class, SecuritySymbolKind::class];
+    }
+
     public function begin(Project $project): void
     {
         $this->facts[$project->rootPath()] = [];

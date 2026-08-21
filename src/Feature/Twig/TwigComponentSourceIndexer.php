@@ -21,6 +21,11 @@ final class TwigComponentSourceIndexer implements SourceIndexProviderInterface
         return 'twig_components_v2';
     }
 
+    public function payloadClasses(): array
+    {
+        return [LiveComponentEvent::class, TwigComponent::class, TwigComponentAction::class, TwigComponentActionReference::class, TwigComponentReference::class, TwigComponentSourceFacts::class];
+    }
+
     public function begin(Project $project): void
     {
         $this->facts[$project->rootPath()] = [];

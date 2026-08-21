@@ -21,6 +21,11 @@ final class StimulusSourceIndexer implements SourceIndexProviderInterface
         return 'stimulus';
     }
 
+    public function payloadClasses(): array
+    {
+        return [StimulusControllerDeclaration::class, StimulusMember::class, StimulusMemberKind::class, StimulusReference::class, StimulusSourceFacts::class];
+    }
+
     public function begin(Project $project): void
     {
         $this->facts[$project->rootPath()] = [];
