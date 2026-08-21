@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Translation;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\UriToPathConverter;
 
 final class TranslationExtractor
@@ -13,6 +14,7 @@ final class TranslationExtractor
         private readonly PositionConverter $converter,
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly TwigCommentParser $commentParser,
+        private readonly YamlDocumentParser $yamlParser,
     ) {
     }
 
@@ -59,23 +61,21 @@ final class TranslationExtractor
             return $result;
         }
 
-        $stack = [];
         $result = [];
-        preg_match_all('/^([ \t]*)([\'\"]?)([^:\'\"]+)\2[ \t]*:[ \t]*(.*)$/m', $text, $lines, \PREG_OFFSET_CAPTURE);
-        foreach ($lines[0] as $i => $_) {
-            $indent = \strlen($lines[1][$i][0]);
-            $key = trim($lines[3][$i][0]);
-            $value = trim($lines[4][$i][0]);
-            while ([] !== $stack && $stack[array_key_last($stack)][0] >= $indent) {
-                array_pop($stack);
-            }
-            if ('' === $value) {
-                $stack[] = [$indent, $key];
+        foreach ($this->yamlParser->parse($text) as $mapping) {
+            if ('' === $mapping->value()) {
                 continue;
             }
-            $fullKey = implode('.', [...array_column($stack, 1), $key]);
-            $message = trim(preg_replace('/\s+#.*$/', '', $value) ?? $value, "'\"");
-            $result[] = $this->declaration($fullKey, $message, $domain, $locale, $uri, $text, $lines[3][$i][1], \strlen($key));
+            $result[] = $this->declaration(
+                implode('.', $mapping->path()),
+                trim($mapping->value(), "'\""),
+                $domain,
+                $locale,
+                $uri,
+                $text,
+                $mapping->keyStartByte(),
+                $mapping->keyEndByte() - $mapping->keyStartByte(),
+            );
         }
 
         return $result;

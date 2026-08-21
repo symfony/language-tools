@@ -34,6 +34,18 @@ final class YamlDocumentParser
         return $mappings;
     }
 
+    /** @return list<string> */
+    public function parentPath(string $source, int $offset): array
+    {
+        $mappings = $this->parse(substr($source, 0, $offset));
+        if ([] === $mappings) {
+            return [];
+        }
+        $mapping = $mappings[array_key_last($mappings)];
+
+        return '' === $mapping->value() ? $mapping->path() : \array_slice($mapping->path(), 0, -1);
+    }
+
     /**
      * @param list<string>      $path
      * @param list<YamlMapping> $mappings
@@ -56,7 +68,7 @@ final class YamlDocumentParser
 
             $valueNode = $tree->childByField($node, 'value');
             $environmentSection = str_starts_with($key, 'when@');
-            $mappingPath = $environmentSection ? $path : [...$path, str_replace('-', '_', $key)];
+            $mappingPath = $environmentSection ? $path : [...$path, $key];
             $mappingScope = $environmentSection ? $key : $scope;
             if (!$environmentSection) {
                 [$value, $valueStart, $valueEnd] = $this->value($tree, $valueNode, $source, $node->endByte());
@@ -136,7 +148,7 @@ final class YamlDocumentParser
                 $scope = $parsed['key'];
             }
             $sequenceItem = $insideSequence || $parsed['sequence'];
-            $path = $environmentSection ? $parent : [...$parent, str_replace('-', '_', $parsed['key'])];
+            $path = $environmentSection ? $parent : [...$parent, $parsed['key']];
             if ($environmentSection || '' === $parsed['value']) {
                 $stack[$parsed['indent']] = ['path' => $path, 'sequence' => $sequenceItem, 'scope' => $scope];
             } elseif ($parsed['sequence']) {

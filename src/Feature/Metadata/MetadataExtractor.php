@@ -285,7 +285,7 @@ final class MetadataExtractor
         $lineOffset = strrpos($before, "\n");
         $lineOffset = false === $lineOffset ? 0 : $lineOffset + 1;
         $line = substr($before, $lineOffset);
-        $parent = $this->yamlParent(substr($before, 0, $lineOffset));
+        $parent = $this->yaml->parentPath($text, $lineOffset);
         if (2 === \count($parent) && \in_array($parent[1], ['properties', 'attributes'], true) && preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)$/', $line, $match, \PREG_OFFSET_CAPTURE)) {
             return $this->context(MetadataCompletionKind::Property, $match[1][0], $text, $lineOffset + $match[1][1], $parent[0]);
         }
@@ -465,40 +465,6 @@ final class MetadataExtractor
         }
 
         return null;
-    }
-
-    /** @return list<string> */
-    private function yamlParent(string $text): array
-    {
-        $stack = [];
-        preg_match_all('/^.*(?:\R|$)/m', $text, $lines);
-        foreach ($lines[0] as $line) {
-            $line = rtrim($line, "\r\n");
-            if (!preg_match('/^(\s*)(?:-\s+)?([^:#][^:]*)\s*:\s*(.*)$/', $line, $match)) {
-                continue;
-            }
-            $indent = \strlen($match[1]);
-            foreach (array_keys($stack) as $level) {
-                if ($level >= $indent) {
-                    unset($stack[$level]);
-                }
-            }
-            $parent = [];
-            ksort($stack);
-            foreach ($stack as $path) {
-                $parent = $path;
-            }
-            if ('' === trim($match[3])) {
-                $stack[$indent] = [...$parent, trim($match[2], " \t\"'")];
-            }
-        }
-        $parent = [];
-        ksort($stack);
-        foreach ($stack as $path) {
-            $parent = $path;
-        }
-
-        return $parent;
     }
 
     /** @return list<MetadataSourceSymbol> */

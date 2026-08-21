@@ -30,6 +30,21 @@ final class YamlDocumentParserTest extends TestCase
         );
     }
 
+    public function testResolvesTheParentPathAtAnIncompleteLine(): void
+    {
+        $source = <<<'YAML'
+            framework:
+                messenger:
+                    default_bus: command.bus
+                    routing:
+                        App\Message\Report: [as
+            YAML;
+        $parser = new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()));
+
+        self::assertSame(['framework', 'messenger', 'routing'], $parser->parentPath($source, (int) strpos($source, 'App\Message')));
+        self::assertSame(['framework', 'messenger'], $parser->parentPath($source, (int) strpos($source, 'routing:')));
+    }
+
     public function testKeepsEnvironmentScopeOutsideTheConfigurationPath(): void
     {
         $source = <<<'YAML'

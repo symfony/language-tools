@@ -46,6 +46,8 @@ use Symfony\Lsp\Index\SourceIndexStoreInterface;
 use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Parser\TreeSitter\LastResultTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
 use Symfony\Lsp\Progress\ProgressReporterInterface;
 use Symfony\Lsp\Runtime\DebouncedRuntimeRefreshScheduler;
@@ -147,13 +149,16 @@ return static function (ContainerConfigurator $container): void {
     $services->set(JsonRpcPeer::class)->synthetic()->public();
     $services->set(JsonRpcDispatcher::class)->synthetic()->public();
     $services->set(ServerLogger::class)->synthetic()->public();
-    $services->set(TreeSitterParserInterface::class)->synthetic()->public();
 
     $services->alias(ClientInterface::class, JsonRpcClient::class);
     $services->alias(PhpParserInterface::class, TolerantPhpParser::class);
     $services->get(LastResultPhpParser::class)
         ->decorate(PhpParserInterface::class)
         ->arg('$parser', service(LastResultPhpParser::class.'.inner'));
+    $services->alias(TreeSitterParserInterface::class, NativeTreeSitterParser::class);
+    $services->get(LastResultTreeSitterParser::class)
+        ->decorate(TreeSitterParserInterface::class)
+        ->arg('$parser', service(LastResultTreeSitterParser::class.'.inner'));
     $services->alias(ProcessRunnerInterface::class, NativeProcessRunner::class);
     $services->alias(ProgressReporterInterface::class, WorkDoneProgressReporter::class);
     $services->alias(RuntimeRefreshObserverInterface::class, DiagnosticProviderRegistry::class);

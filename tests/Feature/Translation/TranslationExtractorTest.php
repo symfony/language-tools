@@ -5,7 +5,10 @@ namespace Symfony\Lsp\Tests\Feature\Translation;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Translation\TranslationExtractor;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\UriToPathConverter;
 
 final class TranslationExtractorTest extends TestCase
@@ -29,6 +32,13 @@ final class TranslationExtractorTest extends TestCase
             ['article.title', 'messages', ['name']],
             ['admin.title', 'admin', []],
         ], array_map(static fn ($item): array => [$item->key(), $item->domain(), $item->placeholders()], $references->references()));
+    }
+
+    public function testPreservesHyphenatedYamlKeys(): void
+    {
+        $facts = $this->extractor()->extract('file:///workspace/translations/messages.en.yaml', 'yaml', "article-title: Article\n");
+
+        self::assertSame('article-title', $facts->declarations()[0]->key());
     }
 
     public function testIgnoresTwigReferencesInsideDocumentationComments(): void
@@ -108,6 +118,6 @@ final class TranslationExtractorTest extends TestCase
 
     private function extractor(): TranslationExtractor
     {
-        return new TranslationExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser());
+        return new TranslationExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser(), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
     }
 }

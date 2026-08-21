@@ -12,9 +12,6 @@ use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 use Symfony\Component\Filesystem\Path;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 
 final class LanguageServerFactory
 {
@@ -49,7 +46,6 @@ final class LanguageServerFactory
         $container->set(JsonRpcPeer::class, $peer);
         $container->set(JsonRpcDispatcher::class, $dispatcher);
         $container->set(ServerLogger::class, $logger);
-        $container->set(TreeSitterParserInterface::class, new NativeTreeSitterParser(new TreeSitterResultDecoder()));
 
         /** @var LanguageServer $server */
         $server = $container->get(LanguageServer::class);

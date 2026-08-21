@@ -9,6 +9,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
@@ -21,6 +22,9 @@ use Symfony\Lsp\Feature\Messenger\MessengerProvider;
 use Symfony\Lsp\Feature\Messenger\MessengerSourceIndexRegistry;
 use Symfony\Lsp\Feature\Messenger\MessengerTransport;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -42,7 +46,9 @@ framework:
     routing:
       App\Message\Ping: [async]
 YAML;
-        $extractor = new MessengerExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()));
+        $converter = new PositionConverter();
+        $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
+        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser);
         $facts = $extractor->extract('file:///workspace/config/packages/messenger.yaml', 'yaml', $text);
 
         self::assertSame(
@@ -97,7 +103,8 @@ YAML;
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()));
+        $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
+        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser);
         $indexes = new MessengerIndexRegistry();
         $indexes->forProject($project)->replace(
             [new MessengerBus('command.bus', true)],
@@ -114,7 +121,7 @@ YAML;
             new DependencyInjectionSourceFacts($messageUri, classes: $classExtractor->extract($messageUri, $message)),
             new DependencyInjectionSourceFacts($handlerUri, classes: $classExtractor->extract($handlerUri, $handler)),
         );
-        $provider = new MessengerProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
+        $provider = new MessengerProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes, $yamlParser);
 
         $completionParams = $this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'command.bus }') + 4));
         self::assertSame(['command.bus'], array_column($provider->complete($completionParams) ?? [], 'label'));

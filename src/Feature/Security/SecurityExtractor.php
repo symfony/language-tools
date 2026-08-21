@@ -71,7 +71,7 @@ final class SecurityExtractor
             $lineOffset = strrpos($before, "\n");
             $lineOffset = false === $lineOffset ? 0 : $lineOffset + 1;
             $line = substr($before, $lineOffset);
-            $parent = $this->yamlParentPath(substr($before, 0, $lineOffset));
+            $parent = $this->yaml->parentPath($text, $lineOffset);
             if (\count($parent) >= 3 && ['security', 'firewalls'] === \array_slice($parent, 0, 2) && preg_match('/^\s*provider\s*:\s*["\']?([A-Za-z0-9_.-]*)$/', $line, $match, \PREG_OFFSET_CAPTURE)) {
                 return $this->context(SecuritySymbolKind::Provider, $match[1][0], $text, $lineOffset + $match[1][1]);
             }
@@ -224,40 +224,6 @@ final class SecurityExtractor
         }
 
         return false;
-    }
-
-    /** @return list<string> */
-    private function yamlParentPath(string $text): array
-    {
-        $stack = [];
-        preg_match_all('/^.*(?:\R|$)/m', $text, $lines);
-        foreach ($lines[0] as $line) {
-            $line = rtrim($line, "\r\n");
-            if (!preg_match('/^(\s*)(?:-\s+)?([A-Za-z_][A-Za-z0-9_.@-]*)\s*:\s*(.*)$/', $line, $match)) {
-                continue;
-            }
-            $indent = \strlen($match[1]);
-            foreach (array_keys($stack) as $level) {
-                if ($level >= $indent) {
-                    unset($stack[$level]);
-                }
-            }
-            $parent = [];
-            ksort($stack);
-            foreach ($stack as $path) {
-                $parent = $path;
-            }
-            if ('' === trim($match[3])) {
-                $stack[$indent] = [...$parent, str_replace('-', '_', $match[2])];
-            }
-        }
-        $parent = [];
-        ksort($stack);
-        foreach ($stack as $path) {
-            $parent = $path;
-        }
-
-        return $parent;
     }
 
     /**

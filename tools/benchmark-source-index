@@ -284,6 +284,10 @@ function bootScanner(bool $countParsers): array
             ->setDecoratedService(TolerantPhpParser::class)
             ->setArgument('$parser', new Reference(CountingPhpParser::class.'.inner'))
             ->setArgument('$counter', new Reference(ParseCallCounter::class));
+        $container->register(CountingTreeSitterParser::class, CountingTreeSitterParser::class)
+            ->setDecoratedService(NativeTreeSitterParser::class)
+            ->setArgument('$parser', new Reference(CountingTreeSitterParser::class.'.inner'))
+            ->setArgument('$counter', new Reference(ParseCallCounter::class));
     }
     $container->getDefinition(ApplicationSourceScanner::class)->setPublic(true);
     $container->getDefinition(ProjectIndexStatusRegistry::class)->setPublic(true);
@@ -296,12 +300,8 @@ function bootScanner(bool $countParsers): array
     $container->set(JsonRpcPeer::class, $peer);
     $container->set(JsonRpcDispatcher::class, new JsonRpcDispatcher($peer));
     $container->set(ServerLogger::class, new ServerLogger(null));
-    $treeSitterParser = new NativeTreeSitterParser(new TreeSitterResultDecoder());
-    if (null === $counter) {
-        $container->set(TreeSitterParserInterface::class, $treeSitterParser);
-    } else {
+    if (null !== $counter) {
         $container->set(ParseCallCounter::class, $counter);
-        $container->set(TreeSitterParserInterface::class, new CountingTreeSitterParser($treeSitterParser, $counter));
     }
 
     /** @var ApplicationSourceScanner $scanner */

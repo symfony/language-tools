@@ -4,12 +4,13 @@ namespace Symfony\Lsp\Feature\Messenger;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
 final class MessengerExtractor
 {
-    public function __construct(private readonly PositionConverter $converter, private readonly PhpParserInterface $parser)
+    public function __construct(private readonly PositionConverter $converter, private readonly PhpParserInterface $parser, private readonly YamlConfigurationParser $yaml)
     {
     }
 
@@ -81,46 +82,27 @@ final class MessengerExtractor
     private function yamlSymbols(string $uri, string $text): array
     {
         $symbols = [];
-        $stack = [];
-        preg_match_all('/^.*(?:\R|$)/m', $text, $lines, \PREG_OFFSET_CAPTURE);
-        foreach ($lines[0] as [$line, $lineOffset]) {
-            $line = rtrim($line, "\r\n");
-            if (!preg_match('/^(\s*)([^#:\s][^:#]*?)\s*:\s*(.*)$/', $line, $match, \PREG_OFFSET_CAPTURE)) {
-                continue;
-            }
-            $indent = \strlen($match[1][0]);
-            $key = trim($match[2][0], " \t\"'");
-            $value = trim((string) preg_replace('/\s+#.*$/', '', $match[3][0]));
-            foreach (array_keys($stack) as $level) {
-                if ($level >= $indent) {
-                    unset($stack[$level]);
-                }
-            }
-            ksort($stack);
-            $parent = [];
-            foreach ($stack as $path) {
-                $parent = $path;
-            }
-            $path = [...$parent, $key];
-            if ('' === $value) {
-                $stack[$indent] = $path;
-            }
+        foreach ($this->yaml->parse($text) as $occurrence) {
+            $path = $occurrence->path();
+            $parent = \array_slice($path, 0, -1);
+            $key = [] === $path ? '' : $path[\count($path) - 1];
+            $keyOffset = $this->converter->toByteOffset($text, $occurrence->keyRange()->start());
             $declarationKind = match (\array_slice($parent, -3)) {
                 ['framework', 'messenger', 'buses'] => MessengerSymbolKind::Bus,
                 ['framework', 'messenger', 'transports'] => MessengerSymbolKind::Transport,
                 default => null,
             };
-            $keyOffset = $lineOffset + $match[2][1] + (int) strpos($match[2][0], $key);
             if (null !== $declarationKind) {
                 $symbols[] = $this->symbol($declarationKind, $key, $uri, $text, $keyOffset, true);
             }
-            if (\array_slice($parent, -3) === ['framework', 'messenger', 'routing']) {
-                $symbols[] = $this->symbol(MessengerSymbolKind::Message, ltrim($key, '\\'), $uri, $text, $keyOffset, false, \strlen($key));
-                preg_match_all('/[A-Za-z_][A-Za-z0-9_.-]*/', trim($value, "[] \t\"'"), $names, \PREG_OFFSET_CAPTURE);
-                foreach ($names[0] as [$name, $relativeOffset]) {
-                    $valueOffset = $lineOffset + $match[3][1] + strpos($match[3][0], $name, $relativeOffset);
-                    $symbols[] = $this->symbol(MessengerSymbolKind::Transport, $name, $uri, $text, $valueOffset, false);
-                }
+            if (\array_slice($parent, -3) !== ['framework', 'messenger', 'routing']) {
+                continue;
+            }
+            $symbols[] = $this->symbol(MessengerSymbolKind::Message, ltrim($key, '\\'), $uri, $text, $keyOffset, false, \strlen($key));
+            $valueOffset = $this->converter->toByteOffset($text, $occurrence->valueRange()->start());
+            preg_match_all('/[A-Za-z_][A-Za-z0-9_.-]*/', $occurrence->value(), $names, \PREG_OFFSET_CAPTURE);
+            foreach ($names[0] as [$name, $relativeOffset]) {
+                $symbols[] = $this->symbol(MessengerSymbolKind::Transport, $name, $uri, $text, $valueOffset + $relativeOffset, false);
             }
         }
 

@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CodeLensProviderInterface;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
+use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
@@ -29,6 +30,7 @@ final class MessengerProvider implements CodeLensProviderInterface, CompletionPr
         private readonly MessengerExtractor $extractor,
         private readonly PhpClassDeclarationExtractor $classExtractor,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
+        private readonly YamlConfigurationParser $yaml,
     ) {
     }
 
@@ -40,6 +42,7 @@ final class MessengerProvider implements CodeLensProviderInterface, CompletionPr
         }
         $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
         $before = substr($request->document->text(), 0, $offset);
+        $lineOffset = (int) strrpos("\n".$before, "\n");
         $kind = null;
         $prefix = '';
         $messengerOptionContext = 'yaml' === $request->document->languageId() || ('php' === $request->document->languageId() && preg_match('/AsMessageHandler\s*\([^)]*$/s', $before));
@@ -52,7 +55,7 @@ final class MessengerProvider implements CodeLensProviderInterface, CompletionPr
         } elseif (preg_match('/BusNameStamp\s*\(\s*["\']([A-Za-z0-9_.-]*)$/', $before, $match)) {
             $kind = MessengerSymbolKind::Bus;
             $prefix = $match[1];
-        } elseif ('yaml' === $request->document->languageId() && \array_slice($this->yamlParentPath($before), -3) === ['framework', 'messenger', 'routing'] && preg_match('/:\s*\[?\s*["\']?([A-Za-z0-9_.-]*)$/', substr($before, (int) strrpos("\n".$before, "\n")), $match)) {
+        } elseif ('yaml' === $request->document->languageId() && \array_slice($this->yaml->parentPath($request->document->text(), $lineOffset), -3) === ['framework', 'messenger', 'routing'] && preg_match('/:\s*\[?\s*["\']?([A-Za-z0-9_.-]*)$/', substr($before, $lineOffset), $match)) {
             $kind = MessengerSymbolKind::Transport;
             $prefix = $match[1];
         }
@@ -277,43 +280,6 @@ final class MessengerProvider implements CodeLensProviderInterface, CompletionPr
     private function contains(string $text, Range $range, int $offset): bool
     {
         return $offset >= $this->converter->toByteOffset($text, $range->start()) && $offset <= $this->converter->toByteOffset($text, $range->end());
-    }
-
-    /** @return list<string> */
-    private function yamlParentPath(string $before): array
-    {
-        $lines = preg_split('/\R/', $before);
-        if (false === $lines) {
-            return [];
-        }
-        array_pop($lines);
-        $stack = [];
-        foreach ($lines as $line) {
-            if (!preg_match('/^(\s*)([^#:\s][^:#]*?)\s*:\s*(.*)$/', $line, $match)) {
-                continue;
-            }
-            $indent = \strlen($match[1]);
-            foreach (array_keys($stack) as $level) {
-                if ($level >= $indent) {
-                    unset($stack[$level]);
-                }
-            }
-            $parent = [];
-            ksort($stack);
-            foreach ($stack as $path) {
-                $parent = $path;
-            }
-            if ('' === trim($match[3])) {
-                $stack[$indent] = [...$parent, trim($match[2], " \t\"'")];
-            }
-        }
-        $parent = [];
-        ksort($stack);
-        foreach ($stack as $path) {
-            $parent = $path;
-        }
-
-        return $parent;
     }
 
     /** @return array<array-key, mixed> */
