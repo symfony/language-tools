@@ -2,49 +2,22 @@
 
 namespace Symfony\Lsp\Feature\Asset;
 
+use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 use Symfony\Lsp\Index\SourceFactsOverlayOrder;
-use Symfony\Lsp\Index\SourceFactsStore;
 
-final class AssetSourceIndex
+/** @extends AbstractSourceFactsIndex<AssetSourceFacts> */
+final class AssetSourceIndex extends AbstractSourceFactsIndex
 {
-    /** @var SourceFactsStore<AssetSourceFacts> */
-    private readonly SourceFactsStore $facts;
-
     public function __construct()
     {
-        $this->facts = new SourceFactsStore(SourceFactsOverlayOrder::PreserveSavedPosition);
-    }
-
-    public function replace(AssetSourceFacts ...$facts): void
-    {
-        $this->facts->replaceSaved(...$facts);
-    }
-
-    public function replaceSource(AssetSourceFacts $facts): void
-    {
-        $this->facts->replaceSavedFact($facts);
-    }
-
-    public function removeSource(string $uri): void
-    {
-        $this->facts->removeSaved($uri);
-    }
-
-    public function overlay(AssetSourceFacts $facts): void
-    {
-        $this->facts->replaceOverlay($facts);
-    }
-
-    public function removeOverlay(string $uri): void
-    {
-        $this->facts->removeOverlay($uri);
+        parent::__construct(SourceFactsOverlayOrder::PreserveSavedPosition);
     }
 
     /** @return list<AssetSourceSymbol> */
     public function symbols(AssetSymbolKind $kind, ?string $name = null): array
     {
         $symbols = [];
-        foreach ($this->facts->effective() as $facts) {
+        foreach ($this->facts() as $facts) {
             foreach ($facts->symbols() as $symbol) {
                 if ($symbol->kind() === $kind && (null === $name || $symbol->name() === $name)) {
                     $symbols[] = $symbol;
