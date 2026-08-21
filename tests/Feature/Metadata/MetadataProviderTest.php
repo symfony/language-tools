@@ -8,13 +8,19 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
+use Symfony\Lsp\Feature\DiagnosticProviderInterface;
+use Symfony\Lsp\Feature\HoverProviderInterface;
+use Symfony\Lsp\Feature\Metadata\FormMetadataProvider;
 use Symfony\Lsp\Feature\Metadata\FormType;
 use Symfony\Lsp\Feature\Metadata\MetadataExtractor;
 use Symfony\Lsp\Feature\Metadata\MetadataIndexRegistry;
-use Symfony\Lsp\Feature\Metadata\MetadataProvider;
+use Symfony\Lsp\Feature\Metadata\MetadataRelationshipProvider;
 use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexRegistry;
+use Symfony\Lsp\Feature\Metadata\SerializerMetadataProvider;
 use Symfony\Lsp\Feature\Metadata\ValidationConstraint;
+use Symfony\Lsp\Feature\Metadata\ValidationMetadataProvider;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -75,7 +81,15 @@ final class MetadataProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($entityUri, 'php', 1, $entityText));
         $documents->open(new Document($mappingUri, 'yaml', 1, $mappingText));
-        $provider = new MetadataProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $sourceIndexes, $extractor);
+        $resolver = new DocumentContextResolver($documents, $projects);
+        $protocol = new LspProtocolMapper();
+        $formProvider = new FormMetadataProvider($resolver, $converter, $protocol, $indexes, $extractor);
+        $validationProvider = new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
+        $serializerProvider = new SerializerMetadataProvider($resolver, $converter, $protocol, $sourceIndexes, $extractor);
+        $relationshipProvider = new MetadataRelationshipProvider($resolver, $converter, $protocol, $sourceIndexes, $extractor);
+        $completionProviders = [$formProvider, $validationProvider, $serializerProvider, $relationshipProvider];
+        $hoverProviders = [$relationshipProvider, $formProvider, $validationProvider];
+        $diagnosticProviders = [$formProvider, $validationProvider];
 
         $formUri = 'file:///workspace/src/Controller/EventController.php';
         $formText = <<<'PHP'
@@ -99,14 +113,12 @@ final class MetadataProviderTest extends TestCase
             PHP;
         $documents->open(new Document($formUri, 'php', 1, $formText));
         $firstRequired = strpos($formText, 'required');
-        self::assertSame(['required'], $this->completionLabels($provider, $converter, $formUri, $formText, $firstRequired + 4));
+        self::assertSame(['required'], $this->completionLabels($completionProviders, $converter, $formUri, $formText, $firstRequired + 4));
         $builderRequired = strpos($formText, 'required', $firstRequired + 1);
-        self::assertSame(['required'], $this->completionLabels($provider, $converter, $formUri, $formText, $builderRequired + 4));
-        $formDiagnostics = $provider->diagnostics(['textDocument' => ['uri' => $formUri]]);
-        self::assertIsArray($formDiagnostics);
-        self::assertSame(['form.unknown_option'], array_column($formDiagnostics, 'code'));
+        self::assertSame(['required'], $this->completionLabels($completionProviders, $converter, $formUri, $formText, $builderRequired + 4));
+        self::assertSame(['form.unknown_option'], array_column($this->diagnostics($diagnosticProviders, $formUri), 'code'));
         $required = strpos($formText, 'required') + 1;
-        self::assertNotNull($this->hover($provider, $converter, $formUri, $formText, $required));
+        self::assertIsArray($this->hover($hoverProviders, $converter, $formUri, $formText, $required));
 
         $constraintUri = 'file:///workspace/src/Dto/Input.php';
         $constraintText = <<<'PHP'
@@ -119,10 +131,8 @@ final class MetadataProviderTest extends TestCase
             }
             PHP;
         $documents->open(new Document($constraintUri, 'php', 1, $constraintText));
-        self::assertSame(['max'], $this->completionLabels($provider, $converter, $constraintUri, $constraintText, strpos($constraintText, 'ma)') + 2));
-        $constraintDiagnostics = $provider->diagnostics(['textDocument' => ['uri' => $constraintUri]]);
-        self::assertIsArray($constraintDiagnostics);
-        self::assertSame(['validation.unknown_constraint_option'], array_column($constraintDiagnostics, 'code'));
+        self::assertSame(['max'], $this->completionLabels($completionProviders, $converter, $constraintUri, $constraintText, strpos($constraintText, 'ma)') + 2));
+        self::assertSame(['validation.unknown_constraint_option'], array_column($this->diagnostics($diagnosticProviders, $constraintUri), 'code'));
         $validationUri = 'file:///workspace/config/validator/User.yaml';
         $validationText = <<<'YAML'
             App\Entity\User:
@@ -133,52 +143,89 @@ final class MetadataProviderTest extends TestCase
                             maximum: 200
             YAML;
         $documents->open(new Document($validationUri, 'yaml', 1, $validationText));
-        self::assertSame(['max'], $this->completionLabels($provider, $converter, $validationUri, $validationText, strpos($validationText, 'max:') + 3));
-        $yamlDiagnostics = $provider->diagnostics(['textDocument' => ['uri' => $validationUri]]);
-        self::assertIsArray($yamlDiagnostics);
-        self::assertSame(['validation.unknown_constraint_option'], array_column($yamlDiagnostics, 'code'));
+        self::assertSame(['max'], $this->completionLabels($completionProviders, $converter, $validationUri, $validationText, strpos($validationText, 'max:') + 3));
+        self::assertSame(['validation.unknown_constraint_option'], array_column($this->diagnostics($diagnosticProviders, $validationUri), 'code'));
         $constraintNameUri = 'file:///workspace/config/validator/Custom.yaml';
         $constraintNameText = "App\\Entity\\User:\n    properties:\n        email:\n            - Sl";
         $documents->open(new Document($constraintNameUri, 'yaml', 1, $constraintNameText));
-        self::assertSame(['Slug'], $this->completionLabels($provider, $converter, $constraintNameUri, $constraintNameText, \strlen($constraintNameText)));
+        self::assertSame(['Slug'], $this->completionLabels($completionProviders, $converter, $constraintNameUri, $constraintNameText, \strlen($constraintNameText)));
 
         $groupUri = 'file:///workspace/src/Serializer.php';
         $groupText = "<?php\n\$context = ['groups' => ['ad";
         $documents->open(new Document($groupUri, 'php', 1, $groupText));
-        self::assertSame(['admin'], $this->completionLabels($provider, $converter, $groupUri, $groupText, \strlen($groupText)));
+        self::assertSame(['admin'], $this->completionLabels($completionProviders, $converter, $groupUri, $groupText, \strlen($groupText)));
 
         $propertyUri = 'file:///workspace/config/serializer/Completion.yaml';
         $propertyText = "App\\Entity\\User:\n    attributes:\n        em";
         $documents->open(new Document($propertyUri, 'yaml', 1, $propertyText));
-        self::assertSame(['email'], $this->completionLabels($provider, $converter, $propertyUri, $propertyText, \strlen($propertyText)));
+        self::assertSame(['email'], $this->completionLabels($completionProviders, $converter, $propertyUri, $propertyText, \strlen($propertyText)));
 
         $mappedClass = strpos($mappingText, 'App\\Entity\\User') + 1;
-        $classDefinition = $provider->definition($this->params($converter, $mappingUri, $mappingText, $mappedClass));
+        $classDefinition = $relationshipProvider->definition($this->params($converter, $mappingUri, $mappingText, $mappedClass));
         self::assertIsArray($classDefinition);
         self::assertSame([$entityUri], array_column($classDefinition, 'uri'));
         $email = strpos($mappingText, 'email') + 1;
-        $definition = $provider->definition($this->params($converter, $mappingUri, $mappingText, $email));
+        $definition = $relationshipProvider->definition($this->params($converter, $mappingUri, $mappingText, $email));
         self::assertIsArray($definition);
         self::assertSame([$entityUri], array_column($definition, 'uri'));
         $admin = strpos($mappingText, 'admin') + 1;
-        $references = $provider->references($this->params($converter, $mappingUri, $mappingText, $admin));
+        $references = $relationshipProvider->references($this->params($converter, $mappingUri, $mappingText, $admin));
         self::assertIsArray($references);
         self::assertCount(2, $references);
     }
 
-    /** @return list<string> */
-    private function completionLabels(MetadataProvider $provider, PositionConverter $converter, string $uri, string $text, int $offset): array
+    /**
+     * @param list<CompletionProviderInterface> $providers
+     *
+     * @return list<string>
+     */
+    private function completionLabels(array $providers, PositionConverter $converter, string $uri, string $text, int $offset): array
     {
+        $items = [];
+        foreach ($providers as $provider) {
+            $completion = $provider->complete($this->params($converter, $uri, $text, $offset));
+            if (null !== $completion) {
+                array_push($items, ...$completion);
+            }
+        }
         /** @var list<string> $labels */
-        $labels = array_column($provider->complete($this->params($converter, $uri, $text, $offset)) ?? [], 'label');
+        $labels = array_column($items, 'label');
 
         return $labels;
     }
 
-    /** @return array<array-key, mixed>|null */
-    private function hover(MetadataProvider $provider, PositionConverter $converter, string $uri, string $text, int $offset): ?array
+    /**
+     * @param list<HoverProviderInterface> $providers
+     *
+     * @return array<array-key, mixed>|null
+     */
+    private function hover(array $providers, PositionConverter $converter, string $uri, string $text, int $offset): ?array
     {
-        return $provider->hover($this->params($converter, $uri, $text, $offset));
+        foreach ($providers as $provider) {
+            if (null !== $hover = $provider->hover($this->params($converter, $uri, $text, $offset))) {
+                return $hover;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<DiagnosticProviderInterface> $providers
+     *
+     * @return list<array<array-key, mixed>>
+     */
+    private function diagnostics(array $providers, string $uri): array
+    {
+        $diagnostics = [];
+        foreach ($providers as $provider) {
+            $provided = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
+            if (null !== $provided) {
+                array_push($diagnostics, ...$provided);
+            }
+        }
+
+        return $diagnostics;
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
