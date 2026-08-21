@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Document;
 
-use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
 final class DocumentContextResolver
@@ -11,21 +10,6 @@ final class DocumentContextResolver
         private readonly DocumentStore $documents,
         private readonly ProjectRegistry $projects,
     ) {
-    }
-
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{Document, Project, Position}|null
-     */
-    public function resolve(array $params): ?array
-    {
-        $context = $this->resolvePositioned($params);
-        if (null === $context) {
-            return null;
-        }
-
-        return [$context->document, $context->project, $context->position];
     }
 
     /** @param array<array-key, mixed> $params */
