@@ -43,6 +43,18 @@ final class LspProtocolMapper
         ];
     }
 
+    /** @return array{contents: array{kind: string, value: string}} */
+    public function markdownHover(string $value): array
+    {
+        return ['contents' => ['kind' => 'markdown', 'value' => $value]];
+    }
+
+    /** @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, newText: string} */
+    public function textEdit(Range $range, string $newText): array
+    {
+        return ['range' => $this->range($range), 'newText' => $newText];
+    }
+
     /** @return array{line: int, character: int} */
     private function position(Position $position): array
     {

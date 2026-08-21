@@ -52,7 +52,7 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
                 'label' => $name,
                 'kind' => AssetSymbolKind::Asset === $context->kind() ? 17 : 12,
                 'detail' => AssetSymbolKind::Asset === $context->kind() ? 'AssetMapper asset' : 'Importmap entrypoint',
-                'textEdit' => ['range' => $this->protocol->range($context->range()), 'newText' => $name],
+                'textEdit' => $this->protocol->textEdit($context->range(), $name),
             ];
         }
 
@@ -72,12 +72,12 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
                 return null;
             }
 
-            return ['contents' => ['kind' => 'markdown', 'value' => \sprintf(
+            return $this->protocol->markdownHover(\sprintf(
                 "AssetMapper asset: `%s`\n\nSource: `%s`\n\nVendor: %s",
                 $asset->logicalPath(),
                 $asset->sourcePath(),
                 $asset->isVendor() ? 'yes' : 'no',
-            )]];
+            ));
         }
         $entry = $this->indexes->forProject($project)->importMapEntry($symbol->name());
         $lines = ['Importmap entrypoint: `'.$symbol->name().'`'];
@@ -90,7 +90,7 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
             }
         }
 
-        return ['contents' => ['kind' => 'markdown', 'value' => implode("\n", $lines)]];
+        return $this->protocol->markdownHover(implode("\n", $lines));
     }
 
     public function definition(array $params): ?array

@@ -85,7 +85,7 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
             $details[] = 'Default present: '.($declaration->hasDefault() ? 'yes' : 'no');
         }
 
-        return ['contents' => ['kind' => 'markdown', 'value' => implode("\n\n", $details)]];
+        return $this->protocol->markdownHover(implode("\n\n", $details));
     }
 
     public function definition(array $params): ?array
@@ -188,6 +188,6 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
     {
         $position = $this->converter->toPosition($text, $start);
 
-        return ['label' => $label, 'kind' => 12, 'detail' => $detail, 'textEdit' => ['range' => $this->protocol->range(new Range($position, $end)), 'newText' => $newText]];
+        return ['label' => $label, 'kind' => 12, 'detail' => $detail, 'textEdit' => $this->protocol->textEdit(new Range($position, $end), $newText)];
     }
 }

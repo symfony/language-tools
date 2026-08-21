@@ -58,4 +58,22 @@ final class LspProtocolMapperTest extends TestCase
             'message' => 'The configuration key is deprecated.',
         ], $this->mapper->diagnostic($this->range, 2, 'config.deprecated_key', 'The configuration key is deprecated.'));
     }
+
+    public function testMapsMarkdownHovers(): void
+    {
+        self::assertSame([
+            'contents' => ['kind' => 'markdown', 'value' => 'Rendered **documentation**'],
+        ], $this->mapper->markdownHover('Rendered **documentation**'));
+    }
+
+    public function testMapsTextEdits(): void
+    {
+        self::assertSame([
+            'range' => [
+                'start' => ['line' => 2, 'character' => 3],
+                'end' => ['line' => 4, 'character' => 5],
+            ],
+            'newText' => 'replacement',
+        ], $this->mapper->textEdit($this->range, 'replacement'));
+    }
 }
