@@ -12,6 +12,7 @@ use Symfony\Lsp\Feature\Doctrine\DoctrineIndexRegistry;
 use Symfony\Lsp\Feature\Doctrine\DoctrineProvider;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class DoctrineProviderTest extends TestCase
 {
@@ -132,7 +133,7 @@ final class DoctrineProviderTest extends TestCase
         ] as [$uri, $text]) {
             $documents->open(new Document($uri, 'php', 1, $text));
         }
-        $provider = new DoctrineProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $indexes, $extractor);
+        $provider = new DoctrineProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor);
 
         self::assertSame(['name'], array_column($provider->complete($this->params($converter, $formCompletionUri, $formCompletionText, \strlen($formCompletionText))) ?? [], 'label'));
         self::assertSame(['name'], array_column($provider->complete($this->params($converter, $repositoryCompletionUri, $repositoryCompletionText, \strlen($repositoryCompletionText))) ?? [], 'label'));
