@@ -81,18 +81,27 @@ final class TolerantPhpParserTest extends TestCase
 
                 protected Service $property;
                 private Other $first = null, $second;
+                private $untyped;
+                private static $alsoUntyped;
+                public int $scalar;
+
+                /** @var Service $documentedOnly */
+                private $documentedOnly;
+
+                public function handle((Handler&Other)|Service $combined, int $count): void {}
             }
             PHP;
 
         $variables = (new TolerantPhpParser(new Parser()))->parse($source)->typedVariables();
 
-        self::assertSame(['service', 'handler', 'property', 'first', 'second'], array_map(static fn ($variable): string => $variable->name(), $variables));
+        self::assertSame(['service', 'handler', 'property', 'first', 'second', 'combined'], array_map(static fn ($variable): string => $variable->name(), $variables));
         self::assertSame([
             ['Vendor\Package\Service'],
             ['Vendor\Package\Handler', 'Vendor\Package\Other'],
             ['Vendor\Package\Service'],
             ['Vendor\Package\Other'],
             ['Vendor\Package\Other'],
+            ['Vendor\Package\Handler', 'Vendor\Package\Other', 'Vendor\Package\Service'],
         ], array_map(static fn ($variable): array => $variable->types(), $variables));
     }
 

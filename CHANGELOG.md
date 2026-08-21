@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ignore untyped PHP properties when resolving receiver types
 - Navigate to and describe custom Twig functions and filters
 
 ## 0.14.1 (2026-08-20)

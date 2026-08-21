@@ -8,8 +8,11 @@ use Microsoft\PhpParser\Node\ArrayElement;
 use Microsoft\PhpParser\Node\Attribute;
 use Microsoft\PhpParser\Node\ClassBaseClause;
 use Microsoft\PhpParser\Node\DelimitedList\ArrayElementList;
+use Microsoft\PhpParser\Node\DelimitedList\ExpressionList;
+use Microsoft\PhpParser\Node\DelimitedList\QualifiedNameList;
 use Microsoft\PhpParser\Node\Expression\ArgumentExpression;
 use Microsoft\PhpParser\Node\Expression\ArrayCreationExpression;
+use Microsoft\PhpParser\Node\Expression\AssignmentExpression;
 use Microsoft\PhpParser\Node\Expression\CallExpression;
 use Microsoft\PhpParser\Node\Expression\MemberAccessExpression;
 use Microsoft\PhpParser\Node\Expression\ObjectCreationExpression;
@@ -19,6 +22,8 @@ use Microsoft\PhpParser\Node\MethodDeclaration;
 use Microsoft\PhpParser\Node\NamespaceAliasingClause;
 use Microsoft\PhpParser\Node\NamespaceUseClause;
 use Microsoft\PhpParser\Node\NamespaceUseGroupClause;
+use Microsoft\PhpParser\Node\Parameter;
+use Microsoft\PhpParser\Node\PropertyDeclaration;
 use Microsoft\PhpParser\Node\QualifiedName;
 use Microsoft\PhpParser\Node\Statement\ClassDeclaration;
 use Microsoft\PhpParser\Node\Statement\EnumDeclaration;
@@ -42,6 +47,7 @@ final class TolerantPhpParser implements PhpParserInterface
         $root = $this->parser->parseSourceFile($source);
         $attributes = [];
         $methodCalls = [];
+        $typedVariableNodes = [];
         $objectCreationNodes = [];
         $methodDeclarationNodes = [];
         $typeDeclarations = [];
@@ -58,6 +64,8 @@ final class TolerantPhpParser implements PhpParserInterface
                 if (null !== $call) {
                     $methodCalls[] = $call;
                 }
+            } elseif ($node instanceof Parameter || $node instanceof PropertyDeclaration) {
+                $typedVariableNodes[] = $node;
             } elseif ($node instanceof ObjectCreationExpression) {
                 $objectCreationNodes[] = $node;
             } elseif ($node instanceof MethodDeclaration) {
@@ -84,7 +92,7 @@ final class TolerantPhpParser implements PhpParserInterface
         }
 
         $names = new PhpNameContext($namespace, $imports);
-        $typedVariables = $this->typedVariables($source, $names);
+        $typedVariables = $this->typedVariables($typedVariableNodes, $source, $names);
         $objectCreations = [];
         foreach ($objectCreationNodes as $node) {
             $creation = $this->objectCreation($node, $source, $names);
@@ -103,40 +111,66 @@ final class TolerantPhpParser implements PhpParserInterface
         return new PhpDocument($attributes, $methodCalls, $typeDeclarations, $diagnostics, $typedVariables, $names, $objectCreations, $methodDeclarations);
     }
 
-    /** @return list<PhpTypedVariable> */
-    private function typedVariables(string $source, PhpNameContext $names): array
+    /**
+     * @param list<Parameter|PropertyDeclaration> $declarations
+     *
+     * @return list<PhpTypedVariable>
+     */
+    private function typedVariables(array $declarations, string $source, PhpNameContext $names): array
     {
-        $typePattern = '\\??[\\\\A-Za-z_][\\\\A-Za-z0-9_]*(?:\\s*[|&]\\s*\\??[\\\\A-Za-z_][\\\\A-Za-z0-9_]*)*';
-        preg_match_all('/('.$typePattern.')\\s+\\$([A-Za-z_][A-Za-z0-9_]*)/', $source, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         $variables = [];
-        foreach ($matches as $match) {
-            $variables[$match[2][1]] = new PhpTypedVariable($match[2][0], $this->resolveTypes($match[1][0], $names));
-        }
-        preg_match_all('/('.$typePattern.')\\s+\\$[A-Za-z_][A-Za-z0-9_]*(?:\\s*=[^,;]*)?((?:\\s*,\\s*\\$[A-Za-z_][A-Za-z0-9_]*(?:\\s*=[^,;]*)?)*)\\s*;/', $source, $declarations, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($declarations as $declaration) {
-            preg_match_all('/\\$([A-Za-z_][A-Za-z0-9_]*)/', $declaration[2][0], $additional, \PREG_OFFSET_CAPTURE);
-            foreach ($additional[1] as [$name, $offset]) {
-                $variables[$declaration[2][1] + $offset] = new PhpTypedVariable($name, $this->resolveTypes($declaration[1][0], $names));
+            $types = $this->resolvedTypes($declaration->typeDeclarationList ?? null, $source, $names);
+            if ([] === $types) {
+                continue;
+            }
+            if ($declaration instanceof Parameter) {
+                $name = $this->variableName($declaration->variableName, $source);
+                if (null !== $name) {
+                    $variables[] = new PhpTypedVariable($name, $types);
+                }
+                continue;
+            }
+            $elements = get_object_vars($declaration)['propertyElements'] ?? null;
+            if (!$elements instanceof ExpressionList) {
+                continue;
+            }
+            foreach ($elements->children as $element) {
+                $variable = $element instanceof Variable
+                    ? $element
+                    : ($element instanceof AssignmentExpression && $element->leftOperand instanceof Variable ? $element->leftOperand : null);
+                if (null !== $variable && null !== $name = $this->variableName($variable, $source)) {
+                    $variables[] = new PhpTypedVariable($name, $types);
+                }
             }
         }
-        ksort($variables);
 
-        return array_values($variables);
+        return $variables;
     }
 
     /** @return list<string> */
-    private function resolveTypes(string $types, PhpNameContext $names): array
+    private function resolvedTypes(mixed $types, string $source, PhpNameContext $names): array
     {
-        $types = preg_split('/\\s*[|&]\\s*/', $types);
-        if (false === $types) {
+        if (!$types instanceof QualifiedNameList) {
             return [];
         }
         $resolved = [];
-        foreach ($types as $type) {
-            $resolved[] = $names->resolve(ltrim($type, '?'));
+        foreach ($types->getDescendantNodes() as $type) {
+            if (!$type instanceof QualifiedName) {
+                continue;
+            }
+            $name = $type->getResolvedName();
+            $resolved[] = null === $name ? $names->resolve($this->qualifiedName($type, $source)) : (string) $name;
         }
 
         return array_values(array_unique($resolved));
+    }
+
+    private function variableName(Node|Token $variable, string $source): ?string
+    {
+        $name = $variable->getText($source);
+
+        return \is_string($name) && 1 === preg_match('/^\\$[A-Za-z_][A-Za-z0-9_]*$/', $name) ? substr($name, 1) : null;
     }
 
     /** @param array<string, string> $imports */
