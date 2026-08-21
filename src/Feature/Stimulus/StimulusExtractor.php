@@ -183,7 +183,11 @@ final class StimulusExtractor
         $references = [];
         preg_match_all('/\bdata-controller\s*=\s*([\'"])(.*?)\1/s', $text, $attributes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($attributes as $attribute) {
-            $this->appendControllerTokens($references, $uri, $text, $this->commentParser->maskSyntax($attribute[2][0]), $attribute[2][1]);
+            $value = $attribute[2][0];
+            if (str_contains($value, '{{') || str_contains($value, '{%')) {
+                continue;
+            }
+            $this->appendControllerTokens($references, $uri, $text, $value, $attribute[2][1]);
         }
         preg_match_all('/\bdata-action\s*=\s*([\'"])(.*?)\1/s', $text, $attributes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($attributes as $attribute) {

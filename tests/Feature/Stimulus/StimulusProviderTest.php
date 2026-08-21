@@ -55,6 +55,8 @@ final class StimulusProviderTest extends TestCase
             </div>
             {% set dataController = 'search' %}
             <div data-controller="{{ dataController }}"></div>
+            <div data-controller="admin-{{ dataController }}"></div>
+            <div data-controller="{{ dataController }}-admin"></div>
             {{ stimulus_action('search', 'open') }}
             TWIG;
         $documents = new DocumentStore();
@@ -116,7 +118,9 @@ final class StimulusProviderTest extends TestCase
         self::assertNull($relationshipProvider->hover($unknownActionParams));
         self::assertSame([], $relationshipProvider->definition($unknownActionParams));
 
-        self::assertSame(['stimulus.unknown_controller'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $usageUri]]) ?? [], 'code'));
+        $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $usageUri]]) ?? [];
+        self::assertSame(['stimulus.unknown_controller'], array_column($diagnostics, 'code'));
+        self::assertSame(['Unknown Stimulus controller "missing".'], array_column($diagnostics, 'message'));
         self::assertGreaterThanOrEqual(4, \count($documentLinkProvider->links(['textDocument' => ['uri' => $usageUri]]) ?? []));
         $lenses = $codeLensProvider->codeLenses(['textDocument' => ['uri' => $controllerUri]]);
         self::assertIsArray($lenses);
