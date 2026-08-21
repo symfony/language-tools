@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Event;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
@@ -17,15 +16,14 @@ use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class EventProvider implements CodeLensProviderInterface, CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
-        private readonly DocumentStore $documents,
-        private readonly ProjectRegistry $projects,
         private readonly PositionConverter $converter,
+        private readonly LspProtocolMapper $protocol,
         private readonly EventIndexRegistry $indexes,
         private readonly EventSourceIndexRegistry $sourceIndexes,
         private readonly EventExtractor $extractor,
@@ -36,20 +34,19 @@ final class EventProvider implements CodeLensProviderInterface, CompletionProvid
 
     public function complete(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
+        $request = $this->resolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
-        [$document, $project, $position] = $request;
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        $prefix = $this->extractor->completionPrefix($document->languageId(), $document->text(), $offset);
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        $prefix = $this->extractor->completionPrefix($request->document->languageId(), $request->document->text(), $offset);
         if (null === $prefix) {
             return null;
         }
         $items = [];
-        foreach ($this->indexes->forProject($project)->events() as $event) {
+        foreach ($this->indexes->forProject($request->project)->events() as $event) {
             if (str_starts_with($event->name(), $prefix)) {
-                $items[] = $this->completion($event->name(), $document->text(), $offset - \strlen($prefix), $position);
+                $items[] = $this->completion($event->name(), $request->document->text(), $offset - \strlen($prefix), $request->position);
             }
         }
 
@@ -79,7 +76,7 @@ final class EventProvider implements CodeLensProviderInterface, CompletionProvid
         }
         $events = array_values(array_unique(array_map(static fn (EventListener $listener): string => $listener->event(), $listeners)));
 
-        return ['contents' => ['kind' => 'markdown', 'value' => 'Event listener: `'.$class->className().'`'."\n\n".'Events: `'.implode('`, `', $events).'`']];
+        return $this->protocol->markdownHover('Event listener: `'.$class->className().'`'."\n\n".'Events: `'.implode('`, `', $events).'`');
     }
 
     public function definition(array $params): ?array
@@ -136,23 +133,18 @@ final class EventProvider implements CodeLensProviderInterface, CompletionProvid
 
     public function diagnostics(array $params): ?array
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
-            return null;
-        }
-        $document = $this->documents->get($textDocument['uri']);
-        if (null === $document || 'php' !== $document->languageId() || null === $this->projects->forDocumentUri($document->uri())) {
+        $request = $this->resolver->resolveDocument($params);
+        if (null === $request || 'php' !== $request->document->languageId()) {
             return null;
         }
         $diagnostics = [];
-        foreach ($this->extractor->extract($document->uri(), $document->languageId(), $document->text())->invalidListenerMethods() as $listener) {
-            $diagnostics[] = [
-                'range' => $this->range($listener->range()),
-                'severity' => 1,
-                'source' => 'symfony',
-                'code' => 'event.invalid_listener_method',
-                'message' => \sprintf('Event listener method "%s::%s" does not exist.', $listener->className(), $listener->method()),
-            ];
+        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->invalidListenerMethods() as $listener) {
+            $diagnostics[] = $this->protocol->diagnostic(
+                $listener->range(),
+                1,
+                'event.invalid_listener_method',
+                \sprintf('Event listener method "%s::%s" does not exist.', $listener->className(), $listener->method()),
+            );
         }
 
         return $diagnostics;
@@ -160,26 +152,18 @@ final class EventProvider implements CodeLensProviderInterface, CompletionProvid
 
     public function codeLenses(array $params): ?array
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
+        $request = $this->resolver->resolveDocument($params);
+        if (null === $request || 'php' !== $request->document->languageId()) {
             return null;
         }
-        $document = $this->documents->get($textDocument['uri']);
-        if (null === $document || 'php' !== $document->languageId()) {
-            return null;
-        }
-        $project = $this->projects->forDocumentUri($document->uri());
-        if (null === $project) {
-            return null;
-        }
-        $index = $this->indexes->forProject($project);
+        $index = $this->indexes->forProject($request->project);
         $lenses = [];
-        foreach ($this->classExtractor->extract($document->uri(), $document->text()) as $class) {
+        foreach ($this->classExtractor->extract($request->document->uri(), $request->document->text()) as $class) {
             $listeners = $index->listenersForEvent($class->className());
             if (null !== $index->event($class->className()) || [] !== $listeners) {
                 $related = array_values(array_unique(array_map(static fn (EventListener $listener): string => $listener->className(), $listeners)));
                 $count = \count($related);
-                $lenses[] = $this->lens($class, \sprintf('%d event listener%s', $count, 1 === $count ? '' : 's'), $this->classLocations($project, $related));
+                $lenses[] = $this->protocol->referenceLens($class->range(), \sprintf('%d event listener%s', $count, 1 === $count ? '' : 's'), $class->uri(), $this->classLocations($request->project, $related));
                 continue;
             }
             $handled = $index->listenersByClass($class->className());
@@ -188,11 +172,11 @@ final class EventProvider implements CodeLensProviderInterface, CompletionProvid
                 $locations = [];
                 foreach ($events as $event) {
                     if (null !== $eventClass = $index->event($event)?->className()) {
-                        array_push($locations, ...$this->classLocations($project, [$eventClass]));
+                        array_push($locations, ...$this->classLocations($request->project, [$eventClass]));
                     }
                 }
                 $count = \count($events);
-                $lenses[] = $this->lens($class, \sprintf('Listens to %d event%s', $count, 1 === $count ? '' : 's'), $locations);
+                $lenses[] = $this->protocol->referenceLens($class->range(), \sprintf('Listens to %d event%s', $count, 1 === $count ? '' : 's'), $class->uri(), $locations);
             }
         }
 
@@ -206,21 +190,20 @@ final class EventProvider implements CodeLensProviderInterface, CompletionProvid
      */
     private function resolve(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
+        $request = $this->resolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
-        [$document, $project, $position] = $request;
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        foreach ($this->extractor->extract($document->uri(), $document->languageId(), $document->text())->symbols() as $symbol) {
-            if ($this->contains($document->text(), $symbol->range(), $offset)) {
-                return [$symbol, null, $project];
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->symbols() as $symbol) {
+            if ($this->contains($request->document->text(), $symbol->range(), $offset)) {
+                return [$symbol, null, $request->project];
             }
         }
-        if ('php' === $document->languageId()) {
-            foreach ($this->classExtractor->extract($document->uri(), $document->text()) as $class) {
-                if ($this->contains($document->text(), $class->range(), $offset)) {
-                    return [null, $class, $project];
+        if ('php' === $request->document->languageId()) {
+            foreach ($this->classExtractor->extract($request->document->uri(), $request->document->text()) as $class) {
+                if ($this->contains($request->document->text(), $class->range(), $offset)) {
+                    return [null, $class, $request->project];
                 }
             }
         }
@@ -244,7 +227,7 @@ final class EventProvider implements CodeLensProviderInterface, CompletionProvid
         $lines[] = '';
         $lines[] = 'Listeners: '.([] === $listeners ? 'none' : '`'.implode('`, `', array_map(static fn (EventListener $listener): string => $listener->className().'::'.$listener->method().' ('.$listener->priority().')', $listeners)).'`');
 
-        return ['contents' => ['kind' => 'markdown', 'value' => implode("\n", $lines)]];
+        return $this->protocol->markdownHover(implode("\n", $lines));
     }
 
     /** @return list<array<array-key, mixed>> */
@@ -264,7 +247,7 @@ final class EventProvider implements CodeLensProviderInterface, CompletionProvid
     /** @return list<array<array-key, mixed>> */
     private function sourceLocations(Project $project, string $name): array
     {
-        return array_map(fn (EventSourceSymbol $symbol): array => ['uri' => $symbol->uri(), 'range' => $this->range($symbol->range())], $this->sourceIndexes->forProject($project)->symbols($name));
+        return array_map(fn (EventSourceSymbol $symbol): array => $this->protocol->location($symbol->uri(), $symbol->range()), $this->sourceIndexes->forProject($project)->symbols($name));
     }
 
     /**
@@ -277,7 +260,7 @@ final class EventProvider implements CodeLensProviderInterface, CompletionProvid
         $locations = [];
         foreach (array_values(array_unique($classNames)) as $className) {
             foreach ($this->classIndexes->forProject($project)->classDeclarations($className) as $declaration) {
-                $locations[] = ['uri' => $declaration->uri(), 'range' => $this->range($declaration->range())];
+                $locations[] = $this->protocol->location($declaration->uri(), $declaration->range());
             }
         }
 
@@ -309,22 +292,6 @@ final class EventProvider implements CodeLensProviderInterface, CompletionProvid
     {
         $position = $this->converter->toPosition($text, $start);
 
-        return ['label' => $name, 'kind' => 12, 'textEdit' => ['range' => ['start' => ['line' => $position->line(), 'character' => $position->character()], 'end' => ['line' => $end->line(), 'character' => $end->character()]], 'newText' => $name]];
-    }
-
-    /**
-     * @param list<array<array-key, mixed>> $locations
-     *
-     * @return array<array-key, mixed>
-     */
-    private function lens(PhpClassDeclaration $class, string $title, array $locations): array
-    {
-        return ['range' => $this->range($class->range()), 'command' => ['title' => $title, 'command' => 'editor.action.showReferences', 'arguments' => [$class->uri(), ['line' => $class->range()->start()->line(), 'character' => $class->range()->start()->character()], $locations]]];
-    }
-
-    /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */
-    private function range(Range $range): array
-    {
-        return ['start' => ['line' => $range->start()->line(), 'character' => $range->start()->character()], 'end' => ['line' => $range->end()->line(), 'character' => $range->end()->character()]];
+        return ['label' => $name, 'kind' => 12, 'textEdit' => $this->protocol->textEdit(new Range($position, $end), $name)];
     }
 }

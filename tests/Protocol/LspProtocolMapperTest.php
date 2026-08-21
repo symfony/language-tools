@@ -76,4 +76,27 @@ final class LspProtocolMapperTest extends TestCase
             'newText' => 'replacement',
         ], $this->mapper->textEdit($this->range, 'replacement'));
     }
+
+    public function testMapsReferenceLenses(): void
+    {
+        $locations = [[
+            'uri' => 'file:///workspace/src/Listener.php',
+            'range' => [
+                'start' => ['line' => 6, 'character' => 7],
+                'end' => ['line' => 8, 'character' => 9],
+            ],
+        ]];
+
+        self::assertSame([
+            'range' => [
+                'start' => ['line' => 2, 'character' => 3],
+                'end' => ['line' => 4, 'character' => 5],
+            ],
+            'command' => [
+                'title' => '1 event listener',
+                'command' => 'editor.action.showReferences',
+                'arguments' => ['file:///workspace/src/Event.php', ['line' => 2, 'character' => 3], $locations],
+            ],
+        ], $this->mapper->referenceLens($this->range, '1 event listener', 'file:///workspace/src/Event.php', $locations));
+    }
 }

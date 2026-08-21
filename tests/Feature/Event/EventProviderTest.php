@@ -21,6 +21,7 @@ use Symfony\Lsp\Feature\Event\EventSourceIndexRegistry;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class EventProviderTest extends TestCase
 {
@@ -133,7 +134,7 @@ PHP;
             new DependencyInjectionSourceFacts($listenerUri, classes: $classExtractor->extract($listenerUri, $listener)),
             new DependencyInjectionSourceFacts($dispatcherUri, classes: $classExtractor->extract($dispatcherUri, $dispatcher)),
         );
-        $provider = new EventProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
+        $provider = new EventProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
 
         $completionOffset = strpos($dispatcher, "App\\Event\\Ord');") + \strlen('App\\Event\\Ord');
         self::assertSame(['App\\Event\\OrderPlaced'], array_column($provider->complete($this->params($dispatcherUri, $converter->toPosition($dispatcher, $completionOffset))) ?? [], 'label'));

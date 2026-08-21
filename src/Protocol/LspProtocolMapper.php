@@ -55,6 +55,23 @@ final class LspProtocolMapper
         return ['range' => $this->range($range), 'newText' => $newText];
     }
 
+    /**
+     * @param list<array<array-key, mixed>> $locations
+     *
+     * @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, command: array{title: string, command: string, arguments: array{string, array{line: int, character: int}, list<array<array-key, mixed>>}}}
+     */
+    public function referenceLens(Range $range, string $title, string $uri, array $locations): array
+    {
+        return [
+            'range' => $this->range($range),
+            'command' => [
+                'title' => $title,
+                'command' => 'editor.action.showReferences',
+                'arguments' => [$uri, $this->position($range->start()), $locations],
+            ],
+        ];
+    }
+
     /** @return array{line: int, character: int} */
     private function position(Position $position): array
     {
