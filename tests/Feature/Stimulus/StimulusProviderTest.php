@@ -7,10 +7,15 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Stimulus\StimulusCodeLensProvider;
+use Symfony\Lsp\Feature\Stimulus\StimulusCompletionProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusController;
+use Symfony\Lsp\Feature\Stimulus\StimulusDiagnosticProvider;
+use Symfony\Lsp\Feature\Stimulus\StimulusDocumentLinkProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusIndexRegistry;
-use Symfony\Lsp\Feature\Stimulus\StimulusProvider;
+use Symfony\Lsp\Feature\Stimulus\StimulusRelationshipProvider;
+use Symfony\Lsp\Feature\Stimulus\StimulusResolver;
 use Symfony\Lsp\Feature\Stimulus\StimulusSourceIndexRegistry;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
@@ -84,34 +89,34 @@ final class StimulusProviderTest extends TestCase
             $extractor->extract($project, $controllerUri, 'javascript', $controllerText),
             $extractor->extract($project, $usageUri, 'twig', $usageText),
         );
-        $provider = new StimulusProvider(
-            new DocumentContextResolver($documents, $projects),
-            $converter,
-            new UriToPathConverter(),
-            new LspProtocolMapper(),
-            $indexes,
-            $sourceIndexes,
-            $extractor,
-        );
+        $documentResolver = new DocumentContextResolver($documents, $projects);
+        $uriConverter = new UriToPathConverter();
+        $protocol = new LspProtocolMapper();
+        $stimulus = new StimulusResolver($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
+        $completionProvider = new StimulusCompletionProvider($documentResolver, $converter, $protocol, $extractor, $stimulus);
+        $relationshipProvider = new StimulusRelationshipProvider($uriConverter, $protocol, $indexes, $sourceIndexes, $stimulus);
+        $diagnosticProvider = new StimulusDiagnosticProvider($documentResolver, $protocol, $indexes, $extractor, $stimulus);
+        $documentLinkProvider = new StimulusDocumentLinkProvider($documentResolver, $uriConverter, $protocol, $indexes, $extractor, $stimulus);
+        $codeLensProvider = new StimulusCodeLensProvider($documentResolver, $protocol, $sourceIndexes, $extractor);
 
-        self::assertSame(['search'], array_column($provider->complete($this->params($converter, $controllerCompletionUri, $controllerCompletionText, \strlen($controllerCompletionText))) ?? [], 'label'));
-        self::assertSame(['open'], array_column($provider->complete($this->params($converter, $actionCompletionUri, $actionCompletionText, \strlen($actionCompletionText))) ?? [], 'label'));
-        self::assertSame(['results'], array_column($provider->complete($this->params($converter, $targetCompletionUri, $targetCompletionText, \strlen($targetCompletionText))) ?? [], 'label'));
+        self::assertSame(['search'], array_column($completionProvider->complete($this->params($converter, $controllerCompletionUri, $controllerCompletionText, \strlen($controllerCompletionText))) ?? [], 'label'));
+        self::assertSame(['open'], array_column($completionProvider->complete($this->params($converter, $actionCompletionUri, $actionCompletionText, \strlen($actionCompletionText))) ?? [], 'label'));
+        self::assertSame(['results'], array_column($completionProvider->complete($this->params($converter, $targetCompletionUri, $targetCompletionText, \strlen($targetCompletionText))) ?? [], 'label'));
 
         $actionParams = $this->params($converter, $usageUri, $usageText, strpos($usageText, '#open') + 2);
-        self::assertSame([$controllerUri], array_column($provider->definition($actionParams) ?? [], 'uri'));
-        self::assertCount(3, $provider->references($actionParams) ?? []);
-        $hover = $provider->hover($actionParams);
+        self::assertSame([$controllerUri], array_column($relationshipProvider->definition($actionParams) ?? [], 'uri'));
+        self::assertCount(3, $relationshipProvider->references($actionParams) ?? []);
+        $hover = $relationshipProvider->hover($actionParams);
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertSame('Stimulus action: `search#open`', $hover['contents']['value'] ?? null);
         $unknownActionParams = $this->params($converter, $unknownActionUri, $unknownActionText, strpos($unknownActionText, 'missing') + 2);
-        self::assertNull($provider->hover($unknownActionParams));
-        self::assertSame([], $provider->definition($unknownActionParams));
+        self::assertNull($relationshipProvider->hover($unknownActionParams));
+        self::assertSame([], $relationshipProvider->definition($unknownActionParams));
 
-        self::assertSame(['stimulus.unknown_controller'], array_column($provider->diagnostics(['textDocument' => ['uri' => $usageUri]]) ?? [], 'code'));
-        self::assertGreaterThanOrEqual(4, \count($provider->links(['textDocument' => ['uri' => $usageUri]]) ?? []));
-        $lenses = $provider->codeLenses(['textDocument' => ['uri' => $controllerUri]]);
+        self::assertSame(['stimulus.unknown_controller'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $usageUri]]) ?? [], 'code'));
+        self::assertGreaterThanOrEqual(4, \count($documentLinkProvider->links(['textDocument' => ['uri' => $usageUri]]) ?? []));
+        $lenses = $codeLensProvider->codeLenses(['textDocument' => ['uri' => $controllerUri]]);
         self::assertIsArray($lenses);
         self::assertIsArray($lenses[0]['command'] ?? null);
         self::assertSame('3 Stimulus controller usages', $lenses[0]['command']['title'] ?? null);

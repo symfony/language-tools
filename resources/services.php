@@ -32,7 +32,7 @@ use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Feature\Route\RouteCompletionProvider;
 use Symfony\Lsp\Feature\Route\RouteSnapshotLoader;
 use Symfony\Lsp\Feature\Security\SecurityUserProvider;
-use Symfony\Lsp\Feature\Stimulus\StimulusProvider;
+use Symfony\Lsp\Feature\Stimulus\StimulusCodeLensProvider;
 use Symfony\Lsp\Feature\Twig\LiveComponentEventProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCodeActionProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCompletionHandler;
@@ -201,7 +201,7 @@ return static function (ContainerConfigurator $container): void {
     $services->get(RuntimeSnapshotLoaderRegistry::class)
         ->arg('$loaders', tagged_iterator('lsp.runtime_snapshot_loader'));
 
-    foreach ([MessengerCodeLensProvider::class, EventCodeLensProvider::class, TwigComponentCodeLensProvider::class, StimulusProvider::class, DoctrineRelationshipCodeLensProvider::class] as $priority => $provider) {
+    foreach ([MessengerCodeLensProvider::class, EventCodeLensProvider::class, TwigComponentCodeLensProvider::class, StimulusCodeLensProvider::class, DoctrineRelationshipCodeLensProvider::class] as $priority => $provider) {
         $services->get($provider)->tag('lsp.provider.code_lens', ['priority' => -$priority]);
     }
     $services->get(CodeLensProviderRegistry::class)
