@@ -10,9 +10,11 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Twig\LiveComponentEventProvider;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TemplateNameResolver;
+use Symfony\Lsp\Feature\Twig\TwigComponentCompletionProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentExtractor;
 use Symfony\Lsp\Feature\Twig\TwigComponentIndexRegistry;
-use Symfony\Lsp\Feature\Twig\TwigComponentProvider;
+use Symfony\Lsp\Feature\Twig\TwigComponentRelationshipProvider;
+use Symfony\Lsp\Feature\Twig\TwigComponentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -70,21 +72,25 @@ final class LiveComponentProviderTest extends TestCase
             $extractor->extract($project, $templateUri, 'twig', $templateText),
             $extractor->extract($project, $usageUri, 'twig', $usageText),
         );
-        $provider = new TwigComponentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, new TemplateIndexRegistry(), $extractor, $commentParser);
+        $documentResolver = new DocumentContextResolver($documents, $projects);
+        $protocol = new LspProtocolMapper();
+        $componentResolver = new TwigComponentResolver($documentResolver, $converter, $indexes, new TemplateIndexRegistry(), $extractor);
+        $completionProvider = new TwigComponentCompletionProvider($documentResolver, $converter, $protocol, $indexes, $componentResolver, $commentParser);
+        $relationshipProvider = new TwigComponentRelationshipProvider($protocol, $indexes, $componentResolver);
 
-        self::assertSame(['submit'], array_column($provider->complete($this->params($converter, $completionUri, $completionText, \strlen($completionText))) ?? [], 'label'));
+        self::assertSame(['submit'], array_column($completionProvider->complete($this->params($converter, $completionUri, $completionText, \strlen($completionText))) ?? [], 'label'));
         $nestedActionOffset = strpos($templateText, 'submit') + \strlen('sub');
-        self::assertSame(['submit'], array_column($provider->complete($this->params($converter, $templateUri, $templateText, $nestedActionOffset)) ?? [], 'label'));
+        self::assertSame(['submit'], array_column($completionProvider->complete($this->params($converter, $templateUri, $templateText, $nestedActionOffset)) ?? [], 'label'));
         $actionParams = $this->params($converter, $usageUri, $usageText, strpos($usageText, 'submit') + 2);
-        self::assertSame([$classUri], array_column($provider->definition($actionParams) ?? [], 'uri'));
-        self::assertCount(4, $provider->references($actionParams) ?? []);
-        $actionHover = $provider->hover($actionParams);
+        self::assertSame([$classUri], array_column($relationshipProvider->definition($actionParams) ?? [], 'uri'));
+        self::assertCount(4, $relationshipProvider->references($actionParams) ?? []);
+        $actionHover = $relationshipProvider->hover($actionParams);
         self::assertIsArray($actionHover);
         self::assertIsArray($actionHover['contents'] ?? null);
         self::assertSame('Live action: `Search#submit`', $actionHover['contents']['value'] ?? null);
 
         $componentParams = $this->params($converter, $usageUri, $usageText, strpos($usageText, 'Search') + 2);
-        $componentHover = $provider->hover($componentParams);
+        $componentHover = $relationshipProvider->hover($componentParams);
         self::assertIsArray($componentHover);
         self::assertIsArray($componentHover['contents'] ?? null);
         self::assertIsString($componentHover['contents']['value'] ?? null);

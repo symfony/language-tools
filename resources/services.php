@@ -37,7 +37,10 @@ use Symfony\Lsp\Feature\Twig\LiveComponentEventProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCodeActionProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCompletionHandler;
 use Symfony\Lsp\Feature\Twig\TemplateNavigationProvider;
-use Symfony\Lsp\Feature\Twig\TwigComponentProvider;
+use Symfony\Lsp\Feature\Twig\TwigComponentCodeLensProvider;
+use Symfony\Lsp\Feature\Twig\TwigComponentCompletionProvider;
+use Symfony\Lsp\Feature\Twig\TwigComponentDiagnosticProvider;
+use Symfony\Lsp\Feature\Twig\TwigComponentRelationshipProvider;
 use Symfony\Lsp\Feature\Twig\TwigVariableProvider;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
@@ -107,7 +110,10 @@ return static function (ContainerConfigurator $container): void {
             TemplateNavigationProvider::class,
             TemplateCodeActionProvider::class,
             TwigVariableProvider::class,
-            TwigComponentProvider::class,
+            TwigComponentCompletionProvider::class,
+            TwigComponentRelationshipProvider::class,
+            TwigComponentDiagnosticProvider::class,
+            TwigComponentCodeLensProvider::class,
             LiveComponentEventProvider::class,
         ],
         'Translation' => [],
@@ -195,7 +201,7 @@ return static function (ContainerConfigurator $container): void {
     $services->get(RuntimeSnapshotLoaderRegistry::class)
         ->arg('$loaders', tagged_iterator('lsp.runtime_snapshot_loader'));
 
-    foreach ([MessengerProvider::class, EventProvider::class, TwigComponentProvider::class, StimulusProvider::class, DoctrineRelationshipCodeLensProvider::class] as $priority => $provider) {
+    foreach ([MessengerProvider::class, EventProvider::class, TwigComponentCodeLensProvider::class, StimulusProvider::class, DoctrineRelationshipCodeLensProvider::class] as $priority => $provider) {
         $services->get($provider)->tag('lsp.provider.code_lens', ['priority' => -$priority]);
     }
     $services->get(CodeLensProviderRegistry::class)
