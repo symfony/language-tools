@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Environment;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
@@ -14,7 +13,7 @@ use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class EnvironmentProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
@@ -23,9 +22,8 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
 
     public function __construct(
         private readonly DocumentContextResolver $resolver,
-        private readonly DocumentStore $documents,
-        private readonly ProjectRegistry $projects,
         private readonly PositionConverter $converter,
+        private readonly LspProtocolMapper $protocol,
         private readonly EnvironmentIndexRegistry $indexes,
         private readonly EnvironmentExtractor $extractor,
         private readonly TwigCommentParser $commentParser,
@@ -34,11 +32,13 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
 
     public function complete(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
+        $request = $this->resolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
-        [$document, $project, $position] = $request;
+        $document = $request->document;
+        $project = $request->project;
+        $position = $request->position;
         $cursor = $this->converter->toByteOffset($document->text(), $position);
         $text = 'twig' === $document->languageId() ? $this->commentParser->mask($document->text()) : $document->text();
         if (!preg_match('/%env\(([^)]*)$/', substr($text, 0, $cursor), $match, \PREG_OFFSET_CAPTURE)) {
@@ -99,7 +99,7 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         }
         [$reference, $project] = $resolved;
 
-        return array_map(fn (EnvironmentDeclaration $declaration): array => ['uri' => $declaration->uri(), 'range' => $this->range($declaration->range())], $this->indexes->forProject($project)->declarations($reference->name()));
+        return array_map(fn (EnvironmentDeclaration $declaration): array => $this->protocol->location($declaration->uri(), $declaration->range()), $this->indexes->forProject($project)->declarations($reference->name()));
     }
 
     public function references(array $params): ?array
@@ -110,24 +110,17 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         }
         [$reference, $project] = $resolved;
 
-        return array_map(fn (EnvironmentReference $item): array => ['uri' => $item->uri(), 'range' => $this->range($item->range())], $this->indexes->forProject($project)->references($reference->name()));
+        return array_map(fn (EnvironmentReference $item): array => $this->protocol->location($item->uri(), $item->range()), $this->indexes->forProject($project)->references($reference->name()));
     }
 
     public function diagnostics(array $params): ?array
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
+        $context = $this->resolver->resolveDocument($params);
+        if (null === $context) {
             return null;
         }
-        $document = $this->documents->get($textDocument['uri']);
-        if (null === $document) {
-            return null;
-        }
-        $project = $this->projects->forDocumentUri($document->uri());
-        if (null === $project) {
-            return null;
-        }
-        $index = $this->indexes->forProject($project);
+        $document = $context->document;
+        $index = $this->indexes->forProject($context->project);
         $processors = $index->processors();
         $diagnostics = [];
         foreach ($this->extractor->extract($document->uri(), $document->languageId(), $document->text())->references() as $reference) {
@@ -140,7 +133,7 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
                     continue;
                 }
                 if ('' === $processor) {
-                    $diagnostics[] = ['range' => $this->range($reference->range()), 'severity' => 1, 'source' => 'symfony', 'code' => 'env.malformed_chain', 'message' => 'Environment processor chains cannot contain empty segments.'];
+                    $diagnostics[] = $this->protocol->diagnostic($reference->range(), 1, 'env.malformed_chain', 'Environment processor chains cannot contain empty segments.');
                     continue;
                 }
                 if (\in_array($processor, self::ARGUMENT_PROCESSORS, true)) {
@@ -148,7 +141,7 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
                 }
                 $customProcessorArgument = null !== $previousProcessor && isset($processors[$previousProcessor]) && !\in_array($previousProcessor, self::BUILT_IN_PROCESSORS, true);
                 if ($index->processorsComplete() && !$customProcessorArgument && !isset($processors[$processor])) {
-                    $diagnostics[] = ['range' => $this->range($reference->range()), 'severity' => 1, 'source' => 'symfony', 'code' => 'env.unknown_processor', 'message' => \sprintf('Environment processor "%s" is not installed.', $processor)];
+                    $diagnostics[] = $this->protocol->diagnostic($reference->range(), 1, 'env.unknown_processor', \sprintf('Environment processor "%s" is not installed.', $processor));
                 }
                 $previousProcessor = $processor;
             }
@@ -156,7 +149,7 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         preg_match_all('/%env\([^\)\r\n]*%/', $document->text(), $malformed, \PREG_OFFSET_CAPTURE);
         foreach ($malformed[0] as [$expression, $offset]) {
             $range = new Range($this->converter->toPosition($document->text(), $offset), $this->converter->toPosition($document->text(), $offset + \strlen($expression)));
-            $diagnostics[] = ['range' => $this->range($range), 'severity' => 1, 'source' => 'symfony', 'code' => 'env.malformed_chain', 'message' => 'Malformed environment expression; expected ")%".'];
+            $diagnostics[] = $this->protocol->diagnostic($range, 1, 'env.malformed_chain', 'Malformed environment expression; expected ")%".');
         }
 
         return $diagnostics;
@@ -169,11 +162,13 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
      */
     private function resolve(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
+        $request = $this->resolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
-        [$document, $project, $position] = $request;
+        $document = $request->document;
+        $project = $request->project;
+        $position = $request->position;
         $offset = $this->converter->toByteOffset($document->text(), $position);
         $facts = $this->extractor->extract($document->uri(), $document->languageId(), $document->text());
         foreach ($facts->declarations() as $declaration) {
@@ -200,12 +195,6 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
     {
         $position = $this->converter->toPosition($text, $start);
 
-        return ['label' => $label, 'kind' => 12, 'detail' => $detail, 'textEdit' => ['range' => ['start' => ['line' => $position->line(), 'character' => $position->character()], 'end' => ['line' => $end->line(), 'character' => $end->character()]], 'newText' => $newText]];
-    }
-
-    /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */
-    private function range(Range $range): array
-    {
-        return ['start' => ['line' => $range->start()->line(), 'character' => $range->start()->character()], 'end' => ['line' => $range->end()->line(), 'character' => $range->end()->character()]];
+        return ['label' => $label, 'kind' => 12, 'detail' => $detail, 'textEdit' => ['range' => $this->protocol->range(new Range($position, $end)), 'newText' => $newText]];
     }
 }
