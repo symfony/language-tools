@@ -2,41 +2,11 @@
 
 namespace Symfony\Lsp\Feature\Doctrine;
 
-final class DoctrineIndex
+use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+
+/** @extends AbstractSourceFactsIndex<DoctrineSourceFacts> */
+final class DoctrineIndex extends AbstractSourceFactsIndex
 {
-    /** @var array<string, DoctrineSourceFacts> */
-    private array $sources = [];
-    /** @var array<string, DoctrineSourceFacts> */
-    private array $overlays = [];
-
-    public function replace(DoctrineSourceFacts ...$sources): void
-    {
-        $this->sources = [];
-        foreach ($sources as $source) {
-            $this->sources[$source->uri()] = $source;
-        }
-    }
-
-    public function replaceSource(DoctrineSourceFacts $source): void
-    {
-        $this->sources[$source->uri()] = $source;
-    }
-
-    public function removeSource(string $uri): void
-    {
-        unset($this->sources[$uri]);
-    }
-
-    public function overlay(DoctrineSourceFacts $source): void
-    {
-        $this->overlays[$source->uri()] = $source;
-    }
-
-    public function removeOverlay(string $uri): void
-    {
-        unset($this->overlays[$uri]);
-    }
-
     public function entity(string $className): ?DoctrineEntity
     {
         foreach ($this->facts() as $facts) {
@@ -119,11 +89,5 @@ final class DoctrineIndex
         }
 
         return null !== $this->entity($owner) ? $owner : $this->entityForRepository($owner)?->className();
-    }
-
-    /** @return list<DoctrineSourceFacts> */
-    private function facts(): array
-    {
-        return [...array_values(array_diff_key($this->sources, $this->overlays)), ...array_values($this->overlays)];
     }
 }

@@ -17,7 +17,7 @@ abstract class AbstractSourceFactsIndex
     final public function replace(SourceFactsInterface ...$facts): void
     {
         $this->facts->replaceSaved(...$facts);
-        $this->factsChanged();
+        $this->factsReplaced();
     }
 
     /** @param TFacts $facts */
@@ -43,6 +43,11 @@ abstract class AbstractSourceFactsIndex
     final public function removeOverlay(string $uri): void
     {
         $this->facts->removeOverlay($uri);
+        $this->factsChanged();
+    }
+
+    protected function factsReplaced(): void
+    {
         $this->factsChanged();
     }
 

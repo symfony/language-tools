@@ -2,12 +2,11 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
-final class TwigComponentIndex
+use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+
+/** @extends AbstractSourceFactsIndex<TwigComponentSourceFacts> */
+final class TwigComponentIndex extends AbstractSourceFactsIndex
 {
-    /** @var array<string, TwigComponentSourceFacts> */
-    private array $sources = [];
-    /** @var array<string, TwigComponentSourceFacts> */
-    private array $overlays = [];
     private bool $complete = false;
     private bool $runtimeComplete = false;
     /** @var array<string, true> */
@@ -15,35 +14,6 @@ final class TwigComponentIndex
     /** @var array<string, true> */
     private array $caseInsensitiveRuntimeNames = [];
     private string $anonymousTemplateDirectory = 'components';
-
-    public function replace(TwigComponentSourceFacts ...$sources): void
-    {
-        $this->sources = [];
-        foreach ($sources as $source) {
-            $this->sources[$source->uri()] = $source;
-        }
-        $this->complete = true;
-    }
-
-    public function replaceSource(TwigComponentSourceFacts $source): void
-    {
-        $this->sources[$source->uri()] = $source;
-    }
-
-    public function removeSource(string $uri): void
-    {
-        unset($this->sources[$uri]);
-    }
-
-    public function overlay(TwigComponentSourceFacts $source): void
-    {
-        $this->overlays[$source->uri()] = $source;
-    }
-
-    public function removeOverlay(string $uri): void
-    {
-        unset($this->overlays[$uri]);
-    }
 
     /** @return list<TwigComponent> */
     public function components(): array
@@ -185,10 +155,9 @@ final class TwigComponentIndex
         return $this->anonymousTemplateDirectory;
     }
 
-    /** @return list<TwigComponentSourceFacts> */
-    private function facts(): array
+    protected function factsReplaced(): void
     {
-        return [...array_values(array_diff_key($this->sources, $this->overlays)), ...array_values($this->overlays)];
+        $this->complete = true;
     }
 
     private function merge(?TwigComponent $current, TwigComponent $component): TwigComponent
