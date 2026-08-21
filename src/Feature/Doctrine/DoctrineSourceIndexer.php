@@ -29,11 +29,14 @@ final class DoctrineSourceIndexer extends AbstractSourceIndexer
             throw new \UnexpectedValueException('The Doctrine source facts are invalid.');
         }
 
-        return [
-            ...$data->entities(),
-            ...$data->repositories(),
-            ...array_filter($data->symbols(), static fn (DoctrineSourceSymbol $symbol): bool => $symbol->isDeclaration()),
-        ];
+        $declarations = [];
+        foreach ($data->symbols() as $symbol) {
+            if ($symbol->isDeclaration()) {
+                $declarations[] = $symbol;
+            }
+        }
+
+        return [...$data->entities(), ...$data->repositories(), ...$declarations];
     }
 
     protected function factsClass(): string

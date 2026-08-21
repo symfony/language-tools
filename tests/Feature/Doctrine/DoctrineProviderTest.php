@@ -8,9 +8,13 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Doctrine\DoctrineCriteriaProvider;
+use Symfony\Lsp\Feature\Doctrine\DoctrineEntityTypeProvider;
 use Symfony\Lsp\Feature\Doctrine\DoctrineExtractor;
+use Symfony\Lsp\Feature\Doctrine\DoctrineFieldCompletionBuilder;
 use Symfony\Lsp\Feature\Doctrine\DoctrineIndexRegistry;
-use Symfony\Lsp\Feature\Doctrine\DoctrineProvider;
+use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipCodeLensProvider;
+use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipProvider;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -118,7 +122,11 @@ final class DoctrineProviderTest extends TestCase
             $extractor->extract($repositoryUri, 'php', $repositoryText),
             $extractor->extract($usageUri, 'php', $usageText),
         );
-        self::assertSame(['id', 'name', 'category'], array_map(static fn ($field): string => $field->name(), $index->entity('App\\Entity\\Product')?->fields() ?? []));
+        $fieldNames = [];
+        foreach ($index->entity('App\\Entity\\Product')?->fields() ?? [] as $field) {
+            $fieldNames[] = $field->name();
+        }
+        self::assertSame(['id', 'name', 'category'], $fieldNames);
         self::assertSame('App\\Entity\\Product', $index->repository('App\\Repository\\ProductRepository')?->entityClass());
 
         $documents = new DocumentStore();
@@ -132,31 +140,37 @@ final class DoctrineProviderTest extends TestCase
         ] as [$uri, $text]) {
             $documents->open(new Document($uri, 'php', 1, $text));
         }
-        $provider = new DoctrineProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor);
+        $resolver = new DocumentContextResolver($documents, $projects);
+        $protocol = new LspProtocolMapper();
+        $completionBuilder = new DoctrineFieldCompletionBuilder($protocol);
+        $entityTypeProvider = new DoctrineEntityTypeProvider($resolver, $converter, $indexes, $extractor, $completionBuilder);
+        $criteriaProvider = new DoctrineCriteriaProvider($resolver, $converter, $indexes, $extractor, $completionBuilder);
+        $relationshipProvider = new DoctrineRelationshipProvider($resolver, $converter, $protocol, $indexes, $extractor);
+        $codeLensProvider = new DoctrineRelationshipCodeLensProvider($resolver, $protocol, $indexes, $extractor);
 
-        self::assertSame(['name'], array_column($provider->complete($this->params($converter, $formCompletionUri, $formCompletionText, \strlen($formCompletionText))) ?? [], 'label'));
-        self::assertSame(['name'], array_column($provider->complete($this->params($converter, $repositoryCompletionUri, $repositoryCompletionText, \strlen($repositoryCompletionText))) ?? [], 'label'));
-        self::assertSame(['category'], array_column($provider->complete($this->params($converter, $managerCompletionUri, $managerCompletionText, \strlen($managerCompletionText))) ?? [], 'label'));
+        self::assertSame(['name'], array_column($entityTypeProvider->complete($this->params($converter, $formCompletionUri, $formCompletionText, \strlen($formCompletionText))) ?? [], 'label'));
+        self::assertSame(['name'], array_column($criteriaProvider->complete($this->params($converter, $repositoryCompletionUri, $repositoryCompletionText, \strlen($repositoryCompletionText))) ?? [], 'label'));
+        self::assertSame(['category'], array_column($criteriaProvider->complete($this->params($converter, $managerCompletionUri, $managerCompletionText, \strlen($managerCompletionText))) ?? [], 'label'));
 
         $fieldParams = $this->params($converter, $usageUri, $usageText, strpos($usageText, "['name'") + 3);
-        self::assertSame([$entityUri], array_column($provider->definition($fieldParams) ?? [], 'uri'));
-        self::assertCount(3, $provider->references($fieldParams) ?? []);
-        $fieldHover = $provider->hover($fieldParams);
+        self::assertSame([$entityUri], array_column($relationshipProvider->definition($fieldParams) ?? [], 'uri'));
+        self::assertCount(3, $relationshipProvider->references($fieldParams) ?? []);
+        $fieldHover = $relationshipProvider->hover($fieldParams);
         self::assertIsArray($fieldHover);
         self::assertIsArray($fieldHover['contents'] ?? null);
         self::assertIsString($fieldHover['contents']['value'] ?? null);
         self::assertStringContainsString('Doctrine field: `App\\Entity\\Product::$name`', $fieldHover['contents']['value']);
 
         $repositoryParams = $this->params($converter, $entityUri, $entityText, strpos($entityText, 'ProductRepository::class') + 2);
-        self::assertSame([$repositoryUri], array_column($provider->definition($repositoryParams) ?? [], 'uri'));
+        self::assertSame([$repositoryUri], array_column($relationshipProvider->definition($repositoryParams) ?? [], 'uri'));
         $entityParams = $this->params($converter, $repositoryUri, $repositoryText, strpos($repositoryText, 'Product::class') + 2);
-        self::assertSame([$entityUri], array_column($provider->definition($entityParams) ?? [], 'uri'));
+        self::assertSame([$entityUri], array_column($relationshipProvider->definition($entityParams) ?? [], 'uri'));
 
-        $entityLenses = $provider->codeLenses(['textDocument' => ['uri' => $entityUri]]);
+        $entityLenses = $codeLensProvider->codeLenses(['textDocument' => ['uri' => $entityUri]]);
         self::assertIsArray($entityLenses);
         self::assertIsArray($entityLenses[0]['command'] ?? null);
         self::assertSame('Repository: App\\Repository\\ProductRepository', $entityLenses[0]['command']['title'] ?? null);
-        $repositoryLenses = $provider->codeLenses(['textDocument' => ['uri' => $repositoryUri]]);
+        $repositoryLenses = $codeLensProvider->codeLenses(['textDocument' => ['uri' => $repositoryUri]]);
         self::assertIsArray($repositoryLenses);
         self::assertIsArray($repositoryLenses[0]['command'] ?? null);
         self::assertSame('Entity: App\\Entity\\Product', $repositoryLenses[0]['command']['title'] ?? null);

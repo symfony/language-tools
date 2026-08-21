@@ -68,6 +68,7 @@ final class DoctrineExtractor
             if (preg_match('/([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*,\s*\[[\s\S]*[\'"]class[\'"]\s*=>\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class/', $statement, $classes)
                 && 'Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' === $php->resolveName($classes[1])) {
                 return new DoctrineCompletionContext(
+                    DoctrineCompletionKind::EntityTypeField,
                     $php->resolveName($classes[2]),
                     null,
                     $field[1][0],
@@ -287,17 +288,17 @@ final class DoctrineExtractor
                 $owner = $repositoryVariables[$variable] ?? null;
             }
             if (null !== $owner) {
-                return new DoctrineCompletionContext(null, $owner, $prefix[1][0], $this->offsetRange($text, $prefix[1][1], \strlen($prefix[1][0])));
+                return new DoctrineCompletionContext(DoctrineCompletionKind::RepositoryCriteria, null, $owner, $prefix[1][0], $this->offsetRange($text, $prefix[1][1], \strlen($prefix[1][0])));
             }
             if (isset($entityVariables[$variable])) {
-                return new DoctrineCompletionContext($entityVariables[$variable], null, $prefix[1][0], $this->offsetRange($text, $prefix[1][1], \strlen($prefix[1][0])));
+                return new DoctrineCompletionContext(DoctrineCompletionKind::RepositoryCriteria, $entityVariables[$variable], null, $prefix[1][0], $this->offsetRange($text, $prefix[1][1], \strlen($prefix[1][0])));
             }
         }
         preg_match_all('/getRepository\s*\(\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*\)\s*->\s*(?:findBy|findOneBy|count)\s*\(\s*\[/', $before, $calls, \PREG_SET_ORDER);
         if ([] !== $calls) {
             $call = $calls[array_key_last($calls)];
 
-            return new DoctrineCompletionContext($php->resolveName($call[1]), null, $prefix[1][0], $this->offsetRange($text, $prefix[1][1], \strlen($prefix[1][0])));
+            return new DoctrineCompletionContext(DoctrineCompletionKind::RepositoryCriteria, $php->resolveName($call[1]), null, $prefix[1][0], $this->offsetRange($text, $prefix[1][1], \strlen($prefix[1][0])));
         }
 
         return null;

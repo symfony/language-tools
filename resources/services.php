@@ -17,7 +17,7 @@ use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DefinitionProviderRegistry;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
-use Symfony\Lsp\Feature\Doctrine\DoctrineProvider;
+use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipCodeLensProvider;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\DocumentLinkProviderRegistry;
 use Symfony\Lsp\Feature\Event\EventProvider;
@@ -127,7 +127,7 @@ return static function (ContainerConfigurator $container): void {
         }
         $services->load(
             'Symfony\\Lsp\\Feature\\'.$feature.'\\',
-            '../src/Feature/'.$feature.'/*{Provider,Handler,Extractor,Indexer,Registry,Resolver,Loader,Publisher,Parser,Validator}.php',
+            '../src/Feature/'.$feature.'/*{Provider,Handler,Extractor,Indexer,Registry,Resolver,Loader,Publisher,Parser,Validator,Builder}.php',
         );
     }
     foreach ([MessengerHandler::class, RouteCompletionProvider::class, RouteSnapshotLoader::class, SecurityUserProvider::class] as $class) {
@@ -195,7 +195,7 @@ return static function (ContainerConfigurator $container): void {
     $services->get(RuntimeSnapshotLoaderRegistry::class)
         ->arg('$loaders', tagged_iterator('lsp.runtime_snapshot_loader'));
 
-    foreach ([MessengerProvider::class, EventProvider::class, TwigComponentProvider::class, StimulusProvider::class, DoctrineProvider::class] as $priority => $provider) {
+    foreach ([MessengerProvider::class, EventProvider::class, TwigComponentProvider::class, StimulusProvider::class, DoctrineRelationshipCodeLensProvider::class] as $priority => $provider) {
         $services->get($provider)->tag('lsp.provider.code_lens', ['priority' => -$priority]);
     }
     $services->get(CodeLensProviderRegistry::class)

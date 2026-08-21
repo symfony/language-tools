@@ -7,11 +7,17 @@ use Symfony\Lsp\Document\Range;
 final class DoctrineCompletionContext
 {
     public function __construct(
+        private readonly DoctrineCompletionKind $kind,
         private readonly ?string $entityClass,
         private readonly ?string $repositoryClass,
         private readonly string $prefix,
         private readonly Range $range,
     ) {
+    }
+
+    public function kind(): DoctrineCompletionKind
+    {
+        return $this->kind;
     }
 
     public function entityClass(): ?string
