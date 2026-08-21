@@ -2,46 +2,16 @@
 
 namespace Symfony\Lsp\Feature\Messenger;
 
-final class MessengerSourceIndex
+use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+
+/** @extends AbstractSourceFactsIndex<MessengerSourceFacts> */
+final class MessengerSourceIndex extends AbstractSourceFactsIndex
 {
-    /** @var array<string, MessengerSourceFacts> */
-    private array $sources = [];
-    /** @var array<string, MessengerSourceFacts> */
-    private array $overlays = [];
-
-    public function replace(MessengerSourceFacts ...$sources): void
-    {
-        $this->sources = [];
-        foreach ($sources as $source) {
-            $this->sources[$source->uri()] = $source;
-        }
-    }
-
-    public function replaceSource(MessengerSourceFacts $source): void
-    {
-        $this->sources[$source->uri()] = $source;
-    }
-
-    public function removeSource(string $uri): void
-    {
-        unset($this->sources[$uri]);
-    }
-
-    public function overlay(MessengerSourceFacts $source): void
-    {
-        $this->overlays[$source->uri()] = $source;
-    }
-
-    public function removeOverlay(string $uri): void
-    {
-        unset($this->overlays[$uri]);
-    }
-
     /** @return list<MessengerSourceSymbol> */
     public function symbols(MessengerSymbolKind $kind, string $name): array
     {
         $result = [];
-        foreach ($this->sources() as $source) {
+        foreach ($this->facts() as $source) {
             foreach ($source->symbols() as $symbol) {
                 if ($symbol->kind() === $kind && $symbol->name() === $name) {
                     $result[] = $symbol;
@@ -56,7 +26,7 @@ final class MessengerSourceIndex
     public function ancestors(string $className): array
     {
         $parents = [];
-        foreach ($this->sources() as $source) {
+        foreach ($this->facts() as $source) {
             foreach ($source->parents() as $class => $classParents) {
                 $parents[$class] = $classParents;
             }
@@ -73,11 +43,5 @@ final class MessengerSourceIndex
         }
 
         return array_keys($ancestors);
-    }
-
-    /** @return list<MessengerSourceFacts> */
-    private function sources(): array
-    {
-        return [...array_values(array_diff_key($this->sources, $this->overlays)), ...array_values($this->overlays)];
     }
 }

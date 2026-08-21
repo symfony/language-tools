@@ -2,39 +2,15 @@
 
 namespace Symfony\Lsp\Feature\Metadata;
 
-final class MetadataSourceIndex
+use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+use Symfony\Lsp\Index\SourceFactsOverlayOrder;
+
+/** @extends AbstractSourceFactsIndex<MetadataSourceFacts> */
+final class MetadataSourceIndex extends AbstractSourceFactsIndex
 {
-    /** @var array<string, MetadataSourceFacts> */
-    private array $sources = [];
-    /** @var array<string, MetadataSourceFacts> */
-    private array $overlays = [];
-
-    public function replace(MetadataSourceFacts ...$facts): void
+    public function __construct()
     {
-        $this->sources = [];
-        foreach ($facts as $item) {
-            $this->sources[$item->uri()] = $item;
-        }
-    }
-
-    public function replaceSource(MetadataSourceFacts $facts): void
-    {
-        $this->sources[$facts->uri()] = $facts;
-    }
-
-    public function removeSource(string $uri): void
-    {
-        unset($this->sources[$uri]);
-    }
-
-    public function overlay(MetadataSourceFacts $facts): void
-    {
-        $this->overlays[$facts->uri()] = $facts;
-    }
-
-    public function removeOverlay(string $uri): void
-    {
-        unset($this->overlays[$uri]);
+        parent::__construct(SourceFactsOverlayOrder::PreserveSavedPosition);
     }
 
     /** @return list<MetadataSourceSymbol> */
@@ -59,11 +35,5 @@ final class MetadataSourceIndex
         sort($names);
 
         return $names;
-    }
-
-    /** @return list<MetadataSourceFacts> */
-    private function facts(): array
-    {
-        return array_values(array_replace($this->sources, $this->overlays));
     }
 }
