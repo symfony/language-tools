@@ -3,13 +3,22 @@
 
 require \dirname(__DIR__).'/vendor/autoload.php';
 require __DIR__.'/InteractiveProcessRunner.php';
+require __DIR__.'/ReleaseProcessRunner.php';
+require __DIR__.'/ReleaseGit.php';
+require __DIR__.'/ReleaseGitHub.php';
+require __DIR__.'/ReleaseSleeperInterface.php';
+require __DIR__.'/NativeReleaseSleeper.php';
 require __DIR__.'/ReleaseMetadataUpdater.php';
 require __DIR__.'/ReleaseVersion.php';
 require __DIR__.'/ReleaseCommand.php';
 
 use Symfony\Lsp\Tools\InteractiveProcessRunner;
+use Symfony\Lsp\Tools\NativeReleaseSleeper;
 use Symfony\Lsp\Tools\ReleaseCommand;
+use Symfony\Lsp\Tools\ReleaseGit;
+use Symfony\Lsp\Tools\ReleaseGitHub;
 use Symfony\Lsp\Tools\ReleaseMetadataUpdater;
+use Symfony\Lsp\Tools\ReleaseProcessRunner;
 
 /** @var list<string> $argv */
 $arguments = array_slice($argv, 1);
@@ -46,10 +55,15 @@ if (!$confirmed) {
 }
 
 try {
+    $root = dirname(__DIR__);
+    $processes = new ReleaseProcessRunner(new InteractiveProcessRunner());
     $command = new ReleaseCommand(
-        dirname(__DIR__),
+        $root,
         new ReleaseMetadataUpdater(),
-        new InteractiveProcessRunner(),
+        $processes,
+        new ReleaseGit($root, $processes),
+        new ReleaseGitHub($root, $processes),
+        new NativeReleaseSleeper(),
     );
     $command->release($version);
 } catch (Throwable $error) {

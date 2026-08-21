@@ -2,14 +2,6 @@
 
 namespace Symfony\Lsp\Tools;
 
-use Amp\Process\Process;
-use Amp\Process\ProcessException;
-
-use function Amp\async;
-use function Amp\ByteStream\buffer;
-use function Amp\Future\await;
-use function Amp\Future\awaitAll;
-
 final class ReleaseCommand
 {
     private const EXPECTED_RELEASE_FILES = [
@@ -26,15 +18,14 @@ final class ReleaseCommand
         'zed.yaml',
     ];
 
-    private readonly \Closure $sleep;
-
     public function __construct(
         private string $root,
         private ReleaseMetadataUpdater $metadataUpdater,
-        private InteractiveProcessRunner $interactiveProcessRunner,
-        ?\Closure $sleep = null,
+        private ReleaseProcessRunner $processes,
+        private ReleaseGit $git,
+        private ReleaseGitHub $github,
+        private ReleaseSleeperInterface $sleeper,
     ) {
-        $this->sleep = $sleep ?? static fn (int $seconds): int => sleep($seconds);
     }
 
     public function release(string $version): void
@@ -43,30 +34,21 @@ final class ReleaseCommand
         $version = $releaseVersion->value();
         $this->assertRequirements();
         $this->assertCleanMainBranch();
-        $this->run(
-            ['git', 'fetch', 'origin', 'refs/heads/main:refs/remotes/origin/main'],
-            $this->root,
-        );
+        $this->git->fetchMain();
 
         $tag = $releaseVersion->tag();
-        $remoteTagExists = $this->succeeds(
-            ['git', 'ls-remote', '--exit-code', '--tags', 'origin', 'refs/tags/'.$tag],
-            $this->root,
-        );
+        $remoteTagExists = $this->git->remoteTagExists($tag);
         if (!$remoteTagExists) {
             $this->prepareAndPublishTag($releaseVersion, $tag);
         } elseif ($version !== $this->packageVersion()) {
             throw new \RuntimeException(\sprintf('The project is no longer at version %s.', $version));
         }
 
-        $releaseCommit = $this->remoteTagCommit($tag);
+        $releaseCommit = $this->git->remoteTagCommit($tag);
         $this->waitForWorkflow('release.yaml', $releaseCommit);
         $this->finishRelease($releaseCommit);
 
-        $url = $this->capture(
-            ['gh', 'release', 'view', $tag, '--json', 'url', '--jq', '.url'],
-            $this->root,
-        );
+        $url = $this->github->releaseUrl($tag);
         fwrite(\STDOUT, \sprintf("Release %s completed: %s\n", $version, $url));
     }
 
@@ -74,8 +56,8 @@ final class ReleaseCommand
     {
         $version = $releaseVersion->value();
         $currentVersion = $this->packageVersion();
-        $head = $this->gitRevision('HEAD');
-        $originMain = $this->gitRevision('refs/remotes/origin/main');
+        $head = $this->git->revision('HEAD');
+        $originMain = $this->git->revision('refs/remotes/origin/main');
 
         if ($currentVersion !== $version) {
             if (!$releaseVersion->isGreaterThan($currentVersion)) {
@@ -84,78 +66,60 @@ final class ReleaseCommand
             if ($head !== $originMain) {
                 throw new \RuntimeException('main must match origin/main before preparing a release.');
             }
-            if ($this->succeeds(['git', 'rev-parse', '--verify', '--quiet', 'refs/tags/'.$tag], $this->root)) {
+            if ($this->git->localTagExists($tag)) {
                 throw new \RuntimeException(\sprintf('Local tag %s already exists.', $tag));
             }
 
             $this->validateLocally();
             $this->metadataUpdater->prepare($this->root, $currentVersion, $version, gmdate('Y-m-d'));
-            $this->run(
-                ['npm', 'version', $version, '--no-git-tag-version'],
-                $this->root.'/editor/vscode',
-            );
+            $this->processes->run(['npm', 'version', $version, '--no-git-tag-version'], $this->root.'/editor/vscode');
             $this->assertPreparedMetadata($version);
             $this->assertExpectedReleaseDiff();
-            $this->run(['git', 'add', ...self::EXPECTED_RELEASE_FILES], $this->root);
-            $this->run(['git', 'commit', '-m', \sprintf('Prepare the %s release', $version)], $this->root);
-            $head = $this->gitRevision('HEAD');
+            $this->git->add(self::EXPECTED_RELEASE_FILES);
+            $this->git->commit(\sprintf('Prepare the %s release', $version));
+            $head = $this->git->revision('HEAD');
         } else {
             $this->assertPreparedMetadata($version);
-            if ($head !== $originMain) {
-                $subject = $this->capture(['git', 'log', '-1', '--format=%s'], $this->root);
-                if (\sprintf('Prepare the %s release', $version) !== $subject) {
-                    throw new \RuntimeException(\sprintf('Version %s has unpushed commits after its release preparation.', $version));
-                }
+            if ($head !== $originMain && \sprintf('Prepare the %s release', $version) !== $this->git->subject()) {
+                throw new \RuntimeException(\sprintf('Version %s has unpushed commits after its release preparation.', $version));
             }
         }
 
         if ($head !== $originMain) {
-            if ($this->gitRevision('HEAD^') !== $originMain) {
+            if ($this->git->revision('HEAD^') !== $originMain) {
                 throw new \RuntimeException('The release-preparation commit must be directly based on origin/main.');
             }
-            $this->run(
-                ['git', 'push', 'origin', 'HEAD:refs/heads/main'],
-                $this->root,
-            );
+            $this->git->pushMain();
         }
 
-        $releaseCommit = $this->gitRevision('HEAD');
+        $releaseCommit = $this->git->revision('HEAD');
         $this->waitForRegularWorkflows($releaseCommit);
 
-        if ($this->succeeds(['git', 'rev-parse', '--verify', '--quiet', 'refs/tags/'.$tag], $this->root)) {
-            if ($this->gitRevision('refs/tags/'.$tag) !== $releaseCommit) {
+        if ($this->git->localTagExists($tag)) {
+            if ($this->git->revision('refs/tags/'.$tag) !== $releaseCommit) {
                 throw new \RuntimeException(\sprintf('Local tag %s points to an unexpected commit.', $tag));
             }
         } else {
-            $this->run(['git', 'tag', $tag], $this->root);
+            $this->git->tag($tag);
         }
-        $this->run(
-            ['git', 'push', 'origin', \sprintf('refs/tags/%s:refs/tags/%s', $tag, $tag)],
-            $this->root,
-        );
+        $this->git->pushTag($tag);
     }
 
     private function validateLocally(): void
     {
-        $this->run(['composer', 'test'], $this->root);
-        $this->run(['composer', 'phpstan'], $this->root);
-        $this->run(['composer', 'cs-check'], $this->root);
-        $this->run(['npm', 'ci'], $this->root.'/editor/vscode');
-        $this->run(['npm', 'run', 'check'], $this->root.'/editor/vscode');
+        $this->processes->run(['composer', 'test'], $this->root);
+        $this->processes->run(['composer', 'phpstan'], $this->root);
+        $this->processes->run(['composer', 'cs-check'], $this->root);
+        $this->processes->run(['npm', 'ci'], $this->root.'/editor/vscode');
+        $this->processes->run(['npm', 'run', 'check'], $this->root.'/editor/vscode');
         $stylua = getenv('STYLUA') ?: 'stylua';
-        $this->run([
-            $stylua,
-            '--config-path',
-            'editor/neovim/.stylua.toml',
-            '--check',
-            'editor/neovim',
-        ], $this->root);
-        $this->run([$this->root.'/editor/neovim/test'], $this->root);
-        $this->run(['rustup', 'target', 'add', 'wasm32-wasip2'], $this->root);
-        $this->run([$this->root.'/editor/zed/test'], $this->root);
-        $this->run(['composer', 'runtime-fixture:install'], $this->root);
-        $this->run(['composer', 'server:benchmark'], $this->root);
-        $this->run(['composer', 'runtime-refresh:benchmark'], $this->root);
+        $this->processes->run([$stylua, '--config-path', 'editor/neovim/.stylua.toml', '--check', 'editor/neovim'], $this->root);
+        $this->processes->run([$this->root.'/editor/neovim/test'], $this->root);
+        $this->processes->run(['rustup', 'target', 'add', 'wasm32-wasip2'], $this->root);
+        $this->processes->run([$this->root.'/editor/zed/test'], $this->root);
+        $this->processes->run(['composer', 'runtime-fixture:install'], $this->root);
+        $this->processes->run(['composer', 'server:benchmark'], $this->root);
+        $this->processes->run(['composer', 'runtime-refresh:benchmark'], $this->root);
     }
 
     private function assertPreparedMetadata(string $version): void
@@ -180,11 +144,7 @@ final class ReleaseCommand
 
     private function assertExpectedReleaseDiff(): void
     {
-        $changed = preg_split('/\R/', $this->capture(['git', 'diff', '--name-only'], $this->root), flags: \PREG_SPLIT_NO_EMPTY);
-        if (false === $changed) {
-            throw new \RuntimeException('Unable to inspect the release diff.');
-        }
-        sort($changed);
+        $changed = $this->git->changedFiles();
         $expected = self::EXPECTED_RELEASE_FILES;
         sort($expected);
         if ($expected !== $changed) {
@@ -198,24 +158,17 @@ final class ReleaseCommand
             throw new \RuntimeException('resources/version must remain dev.');
         }
 
-        $this->run(
-            ['git', 'fetch', 'origin', 'refs/heads/main:refs/remotes/origin/main'],
-            $this->root,
-        );
-        $head = $this->gitRevision('HEAD');
-        $originMain = $this->gitRevision('refs/remotes/origin/main');
+        $this->git->fetchMain();
+        $head = $this->git->revision('HEAD');
+        $originMain = $this->git->revision('refs/remotes/origin/main');
         if ($head !== $originMain) {
-            $subject = $this->capture(['git', 'log', '-1', '--format=%s'], $this->root);
-            if ('Start development on the next release' !== $subject
-                || $this->gitRevision('HEAD^') !== $originMain
+            if ('Start development on the next release' !== $this->git->subject()
+                || $this->git->revision('HEAD^') !== $originMain
                 || $originMain !== $releaseCommit
             ) {
                 throw new \RuntimeException('main must match origin/main before completing the release.');
             }
-            $this->run(
-                ['git', 'push', 'origin', 'HEAD:refs/heads/main'],
-                $this->root,
-            );
+            $this->git->pushMain();
             $this->waitForRegularWorkflows($head);
 
             return;
@@ -225,25 +178,20 @@ final class ReleaseCommand
             throw new \RuntimeException('The release tag is not the current main commit.');
         }
         if (!$this->metadataUpdater->startNextDevelopment($this->root)) {
-            if ($head !== $releaseCommit
-                && 'Start development on the next release' === $this->capture(['git', 'log', '-1', '--format=%s'], $this->root)
-            ) {
+            if ($head !== $releaseCommit && 'Start development on the next release' === $this->git->subject()) {
                 $this->waitForRegularWorkflows($head);
             }
 
             return;
         }
 
-        $this->run(['git', 'add', 'CHANGELOG.md'], $this->root);
-        $this->run(['git', 'commit', '-m', 'Start development on the next release'], $this->root);
-        $postReleaseCommit = $this->gitRevision('HEAD');
-        if ($this->gitRevision('HEAD^') !== $releaseCommit) {
+        $this->git->add(['CHANGELOG.md']);
+        $this->git->commit('Start development on the next release');
+        $postReleaseCommit = $this->git->revision('HEAD');
+        if ($this->git->revision('HEAD^') !== $releaseCommit) {
             throw new \RuntimeException('The post-release commit must immediately follow the release tag.');
         }
-        $this->run(
-            ['git', 'push', 'origin', 'HEAD:refs/heads/main'],
-            $this->root,
-        );
+        $this->git->pushMain();
         $this->waitForRegularWorkflows($postReleaseCommit);
     }
 
@@ -259,21 +207,21 @@ final class ReleaseCommand
         fwrite(\STDOUT, \sprintf("Waiting for %s on %s...\n", $workflow, $commit));
         $runId = '';
         for ($attempt = 0, $attempts = $dispatchMissing ? 6 : 120; $attempt < $attempts; ++$attempt) {
-            $runId = $this->workflowRunId($workflow, $commit, $dispatchMissing ? null : 'push');
+            $runId = $this->github->workflowRunId($workflow, $commit, $dispatchMissing ? null : 'push');
             if ('' !== $runId) {
                 break;
             }
-            ($this->sleep)(5);
+            $this->sleeper->sleep(5);
         }
         if ('' === $runId && $dispatchMissing) {
             fwrite(\STDOUT, \sprintf("Dispatching %s for %s...\n", $workflow, $commit));
-            $this->run(['gh', 'workflow', 'run', $workflow, '--ref', 'main'], $this->root);
+            $this->github->dispatchWorkflow($workflow);
             for ($attempt = 0; $attempt < 120; ++$attempt) {
-                $runId = $this->workflowRunId($workflow, $commit);
+                $runId = $this->github->workflowRunId($workflow, $commit);
                 if ('' !== $runId) {
                     break;
                 }
-                ($this->sleep)(5);
+                $this->sleeper->sleep(5);
             }
         }
         if ('' === $runId) {
@@ -281,53 +229,34 @@ final class ReleaseCommand
         }
 
         for ($attempt = 0; $attempt < 2; ++$attempt) {
-            if (0 === $this->runStatus(['gh', 'run', 'watch', $runId, '--exit-status'], $this->root)) {
+            if ($this->github->watchRun($runId)) {
                 return;
             }
 
             fwrite(\STDERR, "\nFailed workflow logs:\n");
-            $this->runStatus(['gh', 'run', 'view', $runId, '--log-failed'], $this->root);
+            $this->github->showFailedLogs($runId);
 
             if (0 === $attempt) {
                 fwrite(\STDERR, "\nRerunning failed workflow jobs once...\n");
-                $this->run(['gh', 'run', 'rerun', $runId, '--failed'], $this->root);
+                $this->github->rerunFailedJobs($runId);
             }
         }
 
         throw new \RuntimeException(\sprintf('Workflow %s failed after one automatic rerun. Inspect it with "gh run view %s --web" before resuming the release.', $workflow, $runId));
     }
 
-    private function workflowRunId(string $workflow, string $commit, ?string $event = null): string
-    {
-        $command = [
-            'gh',
-            'run',
-            'list',
-            '--workflow='.$workflow,
-            '--commit='.$commit,
-        ];
-        if (null !== $event) {
-            $command[] = '--event='.$event;
-        }
-        $command[] = '--limit=1';
-        $command[] = '--json=databaseId';
-        $command[] = '--jq=.[0].databaseId // empty';
-
-        return $this->capture($command, $this->root);
-    }
-
     private function assertRequirements(): void
     {
         foreach (['git', 'gh', 'composer', 'npm', 'rustup'] as $command) {
-            if (!$this->succeeds(['/usr/bin/env', $command, '--version'], $this->root)) {
+            if (!$this->processes->succeeds(['/usr/bin/env', $command, '--version'], $this->root)) {
                 throw new \RuntimeException(\sprintf('Required command not found: %s.', $command));
             }
         }
-        if (!$this->succeeds(['rustup', 'which', 'cargo'], $this->root)) {
+        if (!$this->processes->succeeds(['rustup', 'which', 'cargo'], $this->root)) {
             throw new \RuntimeException('Required Rustup Cargo toolchain not found.');
         }
         foreach ([getenv('NVIM') ?: 'nvim', getenv('STYLUA') ?: 'stylua'] as $command) {
-            if (!$this->succeeds([$command, '--version'], $this->root)) {
+            if (!$this->processes->succeeds([$command, '--version'], $this->root)) {
                 throw new \RuntimeException(\sprintf('Required command not found: %s.', $command));
             }
         }
@@ -335,10 +264,10 @@ final class ReleaseCommand
 
     private function assertCleanMainBranch(): void
     {
-        if ('main' !== $this->capture(['git', 'branch', '--show-current'], $this->root)) {
+        if ('main' !== $this->git->currentBranch()) {
             throw new \RuntimeException('Releases must run from main.');
         }
-        if ('' !== $this->capture(['git', 'status', '--porcelain=v1', '--untracked-files=no'], $this->root)) {
+        if (!$this->git->isClean()) {
             throw new \RuntimeException('Tracked files must be clean before releasing.');
         }
     }
@@ -352,119 +281,6 @@ final class ReleaseCommand
         }
 
         return $version;
-    }
-
-    private function remoteTagCommit(string $tag): string
-    {
-        $output = $this->capture(
-            ['git', 'ls-remote', '--tags', 'origin', 'refs/tags/'.$tag],
-            $this->root,
-        );
-        $parts = preg_split('/\s+/', $output);
-        if (false === $parts || !isset($parts[0]) || !preg_match('/^[0-9a-f]{40}$/', $parts[0])) {
-            throw new \RuntimeException(\sprintf('Unable to resolve remote tag %s.', $tag));
-        }
-
-        return $parts[0];
-    }
-
-    private function gitRevision(string $revision): string
-    {
-        return $this->capture(['git', 'rev-parse', $revision], $this->root);
-    }
-
-    /** @param list<string> $command */
-    private function run(array $command, ?string $workingDirectory = null): void
-    {
-        $status = $this->runStatus($command, $workingDirectory);
-        if (0 !== $status) {
-            throw new \RuntimeException(\sprintf('Command failed with status %d: %s', $status, $this->formatCommand($command)));
-        }
-    }
-
-    /** @param list<string> $command */
-    private function runStatus(array $command, ?string $workingDirectory = null): int
-    {
-        fwrite(\STDOUT, '$ '.$this->formatCommand($command)."\n");
-
-        return $this->interactiveProcessRunner->run($command, $workingDirectory);
-    }
-
-    /** @param list<string> $command */
-    private function capture(array $command, ?string $workingDirectory = null): string
-    {
-        [$status, $output, $errorOutput] = $this->captureResult($command, $workingDirectory);
-        if (0 !== $status) {
-            throw new \RuntimeException(\sprintf("Command failed with status %d: %s\n%s", $status, $this->formatCommand($command), trim($errorOutput)));
-        }
-
-        return trim($output);
-    }
-
-    /** @param list<string> $command */
-    private function succeeds(array $command, ?string $workingDirectory = null): bool
-    {
-        [$status] = $this->captureResult($command, $workingDirectory);
-
-        return 0 === $status;
-    }
-
-    /**
-     * @param list<string> $command
-     *
-     * @return array{int, string, string}
-     */
-    private function captureResult(array $command, ?string $workingDirectory): array
-    {
-        return $this->execute($command, $workingDirectory);
-    }
-
-    /**
-     * @param list<string> $command
-     *
-     * @return array{int, string, string}
-     */
-    private function execute(array $command, ?string $workingDirectory): array
-    {
-        try {
-            $process = Process::start(
-                $command,
-                workingDirectory: $workingDirectory,
-                options: ['bypass_shell' => true],
-            );
-        } catch (ProcessException $error) {
-            throw new \RuntimeException('Unable to start command: '.$this->formatCommand($command), previous: $error);
-        }
-
-        $process->getStdin()->close();
-        $futures = [
-            'stdout' => async(static fn (): string => buffer($process->getStdout())),
-            'stderr' => async(static fn (): string => buffer($process->getStderr())),
-            'exitCode' => async(static fn (): int => $process->join()),
-        ];
-
-        try {
-            /** @var array{stdout: string, stderr: string, exitCode: int} $result */
-            $result = await($futures);
-        } catch (\Throwable $error) {
-            $process->kill();
-            awaitAll($futures);
-
-            throw new \RuntimeException('Unable to run command: '.$this->formatCommand($command), previous: $error);
-        }
-
-        return [$result['exitCode'], $result['stdout'], $result['stderr']];
-    }
-
-    /** @param list<string> $command */
-    private function formatCommand(array $command): string
-    {
-        $formatted = [];
-        foreach ($command as $argument) {
-            $formatted[] = escapeshellarg($argument);
-        }
-
-        return implode(' ', $formatted);
     }
 
     private function read(string $path): string

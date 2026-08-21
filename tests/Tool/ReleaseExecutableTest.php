@@ -97,12 +97,21 @@ final class ReleaseExecutableTest extends TestCase
             $root = $argv[1];
             require $root.'/vendor/autoload.php';
             require $root.'/tools/InteractiveProcessRunner.php';
+            require $root.'/tools/ReleaseProcessRunner.php';
+            require $root.'/tools/ReleaseGit.php';
+            require $root.'/tools/ReleaseGitHub.php';
+            require $root.'/tools/ReleaseSleeperInterface.php';
+            require $root.'/tools/NativeReleaseSleeper.php';
             require $root.'/tools/ReleaseMetadataUpdater.php';
             require $root.'/tools/ReleaseCommand.php';
+            $processes = new Symfony\Lsp\Tools\ReleaseProcessRunner(new Symfony\Lsp\Tools\InteractiveProcessRunner());
             $command = new Symfony\Lsp\Tools\ReleaseCommand(
                 $root,
                 new Symfony\Lsp\Tools\ReleaseMetadataUpdater(),
-                new Symfony\Lsp\Tools\InteractiveProcessRunner(),
+                $processes,
+                new Symfony\Lsp\Tools\ReleaseGit($root, $processes),
+                new Symfony\Lsp\Tools\ReleaseGitHub($root, $processes),
+                new Symfony\Lsp\Tools\NativeReleaseSleeper(),
             );
             $method = (new ReflectionClass($command))->getMethod('waitForWorkflow');
             try {
@@ -160,13 +169,23 @@ final class ReleaseExecutableTest extends TestCase
             $root = $argv[1];
             require $root.'/vendor/autoload.php';
             require $root.'/tools/InteractiveProcessRunner.php';
+            require $root.'/tools/ReleaseProcessRunner.php';
+            require $root.'/tools/ReleaseGit.php';
+            require $root.'/tools/ReleaseGitHub.php';
+            require $root.'/tools/ReleaseSleeperInterface.php';
             require $root.'/tools/ReleaseMetadataUpdater.php';
             require $root.'/tools/ReleaseCommand.php';
+            $processes = new Symfony\Lsp\Tools\ReleaseProcessRunner(new Symfony\Lsp\Tools\InteractiveProcessRunner());
+            $sleeper = new class implements Symfony\Lsp\Tools\ReleaseSleeperInterface {
+                public function sleep(int $seconds): void {}
+            };
             $command = new Symfony\Lsp\Tools\ReleaseCommand(
                 $root,
                 new Symfony\Lsp\Tools\ReleaseMetadataUpdater(),
-                new Symfony\Lsp\Tools\InteractiveProcessRunner(),
-                static function (int $seconds): void {},
+                $processes,
+                new Symfony\Lsp\Tools\ReleaseGit($root, $processes),
+                new Symfony\Lsp\Tools\ReleaseGitHub($root, $processes),
+                $sleeper,
             );
             $method = (new ReflectionClass($command))->getMethod('waitForWorkflow');
             $method->invoke($command, 'quality.yaml', 'commit', true);
