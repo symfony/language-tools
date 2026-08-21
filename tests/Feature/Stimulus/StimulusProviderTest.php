@@ -53,6 +53,8 @@ final class StimulusProviderTest extends TestCase
                  data-action="click->search#open"
                  data-search-target="results">
             </div>
+            {% set dataController = 'search' %}
+            <div data-controller="{{ dataController }}"></div>
             {{ stimulus_action('search', 'open') }}
             TWIG;
         $documents = new DocumentStore();

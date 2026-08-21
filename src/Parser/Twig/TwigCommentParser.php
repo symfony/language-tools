@@ -6,10 +6,21 @@ final class TwigCommentParser
 {
     public function mask(string $source): string
     {
+        return $this->maskSource($source, false);
+    }
+
+    public function maskSyntax(string $source): string
+    {
+        return $this->maskSource($source, true);
+    }
+
+    private function maskSource(string $source, bool $syntax): string
+    {
         $masked = $source;
         $length = \strlen($source);
         $state = 'data';
         $brackets = [];
+        $tagStart = null;
 
         for ($offset = 0; $offset < $length;) {
             if ('data' === $state) {
@@ -26,16 +37,20 @@ final class TwigCommentParser
                 }
                 if ('{%' === substr($source, $offset, 2)) {
                     if (null !== $verbatim = $this->verbatim($source, $offset, $length)) {
+                        $tagStart = $offset;
                         [$contentStart, $contentEnd, $offset] = $verbatim;
-                        $this->maskRange($masked, $source, $contentStart, $contentEnd);
+                        $this->maskRange($masked, $source, $syntax ? $tagStart : $contentStart, $syntax ? $offset : $contentEnd);
+                        $tagStart = null;
                         continue;
                     }
+                    $tagStart = $offset;
                     $state = 'block';
                     $brackets = [];
                     $offset += 2;
                     continue;
                 }
                 if ('{{' === substr($source, $offset, 2)) {
+                    $tagStart = $offset;
                     $state = 'variable';
                     $brackets = [];
                     $offset += 2;
@@ -50,6 +65,10 @@ final class TwigCommentParser
             if ([] === $brackets && $closingDelimiter === substr($source, $offset, 2)) {
                 $state = 'data';
                 $offset += 2;
+                if ($syntax && null !== $tagStart) {
+                    $this->maskRange($masked, $source, $tagStart, $offset);
+                }
+                $tagStart = null;
                 continue;
             }
             if ('\'' === $character || '"' === $character) {
@@ -72,6 +91,10 @@ final class TwigCommentParser
                 array_pop($brackets);
             }
             ++$offset;
+        }
+
+        if ($syntax && null !== $tagStart) {
+            $this->maskRange($masked, $source, $tagStart, $length);
         }
 
         return $masked;

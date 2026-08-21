@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ignore dynamic Twig expressions in Stimulus controller attributes
 - Ignore untyped PHP properties when resolving receiver types
 - Navigate to and describe custom Twig functions and filters
 
