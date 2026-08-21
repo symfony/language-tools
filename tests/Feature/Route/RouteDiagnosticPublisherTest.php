@@ -6,6 +6,7 @@ use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\Document;
+use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
@@ -25,6 +26,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteDiagnosticPublisherTest extends TestCase
 {
@@ -164,10 +166,10 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $classIndexes = new DependencyInjectionSourceIndexRegistry();
             $phpExtractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()));
             $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()));
-            $diagnosticProvider = new RouteDiagnosticPublisher($documents, $projects, $indexes, $classIndexes, $phpExtractor, $twigExtractor);
+            $diagnosticProvider = new RouteDiagnosticPublisher(new DocumentContextResolver($documents, $projects), new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor);
             $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
-            $provider = new RouteCodeActionProvider($documents, $projects, $converter, $indexes, $classIndexes, $phpExtractor, $twigExtractor, new ProjectPathResolver(new UriToPathConverter()));
+            $provider = new RouteCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor, new ProjectPathResolver(new UriToPathConverter()));
 
             $actions = $provider->actions([
                 'textDocument' => ['uri' => $uri],
@@ -249,8 +251,8 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $projects,
             new ProjectPathResolver(new UriToPathConverter()),
             [new RouteDiagnosticPublisher(
-                $documents,
-                $projects,
+                new DocumentContextResolver($documents, $projects),
+                new LspProtocolMapper(),
                 new RouteIndexRegistry(),
                 new DependencyInjectionSourceIndexRegistry(),
                 new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser())),
@@ -325,8 +327,8 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 $projects,
                 new ProjectPathResolver(new UriToPathConverter()),
                 [new RouteDiagnosticPublisher(
-                    $documents,
-                    $projects,
+                    new DocumentContextResolver($documents, $projects),
+                    new LspProtocolMapper(),
                     $routeIndexes,
                     new DependencyInjectionSourceIndexRegistry(),
                     new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser())),

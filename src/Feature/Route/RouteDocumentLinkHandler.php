@@ -2,16 +2,16 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
-use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
-use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteDocumentLinkHandler implements DocumentLinkProviderInterface
 {
     public function __construct(
-        private readonly DocumentStore $documents,
-        private readonly ProjectRegistry $projects,
+        private readonly DocumentContextResolver $documentContextResolver,
+        private readonly LspProtocolMapper $protocol,
         private readonly RouteDeclarationIndexRegistry $declarationIndexes,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly RouteReferenceExtractor $phpReferenceExtractor,
@@ -26,39 +26,24 @@ final class RouteDocumentLinkHandler implements DocumentLinkProviderInterface
      */
     public function links(array $params): ?array
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
+        $request = $this->documentContextResolver->resolveDocument($params);
+        if (null === $request || !\in_array($request->document->languageId(), ['php', 'twig'], true)) {
             return null;
         }
 
-        $document = $this->documents->get($textDocument['uri']);
-        $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $document || null === $project || !\in_array($document->languageId(), ['php', 'twig'], true)) {
-            return null;
-        }
-
-        $references = 'twig' === $document->languageId()
-            ? $this->twigReferenceExtractor->extract($document->text())
-            : $this->phpReferenceExtractor->extract($document->text(), $this->classIndexes->forProject($project));
+        $references = 'twig' === $request->document->languageId()
+            ? $this->twigReferenceExtractor->extract($request->document->text())
+            : $this->phpReferenceExtractor->extract($request->document->text(), $this->classIndexes->forProject($request->project));
         $links = [];
         foreach ($references as $reference) {
-            $declarations = $this->declarationIndexes->forProject($project)->find($reference->name());
+            $declarations = $this->declarationIndexes->forProject($request->project)->find($reference->name());
             if (1 !== \count($declarations)) {
                 continue;
             }
 
             $declaration = $declarations[0];
             $links[] = [
-                'range' => [
-                    'start' => [
-                        'line' => $reference->range()->start()->line(),
-                        'character' => $reference->range()->start()->character(),
-                    ],
-                    'end' => [
-                        'line' => $reference->range()->end()->line(),
-                        'character' => $reference->range()->end()->character(),
-                    ],
-                ],
+                'range' => $this->protocol->range($reference->range()),
                 'target' => $declaration->uri().'#L'.($declaration->range()->start()->line() + 1),
                 'tooltip' => \sprintf('Open route "%s"', $reference->name()),
             ];

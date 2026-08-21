@@ -3,19 +3,20 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Project\ProjectPathResolver;
-use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteCodeActionProvider implements CodeActionProviderInterface
 {
     public function __construct(
-        private readonly DocumentStore $documents,
-        private readonly ProjectRegistry $projects,
+        private readonly DocumentContextResolver $documentContextResolver,
         private readonly PositionConverter $converter,
+        private readonly LspProtocolMapper $protocol,
         private readonly RouteIndexRegistry $indexes,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly RouteReferenceExtractor $phpExtractor,
@@ -26,23 +27,18 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
 
     public function actions(array $params): ?array
     {
-        $textDocument = $params['textDocument'] ?? null;
+        $request = $this->documentContextResolver->resolveDocument($params);
         $context = $params['context'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null) || !\is_array($context)) {
-            return null;
-        }
-        $document = $this->documents->get($textDocument['uri']);
-        $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $document
-            || null === $project
-            || !$this->pathResolver->isApplicationOwned($project, $document->uri())
-            || !\in_array($document->languageId(), ['php', 'twig'], true)
+        if (null === $request
+            || !\is_array($context)
+            || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri())
+            || !\in_array($request->document->languageId(), ['php', 'twig'], true)
         ) {
             return null;
         }
-        $references = 'twig' === $document->languageId()
-            ? $this->twigExtractor->extract($document->text())
-            : $this->phpExtractor->extract($document->text(), $this->classIndexes->forProject($project));
+        $references = 'twig' === $request->document->languageId()
+            ? $this->twigExtractor->extract($request->document->text())
+            : $this->phpExtractor->extract($request->document->text(), $this->classIndexes->forProject($request->project));
         $actions = [];
         foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
             if (!\is_array($diagnostic) || 'route.missing_parameters' !== ($diagnostic['code'] ?? null)) {
@@ -56,12 +52,12 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
                 if (!$this->sameRange($reference, $range)) {
                     continue;
                 }
-                $route = $this->indexes->forProject($project)->get($reference->name());
+                $route = $this->indexes->forProject($request->project)->get($reference->name());
                 if (null === $route || null === $reference->providedParameters()) {
                     continue;
                 }
                 $missing = array_values(array_diff($route->requiredParameters(), $reference->providedParameters()));
-                $edit = $this->edit($document, $reference, $missing);
+                $edit = $this->edit($request->document, $reference, $missing);
                 if (null === $edit) {
                     continue;
                 }
@@ -71,7 +67,7 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
                     'diagnostics' => [$diagnostic],
                     'isPreferred' => true,
                     'edit' => ['documentChanges' => [[
-                        'textDocument' => ['uri' => $document->uri(), 'version' => $document->version()],
+                        'textDocument' => ['uri' => $request->document->uri(), 'version' => $request->document->version()],
                         'edits' => [$edit],
                     ]]],
                 ];
@@ -112,13 +108,7 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
         }
         $position = $this->converter->toPosition($text, $offset);
 
-        return [
-            'range' => [
-                'start' => ['line' => $position->line(), 'character' => $position->character()],
-                'end' => ['line' => $position->line(), 'character' => $position->character()],
-            ],
-            'newText' => $newText,
-        ];
+        return $this->protocol->textEdit(new Range($position, $position), $newText);
     }
 
     /** @param array<array-key, mixed> $range */

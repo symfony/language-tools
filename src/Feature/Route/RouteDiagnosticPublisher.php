@@ -2,16 +2,16 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
-use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
-use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
 {
     public function __construct(
-        private readonly DocumentStore $documents,
-        private readonly ProjectRegistry $projects,
+        private readonly DocumentContextResolver $documentContextResolver,
+        private readonly LspProtocolMapper $protocol,
         private readonly RouteIndexRegistry $routeIndexes,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly RouteReferenceExtractor $phpReferenceExtractor,
@@ -26,46 +26,24 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
      */
     public function diagnostics(array $params): ?array
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
+        $request = $this->documentContextResolver->resolveDocument($params);
+        if (null === $request || !\in_array($request->document->languageId(), ['php', 'twig'], true)) {
             return null;
         }
 
-        $document = $this->documents->get($textDocument['uri']);
-        $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $document || null === $project || !\in_array($document->languageId(), ['php', 'twig'], true)) {
-            return null;
-        }
-
-        $routeIndex = $this->routeIndexes->forProject($project);
+        $routeIndex = $this->routeIndexes->forProject($request->project);
         if (!$routeIndex->isComplete()) {
             return null;
         }
 
         $diagnostics = [];
-        $references = 'twig' === $document->languageId()
-            ? $this->twigReferenceExtractor->extract($document->text())
-            : $this->phpReferenceExtractor->extract($document->text(), $this->classIndexes->forProject($project));
+        $references = 'twig' === $request->document->languageId()
+            ? $this->twigReferenceExtractor->extract($request->document->text())
+            : $this->phpReferenceExtractor->extract($request->document->text(), $this->classIndexes->forProject($request->project));
         foreach ($references as $reference) {
-            $range = [
-                'start' => [
-                    'line' => $reference->range()->start()->line(),
-                    'character' => $reference->range()->start()->character(),
-                ],
-                'end' => [
-                    'line' => $reference->range()->end()->line(),
-                    'character' => $reference->range()->end()->character(),
-                ],
-            ];
             $route = $routeIndex->get($reference->name());
             if (null === $route) {
-                $diagnostics[] = [
-                    'range' => $range,
-                    'severity' => 1,
-                    'source' => 'symfony',
-                    'code' => 'route.not_found',
-                    'message' => \sprintf('Route "%s" does not exist in the selected environment.', $reference->name()),
-                ];
+                $diagnostics[] = $this->protocol->diagnostic($reference->range(), 1, 'route.not_found', \sprintf('Route "%s" does not exist in the selected environment.', $reference->name()));
 
                 continue;
             }
@@ -79,18 +57,17 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
                 $reference->providedParameters(),
             ));
             if ([] !== $missingParameters) {
-                $diagnostics[] = [
-                    'range' => $range,
-                    'severity' => 1,
-                    'source' => 'symfony',
-                    'code' => 'route.missing_parameters',
-                    'message' => \sprintf(
+                $diagnostics[] = $this->protocol->diagnostic(
+                    $reference->range(),
+                    1,
+                    'route.missing_parameters',
+                    \sprintf(
                         'Route "%s" requires parameter%s "%s".',
                         $reference->name(),
                         1 === \count($missingParameters) ? '' : 's',
                         implode('", "', $missingParameters),
                     ),
-                ];
+                );
             }
         }
 

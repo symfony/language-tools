@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Feature\Route;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
+use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
@@ -22,6 +23,7 @@ use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteDocumentLinkHandlerTest extends TestCase
 {
@@ -40,8 +42,8 @@ final class RouteDocumentLinkHandlerTest extends TestCase
         ));
         $positionConverter = new PositionConverter();
         $handler = new RouteDocumentLinkHandler(
-            $documents,
-            $projects,
+            new DocumentContextResolver($documents, $projects),
+            new LspProtocolMapper(),
             $declarations,
             new DependencyInjectionSourceIndexRegistry(),
             new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser())),
