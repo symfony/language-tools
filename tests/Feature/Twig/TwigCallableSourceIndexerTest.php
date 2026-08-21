@@ -1,0 +1,60 @@
+<?php
+
+namespace Symfony\Lsp\Tests\Feature\Twig;
+
+use Microsoft\PhpParser\Parser;
+use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Twig\TwigCallableDeclarationExtractor;
+use Symfony\Lsp\Feature\Twig\TwigCallableIndexRegistry;
+use Symfony\Lsp\Feature\Twig\TwigCallableKind;
+use Symfony\Lsp\Feature\Twig\TwigCallableSourceFacts;
+use Symfony\Lsp\Feature\Twig\TwigCallableSourceIndexer;
+use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceIndexPayloadCodec;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Project\Project;
+
+final class TwigCallableSourceIndexerTest extends TestCase
+{
+    public function testRestoresPersistedTwigCallableDeclarations(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $uri = 'file:///workspace/src/Twig/AppExtension.php';
+        $document = new SourceDocument($uri, 'php', <<<'PHP'
+            <?php
+            use App\Twig\Runtime;
+            use Twig\TwigFunction;
+
+            return [new TwigFunction('function_name', [Runtime::class, 'render'])];
+            PHP);
+        $sourceIndexes = new TwigCallableIndexRegistry();
+        $sourceIndexer = $this->indexer($sourceIndexes);
+        $sourceIndexer->begin($project);
+        $facts = $sourceIndexer->index($project, $document);
+        self::assertInstanceOf(TwigCallableSourceFacts::class, $facts);
+        $sourceIndexer->finish($project);
+
+        $codec = new SourceIndexPayloadCodec();
+        $codec->validate([$sourceIndexer]);
+        $payload = $codec->encode($sourceIndexer->name(), $facts);
+        $restoredIndexes = new TwigCallableIndexRegistry();
+        $restoredIndexer = $this->indexer($restoredIndexes);
+        $restoredIndexer->begin($project);
+        $restoredIndexer->restore($project, $codec->decode($sourceIndexer->name(), $payload));
+        $restoredIndexer->finish($project);
+
+        $declarations = $restoredIndexes->forProject($project)->declarations(TwigCallableKind::Function, 'function_name');
+        self::assertCount(1, $declarations);
+        self::assertSame('App\Twig\Runtime', $declarations[0]->className());
+        self::assertSame('render', $declarations[0]->method());
+    }
+
+    private function indexer(TwigCallableIndexRegistry $indexes): TwigCallableSourceIndexer
+    {
+        return new TwigCallableSourceIndexer(
+            $indexes,
+            new TwigCallableDeclarationExtractor(new PositionConverter(), new TolerantPhpParser(new Parser())),
+        );
+    }
+}

@@ -17,6 +17,7 @@ final class RuntimeRefreshPlanner
         'security' => ['security', 'container'],
         'stimulus' => ['stimulus'],
         'translations' => ['translations'],
+        'twig_callables' => ['twig'],
         'twig_components_v2' => ['twig', 'twig_components', 'container'],
     ];
 

@@ -45,6 +45,13 @@ Supported Integrations
       - Yes
       - No
       - Yes
+    * - `Twig functions and filters`_
+      - No
+      - Yes
+      - Yes
+      - No
+      - No
+      - No
     * - `Translations`_
       - Yes
       - Yes
@@ -192,6 +199,7 @@ If a runtime-backed feature returns no results, verify that:
 .. _`Routing`: routing.rst
 .. _`Dependency injection`: dependency-injection.rst
 .. _`Twig template names`: templates.rst
+.. _`Twig functions and filters`: twig-callables.rst
 .. _`Translations`: translations.rst
 .. _`Environment variables`: environment.rst
 .. _`Bundle configuration`: configuration.rst

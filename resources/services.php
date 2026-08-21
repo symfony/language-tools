@@ -37,6 +37,7 @@ use Symfony\Lsp\Feature\Twig\LiveComponentEventProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCodeActionProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCompletionHandler;
 use Symfony\Lsp\Feature\Twig\TemplateNavigationProvider;
+use Symfony\Lsp\Feature\Twig\TwigCallableProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentCodeLensProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentCompletionProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentDiagnosticProvider;
@@ -109,6 +110,7 @@ return static function (ContainerConfigurator $container): void {
             TemplateCompletionHandler::class,
             TemplateNavigationProvider::class,
             TemplateCodeActionProvider::class,
+            TwigCallableProvider::class,
             TwigVariableProvider::class,
             TwigComponentCompletionProvider::class,
             TwigComponentRelationshipProvider::class,

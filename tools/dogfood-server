@@ -133,6 +133,61 @@ function findProbe(string $root, array $probe): ?array
     return null;
 }
 
+function findTwigCallableProbe(string $root, string $kind): ?array
+{
+    $names = [];
+    $sourceDirectory = $root.'/src';
+    if (!is_dir($sourceDirectory)) {
+        return null;
+    }
+    $sourceFiles = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($sourceDirectory, FilesystemIterator::SKIP_DOTS));
+    foreach ($sourceFiles as $file) {
+        if (!$file instanceof SplFileInfo || !$file->isFile() || 'php' !== strtolower($file->getExtension())) {
+            continue;
+        }
+        $contents = file_get_contents($file->getPathname());
+        if (false === $contents) {
+            continue;
+        }
+        preg_match_all('/\bnew\s+(?:\\\\?Twig\\\\)?Twig'.preg_quote($kind, '/').'\s*\(\s*([\'\"])([A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*)\1/', $contents, $matches);
+        foreach ($matches[2] as $name) {
+            $names[$name] = true;
+        }
+    }
+    if ([] === $names) {
+        return null;
+    }
+    $alternatives = implode('|', array_map(static fn (string $name): string => preg_quote($name, '/'), array_keys($names)));
+    $pattern = 'Function' === $kind
+        ? '/\b('.$alternatives.')\s*\(/'
+        : '/\|\s*('.$alternatives.')\b/';
+    $templateDirectory = $root.'/templates';
+    if (!is_dir($templateDirectory)) {
+        return null;
+    }
+    $templateFiles = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($templateDirectory, FilesystemIterator::SKIP_DOTS));
+    foreach ($templateFiles as $file) {
+        if (!$file instanceof SplFileInfo || !$file->isFile() || 'twig' !== strtolower($file->getExtension())) {
+            continue;
+        }
+        $contents = file_get_contents($file->getPathname());
+        if (false === $contents || !preg_match($pattern, $contents, $matches, \PREG_OFFSET_CAPTURE)) {
+            continue;
+        }
+        $value = $matches[1][0];
+
+        return [
+            'category' => 'twig.'.strtolower($kind),
+            'path' => str_replace('\\', '/', $file->getPathname()),
+            'contents' => $contents,
+            'value' => $value,
+            'position' => position($contents, $matches[1][1] + intdiv(strlen($value), 2)),
+        ];
+    }
+
+    return null;
+}
+
 if ($argc < 3 || $argc > 4) {
     fwrite(\STDERR, "Usage: dogfood-server <server> <project> [environment]\n");
     exit(2);
@@ -197,6 +252,12 @@ $definitions = [
 $probes = [];
 foreach ($definitions as $definition) {
     $probe = findProbe($project, $definition);
+    if (null !== $probe) {
+        $probes[] = $probe;
+    }
+}
+foreach (['Function', 'Filter'] as $kind) {
+    $probe = findTwigCallableProbe($project, $kind);
     if (null !== $probe) {
         $probes[] = $probe;
     }

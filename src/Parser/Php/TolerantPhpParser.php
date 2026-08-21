@@ -4,11 +4,18 @@ namespace Symfony\Lsp\Parser\Php;
 
 use Microsoft\PhpParser\DiagnosticsProvider;
 use Microsoft\PhpParser\Node;
+use Microsoft\PhpParser\Node\ArrayElement;
 use Microsoft\PhpParser\Node\Attribute;
 use Microsoft\PhpParser\Node\ClassBaseClause;
+use Microsoft\PhpParser\Node\DelimitedList\ArrayElementList;
 use Microsoft\PhpParser\Node\Expression\ArgumentExpression;
+use Microsoft\PhpParser\Node\Expression\ArrayCreationExpression;
 use Microsoft\PhpParser\Node\Expression\CallExpression;
 use Microsoft\PhpParser\Node\Expression\MemberAccessExpression;
+use Microsoft\PhpParser\Node\Expression\ObjectCreationExpression;
+use Microsoft\PhpParser\Node\Expression\ScopedPropertyAccessExpression;
+use Microsoft\PhpParser\Node\Expression\Variable;
+use Microsoft\PhpParser\Node\MethodDeclaration;
 use Microsoft\PhpParser\Node\NamespaceAliasingClause;
 use Microsoft\PhpParser\Node\NamespaceUseClause;
 use Microsoft\PhpParser\Node\NamespaceUseGroupClause;
@@ -35,6 +42,8 @@ final class TolerantPhpParser implements PhpParserInterface
         $root = $this->parser->parseSourceFile($source);
         $attributes = [];
         $methodCalls = [];
+        $objectCreationNodes = [];
+        $methodDeclarationNodes = [];
         $typeDeclarations = [];
         $namespaceDefinition = null;
         $namespaceFound = false;
@@ -49,6 +58,10 @@ final class TolerantPhpParser implements PhpParserInterface
                 if (null !== $call) {
                     $methodCalls[] = $call;
                 }
+            } elseif ($node instanceof ObjectCreationExpression) {
+                $objectCreationNodes[] = $node;
+            } elseif ($node instanceof MethodDeclaration) {
+                $methodDeclarationNodes[] = $node;
             } elseif ($node instanceof ClassDeclaration || $node instanceof InterfaceDeclaration || $node instanceof TraitDeclaration || $node instanceof EnumDeclaration) {
                 $typeDeclarations[] = $this->typeDeclaration($node, $source);
             }
@@ -71,8 +84,23 @@ final class TolerantPhpParser implements PhpParserInterface
         }
 
         $names = new PhpNameContext($namespace, $imports);
+        $typedVariables = $this->typedVariables($source, $names);
+        $objectCreations = [];
+        foreach ($objectCreationNodes as $node) {
+            $creation = $this->objectCreation($node, $source, $names, $typedVariables);
+            if (null !== $creation) {
+                $objectCreations[] = $creation;
+            }
+        }
+        $methodDeclarations = [];
+        foreach ($methodDeclarationNodes as $node) {
+            $declaration = $this->methodDeclaration($node, $source);
+            if (null !== $declaration) {
+                $methodDeclarations[] = $declaration;
+            }
+        }
 
-        return new PhpDocument($attributes, $methodCalls, $typeDeclarations, $diagnostics, $this->typedVariables($source, $names), $names);
+        return new PhpDocument($attributes, $methodCalls, $typeDeclarations, $diagnostics, $typedVariables, $names, $objectCreations, $methodDeclarations);
     }
 
     /** @return list<PhpTypedVariable> */
@@ -184,6 +212,54 @@ final class TolerantPhpParser implements PhpParserInterface
         );
     }
 
+    /** @param list<PhpTypedVariable> $typedVariables */
+    private function objectCreation(ObjectCreationExpression $creation, string $source, PhpNameContext $names, array $typedVariables): ?PhpObjectCreation
+    {
+        if (!$creation->classTypeDesignator instanceof QualifiedName) {
+            return null;
+        }
+        $className = $this->className($creation->classTypeDesignator, $source, $names);
+        if (null === $className) {
+            return null;
+        }
+        $owner = $creation->getFirstAncestor(ClassDeclaration::class);
+
+        return new PhpObjectCreation(
+            $className,
+            $this->arguments(
+                $creation->argumentExpressionList->children ?? [],
+                $source,
+                $names,
+                $owner instanceof ClassDeclaration ? $owner : null,
+                $typedVariables,
+            ),
+        );
+    }
+
+    private function methodDeclaration(MethodDeclaration $declaration, string $source): ?PhpMethodDeclaration
+    {
+        $owner = $declaration->getFirstAncestor(ClassDeclaration::class);
+        if (!$owner instanceof ClassDeclaration || !$declaration->name instanceof Token) {
+            return null;
+        }
+        $name = $declaration->name->getText($source);
+        if (!\is_string($name) || '' === $name) {
+            return null;
+        }
+        $signature = preg_replace('/\s+/', ' ', trim($declaration->getSignatureFormatted()));
+        $signature = str_replace([' ( ', '( ', ' )', ' ,', ' : '], ['(', '(', ')', ',', ': '], $signature ?? '');
+        $description = trim($declaration->getDescriptionFormatted());
+
+        return new PhpMethodDeclaration(
+            (string) $owner->getNamespacedName(),
+            $name,
+            $declaration->name->getStartPosition(),
+            $declaration->name->getEndPosition(),
+            $signature,
+            '' === $description ? null : $description,
+        );
+    }
+
     private function attribute(Attribute $attribute, string $source): PhpAttribute
     {
         return new PhpAttribute(
@@ -213,11 +289,12 @@ final class TolerantPhpParser implements PhpParserInterface
     }
 
     /**
-     * @param array<Node|Token> $children
+     * @param array<Node|Token>      $children
+     * @param list<PhpTypedVariable> $typedVariables
      *
      * @return list<PhpArgument>
      */
-    private function arguments(array $children, string $source): array
+    private function arguments(array $children, string $source, ?PhpNameContext $names = null, ?ClassDeclaration $owner = null, array $typedVariables = []): array
     {
         $arguments = [];
         foreach ($children as $child) {
@@ -229,10 +306,126 @@ final class TolerantPhpParser implements PhpParserInterface
             $arguments[] = new PhpArgument(
                 \is_string($name) ? $name : null,
                 $child->expression instanceof StringLiteral ? $this->stringLiteral($child->expression, $source) : null,
+                null === $names ? null : $this->phpCallable($child->expression, $source, $names, $owner, $typedVariables),
             );
         }
 
         return $arguments;
+    }
+
+    /** @param list<PhpTypedVariable> $typedVariables */
+    private function phpCallable(mixed $expression, string $source, PhpNameContext $names, ?ClassDeclaration $owner, array $typedVariables): ?PhpCallable
+    {
+        if ($expression instanceof ArrayCreationExpression) {
+            $elements = get_object_vars($expression)['arrayElements'] ?? null;
+            if (!$elements instanceof ArrayElementList) {
+                return null;
+            }
+            $values = [];
+            foreach ($elements->children as $element) {
+                if ($element instanceof ArrayElement) {
+                    $values[] = $element->elementValue;
+                }
+            }
+            if (2 !== \count($values) || !$values[1] instanceof StringLiteral) {
+                return null;
+            }
+            $className = $this->classNameFromExpression($values[0], $source, $names, $owner, $typedVariables);
+            $method = $this->stringLiteral($values[1], $source)?->value();
+
+            return null === $className || null === $method ? null : new PhpCallable($className, $method);
+        }
+        if (!$expression instanceof CallExpression || !$this->isFirstClassCallable($expression)) {
+            return null;
+        }
+        $callable = $expression->callableExpression;
+        if ($callable instanceof ScopedPropertyAccessExpression) {
+            $className = $this->classNameFromExpression($callable->scopeResolutionQualifier, $source, $names, $owner, $typedVariables);
+            $method = $callable->memberName->getText($source);
+        } elseif ($callable instanceof MemberAccessExpression) {
+            $className = $this->classNameFromExpression($callable->dereferencableExpression, $source, $names, $owner, $typedVariables);
+            $method = $callable->memberName->getText($source);
+        } else {
+            return null;
+        }
+
+        return null === $className || !\is_string($method) || '' === $method ? null : new PhpCallable($className, $method);
+    }
+
+    private function isFirstClassCallable(CallExpression $call): bool
+    {
+        $arguments = [];
+        foreach ($call->argumentExpressionList->children ?? [] as $child) {
+            if ($child instanceof ArgumentExpression) {
+                $arguments[] = $child;
+            }
+        }
+
+        return 1 === \count($arguments) && $arguments[0]->dotDotDotToken instanceof Token && null === $arguments[0]->expression;
+    }
+
+    /** @param list<PhpTypedVariable> $typedVariables */
+    private function classNameFromExpression(mixed $expression, string $source, PhpNameContext $names, ?ClassDeclaration $owner, array $typedVariables): ?string
+    {
+        if ($expression instanceof ScopedPropertyAccessExpression) {
+            $member = $expression->memberName->getText($source);
+            if ('class' !== $member) {
+                return null;
+            }
+
+            return $this->classNameFromExpression($expression->scopeResolutionQualifier, $source, $names, $owner, $typedVariables);
+        }
+        if ($expression instanceof QualifiedName) {
+            return $this->className($expression, $source, $names, $owner);
+        }
+        if ($expression instanceof Variable) {
+            $variable = $expression->getText($source);
+            if ('$this' === $variable) {
+                return null === $owner ? null : (string) $owner->getNamespacedName();
+            }
+
+            return $this->variableType(ltrim($variable, '$'), $typedVariables);
+        }
+        if ($expression instanceof MemberAccessExpression) {
+            $receiver = $expression->dereferencableExpression->getText($source);
+            $property = $expression->memberName->getText($source);
+            if ('$this' === $receiver && \is_string($property)) {
+                return $this->variableType($property, $typedVariables);
+            }
+        }
+
+        return null;
+    }
+
+    private function className(QualifiedName $name, string $source, PhpNameContext $names, ?ClassDeclaration $owner = null): ?string
+    {
+        $text = trim($this->qualifiedName($name, $source), '\\');
+        if (\in_array(strtolower($text), ['self', 'static'], true)) {
+            return null === $owner ? null : (string) $owner->getNamespacedName();
+        }
+        if ('parent' === strtolower($text)) {
+            $base = null === $owner ? null : (get_object_vars($owner)['classBaseClause'] ?? null);
+
+            return $base instanceof ClassBaseClause ? (string) $base->baseClass->getResolvedName() : null;
+        }
+        $resolved = $name->getResolvedName();
+        $resolved = null === $resolved ? $names->resolve($text) : (string) $resolved;
+
+        return '' === $resolved ? null : ltrim($resolved, '\\');
+    }
+
+    /** @param list<PhpTypedVariable> $typedVariables */
+    private function variableType(string $name, array $typedVariables): ?string
+    {
+        $types = [];
+        foreach ($typedVariables as $variable) {
+            if ($name === $variable->name()) {
+                array_push($types, ...$variable->types());
+            }
+        }
+        $types = array_values(array_unique($types));
+
+        return 1 === \count($types) ? $types[0] : null;
     }
 
     private function attributeName(Node|Token $name, string $source): string

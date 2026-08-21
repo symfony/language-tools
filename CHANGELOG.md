@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Navigate to and describe custom Twig functions and filters
+
 ## 0.14.1 (2026-08-20)
 
 - Build Linux releases with Alpine's musl toolchain

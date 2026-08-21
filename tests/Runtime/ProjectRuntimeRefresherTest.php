@@ -46,6 +46,7 @@ final class ProjectRuntimeRefresherTest extends TestCase
         yield 'asset and Stimulus' => ['file:///workspace/assets/app.js', ['assets', 'stimulus'], RuntimeRefreshMode::Reuse, ['assets', 'stimulus'], true];
         yield 'event' => ['file:///workspace/src/Listener.php', ['events'], RuntimeRefreshMode::Clear, ['events', 'container'], false];
         yield 'translation' => ['file:///workspace/translations/messages.en.yaml', ['translations'], RuntimeRefreshMode::Reuse, ['translations'], true];
+        yield 'Twig callable' => ['file:///workspace/src/Twig/AppExtension.php', ['twig_callables'], RuntimeRefreshMode::Clear, ['twig'], false];
         yield 'ambiguous configuration' => ['file:///workspace/config/packages/framework.yaml', ['dependencyInjection'], RuntimeRefreshMode::Clear, null, false];
         yield 'unknown domain' => ['file:///workspace/src/Entity.php', ['doctrine_v1'], RuntimeRefreshMode::Clear, null, false];
     }

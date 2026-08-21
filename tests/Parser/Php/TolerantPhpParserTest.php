@@ -96,6 +96,57 @@ final class TolerantPhpParserTest extends TestCase
         ], array_map(static fn ($variable): array => $variable->types(), $variables));
     }
 
+    public function testExposesObjectCreationCallablesAndMethodDeclarations(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Twig;
+
+            use App\Twig\Runtime\AppRuntime as Runtime;
+            use Twig\TwigFunction as FunctionDefinition;
+
+            final class AppExtension
+            {
+                public function __construct(private Runtime $runtime) {}
+
+                public function getFunctions(): array
+                {
+                    return [
+                        new FunctionDefinition('array_name', [Runtime::class, 'fromArray']),
+                        new FunctionDefinition(name: 'self_name', callable: [self::class, 'ownMethod']),
+                        new FunctionDefinition('this_name', $this->ownMethod(...)),
+                        new FunctionDefinition('property_name', $this->runtime->fromProperty(...)),
+                        new FunctionDefinition('static_name', Runtime::fromStatic(...)),
+                        new FunctionDefinition('empty_name', []),
+                    ];
+                }
+
+                /** Formats the value. */
+                public function ownMethod(string $value): string { return $value; }
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $creations = $document->objectCreations();
+
+        self::assertSame(['array_name', 'self_name', 'this_name', 'property_name', 'static_name', 'empty_name'], array_map(static fn ($creation): ?string => $creation->argument('name')?->stringLiteral()?->value() ?? $creation->argument(0)?->stringLiteral()?->value(), $creations));
+        self::assertSame([
+            ['App\Twig\Runtime\AppRuntime', 'fromArray'],
+            ['App\Twig\AppExtension', 'ownMethod'],
+            ['App\Twig\AppExtension', 'ownMethod'],
+            ['App\Twig\Runtime\AppRuntime', 'fromProperty'],
+            ['App\Twig\Runtime\AppRuntime', 'fromStatic'],
+            [null, null],
+        ], array_map(static fn ($creation): array => [
+            ($creation->argument('callable') ?? $creation->argument(1))?->callable()?->className(),
+            ($creation->argument('callable') ?? $creation->argument(1))?->callable()?->method(),
+        ], $creations));
+        $method = array_values(array_filter($document->methodDeclarations(), static fn ($method): bool => 'ownMethod' === $method->name()))[0];
+        self::assertSame('App\Twig\AppExtension', $method->className());
+        self::assertSame('public function ownMethod(string $value): string', $method->signature());
+        self::assertSame('Formats the value.', $method->description());
+    }
+
     public function testKeepsImportsFromIncompleteGroupedSyntax(): void
     {
         $document = (new TolerantPhpParser(new Parser()))->parse("<?php\n// café\nnamespace App;\nuse Vendor\\Package\\{First, Second as Alias");
