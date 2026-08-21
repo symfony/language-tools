@@ -44,8 +44,17 @@ final class ConfigurationValueValidator
         if (str_contains($plain, '%') || str_starts_with($plain, '$')) {
             return true;
         }
-        if ([] !== $node->allowedValues() && !\in_array($plain, array_map('strval', $node->allowedValues()), true)) {
-            return false;
+        if ([] !== $node->allowedValues()) {
+            $allowed = false;
+            foreach ($node->allowedValues() as $value) {
+                if ($plain === (string) $value) {
+                    $allowed = true;
+                    break;
+                }
+            }
+            if (!$allowed) {
+                return false;
+            }
         }
 
         return match ($node->type()) {
