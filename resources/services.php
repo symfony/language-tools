@@ -200,6 +200,8 @@ return static function (ContainerConfigurator $container): void {
     foreach ($registries as $registry => $tag) {
         $services->get($registry)->arg('$providers', tagged_iterator($tag));
     }
+    $services->get(ApplicationSourceScanner::class)
+        ->arg('$mutex', service(LocalKeyedMutex::class));
     $services->get(RuntimeSnapshotLoaderRegistry::class)
         ->arg('$loaders', tagged_iterator('lsp.runtime_snapshot_loader'));
 

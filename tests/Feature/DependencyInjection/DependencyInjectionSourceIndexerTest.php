@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 
+use Amp\Sync\LocalKeyedMutex;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
@@ -66,6 +67,7 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
             new PhpRuntimeStructureHasher(),
             new UriToPathConverter(),
             new SourceFileEnumerator(new GitignoreMatcher()),
+            new LocalKeyedMutex(),
             [new DependencyInjectionSourceIndexer(
                 $indexes,
                 new YamlDependencyInjectionExtractor($converter),

@@ -4,6 +4,9 @@ namespace Symfony\Lsp\Index;
 
 use Amp\Cancellation;
 use Amp\CancelledException;
+use Amp\CompositeCancellation;
+use Amp\DeferredCancellation;
+use Amp\Sync\KeyedMutex;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Progress\ProgressReporterInterface;
 use Symfony\Lsp\Project\Project;
@@ -17,11 +20,16 @@ use function Amp\delay;
  */
 final class ApplicationSourceScanner
 {
+    private const LOCK_PREFIX = "source\0";
+
     /** @var list<SourceIndexProviderInterface> */
     private array $providers;
 
     /** @var array<string, array<string, SourceIndexMetadata>> */
     private array $entries = [];
+
+    /** @var array<string, DeferredCancellation> */
+    private array $activeScans = [];
 
     /** @param iterable<SourceIndexProviderInterface> $providers */
     public function __construct(
@@ -34,6 +42,7 @@ final class ApplicationSourceScanner
         private readonly PhpRuntimeStructureHasher $runtimeStructureHasher,
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly SourceFileEnumerator $files,
+        private readonly KeyedMutex $mutex,
         iterable $providers,
     ) {
         $providers = \is_array($providers) ? array_values($providers) : iterator_to_array($providers, false);
@@ -45,11 +54,41 @@ final class ApplicationSourceScanner
     {
         foreach ($this->projects->all() as $project) {
             $cancellation?->throwIfRequested();
-            $this->refreshProject($project, $cancellation);
+            try {
+                $this->refreshProject($project, $cancellation);
+            } catch (CancelledException $error) {
+                if (true === $cancellation?->isRequested()) {
+                    throw $error;
+                }
+                // a superseded scan aborts only its own project
+            }
         }
     }
 
     public function refreshProject(Project $project, ?Cancellation $cancellation = null): void
+    {
+        $root = $project->rootPath();
+        ($this->activeScans[$root] ?? null)?->cancel();
+        $scan = $this->activeScans[$root] = new DeferredCancellation();
+        $cancellation = null === $cancellation
+            ? $scan->getCancellation()
+            : new CompositeCancellation($cancellation, $scan->getCancellation());
+        $lock = null;
+
+        try {
+            $cancellation->throwIfRequested();
+            $lock = $this->mutex->acquire(self::LOCK_PREFIX.$root);
+            $cancellation->throwIfRequested();
+            $this->refreshProjectUnlocked($project, $cancellation);
+        } finally {
+            if (($this->activeScans[$root] ?? null) === $scan) {
+                unset($this->activeScans[$root]);
+            }
+            $lock?->release();
+        }
+    }
+
+    private function refreshProjectUnlocked(Project $project, Cancellation $cancellation): void
     {
         $this->statuses->sourceIndexing($project);
         $progress = $this->progress->begin('Symfony source index', $project->rootPath());
@@ -156,6 +195,16 @@ final class ApplicationSourceScanner
             return SourceFileChange::untracked();
         }
 
+        $lock = $this->mutex->acquire(self::LOCK_PREFIX.$project->rootPath());
+        try {
+            return $this->refreshUriUnlocked($project, $uri, $path, $relativePath, $deleted);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function refreshUriUnlocked(Project $project, string $uri, string $path, string $relativePath, bool $deleted): SourceFileChange
+    {
         $projectKey = $project->rootPath();
         $indexed = \array_key_exists($projectKey, $this->entries);
         $entries = $indexed ? $this->entries[$projectKey] : $this->store->loadMetadata($project);
@@ -260,7 +309,7 @@ final class ApplicationSourceScanner
      *
      * @return array<string, SourceIndexMetadata>
      */
-    private function scan(Project $project, array $cached, ?Cancellation $cancellation): array
+    private function scan(Project $project, array $cached, Cancellation $cancellation): array
     {
         foreach ($this->providers as $provider) {
             $provider->begin($project);
@@ -305,7 +354,7 @@ final class ApplicationSourceScanner
      *
      * @return array<string, SourceIndexMetadata>
      */
-    private function scanSourceFiles(Project $project, array $cached, SourceIndexWriterInterface $writer, ?Cancellation $cancellation, bool $collectCycles): array
+    private function scanSourceFiles(Project $project, array $cached, SourceIndexWriterInterface $writer, Cancellation $cancellation, bool $collectCycles): array
     {
         $entries = [];
         $fileCount = 0;
@@ -314,7 +363,7 @@ final class ApplicationSourceScanner
             if (0 === ++$fileCount % 64) {
                 delay(0, cancellation: $cancellation);
             }
-            $cancellation?->throwIfRequested();
+            $cancellation->throwIfRequested();
             $relativePath = $this->files->relativePath($project, $path);
             $languageId = $this->files->languageId($path);
             if (null === $relativePath || null === $languageId) {

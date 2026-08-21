@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Index;
 
 use Amp\CancelledException;
 use Amp\DeferredCancellation;
+use Amp\Sync\LocalKeyedMutex;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -40,6 +41,10 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Tests\Support\NullProgressReporter;
+
+use function Amp\async;
+use function Amp\delay;
+use function Amp\Future\await;
 
 final class ApplicationSourceScannerTest extends TestCase
 {
@@ -479,6 +484,127 @@ PHP;
         self::assertSame([$firstUri => hash('sha256', '<?php final class NewFirstVersion { public function value(): int { return 2; } }')], $provider->sources);
     }
 
+    public function testAnIncrementalSaveSurvivesAConcurrentFullScan(): void
+    {
+        for ($i = 0; $i < 80; ++$i) {
+            file_put_contents(\sprintf('%s/src/File%02d.php', $this->temporaryDirectory, $i), \sprintf('<?php final class File%02d {}', $i));
+        }
+        $provider = new GenerationalSourceIndexProvider();
+        $scanner = $this->scanner($provider);
+        $scan = async(fn () => $scanner->refreshProject($this->project));
+        delay(0);
+        self::assertNotSame([], $provider->staged[$this->temporaryDirectory] ?? []);
+
+        $uri = (string) array_key_first($provider->staged[$this->temporaryDirectory]);
+        file_put_contents(substr($uri, \strlen('file://')), '<?php final class Saved {}');
+        $refresh = async(static fn () => $scanner->refreshUri($uri));
+        await([$scan, $refresh]);
+
+        self::assertSame(hash('sha256', '<?php final class Saved {}'), $provider->committed[$this->temporaryDirectory][$uri]);
+        self::assertFalse($scanner->refreshUri($uri)->requiresRuntimeRefresh());
+    }
+
+    public function testANewFullScanSupersedesTheActiveScan(): void
+    {
+        for ($i = 0; $i < 80; ++$i) {
+            file_put_contents(\sprintf('%s/src/File%02d.php', $this->temporaryDirectory, $i), \sprintf('<?php final class File%02d {}', $i));
+        }
+        $provider = new GenerationalSourceIndexProvider();
+        $scanner = $this->scanner($provider);
+        $first = async(fn () => $scanner->refreshProject($this->project));
+        delay(0);
+        $second = async(fn () => $scanner->refreshProject($this->project));
+
+        try {
+            $first->await();
+            self::fail('The superseded scan should have been canceled.');
+        } catch (CancelledException) {
+        }
+        $second->await();
+
+        self::assertCount(80, $provider->committed[$this->temporaryDirectory]);
+    }
+
+    public function testIndexAllContinuesWithOtherProjectsWhenAScanIsSuperseded(): void
+    {
+        $secondRoot = $this->temporaryDirectory.'-second';
+        mkdir($secondRoot.'/src', 0777, true);
+
+        try {
+            $this->projects->replace([$this->project, new Project($secondRoot, 'file://'.$secondRoot, '^8.0')]);
+            for ($i = 0; $i < 80; ++$i) {
+                file_put_contents(\sprintf('%s/src/File%02d.php', $this->temporaryDirectory, $i), \sprintf('<?php final class File%02d {}', $i));
+            }
+            file_put_contents($secondRoot.'/src/Other.php', '<?php final class Other {}');
+            $provider = new GenerationalSourceIndexProvider();
+            $scanner = $this->scanner($provider);
+            $indexAll = async(static fn () => $scanner->indexAll());
+            delay(0);
+            $supersede = async(fn () => $scanner->refreshProject($this->project));
+            await([$indexAll, $supersede]);
+
+            self::assertCount(80, $provider->committed[$this->temporaryDirectory]);
+            self::assertCount(1, $provider->committed[$secondRoot]);
+        } finally {
+            (new Filesystem())->remove($secondRoot);
+        }
+    }
+
+    public function testChecksCancellationBeforeWaitingForTheSourceLock(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $mutex = new LocalKeyedMutex();
+        $lock = $mutex->acquire("source\0".$this->temporaryDirectory);
+        $provider = new RecordingSourceIndexProvider();
+        $scanner = $this->scannerWithMutex($mutex, new DocumentStore(), $provider);
+        $cancellation = new DeferredCancellation();
+        $cancellation->cancel();
+
+        try {
+            $scanner->refreshProject($this->project, $cancellation->getCancellation());
+            self::fail('The scan should have been canceled before waiting for the lock.');
+        } catch (CancelledException) {
+        }
+
+        self::assertSame(0, $provider->extractions);
+        $lock->release();
+    }
+
+    public function testChecksCancellationAfterWaitingForTheSourceLock(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $mutex = new LocalKeyedMutex();
+        $lock = $mutex->acquire("source\0".$this->temporaryDirectory);
+        $provider = new RecordingSourceIndexProvider();
+        $scanner = $this->scannerWithMutex($mutex, new DocumentStore(), $provider);
+        $cancellation = new DeferredCancellation();
+        $scan = async(fn () => $scanner->refreshProject($this->project, $cancellation->getCancellation()));
+        delay(0);
+        $cancellation->cancel();
+        $lock->release();
+
+        try {
+            $scan->await();
+            self::fail('The scan should have observed the cancellation after acquiring the lock.');
+        } catch (CancelledException) {
+        }
+
+        self::assertSame(0, $provider->extractions);
+    }
+
+    public function testAFullScanIgnoresTheRuntimeInitializerLock(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $mutex = new LocalKeyedMutex();
+        $runtimeLock = $mutex->acquire("runtime\0".$this->temporaryDirectory);
+        $provider = new RecordingSourceIndexProvider();
+
+        $this->scannerWithMutex($mutex, new DocumentStore(), $provider)->indexAll();
+
+        self::assertSame(1, $provider->extractions);
+        $runtimeLock->release();
+    }
+
     /**
      * @param callable(array<string, mixed>): array<string, mixed> $mutate
      */
@@ -521,6 +647,11 @@ PHP;
 
     private function scannerWithDocuments(DocumentStore $documents, SourceIndexProviderInterface ...$providers): ApplicationSourceScanner
     {
+        return $this->scannerWithMutex(new LocalKeyedMutex(), $documents, ...$providers);
+    }
+
+    private function scannerWithMutex(LocalKeyedMutex $mutex, DocumentStore $documents, SourceIndexProviderInterface ...$providers): ApplicationSourceScanner
+    {
         return new ApplicationSourceScanner(
             $this->projects,
             $documents,
@@ -531,6 +662,7 @@ PHP;
             new PhpRuntimeStructureHasher(),
             new UriToPathConverter(),
             new SourceFileEnumerator(new GitignoreMatcher()),
+            $mutex,
             $providers,
         );
     }
@@ -722,5 +854,87 @@ final class RecordingSourceIndexProvider implements SourceIndexProviderInterface
         $range = new Range(new Position(0, 0), new Position(0, 0));
 
         return new RouteSourceFacts($document->uri(), [new RouteDeclaration($hash, $document->uri(), $range)], []);
+    }
+}
+
+final class GenerationalSourceIndexProvider implements SourceIndexProviderInterface
+{
+    /** @var array<string, array<string, string>> */
+    public array $staged = [];
+
+    /** @var array<string, array<string, string>> */
+    public array $committed = [];
+
+    public function name(): string
+    {
+        return 'generational';
+    }
+
+    public function payloadClasses(): array
+    {
+        return [RouteDeclaration::class, RouteSourceFacts::class];
+    }
+
+    public function begin(Project $project): void
+    {
+        $this->staged[$project->rootPath()] = [];
+    }
+
+    public function index(Project $project, SourceDocument $document): RouteSourceFacts
+    {
+        $hash = hash('sha256', $document->text());
+        $this->staged[$project->rootPath()][$document->uri()] = $hash;
+
+        return $this->facts($document->uri(), $hash);
+    }
+
+    public function restore(Project $project, mixed $data): void
+    {
+        if (!$data instanceof RouteSourceFacts || 1 !== \count($data->declarations())) {
+            throw new \UnexpectedValueException();
+        }
+        $this->staged[$project->rootPath()][$data->uri()] = $data->declarations()[0]->name();
+    }
+
+    public function finish(Project $project): void
+    {
+        $root = $project->rootPath();
+        $this->committed[$root] = $this->staged[$root] ?? [];
+        unset($this->staged[$root]);
+    }
+
+    public function replace(Project $project, SourceDocument $document): RouteSourceFacts
+    {
+        $hash = hash('sha256', $document->text());
+        $this->committed[$project->rootPath()][$document->uri()] = $hash;
+
+        return $this->facts($document->uri(), $hash);
+    }
+
+    public function runtimeDeclarations(mixed $data): array
+    {
+        if (!$data instanceof RouteSourceFacts) {
+            throw new \UnexpectedValueException();
+        }
+
+        return $data->declarations();
+    }
+
+    public function remove(Project $project, string $uri): void
+    {
+        unset($this->committed[$project->rootPath()][$uri]);
+    }
+
+    public function overlay(Project $project, Document $document): void
+    {
+    }
+
+    public function removeOverlay(Project $project, string $uri): void
+    {
+    }
+
+    private function facts(string $uri, string $hash): RouteSourceFacts
+    {
+        return new RouteSourceFacts($uri, [new RouteDeclaration($hash, $uri, new Range(new Position(0, 0), new Position(0, 0)))], []);
     }
 }

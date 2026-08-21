@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Publish the VS Code extension on Open VSX
+- Serialize source index updates so saves survive concurrent full scans
 
 ## 0.15.0 (2026-08-21)
 

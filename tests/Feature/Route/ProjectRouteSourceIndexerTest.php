@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
+use Amp\Sync\LocalKeyedMutex;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
@@ -110,6 +111,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new PhpRuntimeStructureHasher(),
             new UriToPathConverter(),
             new SourceFileEnumerator(new GitignoreMatcher()),
+            new LocalKeyedMutex(),
             [
                 new ProjectRouteSourceIndexer(
                     new RouteDeclarationIndexRegistry(),
@@ -188,6 +190,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new PhpRuntimeStructureHasher(),
             new UriToPathConverter(),
             new SourceFileEnumerator(new GitignoreMatcher()),
+            new LocalKeyedMutex(),
             [$indexer],
         );
 

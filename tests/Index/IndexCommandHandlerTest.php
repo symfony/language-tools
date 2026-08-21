@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Index;
 
 use Amp\Cancellation;
+use Amp\Sync\LocalKeyedMutex;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
@@ -59,6 +60,7 @@ final class IndexCommandHandlerTest extends TestCase
             new PhpRuntimeStructureHasher(),
             new UriToPathConverter(),
             new SourceFileEnumerator(new GitignoreMatcher()),
+            new LocalKeyedMutex(),
             [],
         );
         $runtime = new RecordingRuntimeInitializer();
