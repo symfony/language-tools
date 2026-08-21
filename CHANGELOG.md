@@ -5,6 +5,7 @@
 - Publish the VS Code extension on Open VSX
 - Serialize source index updates so saves survive concurrent full scans
 - Cancel indexing and release all project state when a workspace folder is removed
+- Compute translation quick fixes from unsaved editor contents and versioned edits
 
 ## 0.15.0 (2026-08-21)
 

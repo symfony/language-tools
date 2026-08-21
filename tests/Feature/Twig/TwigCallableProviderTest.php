@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\ProjectDocumentReader;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
@@ -173,13 +174,12 @@ final class TwigCallableProviderTest extends TestCase
         );
         $provider = new TwigCallableProvider(
             new DocumentContextResolver($documents, $projects),
-            $documents,
             $converter,
             $protocol = new LspProtocolMapper(),
             $indexes,
             new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()), $commentParser),
             $classIndexes,
-            new ProjectPathResolver(new UriToPathConverter()),
+            new ProjectDocumentReader($documents, new ProjectPathResolver(new UriToPathConverter())),
             $phpParser,
         );
 

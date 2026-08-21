@@ -6,6 +6,7 @@ use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\ProjectDocumentReader;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -22,6 +23,7 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
         private readonly TranslationIndexRegistry $indexes,
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly ProjectPathResolver $pathResolver,
+        private readonly ProjectDocumentReader $reader,
     ) {
     }
 
@@ -49,28 +51,25 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
                 ) {
                     continue;
                 }
-                $target = $this->target($request->project->rootPath(), $reference->domain());
+                $targetPath = $this->target($request->project->rootPath(), $reference->domain());
+                if (null === $targetPath) {
+                    continue;
+                }
+                $targetUri = $this->uri($targetPath);
+                $target = $this->reader->read($request->project, $targetUri);
                 if (null === $target) {
                     continue;
                 }
-                $targetUri = $this->uri($target);
-                if (!$this->pathResolver->isApplicationOwned($request->project, $targetUri)) {
-                    continue;
-                }
-                $contents = file_get_contents($target);
-                if (false === $contents) {
-                    continue;
-                }
-                $position = $this->converter->toPosition($contents, \strlen($contents));
+                $position = $this->converter->toPosition($target->text, \strlen($target->text));
                 $escapedKey = str_replace("'", "''", $reference->key());
-                $newText = ('' === $contents || str_ends_with($contents, "\n") ? '' : "\n")."'{$escapedKey}': '{$escapedKey}'\n";
+                $newText = ('' === $target->text || str_ends_with($target->text, "\n") ? '' : "\n")."'{$escapedKey}': '{$escapedKey}'\n";
                 $actions[] = [
-                    'title' => \sprintf('Add translation "%s" to %s', $reference->key(), basename($target)),
+                    'title' => \sprintf('Add translation "%s" to %s', $reference->key(), basename($targetPath)),
                     'kind' => 'quickfix',
                     'diagnostics' => [$diagnostic],
                     'isPreferred' => true,
                     'edit' => ['documentChanges' => [[
-                        'textDocument' => ['uri' => $targetUri, 'version' => null],
+                        'textDocument' => ['uri' => $targetUri, 'version' => $target->version],
                         'edits' => [$this->protocol->textEdit(new Range($position, $position), $newText)],
                     ]]],
                 ];

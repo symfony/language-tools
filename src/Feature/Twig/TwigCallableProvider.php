@@ -2,10 +2,9 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
-use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\ProjectDocumentReader;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
@@ -13,20 +12,18 @@ use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TwigCallableProvider implements DefinitionProviderInterface, HoverProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documents,
-        private readonly DocumentStore $documentStore,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly TwigCallableIndexRegistry $indexes,
         private readonly TwigCallableReferenceExtractor $references,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
-        private readonly ProjectPathResolver $paths,
+        private readonly ProjectDocumentReader $reader,
         private readonly PhpParserInterface $phpParser,
     ) {
     }
@@ -137,19 +134,7 @@ final class TwigCallableProvider implements DefinitionProviderInterface, HoverPr
 
     private function source(Project $project, string $uri): ?string
     {
-        if (!$this->paths->isApplicationOwned($project, $uri)) {
-            return null;
-        }
-        if (null !== $document = $this->documentStore->get($uri)) {
-            return $document->text();
-        }
-        $relativePath = $this->paths->relative($project, $uri);
-        if (null === $relativePath || !is_file($path = Path::join($project->rootPath(), $relativePath))) {
-            return null;
-        }
-        $text = file_get_contents($path);
-
-        return false === $text ? null : $text;
+        return $this->reader->read($project, $uri)?->text;
     }
 
     /**
