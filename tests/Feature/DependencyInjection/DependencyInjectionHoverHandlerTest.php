@@ -20,6 +20,7 @@ use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class DependencyInjectionHoverHandlerTest extends TestCase
 {
@@ -62,6 +63,7 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
         );
         $handler = new DependencyInjectionHoverHandler(
             new DocumentContextResolver($documents, $projects),
+            new LspProtocolMapper(),
             new DependencyInjectionSymbolResolver($converter, $yamlExtractor, $autowireExtractor),
             $serviceIndexes,
             $parameterIndexes,

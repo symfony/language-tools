@@ -21,6 +21,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class DependencyInjectionRenameHandlerTest extends TestCase
 {
@@ -51,6 +52,7 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
         );
         $handler = new DependencyInjectionRenameHandler(
             new DocumentContextResolver($documents, $projects),
+            new LspProtocolMapper(),
             new DependencyInjectionSymbolResolver($converter, $yamlExtractor, $autowireExtractor),
             $sourceIndexes,
             new ServiceIndexRegistry(),
@@ -111,6 +113,7 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
         $sourceIndexes->forProject($project)->replace($yamlExtractor->extract($uri, $text));
         $handler = new DependencyInjectionRenameHandler(
             new DocumentContextResolver($documents, $projects),
+            new LspProtocolMapper(),
             new DependencyInjectionSymbolResolver($converter, $yamlExtractor, $autowireExtractor),
             $sourceIndexes,
             new ServiceIndexRegistry(),

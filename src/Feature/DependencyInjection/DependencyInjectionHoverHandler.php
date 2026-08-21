@@ -4,11 +4,13 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\HoverProviderInterface;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class DependencyInjectionHoverHandler implements HoverProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documentContextResolver,
+        private readonly LspProtocolMapper $protocol,
         private readonly DependencyInjectionSymbolResolver $symbolResolver,
         private readonly ServiceIndexRegistry $serviceIndexes,
         private readonly ParameterIndexRegistry $parameterIndexes,
@@ -18,25 +20,24 @@ final class DependencyInjectionHoverHandler implements HoverProviderInterface
 
     public function hover(array $params): ?array
     {
-        $request = $this->documentContextResolver->resolve($params);
+        $request = $this->documentContextResolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
 
-        [$document, $project, $position] = $request;
         $symbol = $this->symbolResolver->resolve(
-            $document->uri(),
-            $document->languageId(),
-            $document->text(),
-            $position,
+            $request->document->uri(),
+            $request->document->languageId(),
+            $request->document->text(),
+            $request->position,
         );
         if (null === $symbol) {
             return null;
         }
 
         if (DependencyInjectionSymbolKind::Parameter === $symbol->kind()) {
-            $parameter = $this->parameterIndexes->forProject($project)->get($symbol->name());
-            $declarations = $this->sourceIndexes->forProject($project)->parameterDeclarations($symbol->name());
+            $parameter = $this->parameterIndexes->forProject($request->project)->get($symbol->name());
+            $declarations = $this->sourceIndexes->forProject($request->project)->parameterDeclarations($symbol->name());
             if (null === $parameter && [] === $declarations) {
                 return null;
             }
@@ -46,11 +47,11 @@ final class DependencyInjectionHoverHandler implements HoverProviderInterface
                 $details[] = 'Deprecated: '.$parameter->deprecation();
             }
 
-            return $this->result($details);
+            return $this->protocol->markdownHover(implode("\n\n", $details));
         }
 
-        $service = $this->serviceIndexes->forProject($project)->get($symbol->name());
-        $declaration = $this->sourceIndexes->forProject($project)->serviceDeclarations($symbol->name())[0] ?? null;
+        $service = $this->serviceIndexes->forProject($request->project)->get($symbol->name());
+        $declaration = $this->sourceIndexes->forProject($request->project)->serviceDeclarations($symbol->name())[0] ?? null;
         if (null === $service && null === $declaration) {
             return null;
         }
@@ -90,16 +91,6 @@ final class DependencyInjectionHoverHandler implements HoverProviderInterface
             $details[] = \sprintf('Decoration stack: `%s`', implode('` → `', $decorationStack));
         }
 
-        return $this->result($details);
-    }
-
-    /**
-     * @param list<string> $details
-     *
-     * @return array{contents: array{kind: string, value: string}}
-     */
-    private function result(array $details): array
-    {
-        return ['contents' => ['kind' => 'markdown', 'value' => implode("\n\n", $details)]];
+        return $this->protocol->markdownHover(implode("\n\n", $details));
     }
 }

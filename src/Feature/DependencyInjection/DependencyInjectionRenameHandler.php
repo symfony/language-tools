@@ -3,15 +3,16 @@
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class DependencyInjectionRenameHandler implements RenameProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documentContextResolver,
+        private readonly LspProtocolMapper $protocol,
         private readonly DependencyInjectionSymbolResolver $symbolResolver,
         private readonly DependencyInjectionSourceIndexRegistry $sourceIndexes,
         private readonly ServiceIndexRegistry $serviceIndexes,
@@ -33,7 +34,7 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
         }
 
         return [
-            'range' => $this->range($symbol->range()),
+            'range' => $this->protocol->range($symbol->range()),
             'placeholder' => $symbol->name(),
         ];
     }
@@ -74,7 +75,7 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
         foreach ($locations as [$uri, $range]) {
             $key = $uri.'\0'.$range->start()->line().'\0'.$range->start()->character();
             $editsByUri[$uri][$key] = [
-                'range' => $this->range($range),
+                'range' => $this->protocol->range($range),
                 'newText' => $newName,
                 'annotationId' => 'dependencyInjectionRename',
             ];
@@ -109,23 +110,18 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
      */
     private function resolve(array $params): ?array
     {
-        $request = $this->documentContextResolver->resolve($params);
-        if (null === $request) {
-            return null;
-        }
-
-        [$document, $project, $position] = $request;
-        if (!$this->pathResolver->isApplicationOwned($project, $document->uri())) {
+        $request = $this->documentContextResolver->resolvePositioned($params);
+        if (null === $request || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri())) {
             return null;
         }
         $symbol = $this->symbolResolver->resolve(
-            $document->uri(),
-            $document->languageId(),
-            $document->text(),
-            $position,
+            $request->document->uri(),
+            $request->document->languageId(),
+            $request->document->text(),
+            $request->position,
         );
 
-        return null === $symbol ? null : [$project, $symbol];
+        return null === $symbol ? null : [$request->project, $symbol];
     }
 
     private function isApplicationOwned(Project $project, DependencyInjectionSymbol $symbol): bool
@@ -165,16 +161,5 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
 
         return null !== $this->parameterIndexes->forProject($project)->get($newName)
             || [] !== $index->parameterDeclarations($newName);
-    }
-
-    /**
-     * @return array{start: array{line: int, character: int}, end: array{line: int, character: int}}
-     */
-    private function range(Range $range): array
-    {
-        return [
-            'start' => ['line' => $range->start()->line(), 'character' => $range->start()->character()],
-            'end' => ['line' => $range->end()->line(), 'character' => $range->end()->character()],
-        ];
     }
 }

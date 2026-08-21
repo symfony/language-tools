@@ -20,6 +20,7 @@ use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class DependencyInjectionNavigationTest extends TestCase
 {
@@ -97,11 +98,12 @@ final class DependencyInjectionNavigationTest extends TestCase
         return [
             new DependencyInjectionDefinitionHandler(
                 $contextResolver,
+                new LspProtocolMapper(),
                 $resolver,
                 $sourceIndexes,
                 new ServiceIndexRegistry(),
             ),
-            new DependencyInjectionReferencesHandler($contextResolver, $resolver, $sourceIndexes),
+            new DependencyInjectionReferencesHandler($contextResolver, new LspProtocolMapper(), $resolver, $sourceIndexes),
             $params,
         ];
     }

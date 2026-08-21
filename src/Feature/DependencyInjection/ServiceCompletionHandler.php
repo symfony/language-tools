@@ -4,15 +4,16 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class ServiceCompletionHandler implements CompletionProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documentContextResolver,
         private readonly PositionConverter $positionConverter,
+        private readonly LspProtocolMapper $protocol,
         private readonly ServiceIndexRegistry $serviceIndexes,
         private readonly ParameterIndexRegistry $parameterIndexes,
         private readonly DependencyInjectionSourceIndexRegistry $sourceIndexes,
@@ -21,31 +22,26 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
 
     public function complete(array $params): ?array
     {
-        $request = $this->documentContextResolver->resolve($params);
-        if (null === $request) {
+        $request = $this->documentContextResolver->resolvePositioned($params);
+        if (null === $request || !\in_array($request->document->languageId(), ['php', 'yaml'], true)) {
             return null;
         }
 
-        [$document, $project, $position] = $request;
-        if (!\in_array($document->languageId(), ['php', 'yaml'], true)) {
-            return null;
-        }
-
-        $parameterContext = 'yaml' === $document->languageId()
-            ? ParameterCompletionContext::fromYaml($document->text(), $position, $this->positionConverter)
-            : ParameterCompletionContext::fromPhp($document->text(), $position, $this->positionConverter);
+        $parameterContext = 'yaml' === $request->document->languageId()
+            ? ParameterCompletionContext::fromYaml($request->document->text(), $request->position, $this->positionConverter)
+            : ParameterCompletionContext::fromPhp($request->document->text(), $request->position, $this->positionConverter);
         if (null !== $parameterContext) {
-            return $this->completeParameters($project, $parameterContext);
+            return $this->completeParameters($request->project, $parameterContext);
         }
 
-        $serviceContext = 'yaml' === $document->languageId()
-            ? ServiceCompletionContext::fromYaml($document->text(), $position, $this->positionConverter)
-            : ServiceCompletionContext::fromPhp($document->text(), $position, $this->positionConverter);
+        $serviceContext = 'yaml' === $request->document->languageId()
+            ? ServiceCompletionContext::fromYaml($request->document->text(), $request->position, $this->positionConverter)
+            : ServiceCompletionContext::fromPhp($request->document->text(), $request->position, $this->positionConverter);
         if (null === $serviceContext) {
             return null;
         }
 
-        return $this->completeServices($project, $serviceContext);
+        return $this->completeServices($request->project, $serviceContext);
     }
 
     /** @return list<array<array-key, mixed>> */
@@ -57,7 +53,7 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
                 'label' => $service->id(),
                 'kind' => 18,
                 'detail' => $this->serviceDetail($service),
-                'textEdit' => $this->textEdit($context->replacementRange(), $service->id()),
+                'textEdit' => $this->protocol->textEdit($context->replacementRange(), $service->id()),
             ];
         }
 
@@ -76,7 +72,7 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
                 'label' => $id,
                 'kind' => 18,
                 'detail' => $detail ?? 'Symfony service',
-                'textEdit' => $this->textEdit($context->replacementRange(), $id),
+                'textEdit' => $this->protocol->textEdit($context->replacementRange(), $id),
             ];
         }
         ksort($items);
@@ -93,7 +89,7 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
                 'label' => $parameter->name(),
                 'kind' => 12,
                 'detail' => null !== $parameter->deprecation() ? 'Deprecated Symfony parameter' : 'Symfony parameter',
-                'textEdit' => $this->textEdit(
+                'textEdit' => $this->protocol->textEdit(
                     $context->replacementRange(),
                     $context->completionText($parameter->name()),
                 ),
@@ -109,7 +105,7 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
                 'label' => $name,
                 'kind' => 12,
                 'detail' => 'Symfony parameter',
-                'textEdit' => $this->textEdit($context->replacementRange(), $context->completionText($name)),
+                'textEdit' => $this->protocol->textEdit($context->replacementRange(), $context->completionText($name)),
             ];
         }
         ksort($items);
@@ -124,25 +120,5 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
         }
 
         return $service->className() ?? 'Symfony service';
-    }
-
-    /**
-     * @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, newText: string}
-     */
-    private function textEdit(Range $range, string $newText): array
-    {
-        return [
-            'range' => [
-                'start' => [
-                    'line' => $range->start()->line(),
-                    'character' => $range->start()->character(),
-                ],
-                'end' => [
-                    'line' => $range->end()->line(),
-                    'character' => $range->end()->character(),
-                ],
-            ],
-            'newText' => $newText,
-        ];
     }
 }

@@ -16,6 +16,7 @@ use Symfony\Lsp\Feature\DependencyInjection\ServiceCompletionHandler;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class ServiceCompletionHandlerTest extends TestCase
 {
@@ -63,6 +64,7 @@ final class ServiceCompletionHandlerTest extends TestCase
         $handler = new ServiceCompletionHandler(
             new DocumentContextResolver($documents, $projects),
             $converter,
+            new LspProtocolMapper(),
             $indexes,
             $parameterIndexes,
             $sourceIndexes,
@@ -118,6 +120,7 @@ final class ServiceCompletionHandlerTest extends TestCase
         $handler = new ServiceCompletionHandler(
             new DocumentContextResolver($documents, $projects),
             $converter,
+            new LspProtocolMapper(),
             $serviceIndexes,
             $parameterIndexes,
             new DependencyInjectionSourceIndexRegistry(),
