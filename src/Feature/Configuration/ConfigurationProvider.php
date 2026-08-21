@@ -11,7 +11,6 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
-use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -25,7 +24,7 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
         private readonly LspProtocolMapper $protocol,
         private readonly ConfigurationIndexRegistry $indexes,
         private readonly YamlConfigurationParser $yaml,
-        private readonly EnvironmentIndexRegistry $environmentIndexes,
+        private readonly ConfigurationValueValidator $values,
         private readonly UriToPathConverter $uriToPathConverter,
     ) {
     }
@@ -114,10 +113,10 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
             if ($node->deprecated()) {
                 $diagnostics[] = $this->diagnostic($occurrence->keyRange(), 2, 'config.deprecated_key', \sprintf('Configuration key "%s" is deprecated.', $key));
             }
-            $environmentType = $this->environmentType($request->project, $occurrence->value());
-            if (null !== $environmentType && !$this->compatibleType($node->type(), $environmentType)) {
+            $environmentType = $this->values->environmentType($request->project, $occurrence->value());
+            if (null !== $environmentType && !$this->values->acceptsType($node, $environmentType)) {
                 $diagnostics[] = $this->diagnostic($occurrence->valueRange(), 1, 'env.incompatible_type', \sprintf('Environment expression returns %s, but "%s" expects %s.', $environmentType, $key, $node->type()));
-            } elseif ('' !== $occurrence->value() && !$this->validValue($node, $occurrence->value())) {
+            } elseif ('' !== $occurrence->value() && !$this->values->acceptsValue($node, $occurrence->value())) {
                 $diagnostics[] = $this->diagnostic($occurrence->valueRange(), 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $node->type(), $key));
             }
         }
@@ -361,7 +360,7 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
                     $diagnostics[] = $this->diagnostic($range, 2, 'config.deprecated_key', \sprintf('Configuration key "%s" is deprecated.', implode('.', $path)));
                 }
                 $argument = trim($method[2][0]);
-                if ('' !== $argument && !$this->validValue($node, $argument)) {
+                if ('' !== $argument && !$this->values->acceptsValue($node, $argument)) {
                     $diagnostics[] = $this->diagnostic($range, 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $node->type(), implode('.', $path)));
                 }
             }
@@ -412,7 +411,7 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
                     $range = $this->offsetRange($document->text(), $tag[3][1] + $attribute[1][1], \strlen($attribute[1][0]));
                     if (null === $child) {
                         $diagnostics[] = $this->diagnostic($range, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', implode('.', $attributePath)));
-                    } elseif (!$this->validValue($child, $attribute[3][0])) {
+                    } elseif (!$this->values->acceptsValue($child, $attribute[3][0])) {
                         $diagnostics[] = $this->diagnostic($range, 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $child->type(), implode('.', $attributePath)));
                     }
                 }
@@ -476,32 +475,6 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
         return [] === $stack ? [$name] : [...$stack, $name];
     }
 
-    private function environmentType(Project $project, string $value): ?string
-    {
-        $value = trim($value, " \t\"'");
-        if (1 !== preg_match('/^%env\(([^)]+)\)%$/', $value, $match)) {
-            return null;
-        }
-        $separator = strpos($match[1], ':');
-        if (false === $separator) {
-            return 'string';
-        }
-
-        return $this->environmentIndexes->forProject($project)->processors()[substr($match[1], 0, $separator)] ?? null;
-    }
-
-    private function compatibleType(string $expected, string $actual): bool
-    {
-        $expected = 'boolean' === $expected ? 'bool' : $expected;
-        if (!\in_array($expected, ['array', 'bool', 'float', 'integer'], true)) {
-            return true;
-        }
-        $expected = 'integer' === $expected ? 'int' : $expected;
-        $actualTypes = preg_split('/[|&]/', str_replace(['?', '"'], '', $actual), -1, \PREG_SPLIT_NO_EMPTY) ?: [];
-
-        return \in_array($expected, $actualTypes, true) || ('float' === $expected && \in_array('int', $actualTypes, true));
-    }
-
     /** @return list<ConfigurationNode> */
     private function completionChildren(?ConfigurationNode $node): array
     {
@@ -513,25 +486,6 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
         }
 
         return $node->prototype()?->children() ?? [];
-    }
-
-    private function validValue(ConfigurationNode $node, string $value): bool
-    {
-        $plain = trim($value, " \t\"'");
-        if (str_contains($plain, '%') || str_starts_with($plain, '$')) {
-            return true;
-        }
-        if ([] !== $node->allowedValues() && !\in_array($plain, array_map('strval', $node->allowedValues()), true)) {
-            return false;
-        }
-
-        return match ($node->type()) {
-            'boolean' => \in_array(strtolower($plain), ['true', 'false', 'yes', 'no', '0', '1'], true),
-            'integer' => 1 === preg_match('/^-?\d+$/', $plain),
-            'float' => is_numeric($plain),
-            'array' => '' === $plain || str_starts_with($plain, '[') || str_starts_with($plain, '{'),
-            default => true,
-        };
     }
 
     private function phpSnippet(ConfigurationNode $node): string

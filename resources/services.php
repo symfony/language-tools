@@ -127,7 +127,7 @@ return static function (ContainerConfigurator $container): void {
         }
         $services->load(
             'Symfony\\Lsp\\Feature\\'.$feature.'\\',
-            '../src/Feature/'.$feature.'/*{Provider,Handler,Extractor,Indexer,Registry,Resolver,Loader,Publisher,Parser}.php',
+            '../src/Feature/'.$feature.'/*{Provider,Handler,Extractor,Indexer,Registry,Resolver,Loader,Publisher,Parser,Validator}.php',
         );
     }
     foreach ([MessengerHandler::class, RouteCompletionProvider::class, RouteSnapshotLoader::class, SecurityUserProvider::class] as $class) {

@@ -9,6 +9,7 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Configuration\ConfigurationIndexRegistry;
 use Symfony\Lsp\Feature\Configuration\ConfigurationProvider;
+use Symfony\Lsp\Feature\Configuration\ConfigurationValueValidator;
 use Symfony\Lsp\Feature\Configuration\ProjectConfigurationSnapshotLoader;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
@@ -171,7 +172,7 @@ final class ConfigurationProviderTest extends TestCase
             ],
         ]]]]);
 
-        return [new ConfigurationProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), $environmentIndexes, new UriToPathConverter()), $documents, $converter];
+        return [new ConfigurationProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new ConfigurationValueValidator($environmentIndexes), new UriToPathConverter()), $documents, $converter];
     }
 
     /**
