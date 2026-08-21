@@ -8,9 +8,10 @@ and completion support from the editor.
 Supported Declarations
 ----------------------
 
-Functions and filters declared with ``TwigFunction`` and ``TwigFilter`` are
-recognized when their names are string literals. Class method callables declared
-as arrays or first-class callables are also resolved.
+Functions and filters returned by extension ``getFunctions()`` and
+``getFilters()`` methods with ``TwigFunction`` and ``TwigFilter`` are recognized
+when their names are string literals. Statically resolvable class method
+callables declared as arrays or first-class callables are also resolved.
 
 Hover
 -----

@@ -23,6 +23,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -57,6 +58,12 @@ final class TwigCallableProviderTest extends TestCase
                         new FunctionDefinition('dynamic_name', $dynamicCallable),
                         new OtherDefinition('ignored_name', [Runtime::class, 'ignored']),
                     ];
+                }
+
+                public function configure(): void
+                {
+                    new FunctionDefinition('ignored_direct_function', [Runtime::class, 'ignored']);
+                    new Filter('ignored_direct_filter', [Runtime::class, 'ignored']);
                 }
 
                 private function localFilter(string $value): string { return $value; }
@@ -109,6 +116,7 @@ final class TwigCallableProviderTest extends TestCase
                     return [
                         new TwigFunction('function_name', [AppExtensionRuntime::class, 'doSomething']),
                         new TwigFunction('dynamic_name', $dynamicCallable),
+                        new TwigFunction('outside_name', [OutsideRuntime::class, 'outside']),
                     ];
                 }
             }
@@ -127,12 +135,26 @@ final class TwigCallableProviderTest extends TestCase
                 }
             }
             PHP;
+        $outsideUri = 'file:///outside/OutsideRuntime.php';
+        $outsideText = <<<'PHP'
+            <?php
+            namespace App\Twig;
+
+            final class OutsideRuntime
+            {
+                /** Must not be exposed. */
+                public function outside(): void {}
+            }
+            PHP;
         $twigUri = 'file:///workspace/templates/page.html.twig';
         $twigText = <<<'TWIG'
             {{ function_name('value') }}
+            {{ "}}" ~ function_name('value') }}
             {{ broken ??? }}
             {{ item|filter_name }}
+            {{ {'nested': {}}|filter_name }}
             {{ dynamic_name() }}
+            {{ outside_name() }}
             {{ object.function_name() }}
             {{ path('home') }}
             {# {{ function_name() }} #}
@@ -140,37 +162,47 @@ final class TwigCallableProviderTest extends TestCase
             TWIG;
         $documents->open(new Document($twigUri, 'twig', 1, $twigText));
         $documents->open(new Document($runtimeUri, 'php', 1, $runtimeText));
+        $documents->open(new Document($outsideUri, 'php', 1, $outsideText));
         $indexes = new TwigCallableIndexRegistry();
         $indexes->forProject($project)->replace($this->declarationExtractor($converter, $phpParser)->extract($extensionUri, $extensionText));
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $classIndexes->forProject($project)->replace(new DependencyInjectionSourceFacts(
-            $runtimeUri,
-            classes: (new PhpClassDeclarationExtractor($converter, $phpParser))->extract($runtimeUri, $runtimeText),
-        ));
+        $classExtractor = new PhpClassDeclarationExtractor($converter, $phpParser);
+        $classIndexes->forProject($project)->replace(
+            new DependencyInjectionSourceFacts($runtimeUri, classes: $classExtractor->extract($runtimeUri, $runtimeText)),
+            new DependencyInjectionSourceFacts($outsideUri, classes: $classExtractor->extract($outsideUri, $outsideText)),
+        );
         $provider = new TwigCallableProvider(
             new DocumentContextResolver($documents, $projects),
             $documents,
             $converter,
             $protocol = new LspProtocolMapper(),
             $indexes,
-            new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
+            new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()), $commentParser),
             $classIndexes,
-            new UriToPathConverter(),
+            new ProjectPathResolver(new UriToPathConverter()),
             $phpParser,
         );
 
-        self::assertSame([
+        $functionHover = [
             'contents' => [
                 'kind' => 'markdown',
                 'value' => "Twig function: `function_name`\n\nCallable: `App\\Twig\\AppExtensionRuntime::doSomething`\n\n```php\npublic function doSomething(string \$value): string\n```\n\nFormats the value for display.",
             ],
-        ], $provider->hover($this->params($twigUri, $twigText, 'function_name', $converter)));
-        self::assertSame([
+        ];
+        self::assertSame($functionHover, $provider->hover($this->params($twigUri, $twigText, 'function_name', $converter)));
+        $delimiterOffset = strpos($twigText, 'function_name', \strlen('{{ function_name'));
+        self::assertIsInt($delimiterOffset);
+        self::assertSame($functionHover, $provider->hover($this->params($twigUri, $twigText, 'function_name', $converter, $delimiterOffset)));
+        $filterHover = [
             'contents' => [
                 'kind' => 'markdown',
                 'value' => "Twig filter: `filter_name`\n\nCallable: `App\\Twig\\AppExtensionRuntime::doSomething`\n\n```php\npublic function doSomething(string \$value): string\n```\n\nFormats the value for display.",
             ],
-        ], $provider->hover($this->params($twigUri, $twigText, 'filter_name', $converter)));
+        ];
+        self::assertSame($filterHover, $provider->hover($this->params($twigUri, $twigText, 'filter_name', $converter)));
+        $nestedFilterOffset = strpos($twigText, 'filter_name', strpos($twigText, 'filter_name') + 1);
+        self::assertIsInt($nestedFilterOffset);
+        self::assertSame($filterHover, $provider->hover($this->params($twigUri, $twigText, 'filter_name', $converter, $nestedFilterOffset)));
         $methodOffset = strpos($runtimeText, 'doSomething');
         self::assertIsInt($methodOffset);
         self::assertSame([
@@ -195,6 +227,24 @@ final class TwigCallableProviderTest extends TestCase
             ),
         ], $provider->definition($this->params($twigUri, $twigText, 'dynamic_name', $converter)));
 
+        self::assertSame([
+            'contents' => [
+                'kind' => 'markdown',
+                'value' => "Twig function: `outside_name`\n\nCallable: `App\\Twig\\OutsideRuntime::outside`",
+            ],
+        ], $provider->hover($this->params($twigUri, $twigText, 'outside_name', $converter)));
+        $outsideOffset = strpos($extensionText, 'outside_name');
+        self::assertIsInt($outsideOffset);
+        self::assertSame([
+            $protocol->location(
+                $extensionUri,
+                new Range(
+                    $converter->toPosition($extensionText, $outsideOffset),
+                    $converter->toPosition($extensionText, $outsideOffset + \strlen('outside_name')),
+                ),
+            ),
+        ], $provider->definition($this->params($twigUri, $twigText, 'outside_name', $converter)));
+
         self::assertNull($provider->hover($this->params($twigUri, $twigText, 'path', $converter)));
         self::assertNull($provider->hover($this->params($twigUri, $twigText, 'function_name', $converter, strrpos($twigText, 'function_name'))));
         self::assertNull($provider->hover($this->params($twigUri, $twigText, 'function_name', $converter, strpos($twigText, 'Plain function_name') + \strlen('Plain '))));
@@ -205,8 +255,8 @@ final class TwigCallableProviderTest extends TestCase
         $extractor = $this->declarationExtractor(new PositionConverter());
         $index = (new TwigCallableIndexRegistry())->forProject(new Project('/workspace', 'file:///workspace', '^8.0'));
         $uri = 'file:///workspace/src/Twig/AppExtension.php';
-        $saved = "<?php new \\Twig\\TwigFunction('saved_name', null);";
-        $unsaved = "<?php new \\Twig\\TwigFunction('unsaved_name', null);";
+        $saved = "<?php class Extension { public function getFunctions(): array { return [new \\Twig\\TwigFunction('saved_name', null)]; } }";
+        $unsaved = "<?php class Extension { public function getFunctions(): array { return [new \\Twig\\TwigFunction('unsaved_name', null)]; } }";
 
         $index->replace($extractor->extract($uri, $saved));
         $index->overlay($extractor->extract($uri, $unsaved));

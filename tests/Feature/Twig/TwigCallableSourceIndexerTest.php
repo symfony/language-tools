@@ -26,7 +26,13 @@ final class TwigCallableSourceIndexerTest extends TestCase
             use App\Twig\Runtime;
             use Twig\TwigFunction;
 
-            return [new TwigFunction('function_name', [Runtime::class, 'render'])];
+            final class AppExtension
+            {
+                public function getFunctions(): array
+                {
+                    return [new TwigFunction('function_name', [Runtime::class, 'render'])];
+                }
+            }
             PHP);
         $sourceIndexes = new TwigCallableIndexRegistry();
         $sourceIndexer = $this->indexer($sourceIndexes);

@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
+use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
@@ -12,7 +13,7 @@ use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TwigCallableProvider implements DefinitionProviderInterface, HoverProviderInterface
@@ -25,7 +26,7 @@ final class TwigCallableProvider implements DefinitionProviderInterface, HoverPr
         private readonly TwigCallableIndexRegistry $indexes,
         private readonly TwigCallableReferenceExtractor $references,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
-        private readonly UriToPathConverter $uriToPathConverter,
+        private readonly ProjectPathResolver $paths,
         private readonly PhpParserInterface $phpParser,
     ) {
     }
@@ -120,7 +121,7 @@ final class TwigCallableProvider implements DefinitionProviderInterface, HoverPr
         }
         $methods = [];
         foreach ($this->classIndexes->forProject($project)->classDeclarations($declaration->className()) as $class) {
-            $text = $this->source($class->uri());
+            $text = $this->source($project, $class->uri());
             if (null === $text) {
                 continue;
             }
@@ -134,13 +135,16 @@ final class TwigCallableProvider implements DefinitionProviderInterface, HoverPr
         return $methods;
     }
 
-    private function source(string $uri): ?string
+    private function source(Project $project, string $uri): ?string
     {
+        if (!$this->paths->isApplicationOwned($project, $uri)) {
+            return null;
+        }
         if (null !== $document = $this->documentStore->get($uri)) {
             return $document->text();
         }
-        $path = $this->uriToPathConverter->convert($uri);
-        if (null === $path || !is_file($path)) {
+        $relativePath = $this->paths->relative($project, $uri);
+        if (null === $relativePath || !is_file($path = Path::join($project->rootPath(), $relativePath))) {
             return null;
         }
         $text = file_get_contents($path);

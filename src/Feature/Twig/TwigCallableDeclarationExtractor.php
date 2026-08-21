@@ -46,9 +46,9 @@ final class TwigCallableDeclarationExtractor
 
     private function kind(PhpObjectCreation $creation): ?TwigCallableKind
     {
-        return match ($creation->className()) {
-            'Twig\\TwigFilter' => TwigCallableKind::Filter,
-            'Twig\\TwigFunction' => TwigCallableKind::Function,
+        return match ([$creation->className(), $creation->enclosingMethod()]) {
+            ['Twig\\TwigFilter', 'getFilters'] => TwigCallableKind::Filter,
+            ['Twig\\TwigFunction', 'getFunctions'] => TwigCallableKind::Function,
             default => null,
         };
     }

@@ -8,12 +8,18 @@ final class PhpObjectCreation
     public function __construct(
         private readonly string $className,
         private readonly array $arguments,
+        private readonly ?string $enclosingMethod = null,
     ) {
     }
 
     public function className(): string
     {
         return $this->className;
+    }
+
+    public function enclosingMethod(): ?string
+    {
+        return $this->enclosingMethod;
     }
 
     /** @return list<PhpArgument> */

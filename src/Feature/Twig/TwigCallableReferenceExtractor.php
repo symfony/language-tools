@@ -3,24 +3,28 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
 final class TwigCallableReferenceExtractor
 {
-    public function __construct(private readonly TwigDocumentParser $parser)
-    {
+    public function __construct(
+        private readonly TwigDocumentParser $parser,
+        private readonly TwigCommentParser $commentParser,
+    ) {
     }
 
     public function at(string $text, int $offset): ?TwigCallableReference
     {
         $document = $this->parser->parse($text);
+        $masked = $this->commentParser->mask($text);
         foreach ([
             ['function_call', 'function_identifier', TwigCallableKind::Function],
             ['filter', 'filter_identifier', TwigCallableKind::Filter],
         ] as [$containerType, $identifierType, $kind]) {
             foreach ($document->nodesOfType($containerType) as $container) {
                 $identifier = $document->directChild($container, $identifierType);
-                if (null === $identifier || !$this->contains($identifier, $offset) || !$this->insideDirective($text, $identifier->startByte())) {
+                if (null === $identifier || !$this->contains($identifier, $offset) || !$this->insideDirective($masked, $identifier->startByte())) {
                     continue;
                 }
                 $name = $document->text($identifier);
@@ -42,23 +46,47 @@ final class TwigCallableReferenceExtractor
 
     private function insideDirective(string $text, int $offset): bool
     {
-        $before = substr($text, 0, $offset);
-        $open = $this->lastOffset($before, '{{', '{%');
-        $close = $this->lastOffset($before, '}}', '%}');
-
-        return $open > $close;
-    }
-
-    private function lastOffset(string $text, string ...$needles): int
-    {
-        $offset = -1;
-        foreach ($needles as $needle) {
-            $position = strrpos($text, $needle);
-            if (false !== $position) {
-                $offset = max($offset, $position);
+        $close = null;
+        $quote = null;
+        $escaped = false;
+        $brackets = [];
+        for ($cursor = 0; $cursor < $offset; ++$cursor) {
+            $character = $text[$cursor];
+            $pair = substr($text, $cursor, 2);
+            if (null === $close) {
+                if ('{{' === $pair) {
+                    $close = '}}';
+                    $brackets = [];
+                    ++$cursor;
+                } elseif ('{%' === $pair) {
+                    $close = '%}';
+                    $brackets = [];
+                    ++$cursor;
+                }
+                continue;
+            }
+            if (null !== $quote) {
+                if ($escaped) {
+                    $escaped = false;
+                } elseif ('\\' === $character) {
+                    $escaped = true;
+                } elseif ($quote === $character) {
+                    $quote = null;
+                }
+                continue;
+            }
+            if (\in_array($character, ["'", '"'], true)) {
+                $quote = $character;
+            } elseif (\in_array($character, ['(', '[', '{'], true)) {
+                $brackets[] = ['(' => ')', '[' => ']', '{' => '}'][$character];
+            } elseif ([] !== $brackets && $character === $brackets[array_key_last($brackets)]) {
+                array_pop($brackets);
+            } elseif ([] === $brackets && $close === $pair) {
+                $close = null;
+                ++$cursor;
             }
         }
 
-        return $offset;
+        return null !== $close;
     }
 }
