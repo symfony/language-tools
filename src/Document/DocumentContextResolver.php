@@ -20,16 +20,19 @@ final class DocumentContextResolver
      */
     public function resolve(array $params): ?array
     {
+        $context = $this->resolvePositioned($params);
+        if (null === $context) {
+            return null;
+        }
+
+        return [$context->document, $context->project, $context->position];
+    }
+
+    /** @param array<array-key, mixed> $params */
+    public function resolveDocument(array $params): ?DocumentContext
+    {
         $textDocument = $params['textDocument'] ?? null;
-        $position = $params['position'] ?? null;
-        if (!\is_array($textDocument)
-            || !\is_string($textDocument['uri'] ?? null)
-            || !\is_array($position)
-            || !\is_int($position['line'] ?? null)
-            || !\is_int($position['character'] ?? null)
-            || $position['line'] < 0
-            || $position['character'] < 0
-        ) {
+        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
             return null;
         }
 
@@ -39,6 +42,24 @@ final class DocumentContextResolver
             return null;
         }
 
-        return [$document, $project, new Position($position['line'], $position['character'])];
+        return new DocumentContext($document, $project);
+    }
+
+    /** @param array<array-key, mixed> $params */
+    public function resolvePositioned(array $params): ?PositionedDocumentContext
+    {
+        $context = $this->resolveDocument($params);
+        $position = $params['position'] ?? null;
+        if (null === $context
+            || !\is_array($position)
+            || !\is_int($position['line'] ?? null)
+            || !\is_int($position['character'] ?? null)
+            || $position['line'] < 0
+            || $position['character'] < 0
+        ) {
+            return null;
+        }
+
+        return new PositionedDocumentContext($context->document, $context->project, new Position($position['line'], $position['character']));
     }
 }
