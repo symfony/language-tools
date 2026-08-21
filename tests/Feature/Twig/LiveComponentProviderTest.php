@@ -70,7 +70,7 @@ final class LiveComponentProviderTest extends TestCase
             $extractor->extract($project, $templateUri, 'twig', $templateText),
             $extractor->extract($project, $usageUri, 'twig', $usageText),
         );
-        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, new TemplateIndexRegistry(), $extractor, $commentParser);
+        $provider = new TwigComponentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, new TemplateIndexRegistry(), $extractor, $commentParser);
 
         self::assertSame(['submit'], array_column($provider->complete($this->params($converter, $completionUri, $completionText, \strlen($completionText))) ?? [], 'label'));
         $nestedActionOffset = strpos($templateText, 'submit') + \strlen('sub');

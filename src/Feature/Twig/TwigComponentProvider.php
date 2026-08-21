@@ -2,7 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
-use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CodeLensProviderInterface;
@@ -13,14 +13,14 @@ use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TwigComponentProvider implements CodeLensProviderInterface, CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
-        private readonly DocumentStore $documents,
-        private readonly ProjectRegistry $projects,
+        private readonly DocumentContextResolver $resolver,
         private readonly PositionConverter $converter,
+        private readonly LspProtocolMapper $protocol,
         private readonly TwigComponentIndexRegistry $indexes,
         private readonly TemplateIndexRegistry $templates,
         private readonly TwigComponentExtractor $extractor,
@@ -30,18 +30,14 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
 
     public function complete(array $params): ?array
     {
-        $resolved = $this->document($params);
-        if (null === $resolved) {
+        $request = $this->resolver->resolvePositioned($params);
+        if (null === $request || 'twig' !== $request->document->languageId()) {
             return null;
         }
-        [$document, $project, $position] = $resolved;
-        if ('twig' !== $document->languageId()) {
-            return null;
-        }
-        $cursor = $this->converter->toByteOffset($document->text(), $position);
-        $before = substr($this->commentParser->mask($document->text()), 0, $cursor);
-        $index = $this->indexes->forProject($project);
-        $liveActionContext = $this->liveActionCompletionContext($project, $document->uri(), $before);
+        $cursor = $this->converter->toByteOffset($request->document->text(), $request->position);
+        $before = substr($this->commentParser->mask($request->document->text()), 0, $cursor);
+        $index = $this->indexes->forProject($request->project);
+        $liveActionContext = $this->liveActionCompletionContext($request->project, $request->document->uri(), $before);
         if (null !== $liveActionContext) {
             [$component, $prefix] = $liveActionContext;
             $values = array_map(static fn (TwigComponentAction $action): string => $action->name(), $component->actions());
@@ -59,14 +55,14 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
             $values = array_values(array_unique([
                 ...array_map(static fn (TwigComponent $component): string => $component->name(), $index->components()),
                 ...$index->runtimeNames(),
-                ...$this->anonymousComponentNames($index->anonymousTemplateDirectory(), $this->templates->forProject($project)),
+                ...$this->anonymousComponentNames($index->anonymousTemplateDirectory(), $this->templates->forProject($request->project)),
             ]));
             sort($values);
             $detail = 'Symfony Twig component';
         } else {
             return null;
         }
-        $start = $this->converter->toPosition($document->text(), $cursor - \strlen($prefix));
+        $start = $this->converter->toPosition($request->document->text(), $cursor - \strlen($prefix));
         $items = [];
         foreach ($values as $value) {
             if (!str_starts_with($value, $prefix)) {
@@ -76,13 +72,7 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
                 'label' => $value,
                 'kind' => 6,
                 'detail' => $detail,
-                'textEdit' => [
-                    'range' => [
-                        'start' => ['line' => $start->line(), 'character' => $start->character()],
-                        'end' => ['line' => $position->line(), 'character' => $position->character()],
-                    ],
-                    'newText' => $value,
-                ],
+                'textEdit' => $this->protocol->textEdit(new Range($start, $request->position), $value),
             ];
         }
 
@@ -95,7 +85,7 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
         if (null !== $action) {
             [$component, $componentAction] = $action;
 
-            return ['contents' => ['kind' => 'markdown', 'value' => \sprintf('Live action: `%s#%s`', $component->name(), $componentAction->name())]];
+            return $this->protocol->markdownHover(\sprintf('Live action: `%s#%s`', $component->name(), $componentAction->name()));
         }
         $resolved = $this->resolve($params);
         if (null === $resolved) {
@@ -116,7 +106,7 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
             $details[] = \sprintf('Actions: `%s`', implode('`, `', array_map(static fn (TwigComponentAction $action): string => $action->name(), $component->actions())));
         }
 
-        return ['contents' => ['kind' => 'markdown', 'value' => implode("\n\n", $details)]];
+        return $this->protocol->markdownHover(implode("\n\n", $details));
     }
 
     public function definition(array $params): ?array
@@ -128,7 +118,7 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
             foreach ($this->indexes->forProject($project)->declarations($component->name()) as $declaration) {
                 foreach ($declaration->actions() as $declarationAction) {
                     if ($componentAction->name() === $declarationAction->name()) {
-                        $locations[] = ['uri' => $declaration->uri(), 'range' => $this->range($declarationAction->range())];
+                        $locations[] = $this->protocol->location($declaration->uri(), $declarationAction->range());
                     }
                 }
             }
@@ -141,10 +131,7 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
         }
         [$component, $project] = $resolved;
 
-        return array_map(fn (TwigComponent $declaration): array => [
-            'uri' => $declaration->uri(),
-            'range' => $this->range($declaration->range()),
-        ], $this->indexes->forProject($project)->declarations($component->name()));
+        return array_map(fn (TwigComponent $declaration): array => $this->protocol->location($declaration->uri(), $declaration->range()), $this->indexes->forProject($project)->declarations($component->name()));
     }
 
     public function references(array $params): ?array
@@ -154,7 +141,7 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
             [$component, $componentAction, $project] = $action;
             $locations = $this->definition($params) ?? [];
             foreach ($this->indexes->forProject($project)->actionReferences($component->name(), $componentAction->name()) as $reference) {
-                $locations[] = ['uri' => $reference->uri(), 'range' => $this->range($reference->range())];
+                $locations[] = $this->protocol->location($reference->uri(), $reference->range());
             }
 
             return $locations;
@@ -165,32 +152,25 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
         }
         [$component, $project] = $resolved;
 
-        return array_map(fn (TwigComponentReference $reference): array => [
-            'uri' => $reference->uri(),
-            'range' => $this->range($reference->range()),
-        ], $this->indexes->forProject($project)->references($component->name()));
+        return array_map(fn (TwigComponentReference $reference): array => $this->protocol->location($reference->uri(), $reference->range()), $this->indexes->forProject($project)->references($component->name()));
     }
 
     public function diagnostics(array $params): ?array
     {
-        $resolved = $this->document($params);
-        if (null === $resolved) {
+        $request = $this->resolver->resolveDocument($params);
+        if (null === $request || 'twig' !== $request->document->languageId()) {
             return null;
         }
-        [$document, $project] = $resolved;
-        if ('twig' !== $document->languageId()) {
-            return null;
-        }
-        $index = $this->indexes->forProject($project);
+        $index = $this->indexes->forProject($request->project);
         if (!$index->isComplete() || !$index->isRuntimeComplete()) {
             return null;
         }
-        $templates = $this->templates->forProject($project);
+        $templates = $this->templates->forProject($request->project);
         if (!$templates->isComplete()) {
             return null;
         }
         $diagnostics = [];
-        foreach ($this->extractor->extract($project, $document->uri(), 'twig', $document->text())->references() as $reference) {
+        foreach ($this->extractor->extract($request->project, $request->document->uri(), 'twig', $request->document->text())->references() as $reference) {
             $name = $reference->name();
             if (null !== $index->get($name)
                 || $index->hasRuntimeName($name)
@@ -198,13 +178,7 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
             ) {
                 continue;
             }
-            $diagnostics[] = [
-                'range' => $this->range($reference->range()),
-                'severity' => 1,
-                'source' => 'symfony',
-                'code' => 'twig_component.not_found',
-                'message' => \sprintf('Twig component "%s" does not exist.', $name),
-            ];
+            $diagnostics[] = $this->protocol->diagnostic($reference->range(), 1, 'twig_component.not_found', \sprintf('Twig component "%s" does not exist.', $name));
         }
 
         return $diagnostics;
@@ -268,34 +242,16 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
 
     public function codeLenses(array $params): ?array
     {
-        $resolved = $this->document($params);
-        if (null === $resolved) {
-            return null;
-        }
-        [$document, $project] = $resolved;
-        if ('php' !== $document->languageId()) {
+        $request = $this->resolver->resolveDocument($params);
+        if (null === $request || 'php' !== $request->document->languageId()) {
             return null;
         }
         $lenses = [];
-        foreach ($this->extractor->extract($project, $document->uri(), 'php', $document->text())->components() as $component) {
-            $references = $this->indexes->forProject($project)->references($component->name());
-            $locations = array_map(fn (TwigComponentReference $reference): array => [
-                'uri' => $reference->uri(),
-                'range' => $this->range($reference->range()),
-            ], $references);
+        foreach ($this->extractor->extract($request->project, $request->document->uri(), 'php', $request->document->text())->components() as $component) {
+            $references = $this->indexes->forProject($request->project)->references($component->name());
+            $locations = array_map(fn (TwigComponentReference $reference): array => $this->protocol->location($reference->uri(), $reference->range()), $references);
             $count = \count($locations);
-            $lenses[] = [
-                'range' => $this->range($component->range()),
-                'command' => [
-                    'title' => \sprintf('%d Twig component usage%s', $count, 1 === $count ? '' : 's'),
-                    'command' => 'editor.action.showReferences',
-                    'arguments' => [
-                        $component->uri(),
-                        ['line' => $component->range()->start()->line(), 'character' => $component->range()->start()->character()],
-                        $locations,
-                    ],
-                ],
-            ];
+            $lenses[] = $this->protocol->referenceLens($component->range(), \sprintf('%d Twig component usage%s', $count, 1 === $count ? '' : 's'), $component->uri(), $locations);
         }
 
         return $lenses;
@@ -350,31 +306,30 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
      */
     private function resolveAction(array $params): ?array
     {
-        $resolved = $this->document($params);
-        if (null === $resolved) {
+        $request = $this->resolver->resolvePositioned($params);
+        if (null === $request) {
             return null;
         }
-        [$document, $project, $position] = $resolved;
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        $facts = $this->extractor->extract($project, $document->uri(), $document->languageId(), $document->text());
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        $facts = $this->extractor->extract($request->project, $request->document->uri(), $request->document->languageId(), $request->document->text());
         foreach ($facts->actionReferences() as $reference) {
-            if (!$this->contains($document->text(), $reference->range(), $offset)) {
+            if (!$this->contains($request->document->text(), $reference->range(), $offset)) {
                 continue;
             }
-            $component = $this->indexes->forProject($project)->get($reference->component());
+            $component = $this->indexes->forProject($request->project)->get($reference->component());
             if (null === $component) {
                 return null;
             }
             foreach ($component->actions() as $action) {
                 if ($reference->action() === $action->name()) {
-                    return [$component, $action, $project];
+                    return [$component, $action, $request->project];
                 }
             }
         }
         foreach ($facts->components() as $component) {
             foreach ($component->actions() as $action) {
-                if ($this->contains($document->text(), $action->range(), $offset)) {
-                    return [$this->indexes->forProject($project)->get($component->name()) ?? $component, $action, $project];
+                if ($this->contains($request->document->text(), $action->range(), $offset)) {
+                    return [$this->indexes->forProject($request->project)->get($component->name()) ?? $component, $action, $request->project];
                 }
             }
         }
@@ -389,63 +344,30 @@ final class TwigComponentProvider implements CodeLensProviderInterface, Completi
      */
     private function resolve(array $params): ?array
     {
-        $resolved = $this->document($params);
-        if (null === $resolved) {
+        $request = $this->resolver->resolvePositioned($params);
+        if (null === $request) {
             return null;
         }
-        [$document, $project, $position] = $resolved;
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        $facts = $this->extractor->extract($project, $document->uri(), $document->languageId(), $document->text());
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        $facts = $this->extractor->extract($request->project, $request->document->uri(), $request->document->languageId(), $request->document->text());
         foreach ($facts->references() as $reference) {
-            if ($this->contains($document->text(), $reference->range(), $offset)) {
-                $component = $this->indexes->forProject($project)->get($reference->name());
+            if ($this->contains($request->document->text(), $reference->range(), $offset)) {
+                $component = $this->indexes->forProject($request->project)->get($reference->name());
 
-                return null === $component ? null : [$component, $project];
+                return null === $component ? null : [$component, $request->project];
             }
         }
         foreach ($facts->components() as $component) {
-            if ($this->contains($document->text(), $component->range(), $offset)) {
-                return [$this->indexes->forProject($project)->get($component->name()) ?? $component, $project];
+            if ($this->contains($request->document->text(), $component->range(), $offset)) {
+                return [$this->indexes->forProject($request->project)->get($component->name()) ?? $component, $request->project];
             }
         }
 
         return null;
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{\Symfony\Lsp\Document\Document, Project, \Symfony\Lsp\Document\Position}|null
-     */
-    private function document(array $params): ?array
-    {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
-            return null;
-        }
-        $document = $this->documents->get($textDocument['uri']);
-        $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $document || null === $project) {
-            return null;
-        }
-        $position = $params['position'] ?? [];
-        $line = \is_array($position) && \is_int($position['line'] ?? null) ? $position['line'] : 0;
-        $character = \is_array($position) && \is_int($position['character'] ?? null) ? $position['character'] : 0;
-
-        return [$document, $project, new \Symfony\Lsp\Document\Position($line, $character)];
-    }
-
     private function contains(string $text, Range $range, int $offset): bool
     {
         return $offset >= $this->converter->toByteOffset($text, $range->start()) && $offset <= $this->converter->toByteOffset($text, $range->end());
-    }
-
-    /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */
-    private function range(Range $range): array
-    {
-        return [
-            'start' => ['line' => $range->start()->line(), 'character' => $range->start()->character()],
-            'end' => ['line' => $range->end()->line(), 'character' => $range->end()->character()],
-        ];
     }
 }

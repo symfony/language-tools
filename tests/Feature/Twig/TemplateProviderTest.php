@@ -237,7 +237,7 @@ final class TemplateProviderTest extends TestCase
         $indexes->forProject($project)->replaceRuntime(true, [], 'components');
         $templateIndexes = new TemplateIndexRegistry();
         $templateIndexes->forProject($project)->replaceRuntime(true);
-        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, $templateIndexes, $extractor, $commentParser);
+        $provider = new TwigComponentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $templateIndexes, $extractor, $commentParser);
         $completionPosition = $converter->toPosition($completionText, \strlen($completionText));
         self::assertSame(['Alert'], array_column($provider->complete([
             'textDocument' => ['uri' => $completionUri],
@@ -305,7 +305,7 @@ final class TemplateProviderTest extends TestCase
             $extractor->extract($project, $usageUri, 'twig', $usageText),
         );
         $templateIndexes = new TemplateIndexRegistry();
-        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, $templateIndexes, $extractor, $commentParser);
+        $provider = new TwigComponentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $templateIndexes, $extractor, $commentParser);
         $params = ['textDocument' => ['uri' => $usageUri]];
 
         $withoutRuntimeMetadata = $provider->diagnostics($params);
@@ -360,7 +360,7 @@ final class TemplateProviderTest extends TestCase
             new TemplateDeclaration('@acme/components/badge.html.twig', 'file:///workspace/vendor/acme/bundle/templates/components/badge.html.twig', $range),
             new TemplateDeclaration('page.html.twig', 'file:///workspace/templates/page.html.twig', $range),
         );
-        $provider = new TwigComponentProvider($documents, $projects, $converter, $indexes, $templateIndexes, $extractor, $commentParser);
+        $provider = new TwigComponentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $templateIndexes, $extractor, $commentParser);
 
         $position = $converter->toPosition($completionText, \strlen($completionText));
         $items = $provider->complete([
