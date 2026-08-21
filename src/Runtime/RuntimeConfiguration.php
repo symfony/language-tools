@@ -4,8 +4,9 @@ namespace Symfony\Lsp\Runtime;
 
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectStateInterface;
 
-final class RuntimeConfiguration
+final class RuntimeConfiguration implements ProjectStateInterface
 {
     /** @var non-empty-list<string> */
     private array $phpCommand = ['php'];
@@ -81,6 +82,11 @@ final class RuntimeConfiguration
     public function setEnvironment(Project $project, string $environment): void
     {
         $this->projectSettings[$project->rootPath()]['environment'] = $environment;
+    }
+
+    public function removeProject(Project $project): void
+    {
+        unset($this->projectSettings[$project->rootPath()]);
     }
 
     /** @return non-empty-list<string> */

@@ -11,6 +11,7 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Progress\ProgressReporterInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\ProjectStateInterface;
 use Symfony\Lsp\Project\UriToPathConverter;
 
 use function Amp\delay;
@@ -18,7 +19,7 @@ use function Amp\delay;
 /**
  * @phpstan-import-type SourceIndexMetadata from SourceIndexStoreInterface
  */
-final class ApplicationSourceScanner
+final class ApplicationSourceScanner implements ProjectStateInterface
 {
     private const LOCK_PREFIX = "source\0";
 
@@ -86,6 +87,13 @@ final class ApplicationSourceScanner
             }
             $lock?->release();
         }
+    }
+
+    public function removeProject(Project $project): void
+    {
+        $root = $project->rootPath();
+        ($this->activeScans[$root] ?? null)?->cancel();
+        unset($this->activeScans[$root], $this->entries[$root]);
     }
 
     private function refreshProjectUnlocked(Project $project, Cancellation $cancellation): void
@@ -205,6 +213,11 @@ final class ApplicationSourceScanner
 
     private function refreshUriUnlocked(Project $project, string $uri, string $path, string $relativePath, bool $deleted): SourceFileChange
     {
+        // the project can be removed from the workspace while waiting for the lock
+        if ($this->projects->forDocumentUri($uri)?->rootPath() !== $project->rootPath()) {
+            return SourceFileChange::untracked();
+        }
+
         $projectKey = $project->rootPath();
         $indexed = \array_key_exists($projectKey, $this->entries);
         $entries = $indexed ? $this->entries[$projectKey] : $this->store->loadMetadata($project);

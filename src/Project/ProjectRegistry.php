@@ -10,9 +10,33 @@ final class ProjectRegistry
     /**
      * @param list<Project> $projects
      */
-    public function replace(array $projects): void
+    public function replace(array $projects): ProjectCollectionChange
     {
+        $previous = [];
+        foreach ($this->projects as $project) {
+            $previous[$project->rootPath()] = $project;
+        }
+        $current = [];
+        foreach ($projects as $project) {
+            $current[$project->rootPath()] = $project;
+        }
         $this->projects = $projects;
+
+        return new ProjectCollectionChange(
+            array_values(array_diff_key($current, $previous)),
+            array_values(array_diff_key($previous, $current)),
+        );
+    }
+
+    public function contains(Project $project): bool
+    {
+        foreach ($this->projects as $candidate) {
+            if ($candidate->rootPath() === $project->rootPath()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

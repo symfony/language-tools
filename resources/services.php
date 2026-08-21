@@ -54,6 +54,8 @@ use Symfony\Lsp\Parser\TreeSitter\LastResultTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
 use Symfony\Lsp\Progress\ProgressReporterInterface;
+use Symfony\Lsp\Project\ProjectStateCleaner;
+use Symfony\Lsp\Project\ProjectStateInterface;
 use Symfony\Lsp\Runtime\DebouncedRuntimeRefreshScheduler;
 use Symfony\Lsp\Runtime\NativeProcessRunner;
 use Symfony\Lsp\Runtime\ObservedRuntimeInitializer;
@@ -97,6 +99,7 @@ return static function (ContainerConfigurator $container): void {
         RenameProviderInterface::class => 'lsp.provider.rename',
         SourceIndexProviderInterface::class => 'lsp.source_index_provider',
         RuntimeSnapshotLoaderInterface::class => 'lsp.runtime_snapshot_loader',
+        ProjectStateInterface::class => 'lsp.project_state',
     ];
     foreach ($providerTags as $interface => $tag) {
         $services->instanceof($interface)->tag($tag);
@@ -146,7 +149,7 @@ return static function (ContainerConfigurator $container): void {
     $services->load('Symfony\\Lsp\\Document\\', '../src/Document/*{Resolver,Store,Synchronizer,Converter}.php');
     $services->load('Symfony\\Lsp\\Index\\', '../src/Index/*{Scanner,Handler,Store,Registry,Codec,Hasher,Enumerator}.php');
     $services->load('Symfony\\Lsp\\Parser\\', '../src/Parser/**/*{Parser,Decoder}.php');
-    $services->load('Symfony\\Lsp\\Project\\', '../src/Project/*{Discovery,Registry,Resolver,Settings,Converter,Configuration,Trust,Manager,Matcher}.php');
+    $services->load('Symfony\\Lsp\\Project\\', '../src/Project/*{Discovery,Registry,Resolver,Settings,Converter,Configuration,Trust,Manager,Matcher,Cleaner}.php');
     $services->load('Symfony\\Lsp\\Protocol\\', '../src/Protocol/*Mapper.php');
     $services->load('Symfony\\Lsp\\Runtime\\', '../src/Runtime/*{Installer,Runner,Initializer,Refresher,Scheduler,Configuration,Registry,Planner,Mapper}.php');
     $services->load('Symfony\\Lsp\\Server\\', '../src/Server/*{Server,Logger,State,Reporter,Watcher}.php');
@@ -202,6 +205,8 @@ return static function (ContainerConfigurator $container): void {
     }
     $services->get(ApplicationSourceScanner::class)
         ->arg('$mutex', service(LocalKeyedMutex::class));
+    $services->get(ProjectStateCleaner::class)
+        ->arg('$states', tagged_iterator('lsp.project_state'));
     $services->get(RuntimeSnapshotLoaderRegistry::class)
         ->arg('$loaders', tagged_iterator('lsp.runtime_snapshot_loader'));
 

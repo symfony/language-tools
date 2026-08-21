@@ -71,7 +71,7 @@ final class IndexCommandHandlerTest extends TestCase
             $projects,
             $workspaceTrust,
             $sourceScanner,
-            new StatusRuntimeInitializer($runtime, $statuses),
+            new StatusRuntimeInitializer($runtime, $statuses, $projects),
             $statuses,
             $runtimeConfiguration,
         );

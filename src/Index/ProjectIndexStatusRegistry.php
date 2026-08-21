@@ -3,8 +3,9 @@
 namespace Symfony\Lsp\Index;
 
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectStateInterface;
 
-final class ProjectIndexStatusRegistry
+final class ProjectIndexStatusRegistry implements ProjectStateInterface
 {
     /** @var array<string, array{source: array{state: string, error?: string}, runtime: array{state: string, error?: string}}> */
     private array $statuses = [];
@@ -47,6 +48,11 @@ final class ProjectIndexStatusRegistry
     {
         $state = isset($this->hasRuntimeSnapshot[$project->rootPath()]) ? 'stale' : 'failed';
         $this->section($project, 'runtime', $state, 'Runtime indexing failed.');
+    }
+
+    public function removeProject(Project $project): void
+    {
+        unset($this->statuses[$project->rootPath()], $this->hasRuntimeSnapshot[$project->rootPath()]);
     }
 
     /**

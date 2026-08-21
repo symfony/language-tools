@@ -11,6 +11,7 @@ use Symfony\Lsp\Feature\Stimulus\StimulusIndexRegistry;
 use Symfony\Lsp\Feature\Twig\ProjectTemplateSnapshotLoader;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Runtime\BridgeInstaller;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
@@ -26,6 +27,14 @@ use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
  */
 final class ContainerProjectRootBridgeTest extends TestCase
 {
+    private static function projects(Project ...$projects): ProjectRegistry
+    {
+        $registry = new ProjectRegistry();
+        $registry->replace(array_values($projects));
+
+        return $registry;
+    }
+
     public function testRunsTheBridgeThroughAMappedProjectRoot(): void
     {
         if ('Windows' === \PHP_OS_FAMILY) {
@@ -59,6 +68,7 @@ final class ContainerProjectRootBridgeTest extends TestCase
             ]),
             $configuration,
             $pathMapper,
+            self::projects($project),
         );
 
         try {

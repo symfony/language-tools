@@ -6,12 +6,14 @@ use Amp\Cancellation;
 use Amp\CancelledException;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectRegistry;
 
 final class StatusRuntimeInitializer implements RuntimeInitializerInterface
 {
     public function __construct(
         private readonly RuntimeInitializerInterface $initializer,
         private readonly ProjectIndexStatusRegistry $statuses,
+        private readonly ProjectRegistry $projects,
     ) {
     }
 
@@ -23,11 +25,15 @@ final class StatusRuntimeInitializer implements RuntimeInitializerInterface
             $this->initializer->initialize($project, $plan, $cancellation);
             $this->statuses->runtimeReady($project);
         } catch (CancelledException $error) {
-            $this->statuses->runtimeStale($project);
+            if ($this->projects->contains($project)) {
+                $this->statuses->runtimeStale($project);
+            }
 
             throw $error;
         } catch (\Throwable $error) {
-            $this->statuses->runtimeFailed($project);
+            if ($this->projects->contains($project)) {
+                $this->statuses->runtimeFailed($project);
+            }
 
             throw $error;
         }

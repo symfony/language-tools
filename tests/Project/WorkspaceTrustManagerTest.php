@@ -24,12 +24,12 @@ final class WorkspaceTrustManagerTest extends TestCase
         $statuses = new ProjectIndexStatusRegistry();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
         $registry = $this->registry($project = new Project('/workspace', 'file:///workspace', '^8.0'));
-        $manager = new WorkspaceTrustManager($client, $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration());
+        $manager = new WorkspaceTrustManager($client, $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $registry);
 
         $manager->applyInitializationOptions([
             'initializationOptions' => ['workspaceTrust' => true],
-        ], $registry);
-        $manager->requestUnknownDecisions($registry);
+        ], $registry->all());
+        $manager->requestUnknownDecisions($registry->all());
 
         self::assertSame(TrustStatus::Trusted, $trust->status($project));
         self::assertSame([], $client->requests);
@@ -43,9 +43,9 @@ final class WorkspaceTrustManagerTest extends TestCase
         $statuses = new ProjectIndexStatusRegistry();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
         $registry = $this->registry($project = new Project('/workspace', 'file:///workspace', '^8.0'));
-        $manager = new WorkspaceTrustManager($client, $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration());
+        $manager = new WorkspaceTrustManager($client, $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $registry);
 
-        $manager->requestUnknownDecisions($registry);
+        $manager->requestUnknownDecisions($registry->all());
 
         self::assertSame(TrustStatus::Trusted, $trust->status($project));
         self::assertSame('window/showMessageRequest', $client->requests[0]['method']);
@@ -62,9 +62,9 @@ final class WorkspaceTrustManagerTest extends TestCase
         $statuses = new ProjectIndexStatusRegistry();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
         $registry = $this->registry($project = new Project('/workspace', 'file:///workspace', '^8.0'));
-        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration());
+        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $registry);
 
-        $manager->requestUnknownDecisions($registry);
+        $manager->requestUnknownDecisions($registry->all());
 
         self::assertSame(TrustStatus::Untrusted, $trust->status($project));
         self::assertSame([], $runtimeInitializer->projects);
@@ -78,10 +78,10 @@ final class WorkspaceTrustManagerTest extends TestCase
         $trust->set($project, TrustStatus::Trusted);
         $statuses = new ProjectIndexStatusRegistry();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses, [false, true]);
-        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration());
+        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $registry);
 
-        $manager->requestUnknownDecisions($registry);
-        $manager->requestUnknownDecisions($registry);
+        $manager->requestUnknownDecisions($registry->all());
+        $manager->requestUnknownDecisions($registry->all());
 
         self::assertSame(['/workspace', '/workspace'], $runtimeInitializer->projects);
         self::assertSame('ready', $statuses->status($project)['runtime']['state']);
@@ -95,16 +95,49 @@ final class WorkspaceTrustManagerTest extends TestCase
         $statuses = new ProjectIndexStatusRegistry();
         $configuration = new RuntimeConfiguration();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
-        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, $configuration);
+        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, $configuration, $this->registry($project));
 
-        $manager->requestUnknownDecisions($this->registry($project));
-        $manager->requestUnknownDecisions($this->registry($project));
+        $manager->requestUnknownDecisions([$project]);
+        $manager->requestUnknownDecisions([$project]);
         $configuration->setEnvironment($project, 'test');
-        $manager->requestUnknownDecisions($this->registry($project));
+        $manager->requestUnknownDecisions([$project]);
         $replacement = new Project('/workspace', 'file:///workspace', '^8.0');
-        $manager->requestUnknownDecisions($this->registry($replacement));
+        $manager->requestUnknownDecisions([$replacement]);
 
         self::assertSame(['/workspace', '/workspace', '/workspace'], $runtimeInitializer->projects);
+    }
+
+    public function testDiscardsDecisionsForProjectsRemovedWhileTheClientDecides(): void
+    {
+        $trust = new WorkspaceTrust();
+        $statuses = new ProjectIndexStatusRegistry();
+        $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
+        $registry = $this->registry($project = new Project('/workspace', 'file:///workspace', '^8.0'));
+        $client = new RemovingClient($registry, ['title' => 'Trust and enable runtime indexing']);
+        $manager = new WorkspaceTrustManager($client, $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $registry);
+
+        $manager->requestUnknownDecisions([$project]);
+
+        self::assertSame(TrustStatus::Unknown, $trust->status($project));
+        self::assertSame([], $runtimeInitializer->projects);
+    }
+
+    public function testRemovalResetsTrustSoReAddingPromptsAgain(): void
+    {
+        $client = new CapturingClient(['title' => 'Trust and enable runtime indexing']);
+        $trust = new WorkspaceTrust();
+        $statuses = new ProjectIndexStatusRegistry();
+        $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
+        $registry = $this->registry($project = new Project('/workspace', 'file:///workspace', '^8.0'));
+        $manager = new WorkspaceTrustManager($client, $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $registry);
+
+        $manager->requestUnknownDecisions($registry->all());
+        $trust->removeProject($project);
+        $manager->removeProject($project);
+        $manager->requestUnknownDecisions($registry->all());
+
+        self::assertCount(2, $client->requests);
+        self::assertSame(['/workspace', '/workspace'], $runtimeInitializer->projects);
     }
 
     private function registry(Project $project): ProjectRegistry
@@ -136,6 +169,26 @@ final class CapturingRuntimeInitializer implements RuntimeInitializerInterface
         } else {
             $this->statuses->runtimeReady($project);
         }
+    }
+}
+
+final class RemovingClient implements ClientInterface
+{
+    public function __construct(
+        private readonly ProjectRegistry $registry,
+        private readonly mixed $response,
+    ) {
+    }
+
+    public function request(string $method, array $params): mixed
+    {
+        $this->registry->replace([]);
+
+        return $this->response;
+    }
+
+    public function notify(string $method, array $params): void
+    {
     }
 }
 

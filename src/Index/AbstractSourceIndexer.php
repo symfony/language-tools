@@ -4,9 +4,10 @@ namespace Symfony\Lsp\Index;
 
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectStateInterface;
 
 /** @template TFacts of SourceFactsInterface */
-abstract class AbstractSourceIndexer implements SourceIndexProviderInterface
+abstract class AbstractSourceIndexer implements SourceIndexProviderInterface, ProjectStateInterface
 {
     /** @var array<string, list<TFacts>> */
     private array $facts = [];
@@ -14,6 +15,11 @@ abstract class AbstractSourceIndexer implements SourceIndexProviderInterface
     final public function begin(Project $project): void
     {
         $this->facts[$project->rootPath()] = [];
+    }
+
+    public function removeProject(Project $project): void
+    {
+        unset($this->facts[$project->rootPath()]);
     }
 
     /** @return TFacts|null */

@@ -6,6 +6,7 @@ use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectStateInterface;
 
 /**
  * Append-friendly JSON Lines index: a header line, then one record per file
@@ -14,7 +15,7 @@ use Symfony\Lsp\Project\Project;
  *
  * @phpstan-import-type SourceIndexMetadata from SourceIndexStoreInterface
  */
-final class PersistentSourceIndexStore implements SourceIndexStoreInterface
+final class PersistentSourceIndexStore implements SourceIndexStoreInterface, ProjectStateInterface
 {
     private const SCHEMA_VERSION = 5;
 
@@ -163,6 +164,11 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface
     {
         $this->offsets[$project->rootPath()] = $offsets;
         $this->needsReset[$project->rootPath()] = false;
+    }
+
+    public function removeProject(Project $project): void
+    {
+        unset($this->offsets[$project->rootPath()], $this->needsReset[$project->rootPath()]);
     }
 
     private function appendLine(Project $project, string $relativePath, string $line): void

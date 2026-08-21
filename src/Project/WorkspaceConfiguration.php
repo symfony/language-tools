@@ -17,6 +17,7 @@ final class WorkspaceConfiguration
         private readonly RuntimeConfiguration $runtimeConfiguration,
         private readonly ProjectSettings $projectSettings,
         private readonly PositionConverter $positionConverter,
+        private readonly ProjectStateCleaner $projectStateCleaner,
     ) {
     }
 
@@ -35,7 +36,7 @@ final class WorkspaceConfiguration
         $this->workspaceFolders = $this->workspaceFolders($params);
         $this->rediscoverProjects();
         if ($this->runtimeConfiguration->runtimeIndexing()) {
-            $this->workspaceTrustManager->applyInitializationOptions($params, $this->projectRegistry);
+            $this->workspaceTrustManager->applyInitializationOptions($params, $this->projectRegistry->all());
         }
     }
 
@@ -59,9 +60,7 @@ final class WorkspaceConfiguration
                 $this->workspaceTrustManager->invalidateRuntime($project);
             }
         }
-        $projects = new ProjectRegistry();
-        $projects->replace($runtimeProjects);
-        $this->workspaceTrustManager->requestUnknownDecisions($projects);
+        $this->workspaceTrustManager->requestUnknownDecisions($runtimeProjects);
     }
 
     /** @param array<array-key, mixed> $params */
@@ -101,10 +100,13 @@ final class WorkspaceConfiguration
 
     public function rediscoverProjects(): void
     {
-        $this->projectRegistry->replace($this->projectDiscovery->discover(
+        $change = $this->projectRegistry->replace($this->projectDiscovery->discover(
             $this->workspaceFolders,
             $this->runtimeConfiguration->projectRoots(),
         ));
+        foreach ($change->removed as $project) {
+            $this->projectStateCleaner->remove($project);
+        }
     }
 
     /** @param array<array-key, mixed> $params */

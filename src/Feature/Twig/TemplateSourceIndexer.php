@@ -12,9 +12,6 @@ use Symfony\Lsp\Project\Project;
 /** @extends AbstractSourceIndexer<TemplateSourceFacts> */
 final class TemplateSourceIndexer extends AbstractSourceIndexer
 {
-    /** @var array<string, TemplateSourceIndexAdapter> */
-    private array $sourceIndexes = [];
-
     public function __construct(
         private readonly TemplateIndexRegistry $indexes,
         private readonly TemplateReferenceExtractor $extractor,
@@ -48,7 +45,7 @@ final class TemplateSourceIndexer extends AbstractSourceIndexer
 
     protected function sourceIndex(Project $project): TemplateSourceIndexAdapter
     {
-        return $this->sourceIndexes[$project->rootPath()] ??= new TemplateSourceIndexAdapter($this->indexes->forProject($project));
+        return new TemplateSourceIndexAdapter($this->indexes->forProject($project));
     }
 
     protected function extract(Project $project, SourceDocument $document): TemplateSourceFacts

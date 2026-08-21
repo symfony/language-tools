@@ -3,7 +3,9 @@
 namespace Symfony\Lsp\Runtime;
 
 use Amp\Cancellation;
+use Amp\CancelledException;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectRegistry;
 
 final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
 {
@@ -13,6 +15,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         private readonly RuntimeSnapshotLoaderRegistry $snapshotLoaders,
         private readonly RuntimeConfiguration $configuration,
         private readonly ContainerPathMapper $pathMapper,
+        private readonly ProjectRegistry $projects,
     ) {
     }
 
@@ -36,6 +39,12 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             ...($plan->preservesContainer() ? ['--targeted-refresh=1'] : []),
             ...(RuntimeRefreshMode::Clear === $mode ? ['--rebuild-container=1'] : []),
         ], $project->rootPath(), $cancellation, $this->configuration->bridgeTimeout($project));
+
+        $cancellation?->throwIfRequested();
+        if (!$this->projects->contains($project)) {
+            // never load metadata for a project removed while the bridge ran
+            throw new CancelledException();
+        }
 
         if (0 !== $result->exitCode()) {
             throw new \RuntimeException(\sprintf('The project bridge failed with status %d.', $result->exitCode()));

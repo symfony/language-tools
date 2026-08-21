@@ -8,9 +8,10 @@ use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\ProjectStateInterface;
 use Symfony\Lsp\Runtime\RuntimeRefreshObserverInterface;
 
-final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterface
+final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterface, ProjectStateInterface
 {
     /** @param iterable<DiagnosticProviderInterface> $providers */
     public function __construct(
@@ -68,6 +69,21 @@ final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterfac
             'version' => $document->version(),
             'diagnostics' => $diagnostics,
         ]);
+    }
+
+    public function removeProject(Project $project): void
+    {
+        $rootUri = rtrim($project->rootUri(), '/').'/';
+        foreach ($this->documents->all() as $document) {
+            if (!str_starts_with($document->uri(), $rootUri)) {
+                continue;
+            }
+            if (null === $this->projects->forDocumentUri($document->uri())) {
+                $this->clear(['textDocument' => ['uri' => $document->uri()]]);
+            } else {
+                $this->publish(['textDocument' => ['uri' => $document->uri()]]);
+            }
+        }
     }
 
     public function refreshAll(): void

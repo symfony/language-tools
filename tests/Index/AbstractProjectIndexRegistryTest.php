@@ -18,6 +18,17 @@ final class AbstractProjectIndexRegistryTest extends TestCase
         self::assertSame($registry->forProject($first), $registry->forProject($sameRoot));
         self::assertNotSame($registry->forProject($first), $registry->forProject($second));
     }
+
+    public function testRemovalReleasesTheIndexSoReAddingStartsFresh(): void
+    {
+        $registry = new TestProjectIndexRegistry();
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $index = $registry->forProject($project);
+
+        $registry->removeProject($project);
+
+        self::assertNotSame($index, $registry->forProject($project));
+    }
 }
 
 /** @extends AbstractProjectIndexRegistry<TestProjectIndex> */

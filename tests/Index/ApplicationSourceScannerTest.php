@@ -592,6 +592,49 @@ PHP;
         self::assertSame(0, $provider->extractions);
     }
 
+    public function testRemovalCancelsTheActiveScanAndReleasesProjectEntries(): void
+    {
+        for ($i = 0; $i < 80; ++$i) {
+            file_put_contents(\sprintf('%s/src/File%02d.php', $this->temporaryDirectory, $i), \sprintf('<?php final class File%02d {}', $i));
+        }
+        $provider = new GenerationalSourceIndexProvider();
+        $scanner = $this->scanner($provider);
+        $scan = async(fn () => $scanner->refreshProject($this->project));
+        delay(0);
+
+        $this->projects->replace([]);
+        $scanner->removeProject($this->project);
+
+        try {
+            $scan->await();
+            self::fail('The scan of the removed project should have been canceled.');
+        } catch (CancelledException) {
+        }
+
+        self::assertArrayNotHasKey($this->temporaryDirectory, $provider->committed);
+        $scanner->refreshUri('file://'.$this->temporaryDirectory.'/src/File00.php');
+        self::assertArrayNotHasKey($this->temporaryDirectory, $provider->committed);
+    }
+
+    public function testARefreshWaitingForTheLockIgnoresARemovedProject(): void
+    {
+        $path = $this->temporaryDirectory.'/src/Controller.php';
+        file_put_contents($path, '<?php final class Controller {}');
+        $mutex = new LocalKeyedMutex();
+        $lock = $mutex->acquire("source\0".$this->temporaryDirectory);
+        $provider = new RecordingSourceIndexProvider();
+        $scanner = $this->scannerWithMutex($mutex, new DocumentStore(), $provider);
+        $refresh = async(static fn () => $scanner->refreshUri('file://'.$path));
+        delay(0);
+
+        $this->projects->replace([]);
+        $lock->release();
+        $refresh->await();
+
+        self::assertSame([], $provider->replacements);
+        self::assertSame([], $provider->sources);
+    }
+
     public function testAFullScanIgnoresTheRuntimeInitializerLock(): void
     {
         file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');

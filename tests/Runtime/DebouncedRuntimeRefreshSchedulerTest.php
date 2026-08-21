@@ -3,9 +3,11 @@
 namespace Symfony\Lsp\Tests\Runtime;
 
 use Amp\Cancellation;
+use Amp\CancelledException;
 use PHPUnit\Framework\TestCase;
 use Revolt\EventLoop;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Runtime\DebouncedRuntimeRefreshScheduler;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 use Symfony\Lsp\Runtime\RuntimeRefreshMode;
@@ -15,11 +17,19 @@ use function Amp\delay;
 
 final class DebouncedRuntimeRefreshSchedulerTest extends TestCase
 {
+    private static function projects(Project ...$projects): ProjectRegistry
+    {
+        $registry = new ProjectRegistry();
+        $registry->replace(array_values($projects));
+
+        return $registry;
+    }
+
     public function testCollapsesAndCombinesRapidRefreshesPerProject(): void
     {
         $initializer = new DebouncedRuntimeInitializer();
-        $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, 0.001);
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, self::projects($project), 0.001);
 
         $scheduler->schedule($project, new RuntimeRefreshPlan(RuntimeRefreshMode::Reuse, ['routes'], true));
         $scheduler->schedule($project, new RuntimeRefreshPlan(RuntimeRefreshMode::Reuse, ['assets'], true));
@@ -33,9 +43,9 @@ final class DebouncedRuntimeRefreshSchedulerTest extends TestCase
     public function testSerializesRefreshesAndQueuesOneReplacement(): void
     {
         $initializer = new QueuingRuntimeInitializer();
-        $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, 0.001);
-        $initializer->scheduler = $scheduler;
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, self::projects($project), 0.001);
+        $initializer->scheduler = $scheduler;
 
         $scheduler->schedule($project, new RuntimeRefreshPlan());
         EventLoop::run();
@@ -46,6 +56,73 @@ final class DebouncedRuntimeRefreshSchedulerTest extends TestCase
         ));
         self::assertNull($initializer->plans[1]->sections());
         self::assertSame(1, $initializer->maximumActive);
+    }
+
+    public function testRemovalCancelsDelayedRefreshes(): void
+    {
+        $initializer = new DebouncedRuntimeInitializer();
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $registry = self::projects($project);
+        $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, $registry, 0.001);
+
+        $scheduler->schedule($project);
+        $registry->replace([]);
+        $scheduler->removeProject($project);
+        EventLoop::run();
+
+        self::assertSame([], $initializer->projects);
+    }
+
+    public function testRemovalCancelsTheActiveRefreshAndDropsQueuedPlans(): void
+    {
+        $initializer = new BlockingRuntimeInitializer();
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $registry = self::projects($project);
+        $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, $registry, 0.001);
+
+        $scheduler->schedule($project);
+        EventLoop::queue(static function () use ($scheduler, $registry, $project): void {
+            delay(0.005);
+            $scheduler->schedule($project);
+            $registry->replace([]);
+            $scheduler->removeProject($project);
+        });
+        EventLoop::run();
+
+        self::assertSame(1, $initializer->starts);
+        self::assertTrue($initializer->cancelled);
+    }
+
+    public function testDoesNotRunForProjectsRemovedFromTheRegistry(): void
+    {
+        $initializer = new DebouncedRuntimeInitializer();
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $registry = self::projects($project);
+        $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, $registry, 0.001);
+
+        $scheduler->schedule($project);
+        $registry->replace([]);
+        EventLoop::run();
+
+        self::assertSame([], $initializer->projects);
+    }
+}
+
+final class BlockingRuntimeInitializer implements RuntimeInitializerInterface
+{
+    public int $starts = 0;
+    public bool $cancelled = false;
+
+    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+    {
+        ++$this->starts;
+        try {
+            delay(1.0, cancellation: $cancellation);
+        } catch (CancelledException $error) {
+            $this->cancelled = true;
+
+            throw $error;
+        }
     }
 }
 

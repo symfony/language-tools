@@ -13,6 +13,8 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\ProjectSettings;
+use Symfony\Lsp\Project\ProjectStateCleaner;
+use Symfony\Lsp\Project\ProjectStateInterface;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
 use Symfony\Lsp\Project\WorkspaceTrust;
@@ -45,14 +47,7 @@ final class WorkspaceConfigurationTest extends TestCase
     {
         $registry = new ProjectRegistry();
         $runtimeConfiguration = new RuntimeConfiguration();
-        $configuration = new WorkspaceConfiguration(
-            new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher()),
-            $registry,
-            new WorkspaceTrustManager($this->client(), new WorkspaceTrust(), $this->runtimeInitializer(), new ProjectIndexStatusRegistry(), $runtimeConfiguration),
-            $runtimeConfiguration,
-            new ProjectSettings($this->client(), $registry, new TranslationConfigurationRegistry(), $runtimeConfiguration),
-            new PositionConverter(),
-        );
+        $configuration = $this->workspaceConfiguration($registry, $runtimeConfiguration);
 
         $configuration->initialize([
             'rootUri' => 'file://'.$this->temporaryDirectory,
@@ -78,15 +73,8 @@ final class WorkspaceConfigurationTest extends TestCase
     public function testRediscoversProjectsAfterWorkspaceFolderChanges(): void
     {
         $registry = new ProjectRegistry();
-        $runtimeConfiguration = new RuntimeConfiguration();
-        $configuration = new WorkspaceConfiguration(
-            new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher()),
-            $registry,
-            new WorkspaceTrustManager($this->client(), new WorkspaceTrust(), $this->runtimeInitializer(), new ProjectIndexStatusRegistry(), $runtimeConfiguration),
-            $runtimeConfiguration,
-            new ProjectSettings($this->client(), $registry, new TranslationConfigurationRegistry(), $runtimeConfiguration),
-            new PositionConverter(),
-        );
+        $state = new RecordingProjectState();
+        $configuration = $this->workspaceConfiguration($registry, new RuntimeConfiguration(), $state);
         $rootUri = 'file://'.$this->temporaryDirectory;
         $configuration->initialize(['workspaceFolders' => [['uri' => $rootUri]]]);
         mkdir($this->temporaryDirectory.'/nested');
@@ -102,8 +90,36 @@ final class WorkspaceConfigurationTest extends TestCase
 
         self::assertCount(1, $registry->all());
         self::assertSame($this->temporaryDirectory.'/nested', $registry->all()[0]->rootPath());
+        self::assertSame([$this->temporaryDirectory], $state->removed);
         unlink($this->temporaryDirectory.'/nested/composer.json');
         rmdir($this->temporaryDirectory.'/nested');
+    }
+
+    public function testRediscoveringTheSameRootDoesNotReleaseProjectState(): void
+    {
+        $registry = new ProjectRegistry();
+        $state = new RecordingProjectState();
+        $configuration = $this->workspaceConfiguration($registry, new RuntimeConfiguration(), $state);
+        $rootUri = 'file://'.$this->temporaryDirectory;
+        $configuration->initialize(['workspaceFolders' => [['uri' => $rootUri]]]);
+
+        $configuration->rediscoverProjects();
+
+        self::assertCount(1, $registry->all());
+        self::assertSame([], $state->removed);
+    }
+
+    private function workspaceConfiguration(ProjectRegistry $registry, RuntimeConfiguration $runtimeConfiguration, ?ProjectStateInterface $state = null): WorkspaceConfiguration
+    {
+        return new WorkspaceConfiguration(
+            new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher()),
+            $registry,
+            new WorkspaceTrustManager($this->client(), new WorkspaceTrust(), $this->runtimeInitializer(), new ProjectIndexStatusRegistry(), $runtimeConfiguration, $registry),
+            $runtimeConfiguration,
+            new ProjectSettings($this->client(), $registry, new TranslationConfigurationRegistry(), $runtimeConfiguration),
+            new PositionConverter(),
+            new ProjectStateCleaner(null === $state ? [] : [$state]),
+        );
     }
 
     private function client(): ClientInterface
@@ -127,5 +143,16 @@ final class WorkspaceConfigurationTest extends TestCase
             {
             }
         };
+    }
+}
+
+final class RecordingProjectState implements ProjectStateInterface
+{
+    /** @var list<string> */
+    public array $removed = [];
+
+    public function removeProject(Project $project): void
+    {
+        $this->removed[] = $project->rootPath();
     }
 }

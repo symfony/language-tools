@@ -7,7 +7,7 @@ use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 
-final class WorkspaceTrustManager
+final class WorkspaceTrustManager implements ProjectStateInterface
 {
     /** @var array<string, array{project: Project, configuration: string}> */
     private array $runtimeStarted = [];
@@ -18,13 +18,15 @@ final class WorkspaceTrustManager
         private readonly RuntimeInitializerInterface $runtimeInitializer,
         private readonly ProjectIndexStatusRegistry $statuses,
         private readonly RuntimeConfiguration $configuration,
+        private readonly ProjectRegistry $projects,
     ) {
     }
 
     /**
      * @param array<array-key, mixed> $params
+     * @param list<Project>           $projects
      */
-    public function applyInitializationOptions(array $params, ProjectRegistry $projects): void
+    public function applyInitializationOptions(array $params, array $projects): void
     {
         $initializationOptions = $params['initializationOptions'] ?? null;
         if (!\is_array($initializationOptions)
@@ -37,14 +39,15 @@ final class WorkspaceTrustManager
             ? TrustStatus::Trusted
             : TrustStatus::Untrusted;
 
-        foreach ($projects->all() as $project) {
+        foreach ($projects as $project) {
             $this->workspaceTrust->set($project, $status);
         }
     }
 
-    public function requestUnknownDecisions(ProjectRegistry $projects): void
+    /** @param list<Project> $projects */
+    public function requestUnknownDecisions(array $projects): void
     {
-        foreach ($projects->all() as $project) {
+        foreach ($projects as $project) {
             $status = $this->workspaceTrust->status($project);
             if (TrustStatus::Trusted === $status) {
                 $this->startRuntime($project);
@@ -66,6 +69,10 @@ final class WorkspaceTrustManager
                 ],
             ]);
 
+            if (!$this->projects->contains($project)) {
+                // the project was removed while the client decided
+                continue;
+            }
             $trusted = \is_array($response)
                 && 'Trust and enable runtime indexing' === ($response['title'] ?? null);
             $status = $trusted ? TrustStatus::Trusted : TrustStatus::Untrusted;
@@ -79,6 +86,11 @@ final class WorkspaceTrustManager
     public function invalidateRuntime(Project $project): void
     {
         unset($this->runtimeStarted[$project->rootPath()]);
+    }
+
+    public function removeProject(Project $project): void
+    {
+        $this->invalidateRuntime($project);
     }
 
     private function startRuntime(Project $project): void

@@ -3,9 +3,10 @@
 namespace Symfony\Lsp\Index;
 
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectStateInterface;
 
 /** @template TIndex of object */
-abstract class AbstractProjectIndexRegistry
+abstract class AbstractProjectIndexRegistry implements ProjectStateInterface
 {
     /** @var array<string, TIndex> */
     private array $indexes = [];
@@ -19,6 +20,11 @@ abstract class AbstractProjectIndexRegistry
     final public function forProject(Project $project): object
     {
         return $this->indexes[$project->rootPath()] ??= $this->createIndex($project);
+    }
+
+    final public function removeProject(Project $project): void
+    {
+        unset($this->indexes[$project->rootPath()]);
     }
 
     /** @return TIndex */

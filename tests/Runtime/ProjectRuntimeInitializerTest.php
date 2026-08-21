@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Runtime;
 
 use Amp\Cancellation;
+use Amp\CancelledException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
@@ -12,6 +13,7 @@ use Symfony\Lsp\Feature\Route\ProjectRouteSnapshotLoader;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Runtime\BridgeInstaller;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\ProcessResult;
@@ -25,6 +27,14 @@ use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 final class ProjectRuntimeInitializerTest extends TestCase
 {
     private string $temporaryDirectory;
+
+    private static function projects(Project ...$projects): ProjectRegistry
+    {
+        $registry = new ProjectRegistry();
+        $registry->replace(array_values($projects));
+
+        return $registry;
+    }
 
     protected function setUp(): void
     {
@@ -80,6 +90,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             ]),
             $configuration,
             new ContainerPathMapper($configuration),
+            self::projects($project),
         );
 
         $initializer->initialize($project);
@@ -94,6 +105,43 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame('--sections=routes,container', $processRunner->command[6]);
         self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
         self::assertSame(90.0, $processRunner->timeout);
+    }
+
+    public function testNeverLoadsMetadataForAProjectRemovedWhileTheBridgeRan(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $registry = self::projects($project);
+        $processRunner = new RemovingProcessRunner($registry, new ProcessResult(0, json_encode([
+            'schemaVersion' => 1,
+            'sections' => [
+                'routes' => [
+                    'complete' => true,
+                    'items' => [
+                        ['name' => 'homepage', 'path' => '/'],
+                    ],
+                ],
+            ],
+        ], \JSON_THROW_ON_ERROR), ''));
+        $indexes = new RouteIndexRegistry();
+        $configuration = new RuntimeConfiguration();
+        $initializer = new ProjectRuntimeInitializer(
+            new BridgeInstaller($source, 'test', new Filesystem()),
+            $processRunner,
+            new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($indexes)]),
+            $configuration,
+            new ContainerPathMapper($configuration),
+            $registry,
+        );
+
+        try {
+            $initializer->initialize($project);
+            self::fail('Initialization for the removed project should have been abandoned.');
+        } catch (CancelledException) {
+        }
+
+        self::assertNull($indexes->forProject($project)->get('homepage'));
     }
 
     public function testMapsBridgeArgumentsToTheContainerProjectRoot(): void
@@ -116,6 +164,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             new RuntimeSnapshotLoaderRegistry([]),
             $configuration,
             new ContainerPathMapper($configuration),
+            self::projects($project),
         );
 
         $initializer->initialize($project);
@@ -134,18 +183,20 @@ final class ProjectRuntimeInitializerTest extends TestCase
         file_put_contents($source, '<?php');
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['debug' => false]);
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
         $initializer = new ProjectRuntimeInitializer(
             new BridgeInstaller($source, 'test', new Filesystem()),
             new CapturingProcessRunner(new ProcessResult(0, '', '')),
             new RuntimeSnapshotLoaderRegistry([]),
             $configuration,
             new ContainerPathMapper($configuration),
+            self::projects($project),
         );
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Runtime indexing requires Symfony debug mode.');
 
-        $initializer->initialize(new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0'));
+        $initializer->initialize($project);
     }
 
     public function testRebuildsTheDebugContainerWhenRequiredByThePlan(): void
@@ -155,16 +206,18 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $processRunner = new CapturingProcessRunner(
             new ProcessResult(0, json_encode(['schemaVersion' => 1, 'sections' => []], \JSON_THROW_ON_ERROR), ''),
         );
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
         $initializer = new ProjectRuntimeInitializer(
             new BridgeInstaller($source, 'test', new Filesystem()),
             $processRunner,
             new RuntimeSnapshotLoaderRegistry([]),
             new RuntimeConfiguration(),
             new ContainerPathMapper(new RuntimeConfiguration()),
+            self::projects($project),
         );
 
         $initializer->initialize(
-            new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0'),
+            $project,
             new RuntimeRefreshPlan(RuntimeRefreshMode::Clear),
         );
 
@@ -181,16 +234,18 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $processRunner = new CapturingProcessRunner(
             new ProcessResult(0, json_encode(['schemaVersion' => 1, 'sections' => []], \JSON_THROW_ON_ERROR), ''),
         );
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
         $initializer = new ProjectRuntimeInitializer(
             new BridgeInstaller($source, 'test', new Filesystem()),
             $processRunner,
             new RuntimeSnapshotLoaderRegistry([]),
             new RuntimeConfiguration(),
             new ContainerPathMapper(new RuntimeConfiguration()),
+            self::projects($project),
         );
 
         $initializer->initialize(
-            new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0'),
+            $project,
             new RuntimeRefreshPlan(RuntimeRefreshMode::Reuse, ['routes'], true),
         );
 
@@ -224,6 +279,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             ]),
             new RuntimeConfiguration(),
             new ContainerPathMapper(new RuntimeConfiguration()),
+            self::projects($project),
         );
 
         $routeIndexes->forProject($project)->replace(new Route('existing', '/existing', [], [], null, null));
@@ -242,6 +298,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
         $initializer = new ProjectRuntimeInitializer(
             new BridgeInstaller($source, 'test', new Filesystem()),
             new CapturingProcessRunner(new ProcessResult(1, '', "CANARY_SECRET_RUNTIME_OUTPUT\n")),
@@ -250,14 +307,11 @@ final class ProjectRuntimeInitializerTest extends TestCase
             ]),
             new RuntimeConfiguration(),
             new ContainerPathMapper(new RuntimeConfiguration()),
+            self::projects($project),
         );
 
         try {
-            $initializer->initialize(new Project(
-                $this->temporaryDirectory,
-                'file://'.$this->temporaryDirectory,
-                '^8.0',
-            ));
+            $initializer->initialize($project);
             self::fail('The failed bridge execution was accepted.');
         } catch (\RuntimeException $error) {
             self::assertSame('The project bridge failed with status 1.', $error->getMessage());
@@ -286,6 +340,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($indexes)]),
             new RuntimeConfiguration(),
             new ContainerPathMapper(new RuntimeConfiguration()),
+            self::projects($project),
         );
 
         $initializer->initialize($project);
@@ -297,6 +352,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
         $initializer = new ProjectRuntimeInitializer(
             new BridgeInstaller($source, 'test', new Filesystem()),
             new CapturingProcessRunner(new ProcessResult(
@@ -307,14 +363,11 @@ final class ProjectRuntimeInitializerTest extends TestCase
             new RuntimeSnapshotLoaderRegistry([]),
             new RuntimeConfiguration(),
             new ContainerPathMapper(new RuntimeConfiguration()),
+            self::projects($project),
         );
 
         try {
-            $initializer->initialize(new Project(
-                $this->temporaryDirectory,
-                'file://'.$this->temporaryDirectory,
-                '^8.0',
-            ));
+            $initializer->initialize($project);
             self::fail('The missing bridge payload was accepted.');
         } catch (\RuntimeException $error) {
             self::assertSame('The project bridge returned invalid JSON.', $error->getMessage());
@@ -346,6 +399,26 @@ final class CapturingProcessRunner implements ProcessRunnerInterface
         $this->commands[] = $command;
         $this->workingDirectory = $workingDirectory;
         $this->timeout = $timeout;
+
+        return array_shift($this->results) ?? throw new \LogicException('No process result was configured.');
+    }
+}
+
+final class RemovingProcessRunner implements ProcessRunnerInterface
+{
+    /** @var list<ProcessResult> */
+    private array $results;
+
+    public function __construct(
+        private readonly ProjectRegistry $registry,
+        ProcessResult ...$results,
+    ) {
+        $this->results = array_values($results);
+    }
+
+    public function run(array $command, string $workingDirectory, ?Cancellation $cancellation = null, ?float $timeout = null): ProcessResult
+    {
+        $this->registry->replace([]);
 
         return array_shift($this->results) ?? throw new \LogicException('No process result was configured.');
     }
