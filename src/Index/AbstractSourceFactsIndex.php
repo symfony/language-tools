@@ -17,28 +17,37 @@ abstract class AbstractSourceFactsIndex
     final public function replace(SourceFactsInterface ...$facts): void
     {
         $this->facts->replaceSaved(...$facts);
+        $this->factsChanged();
     }
 
     /** @param TFacts $facts */
     final public function replaceSource(SourceFactsInterface $facts): void
     {
         $this->facts->replaceSavedFact($facts);
+        $this->factsChanged();
     }
 
     final public function removeSource(string $uri): void
     {
         $this->facts->removeSaved($uri);
+        $this->factsChanged();
     }
 
     /** @param TFacts $facts */
     final public function overlay(SourceFactsInterface $facts): void
     {
         $this->facts->replaceOverlay($facts);
+        $this->factsChanged();
     }
 
     final public function removeOverlay(string $uri): void
     {
         $this->facts->removeOverlay($uri);
+        $this->factsChanged();
+    }
+
+    protected function factsChanged(): void
+    {
     }
 
     /** @return list<TFacts> */

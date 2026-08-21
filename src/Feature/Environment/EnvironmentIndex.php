@@ -2,14 +2,13 @@
 
 namespace Symfony\Lsp\Feature\Environment;
 
-final class EnvironmentIndex
+use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+
+/** @extends AbstractSourceFactsIndex<EnvironmentSourceFacts> */
+final class EnvironmentIndex extends AbstractSourceFactsIndex
 {
     /** @var array<string, string> */
     private array $processors = [];
-    /** @var array<string, EnvironmentSourceFacts> */
-    private array $sources = [];
-    /** @var array<string, EnvironmentSourceFacts> */
-    private array $overlays = [];
     private bool $processorsComplete = false;
 
     /** @param array<string, string> $processors */
@@ -22,30 +21,7 @@ final class EnvironmentIndex
 
     public function replaceSources(EnvironmentSourceFacts ...$facts): void
     {
-        $this->sources = [];
-        foreach ($facts as $source) {
-            $this->sources[$source->uri()] = $source;
-        }
-    }
-
-    public function replaceSource(EnvironmentSourceFacts $facts): void
-    {
-        $this->sources[$facts->uri()] = $facts;
-    }
-
-    public function removeSource(string $uri): void
-    {
-        unset($this->sources[$uri]);
-    }
-
-    public function overlay(EnvironmentSourceFacts $facts): void
-    {
-        $this->overlays[$facts->uri()] = $facts;
-    }
-
-    public function removeOverlay(string $uri): void
-    {
-        unset($this->overlays[$uri]);
+        $this->replace(...$facts);
     }
 
     /** @return array<string, string> */
@@ -102,11 +78,5 @@ final class EnvironmentIndex
         }
 
         return $result;
-    }
-
-    /** @return list<EnvironmentSourceFacts> */
-    private function facts(): array
-    {
-        return [...array_values(array_diff_key($this->sources, $this->overlays)), ...array_values($this->overlays)];
     }
 }

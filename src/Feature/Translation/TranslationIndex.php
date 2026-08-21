@@ -2,14 +2,13 @@
 
 namespace Symfony\Lsp\Feature\Translation;
 
-final class TranslationIndex
+use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+
+/** @extends AbstractSourceFactsIndex<TranslationSourceFacts> */
+final class TranslationIndex extends AbstractSourceFactsIndex
 {
     /** @var list<TranslationMessage> */
     private array $runtime = [];
-    /** @var array<string, TranslationSourceFacts> */
-    private array $sources = [];
-    /** @var array<string, TranslationSourceFacts> */
-    private array $overlays = [];
     private bool $complete = false;
 
     public function replaceRuntime(bool $complete, TranslationMessage ...$messages): void
@@ -20,30 +19,7 @@ final class TranslationIndex
 
     public function replaceSources(TranslationSourceFacts ...$sources): void
     {
-        $this->sources = [];
-        foreach ($sources as $source) {
-            $this->sources[$source->uri()] = $source;
-        }
-    }
-
-    public function replaceSource(TranslationSourceFacts $facts): void
-    {
-        $this->sources[$facts->uri()] = $facts;
-    }
-
-    public function removeSource(string $uri): void
-    {
-        unset($this->sources[$uri]);
-    }
-
-    public function overlay(TranslationSourceFacts $facts): void
-    {
-        $this->overlays[$facts->uri()] = $facts;
-    }
-
-    public function removeOverlay(string $uri): void
-    {
-        unset($this->overlays[$uri]);
+        $this->replace(...$sources);
     }
 
     /** @return list<TranslationMessage> */
@@ -146,11 +122,5 @@ final class TranslationIndex
     public function isComplete(): bool
     {
         return $this->complete;
-    }
-
-    /** @return list<TranslationSourceFacts> */
-    private function facts(): array
-    {
-        return [...array_values(array_diff_key($this->sources, $this->overlays)), ...array_values($this->overlays)];
     }
 }

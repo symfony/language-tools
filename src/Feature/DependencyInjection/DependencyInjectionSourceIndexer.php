@@ -2,16 +2,13 @@
 
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
-use Symfony\Lsp\Document\Document;
+use Symfony\Lsp\Index\AbstractSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Project\Project;
 
-final class DependencyInjectionSourceIndexer implements SourceIndexProviderInterface
+/** @extends AbstractSourceIndexer<DependencyInjectionSourceFacts> */
+final class DependencyInjectionSourceIndexer extends AbstractSourceIndexer
 {
-    /** @var array<string, list<DependencyInjectionSourceFacts>> */
-    private array $sources = [];
-
     public function __construct(
         private readonly DependencyInjectionSourceIndexRegistry $indexes,
         private readonly YamlDependencyInjectionExtractor $yamlExtractor,
@@ -38,52 +35,6 @@ final class DependencyInjectionSourceIndexer implements SourceIndexProviderInter
         ];
     }
 
-    public function begin(Project $project): void
-    {
-        $this->sources[$project->rootPath()] = [];
-    }
-
-    public function index(Project $project, SourceDocument $document): ?DependencyInjectionSourceFacts
-    {
-        $facts = $this->extract($document->uri(), $document->languageId(), $document->text());
-        if (null !== $facts) {
-            $this->sources[$project->rootPath()][] = $facts;
-        }
-
-        return $facts;
-    }
-
-    public function restore(Project $project, mixed $data): void
-    {
-        if (null === $data) {
-            return;
-        }
-        if (!$data instanceof DependencyInjectionSourceFacts) {
-            throw new \UnexpectedValueException('The cached dependency injection source facts are invalid.');
-        }
-
-        $this->sources[$project->rootPath()][] = $data;
-    }
-
-    public function finish(Project $project): void
-    {
-        $key = $project->rootPath();
-        $this->indexes->forProject($project)->replace(...$this->sources[$key]);
-        unset($this->sources[$key]);
-    }
-
-    public function replace(Project $project, SourceDocument $document): ?DependencyInjectionSourceFacts
-    {
-        $facts = $this->extract($document->uri(), $document->languageId(), $document->text());
-        if (null === $facts) {
-            $this->indexes->forProject($project)->removeSource($document->uri());
-        } else {
-            $this->indexes->forProject($project)->replaceSource($facts);
-        }
-
-        return $facts;
-    }
-
     public function runtimeDeclarations(mixed $data): array
     {
         if (null === $data) {
@@ -101,37 +52,29 @@ final class DependencyInjectionSourceIndexer implements SourceIndexProviderInter
         ];
     }
 
-    public function remove(Project $project, string $uri): void
+    protected function factsClass(): string
     {
-        $this->indexes->forProject($project)->removeSource($uri);
+        return DependencyInjectionSourceFacts::class;
     }
 
-    public function overlay(Project $project, Document $document): void
+    protected function sourceIndex(Project $project): DependencyInjectionSourceIndex
     {
-        $facts = $this->extract($document->uri(), $document->languageId(), $document->text());
-        if (null !== $facts) {
-            $this->indexes->forProject($project)->overlay($facts);
+        return $this->indexes->forProject($project);
+    }
+
+    protected function extract(Project $project, SourceDocument $document): ?DependencyInjectionSourceFacts
+    {
+        if ('yaml' === $document->languageId()) {
+            return $this->yamlExtractor->extract($document->uri(), $document->text());
         }
-    }
-
-    public function removeOverlay(Project $project, string $uri): void
-    {
-        $this->indexes->forProject($project)->removeOverlay($uri);
-    }
-
-    private function extract(string $uri, string $languageId, string $text): ?DependencyInjectionSourceFacts
-    {
-        if ('yaml' === $languageId) {
-            return $this->yamlExtractor->extract($uri, $text);
-        }
-        if ('php' !== $languageId) {
+        if ('php' !== $document->languageId()) {
             return null;
         }
 
         return new DependencyInjectionSourceFacts(
-            $uri,
-            references: $this->autowireExtractor->extract($uri, $text),
-            classes: $this->classExtractor->extract($uri, $text),
+            $document->uri(),
+            references: $this->autowireExtractor->extract($document->uri(), $document->text()),
+            classes: $this->classExtractor->extract($document->uri(), $document->text()),
         );
     }
 }

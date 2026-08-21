@@ -2,16 +2,13 @@
 
 namespace Symfony\Lsp\Feature\Environment;
 
-use Symfony\Lsp\Document\Document;
+use Symfony\Lsp\Index\AbstractSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Project\Project;
 
-final class EnvironmentSourceIndexer implements SourceIndexProviderInterface
+/** @extends AbstractSourceIndexer<EnvironmentSourceFacts> */
+final class EnvironmentSourceIndexer extends AbstractSourceIndexer
 {
-    /** @var array<string, list<EnvironmentSourceFacts>> */
-    private array $facts = [];
-
     public function __construct(private readonly EnvironmentIndexRegistry $indexes, private readonly EnvironmentExtractor $extractor)
     {
     }
@@ -26,40 +23,6 @@ final class EnvironmentSourceIndexer implements SourceIndexProviderInterface
         return [EnvironmentDeclaration::class, EnvironmentReference::class, EnvironmentSourceFacts::class];
     }
 
-    public function begin(Project $project): void
-    {
-        $this->facts[$project->rootPath()] = [];
-    }
-
-    public function index(Project $project, SourceDocument $document): EnvironmentSourceFacts
-    {
-        return $this->add($project, $this->extract($document));
-    }
-
-    public function restore(Project $project, mixed $data): void
-    {
-        if (!$data instanceof EnvironmentSourceFacts) {
-            throw new \UnexpectedValueException('The cached environment source facts are invalid.');
-        }
-
-        $this->add($project, $data);
-    }
-
-    public function finish(Project $project): void
-    {
-        $key = $project->rootPath();
-        $this->indexes->forProject($project)->replaceSources(...$this->facts[$key]);
-        unset($this->facts[$key]);
-    }
-
-    public function replace(Project $project, SourceDocument $document): EnvironmentSourceFacts
-    {
-        $facts = $this->extract($document);
-        $this->indexes->forProject($project)->replaceSource($facts);
-
-        return $facts;
-    }
-
     public function runtimeDeclarations(mixed $data): array
     {
         if (!$data instanceof EnvironmentSourceFacts) {
@@ -72,29 +35,17 @@ final class EnvironmentSourceIndexer implements SourceIndexProviderInterface
         ];
     }
 
-    public function remove(Project $project, string $uri): void
+    protected function factsClass(): string
     {
-        $this->indexes->forProject($project)->removeSource($uri);
+        return EnvironmentSourceFacts::class;
     }
 
-    public function overlay(Project $project, Document $document): void
+    protected function sourceIndex(Project $project): EnvironmentIndex
     {
-        $this->indexes->forProject($project)->overlay($this->extractor->extract($document->uri(), $document->languageId(), $document->text()));
+        return $this->indexes->forProject($project);
     }
 
-    public function removeOverlay(Project $project, string $uri): void
-    {
-        $this->indexes->forProject($project)->removeOverlay($uri);
-    }
-
-    private function add(Project $project, EnvironmentSourceFacts $facts): EnvironmentSourceFacts
-    {
-        $this->facts[$project->rootPath()][] = $facts;
-
-        return $facts;
-    }
-
-    private function extract(SourceDocument $document): EnvironmentSourceFacts
+    protected function extract(Project $project, SourceDocument $document): EnvironmentSourceFacts
     {
         return $this->extractor->extract($document->uri(), $document->languageId(), $document->text());
     }

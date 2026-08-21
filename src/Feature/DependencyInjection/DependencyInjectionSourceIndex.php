@@ -2,58 +2,22 @@
 
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
-final class DependencyInjectionSourceIndex
+use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+
+/** @extends AbstractSourceFactsIndex<DependencyInjectionSourceFacts> */
+final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
 {
-    /** @var array<string, DependencyInjectionSourceFacts> */
-    private array $sources = [];
-
-    /** @var array<string, DependencyInjectionSourceFacts> */
-    private array $overlays = [];
-
     /** @var array<string, list<PhpClassDeclaration>>|null */
     private ?array $classDeclarations = null;
 
     /** @var array<string, bool> */
     private array $subclasses = [];
 
-    public function replace(DependencyInjectionSourceFacts ...$sources): void
-    {
-        $this->sources = [];
-        foreach ($sources as $source) {
-            $this->sources[$source->uri()] = $source;
-        }
-        $this->invalidateClasses();
-    }
-
-    public function replaceSource(DependencyInjectionSourceFacts $source): void
-    {
-        $this->sources[$source->uri()] = $source;
-        $this->invalidateClasses();
-    }
-
-    public function removeSource(string $uri): void
-    {
-        unset($this->sources[$uri]);
-        $this->invalidateClasses();
-    }
-
-    public function overlay(DependencyInjectionSourceFacts $source): void
-    {
-        $this->overlays[$source->uri()] = $source;
-        $this->invalidateClasses();
-    }
-
-    public function removeOverlay(string $uri): void
-    {
-        unset($this->overlays[$uri]);
-        $this->invalidateClasses();
-    }
-
     /** @return list<ServiceDeclaration> */
     public function serviceDeclarations(string $id): array
     {
         $declarations = [];
-        foreach ($this->sources() as $source) {
+        foreach ($this->facts() as $source) {
             foreach ($source->services() as $declaration) {
                 if ($declaration->id() === $id) {
                     $declarations[] = $declaration;
@@ -68,7 +32,7 @@ final class DependencyInjectionSourceIndex
     public function parameterDeclarations(string $name): array
     {
         $declarations = [];
-        foreach ($this->sources() as $source) {
+        foreach ($this->facts() as $source) {
             foreach ($source->parameters() as $declaration) {
                 if ($declaration->name() === $name) {
                     $declarations[] = $declaration;
@@ -83,7 +47,7 @@ final class DependencyInjectionSourceIndex
     public function references(DependencyInjectionSymbolKind $kind, string $name): array
     {
         $references = [];
-        foreach ($this->sources() as $source) {
+        foreach ($this->facts() as $source) {
             foreach ($source->references() as $reference) {
                 if ($reference->kind() === $kind && $reference->name() === $name) {
                     $references[] = $reference;
@@ -99,7 +63,7 @@ final class DependencyInjectionSourceIndex
     {
         if (null === $this->classDeclarations) {
             $this->classDeclarations = [];
-            foreach ($this->sources() as $source) {
+            foreach ($this->facts() as $source) {
                 foreach ($source->classes() as $declaration) {
                     $this->classDeclarations[strtolower(ltrim($declaration->className(), '\\'))][] = $declaration;
                 }
@@ -151,7 +115,7 @@ final class DependencyInjectionSourceIndex
     public function serviceIds(): array
     {
         $ids = [];
-        foreach ($this->sources() as $source) {
+        foreach ($this->facts() as $source) {
             foreach ($source->services() as $declaration) {
                 $ids[$declaration->id()] = true;
             }
@@ -166,7 +130,7 @@ final class DependencyInjectionSourceIndex
     public function parameterNames(): array
     {
         $names = [];
-        foreach ($this->sources() as $source) {
+        foreach ($this->facts() as $source) {
             foreach ($source->parameters() as $declaration) {
                 $names[$declaration->name()] = true;
             }
@@ -181,7 +145,7 @@ final class DependencyInjectionSourceIndex
     public function decoratorsOf(string $id): array
     {
         $declarations = [];
-        foreach ($this->sources() as $source) {
+        foreach ($this->facts() as $source) {
             foreach ($source->services() as $declaration) {
                 if ($declaration->decorates() === $id) {
                     $declarations[] = $declaration;
@@ -192,18 +156,9 @@ final class DependencyInjectionSourceIndex
         return $declarations;
     }
 
-    private function invalidateClasses(): void
+    protected function factsChanged(): void
     {
         $this->classDeclarations = null;
         $this->subclasses = [];
-    }
-
-    /** @return list<DependencyInjectionSourceFacts> */
-    private function sources(): array
-    {
-        return [
-            ...array_values(array_diff_key($this->sources, $this->overlays)),
-            ...array_values($this->overlays),
-        ];
     }
 }
