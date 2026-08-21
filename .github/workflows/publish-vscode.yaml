@@ -123,7 +123,7 @@ jobs:
                   OVSX_PAT: ${{ secrets.OVSX_PAT }}
               run: |
                   publisher="$(node --print "require('./package.json').publisher")"
-                  npx ovsx verify-pat "$publisher"
+                  ../../tools/publish-open-vsx --verify "$publisher"
             - name: Publish release packages to Visual Studio Marketplace
               if: ${{ inputs.verify_only != true }}
               working-directory: editor/vscode

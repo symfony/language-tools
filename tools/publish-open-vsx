@@ -1,14 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+require_token() {
+    if [[ -z "${OVSX_PAT:-}" ]]; then
+        echo "OVSX_PAT is required to publish to Open VSX." >&2
+        exit 2
+    fi
+}
+
+if [[ "${1:-}" = --verify ]]; then
+    if [[ $# -ne 2 ]]; then
+        echo "Usage: publish-open-vsx --verify NAMESPACE" >&2
+        exit 2
+    fi
+    require_token
+    npx ovsx verify-pat "$2"
+    exit
+fi
 if [[ $# -ne 1 ]]; then
     echo "Usage: publish-open-vsx VSIX_DIRECTORY" >&2
     exit 2
 fi
-if [[ -z "${OVSX_PAT:-}" ]]; then
-    echo "OVSX_PAT is required to publish to Open VSX." >&2
-    exit 2
-fi
+require_token
 
 vsix_directory="$1"
 attempts="${OVSX_PUBLISH_ATTEMPTS:-3}"

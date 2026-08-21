@@ -28,6 +28,10 @@ final class PublishOpenVsxTest extends TestCase
         file_put_contents($npx, <<<'BASH'
             #!/usr/bin/env bash
             set -euo pipefail
+            if [[ "$2" = verify-pat ]]; then
+                echo "$*" >> "$STATE_DIRECTORY/arguments"
+                exit
+            fi
             package="${!#}"
             name="$(basename "$package")"
             count_file="$STATE_DIRECTORY/$name"
@@ -76,11 +80,17 @@ final class PublishOpenVsxTest extends TestCase
         self::assertSame('3', trim((string) file_get_contents(Path::join($this->state, 'failure.vsix'))));
     }
 
+    public function testVerifiesMarketplaceAccess(): void
+    {
+        $result = $this->runCommand(['--verify', 'symfony']);
+
+        self::assertSame(0, $result['exitCode'], $result['stderr']);
+        self::assertSame("ovsx verify-pat symfony\n", file_get_contents(Path::join($this->state, 'arguments')));
+    }
+
     public function testRequiresAnAccessToken(): void
     {
-        touch(Path::join($this->packages, 'extension.vsix'));
-
-        $result = $this->runPublisher(false);
+        $result = $this->runCommand(['--verify', 'symfony'], false);
 
         self::assertSame(2, $result['exitCode']);
         self::assertStringContainsString('OVSX_PAT is required to publish to Open VSX.', $result['stderr']);
@@ -88,7 +98,17 @@ final class PublishOpenVsxTest extends TestCase
     }
 
     /** @return array{stdout: string, stderr: string, exitCode: int} */
-    private function runPublisher(bool $authenticated = true): array
+    private function runPublisher(): array
+    {
+        return $this->runCommand([$this->packages]);
+    }
+
+    /**
+     * @param list<string> $arguments
+     *
+     * @return array{stdout: string, stderr: string, exitCode: int}
+     */
+    private function runCommand(array $arguments, bool $authenticated = true): array
     {
         $environment = getenv();
         $environment['PATH'] = Path::join($this->directory, 'bin').\PATH_SEPARATOR.($environment['PATH'] ?? '');
@@ -97,7 +117,7 @@ final class PublishOpenVsxTest extends TestCase
         $environment['OVSX_PUBLISH_RETRY_DELAY'] = '0';
         $environment['OVSX_PAT'] = $authenticated ? 'token' : '';
         $process = Process::start(
-            [Path::join(\dirname(__DIR__, 2), 'tools/publish-open-vsx'), $this->packages],
+            [Path::join(\dirname(__DIR__, 2), 'tools/publish-open-vsx'), ...$arguments],
             workingDirectory: $this->directory,
             environment: $environment,
             options: ['bypass_shell' => true],
