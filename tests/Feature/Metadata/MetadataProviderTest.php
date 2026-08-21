@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\Metadata;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -14,6 +15,7 @@ use Symfony\Lsp\Feature\Metadata\MetadataIndexRegistry;
 use Symfony\Lsp\Feature\Metadata\MetadataProvider;
 use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexRegistry;
 use Symfony\Lsp\Feature\Metadata\ValidationConstraint;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
@@ -26,7 +28,7 @@ final class MetadataProviderTest extends TestCase
     public function testProvidesFormConstraintSerializerAndMappingMetadata(): void
     {
         $converter = new PositionConverter();
-        $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))));
+        $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TolerantPhpParser(new Parser()));
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -41,7 +43,7 @@ final class MetadataProviderTest extends TestCase
         $entityText = <<<'PHP'
             <?php
             namespace App\Entity;
-            use Symfony\Component\Serializer\Attribute\Groups;
+            use Symfony\Component\Serializer\Attribute\{Groups};
             final class User
             {
                 #[Groups(['admin'])]
@@ -52,7 +54,7 @@ final class MetadataProviderTest extends TestCase
         $constraintDeclarationText = <<<'PHP'
             <?php
             namespace App\Validator;
-            use Symfony\Component\Validator\Constraint;
+            use Symfony\Component\Validator\{Constraint};
             final class Slug extends Constraint
             {
             }
@@ -79,8 +81,8 @@ final class MetadataProviderTest extends TestCase
         $formText = <<<'PHP'
             <?php
             namespace App\Controller;
-            use App\Form\EventType;
-            use Symfony\Component\Form\FormBuilderInterface;
+            use App\Form\{EventType};
+            use Symfony\Component\Form\{FormBuilderInterface};
             final class EventController
             {
                 public function create(): void

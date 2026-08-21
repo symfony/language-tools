@@ -5,10 +5,12 @@ namespace Symfony\Lsp\Feature\Metadata;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
+use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
 final class MetadataExtractor
 {
-    public function __construct(private readonly PositionConverter $converter, private readonly YamlConfigurationParser $yaml)
+    public function __construct(private readonly PositionConverter $converter, private readonly YamlConfigurationParser $yaml, private readonly PhpParserInterface $phpParser)
     {
     }
 
@@ -37,9 +39,9 @@ final class MetadataExtractor
      */
     public function formOptions(string $text): array
     {
-        [$namespace, $imports] = $this->phpNames($text);
+        $php = $this->phpParser->parse($text);
         $options = [];
-        foreach ($this->calls($text) as $call) {
+        foreach ($this->calls($text, $php) as $call) {
             $typeIndex = 'createNamed' === $call['name'] ? 1 : ('add' === $call['name'] ? 1 : 0);
             $optionsIndex = 'createNamed' === $call['name'] ? 3 : 2;
             if (!isset($call['arguments'][$typeIndex], $call['arguments'][$optionsIndex])) {
@@ -48,7 +50,7 @@ final class MetadataExtractor
             if (!preg_match('/^\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\b/', $call['arguments'][$typeIndex]['text'], $type)) {
                 continue;
             }
-            $class = $this->resolvePhpName($type[1], $namespace, $imports);
+            $class = $php->resolveName($type[1]);
             foreach ($this->arrayKeys($text, $call['arguments'][$optionsIndex]) as $key) {
                 $options[] = ['class' => $class, 'option' => $key['name'], 'range' => $key['range']];
             }
@@ -99,14 +101,14 @@ final class MetadataExtractor
     /** @return list<MetadataSourceSymbol> */
     private function phpSymbols(string $uri, string $text): array
     {
-        [$namespace, $imports] = $this->phpNames($text);
+        $php = $this->phpParser->parse($text);
         $symbols = [];
         preg_match_all('/\b(?:final\s+|abstract\s+|readonly\s+)?class\s+([A-Za-z_][A-Za-z0-9_]*)[^\{]*\{/', $text, $classes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($classes as $class) {
             $open = $class[0][1] + \strlen($class[0][0]) - 1;
             $close = $this->matching($text, $open, '{', '}') ?? \strlen($text);
             $body = substr($text, $open + 1, $close - $open - 1);
-            $className = '' === $namespace ? $class[1][0] : $namespace.'\\'.$class[1][0];
+            $className = $php->resolveName($class[1][0]);
             $symbols[] = new MetadataSourceSymbol(
                 MetadataSymbolKind::MappedClass,
                 $className,
@@ -115,7 +117,7 @@ final class MetadataExtractor
                 true,
             );
             if (preg_match('/\bextends\s+([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)/', $class[0][0], $parent)
-                && 'Symfony\\Component\\Validator\\Constraint' === $this->resolvePhpName($parent[1], $namespace, $imports)) {
+                && 'Symfony\\Component\\Validator\\Constraint' === $php->resolveName($parent[1])) {
                 $symbols[] = new MetadataSourceSymbol(
                     MetadataSymbolKind::Constraint,
                     $class[1][0],
@@ -136,8 +138,8 @@ final class MetadataExtractor
             }
         }
 
-        $groupsImported = 'Symfony\\Component\\Serializer\\Attribute\\Groups' === ($imports['Groups'] ?? null)
-            || 'Symfony\\Component\\Serializer\\Annotation\\Groups' === ($imports['Groups'] ?? null);
+        $groupsImported = 'Symfony\\Component\\Serializer\\Attribute\\Groups' === ($php->imports()['Groups'] ?? null)
+            || 'Symfony\\Component\\Serializer\\Annotation\\Groups' === ($php->imports()['Groups'] ?? null);
         preg_match_all('/#\[\s*((?:[A-Za-z_\\\\][A-Za-z0-9_\\\\]*\\\\)?Groups)\s*\((.*?)\)\s*\]/s', $text, $groups, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($groups as $group) {
             if ('Groups' === $group[1][0] && !$groupsImported) {
@@ -153,7 +155,7 @@ final class MetadataExtractor
         foreach ($constraintReferences[1] as [$name, $offset]) {
             $symbols[] = new MetadataSourceSymbol(MetadataSymbolKind::Constraint, $name, $uri, $this->offsetRange($text, $offset, \strlen($name)), false);
         }
-        foreach ($imports as $alias => $className) {
+        foreach ($php->imports() as $alias => $className) {
             if (!str_contains($className, '\\Validator\\') && !str_contains($className, '\\Constraints\\')) {
                 continue;
             }
@@ -242,8 +244,8 @@ final class MetadataExtractor
 
     private function formCompletionContext(string $text, int $offset): ?MetadataCompletionContext
     {
-        [$namespace, $imports] = $this->phpNames($text);
-        $formBuilders = $this->formBuilderVariables($text, $namespace, $imports);
+        $php = $this->phpParser->parse($text);
+        $formBuilders = $this->formBuilderVariables($php);
         preg_match_all('/(?:(->)\s*)?\b(createForm|createNamed|add)\s*\(/', substr($text, 0, $offset), $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach (array_reverse($calls) as $call) {
             if ('add' === $call[2][0] && !$this->isFormBuilderCall($text, $call[0][1], $formBuilders)) {
@@ -268,7 +270,7 @@ final class MetadataExtractor
             if (!preg_match('/^\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\b/', $arguments[$typeIndex]['text'], $type)) {
                 continue;
             }
-            $class = $this->resolvePhpName($type[1], $namespace, $imports);
+            $class = $php->resolveName($type[1]);
             $prefixOffset = $current['offset'] + $prefix[1][1];
 
             return $this->context(MetadataCompletionKind::FormOption, $prefix[1][0], $text, $prefixOffset, $class);
@@ -304,10 +306,9 @@ final class MetadataExtractor
     }
 
     /** @return list<array{name: string, arguments: list<array{text: string, offset: int}>}> */
-    private function calls(string $text): array
+    private function calls(string $text, PhpDocument $php): array
     {
-        [$namespace, $imports] = $this->phpNames($text);
-        $formBuilders = $this->formBuilderVariables($text, $namespace, $imports);
+        $formBuilders = $this->formBuilderVariables($php);
         preg_match_all('/(?:(->)\s*)?\b(createForm|createNamed|add)\s*\(/', $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         $calls = [];
         foreach ($matches as $match) {
@@ -342,18 +343,13 @@ final class MetadataExtractor
         return false;
     }
 
-    /**
-     * @param array<string, string> $imports
-     *
-     * @return array<string, true>
-     */
-    private function formBuilderVariables(string $text, string $namespace, array $imports): array
+    /** @return array<string, true> */
+    private function formBuilderVariables(PhpDocument $php): array
     {
         $variables = [];
-        preg_match_all('/([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s+\$([A-Za-z_][A-Za-z0-9_]*)/', $text, $matches, \PREG_SET_ORDER);
-        foreach ($matches as $match) {
-            if ('Symfony\\Component\\Form\\FormBuilderInterface' === $this->resolvePhpName($match[1], $namespace, $imports)) {
-                $variables[$match[2]] = true;
+        foreach ($php->typedVariables() as $variable) {
+            if (\in_array('Symfony\\Component\\Form\\FormBuilderInterface', $variable->types(), true)) {
+                $variables[$variable->name()] = true;
             }
         }
 
@@ -503,46 +499,6 @@ final class MetadataExtractor
         }
 
         return $parent;
-    }
-
-    /** @return array{string, array<string, string>} */
-    private function phpNames(string $text): array
-    {
-        $namespace = '';
-        if (preg_match('/\bnamespace\s+([^;{]+)[;{]/', $text, $match)) {
-            $namespace = trim($match[1]);
-        }
-        $imports = [];
-        preg_match_all('/^\s*use\s+([^;]+);/m', $text, $matches);
-        foreach ($matches[1] as $import) {
-            if (str_contains($import, '{')) {
-                continue;
-            }
-            $parts = preg_split('/\s+as\s+/i', trim($import));
-            if (false === $parts || [] === $parts) {
-                continue;
-            }
-            $className = ltrim($parts[0], '\\');
-            $alias = $parts[1] ?? substr($className, (int) strrpos('\\'.$className, '\\'));
-            $imports[$alias] = $className;
-        }
-
-        return [$namespace, $imports];
-    }
-
-    /** @param array<string, string> $imports */
-    private function resolvePhpName(string $name, string $namespace, array $imports): string
-    {
-        if (str_starts_with($name, '\\')) {
-            return ltrim($name, '\\');
-        }
-        $separator = strpos($name, '\\');
-        $head = false === $separator ? $name : substr($name, 0, $separator);
-        if (isset($imports[$head])) {
-            return $imports[$head].(false === $separator ? '' : substr($name, $separator));
-        }
-
-        return '' === $namespace ? $name : $namespace.'\\'.$name;
     }
 
     /** @return list<MetadataSourceSymbol> */
