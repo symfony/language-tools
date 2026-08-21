@@ -3,7 +3,7 @@
   "displayName": "Symfony Language Tools",
   "publisher": "symfony",
   "description": "Official VS Code extension for Symfony",
-  "version": "0.14.1",
+  "version": "0.15.0",
   "license": "MIT",
   "icon": "images/icon.png",
   "repository": {
