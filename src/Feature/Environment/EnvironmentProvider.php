@@ -36,11 +36,8 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         if (null === $request) {
             return null;
         }
-        $document = $request->document;
-        $project = $request->project;
-        $position = $request->position;
-        $cursor = $this->converter->toByteOffset($document->text(), $position);
-        $text = 'twig' === $document->languageId() ? $this->commentParser->mask($document->text()) : $document->text();
+        $cursor = $this->converter->toByteOffset($request->document->text(), $request->position);
+        $text = 'twig' === $request->document->languageId() ? $this->commentParser->mask($request->document->text()) : $request->document->text();
         if (!preg_match('/%env\(([^)]*)$/', substr($text, 0, $cursor), $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
@@ -48,17 +45,17 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         $separator = strrpos($expression, ':');
         $prefix = false === $separator ? $expression : substr($expression, $separator + 1);
         $start = $cursor - \strlen($prefix);
-        $end = $this->converter->toPosition($document->text(), $cursor + strspn(substr($document->text(), $cursor), 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_'));
+        $end = $this->converter->toPosition($request->document->text(), $cursor + strspn(substr($request->document->text(), $cursor), 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_'));
         $items = [];
-        $index = $this->indexes->forProject($project);
+        $index = $this->indexes->forProject($request->project);
         foreach ($index->processors() as $name => $type) {
             if (str_starts_with($name, $prefix)) {
-                $items[] = $this->item($name, $name.':', 'Environment processor returning '.$type, $document->text(), $start, $end);
+                $items[] = $this->item($name, $name.':', 'Environment processor returning '.$type, $request->document->text(), $start, $end);
             }
         }
         foreach ($index->names() as $name) {
             if (str_starts_with($name, $prefix)) {
-                $items[] = $this->item($name, $name, 'Environment variable', $document->text(), $start, $end);
+                $items[] = $this->item($name, $name, 'Environment variable', $request->document->text(), $start, $end);
             }
         }
 
@@ -115,15 +112,14 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
 
     public function diagnostics(array $params): ?array
     {
-        $context = $this->resolver->resolveDocument($params);
-        if (null === $context) {
+        $request = $this->resolver->resolveDocument($params);
+        if (null === $request) {
             return null;
         }
-        $document = $context->document;
-        $index = $this->indexes->forProject($context->project);
+        $index = $this->indexes->forProject($request->project);
         $processors = $index->processors();
         $diagnostics = [];
-        foreach ($this->extractor->extract($document->uri(), $document->languageId(), $document->text())->references() as $reference) {
+        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->references() as $reference) {
             $skipNext = false;
             $previousProcessor = null;
             foreach ($reference->processors() as $processor) {
@@ -146,9 +142,9 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
                 $previousProcessor = $processor;
             }
         }
-        preg_match_all('/%env\([^\)\r\n]*%/', $document->text(), $malformed, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/%env\([^\)\r\n]*%/', $request->document->text(), $malformed, \PREG_OFFSET_CAPTURE);
         foreach ($malformed[0] as [$expression, $offset]) {
-            $range = new Range($this->converter->toPosition($document->text(), $offset), $this->converter->toPosition($document->text(), $offset + \strlen($expression)));
+            $range = new Range($this->converter->toPosition($request->document->text(), $offset), $this->converter->toPosition($request->document->text(), $offset + \strlen($expression)));
             $diagnostics[] = $this->protocol->diagnostic($range, 1, 'env.malformed_chain', 'Malformed environment expression; expected ")%".');
         }
 
@@ -166,19 +162,16 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         if (null === $request) {
             return null;
         }
-        $document = $request->document;
-        $project = $request->project;
-        $position = $request->position;
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        $facts = $this->extractor->extract($document->uri(), $document->languageId(), $document->text());
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        $facts = $this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text());
         foreach ($facts->declarations() as $declaration) {
-            if ($this->contains($document->text(), $declaration->range(), $offset)) {
-                return [new EnvironmentReference($declaration->name(), $document->uri(), $declaration->range(), []), $project];
+            if ($this->contains($request->document->text(), $declaration->range(), $offset)) {
+                return [new EnvironmentReference($declaration->name(), $request->document->uri(), $declaration->range(), []), $request->project];
             }
         }
         foreach ($facts->references() as $reference) {
-            if ($this->contains($document->text(), $reference->range(), $offset)) {
-                return [$reference, $project];
+            if ($this->contains($request->document->text(), $reference->range(), $offset)) {
+                return [$reference, $request->project];
             }
         }
 

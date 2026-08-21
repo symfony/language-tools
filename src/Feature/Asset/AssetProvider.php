@@ -35,17 +35,14 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         if (null === $request) {
             return null;
         }
-        $document = $request->document;
-        $project = $request->project;
-        $position = $request->position;
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        $context = $this->extractor->completionContext($document->languageId(), $document->text(), $offset);
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        $context = $this->extractor->completionContext($request->document->languageId(), $request->document->text(), $offset);
         if (null === $context) {
             return null;
         }
         $names = AssetSymbolKind::Asset === $context->kind()
-            ? array_map(static fn (Asset $asset): string => $asset->logicalPath(), $this->indexes->forProject($project)->assets())
-            : $this->entrypointNames($project);
+            ? array_map(static fn (Asset $asset): string => $asset->logicalPath(), $this->indexes->forProject($request->project)->assets())
+            : $this->entrypointNames($request->project);
         $items = [];
         foreach ($names as $name) {
             if (!str_starts_with($name, $context->prefix())) {
@@ -129,15 +126,13 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
 
     public function links(array $params): ?array
     {
-        $context = $this->resolver->resolveDocument($params);
-        if (null === $context || 'twig' !== $context->document->languageId()) {
+        $request = $this->resolver->resolveDocument($params);
+        if (null === $request || 'twig' !== $request->document->languageId()) {
             return null;
         }
-        $document = $context->document;
-        $project = $context->project;
         $links = [];
-        foreach ($this->extractor->extract($document->uri(), $document->languageId(), $document->text())->symbols() as $symbol) {
-            $target = $this->target($project, $symbol);
+        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->symbols() as $symbol) {
+            $target = $this->target($request->project, $symbol);
             if (null !== $target) {
                 $links[] = ['range' => $this->protocol->range($symbol->range()), 'target' => $target];
             }
@@ -148,19 +143,17 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
 
     public function diagnostics(array $params): ?array
     {
-        $context = $this->resolver->resolveDocument($params);
-        if (null === $context || 'twig' !== $context->document->languageId()) {
+        $request = $this->resolver->resolveDocument($params);
+        if (null === $request || 'twig' !== $request->document->languageId()) {
             return null;
         }
-        $document = $context->document;
-        $project = $context->project;
-        $index = $this->indexes->forProject($project);
+        $index = $this->indexes->forProject($request->project);
         if (!$index->importMapComplete()) {
             return [];
         }
-        $known = array_fill_keys($this->entrypointNames($project), true);
+        $known = array_fill_keys($this->entrypointNames($request->project), true);
         $diagnostics = [];
-        foreach ($this->extractor->extract($document->uri(), $document->languageId(), $document->text())->symbols() as $symbol) {
+        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->symbols() as $symbol) {
             if (AssetSymbolKind::Entrypoint !== $symbol->kind() || isset($known[$symbol->name()])) {
                 continue;
             }
@@ -201,13 +194,10 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         if (null === $request) {
             return null;
         }
-        $document = $request->document;
-        $project = $request->project;
-        $position = $request->position;
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        foreach ($this->extractor->extract($document->uri(), $document->languageId(), $document->text())->symbols() as $symbol) {
-            if ($this->contains($document, $symbol->range(), $offset)) {
-                return [$symbol, $project];
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->symbols() as $symbol) {
+            if ($this->contains($request->document, $symbol->range(), $offset)) {
+                return [$symbol, $request->project];
             }
         }
 
