@@ -3,9 +3,7 @@
 namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
@@ -13,15 +11,14 @@ use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TranslationProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
-        private readonly DocumentStore $documents,
-        private readonly ProjectRegistry $projects,
         private readonly PositionConverter $converter,
+        private readonly LspProtocolMapper $protocol,
         private readonly TranslationIndexRegistry $indexes,
         private readonly TranslationExtractor $extractor,
         private readonly TranslationConfigurationRegistry $configuration,
@@ -31,23 +28,22 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
 
     public function complete(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
+        $request = $this->resolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
 
-        [$document, $project, $position] = $request;
         $context = TranslationCompletionContext::create(
-            $document->languageId(),
-            'twig' === $document->languageId() ? $this->commentParser->mask($document->text()) : $document->text(),
-            $position,
+            $request->document->languageId(),
+            'twig' === $request->document->languageId() ? $this->commentParser->mask($request->document->text()) : $request->document->text(),
+            $request->position,
             $this->converter,
         );
         if (null === $context) {
             return null;
         }
 
-        $index = $this->indexes->forProject($project);
+        $index = $this->indexes->forProject($request->project);
         /** @var list<string> $values */
         $values = match ($context->kind()) {
             'domain' => $index->domains(),
@@ -64,10 +60,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
             'label' => $value,
             'kind' => 12,
             'detail' => 'Symfony translation '.$context->kind(),
-            'textEdit' => [
-                'range' => $this->range($context->range()),
-                'newText' => 'placeholder' === $context->kind() ? $value.'%' : $value,
-            ],
+            'textEdit' => $this->protocol->textEdit($context->range(), 'placeholder' === $context->kind() ? $value.'%' : $value),
         ], $values);
     }
 
@@ -93,13 +86,13 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         ]));
         sort($locales);
 
-        return ['contents' => ['kind' => 'markdown', 'value' => \sprintf(
+        return $this->protocol->markdownHover(\sprintf(
             "Translation: `%s`\n\nDomain: `%s`\n\nLocales: `%s`\n\nMessage: %s",
             $reference->key(),
             $reference->domain(),
             implode('`, `', $locales),
             $item->message(),
-        )]];
+        ));
     }
 
     public function definition(array $params): ?array
@@ -111,10 +104,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
 
         [$reference, $project] = $resolved;
 
-        return array_map(fn (TranslationDeclaration $declaration): array => [
-            'uri' => $declaration->uri(),
-            'range' => $this->range($declaration->range()),
-        ], $this->indexes->forProject($project)->declarations($reference->domain(), $reference->key()));
+        return array_map(fn (TranslationDeclaration $declaration): array => $this->protocol->location($declaration->uri(), $declaration->range()), $this->indexes->forProject($project)->declarations($reference->domain(), $reference->key()));
     }
 
     public function references(array $params): ?array
@@ -126,30 +116,21 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
 
         [$reference, $project] = $resolved;
 
-        return array_map(fn (TranslationReference $item): array => [
-            'uri' => $item->uri(),
-            'range' => $this->range($item->range()),
-        ], $this->indexes->forProject($project)->references($reference->domain(), $reference->key()));
+        return array_map(fn (TranslationReference $item): array => $this->protocol->location($item->uri(), $item->range()), $this->indexes->forProject($project)->references($reference->domain(), $reference->key()));
     }
 
     public function diagnostics(array $params): ?array
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
+        $request = $this->resolver->resolveDocument($params);
+        if (null === $request) {
             return null;
         }
 
-        $document = $this->documents->get($textDocument['uri']);
-        $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $document || null === $project) {
-            return null;
-        }
-
-        $index = $this->indexes->forProject($project);
+        $index = $this->indexes->forProject($request->project);
         $diagnostics = [];
-        foreach ($this->extractor->extract($document->uri(), $document->languageId(), $document->text())->references() as $reference) {
+        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->references() as $reference) {
             if ($index->isComplete() && !\in_array($reference->domain(), $index->domains(), true)) {
-                if ($this->configuration->missingKeyDiagnostics($project)) {
+                if ($this->configuration->missingKeyDiagnostics($request->project)) {
                     $diagnostics[] = $this->diagnostic(
                         $reference,
                         'translation.domain_not_found',
@@ -163,7 +144,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
             $messages = $index->messages($reference->domain(), $reference->key());
             $declarations = $index->declarations($reference->domain(), $reference->key());
             if ([] === $messages && [] === $declarations) {
-                if ($this->configuration->missingKeyDiagnostics($project) && $index->isComplete()) {
+                if ($this->configuration->missingKeyDiagnostics($request->project) && $index->isComplete()) {
                     $diagnostics[] = $this->diagnostic(
                         $reference,
                         'translation.not_found',
@@ -196,31 +177,30 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
      */
     private function resolve(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
+        $request = $this->resolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
 
-        [$document, $project, $position] = $request;
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        $facts = $this->extractor->extract($document->uri(), $document->languageId(), $document->text());
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        $facts = $this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text());
         foreach ($facts->declarations() as $declaration) {
-            $start = $this->converter->toByteOffset($document->text(), $declaration->range()->start());
-            $end = $this->converter->toByteOffset($document->text(), $declaration->range()->end());
+            $start = $this->converter->toByteOffset($request->document->text(), $declaration->range()->start());
+            $end = $this->converter->toByteOffset($request->document->text(), $declaration->range()->end());
             if ($offset >= $start && $offset <= $end) {
                 return [new TranslationReference(
                     $declaration->key(),
                     $declaration->domain(),
-                    $document->uri(),
+                    $request->document->uri(),
                     $declaration->range(),
-                ), $project];
+                ), $request->project];
             }
         }
         foreach ($facts->references() as $reference) {
-            $start = $this->converter->toByteOffset($document->text(), $reference->range()->start());
-            $end = $this->converter->toByteOffset($document->text(), $reference->range()->end());
+            $start = $this->converter->toByteOffset($request->document->text(), $reference->range()->start());
+            $end = $this->converter->toByteOffset($request->document->text(), $reference->range()->end());
             if ($offset >= $start && $offset <= $end) {
-                return [$reference, $project];
+                return [$reference, $request->project];
             }
         }
 
@@ -241,21 +221,6 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
     /** @return array<array-key, mixed> */
     private function diagnostic(TranslationReference $reference, string $code, string $message): array
     {
-        return [
-            'range' => $this->range($reference->range()),
-            'severity' => 1,
-            'source' => 'symfony',
-            'code' => $code,
-            'message' => $message,
-        ];
-    }
-
-    /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */
-    private function range(Range $range): array
-    {
-        return [
-            'start' => ['line' => $range->start()->line(), 'character' => $range->start()->character()],
-            'end' => ['line' => $range->end()->line(), 'character' => $range->end()->character()],
-        ];
+        return $this->protocol->diagnostic($reference->range(), 1, $code, $message);
     }
 }

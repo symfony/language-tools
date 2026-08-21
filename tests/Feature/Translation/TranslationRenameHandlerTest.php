@@ -15,6 +15,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TranslationRenameHandlerTest extends TestCase
 {
@@ -38,6 +39,7 @@ final class TranslationRenameHandlerTest extends TestCase
         $handler = new TranslationRenameHandler(
             new DocumentContextResolver($documents, $projects),
             $converter,
+            new LspProtocolMapper(),
             $extractor,
             $indexes,
             new ProjectPathResolver(new UriToPathConverter()),

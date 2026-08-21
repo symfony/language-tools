@@ -4,19 +4,20 @@ namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Finder\Finder;
-use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Project\ProjectPathResolver;
-use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TranslationCodeActionProvider implements CodeActionProviderInterface
 {
     public function __construct(
-        private readonly DocumentStore $documents,
-        private readonly ProjectRegistry $projects,
+        private readonly DocumentContextResolver $documentContextResolver,
         private readonly PositionConverter $converter,
+        private readonly LspProtocolMapper $protocol,
         private readonly TranslationExtractor $extractor,
         private readonly TranslationIndexRegistry $indexes,
         private readonly UriToPathConverter $uriToPathConverter,
@@ -26,18 +27,13 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
 
     public function actions(array $params): ?array
     {
-        $textDocument = $params['textDocument'] ?? null;
+        $request = $this->documentContextResolver->resolveDocument($params);
         $context = $params['context'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null) || !\is_array($context)) {
-            return null;
-        }
-        $document = $this->documents->get($textDocument['uri']);
-        $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $document || null === $project || !$this->pathResolver->isApplicationOwned($project, $document->uri())) {
+        if (null === $request || !\is_array($context) || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri())) {
             return null;
         }
 
-        $references = $this->extractor->extract($document->uri(), $document->languageId(), $document->text())->references();
+        $references = $this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->references();
         $actions = [];
         foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
             if (!\is_array($diagnostic) || 'translation.not_found' !== ($diagnostic['code'] ?? null)) {
@@ -49,16 +45,16 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
             }
             foreach ($references as $reference) {
                 if (!$this->sameRange($reference, $range)
-                    || [] !== $this->indexes->forProject($project)->declarations($reference->domain(), $reference->key())
+                    || [] !== $this->indexes->forProject($request->project)->declarations($reference->domain(), $reference->key())
                 ) {
                     continue;
                 }
-                $target = $this->target($project->rootPath(), $reference->domain());
+                $target = $this->target($request->project->rootPath(), $reference->domain());
                 if (null === $target) {
                     continue;
                 }
                 $targetUri = $this->uri($target);
-                if (!$this->pathResolver->isApplicationOwned($project, $targetUri)) {
+                if (!$this->pathResolver->isApplicationOwned($request->project, $targetUri)) {
                     continue;
                 }
                 $contents = file_get_contents($target);
@@ -75,13 +71,7 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
                     'isPreferred' => true,
                     'edit' => ['documentChanges' => [[
                         'textDocument' => ['uri' => $targetUri, 'version' => null],
-                        'edits' => [[
-                            'range' => [
-                                'start' => ['line' => $position->line(), 'character' => $position->character()],
-                                'end' => ['line' => $position->line(), 'character' => $position->character()],
-                            ],
-                            'newText' => $newText,
-                        ]],
+                        'edits' => [$this->protocol->textEdit(new Range($position, $position), $newText)],
                     ]]],
                 ];
                 break;

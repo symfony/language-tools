@@ -18,6 +18,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TranslationProviderTest extends TestCase
 {
@@ -88,12 +89,12 @@ final class TranslationProviderTest extends TestCase
         $indexes->forProject($project)->replaceSources($extractor->extract('file://'.$translationPath, 'yaml', "existing: Existing\n"));
         $configuration = new TranslationConfigurationRegistry();
         $configuration->configure($project, true);
-        $provider = new TranslationProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $indexes, $extractor, $configuration, $commentParser);
+        $provider = new TranslationProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser);
 
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
-            $actions = (new TranslationCodeActionProvider($documents, $projects, $converter, $extractor, $indexes, new UriToPathConverter(), new ProjectPathResolver(new UriToPathConverter())))->actions([
+            $actions = (new TranslationCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $extractor, $indexes, new UriToPathConverter(), new ProjectPathResolver(new UriToPathConverter())))->actions([
                 'textDocument' => ['uri' => $uri],
                 'range' => $diagnostics[0]['range'],
                 'context' => ['diagnostics' => $diagnostics],
@@ -140,6 +141,6 @@ final class TranslationProviderTest extends TestCase
         $indexes->forProject($project)->replaceRuntime(true, new TranslationMessage('article.title', 'messages', 'en', 'Article %name%'));
         $configuration = new TranslationConfigurationRegistry();
 
-        return [new TranslationProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $indexes, $extractor, $configuration, $commentParser), $converter, $configuration, $project];
+        return [new TranslationProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser), $converter, $configuration, $project];
     }
 }

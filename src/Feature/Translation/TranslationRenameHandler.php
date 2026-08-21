@@ -8,12 +8,14 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TranslationRenameHandler implements RenameProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
         private readonly PositionConverter $converter,
+        private readonly LspProtocolMapper $protocol,
         private readonly TranslationExtractor $extractor,
         private readonly TranslationIndexRegistry $indexes,
         private readonly ProjectPathResolver $pathResolver,
@@ -35,7 +37,7 @@ final class TranslationRenameHandler implements RenameProviderInterface
             return null;
         }
 
-        return ['range' => $this->range($reference->range()), 'placeholder' => $reference->key()];
+        return ['range' => $this->protocol->range($reference->range()), 'placeholder' => $reference->key()];
     }
 
     public function rename(array $params): ?array
@@ -98,33 +100,29 @@ final class TranslationRenameHandler implements RenameProviderInterface
      */
     private function resolve(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
-        if (null === $request) {
+        $request = $this->resolver->resolvePositioned($params);
+        if (null === $request || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri())) {
             return null;
         }
-        [$document, $project, $position] = $request;
-        if (!$this->pathResolver->isApplicationOwned($project, $document->uri())) {
-            return null;
-        }
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        $facts = $this->extractor->extract($document->uri(), $document->languageId(), $document->text());
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        $facts = $this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text());
         foreach ($facts->declarations() as $declaration) {
-            $start = $this->converter->toByteOffset($document->text(), $declaration->range()->start());
-            $end = $this->converter->toByteOffset($document->text(), $declaration->range()->end());
+            $start = $this->converter->toByteOffset($request->document->text(), $declaration->range()->start());
+            $end = $this->converter->toByteOffset($request->document->text(), $declaration->range()->end());
             if ($offset >= $start && $offset <= $end) {
                 return [new TranslationReference(
                     $declaration->key(),
                     $declaration->domain(),
-                    $document->uri(),
+                    $request->document->uri(),
                     $declaration->range(),
-                ), $project];
+                ), $request->project];
             }
         }
         foreach ($facts->references() as $reference) {
-            $start = $this->converter->toByteOffset($document->text(), $reference->range()->start());
-            $end = $this->converter->toByteOffset($document->text(), $reference->range()->end());
+            $start = $this->converter->toByteOffset($request->document->text(), $reference->range()->start());
+            $end = $this->converter->toByteOffset($request->document->text(), $reference->range()->end());
             if ($offset >= $start && $offset <= $end) {
-                return [$reference, $project];
+                return [$reference, $request->project];
             }
         }
 
@@ -148,15 +146,6 @@ final class TranslationRenameHandler implements RenameProviderInterface
     /** @return array<array-key, mixed> */
     private function edit(Range $range, string $newText): array
     {
-        return ['range' => $this->range($range), 'newText' => $newText, 'annotationId' => 'translationRename'];
-    }
-
-    /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */
-    private function range(Range $range): array
-    {
-        return [
-            'start' => ['line' => $range->start()->line(), 'character' => $range->start()->character()],
-            'end' => ['line' => $range->end()->line(), 'character' => $range->end()->character()],
-        ];
+        return ['range' => $this->protocol->range($range), 'newText' => $newText, 'annotationId' => 'translationRename'];
     }
 }
