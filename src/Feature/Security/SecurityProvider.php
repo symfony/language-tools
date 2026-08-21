@@ -3,24 +3,21 @@
 namespace Symfony\Lsp\Feature\Security;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class SecurityProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
-        private readonly DocumentStore $documents,
-        private readonly ProjectRegistry $projects,
         private readonly PositionConverter $converter,
+        private readonly LspProtocolMapper $protocol,
         private readonly SecurityIndexRegistry $indexes,
         private readonly SecuritySourceIndexRegistry $sourceIndexes,
         private readonly SecurityExtractor $extractor,
@@ -29,23 +26,22 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
 
     public function complete(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
+        $request = $this->resolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
-        [$document, $project, $position] = $request;
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        $context = $this->extractor->completionContext($document->languageId(), $document->text(), $offset);
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        $context = $this->extractor->completionContext($request->document->languageId(), $request->document->text(), $offset);
         if (null === $context) {
             return null;
         }
-        $index = $this->indexes->forProject($project);
+        $index = $this->indexes->forProject($request->project);
         $names = match ($context->kind()) {
             SecuritySymbolKind::Firewall => array_map(static fn (SecurityFirewall $firewall): string => $firewall->name(), $index->firewalls()),
             SecuritySymbolKind::Provider => array_map(static fn (SecurityUserProvider $provider): string => $provider->name(), $index->providers()),
             SecuritySymbolKind::Role => array_map(static fn (SecurityRole $role): string => $role->name(), $index->roles()),
         };
-        $sourceIndex = $this->sourceIndexes->forProject($project);
+        $sourceIndex = $this->sourceIndexes->forProject($request->project);
         $sourceNames = SecuritySymbolKind::Role === $context->kind()
             ? $sourceIndex->names($context->kind())
             : $sourceIndex->declarationNames($context->kind());
@@ -59,7 +55,7 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
                     'label' => $name,
                     'kind' => 12,
                     'detail' => 'Symfony security '.$context->kind()->value,
-                    'textEdit' => ['range' => $this->range($context->range()), 'newText' => $name],
+                    'textEdit' => $this->protocol->textEdit($context->range(), $name),
                 ];
             }
         }
@@ -81,7 +77,7 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
             SecuritySymbolKind::Role => $this->roleHover($index, $symbol->name()),
         };
 
-        return [] === $lines ? null : ['contents' => ['kind' => 'markdown', 'value' => implode("\n", $lines)]];
+        return [] === $lines ? null : $this->protocol->markdownHover(implode("\n", $lines));
     }
 
     public function definition(array $params): ?array
@@ -96,7 +92,7 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
             static fn (SecuritySourceSymbol $candidate): bool => $candidate->isDeclaration(),
         );
 
-        return array_map(fn (SecuritySourceSymbol $candidate): array => ['uri' => $candidate->uri(), 'range' => $this->range($candidate->range())], array_values($declarations));
+        return array_map(fn (SecuritySourceSymbol $candidate): array => $this->protocol->location($candidate->uri(), $candidate->range()), array_values($declarations));
     }
 
     public function references(array $params): ?array
@@ -107,27 +103,22 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
         }
         [$symbol, $project] = $resolved;
 
-        return array_map(fn (SecuritySourceSymbol $candidate): array => ['uri' => $candidate->uri(), 'range' => $this->range($candidate->range())], $this->sourceIndexes->forProject($project)->symbols($symbol->kind(), $symbol->name()));
+        return array_map(fn (SecuritySourceSymbol $candidate): array => $this->protocol->location($candidate->uri(), $candidate->range()), $this->sourceIndexes->forProject($project)->symbols($symbol->kind(), $symbol->name()));
     }
 
     public function diagnostics(array $params): ?array
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
+        $request = $this->resolver->resolveDocument($params);
+        if (null === $request) {
             return null;
         }
-        $document = $this->documents->get($textDocument['uri']);
-        $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $document || null === $project) {
-            return null;
-        }
-        $index = $this->indexes->forProject($project);
+        $index = $this->indexes->forProject($request->project);
         if (!$index->isComplete()) {
             return [];
         }
-        $sourceIndex = $this->sourceIndexes->forProject($project);
+        $sourceIndex = $this->sourceIndexes->forProject($request->project);
         $diagnostics = [];
-        foreach ($this->extractor->extract($document->uri(), $document->languageId(), $document->text())->symbols() as $symbol) {
+        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->symbols() as $symbol) {
             if ($symbol->isDeclaration() || SecuritySymbolKind::Role === $symbol->kind()) {
                 continue;
             }
@@ -135,13 +126,7 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
                 ? null !== $index->firewall($symbol->name())
                 : null !== $index->provider($symbol->name());
             if (!$known && !\in_array($symbol->name(), $sourceIndex->declarationNames($symbol->kind()), true)) {
-                $diagnostics[] = [
-                    'range' => $this->range($symbol->range()),
-                    'severity' => 1,
-                    'source' => 'symfony',
-                    'code' => SecuritySymbolKind::Firewall === $symbol->kind() ? 'security.unknown_firewall' : 'security.unknown_provider',
-                    'message' => \sprintf('Unknown security %s "%s".', $symbol->kind()->value, $symbol->name()),
-                ];
+                $diagnostics[] = $this->protocol->diagnostic($symbol->range(), 1, SecuritySymbolKind::Firewall === $symbol->kind() ? 'security.unknown_firewall' : 'security.unknown_provider', \sprintf('Unknown security %s "%s".', $symbol->kind()->value, $symbol->name()));
             }
         }
 
@@ -155,17 +140,16 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
      */
     private function resolve(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
+        $request = $this->resolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
-        [$document, $project, $position] = $request;
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        foreach ($this->extractor->extract($document->uri(), $document->languageId(), $document->text())->symbols() as $symbol) {
-            $start = $this->converter->toByteOffset($document->text(), $symbol->range()->start());
-            $end = $this->converter->toByteOffset($document->text(), $symbol->range()->end());
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->symbols() as $symbol) {
+            $start = $this->converter->toByteOffset($request->document->text(), $symbol->range()->start());
+            $end = $this->converter->toByteOffset($request->document->text(), $symbol->range()->end());
             if ($offset >= $start && $offset <= $end) {
-                return [$symbol, $project];
+                return [$symbol, $request->project];
             }
         }
 
@@ -237,11 +221,5 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
             '',
             'Registered voters: '.([] === $voters ? 'none' : '`'.implode('`, `', $voters).'`'),
         ];
-    }
-
-    /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */
-    private function range(Range $range): array
-    {
-        return ['start' => ['line' => $range->start()->line(), 'character' => $range->start()->character()], 'end' => ['line' => $range->end()->line(), 'character' => $range->end()->character()]];
     }
 }

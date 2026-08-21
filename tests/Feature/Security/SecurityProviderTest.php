@@ -23,6 +23,7 @@ use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class SecurityProviderTest extends TestCase
 {
@@ -121,7 +122,7 @@ PHP;
             $extractor->extract($phpUri, 'php', $php),
             $extractor->extract($twigUri, 'twig', $twig),
         );
-        $provider = new SecurityProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $indexes, $sourceIndexes, $extractor);
+        $provider = new SecurityProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $sourceIndexes, $extractor);
 
         $completionPosition = $converter->toPosition($completion, strpos($completion, "ROLE_A')") + \strlen('ROLE_A'));
         self::assertSame(['ROLE_ADMIN'], array_column($provider->complete($this->params($completionUri, $completionPosition)) ?? [], 'label'));
