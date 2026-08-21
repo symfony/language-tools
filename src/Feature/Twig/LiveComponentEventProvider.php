@@ -11,12 +11,14 @@ use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class LiveComponentEventProvider implements CompletionProviderInterface, DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
         private readonly PositionConverter $converter,
+        private readonly LspProtocolMapper $protocol,
         private readonly TwigComponentIndexRegistry $indexes,
         private readonly TwigComponentExtractor $extractor,
     ) {
@@ -24,35 +26,25 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
 
     public function complete(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
-        if (null === $request) {
+        $request = $this->resolver->resolvePositioned($params);
+        if (null === $request || 'php' !== $request->document->languageId() || !str_contains($request->document->text(), 'AsLiveComponent')) {
             return null;
         }
-        [$document, $project, $position] = $request;
-        if ('php' !== $document->languageId() || !str_contains($document->text(), 'AsLiveComponent')) {
-            return null;
-        }
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        $before = substr($document->text(), 0, $offset);
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        $before = substr($request->document->text(), 0, $offset);
         if (!preg_match('/(?:->|\b)emit\s*\(\s*([\'"])([^\'"]*)$/s', $before, $match)) {
             return null;
         }
         $prefix = $match[2];
-        $start = $this->converter->toPosition($document->text(), $offset - \strlen($prefix));
+        $start = $this->converter->toPosition($request->document->text(), $offset - \strlen($prefix));
         $items = [];
-        foreach ($this->indexes->forProject($project)->eventNames() as $event) {
+        foreach ($this->indexes->forProject($request->project)->eventNames() as $event) {
             if (str_starts_with($event, $prefix)) {
                 $items[] = [
                     'label' => $event,
                     'kind' => 23,
                     'detail' => 'Live component event',
-                    'textEdit' => [
-                        'range' => [
-                            'start' => ['line' => $start->line(), 'character' => $start->character()],
-                            'end' => ['line' => $position->line(), 'character' => $position->character()],
-                        ],
-                        'newText' => $event,
-                    ],
+                    'textEdit' => $this->protocol->textEdit(new Range($start, $request->position), $event),
                 ];
             }
         }
@@ -74,7 +66,7 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
             }
         }
 
-        return ['contents' => ['kind' => 'markdown', 'value' => implode("\n\n", array_values(array_unique($details)))]];
+        return $this->protocol->markdownHover(implode("\n\n", array_values(array_unique($details))));
     }
 
     public function definition(array $params): ?array
@@ -87,7 +79,7 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
         $locations = [];
         foreach ($this->indexes->forProject($project)->events($event->name()) as $candidate) {
             if ($candidate->isDeclaration()) {
-                $locations[] = ['uri' => $candidate->uri(), 'range' => $this->range($candidate->range())];
+                $locations[] = $this->protocol->location($candidate->uri(), $candidate->range());
             }
         }
 
@@ -102,10 +94,7 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
         }
         [$event, $project] = $resolved;
 
-        return array_map(fn (LiveComponentEvent $candidate): array => [
-            'uri' => $candidate->uri(),
-            'range' => $this->range($candidate->range()),
-        ], $this->indexes->forProject($project)->events($event->name()));
+        return array_map(fn (LiveComponentEvent $candidate): array => $this->protocol->location($candidate->uri(), $candidate->range()), $this->indexes->forProject($project)->events($event->name()));
     }
 
     /**
@@ -115,15 +104,14 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
      */
     private function resolve(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
+        $request = $this->resolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
-        [$document, $project, $position] = $request;
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        foreach ($this->extractor->extract($project, $document->uri(), $document->languageId(), $document->text())->events() as $event) {
-            if ($this->contains($document, $event->range(), $offset)) {
-                return [$event, $project];
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        foreach ($this->extractor->extract($request->project, $request->document->uri(), $request->document->languageId(), $request->document->text())->events() as $event) {
+            if ($this->contains($request->document, $event->range(), $offset)) {
+                return [$event, $request->project];
             }
         }
 
@@ -134,11 +122,5 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
     {
         return $offset >= $this->converter->toByteOffset($document->text(), $range->start())
             && $offset <= $this->converter->toByteOffset($document->text(), $range->end());
-    }
-
-    /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */
-    private function range(Range $range): array
-    {
-        return ['start' => ['line' => $range->start()->line(), 'character' => $range->start()->character()], 'end' => ['line' => $range->end()->line(), 'character' => $range->end()->character()]];
     }
 }

@@ -18,6 +18,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class LiveComponentProviderTest extends TestCase
 {
@@ -91,7 +92,7 @@ final class LiveComponentProviderTest extends TestCase
         self::assertStringContainsString('Properties: `query`', $componentHover['contents']['value']);
         self::assertStringContainsString('Actions: `submit`, `refresh`', $componentHover['contents']['value']);
 
-        $eventProvider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, $indexes, $extractor);
+        $eventProvider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor);
         self::assertSame(['search:completed'], array_column($eventProvider->complete($this->params($converter, $classUri, $classText, strpos($classText, "emit('search:co") + \strlen("emit('search:co"))) ?? [], 'label'));
         $eventParams = $this->params($converter, $classUri, $classText, strpos($classText, "emit('search:completed") + \strlen("emit('search:"));
         self::assertSame([$classUri], array_column($eventProvider->definition($eventParams) ?? [], 'uri'));
