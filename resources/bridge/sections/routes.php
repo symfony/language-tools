@@ -2,24 +2,18 @@
 
 function bridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
 {
-    $environment = $context->environment();
-    $noDebug = !$context->debug();
     if (!class_exists(Symfony\Component\Console\Input\ArrayInput::class)
         || !class_exists(Symfony\Component\Console\Output\BufferedOutput::class)
     ) {
         $context->addError('routes');
     } else {
         try {
-            $kernel = $context->kernel();
-            $application = new Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
-            $application->setAutoExit(false);
+            $application = $context->application();
             $routes = runJsonCommand($application, [
                 'command' => 'debug:router',
                 '--format' => 'json',
                 '--show-aliases' => true,
-                '--env' => $environment,
-                '--no-debug' => $noDebug,
-                '--no-interaction' => true,
+                ...$context->commandOptions(),
             ]);
 
             $items = [];

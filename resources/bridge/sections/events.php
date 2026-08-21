@@ -2,22 +2,16 @@
 
 function bridgeEventsSection(SymfonyLspBridgeContext $context): ?array
 {
-    $environment = $context->environment();
-    $noDebug = !$context->debug();
     $eventItems = [];
     $listeners = [];
     $complete = true;
     if (interface_exists(Symfony\Contracts\EventDispatcher\EventDispatcherInterface::class)) {
         try {
-            $kernel = $context->kernel();
-            $application = new Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
-            $application->setAutoExit(false);
+            $application = $context->application();
             $events = runJsonCommand($application, [
                 'command' => 'debug:event-dispatcher',
                 '--format' => 'json',
-                '--env' => $environment,
-                '--no-debug' => $noDebug,
-                '--no-interaction' => true,
+                ...$context->commandOptions(),
             ]);
             foreach ($events as $name => $eventListeners) {
                 if (!is_string($name)) {

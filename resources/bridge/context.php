@@ -3,6 +3,7 @@
 final class SymfonyLspBridgeContext
 {
     private ?object $kernel = null;
+    private ?object $application = null;
     private ?Throwable $kernelError = null;
     private array $errors = [];
 
@@ -33,6 +34,28 @@ final class SymfonyLspBridgeContext
     public function targetedRefresh(): bool
     {
         return $this->targetedRefresh;
+    }
+
+    /** @return array{--env: string, --no-debug: bool, --no-interaction: true} */
+    public function commandOptions(): array
+    {
+        return [
+            '--env' => $this->environment,
+            '--no-debug' => !$this->debug,
+            '--no-interaction' => true,
+        ];
+    }
+
+    public function application(): object
+    {
+        if (is_object($this->application)) {
+            return $this->application;
+        }
+
+        $application = new Symfony\Bundle\FrameworkBundle\Console\Application($this->kernel());
+        $application->setAutoExit(false);
+
+        return $this->application = $application;
     }
 
     public function kernel(): object

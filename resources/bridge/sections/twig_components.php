@@ -14,22 +14,14 @@ function bridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
 
         return $section;
     }
-    $environment = $context->environment();
-    $noDebug = !$context->debug();
     if (!class_exists(Symfony\Component\Console\Input\ArrayInput::class)
         || !class_exists(Symfony\Component\Console\Output\BufferedOutput::class)
     ) {
         $context->addError('twig_components');
     } else {
         try {
-            $kernel = $context->kernel();
-            $application = new Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
-            $application->setAutoExit(false);
-            $commandOptions = [
-                '--env' => $environment,
-                '--no-debug' => $noDebug,
-                '--no-interaction' => true,
-            ];
+            $application = $context->application();
+            $commandOptions = $context->commandOptions();
             $configuration = runJsonCommand($application, [
                 'command' => 'debug:config',
                 'name' => 'twig_component',

@@ -520,7 +520,7 @@ final class BridgeTest extends TestCase
         ], $result['sections']['container']['parameters']);
     }
 
-    public function testUsesOneKernelForAllRequestedSections(): void
+    public function testUsesOneKernelAndApplicationForAllRequestedSections(): void
     {
         $this->writeSharedKernelApplication();
 
@@ -1217,7 +1217,11 @@ final class BridgeTest extends TestCase
             namespace Symfony\Bundle\FrameworkBundle\Console;
             final class Application
             {
-                public function __construct(object $kernel) {}
+                private static int $instances = 0;
+                public function __construct(object $kernel)
+                {
+                    if (1 !== ++self::$instances) { throw new \RuntimeException('Application constructed more than once.'); }
+                }
                 public function setAutoExit(bool $autoExit): void {}
                 public function run(object $input, object $output): int
                 {

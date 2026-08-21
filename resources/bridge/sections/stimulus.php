@@ -18,15 +18,12 @@ function bridgeStimulusSection(SymfonyLspBridgeContext $context): ?array
                 }
             }
             if ($enabled) {
-                $application = new Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
-                $application->setAutoExit(false);
+                $application = $context->application();
                 $configuration = runJsonCommand($application, [
                     'command' => 'debug:config',
                     'name' => 'stimulus',
                     '--format' => 'json',
-                    '--env' => $context->environment(),
-                    '--no-debug' => !$context->debug(),
-                    '--no-interaction' => true,
+                    ...$context->commandOptions(),
                 ]);
                 $configuration = is_array($configuration['stimulus'] ?? null) ? $configuration['stimulus'] : $configuration;
                 $controllerPaths = array_values(array_filter(is_array($configuration['controller_paths'] ?? null) ? $configuration['controller_paths'] : [], 'is_string'));

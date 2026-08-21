@@ -10,17 +10,11 @@ function bridgeMetadataSection(SymfonyLspBridgeContext $context): ?array
 
     if (interface_exists(Symfony\Component\Form\FormTypeInterface::class)) {
         try {
-            $application = new Symfony\Bundle\FrameworkBundle\Console\Application($context->kernel());
-            $application->setAutoExit(false);
+            $application = $context->application();
             if (!$application->has('debug:form')) {
                 $warnings[] = 'The debug:form command is unavailable.';
             } else {
-                $commandOptions = [
-                    '--format' => 'json',
-                    '--env' => $context->environment(),
-                    '--no-debug' => !$context->debug(),
-                    '--no-interaction' => true,
-                ];
+                $commandOptions = ['--format' => 'json', ...$context->commandOptions()];
                 $formList = runJsonCommand($application, ['command' => 'debug:form', ...$commandOptions]);
                 $types = [];
                 foreach (['builtin_form_types', 'service_form_types'] as $key) {

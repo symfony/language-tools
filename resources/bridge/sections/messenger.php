@@ -2,8 +2,6 @@
 
 function bridgeMessengerSection(SymfonyLspBridgeContext $context): ?array
 {
-    $environment = $context->environment();
-    $noDebug = !$context->debug();
     $buses = [];
     $transports = [];
     $messages = [];
@@ -12,14 +10,8 @@ function bridgeMessengerSection(SymfonyLspBridgeContext $context): ?array
     $complete = true;
     if (interface_exists(Symfony\Component\Messenger\MessageBusInterface::class)) {
         try {
-            $kernel = $context->kernel();
-            $application = new Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
-            $application->setAutoExit(false);
-            $commandOptions = [
-                '--env' => $environment,
-                '--no-debug' => $noDebug,
-                '--no-interaction' => true,
-            ];
+            $application = $context->application();
+            $commandOptions = $context->commandOptions();
             $container = runJsonCommand($application, [
                 'command' => 'debug:container',
                 '--format' => 'json',

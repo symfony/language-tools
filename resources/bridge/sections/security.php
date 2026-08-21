@@ -25,13 +25,8 @@ function bridgeSecuritySection(SymfonyLspBridgeContext $context): ?array
     }
     if ($securityEnabled) {
         try {
-            $application = new Symfony\Bundle\FrameworkBundle\Console\Application($context->kernel());
-            $application->setAutoExit(false);
-            $commandOptions = [
-                '--env' => $context->environment(),
-                '--no-debug' => !$context->debug(),
-                '--no-interaction' => true,
-            ];
+            $application = $context->application();
+            $commandOptions = $context->commandOptions();
             $configuration = runJsonCommand($application, [
                 'command' => 'debug:config',
                 'name' => 'security',

@@ -2,8 +2,6 @@
 
 function bridgeEnvironmentSection(SymfonyLspBridgeContext $context): ?array
 {
-    $environment = $context->environment();
-    $noDebug = !$context->debug();
     $processors = [];
     $complete = true;
     if (interface_exists(Symfony\Component\DependencyInjection\EnvVarProcessorInterface::class)) {
@@ -11,16 +9,12 @@ function bridgeEnvironmentSection(SymfonyLspBridgeContext $context): ?array
             ? [Symfony\Component\DependencyInjection\EnvVarProcessor::class]
             : [];
         try {
-            $kernel = $context->kernel();
-            $application = new Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
-            $application->setAutoExit(false);
+            $application = $context->application();
             $tagged = runJsonCommand($application, [
                 'command' => 'debug:container',
                 '--tag' => 'container.env_var_processor',
                 '--format' => 'json',
-                '--env' => $environment,
-                '--no-debug' => $noDebug,
-                '--no-interaction' => true,
+                ...$context->commandOptions(),
             ]);
             foreach (is_array($tagged['definitions'] ?? null) ? $tagged['definitions'] : [] as $definition) {
                 if (is_array($definition) && is_string($definition['class'] ?? null)) {

@@ -2,22 +2,14 @@
 
 function bridgeContainerSection(SymfonyLspBridgeContext $context): ?array
 {
-    $environment = $context->environment();
-    $noDebug = !$context->debug();
     if (!class_exists(Symfony\Component\Console\Input\ArrayInput::class)
         || !class_exists(Symfony\Component\Console\Output\BufferedOutput::class)
     ) {
         $context->addError('container');
     } else {
         try {
-            $kernel = $context->kernel();
-            $application = new Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
-            $application->setAutoExit(false);
-            $commandOptions = [
-                '--env' => $environment,
-                '--no-debug' => $noDebug,
-                '--no-interaction' => true,
-            ];
+            $application = $context->application();
+            $commandOptions = $context->commandOptions();
             $container = runJsonCommand($application, [
                 'command' => 'debug:container',
                 '--format' => 'json',

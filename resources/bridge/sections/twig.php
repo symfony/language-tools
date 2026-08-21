@@ -2,17 +2,13 @@
 
 function bridgeTwigSection(SymfonyLspBridgeContext $context): ?array
 {
-    $environment = $context->environment();
-    $noDebug = !$context->debug();
     $paths = [];
     $globals = [];
     $warnings = [];
     $complete = true;
     if (class_exists(Twig\Environment::class)) {
         try {
-            $kernel = $context->kernel();
-            $application = new Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
-            $application->setAutoExit(false);
+            $application = $context->application();
             if (!$application->has('debug:twig')) {
                 $complete = false;
                 $warnings[] = 'The debug:twig command is unavailable.';
@@ -20,9 +16,7 @@ function bridgeTwigSection(SymfonyLspBridgeContext $context): ?array
                 $twig = runJsonCommand($application, [
                     'command' => 'debug:twig',
                     '--format' => 'json',
-                    '--env' => $environment,
-                    '--no-debug' => $noDebug,
-                    '--no-interaction' => true,
+                    ...$context->commandOptions(),
                 ]);
                 foreach (is_array($twig['globals'] ?? null) ? array_keys($twig['globals']) : [] as $name) {
                     if (is_string($name)) {
