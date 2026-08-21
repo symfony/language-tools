@@ -41,6 +41,42 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame([], $document->diagnostics());
     }
 
+    public function testExposesNamespaceImportsAndNameResolution(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Domain;
+
+            use Vendor\Package\{First, Second as Alias};
+            use Other\Single;
+            use function Vendor\helper;
+            use const Vendor\VALUE;
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+
+        self::assertSame('App\Domain', $document->namespace());
+        self::assertSame([
+            'First' => 'Vendor\Package\First',
+            'Alias' => 'Vendor\Package\Second',
+            'Single' => 'Other\Single',
+        ], $document->imports());
+        self::assertSame('Vendor\Package\Second\Nested', $document->resolveName('Alias\Nested'));
+        self::assertSame('App\Domain\Local', $document->resolveName('Local'));
+        self::assertSame('App\Domain\Relative', $document->resolveName('namespace\Relative'));
+        self::assertSame('Global\Name', $document->resolveName('\Global\Name'));
+    }
+
+    public function testKeepsImportsFromIncompleteGroupedSyntax(): void
+    {
+        $document = (new TolerantPhpParser(new Parser()))->parse("<?php\n// café\nnamespace App;\nuse Vendor\\Package\\{First, Second as Alias");
+
+        self::assertSame([
+            'First' => 'Vendor\Package\First',
+            'Alias' => 'Vendor\Package\Second',
+        ], $document->imports());
+    }
+
     public function testRejectsInterpolatedStringsAsLiteralsAndReportsSyntaxDiagnostics(): void
     {
         $source = <<<'PHP'

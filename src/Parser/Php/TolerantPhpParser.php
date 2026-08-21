@@ -9,10 +9,15 @@ use Microsoft\PhpParser\Node\ClassBaseClause;
 use Microsoft\PhpParser\Node\Expression\ArgumentExpression;
 use Microsoft\PhpParser\Node\Expression\CallExpression;
 use Microsoft\PhpParser\Node\Expression\MemberAccessExpression;
+use Microsoft\PhpParser\Node\NamespaceAliasingClause;
+use Microsoft\PhpParser\Node\NamespaceUseClause;
+use Microsoft\PhpParser\Node\NamespaceUseGroupClause;
 use Microsoft\PhpParser\Node\QualifiedName;
 use Microsoft\PhpParser\Node\Statement\ClassDeclaration;
 use Microsoft\PhpParser\Node\Statement\EnumDeclaration;
 use Microsoft\PhpParser\Node\Statement\InterfaceDeclaration;
+use Microsoft\PhpParser\Node\Statement\NamespaceDefinition;
+use Microsoft\PhpParser\Node\Statement\NamespaceUseDeclaration;
 use Microsoft\PhpParser\Node\Statement\TraitDeclaration;
 use Microsoft\PhpParser\Node\StringLiteral;
 use Microsoft\PhpParser\Parser;
@@ -31,6 +36,10 @@ final class TolerantPhpParser implements PhpParserInterface
         $attributes = [];
         $methodCalls = [];
         $typeDeclarations = [];
+        $namespaceDefinition = null;
+        $namespaceFound = false;
+        $namespace = '';
+        $imports = [];
 
         foreach ($root->getDescendantNodes() as $node) {
             if ($node instanceof Attribute) {
@@ -43,6 +52,13 @@ final class TolerantPhpParser implements PhpParserInterface
             } elseif ($node instanceof ClassDeclaration || $node instanceof InterfaceDeclaration || $node instanceof TraitDeclaration || $node instanceof EnumDeclaration) {
                 $typeDeclarations[] = $this->typeDeclaration($node, $source);
             }
+            if (!$namespaceFound && $node instanceof NamespaceDefinition) {
+                $namespaceDefinition = $node;
+                $namespaceFound = true;
+                $namespace = trim((string) $node->name?->getText($source), '\\');
+            } elseif ($node instanceof NamespaceUseDeclaration && null === $node->functionOrConst && $node->getNamespaceDefinition() === $namespaceDefinition) {
+                $this->addImports($node, $source, $imports);
+            }
         }
 
         $diagnostics = [];
@@ -54,7 +70,44 @@ final class TolerantPhpParser implements PhpParserInterface
             );
         }
 
-        return new PhpDocument($attributes, $methodCalls, $typeDeclarations, $diagnostics);
+        return new PhpDocument($attributes, $methodCalls, $typeDeclarations, $diagnostics, $namespace, $imports);
+    }
+
+    /** @param array<string, string> $imports */
+    private function addImports(NamespaceUseDeclaration $declaration, string $source, array &$imports): void
+    {
+        if (null === $declaration->useClauses) {
+            return;
+        }
+        foreach ($declaration->useClauses->children as $clause) {
+            if (!$clause instanceof NamespaceUseClause) {
+                continue;
+            }
+            $prefix = trim((string) $clause->namespaceName->getText($source), '\\');
+            if (null !== $clause->groupClauses) {
+                foreach ($clause->groupClauses->children as $group) {
+                    if (!$group instanceof NamespaceUseGroupClause || null !== $group->functionOrConst) {
+                        continue;
+                    }
+                    $name = trim((string) $group->namespaceName->getText($source), '\\');
+                    $class = '' === $prefix ? $name : $prefix.'\\'.$name;
+                    $imports[$this->alias($group, $name, $source)] = $class;
+                }
+
+                continue;
+            }
+            $imports[$this->alias($clause, $prefix, $source)] = $prefix;
+        }
+    }
+
+    private function alias(NamespaceUseClause|NamespaceUseGroupClause $clause, string $name, string $source): string
+    {
+        $alias = get_object_vars($clause)['namespaceAliasingClause'] ?? null;
+        if ($alias instanceof NamespaceAliasingClause) {
+            return (string) $alias->name->getText($source);
+        }
+
+        return substr($name, (int) strrpos('\\'.$name, '\\'));
     }
 
     private function typeDeclaration(ClassDeclaration|InterfaceDeclaration|TraitDeclaration|EnumDeclaration $declaration, string $source): PhpTypeDeclaration

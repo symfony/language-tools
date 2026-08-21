@@ -4,10 +4,12 @@ namespace Symfony\Lsp\Feature\Event;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
 final class EventExtractor
 {
-    public function __construct(private readonly PositionConverter $converter)
+    public function __construct(private readonly PositionConverter $converter, private readonly PhpParserInterface $parser)
     {
     }
 
@@ -27,6 +29,7 @@ final class EventExtractor
     {
         $before = substr($text, 0, $offset);
         if ('php' === $languageId) {
+            $php = $this->parser->parse($text);
             if (preg_match('/AsEventListener\s*\([^)]*\bevent\s*:\s*["\']([^"\']*)$/s', $before, $match)) {
                 return $match[1];
             }
@@ -41,8 +44,7 @@ final class EventExtractor
                     return $match[1];
                 }
             }
-            [$namespace, $imports] = $this->phpNames($text);
-            $dispatchers = $this->eventDispatcherVariables($text, $namespace, $imports);
+            $dispatchers = $this->eventDispatcherVariables($text, $php);
             if (preg_match('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:addListener\s*\(\s*|dispatch\s*\([^,\r\n]+,\s*)["\']([^"\']*)$/', $before, $match)) {
                 $variable = '' !== $match[2] ? $match[2] : $match[1];
                 if (isset($dispatchers[$variable])) {
@@ -61,7 +63,7 @@ final class EventExtractor
     {
         $symbols = [];
         $invalidListenerMethods = [];
-        [$namespace, $imports] = $this->phpNames($text);
+        $php = $this->parser->parse($text);
         preg_match_all('/#\[\s*(?:[\\\\A-Za-z_][\\\\A-Za-z0-9_]*\\\\)*AsEventListener\b(?:\([^)]*\))?\s*\]/s', $text, $listenerAttributes);
         $listeners = $listenerAttributes[0];
 
@@ -70,16 +72,16 @@ final class EventExtractor
             if (preg_match('/\bevent\s*:\s*["\']([^"\']+)/', $arguments, $match, \PREG_OFFSET_CAPTURE)) {
                 $symbols[] = $this->symbol($match[1][0], $uri, $text, $argumentsOffset + $match[1][1], true);
             } elseif (preg_match('/\bevent\s*:\s*([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)::class/', $arguments, $match, \PREG_OFFSET_CAPTURE)) {
-                $symbols[] = $this->symbol($this->resolvePhpName($match[1][0], $namespace, $imports), $uri, $text, $argumentsOffset + $match[1][1], true, \strlen($match[1][0]));
+                $symbols[] = $this->symbol($php->resolveName($match[1][0]), $uri, $text, $argumentsOffset + $match[1][1], true, \strlen($match[1][0]));
             }
         }
 
-        $dispatchers = $this->eventDispatcherVariables($text, $namespace, $imports);
+        $dispatchers = $this->eventDispatcherVariables($text, $php);
         preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*dispatch\s*\(\s*new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)/', $text, $dispatches, \PREG_OFFSET_CAPTURE);
         foreach ($dispatches[3] as $index => [$name, $offset]) {
             $variable = '' !== $dispatches[2][$index][0] ? $dispatches[2][$index][0] : $dispatches[1][$index][0];
             if (isset($dispatchers[$variable])) {
-                $symbols[] = $this->symbol($this->resolvePhpName($name, $namespace, $imports), $uri, $text, $offset, false, \strlen($name));
+                $symbols[] = $this->symbol($php->resolveName($name), $uri, $text, $offset, false, \strlen($name));
             }
         }
         preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:addListener\s*\(\s*|dispatch\s*\([^,\r\n]+,\s*)["\']([^"\']+)/', $text, $namedEvents, \PREG_OFFSET_CAPTURE);
@@ -101,7 +103,7 @@ final class EventExtractor
             }
             preg_match_all('/([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)::class\s*=>/', $body, $classEvents, \PREG_OFFSET_CAPTURE);
             foreach ($classEvents[1] as [$name, $offset]) {
-                $symbols[] = $this->symbol($this->resolvePhpName($name, $namespace, $imports), $uri, $text, $open + 1 + $offset, true, \strlen($name));
+                $symbols[] = $this->symbol($php->resolveName($name), $uri, $text, $open + 1 + $offset, true, \strlen($name));
             }
         }
 
@@ -114,7 +116,7 @@ final class EventExtractor
             $close = $this->matchingBrace($text, $open);
             $body = substr($text, $open + 1, $close - $open - 1);
             if (!str_contains($listener[3][0], 'extends') && !preg_match('/\buse\s+[^;]+;/', $body) && !preg_match('/\bfunction\s+'.preg_quote($method[1][0], '/').'\s*\(/', $body)) {
-                $className = '' === $namespace ? $listener[2][0] : $namespace.'\\'.$listener[2][0];
+                $className = $php->resolveName($listener[2][0]);
                 $methodOffset = $listener[1][1] + $method[1][1];
                 $invalidListenerMethods[] = new InvalidEventListenerMethod($className, $method[1][0], new Range($this->converter->toPosition($text, $methodOffset), $this->converter->toPosition($text, $methodOffset + \strlen($method[1][0]))));
             }
@@ -192,63 +194,19 @@ final class EventExtractor
         return new EventSourceSymbol(ltrim($name, '\\'), $uri, new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + ($length ?? \strlen($name)))), $declaration);
     }
 
-    /** @return array{string, array<string, string>} */
-    private function phpNames(string $text): array
-    {
-        $namespace = '';
-        if (preg_match('/\bnamespace\s+([^;{]+)[;{]/', $text, $match)) {
-            $namespace = trim($match[1]);
-        }
-        $imports = [];
-        preg_match_all('/^\s*use\s+([^;]+);/m', $text, $matches);
-        foreach ($matches[1] as $import) {
-            if (str_contains($import, '{')) {
-                continue;
-            }
-            $parts = preg_split('/\s+as\s+/i', trim($import));
-            if (false === $parts || [] === $parts) {
-                continue;
-            }
-            $className = ltrim($parts[0], '\\');
-            $alias = $parts[1] ?? substr($className, (int) strrpos('\\'.$className, '\\'));
-            $imports[$alias] = $className;
-        }
-
-        return [$namespace, $imports];
-    }
-
-    /**
-     * @param array<string, string> $imports
-     *
-     * @return array<string, true>
-     */
-    private function eventDispatcherVariables(string $text, string $namespace, array $imports): array
+    /** @return array<string, true> */
+    private function eventDispatcherVariables(string $text, PhpDocument $php): array
     {
         $variables = [];
         preg_match_all('/(\\??[\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s+\$([A-Za-z_][A-Za-z0-9_]*)/', $text, $matches, \PREG_SET_ORDER);
         foreach ($matches as $match) {
-            $type = $this->resolvePhpName(ltrim($match[1], '?'), $namespace, $imports);
+            $type = $php->resolveName(ltrim($match[1], '?'));
             if (\in_array($type, ['Symfony\\Component\\EventDispatcher\\EventDispatcher', 'Symfony\\Component\\EventDispatcher\\EventDispatcherInterface', 'Symfony\\Contracts\\EventDispatcher\\EventDispatcherInterface'], true)) {
                 $variables[$match[2]] = true;
             }
         }
 
         return $variables;
-    }
-
-    /** @param array<string, string> $imports */
-    private function resolvePhpName(string $name, string $namespace, array $imports): string
-    {
-        if (str_starts_with($name, '\\')) {
-            return ltrim($name, '\\');
-        }
-        $separator = strpos($name, '\\');
-        $head = false === $separator ? $name : substr($name, 0, $separator);
-        if (isset($imports[$head])) {
-            return $imports[$head].(false === $separator ? '' : substr($name, $separator));
-        }
-
-        return '' === $namespace ? $name : $namespace.'\\'.$name;
     }
 
     private function matchingBrace(string $text, int $open): int

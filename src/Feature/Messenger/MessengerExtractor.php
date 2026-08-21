@@ -4,10 +4,12 @@ namespace Symfony\Lsp\Feature\Messenger;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
 final class MessengerExtractor
 {
-    public function __construct(private readonly PositionConverter $converter)
+    public function __construct(private readonly PositionConverter $converter, private readonly PhpParserInterface $parser)
     {
     }
 
@@ -32,6 +34,7 @@ final class MessengerExtractor
             }
         }
         if ('php' === $languageId) {
+            $php = $this->parser->parse($text);
             preg_match_all('/#\[\s*(?:[\\\\A-Za-z_][\\\\A-Za-z0-9_]*\\\\)*AsMessageHandler\b(?:\([^)]*\))?\s*\]/s', $text, $handlerAttributes);
             $handlers = $handlerAttributes[0];
             preg_match_all('/AsMessageHandler\s*\(([^)]*)\)/s', $text, $attributes, \PREG_OFFSET_CAPTURE);
@@ -50,25 +53,24 @@ final class MessengerExtractor
             foreach ($matches[1] as [$name, $offset]) {
                 $symbols[] = $this->symbol(MessengerSymbolKind::Bus, $name, $uri, $text, $offset, false);
             }
-            [$namespace, $imports] = $this->phpNames($text);
-            $parents = $this->phpParents($text, $namespace, $imports);
-            $busVariables = $this->messengerBusVariables($text, $namespace, $imports);
+            $parents = $this->phpParents($text, $php);
+            $busVariables = $this->messengerBusVariables($text, $php);
             preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*dispatch\s*\(\s*new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)/', $text, $dispatches, \PREG_OFFSET_CAPTURE);
             foreach ($dispatches[3] as $index => [$name, $offset]) {
                 $variable = '' !== $dispatches[2][$index][0] ? $dispatches[2][$index][0] : $dispatches[1][$index][0];
                 if (isset($busVariables[$variable])) {
-                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $this->resolvePhpName($name, $namespace, $imports), $uri, $text, $offset, false, \strlen($name));
+                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $php->resolveName($name), $uri, $text, $offset, false, \strlen($name));
                 }
             }
             preg_match_all('/new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s*\(\s*new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)/', $text, $envelopes, \PREG_OFFSET_CAPTURE);
             foreach ($envelopes[2] as $index => [$name, $offset]) {
-                if ('Symfony\\Component\\Messenger\\Envelope' === $this->resolvePhpName($envelopes[1][$index][0], $namespace, $imports)) {
-                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $this->resolvePhpName($name, $namespace, $imports), $uri, $text, $offset, false, \strlen($name));
+                if ('Symfony\\Component\\Messenger\\Envelope' === $php->resolveName($envelopes[1][$index][0])) {
+                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $php->resolveName($name), $uri, $text, $offset, false, \strlen($name));
                 }
             }
             preg_match_all('/AsMessageHandler\s*\([^)]*\bhandles\s*:\s*([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)::class/', $text, $handledMessages, \PREG_OFFSET_CAPTURE);
             foreach ($handledMessages[1] as [$name, $offset]) {
-                $symbols[] = $this->symbol(MessengerSymbolKind::Message, $this->resolvePhpName($name, $namespace, $imports), $uri, $text, $offset, false, \strlen($name));
+                $symbols[] = $this->symbol(MessengerSymbolKind::Message, $php->resolveName($name), $uri, $text, $offset, false, \strlen($name));
             }
         }
 
@@ -130,42 +132,13 @@ final class MessengerExtractor
         return new MessengerSourceSymbol($kind, $name, $uri, new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + ($length ?? \strlen($name)))), $declaration);
     }
 
-    /** @return array{string, array<string, string>} */
-    private function phpNames(string $text): array
-    {
-        $namespace = '';
-        if (preg_match('/\bnamespace\s+([^;{]+)[;{]/', $text, $match)) {
-            $namespace = trim($match[1]);
-        }
-        $imports = [];
-        preg_match_all('/^\s*use\s+([^;]+);/m', $text, $matches);
-        foreach ($matches[1] as $import) {
-            if (str_contains($import, '{')) {
-                continue;
-            }
-            $parts = preg_split('/\s+as\s+/i', trim($import));
-            if (false === $parts || [] === $parts) {
-                continue;
-            }
-            $className = ltrim($parts[0], '\\');
-            $alias = $parts[1] ?? substr($className, (int) strrpos('\\'.$className, '\\'));
-            $imports[$alias] = $className;
-        }
-
-        return [$namespace, $imports];
-    }
-
-    /**
-     * @param array<string, string> $imports
-     *
-     * @return array<string, list<string>>
-     */
-    private function phpParents(string $text, string $namespace, array $imports): array
+    /** @return array<string, list<string>> */
+    private function phpParents(string $text, PhpDocument $php): array
     {
         $parents = [];
         preg_match_all('/\b(class|interface|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\s*([^{}]*)\{/', $text, $matches, \PREG_SET_ORDER);
         foreach ($matches as $match) {
-            $className = '' === $namespace ? $match[2] : $namespace.'\\'.$match[2];
+            $className = $php->resolveName($match[2]);
             $typeLists = [];
             if (preg_match('/\bextends\s+([^\s,{]+(?:\s*,\s*[^\s,{]+)*)/', $match[3], $extends)) {
                 $typeLists[] = $extends[1];
@@ -180,44 +153,29 @@ final class MessengerExtractor
                     array_push($types, ...$splitTypes);
                 }
             }
-            $parents[$className] = array_values(array_unique(array_map(fn (string $type): string => $this->resolvePhpName($type, $namespace, $imports), $types)));
+            $resolved = [];
+            foreach ($types as $type) {
+                $resolved[] = $php->resolveName($type);
+            }
+            $parents[$className] = array_values(array_unique($resolved));
         }
 
         return $parents;
     }
 
-    /**
-     * @param array<string, string> $imports
-     *
-     * @return array<string, true>
-     */
-    private function messengerBusVariables(string $text, string $namespace, array $imports): array
+    /** @return array<string, true> */
+    private function messengerBusVariables(string $text, PhpDocument $php): array
     {
         $variables = [];
         preg_match_all('/(\\??[\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s+\$([A-Za-z_][A-Za-z0-9_]*)/', $text, $matches, \PREG_SET_ORDER);
         foreach ($matches as $match) {
-            $type = $this->resolvePhpName(ltrim($match[1], '?'), $namespace, $imports);
+            $type = $php->resolveName(ltrim($match[1], '?'));
             if (\in_array($type, ['Symfony\\Component\\Messenger\\MessageBus', 'Symfony\\Component\\Messenger\\MessageBusInterface'], true)) {
                 $variables[$match[2]] = true;
             }
         }
 
         return $variables;
-    }
-
-    /** @param array<string, string> $imports */
-    private function resolvePhpName(string $name, string $namespace, array $imports): string
-    {
-        if (str_starts_with($name, '\\')) {
-            return ltrim($name, '\\');
-        }
-        $separator = strpos($name, '\\');
-        $head = false === $separator ? $name : substr($name, 0, $separator);
-        if (isset($imports[$head])) {
-            return $imports[$head].(false === $separator ? '' : substr($name, $separator));
-        }
-
-        return '' === $namespace ? $name : $namespace.'\\'.$name;
     }
 
     /**

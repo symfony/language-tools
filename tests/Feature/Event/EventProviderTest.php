@@ -28,12 +28,12 @@ final class EventProviderTest extends TestCase
     public function testExtractsHighConfidenceEventReferences(): void
     {
         $converter = new PositionConverter();
-        $extractor = new EventExtractor($converter);
+        $extractor = new EventExtractor($converter, new TolerantPhpParser(new Parser()));
         $php = <<<'PHP'
 <?php
 namespace App;
-use App\Event\OrderPlaced;
-use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+use App\Event\{OrderPlaced};
+use Symfony\Contracts\EventDispatcher\{EventDispatcherInterface};
 final class Subscriber
 {
     public function __construct(private EventDispatcherInterface $dispatcher) {}
@@ -115,7 +115,7 @@ PHP;
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new EventExtractor($converter);
+        $extractor = new EventExtractor($converter, new TolerantPhpParser(new Parser()));
         $indexes = new EventIndexRegistry();
         $indexes->forProject($project)->replace(
             [new Event('App\\Event\\OrderPlaced', 'App\\Event\\OrderPlaced')],

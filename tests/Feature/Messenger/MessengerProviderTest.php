@@ -42,7 +42,8 @@ framework:
     routing:
       App\Message\Ping: [async]
 YAML;
-        $facts = (new MessengerExtractor(new PositionConverter()))->extract('file:///workspace/config/packages/messenger.yaml', 'yaml', $text);
+        $extractor = new MessengerExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()));
+        $facts = $extractor->extract('file:///workspace/config/packages/messenger.yaml', 'yaml', $text);
 
         self::assertSame(
             ['command.bus', 'async', 'failed', 'App\\Message\\Ping', 'async', 'command.bus', 'failed'],
@@ -52,10 +53,10 @@ YAML;
             [true, true, true, false, false, false, false],
             array_map(static fn ($symbol): bool => $symbol->isDeclaration(), $facts->symbols()),
         );
-        $phpFacts = (new MessengerExtractor(new PositionConverter()))->extract('file:///workspace/src/Example.php', 'php', "<?php\nfoo(bus: 'not_messenger');\n\$dispatcher->dispatch(new NotAMessage());\n");
+        $phpFacts = $extractor->extract('file:///workspace/src/Example.php', 'php', "<?php\nfoo(bus: 'not_messenger');\n\$dispatcher->dispatch(new NotAMessage());\n");
         self::assertSame([], $phpFacts->symbols());
 
-        $handlerFacts = (new MessengerExtractor(new PositionConverter()))->extract(
+        $handlerFacts = $extractor->extract(
             'file:///workspace/src/Handler.php',
             'php',
             "<?php\n#[AsMessageHandler(bus: 'command.bus')]\nfinal class Handler {}\n",
@@ -87,7 +88,7 @@ YAML;
         $handlerUri = 'file:///workspace/src/MessageHandler/PingHandler.php';
         $handler = "<?php\nnamespace App\\MessageHandler;\nfinal class PingHandler { public function __invoke(string \$message): void {} }\n";
         $controllerUri = 'file:///workspace/src/Controller/PingController.php';
-        $controller = "<?php\nnamespace App\\Controller;\nuse App\\Message\\Ping;\nuse Symfony\\Component\\Messenger\\MessageBusInterface;\nfinal class PingController { public function __construct(private MessageBusInterface \$bus) {} public function send(): void { \$this->bus->dispatch(new Ping()); } }\n";
+        $controller = "<?php\nnamespace App\\Controller;\nuse App\\Message\\{Ping};\nuse Symfony\\Component\\Messenger\\{MessageBusInterface};\nfinal class PingController { public function __construct(private MessageBusInterface \$bus) {} public function send(): void { \$this->bus->dispatch(new Ping()); } }\n";
         $documents = new DocumentStore();
         $documents->open(new Document($yamlUri, 'yaml', 1, $yaml));
         $documents->open(new Document($messageUri, 'php', 1, $message));
@@ -96,7 +97,7 @@ YAML;
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new MessengerExtractor($converter);
+        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()));
         $indexes = new MessengerIndexRegistry();
         $indexes->forProject($project)->replace(
             [new MessengerBus('command.bus', true)],
