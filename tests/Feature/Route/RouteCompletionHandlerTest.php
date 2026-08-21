@@ -18,6 +18,7 @@ use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteCompletionHandlerTest extends TestCase
 {
@@ -237,6 +238,7 @@ final class RouteCompletionHandlerTest extends TestCase
         return new RouteCompletionHandler(
             new DocumentContextResolver($documents, $projects),
             $converter,
+            new LspProtocolMapper(),
             $indexes,
             $classIndexes ?? new DependencyInjectionSourceIndexRegistry(),
             new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser())),

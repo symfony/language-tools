@@ -29,6 +29,7 @@ use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteDefinitionHandlerTest extends TestCase
 {
@@ -79,6 +80,7 @@ final class RouteDefinitionHandlerTest extends TestCase
         );
         $handler = new RouteDefinitionHandler(
             new DocumentContextResolver($documents, $projects),
+            new LspProtocolMapper(),
             new RouteSymbolResolver(
                 $converter,
                 new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser())),

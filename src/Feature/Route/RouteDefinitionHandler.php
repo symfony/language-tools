@@ -4,11 +4,13 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteDefinitionHandler implements DefinitionProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documentContextResolver,
+        private readonly LspProtocolMapper $protocol,
         private readonly RouteSymbolResolver $symbolResolver,
         private readonly RouteDeclarationIndexRegistry $declarationIndexes,
     ) {
@@ -21,36 +23,19 @@ final class RouteDefinitionHandler implements DefinitionProviderInterface
      */
     public function definition(array $params): ?array
     {
-        $request = $this->documentContextResolver->resolve($params);
-        if (null === $request) {
+        $request = $this->documentContextResolver->resolvePositioned($params);
+        if (null === $request || !\in_array($request->document->languageId(), ['php', 'twig'], true)) {
             return null;
         }
 
-        [$document, $project, $position] = $request;
-        if (!\in_array($document->languageId(), ['php', 'twig'], true)) {
-            return null;
-        }
-
-        $symbol = $this->symbolResolver->resolve($project, $document->uri(), $document->text(), $position);
+        $symbol = $this->symbolResolver->resolve($request->project, $request->document->uri(), $request->document->text(), $request->position);
         if (null === $symbol) {
             return null;
         }
 
         return array_map(
-            static fn (RouteDeclaration $declaration): array => [
-                'uri' => $declaration->uri(),
-                'range' => [
-                    'start' => [
-                        'line' => $declaration->range()->start()->line(),
-                        'character' => $declaration->range()->start()->character(),
-                    ],
-                    'end' => [
-                        'line' => $declaration->range()->end()->line(),
-                        'character' => $declaration->range()->end()->character(),
-                    ],
-                ],
-            ],
-            $this->declarationIndexes->forProject($project)->find($symbol->name()),
+            fn (RouteDeclaration $declaration): array => $this->protocol->location($declaration->uri(), $declaration->range()),
+            $this->declarationIndexes->forProject($request->project)->find($symbol->name()),
         );
     }
 }

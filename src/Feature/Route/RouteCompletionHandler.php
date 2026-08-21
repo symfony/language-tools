@@ -7,12 +7,14 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteCompletionHandler implements CompletionProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documentContextResolver,
         private readonly PositionConverter $positionConverter,
+        private readonly LspProtocolMapper $protocol,
         private readonly RouteIndexRegistry $routeIndexes,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly RouteReferenceExtractor $phpReferenceExtractor,
@@ -26,21 +28,16 @@ final class RouteCompletionHandler implements CompletionProviderInterface
      */
     public function complete(array $params): ?array
     {
-        $request = $this->documentContextResolver->resolve($params);
-        if (null === $request) {
+        $request = $this->documentContextResolver->resolvePositioned($params);
+        if (null === $request || !\in_array($request->document->languageId(), ['php', 'twig'], true)) {
             return null;
         }
 
-        [$document, $project, $position] = $request;
-        if (!\in_array($document->languageId(), ['php', 'twig'], true)) {
-            return null;
-        }
-
-        $routeIndex = $this->routeIndexes->forProject($project);
-        if ('twig' === $document->languageId()) {
+        $routeIndex = $this->routeIndexes->forProject($request->project);
+        if ('twig' === $request->document->languageId()) {
             $parameterContext = TwigRouteParameterCompletionContext::fromTwig(
-                $document->text(),
-                $position,
+                $request->document->text(),
+                $request->position,
                 $this->positionConverter,
             );
             if (null !== $parameterContext) {
@@ -60,8 +57,8 @@ final class RouteCompletionHandler implements CompletionProviderInterface
             }
 
             $routeContext = TwigRouteCompletionContext::fromTwig(
-                $document->text(),
-                $position,
+                $request->document->text(),
+                $request->position,
                 $this->positionConverter,
             );
             if (null === $routeContext) {
@@ -73,11 +70,11 @@ final class RouteCompletionHandler implements CompletionProviderInterface
                 $routeContext->replacementRange(),
             );
         }
-        $classIndex = $this->classIndexes->forProject($project);
+        $classIndex = $this->classIndexes->forProject($request->project);
         $isSymfonyReceiver = fn (string $source): bool => $this->phpReferenceExtractor->isSymfonyReceiver($source, $classIndex);
         $parameterContext = RouteParameterCompletionContext::fromPhp(
-            $document->text(),
-            $position,
+            $request->document->text(),
+            $request->position,
             $this->positionConverter,
             $isSymfonyReceiver,
         );
@@ -98,8 +95,8 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         }
 
         $routeContext = RouteCompletionContext::fromPhp(
-            $document->text(),
-            $position,
+            $request->document->text(),
+            $request->position,
             $this->positionConverter,
             $isSymfonyReceiver,
         );
@@ -142,21 +139,9 @@ final class RouteCompletionHandler implements CompletionProviderInterface
     private function withTextEdits(array $items, Range $range): array
     {
         return array_map(
-            static fn (array $item): array => [
+            fn (array $item): array => [
                 ...$item,
-                'textEdit' => [
-                    'range' => [
-                        'start' => [
-                            'line' => $range->start()->line(),
-                            'character' => $range->start()->character(),
-                        ],
-                        'end' => [
-                            'line' => $range->end()->line(),
-                            'character' => $range->end()->character(),
-                        ],
-                    ],
-                    'newText' => $item['label'],
-                ],
+                'textEdit' => $this->protocol->textEdit($range, $item['label']),
             ],
             $items,
         );

@@ -6,12 +6,14 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\HoverProviderInterface;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteHoverHandler implements HoverProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documentContextResolver,
         private readonly PositionConverter $positionConverter,
+        private readonly LspProtocolMapper $protocol,
         private readonly RouteIndexRegistry $routeIndexes,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly RouteReferenceExtractor $phpReferenceExtractor,
@@ -26,21 +28,16 @@ final class RouteHoverHandler implements HoverProviderInterface
      */
     public function hover(array $params): ?array
     {
-        $request = $this->documentContextResolver->resolve($params);
-        if (null === $request) {
+        $request = $this->documentContextResolver->resolvePositioned($params);
+        if (null === $request || !\in_array($request->document->languageId(), ['php', 'twig'], true)) {
             return null;
         }
 
-        [$document, $project, $position] = $request;
-        if (!\in_array($document->languageId(), ['php', 'twig'], true)) {
-            return null;
-        }
-
-        $offset = $this->positionConverter->toByteOffset($document->text(), $position);
-        $reference = 'twig' === $document->languageId()
-            ? $this->twigReferenceExtractor->at($document->text(), $offset)
-            : $this->phpReferenceExtractor->at($document->text(), $offset, $this->classIndexes->forProject($project));
-        if (null === $reference || null === $route = $this->routeIndexes->forProject($project)->get($reference->name())) {
+        $offset = $this->positionConverter->toByteOffset($request->document->text(), $request->position);
+        $reference = 'twig' === $request->document->languageId()
+            ? $this->twigReferenceExtractor->at($request->document->text(), $offset)
+            : $this->phpReferenceExtractor->at($request->document->text(), $offset, $this->classIndexes->forProject($request->project));
+        if (null === $reference || null === $route = $this->routeIndexes->forProject($request->project)->get($reference->name())) {
             return null;
         }
 
@@ -74,6 +71,6 @@ final class RouteHoverHandler implements HoverProviderInterface
             $details[] = \sprintf('Controller: `%s`', $route->controller());
         }
 
-        return ['contents' => ['kind' => 'markdown', 'value' => implode("\n\n", $details)]];
+        return $this->protocol->markdownHover(implode("\n\n", $details));
     }
 }

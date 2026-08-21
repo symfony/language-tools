@@ -32,6 +32,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteRenameHandlerTest extends TestCase
 {
@@ -118,6 +119,7 @@ final class RouteRenameHandlerTest extends TestCase
         $positionConverter = new PositionConverter();
         $handler = new RouteRenameHandler(
             new DocumentContextResolver($documents, $projects),
+            new LspProtocolMapper(),
             new RouteSymbolResolver(
                 $positionConverter,
                 new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser())),
@@ -206,6 +208,7 @@ final class RouteRenameHandlerTest extends TestCase
         $positionConverter = new PositionConverter();
         $handler = new RouteRenameHandler(
             new DocumentContextResolver($documents, $projects),
+            new LspProtocolMapper(),
             new RouteSymbolResolver(
                 $positionConverter,
                 new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser())),

@@ -23,6 +23,7 @@ use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteHoverHandlerTest extends TestCase
 {
@@ -79,6 +80,7 @@ final class RouteHoverHandlerTest extends TestCase
         $handler = new RouteHoverHandler(
             new DocumentContextResolver($documents, $projects),
             $converter,
+            new LspProtocolMapper(),
             $indexes,
             $classIndexes,
             new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser())),

@@ -3,13 +3,14 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteReferencesHandler implements ReferencesProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documentContextResolver,
+        private readonly LspProtocolMapper $protocol,
         private readonly RouteSymbolResolver $symbolResolver,
         private readonly RouteReferenceIndexRegistry $referenceIndexes,
         private readonly RouteDeclarationIndexRegistry $declarationIndexes,
@@ -23,55 +24,27 @@ final class RouteReferencesHandler implements ReferencesProviderInterface
      */
     public function references(array $params): ?array
     {
-        $request = $this->documentContextResolver->resolve($params);
-        if (null === $request) {
+        $request = $this->documentContextResolver->resolvePositioned($params);
+        if (null === $request || !\in_array($request->document->languageId(), ['php', 'twig', 'yaml'], true)) {
             return null;
         }
 
-        [$document, $project, $position] = $request;
-        if (!\in_array($document->languageId(), ['php', 'twig', 'yaml'], true)) {
-            return null;
-        }
-
-        $symbol = $this->symbolResolver->resolve($project, $document->uri(), $document->text(), $position);
+        $symbol = $this->symbolResolver->resolve($request->project, $request->document->uri(), $request->document->text(), $request->position);
         if (null === $symbol) {
             return null;
         }
 
         $locations = array_map(
-            static fn (RouteReferenceLocation $reference): array => self::location(
-                $reference->uri(),
-                $reference->range(),
-            ),
-            $this->referenceIndexes->forProject($project)->find($symbol->name()),
+            fn (RouteReferenceLocation $reference): array => $this->protocol->location($reference->uri(), $reference->range()),
+            $this->referenceIndexes->forProject($request->project)->find($symbol->name()),
         );
         $context = $params['context'] ?? null;
         if (\is_array($context) && true === ($context['includeDeclaration'] ?? null)) {
-            foreach ($this->declarationIndexes->forProject($project)->find($symbol->name()) as $declaration) {
-                $locations[] = self::location($declaration->uri(), $declaration->range());
+            foreach ($this->declarationIndexes->forProject($request->project)->find($symbol->name()) as $declaration) {
+                $locations[] = $this->protocol->location($declaration->uri(), $declaration->range());
             }
         }
 
         return $locations;
-    }
-
-    /**
-     * @return array{uri: string, range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}}
-     */
-    private static function location(string $uri, Range $range): array
-    {
-        return [
-            'uri' => $uri,
-            'range' => [
-                'start' => [
-                    'line' => $range->start()->line(),
-                    'character' => $range->start()->character(),
-                ],
-                'end' => [
-                    'line' => $range->end()->line(),
-                    'character' => $range->end()->character(),
-                ],
-            ],
-        ];
     }
 }

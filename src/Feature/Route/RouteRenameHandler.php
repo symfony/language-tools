@@ -5,12 +5,15 @@ namespace Symfony\Lsp\Feature\Route;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\RenameProviderInterface;
+use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteRenameHandler implements RenameProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documentContextResolver,
+        private readonly LspProtocolMapper $protocol,
         private readonly RouteSymbolResolver $symbolResolver,
         private readonly RouteReferenceIndexRegistry $referenceIndexes,
         private readonly RouteDeclarationIndexRegistry $declarationIndexes,
@@ -34,7 +37,7 @@ final class RouteRenameHandler implements RenameProviderInterface
         [, $symbol] = $resolved;
 
         return [
-            'range' => self::range($symbol->range()),
+            'range' => $this->protocol->range($symbol->range()),
             'placeholder' => $symbol->name(),
         ];
     }
@@ -73,12 +76,12 @@ final class RouteRenameHandler implements RenameProviderInterface
         $editsByUri = [];
         foreach ($this->referenceIndexes->forProject($project)->find($symbol->name()) as $reference) {
             if ($this->pathResolver->isApplicationOwned($project, $reference->uri())) {
-                $editsByUri[$reference->uri()][] = self::edit($reference->range(), $newName);
+                $editsByUri[$reference->uri()][] = $this->edit($reference->range(), $newName);
             }
         }
         foreach ($declarations as $declaration) {
             if ($this->pathResolver->isApplicationOwned($project, $declaration->uri())) {
-                $editsByUri[$declaration->uri()][] = self::edit($declaration->range(), $newName);
+                $editsByUri[$declaration->uri()][] = $this->edit($declaration->range(), $newName);
             }
         }
         ksort($editsByUri);
@@ -106,53 +109,32 @@ final class RouteRenameHandler implements RenameProviderInterface
     /**
      * @param array<array-key, mixed> $params
      *
-     * @return array{\Symfony\Lsp\Project\Project, RouteSymbol}|null
+     * @return array{Project, RouteSymbol}|null
      */
     private function resolve(array $params): ?array
     {
-        $request = $this->documentContextResolver->resolve($params);
-        if (null === $request) {
-            return null;
-        }
-
-        [$document, $project, $position] = $request;
-        if (!$this->pathResolver->isApplicationOwned($project, $document->uri())
-            || !\in_array($document->languageId(), ['php', 'twig', 'yaml'], true)
+        $request = $this->documentContextResolver->resolvePositioned($params);
+        if (null === $request
+            || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri())
+            || !\in_array($request->document->languageId(), ['php', 'twig', 'yaml'], true)
         ) {
             return null;
         }
 
-        $symbol = $this->symbolResolver->resolve($project, $document->uri(), $document->text(), $position);
+        $symbol = $this->symbolResolver->resolve($request->project, $request->document->uri(), $request->document->text(), $request->position);
 
-        return null === $symbol ? null : [$project, $symbol];
+        return null === $symbol ? null : [$request->project, $symbol];
     }
 
     /**
      * @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, newText: string, annotationId: string}
      */
-    private static function edit(Range $range, string $newName): array
+    private function edit(Range $range, string $newName): array
     {
         return [
-            'range' => self::range($range),
+            'range' => $this->protocol->range($range),
             'newText' => $newName,
             'annotationId' => 'routeRename',
-        ];
-    }
-
-    /**
-     * @return array{start: array{line: int, character: int}, end: array{line: int, character: int}}
-     */
-    private static function range(Range $range): array
-    {
-        return [
-            'start' => [
-                'line' => $range->start()->line(),
-                'character' => $range->start()->character(),
-            ],
-            'end' => [
-                'line' => $range->end()->line(),
-                'character' => $range->end()->character(),
-            ],
         ];
     }
 }
