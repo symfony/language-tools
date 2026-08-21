@@ -11,13 +11,13 @@ interface SourceIndexProviderInterface
 
     public function begin(Project $project): void;
 
-    public function index(Project $project, SourceDocument $document): mixed;
+    public function index(Project $project, SourceDocument $document): ?SourceFactsInterface;
 
     public function restore(Project $project, mixed $data): void;
 
     public function finish(Project $project): void;
 
-    public function replace(Project $project, SourceDocument $document): mixed;
+    public function replace(Project $project, SourceDocument $document): ?SourceFactsInterface;
 
     /** @return list<mixed> */
     public function runtimeDeclarations(mixed $data): array;

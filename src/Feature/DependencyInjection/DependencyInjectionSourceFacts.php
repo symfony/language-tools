@@ -2,7 +2,9 @@
 
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
-final class DependencyInjectionSourceFacts
+use Symfony\Lsp\Index\SourceFactsInterface;
+
+final class DependencyInjectionSourceFacts implements SourceFactsInterface
 {
     /**
      * @param list<ServiceDeclaration>           $services
@@ -46,5 +48,10 @@ final class DependencyInjectionSourceFacts
     public function classes(): array
     {
         return $this->classes;
+    }
+
+    public function isEmpty(): bool
+    {
+        return [] === $this->services && [] === $this->parameters && [] === $this->references && [] === $this->classes;
     }
 }

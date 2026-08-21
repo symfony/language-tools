@@ -2,7 +2,9 @@
 
 namespace Symfony\Lsp\Feature\Messenger;
 
-final class MessengerSourceFacts
+use Symfony\Lsp\Index\SourceFactsInterface;
+
+final class MessengerSourceFacts implements SourceFactsInterface
 {
     /**
      * @param list<MessengerSourceSymbol> $symbols
@@ -38,5 +40,10 @@ final class MessengerSourceFacts
     public function handlers(): array
     {
         return $this->handlers;
+    }
+
+    public function isEmpty(): bool
+    {
+        return [] === $this->symbols && [] === $this->parents && [] === $this->handlers;
     }
 }

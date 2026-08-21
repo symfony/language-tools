@@ -2,7 +2,9 @@
 
 namespace Symfony\Lsp\Feature\Metadata;
 
-final class MetadataSourceFacts
+use Symfony\Lsp\Index\SourceFactsInterface;
+
+final class MetadataSourceFacts implements SourceFactsInterface
 {
     /** @param list<MetadataSourceSymbol> $symbols */
     public function __construct(private readonly string $uri, private readonly array $symbols)
@@ -18,5 +20,10 @@ final class MetadataSourceFacts
     public function symbols(): array
     {
         return $this->symbols;
+    }
+
+    public function isEmpty(): bool
+    {
+        return [] === $this->symbols;
     }
 }

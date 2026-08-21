@@ -2,7 +2,9 @@
 
 namespace Symfony\Lsp\Feature\Translation;
 
-final class TranslationSourceFacts
+use Symfony\Lsp\Index\SourceFactsInterface;
+
+final class TranslationSourceFacts implements SourceFactsInterface
 {
     /**
      * @param list<TranslationDeclaration> $declarations
@@ -30,5 +32,10 @@ final class TranslationSourceFacts
     public function references(): array
     {
         return $this->references;
+    }
+
+    public function isEmpty(): bool
+    {
+        return [] === $this->declarations && [] === $this->references;
     }
 }

@@ -2,7 +2,9 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
-final class TemplateSourceFacts
+use Symfony\Lsp\Index\SourceFactsInterface;
+
+final class TemplateSourceFacts implements SourceFactsInterface
 {
     /** @param list<TemplateReference> $references */
     public function __construct(
@@ -26,5 +28,10 @@ final class TemplateSourceFacts
     public function references(): array
     {
         return $this->references;
+    }
+
+    public function isEmpty(): bool
+    {
+        return null === $this->declaration && [] === $this->references;
     }
 }

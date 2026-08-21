@@ -2,7 +2,9 @@
 
 namespace Symfony\Lsp\Feature\Event;
 
-final class EventSourceFacts
+use Symfony\Lsp\Index\SourceFactsInterface;
+
+final class EventSourceFacts implements SourceFactsInterface
 {
     /**
      * @param list<EventSourceSymbol>          $symbols
@@ -38,5 +40,10 @@ final class EventSourceFacts
     public function listeners(): array
     {
         return $this->listeners;
+    }
+
+    public function isEmpty(): bool
+    {
+        return [] === $this->symbols && [] === $this->invalidListenerMethods && [] === $this->listeners;
     }
 }

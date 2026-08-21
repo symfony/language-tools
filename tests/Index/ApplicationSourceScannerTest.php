@@ -578,44 +578,40 @@ final class RecordingSourceIndexProvider implements SourceIndexProviderInterface
         $this->sources = [];
     }
 
-    public function index(Project $project, SourceDocument $document): string
+    public function index(Project $project, SourceDocument $document): RouteSourceFacts
     {
         ++$this->extractions;
-        $hash = hash('sha256', $document->text());
-        $this->sources[$document->uri()] = $hash;
 
-        return $hash;
+        return $this->record($document);
     }
 
     public function restore(Project $project, mixed $data): void
     {
-        if (!\is_string($data)) {
+        if (!$data instanceof RouteSourceFacts || 1 !== \count($data->declarations())) {
             throw new \UnexpectedValueException();
         }
         ++$this->restores;
-        $this->sources[$project->rootUri().'/src/Controller.php'] = $data;
+        $this->sources[$data->uri()] = $data->declarations()[0]->name();
     }
 
     public function finish(Project $project): void
     {
     }
 
-    public function replace(Project $project, SourceDocument $document): string
+    public function replace(Project $project, SourceDocument $document): RouteSourceFacts
     {
         $this->replacements[] = $document->uri();
-        $hash = hash('sha256', $document->text());
-        $this->sources[$document->uri()] = $hash;
 
-        return $hash;
+        return $this->record($document);
     }
 
     public function runtimeDeclarations(mixed $data): array
     {
-        if (!\is_string($data)) {
+        if (!$data instanceof RouteSourceFacts) {
             throw new \UnexpectedValueException();
         }
 
-        return [$data];
+        return $data->declarations();
     }
 
     public function remove(Project $project, string $uri): void
@@ -631,5 +627,14 @@ final class RecordingSourceIndexProvider implements SourceIndexProviderInterface
 
     public function removeOverlay(Project $project, string $uri): void
     {
+    }
+
+    private function record(SourceDocument $document): RouteSourceFacts
+    {
+        $hash = hash('sha256', $document->text());
+        $this->sources[$document->uri()] = $hash;
+        $range = new Range(new Position(0, 0), new Position(0, 0));
+
+        return new RouteSourceFacts($document->uri(), [new RouteDeclaration($hash, $document->uri(), $range)], []);
     }
 }

@@ -2,7 +2,9 @@
 
 namespace Symfony\Lsp\Feature\Environment;
 
-final class EnvironmentSourceFacts
+use Symfony\Lsp\Index\SourceFactsInterface;
+
+final class EnvironmentSourceFacts implements SourceFactsInterface
 {
     /**
      * @param list<EnvironmentDeclaration> $declarations
@@ -30,5 +32,10 @@ final class EnvironmentSourceFacts
     public function references(): array
     {
         return $this->references;
+    }
+
+    public function isEmpty(): bool
+    {
+        return [] === $this->declarations && [] === $this->references;
     }
 }

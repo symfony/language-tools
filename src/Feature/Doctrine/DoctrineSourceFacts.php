@@ -2,7 +2,9 @@
 
 namespace Symfony\Lsp\Feature\Doctrine;
 
-final class DoctrineSourceFacts
+use Symfony\Lsp\Index\SourceFactsInterface;
+
+final class DoctrineSourceFacts implements SourceFactsInterface
 {
     /**
      * @param list<DoctrineEntity>       $entities
@@ -38,5 +40,10 @@ final class DoctrineSourceFacts
     public function symbols(): array
     {
         return $this->symbols;
+    }
+
+    public function isEmpty(): bool
+    {
+        return [] === $this->entities && [] === $this->repositories && [] === $this->symbols;
     }
 }

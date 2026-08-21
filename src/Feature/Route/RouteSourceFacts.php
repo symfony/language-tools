@@ -2,7 +2,9 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
-final class RouteSourceFacts
+use Symfony\Lsp\Index\SourceFactsInterface;
+
+final class RouteSourceFacts implements SourceFactsInterface
 {
     /**
      * @param list<RouteDeclaration>       $declarations
@@ -30,5 +32,10 @@ final class RouteSourceFacts
     public function references(): array
     {
         return $this->references;
+    }
+
+    public function isEmpty(): bool
+    {
+        return [] === $this->declarations && [] === $this->references;
     }
 }

@@ -2,7 +2,9 @@
 
 namespace Symfony\Lsp\Feature\Stimulus;
 
-final class StimulusSourceFacts
+use Symfony\Lsp\Index\SourceFactsInterface;
+
+final class StimulusSourceFacts implements SourceFactsInterface
 {
     /**
      * @param list<StimulusControllerDeclaration> $declarations
@@ -30,5 +32,10 @@ final class StimulusSourceFacts
     public function references(): array
     {
         return $this->references;
+    }
+
+    public function isEmpty(): bool
+    {
+        return [] === $this->declarations && [] === $this->references;
     }
 }

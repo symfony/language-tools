@@ -2,7 +2,9 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
-final class TwigComponentSourceFacts
+use Symfony\Lsp\Index\SourceFactsInterface;
+
+final class TwigComponentSourceFacts implements SourceFactsInterface
 {
     /**
      * @param list<TwigComponent>                $components
@@ -46,5 +48,10 @@ final class TwigComponentSourceFacts
     public function events(): array
     {
         return $this->events;
+    }
+
+    public function isEmpty(): bool
+    {
+        return [] === $this->components && [] === $this->references && [] === $this->actionReferences && [] === $this->events;
     }
 }

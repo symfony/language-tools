@@ -2,7 +2,9 @@
 
 namespace Symfony\Lsp\Feature\Asset;
 
-final class AssetSourceFacts
+use Symfony\Lsp\Index\SourceFactsInterface;
+
+final class AssetSourceFacts implements SourceFactsInterface
 {
     /** @param list<AssetSourceSymbol> $symbols */
     public function __construct(private readonly string $uri, private readonly array $symbols)
@@ -18,5 +20,10 @@ final class AssetSourceFacts
     public function symbols(): array
     {
         return $this->symbols;
+    }
+
+    public function isEmpty(): bool
+    {
+        return [] === $this->symbols;
     }
 }
