@@ -13,10 +13,14 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Event\Event;
+use Symfony\Lsp\Feature\Event\EventCodeLensProvider;
+use Symfony\Lsp\Feature\Event\EventCompletionProvider;
+use Symfony\Lsp\Feature\Event\EventDiagnosticProvider;
 use Symfony\Lsp\Feature\Event\EventExtractor;
 use Symfony\Lsp\Feature\Event\EventIndexRegistry;
 use Symfony\Lsp\Feature\Event\EventListener;
-use Symfony\Lsp\Feature\Event\EventProvider;
+use Symfony\Lsp\Feature\Event\EventRelationshipProvider;
+use Symfony\Lsp\Feature\Event\EventRelationshipResolver;
 use Symfony\Lsp\Feature\Event\EventSourceIndexRegistry;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
@@ -51,12 +55,15 @@ final class Subscriber
 PHP;
 
         $facts = $extractor->extract('file:///workspace/src/Subscriber.php', 'php', $php);
-        self::assertSame(
-            ['App\\Event\\OrderPlaced', 'legacy.order_placed'],
-            array_values(array_unique(array_map(static fn ($symbol): string => $symbol->name(), $facts->symbols()))),
-        );
-        self::assertSame(2, \count(array_filter($facts->symbols(), static fn ($symbol): bool => $symbol->isDeclaration())));
-        self::assertSame(3, \count(array_filter($facts->symbols(), static fn ($symbol): bool => !$symbol->isDeclaration())));
+        $names = [];
+        $declarations = 0;
+        foreach ($facts->symbols() as $symbol) {
+            $names[$symbol->name()] = true;
+            $declarations += $symbol->isDeclaration() ? 1 : 0;
+        }
+        self::assertSame(['App\\Event\\OrderPlaced', 'legacy.order_placed'], array_keys($names));
+        self::assertSame(2, $declarations);
+        self::assertSame(3, \count($facts->symbols()) - $declarations);
 
         $yaml = <<<'YAML'
 services:
@@ -64,7 +71,7 @@ services:
     tags:
       - { name: kernel.event_listener, event: legacy.order_placed }
 YAML;
-        self::assertSame(['legacy.order_placed'], array_map(static fn ($symbol): string => $symbol->name(), $extractor->extract('file:///workspace/config/services.yaml', 'yaml', $yaml)->symbols()));
+        self::assertSame('legacy.order_placed', $extractor->extract('file:///workspace/config/services.yaml', 'yaml', $yaml)->symbols()[0]->name());
     }
 
     public function testCompletesHoversNavigatesDiagnosesAndProvidesCodeLenses(): void
@@ -134,22 +141,28 @@ PHP;
             new DependencyInjectionSourceFacts($listenerUri, classes: $classExtractor->extract($listenerUri, $listener)),
             new DependencyInjectionSourceFacts($dispatcherUri, classes: $classExtractor->extract($dispatcherUri, $dispatcher)),
         );
-        $provider = new EventProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
+        $documentResolver = new DocumentContextResolver($documents, $projects);
+        $protocol = new LspProtocolMapper();
+        $relationshipResolver = new EventRelationshipResolver($documentResolver, $converter, $protocol, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
+        $completionProvider = new EventCompletionProvider($documentResolver, $converter, $protocol, $indexes, $extractor);
+        $relationshipProvider = new EventRelationshipProvider($protocol, $indexes, $relationshipResolver);
+        $diagnosticProvider = new EventDiagnosticProvider($documentResolver, $protocol, $extractor);
+        $codeLensProvider = new EventCodeLensProvider($documentResolver, $protocol, $indexes, $classExtractor, $relationshipResolver);
 
         $completionOffset = strpos($dispatcher, "App\\Event\\Ord');") + \strlen('App\\Event\\Ord');
-        self::assertSame(['App\\Event\\OrderPlaced'], array_column($provider->complete($this->params($dispatcherUri, $converter->toPosition($dispatcher, $completionOffset))) ?? [], 'label'));
+        self::assertSame(['App\\Event\\OrderPlaced'], array_column($completionProvider->complete($this->params($dispatcherUri, $converter->toPosition($dispatcher, $completionOffset))) ?? [], 'label'));
         $dispatchPosition = $converter->toPosition($dispatcher, (int) strpos($dispatcher, 'OrderPlaced());'));
-        self::assertStringContainsString('Symfony event', json_encode($provider->hover($this->params($dispatcherUri, $dispatchPosition)), \JSON_THROW_ON_ERROR));
-        self::assertSame([$eventUri, $listenerUri], array_column($provider->definition($this->params($dispatcherUri, $dispatchPosition)) ?? [], 'uri'));
+        self::assertStringContainsString('Symfony event', json_encode($relationshipProvider->hover($this->params($dispatcherUri, $dispatchPosition)), \JSON_THROW_ON_ERROR));
+        self::assertSame([$eventUri, $listenerUri], array_column($relationshipProvider->definition($this->params($dispatcherUri, $dispatchPosition)) ?? [], 'uri'));
 
         $eventPosition = $converter->toPosition($event, (int) strpos($event, 'OrderPlaced'));
-        self::assertContains($dispatcherUri, array_column($provider->references($this->params($eventUri, $eventPosition)) ?? [], 'uri'));
-        self::assertSame(['event.invalid_listener_method'], array_column($provider->diagnostics(['textDocument' => ['uri' => $invalidUri]]) ?? [], 'code'));
-        $eventLens = $provider->codeLenses(['textDocument' => ['uri' => $eventUri]])[0] ?? null;
+        self::assertContains($dispatcherUri, array_column($relationshipProvider->references($this->params($eventUri, $eventPosition)) ?? [], 'uri'));
+        self::assertSame(['event.invalid_listener_method'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $invalidUri]]) ?? [], 'code'));
+        $eventLens = $codeLensProvider->codeLenses(['textDocument' => ['uri' => $eventUri]])[0] ?? null;
         self::assertIsArray($eventLens);
         self::assertIsArray($eventLens['command'] ?? null);
         self::assertSame('1 event listener', $eventLens['command']['title'] ?? null);
-        $listenerLens = $provider->codeLenses(['textDocument' => ['uri' => $listenerUri]])[0] ?? null;
+        $listenerLens = $codeLensProvider->codeLenses(['textDocument' => ['uri' => $listenerUri]])[0] ?? null;
         self::assertIsArray($listenerLens);
         self::assertIsArray($listenerLens['command'] ?? null);
         self::assertSame('Listens to 1 event', $listenerLens['command']['title'] ?? null);

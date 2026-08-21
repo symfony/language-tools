@@ -20,7 +20,7 @@ use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipCodeLensProvider;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\DocumentLinkProviderRegistry;
-use Symfony\Lsp\Feature\Event\EventProvider;
+use Symfony\Lsp\Feature\Event\EventCodeLensProvider;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderRegistry;
 use Symfony\Lsp\Feature\Messenger\MessengerCodeLensProvider;
@@ -201,7 +201,7 @@ return static function (ContainerConfigurator $container): void {
     $services->get(RuntimeSnapshotLoaderRegistry::class)
         ->arg('$loaders', tagged_iterator('lsp.runtime_snapshot_loader'));
 
-    foreach ([MessengerCodeLensProvider::class, EventProvider::class, TwigComponentCodeLensProvider::class, StimulusProvider::class, DoctrineRelationshipCodeLensProvider::class] as $priority => $provider) {
+    foreach ([MessengerCodeLensProvider::class, EventCodeLensProvider::class, TwigComponentCodeLensProvider::class, StimulusProvider::class, DoctrineRelationshipCodeLensProvider::class] as $priority => $provider) {
         $services->get($provider)->tag('lsp.provider.code_lens', ['priority' => -$priority]);
     }
     $services->get(CodeLensProviderRegistry::class)
