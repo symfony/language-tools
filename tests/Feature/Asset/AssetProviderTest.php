@@ -17,6 +17,7 @@ use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class AssetProviderTest extends TestCase
 {
@@ -68,10 +69,9 @@ final class AssetProviderTest extends TestCase
         $documents->open(new Document($usageUri, 'twig', 1, $usageText));
         $provider = new AssetProvider(
             new DocumentContextResolver($documents, $projects),
-            $documents,
-            $projects,
             $converter,
             new UriToPathConverter(),
+            new LspProtocolMapper(),
             $indexes,
             $sourceIndexes,
             $extractor,

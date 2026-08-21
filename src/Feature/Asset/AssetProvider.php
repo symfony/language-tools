@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
@@ -14,17 +13,16 @@ use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class AssetProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, DocumentLinkProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
-        private readonly DocumentStore $documents,
-        private readonly ProjectRegistry $projects,
         private readonly PositionConverter $converter,
         private readonly UriToPathConverter $uriConverter,
+        private readonly LspProtocolMapper $protocol,
         private readonly AssetIndexRegistry $indexes,
         private readonly AssetSourceIndexRegistry $sourceIndexes,
         private readonly AssetExtractor $extractor,
@@ -33,11 +31,13 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
 
     public function complete(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
+        $request = $this->resolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
-        [$document, $project, $position] = $request;
+        $document = $request->document;
+        $project = $request->project;
+        $position = $request->position;
         $offset = $this->converter->toByteOffset($document->text(), $position);
         $context = $this->extractor->completionContext($document->languageId(), $document->text(), $offset);
         if (null === $context) {
@@ -55,7 +55,7 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
                 'label' => $name,
                 'kind' => AssetSymbolKind::Asset === $context->kind() ? 17 : 12,
                 'detail' => AssetSymbolKind::Asset === $context->kind() ? 'AssetMapper asset' : 'Importmap entrypoint',
-                'textEdit' => ['range' => $this->range($context->range()), 'newText' => $name],
+                'textEdit' => ['range' => $this->protocol->range($context->range()), 'newText' => $name],
             ];
         }
 
@@ -106,14 +106,14 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         if (AssetSymbolKind::Asset === $symbol->kind()) {
             $asset = $this->indexes->forProject($project)->asset($symbol->name());
 
-            return null === $asset ? [] : [['uri' => $this->uriConverter->toUri($asset->sourcePath()), 'range' => $this->zeroRange()]];
+            return null === $asset ? [] : [['uri' => $this->uriConverter->toUri($asset->sourcePath()), 'range' => $this->protocol->zeroRange()]];
         }
         $declarations = array_values(array_filter(
             $this->sourceIndexes->forProject($project)->symbols(AssetSymbolKind::Entrypoint, $symbol->name()),
             static fn (AssetSourceSymbol $candidate): bool => $candidate->isDeclaration(),
         ));
 
-        return array_map(fn (AssetSourceSymbol $candidate): array => ['uri' => $candidate->uri(), 'range' => $this->range($candidate->range())], $declarations);
+        return array_map(fn (AssetSourceSymbol $candidate): array => $this->protocol->location($candidate->uri(), $candidate->range()), $declarations);
     }
 
     public function references(array $params): ?array
@@ -124,25 +124,22 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         }
         [$symbol, $project] = $resolved;
 
-        return array_map(fn (AssetSourceSymbol $candidate): array => ['uri' => $candidate->uri(), 'range' => $this->range($candidate->range())], $this->sourceIndexes->forProject($project)->symbols($symbol->kind(), $symbol->name()));
+        return array_map(fn (AssetSourceSymbol $candidate): array => $this->protocol->location($candidate->uri(), $candidate->range()), $this->sourceIndexes->forProject($project)->symbols($symbol->kind(), $symbol->name()));
     }
 
     public function links(array $params): ?array
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
+        $context = $this->resolver->resolveDocument($params);
+        if (null === $context || 'twig' !== $context->document->languageId()) {
             return null;
         }
-        $document = $this->documents->get($textDocument['uri']);
-        $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $document || null === $project || 'twig' !== $document->languageId()) {
-            return null;
-        }
+        $document = $context->document;
+        $project = $context->project;
         $links = [];
         foreach ($this->extractor->extract($document->uri(), $document->languageId(), $document->text())->symbols() as $symbol) {
             $target = $this->target($project, $symbol);
             if (null !== $target) {
-                $links[] = ['range' => $this->range($symbol->range()), 'target' => $target];
+                $links[] = ['range' => $this->protocol->range($symbol->range()), 'target' => $target];
             }
         }
 
@@ -151,15 +148,12 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
 
     public function diagnostics(array $params): ?array
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
+        $context = $this->resolver->resolveDocument($params);
+        if (null === $context || 'twig' !== $context->document->languageId()) {
             return null;
         }
-        $document = $this->documents->get($textDocument['uri']);
-        $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $document || null === $project || 'twig' !== $document->languageId()) {
-            return null;
-        }
+        $document = $context->document;
+        $project = $context->project;
         $index = $this->indexes->forProject($project);
         if (!$index->importMapComplete()) {
             return [];
@@ -170,13 +164,12 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
             if (AssetSymbolKind::Entrypoint !== $symbol->kind() || isset($known[$symbol->name()])) {
                 continue;
             }
-            $diagnostics[] = [
-                'range' => $this->range($symbol->range()),
-                'severity' => 1,
-                'source' => 'symfony',
-                'code' => 'importmap.unknown_entrypoint',
-                'message' => \sprintf('Unknown importmap entrypoint "%s".', $symbol->name()),
-            ];
+            $diagnostics[] = $this->protocol->diagnostic(
+                $symbol->range(),
+                1,
+                'importmap.unknown_entrypoint',
+                \sprintf('Unknown importmap entrypoint "%s".', $symbol->name()),
+            );
         }
 
         return $diagnostics;
@@ -204,11 +197,13 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
      */
     private function resolve(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
+        $request = $this->resolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
-        [$document, $project, $position] = $request;
+        $document = $request->document;
+        $project = $request->project;
+        $position = $request->position;
         $offset = $this->converter->toByteOffset($document->text(), $position);
         foreach ($this->extractor->extract($document->uri(), $document->languageId(), $document->text())->symbols() as $symbol) {
             if ($this->contains($document, $symbol->range(), $offset)) {
@@ -239,17 +234,5 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
     {
         return $offset >= $this->converter->toByteOffset($document->text(), $range->start())
             && $offset <= $this->converter->toByteOffset($document->text(), $range->end());
-    }
-
-    /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */
-    private function range(Range $range): array
-    {
-        return ['start' => ['line' => $range->start()->line(), 'character' => $range->start()->character()], 'end' => ['line' => $range->end()->line(), 'character' => $range->end()->character()]];
-    }
-
-    /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */
-    private function zeroRange(): array
-    {
-        return ['start' => ['line' => 0, 'character' => 0], 'end' => ['line' => 0, 'character' => 0]];
     }
 }
