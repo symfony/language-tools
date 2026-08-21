@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
+use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDiagnosticProvider;
@@ -16,6 +17,7 @@ use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class DependencyInjectionDiagnosticProviderTest extends TestCase
 {
@@ -44,8 +46,8 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($yamlExtractor->extract($uri, $text));
         $provider = new DependencyInjectionDiagnosticProvider(
-            $documents,
-            $projects,
+            new DocumentContextResolver($documents, $projects),
+            new LspProtocolMapper(),
             $serviceIndexes,
             $parameterIndexes,
             $sourceIndexes,

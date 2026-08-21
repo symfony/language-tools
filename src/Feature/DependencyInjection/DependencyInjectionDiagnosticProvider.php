@@ -2,15 +2,15 @@
 
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
-use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
-use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderInterface
 {
     public function __construct(
-        private readonly DocumentStore $documents,
-        private readonly ProjectRegistry $projects,
+        private readonly DocumentContextResolver $documentContextResolver,
+        private readonly LspProtocolMapper $protocol,
         private readonly ServiceIndexRegistry $serviceIndexes,
         private readonly ParameterIndexRegistry $parameterIndexes,
         private readonly DependencyInjectionSourceIndexRegistry $sourceIndexes,
@@ -21,23 +21,17 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
 
     public function diagnostics(array $params): ?array
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
+        $request = $this->documentContextResolver->resolveDocument($params);
+        if (null === $request || !\in_array($request->document->languageId(), ['php', 'yaml'], true)) {
             return null;
         }
 
-        $document = $this->documents->get($textDocument['uri']);
-        $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $document || null === $project || !\in_array($document->languageId(), ['php', 'yaml'], true)) {
-            return null;
-        }
-
-        $references = 'yaml' === $document->languageId()
-            ? $this->yamlExtractor->extract($document->uri(), $document->text())->references()
-            : $this->autowireExtractor->extract($document->uri(), $document->text());
-        $sourceIndex = $this->sourceIndexes->forProject($project);
-        $serviceIndex = $this->serviceIndexes->forProject($project);
-        $parameterIndex = $this->parameterIndexes->forProject($project);
+        $references = 'yaml' === $request->document->languageId()
+            ? $this->yamlExtractor->extract($request->document->uri(), $request->document->text())->references()
+            : $this->autowireExtractor->extract($request->document->uri(), $request->document->text());
+        $sourceIndex = $this->sourceIndexes->forProject($request->project);
+        $serviceIndex = $this->serviceIndexes->forProject($request->project);
+        $parameterIndex = $this->parameterIndexes->forProject($request->project);
         if (!$serviceIndex->isComplete() && !$parameterIndex->isComplete()) {
             return null;
         }
@@ -67,22 +61,7 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
                 $message = \sprintf('Parameter "%s" does not exist in the selected environment.', $reference->name());
             }
 
-            $diagnostics[] = [
-                'range' => [
-                    'start' => [
-                        'line' => $reference->range()->start()->line(),
-                        'character' => $reference->range()->start()->character(),
-                    ],
-                    'end' => [
-                        'line' => $reference->range()->end()->line(),
-                        'character' => $reference->range()->end()->character(),
-                    ],
-                ],
-                'severity' => 1,
-                'source' => 'symfony',
-                'code' => $code,
-                'message' => $message,
-            ];
+            $diagnostics[] = $this->protocol->diagnostic($reference->range(), 1, $code, $message);
         }
 
         return $diagnostics;
