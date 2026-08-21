@@ -23,11 +23,11 @@ function bridgeMessengerSection(SymfonyLspBridgeContext $context): ?array
                 $warnings[] = 'The messenger configuration is unavailable.';
             }
             [$handlers, $locatorMessages, $locatorWarnings] = bridgeMessengerLocatorHandlers($application, $commandOptions, $definitions, array_keys($buses));
-            $messages = array_replace($messages, $locatorMessages);
+            $messages = bridgeMessengerMergeMessages($messages, $locatorMessages);
             array_push($warnings, ...$locatorWarnings);
             if ([] === $handlers) {
                 [$handlers, $taggedMessages] = bridgeMessengerTaggedHandlers($definitions, array_keys($buses));
-                $messages = array_replace($messages, $taggedMessages);
+                $messages = bridgeMessengerMergeMessages($messages, $taggedMessages);
             }
             try {
                 $messages = bridgeMessengerSenderRouting($application, $commandOptions, $messages);
@@ -259,6 +259,15 @@ function bridgeMessengerHandler(string $message, string $bus, string $service, s
         'priority' => $priority,
         'fromTransport' => $fromTransport,
     ];
+}
+
+function bridgeMessengerMergeMessages(array $messages, array $additional): array
+{
+    foreach ($additional as $class => $message) {
+        $messages[$class] ??= $message;
+    }
+
+    return $messages;
 }
 
 function bridgeMessengerStringList(mixed $values): array
