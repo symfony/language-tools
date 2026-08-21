@@ -4,18 +4,16 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\Document;
+use Symfony\Lsp\Index\AbstractSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 
-final class ProjectRouteSourceIndexer implements SourceIndexProviderInterface
+/** @extends AbstractSourceIndexer<RouteSourceFacts> */
+final class ProjectRouteSourceIndexer extends AbstractSourceIndexer
 {
-    /** @var array<string, list<RouteDeclaration>> */
-    private array $declarations = [];
-
-    /** @var array<string, list<RouteReferenceLocation>> */
-    private array $references = [];
+    /** @var array<string, RouteSourceIndexAdapter> */
+    private array $indexes = [];
 
     public function __construct(
         private readonly RouteDeclarationIndexRegistry $declarationIndexes,
@@ -38,43 +36,6 @@ final class ProjectRouteSourceIndexer implements SourceIndexProviderInterface
         return [RouteDeclaration::class, RouteReferenceLocation::class, RouteSourceFacts::class];
     }
 
-    public function begin(Project $project): void
-    {
-        $this->declarations[$project->rootPath()] = [];
-        $this->references[$project->rootPath()] = [];
-    }
-
-    public function index(Project $project, SourceDocument $document): RouteSourceFacts
-    {
-        return $this->add($project, $this->extract($project, $document));
-    }
-
-    public function restore(Project $project, mixed $data): void
-    {
-        if (!$data instanceof RouteSourceFacts) {
-            throw new \UnexpectedValueException('The cached route source facts are invalid.');
-        }
-
-        $this->add($project, $data);
-    }
-
-    public function finish(Project $project): void
-    {
-        $key = $project->rootPath();
-        $this->declarationIndexes->forProject($project)->replace(...$this->declarations[$key]);
-        $this->referenceIndexes->forProject($project)->replace(...$this->references[$key]);
-        unset($this->declarations[$key], $this->references[$key]);
-    }
-
-    public function replace(Project $project, SourceDocument $document): RouteSourceFacts
-    {
-        $facts = $this->extract($project, $document);
-        $this->declarationIndexes->forProject($project)->replaceSource($document->uri(), ...$facts->declarations());
-        $this->referenceIndexes->forProject($project)->replaceSource($document->uri(), ...$facts->references());
-
-        return $facts;
-    }
-
     public function runtimeDeclarations(mixed $data): array
     {
         if (!$data instanceof RouteSourceFacts) {
@@ -84,38 +45,20 @@ final class ProjectRouteSourceIndexer implements SourceIndexProviderInterface
         return $data->declarations();
     }
 
-    public function remove(Project $project, string $uri): void
+    protected function factsClass(): string
     {
-        $this->declarationIndexes->forProject($project)->removeSource($uri);
-        $this->referenceIndexes->forProject($project)->removeSource($uri);
+        return RouteSourceFacts::class;
     }
 
-    public function overlay(Project $project, Document $document): void
+    protected function sourceIndex(Project $project): RouteSourceIndexAdapter
     {
-        if ('yaml' === $document->languageId() && !$this->isRouteYaml($project, $document->uri())) {
-            return;
-        }
-
-        $facts = $this->extract($project, new SourceDocument($document->uri(), $document->languageId(), $document->text()));
-        $this->declarationIndexes->forProject($project)->replaceForUri($document->uri(), ...$facts->declarations());
-        $this->referenceIndexes->forProject($project)->replaceForUri($document->uri(), ...$facts->references());
+        return $this->indexes[$project->rootPath()] ??= new RouteSourceIndexAdapter(
+            $this->declarationIndexes->forProject($project),
+            $this->referenceIndexes->forProject($project),
+        );
     }
 
-    public function removeOverlay(Project $project, string $uri): void
-    {
-        $this->declarationIndexes->forProject($project)->removeOverlay($uri);
-        $this->referenceIndexes->forProject($project)->removeOverlay($uri);
-    }
-
-    private function add(Project $project, RouteSourceFacts $facts): RouteSourceFacts
-    {
-        array_push($this->declarations[$project->rootPath()], ...$facts->declarations());
-        array_push($this->references[$project->rootPath()], ...$facts->references());
-
-        return $facts;
-    }
-
-    private function extract(Project $project, SourceDocument $document): RouteSourceFacts
+    protected function extract(Project $project, SourceDocument $document): RouteSourceFacts
     {
         $uri = $document->uri();
         $languageId = $document->languageId();
@@ -142,6 +85,11 @@ final class ProjectRouteSourceIndexer implements SourceIndexProviderInterface
             ),
             $references,
         ));
+    }
+
+    protected function supportsOverlay(Project $project, Document $document): bool
+    {
+        return 'yaml' !== $document->languageId() || $this->isRouteYaml($project, $document->uri());
     }
 
     private function isRouteYaml(Project $project, string $uri): bool

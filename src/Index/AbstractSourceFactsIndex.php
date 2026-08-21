@@ -2,8 +2,12 @@
 
 namespace Symfony\Lsp\Index;
 
-/** @template TFacts of SourceFactsInterface */
-abstract class AbstractSourceFactsIndex
+/**
+ * @template TFacts of SourceFactsInterface
+ *
+ * @implements SourceFactsIndexInterface<TFacts>
+ */
+abstract class AbstractSourceFactsIndex implements SourceFactsIndexInterface
 {
     /** @var SourceFactsStore<TFacts> */
     private readonly SourceFactsStore $facts;

@@ -3,19 +3,17 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Component\Filesystem\Path;
-use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\AbstractSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Project\Project;
 
-final class TemplateSourceIndexer implements SourceIndexProviderInterface
+/** @extends AbstractSourceIndexer<TemplateSourceFacts> */
+final class TemplateSourceIndexer extends AbstractSourceIndexer
 {
-    /** @var array<string, list<TemplateDeclaration>> */
-    private array $templates = [];
-    /** @var array<string, list<TemplateReference>> */
-    private array $references = [];
+    /** @var array<string, TemplateSourceIndexAdapter> */
+    private array $sourceIndexes = [];
 
     public function __construct(
         private readonly TemplateIndexRegistry $indexes,
@@ -34,43 +32,6 @@ final class TemplateSourceIndexer implements SourceIndexProviderInterface
         return [TemplateDeclaration::class, TemplateReference::class, TemplateSourceFacts::class];
     }
 
-    public function begin(Project $project): void
-    {
-        $this->templates[$project->rootPath()] = [];
-        $this->references[$project->rootPath()] = [];
-    }
-
-    public function index(Project $project, SourceDocument $document): TemplateSourceFacts
-    {
-        return $this->add($project, $this->extract($project, $document));
-    }
-
-    public function restore(Project $project, mixed $data): void
-    {
-        if (!$data instanceof TemplateSourceFacts) {
-            throw new \UnexpectedValueException('The cached template source facts are invalid.');
-        }
-
-        $this->add($project, $data);
-    }
-
-    public function finish(Project $project): void
-    {
-        $key = $project->rootPath();
-        $index = $this->indexes->forProject($project);
-        $index->replaceSources(...$this->templates[$key]);
-        $index->replaceReferences(...$this->references[$key]);
-        unset($this->templates[$key], $this->references[$key]);
-    }
-
-    public function replace(Project $project, SourceDocument $document): TemplateSourceFacts
-    {
-        $facts = $this->extract($project, $document);
-        $this->indexes->forProject($project)->replaceSource($facts->uri(), $facts->declaration(), $facts->references());
-
-        return $facts;
-    }
-
     public function runtimeDeclarations(mixed $data): array
     {
         if (!$data instanceof TemplateSourceFacts) {
@@ -80,38 +41,17 @@ final class TemplateSourceIndexer implements SourceIndexProviderInterface
         return null === $data->declaration() ? [] : [$data->declaration()];
     }
 
-    public function remove(Project $project, string $uri): void
+    protected function factsClass(): string
     {
-        $this->indexes->forProject($project)->removeSource($uri);
+        return TemplateSourceFacts::class;
     }
 
-    public function overlay(Project $project, Document $document): void
+    protected function sourceIndex(Project $project): TemplateSourceIndexAdapter
     {
-        $facts = $this->extract($project, new SourceDocument($document->uri(), $document->languageId(), $document->text()));
-        $this->indexes->forProject($project)->overlay(
-            $facts->uri(),
-            $facts->declaration(),
-            $facts->references(),
-        );
+        return $this->sourceIndexes[$project->rootPath()] ??= new TemplateSourceIndexAdapter($this->indexes->forProject($project));
     }
 
-    public function removeOverlay(Project $project, string $uri): void
-    {
-        $this->indexes->forProject($project)->removeOverlay($uri);
-    }
-
-    private function add(Project $project, TemplateSourceFacts $facts): TemplateSourceFacts
-    {
-        $key = $project->rootPath();
-        if (null !== $facts->declaration()) {
-            $this->templates[$key][] = $facts->declaration();
-        }
-        array_push($this->references[$key], ...$facts->references());
-
-        return $facts;
-    }
-
-    private function extract(Project $project, SourceDocument $document): TemplateSourceFacts
+    protected function extract(Project $project, SourceDocument $document): TemplateSourceFacts
     {
         return new TemplateSourceFacts(
             $document->uri(),

@@ -66,6 +66,9 @@ abstract class AbstractSourceIndexer implements SourceIndexProviderInterface
 
     final public function overlay(Project $project, Document $document): void
     {
+        if (!$this->supportsOverlay($project, $document)) {
+            return;
+        }
         $facts = $this->extract($project, new SourceDocument($document->uri(), $document->languageId(), $document->text()));
         if (null !== $facts) {
             $this->sourceIndex($project)->overlay($facts);
@@ -80,9 +83,14 @@ abstract class AbstractSourceIndexer implements SourceIndexProviderInterface
     /** @return class-string<TFacts> */
     abstract protected function factsClass(): string;
 
-    /** @return AbstractSourceFactsIndex<TFacts> */
-    abstract protected function sourceIndex(Project $project): AbstractSourceFactsIndex;
+    /** @return SourceFactsIndexInterface<TFacts> */
+    abstract protected function sourceIndex(Project $project): SourceFactsIndexInterface;
 
     /** @return TFacts|null */
     abstract protected function extract(Project $project, SourceDocument $document): ?SourceFactsInterface;
+
+    protected function supportsOverlay(Project $project, Document $document): bool
+    {
+        return true;
+    }
 }
