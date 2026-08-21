@@ -67,6 +67,35 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame('Global\Name', $document->resolveName('\Global\Name'));
     }
 
+    public function testExposesResolvedTypedParametersAndProperties(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+
+            use Vendor\Package\{Handler, Other, Service};
+
+            final class Example
+            {
+                public function __construct(private ?Service $service, Handler|Other $handler) {}
+
+                protected Service $property;
+                private Other $first = null, $second;
+            }
+            PHP;
+
+        $variables = (new TolerantPhpParser(new Parser()))->parse($source)->typedVariables();
+
+        self::assertSame(['service', 'handler', 'property', 'first', 'second'], array_map(static fn ($variable): string => $variable->name(), $variables));
+        self::assertSame([
+            ['Vendor\Package\Service'],
+            ['Vendor\Package\Handler', 'Vendor\Package\Other'],
+            ['Vendor\Package\Service'],
+            ['Vendor\Package\Other'],
+            ['Vendor\Package\Other'],
+        ], array_map(static fn ($variable): array => $variable->types(), $variables));
+    }
+
     public function testKeepsImportsFromIncompleteGroupedSyntax(): void
     {
         $document = (new TolerantPhpParser(new Parser()))->parse("<?php\n// café\nnamespace App;\nuse Vendor\\Package\\{First, Second as Alias");

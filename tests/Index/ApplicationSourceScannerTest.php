@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Index;
 
 use Amp\CancelledException;
 use Amp\DeferredCancellation;
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -28,6 +29,7 @@ use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -506,6 +508,7 @@ PHP;
                     new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
                 ),
                 new TwigCommentParser(),
+                new TolerantPhpParser(new Parser()),
             ),
         );
     }

@@ -55,7 +55,7 @@ final class TolerantPhpParser implements PhpParserInterface
             if (!$namespaceFound && $node instanceof NamespaceDefinition) {
                 $namespaceDefinition = $node;
                 $namespaceFound = true;
-                $namespace = trim((string) $node->name?->getText($source), '\\');
+                $namespace = $node->name instanceof QualifiedName ? trim($this->qualifiedName($node->name, $source), '\\') : '';
             } elseif ($node instanceof NamespaceUseDeclaration && null === $node->functionOrConst && $node->getNamespaceDefinition() === $namespaceDefinition) {
                 $this->addImports($node, $source, $imports);
             }
@@ -70,7 +70,45 @@ final class TolerantPhpParser implements PhpParserInterface
             );
         }
 
-        return new PhpDocument($attributes, $methodCalls, $typeDeclarations, $diagnostics, $namespace, $imports);
+        $names = new PhpNameContext($namespace, $imports);
+
+        return new PhpDocument($attributes, $methodCalls, $typeDeclarations, $diagnostics, $this->typedVariables($source, $names), $names);
+    }
+
+    /** @return list<PhpTypedVariable> */
+    private function typedVariables(string $source, PhpNameContext $names): array
+    {
+        $typePattern = '\\??[\\\\A-Za-z_][\\\\A-Za-z0-9_]*(?:\\s*[|&]\\s*\\??[\\\\A-Za-z_][\\\\A-Za-z0-9_]*)*';
+        preg_match_all('/('.$typePattern.')\\s+\\$([A-Za-z_][A-Za-z0-9_]*)/', $source, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        $variables = [];
+        foreach ($matches as $match) {
+            $variables[$match[2][1]] = new PhpTypedVariable($match[2][0], $this->resolveTypes($match[1][0], $names));
+        }
+        preg_match_all('/('.$typePattern.')\\s+\\$[A-Za-z_][A-Za-z0-9_]*(?:\\s*=[^,;]*)?((?:\\s*,\\s*\\$[A-Za-z_][A-Za-z0-9_]*(?:\\s*=[^,;]*)?)*)\\s*;/', $source, $declarations, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        foreach ($declarations as $declaration) {
+            preg_match_all('/\\$([A-Za-z_][A-Za-z0-9_]*)/', $declaration[2][0], $additional, \PREG_OFFSET_CAPTURE);
+            foreach ($additional[1] as [$name, $offset]) {
+                $variables[$declaration[2][1] + $offset] = new PhpTypedVariable($name, $this->resolveTypes($declaration[1][0], $names));
+            }
+        }
+        ksort($variables);
+
+        return array_values($variables);
+    }
+
+    /** @return list<string> */
+    private function resolveTypes(string $types, PhpNameContext $names): array
+    {
+        $types = preg_split('/\\s*[|&]\\s*/', $types);
+        if (false === $types) {
+            return [];
+        }
+        $resolved = [];
+        foreach ($types as $type) {
+            $resolved[] = $names->resolve(ltrim($type, '?'));
+        }
+
+        return array_values(array_unique($resolved));
     }
 
     /** @param array<string, string> $imports */
@@ -83,13 +121,13 @@ final class TolerantPhpParser implements PhpParserInterface
             if (!$clause instanceof NamespaceUseClause) {
                 continue;
             }
-            $prefix = trim((string) $clause->namespaceName->getText($source), '\\');
+            $prefix = $clause->namespaceName instanceof QualifiedName ? trim($this->qualifiedName($clause->namespaceName, $source), '\\') : '';
             if (null !== $clause->groupClauses) {
                 foreach ($clause->groupClauses->children as $group) {
                     if (!$group instanceof NamespaceUseGroupClause || null !== $group->functionOrConst) {
                         continue;
                     }
-                    $name = trim((string) $group->namespaceName->getText($source), '\\');
+                    $name = trim($this->qualifiedName($group->namespaceName, $source), '\\');
                     $class = '' === $prefix ? $name : $prefix.'\\'.$name;
                     $imports[$this->alias($group, $name, $source)] = $class;
                 }
@@ -98,6 +136,21 @@ final class TolerantPhpParser implements PhpParserInterface
             }
             $imports[$this->alias($clause, $prefix, $source)] = $prefix;
         }
+    }
+
+    private function qualifiedName(QualifiedName $name, string $source): string
+    {
+        $text = $name->globalSpecifier instanceof Token ? (string) $name->globalSpecifier->getText($source) : '';
+        if (null !== $name->relativeSpecifier) {
+            $text .= $name->relativeSpecifier->getText($source);
+        }
+        foreach ($name->nameParts as $part) {
+            if ($part instanceof Token) {
+                $text .= $part->getText($source);
+            }
+        }
+
+        return $text;
     }
 
     private function alias(NamespaceUseClause|NamespaceUseGroupClause $clause, string $name, string $source): string

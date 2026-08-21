@@ -4,21 +4,24 @@ namespace Symfony\Lsp\Parser\Php;
 
 final class PhpDocument
 {
+    private readonly PhpNameContext $names;
+
     /**
      * @param list<PhpAttribute>       $attributes
      * @param list<PhpMethodCall>      $methodCalls
      * @param list<PhpTypeDeclaration> $typeDeclarations
      * @param list<PhpDiagnostic>      $diagnostics
-     * @param array<string, string>    $imports
+     * @param list<PhpTypedVariable>   $typedVariables
      */
     public function __construct(
         private readonly array $attributes,
         private readonly array $methodCalls,
         private readonly array $typeDeclarations,
         private readonly array $diagnostics,
-        private readonly string $namespace = '',
-        private readonly array $imports = [],
+        private readonly array $typedVariables = [],
+        ?PhpNameContext $names = null,
     ) {
+        $this->names = $names ?? new PhpNameContext();
     }
 
     /** @return list<PhpAttribute> */
@@ -45,33 +48,25 @@ final class PhpDocument
         return $this->diagnostics;
     }
 
+    /** @return list<PhpTypedVariable> */
+    public function typedVariables(): array
+    {
+        return $this->typedVariables;
+    }
+
     public function namespace(): string
     {
-        return $this->namespace;
+        return $this->names->namespace();
     }
 
     /** @return array<string, string> */
     public function imports(): array
     {
-        return $this->imports;
+        return $this->names->imports();
     }
 
     public function resolveName(string $name): string
     {
-        if (str_starts_with($name, '\\')) {
-            return ltrim($name, '\\');
-        }
-        if (str_starts_with($name, 'namespace\\')) {
-            $name = substr($name, \strlen('namespace\\'));
-
-            return '' === $this->namespace ? $name : $this->namespace.'\\'.$name;
-        }
-        $separator = strpos($name, '\\');
-        $head = false === $separator ? $name : substr($name, 0, $separator);
-        if (isset($this->imports[$head])) {
-            return $this->imports[$head].(false === $separator ? '' : substr($name, $separator));
-        }
-
-        return '' === $this->namespace ? $name : $this->namespace.'\\'.$name;
+        return $this->names->resolve($name);
     }
 }

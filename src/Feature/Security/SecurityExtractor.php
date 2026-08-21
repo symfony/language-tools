@@ -6,6 +6,8 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\ConfigurationOccurrence;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
+use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 
 final class SecurityExtractor
@@ -14,6 +16,7 @@ final class SecurityExtractor
         private readonly PositionConverter $converter,
         private readonly YamlConfigurationParser $yaml,
         private readonly TwigCommentParser $commentParser,
+        private readonly PhpParserInterface $phpParser,
     ) {
     }
 
@@ -36,14 +39,14 @@ final class SecurityExtractor
             return $this->context(SecuritySymbolKind::Role, $match[1][0], $text, $match[1][1]);
         }
         if ('php' === $languageId) {
-            [$namespace, $imports] = $this->phpNames($text);
-            if ($this->hasIsGrantedAttribute($imports) && preg_match('/\bIsGranted\s*\(\s*(?:attribute\s*:\s*)?["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
+            $php = $this->phpParser->parse($text);
+            if ($this->hasIsGrantedAttribute($php) && preg_match('/\bIsGranted\s*\(\s*(?:attribute\s*:\s*)?["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
                 return $this->context(SecuritySymbolKind::Role, $match[1][0], $text, $match[1][1]);
             }
-            if ($this->extendsAbstractController($text, $namespace, $imports) && preg_match('/\$this\s*->\s*denyAccessUnlessGranted\s*\(\s*["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
+            if ($this->extendsAbstractController($php) && preg_match('/\$this\s*->\s*denyAccessUnlessGranted\s*\(\s*["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
                 return $this->context(SecuritySymbolKind::Role, $match[1][0], $text, $match[1][1]);
             }
-            $authorizationVariables = $this->typedVariables($text, $namespace, $imports, [
+            $authorizationVariables = $this->typedVariables($php, [
                 'Symfony\\Bundle\\SecurityBundle\\Security',
                 'Symfony\\Component\\Security\\Core\\Authorization\\AuthorizationCheckerInterface',
             ]);
@@ -53,7 +56,7 @@ final class SecurityExtractor
                     return $this->context(SecuritySymbolKind::Role, $match[3][0], $text, $match[3][1]);
                 }
             }
-            $logoutVariables = $this->typedVariables($text, $namespace, $imports, ['Symfony\\Component\\Security\\Http\\Logout\\LogoutUrlGenerator']);
+            $logoutVariables = $this->typedVariables($php, ['Symfony\\Component\\Security\\Http\\Logout\\LogoutUrlGenerator']);
             if (preg_match('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*getLogout(?:Path|Url)\s*\(\s*["\']([A-Za-z0-9_.-]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
                 $variable = '' !== $match[2][0] ? $match[2][0] : $match[1][0];
                 if (isset($logoutVariables[$variable])) {
@@ -108,20 +111,20 @@ final class SecurityExtractor
     private function phpSymbols(string $uri, string $text): array
     {
         $symbols = [];
-        [$namespace, $imports] = $this->phpNames($text);
-        if ($this->hasIsGrantedAttribute($imports)) {
+        $php = $this->phpParser->parse($text);
+        if ($this->hasIsGrantedAttribute($php)) {
             preg_match_all('/\bIsGranted\s*\(\s*(?:attribute\s*:\s*)?["\'](ROLE_[A-Z0-9_]+)["\']/', $text, $attributes, \PREG_OFFSET_CAPTURE);
             foreach ($attributes[1] as [$role, $offset]) {
                 $symbols[] = $this->symbol(SecuritySymbolKind::Role, $role, $uri, $text, $offset);
             }
         }
-        if ($this->extendsAbstractController($text, $namespace, $imports)) {
+        if ($this->extendsAbstractController($php)) {
             preg_match_all('/\$this\s*->\s*denyAccessUnlessGranted\s*\(\s*["\'](ROLE_[A-Z0-9_]+)["\']/', $text, $controllerRoles, \PREG_OFFSET_CAPTURE);
             foreach ($controllerRoles[1] as [$role, $offset]) {
                 $symbols[] = $this->symbol(SecuritySymbolKind::Role, $role, $uri, $text, $offset);
             }
         }
-        $authorizationVariables = $this->typedVariables($text, $namespace, $imports, [
+        $authorizationVariables = $this->typedVariables($php, [
             'Symfony\\Bundle\\SecurityBundle\\Security',
             'Symfony\\Component\\Security\\Core\\Authorization\\AuthorizationCheckerInterface',
         ]);
@@ -132,7 +135,7 @@ final class SecurityExtractor
                 $symbols[] = $this->symbol(SecuritySymbolKind::Role, $role, $uri, $text, $offset);
             }
         }
-        $logoutVariables = $this->typedVariables($text, $namespace, $imports, ['Symfony\\Component\\Security\\Http\\Logout\\LogoutUrlGenerator']);
+        $logoutVariables = $this->typedVariables($php, ['Symfony\\Component\\Security\\Http\\Logout\\LogoutUrlGenerator']);
         preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*getLogout(?:Path|Url)\s*\(\s*["\']([A-Za-z0-9_.-]+)["\']/', $text, $firewalls, \PREG_OFFSET_CAPTURE);
         foreach ($firewalls[3] as $index => [$firewall, $offset]) {
             $variable = '' !== $firewalls[2][$index][0] ? $firewalls[2][$index][0] : $firewalls[1][$index][0];
@@ -187,76 +190,40 @@ final class SecurityExtractor
         return new SecuritySourceSymbol($kind, $name, $uri, new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + \strlen($name))), false);
     }
 
-    /** @return array{string, array<string, string>} */
-    private function phpNames(string $text): array
+    private function hasIsGrantedAttribute(PhpDocument $php): bool
     {
-        $namespace = '';
-        if (preg_match('/\bnamespace\s+([^;{]+)[;{]/', $text, $match)) {
-            $namespace = trim($match[1]);
-        }
-        $imports = [];
-        preg_match_all('/^\s*use\s+([^;]+);/m', $text, $matches);
-        foreach ($matches[1] as $import) {
-            if (str_contains($import, '{')) {
-                continue;
-            }
-            $parts = preg_split('/\s+as\s+/i', trim($import));
-            if (false === $parts || [] === $parts) {
-                continue;
-            }
-            $className = ltrim($parts[0], '\\');
-            $alias = $parts[1] ?? substr($className, (int) strrpos('\\'.$className, '\\'));
-            $imports[$alias] = $className;
-        }
-
-        return [$namespace, $imports];
-    }
-
-    /** @param array<string, string> $imports */
-    private function hasIsGrantedAttribute(array $imports): bool
-    {
-        return 'Symfony\\Component\\Security\\Http\\Attribute\\IsGranted' === ($imports['IsGranted'] ?? null);
+        return 'Symfony\\Component\\Security\\Http\\Attribute\\IsGranted' === ($php->imports()['IsGranted'] ?? null);
     }
 
     /**
-     * @param array<string, string> $imports
-     * @param list<string>          $acceptedTypes
+     * @param list<string> $acceptedTypes
      *
      * @return array<string, true>
      */
-    private function typedVariables(string $text, string $namespace, array $imports, array $acceptedTypes): array
+    private function typedVariables(PhpDocument $php, array $acceptedTypes): array
     {
         $variables = [];
-        preg_match_all('/(\\??[\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s+\$([A-Za-z_][A-Za-z0-9_]*)/', $text, $matches, \PREG_SET_ORDER);
-        foreach ($matches as $match) {
-            if (\in_array($this->resolvePhpName(ltrim($match[1], '?'), $namespace, $imports), $acceptedTypes, true)) {
-                $variables[$match[2]] = true;
+        foreach ($php->typedVariables() as $variable) {
+            foreach ($variable->types() as $type) {
+                if (\in_array($type, $acceptedTypes, true)) {
+                    $variables[$variable->name()] = true;
+                    break;
+                }
             }
         }
 
         return $variables;
     }
 
-    /** @param array<string, string> $imports */
-    private function extendsAbstractController(string $text, string $namespace, array $imports): bool
+    private function extendsAbstractController(PhpDocument $php): bool
     {
-        return preg_match('/\bclass\s+[A-Za-z_][A-Za-z0-9_]*\s+extends\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)/', $text, $match)
-            && 'Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController' === $this->resolvePhpName($match[1], $namespace, $imports);
-    }
-
-    /** @param array<string, string> $imports */
-    private function resolvePhpName(string $name, string $namespace, array $imports): string
-    {
-        if (str_starts_with($name, '\\')) {
-            return ltrim($name, '\\');
-        }
-        $separator = strpos($name, '\\');
-        $head = false === $separator ? $name : substr($name, 0, $separator);
-        if (isset($imports[$head])) {
-            return $imports[$head].(false === $separator ? '' : substr($name, $separator));
+        foreach ($php->typeDeclarations() as $type) {
+            if ('Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController' === $type->parentClassName()) {
+                return true;
+            }
         }
 
-        return '' === $namespace ? $name : $namespace.'\\'.$name;
+        return false;
     }
 
     /** @return list<string> */
