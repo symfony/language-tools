@@ -3,20 +3,19 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
 use Symfony\Lsp\Project\Project;
 
-final class RouteReferenceIndexRegistry
+/** @extends AbstractProjectIndexRegistry<RouteReferenceIndex> */
+final class RouteReferenceIndexRegistry extends AbstractProjectIndexRegistry
 {
-    /** @var array<string, RouteReferenceIndex> */
-    private array $indexes = [];
-
-    public function __construct(
-        private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
-    ) {
+    public function __construct(private readonly DependencyInjectionSourceIndexRegistry $classIndexes)
+    {
+        parent::__construct();
     }
 
-    public function forProject(Project $project): RouteReferenceIndex
+    protected function createIndex(Project $project): RouteReferenceIndex
     {
-        return $this->indexes[$project->rootPath()] ??= new RouteReferenceIndex($this->classIndexes->forProject($project));
+        return new RouteReferenceIndex($this->classIndexes->forProject($project));
     }
 }

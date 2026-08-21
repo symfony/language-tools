@@ -2,15 +2,13 @@
 
 namespace Symfony\Lsp\Feature\Security;
 
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
 
-final class SecurityIndexRegistry
+/** @extends AbstractProjectIndexRegistry<SecurityIndex> */
+final class SecurityIndexRegistry extends AbstractProjectIndexRegistry
 {
-    /** @var array<string, SecurityIndex> */
-    private array $indexes = [];
-
-    public function forProject(Project $project): SecurityIndex
+    public function __construct()
     {
-        return $this->indexes[$project->rootPath()] ??= new SecurityIndex();
+        parent::__construct(SecurityIndex::class);
     }
 }

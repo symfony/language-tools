@@ -2,15 +2,13 @@
 
 namespace Symfony\Lsp\Feature\Environment;
 
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
 
-final class EnvironmentIndexRegistry
+/** @extends AbstractProjectIndexRegistry<EnvironmentIndex> */
+final class EnvironmentIndexRegistry extends AbstractProjectIndexRegistry
 {
-    /** @var array<string, EnvironmentIndex> */
-    private array $indexes = [];
-
-    public function forProject(Project $project): EnvironmentIndex
+    public function __construct()
     {
-        return $this->indexes[$project->rootPath()] ??= new EnvironmentIndex();
+        parent::__construct(EnvironmentIndex::class);
     }
 }

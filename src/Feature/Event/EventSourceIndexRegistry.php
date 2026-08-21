@@ -2,15 +2,13 @@
 
 namespace Symfony\Lsp\Feature\Event;
 
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
 
-final class EventSourceIndexRegistry
+/** @extends AbstractProjectIndexRegistry<EventSourceIndex> */
+final class EventSourceIndexRegistry extends AbstractProjectIndexRegistry
 {
-    /** @var array<string, EventSourceIndex> */
-    private array $indexes = [];
-
-    public function forProject(Project $project): EventSourceIndex
+    public function __construct()
     {
-        return $this->indexes[$project->rootPath()] ??= new EventSourceIndex();
+        parent::__construct(EventSourceIndex::class);
     }
 }

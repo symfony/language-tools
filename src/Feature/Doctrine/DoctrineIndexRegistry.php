@@ -2,15 +2,13 @@
 
 namespace Symfony\Lsp\Feature\Doctrine;
 
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
 
-final class DoctrineIndexRegistry
+/** @extends AbstractProjectIndexRegistry<DoctrineIndex> */
+final class DoctrineIndexRegistry extends AbstractProjectIndexRegistry
 {
-    /** @var array<string, DoctrineIndex> */
-    private array $indexes = [];
-
-    public function forProject(Project $project): DoctrineIndex
+    public function __construct()
     {
-        return $this->indexes[$project->rootPath()] ??= new DoctrineIndex();
+        parent::__construct(DoctrineIndex::class);
     }
 }

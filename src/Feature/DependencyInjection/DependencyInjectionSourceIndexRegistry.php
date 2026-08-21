@@ -2,15 +2,13 @@
 
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
 
-final class DependencyInjectionSourceIndexRegistry
+/** @extends AbstractProjectIndexRegistry<DependencyInjectionSourceIndex> */
+final class DependencyInjectionSourceIndexRegistry extends AbstractProjectIndexRegistry
 {
-    /** @var array<string, DependencyInjectionSourceIndex> */
-    private array $indexes = [];
-
-    public function forProject(Project $project): DependencyInjectionSourceIndex
+    public function __construct()
     {
-        return $this->indexes[$project->rootPath()] ??= new DependencyInjectionSourceIndex();
+        parent::__construct(DependencyInjectionSourceIndex::class);
     }
 }

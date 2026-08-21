@@ -2,15 +2,13 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
 
-final class TemplateIndexRegistry
+/** @extends AbstractProjectIndexRegistry<TemplateIndex> */
+final class TemplateIndexRegistry extends AbstractProjectIndexRegistry
 {
-    /** @var array<string, TemplateIndex> */
-    private array $indexes = [];
-
-    public function forProject(Project $project): TemplateIndex
+    public function __construct()
     {
-        return $this->indexes[$project->rootPath()] ??= new TemplateIndex();
+        parent::__construct(TemplateIndex::class);
     }
 }

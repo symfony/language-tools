@@ -2,15 +2,13 @@
 
 namespace Symfony\Lsp\Feature\Stimulus;
 
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
 
-final class StimulusSourceIndexRegistry
+/** @extends AbstractProjectIndexRegistry<StimulusSourceIndex> */
+final class StimulusSourceIndexRegistry extends AbstractProjectIndexRegistry
 {
-    /** @var array<string, StimulusSourceIndex> */
-    private array $indexes = [];
-
-    public function forProject(Project $project): StimulusSourceIndex
+    public function __construct()
     {
-        return $this->indexes[$project->rootPath()] ??= new StimulusSourceIndex();
+        parent::__construct(StimulusSourceIndex::class);
     }
 }

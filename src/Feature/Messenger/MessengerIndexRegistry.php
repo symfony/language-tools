@@ -2,15 +2,13 @@
 
 namespace Symfony\Lsp\Feature\Messenger;
 
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
 
-final class MessengerIndexRegistry
+/** @extends AbstractProjectIndexRegistry<MessengerIndex> */
+final class MessengerIndexRegistry extends AbstractProjectIndexRegistry
 {
-    /** @var array<string, MessengerIndex> */
-    private array $indexes = [];
-
-    public function forProject(Project $project): MessengerIndex
+    public function __construct()
     {
-        return $this->indexes[$project->rootPath()] ??= new MessengerIndex();
+        parent::__construct(MessengerIndex::class);
     }
 }

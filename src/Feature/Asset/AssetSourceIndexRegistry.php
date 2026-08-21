@@ -2,15 +2,13 @@
 
 namespace Symfony\Lsp\Feature\Asset;
 
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
 
-final class AssetSourceIndexRegistry
+/** @extends AbstractProjectIndexRegistry<AssetSourceIndex> */
+final class AssetSourceIndexRegistry extends AbstractProjectIndexRegistry
 {
-    /** @var array<string, AssetSourceIndex> */
-    private array $indexes = [];
-
-    public function forProject(Project $project): AssetSourceIndex
+    public function __construct()
     {
-        return $this->indexes[$project->rootPath()] ??= new AssetSourceIndex();
+        parent::__construct(AssetSourceIndex::class);
     }
 }

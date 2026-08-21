@@ -2,15 +2,13 @@
 
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
 
-final class ServiceIndexRegistry
+/** @extends AbstractProjectIndexRegistry<ServiceIndex> */
+final class ServiceIndexRegistry extends AbstractProjectIndexRegistry
 {
-    /** @var array<string, ServiceIndex> */
-    private array $indexes = [];
-
-    public function forProject(Project $project): ServiceIndex
+    public function __construct()
     {
-        return $this->indexes[$project->rootPath()] ??= new ServiceIndex();
+        parent::__construct(ServiceIndex::class);
     }
 }

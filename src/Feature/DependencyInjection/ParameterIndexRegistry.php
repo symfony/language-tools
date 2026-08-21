@@ -2,15 +2,13 @@
 
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
 
-final class ParameterIndexRegistry
+/** @extends AbstractProjectIndexRegistry<ParameterIndex> */
+final class ParameterIndexRegistry extends AbstractProjectIndexRegistry
 {
-    /** @var array<string, ParameterIndex> */
-    private array $indexes = [];
-
-    public function forProject(Project $project): ParameterIndex
+    public function __construct()
     {
-        return $this->indexes[$project->rootPath()] ??= new ParameterIndex();
+        parent::__construct(ParameterIndex::class);
     }
 }

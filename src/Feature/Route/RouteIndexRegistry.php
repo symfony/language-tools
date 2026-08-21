@@ -2,15 +2,13 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
 
-final class RouteIndexRegistry
+/** @extends AbstractProjectIndexRegistry<RouteIndex> */
+final class RouteIndexRegistry extends AbstractProjectIndexRegistry
 {
-    /** @var array<string, RouteIndex> */
-    private array $indexes = [];
-
-    public function forProject(Project $project): RouteIndex
+    public function __construct()
     {
-        return $this->indexes[$project->rootPath()] ??= new RouteIndex();
+        parent::__construct(RouteIndex::class);
     }
 }

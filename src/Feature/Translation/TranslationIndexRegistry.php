@@ -2,15 +2,13 @@
 
 namespace Symfony\Lsp\Feature\Translation;
 
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
 
-final class TranslationIndexRegistry
+/** @extends AbstractProjectIndexRegistry<TranslationIndex> */
+final class TranslationIndexRegistry extends AbstractProjectIndexRegistry
 {
-    /** @var array<string, TranslationIndex> */
-    private array $indexes = [];
-
-    public function forProject(Project $project): TranslationIndex
+    public function __construct()
     {
-        return $this->indexes[$project->rootPath()] ??= new TranslationIndex();
+        parent::__construct(TranslationIndex::class);
     }
 }

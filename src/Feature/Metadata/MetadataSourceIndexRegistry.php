@@ -2,15 +2,13 @@
 
 namespace Symfony\Lsp\Feature\Metadata;
 
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
 
-final class MetadataSourceIndexRegistry
+/** @extends AbstractProjectIndexRegistry<MetadataSourceIndex> */
+final class MetadataSourceIndexRegistry extends AbstractProjectIndexRegistry
 {
-    /** @var array<string, MetadataSourceIndex> */
-    private array $indexes = [];
-
-    public function forProject(Project $project): MetadataSourceIndex
+    public function __construct()
     {
-        return $this->indexes[$project->rootPath()] ??= new MetadataSourceIndex();
+        parent::__construct(MetadataSourceIndex::class);
     }
 }
