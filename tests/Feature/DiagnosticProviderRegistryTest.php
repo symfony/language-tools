@@ -27,6 +27,48 @@ final class DiagnosticProviderRegistryTest extends TestCase
         self::assertSame(['stub'], array_column($diagnostics, 'code'));
     }
 
+    public function testDoesNotPublishWhenNoProviderMatches(): void
+    {
+        [$registry, $client] = $this->registryWithProviders(
+            'file:///workspace/templates/page.html.twig',
+            new StubDiagnosticProvider(null),
+        );
+
+        $registry->publish(['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']]);
+
+        self::assertSame([], $client->notifications);
+    }
+
+    public function testPublishesAnEmptyListWhenAProviderMatchesWithoutDiagnostics(): void
+    {
+        [$registry, $client] = $this->registryWithProviders(
+            'file:///workspace/templates/page.html.twig',
+            new StubDiagnosticProvider([]),
+        );
+
+        $registry->publish(['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']]);
+
+        self::assertCount(1, $client->notifications);
+        self::assertSame([], $client->notifications[0]['params']['diagnostics']);
+    }
+
+    public function testMergesProviderDiagnosticsInOrder(): void
+    {
+        [$registry, $client] = $this->registryWithProviders(
+            'file:///workspace/templates/page.html.twig',
+            new StubDiagnosticProvider(null),
+            new StubDiagnosticProvider([$this->diagnostic('second')]),
+            new StubDiagnosticProvider([$this->diagnostic('third')]),
+        );
+
+        $registry->publish(['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']]);
+
+        self::assertCount(1, $client->notifications);
+        $diagnostics = $client->notifications[0]['params']['diagnostics'];
+        self::assertIsArray($diagnostics);
+        self::assertSame(['second', 'third'], array_column($diagnostics, 'code'));
+    }
+
     public function testSuppressesDiagnosticsInDependencyOwnedDocuments(): void
     {
         foreach ([
@@ -46,35 +88,50 @@ final class DiagnosticProviderRegistryTest extends TestCase
     /** @return array{DiagnosticProviderRegistry, CollectingClient} */
     private function registry(string $uri): array
     {
+        return $this->registryWithProviders($uri, new StubDiagnosticProvider([$this->diagnostic('stub')]));
+    }
+
+    /** @return array{DiagnosticProviderRegistry, CollectingClient} */
+    private function registryWithProviders(string $uri, DiagnosticProviderInterface ...$providers): array
+    {
         $client = new CollectingClient();
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'twig', 1, ''));
         $projects = new ProjectRegistry();
         $projects->replace([new Project('/workspace', 'file:///workspace', '^8.0')]);
-        $provider = new class implements DiagnosticProviderInterface {
-            public function diagnostics(array $params): ?array
-            {
-                if (!\is_array($params['textDocument'] ?? null)) {
-                    return null;
-                }
-
-                return [[
-                    'range' => ['start' => ['line' => 0, 'character' => 0], 'end' => ['line' => 0, 'character' => 0]],
-                    'severity' => 1,
-                    'source' => 'symfony',
-                    'code' => 'stub',
-                    'message' => 'Stub diagnostic.',
-                ]];
-            }
-        };
 
         return [new DiagnosticProviderRegistry(
             $client,
             $documents,
             $projects,
             new ProjectPathResolver(new UriToPathConverter()),
-            [$provider],
+            $providers,
         ), $client];
+    }
+
+    /** @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, severity: int, source: string, code: string, message: string} */
+    private function diagnostic(string $code): array
+    {
+        return [
+            'range' => ['start' => ['line' => 0, 'character' => 0], 'end' => ['line' => 0, 'character' => 0]],
+            'severity' => 1,
+            'source' => 'symfony',
+            'code' => $code,
+            'message' => 'Stub diagnostic.',
+        ];
+    }
+}
+
+final class StubDiagnosticProvider implements DiagnosticProviderInterface
+{
+    /** @param list<array<array-key, mixed>>|null $diagnostics */
+    public function __construct(private readonly ?array $diagnostics)
+    {
+    }
+
+    public function diagnostics(array $params): ?array
+    {
+        return $this->diagnostics;
     }
 }
 
