@@ -23,6 +23,7 @@ use Symfony\Lsp\Feature\Messenger\MessengerTransport;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class MessengerProviderTest extends TestCase
 {
@@ -112,7 +113,7 @@ YAML;
             new DependencyInjectionSourceFacts($messageUri, classes: $classExtractor->extract($messageUri, $message)),
             new DependencyInjectionSourceFacts($handlerUri, classes: $classExtractor->extract($handlerUri, $handler)),
         );
-        $provider = new MessengerProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
+        $provider = new MessengerProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
 
         $completionParams = $this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'command.bus }') + 4));
         self::assertSame(['command.bus'], array_column($provider->complete($completionParams) ?? [], 'label'));
