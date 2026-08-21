@@ -9,6 +9,7 @@ use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\IndexCommandHandler;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\Project;
@@ -57,7 +58,7 @@ final class IndexCommandHandlerTest extends TestCase
             new SourceIndexPayloadCodec(),
             new PhpRuntimeStructureHasher(),
             new UriToPathConverter(),
-            new GitignoreMatcher(),
+            new SourceFileEnumerator(new GitignoreMatcher()),
             [],
         );
         $runtime = new RecordingRuntimeInitializer();

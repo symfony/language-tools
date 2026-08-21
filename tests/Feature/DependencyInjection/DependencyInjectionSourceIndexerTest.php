@@ -15,6 +15,7 @@ use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\GitignoreMatcher;
@@ -64,7 +65,7 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
             new SourceIndexPayloadCodec(),
             new PhpRuntimeStructureHasher(),
             new UriToPathConverter(),
-            new GitignoreMatcher(),
+            new SourceFileEnumerator(new GitignoreMatcher()),
             [new DependencyInjectionSourceIndexer(
                 $indexes,
                 new YamlDependencyInjectionExtractor($converter),

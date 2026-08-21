@@ -4,7 +4,7 @@ namespace Symfony\Lsp\Feature;
 
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Index\ApplicationSourceScanner;
+use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -115,7 +115,7 @@ final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterfac
         }
 
         foreach (explode('/', $relativePath) as $segment) {
-            if (\in_array($segment, ApplicationSourceScanner::EXCLUDED_DIRECTORIES, true)) {
+            if (\in_array($segment, SourceFileEnumerator::EXCLUDED_DIRECTORIES, true)) {
                 return true;
             }
         }

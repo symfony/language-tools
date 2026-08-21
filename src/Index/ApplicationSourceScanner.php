@@ -4,11 +4,8 @@ namespace Symfony\Lsp\Index;
 
 use Amp\Cancellation;
 use Amp\CancelledException;
-use Symfony\Component\Filesystem\Path;
-use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Progress\ProgressReporterInterface;
-use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -20,32 +17,6 @@ use function Amp\delay;
  */
 final class ApplicationSourceScanner
 {
-    public const EXCLUDED_DIRECTORIES = [
-        '.git',
-        'node_modules',
-        'var',
-        'vendor',
-    ];
-
-    private const LANGUAGE_IDS = [
-        'js' => 'javascript',
-        'json' => 'json',
-        'mjs' => 'javascript',
-        'php' => 'php',
-        'ts' => 'typescript',
-        'twig' => 'twig',
-        'xlf' => 'xml',
-        'xliff' => 'xml',
-        'yaml' => 'yaml',
-        'yml' => 'yaml',
-    ];
-
-    private const LOCK_FILES = [
-        'npm-shrinkwrap.json',
-        'package-lock.json',
-        'pnpm-lock.yaml',
-    ];
-
     /** @var list<SourceIndexProviderInterface> */
     private array $providers;
 
@@ -62,7 +33,7 @@ final class ApplicationSourceScanner
         private readonly SourceIndexPayloadCodec $codec,
         private readonly PhpRuntimeStructureHasher $runtimeStructureHasher,
         private readonly UriToPathConverter $uriToPathConverter,
-        private readonly GitignoreMatcher $gitignore,
+        private readonly SourceFileEnumerator $files,
         iterable $providers,
     ) {
         $providers = \is_array($providers) ? array_values($providers) : iterator_to_array($providers, false);
@@ -126,7 +97,7 @@ final class ApplicationSourceScanner
         if (null === $document || null === $project || null === $path) {
             return;
         }
-        if (!$this->belongsToProject($project, $path) || $this->gitignoreExcluded($project->rootPath(), $path)) {
+        if (!$this->files->belongsToProject($project, $path) || $this->files->gitignoreExcluded($project->rootPath(), $path)) {
             foreach ($this->providers as $provider) {
                 $provider->removeOverlay($project, $document->uri());
             }
@@ -176,11 +147,11 @@ final class ApplicationSourceScanner
     {
         $project = $this->projects->forDocumentUri($uri);
         $path = $this->uriToPathConverter->convert($uri);
-        if (null === $project || null === $path || !$this->belongsToProject($project, $path)) {
+        if (null === $project || null === $path || !$this->files->belongsToProject($project, $path)) {
             return SourceFileChange::untracked();
         }
 
-        $relativePath = $this->relativePath($project, $path);
+        $relativePath = $this->files->relativePath($project, $path);
         if (null === $relativePath) {
             return SourceFileChange::untracked();
         }
@@ -188,7 +159,7 @@ final class ApplicationSourceScanner
         $projectKey = $project->rootPath();
         $indexed = \array_key_exists($projectKey, $this->entries);
         $entries = $indexed ? $this->entries[$projectKey] : $this->store->loadMetadata($project);
-        if ($this->gitignoreExcluded($project->rootPath(), $path)) {
+        if ($this->files->gitignoreExcluded($project->rootPath(), $path)) {
             if (isset($entries[$relativePath])) {
                 foreach ($this->providers as $provider) {
                     $provider->remove($project, $uri);
@@ -211,7 +182,7 @@ final class ApplicationSourceScanner
             }
             unset($entries[$relativePath]);
             $this->store->appendDeletion($project, $relativePath);
-        } elseif (null === $languageId = $this->languageId($path)) {
+        } elseif (null === $languageId = $this->files->languageId($path)) {
             return SourceFileChange::untracked();
         } else {
             $text = file_get_contents($path);
@@ -339,13 +310,13 @@ final class ApplicationSourceScanner
         $entries = [];
         $fileCount = 0;
         $parsedCount = 0;
-        foreach ($this->sourceFiles($project->rootPath()) as $path) {
+        foreach ($this->files->files($project->rootPath()) as $path) {
             if (0 === ++$fileCount % 64) {
                 delay(0, cancellation: $cancellation);
             }
             $cancellation?->throwIfRequested();
-            $relativePath = $this->relativePath($project, $path);
-            $languageId = $this->languageId($path);
+            $relativePath = $this->files->relativePath($project, $path);
+            $languageId = $this->files->languageId($path);
             if (null === $relativePath || null === $languageId) {
                 continue;
             }
@@ -394,64 +365,6 @@ final class ApplicationSourceScanner
         return $entries;
     }
 
-    /** @return \Generator<int, string> */
-    private function sourceFiles(string $directory): \Generator
-    {
-        if (!is_dir($directory)) {
-            return;
-        }
-
-        $dotenvPaths = [];
-        $files = (new Finder())
-            ->files()
-            ->in($directory)
-            ->exclude(self::EXCLUDED_DIRECTORIES)
-            ->ignoreDotFiles(false)
-            ->ignoreVCS(false)
-            ->ignoreUnreadableDirs()
-            ->filter(fn (\SplFileInfo $file): bool => null !== $this->languageId($file->getPathname()));
-        foreach ($this->gitignore->filter($files, $directory) as $path) {
-            if ('dotenv' === $this->languageId($path)) {
-                $dotenvPaths[$path] = true;
-            }
-            yield $path;
-        }
-
-        foreach (glob($directory.'/.env*') ?: [] as $path) {
-            if (is_file($path) && !isset($dotenvPaths[$path])) {
-                yield $path;
-            }
-        }
-    }
-
-    private function gitignoreExcluded(string $rootPath, string $path): bool
-    {
-        // Symfony reads project-root dotenv files even when they are gitignored
-        if ('dotenv' === $this->languageId($path) && Path::canonicalize($rootPath) === \dirname(Path::canonicalize($path))) {
-            return false;
-        }
-
-        return $this->gitignore->isIgnored($rootPath, $path);
-    }
-
-    private function languageId(string $path): ?string
-    {
-        $basename = basename($path);
-        if (str_starts_with($basename, '.env')) {
-            return 'dotenv';
-        }
-        if (\in_array($basename, self::LOCK_FILES, true)) {
-            return null;
-        }
-
-        $extension = Path::getExtension($path, true);
-        if (\in_array($extension, ['js', 'mjs', 'ts'], true) && !str_contains('/'.Path::canonicalize($path), '/assets/')) {
-            return null;
-        }
-
-        return self::LANGUAGE_IDS[$extension] ?? null;
-    }
-
     /**
      * @param SourceIndexMetadata $entry
      */
@@ -487,36 +400,9 @@ final class ApplicationSourceScanner
         return null === $facts || $facts->isEmpty() ? '' : $this->codec->encode($provider->name(), $facts);
     }
 
-    private function belongsToProject(Project $project, string $path): bool
-    {
-        $relativePath = $this->relativePath($project, $path);
-        if (null === $relativePath) {
-            return false;
-        }
-
-        foreach (explode('/', $relativePath) as $part) {
-            if (\in_array($part, self::EXCLUDED_DIRECTORIES, true)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function relativePath(Project $project, string $path): ?string
-    {
-        $root = Path::canonicalize($project->rootPath());
-        $path = Path::canonicalize($path);
-        if (!Path::isBasePath($root, $path) || $root === $path) {
-            return null;
-        }
-
-        return Path::makeRelative($path, $root);
-    }
-
     private function uri(Project $project, string $path): string
     {
-        $relativePath = $this->relativePath($project, $path);
+        $relativePath = $this->files->relativePath($project, $path);
         if (null === $relativePath) {
             throw new \InvalidArgumentException('The source path is outside the project root.');
         }

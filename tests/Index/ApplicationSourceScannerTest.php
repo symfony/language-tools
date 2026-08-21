@@ -27,6 +27,7 @@ use Symfony\Lsp\Index\PersistentSourceIndexStore;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -529,7 +530,7 @@ PHP;
             new SourceIndexPayloadCodec(),
             new PhpRuntimeStructureHasher(),
             new UriToPathConverter(),
-            new GitignoreMatcher(),
+            new SourceFileEnumerator(new GitignoreMatcher()),
             $providers,
         );
     }

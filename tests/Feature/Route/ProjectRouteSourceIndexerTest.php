@@ -22,6 +22,7 @@ use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -108,7 +109,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new SourceIndexPayloadCodec(),
             new PhpRuntimeStructureHasher(),
             new UriToPathConverter(),
-            new GitignoreMatcher(),
+            new SourceFileEnumerator(new GitignoreMatcher()),
             [
                 new ProjectRouteSourceIndexer(
                     new RouteDeclarationIndexRegistry(),
@@ -186,7 +187,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new SourceIndexPayloadCodec(),
             new PhpRuntimeStructureHasher(),
             new UriToPathConverter(),
-            new GitignoreMatcher(),
+            new SourceFileEnumerator(new GitignoreMatcher()),
             [$indexer],
         );
 
