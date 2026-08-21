@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\Doctrine;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -10,6 +11,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Doctrine\DoctrineExtractor;
 use Symfony\Lsp\Feature\Doctrine\DoctrineIndexRegistry;
 use Symfony\Lsp\Feature\Doctrine\DoctrineProvider;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -23,8 +25,8 @@ final class DoctrineProviderTest extends TestCase
             <?php
             namespace App\Entity;
 
-            use App\Repository\ProductRepository;
-            use Doctrine\ORM\Mapping as ORM;
+            use App\Repository\{ProductRepository};
+            use Doctrine\ORM\{Mapping as ORM};
 
             #[ORM\Entity(repositoryClass: ProductRepository::class)]
             class Product
@@ -47,9 +49,8 @@ final class DoctrineProviderTest extends TestCase
             <?php
             namespace App\Repository;
 
-            use App\Entity\Product;
-            use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
-            use Doctrine\Persistence\ManagerRegistry;
+            use App\Entity\{Product};
+            use Doctrine\{Bundle\DoctrineBundle\Repository\ServiceEntityRepository, Persistence\ManagerRegistry};
 
             class ProductRepository extends ServiceEntityRepository
             {
@@ -64,11 +65,9 @@ final class DoctrineProviderTest extends TestCase
             <?php
             namespace App\Form;
 
-            use App\Entity\Product;
-            use App\Repository\ProductRepository;
-            use Doctrine\ORM\EntityManagerInterface;
-            use Symfony\Bridge\Doctrine\Form\Type\EntityType;
-            use Symfony\Component\Form\FormBuilderInterface;
+            use App\{Entity\Product, Repository\ProductRepository};
+            use Doctrine\ORM\{EntityManagerInterface};
+            use Symfony\{Bridge\Doctrine\Form\Type\EntityType, Component\Form\FormBuilderInterface};
 
             final class ProductType
             {
@@ -86,8 +85,8 @@ final class DoctrineProviderTest extends TestCase
         $formCompletionUri = 'file:///workspace/src/Form/FormCompletion.php';
         $formCompletionText = <<<'PHP'
             <?php
-            use App\Entity\Product;
-            use Symfony\Bridge\Doctrine\Form\Type\EntityType;
+            use App\Entity\{Product};
+            use Symfony\Bridge\Doctrine\Form\Type\{EntityType};
             $builder->add('product', EntityType::class, [
                 'class' => Product::class,
                 'choice_label' => 'na
@@ -108,7 +107,7 @@ final class DoctrineProviderTest extends TestCase
             PHP;
 
         $converter = new PositionConverter();
-        $extractor = new DoctrineExtractor($converter);
+        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()));
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);

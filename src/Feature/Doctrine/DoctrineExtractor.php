@@ -4,12 +4,14 @@ namespace Symfony\Lsp\Feature\Doctrine;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
 final class DoctrineExtractor
 {
     private const ASSOCIATIONS = ['Embedded', 'ManyToMany', 'ManyToOne', 'OneToMany', 'OneToOne'];
 
-    public function __construct(private readonly PositionConverter $converter)
+    public function __construct(private readonly PositionConverter $converter, private readonly PhpParserInterface $phpParser)
     {
     }
 
@@ -18,15 +20,15 @@ final class DoctrineExtractor
         if ('php' !== $languageId) {
             return new DoctrineSourceFacts($uri, [], [], []);
         }
-        [$namespace, $imports] = $this->phpNames($text);
-        $classes = $this->classes($text, $namespace, $imports);
+        $php = $this->phpParser->parse($text);
+        $classes = $this->classes($text, $php);
         $entities = [];
         $repositories = [];
         $symbols = [];
         foreach ($classes as $class) {
-            if ($this->hasMappingAttribute($class['attributes'], $imports, ['Entity', 'MappedSuperclass'])) {
-                [$repositoryClass, $repositoryOffset] = $this->repositoryClass($class, $namespace, $imports);
-                $fields = $this->fields($uri, $text, $class, $namespace, $imports);
+            if ($this->hasMappingAttribute($class['attributes'], $php, ['Entity', 'MappedSuperclass'])) {
+                [$repositoryClass, $repositoryOffset] = $this->repositoryClass($class, $php);
+                $fields = $this->fields($uri, $text, $class, $php);
                 $entity = new DoctrineEntity($class['className'], $uri, $class['range'], $repositoryClass, $fields);
                 $entities[] = $entity;
                 $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Entity, $entity->className(), null, $uri, $entity->range(), true);
@@ -37,7 +39,7 @@ final class DoctrineExtractor
                     $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Repository, $repositoryClass, null, $uri, $this->offsetRange($text, $repositoryOffset, $this->shortNameLengthAt($text, $repositoryOffset)), false);
                 }
             }
-            $repository = $this->repository($uri, $text, $class, $namespace, $imports);
+            $repository = $this->repository($uri, $text, $class, $php);
             if (null !== $repository) {
                 $repositories[] = $repository;
                 $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Repository, $repository->className(), null, $uri, $repository->range(), true);
@@ -47,8 +49,8 @@ final class DoctrineExtractor
                 }
             }
         }
-        array_push($symbols, ...$this->formSymbols($uri, $text, $namespace, $imports));
-        array_push($symbols, ...$this->repositorySymbols($uri, $text, $namespace, $imports, $repositories));
+        array_push($symbols, ...$this->formSymbols($uri, $text, $php));
+        array_push($symbols, ...$this->repositorySymbols($uri, $text, $php, $repositories));
 
         return new DoctrineSourceFacts($uri, $entities, $repositories, $this->unique($symbols));
     }
@@ -58,15 +60,15 @@ final class DoctrineExtractor
         if ('php' !== $languageId) {
             return null;
         }
-        [$namespace, $imports] = $this->phpNames($text);
+        $php = $this->phpParser->parse($text);
         $before = substr($text, 0, $offset);
         if (preg_match('/[\'"](?:choice_label|choice_value|group_by)[\'"]\s*=>\s*[\'"]([A-Za-z_][A-Za-z0-9_]*)$/s', $before, $field, \PREG_OFFSET_CAPTURE)) {
             $statementStart = max((int) strrpos($before, ';'), (int) strrpos($before, '->add('), (int) strrpos($before, 'createForm('), (int) strrpos($before, 'createNamed('));
             $statement = substr($before, $statementStart);
             if (preg_match('/([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*,\s*\[[\s\S]*[\'"]class[\'"]\s*=>\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class/', $statement, $classes)
-                && 'Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' === $this->resolvePhpName($classes[1], $namespace, $imports)) {
+                && 'Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' === $php->resolveName($classes[1])) {
                 return new DoctrineCompletionContext(
-                    $this->resolvePhpName($classes[2], $namespace, $imports),
+                    $php->resolveName($classes[2]),
                     null,
                     $field[1][0],
                     $this->offsetRange($text, $field[1][1], \strlen($field[1][0])),
@@ -74,16 +76,15 @@ final class DoctrineExtractor
             }
         }
 
-        return $this->repositoryCompletionContext($text, $offset, $namespace, $imports);
+        return $this->repositoryCompletionContext($text, $offset, $php);
     }
 
     /**
      * @param array{className: string, shortName: string, header: string, body: string, bodyOffset: int, attributes: string, attributesOffset: int, before: string, range: Range} $class
-     * @param array<string, string>                                                                                                                                               $imports
      *
      * @return list<DoctrineField>
      */
-    private function fields(string $uri, string $text, array $class, string $namespace, array $imports): array
+    private function fields(string $uri, string $text, array $class, PhpDocument $php): array
     {
         preg_match_all(
             '/(?:(?:public|protected|private|var|readonly|static)\s+)+(?:(\??[A-Za-z_\\\\][A-Za-z0-9_\\\\|?]*)\s+)?\$([A-Za-z_][A-Za-z0-9_]*)/',
@@ -96,12 +97,12 @@ final class DoctrineExtractor
             $before = substr($class['body'], 0, $property[0][1]);
             $boundary = max((int) strrpos($before, ';'), (int) strrpos($before, '{'), (int) strrpos($before, '}'));
             $attributes = substr($before, $boundary + 1);
-            if (!$this->hasMappingAttribute($attributes, $imports, ['Column', 'Embedded', 'Id', 'ManyToMany', 'ManyToOne', 'OneToMany', 'OneToOne'])) {
+            if (!$this->hasMappingAttribute($attributes, $php, ['Column', 'Embedded', 'Id', 'ManyToMany', 'ManyToOne', 'OneToMany', 'OneToOne'])) {
                 continue;
             }
-            $association = $this->hasMappingAttribute($attributes, $imports, self::ASSOCIATIONS);
+            $association = $this->hasMappingAttribute($attributes, $php, self::ASSOCIATIONS);
             $type = '' !== $property[1][0] ? ltrim($property[1][0], '?') : null;
-            $targetEntity = $this->associationTarget($attributes, $type, $namespace, $imports);
+            $targetEntity = $this->associationTarget($attributes, $type, $php);
             $offset = $class['bodyOffset'] + $property[2][1];
             $fields[] = new DoctrineField(
                 $property[2][0],
@@ -118,19 +119,18 @@ final class DoctrineExtractor
 
     /**
      * @param array{className: string, shortName: string, header: string, body: string, bodyOffset: int, attributes: string, attributesOffset: int, before: string, range: Range} $class
-     * @param array<string, string>                                                                                                                                               $imports
      *
      * @return array{?string, ?int}
      */
-    private function repositoryClass(array $class, string $namespace, array $imports): array
+    private function repositoryClass(array $class, PhpDocument $php): array
     {
-        foreach ($this->attributes($class['attributes'], $imports) as $attribute) {
+        foreach ($this->attributes($class['attributes'], $php) as $attribute) {
             if ('Doctrine\\ORM\\Mapping\\Entity' !== $attribute['class'] || !preg_match('/\brepositoryClass\s*:\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class/', $attribute['arguments'], $repository, \PREG_OFFSET_CAPTURE)) {
                 continue;
             }
             $offset = $class['attributesOffset'] + $attribute['argumentsOffset'] + $repository[1][1];
 
-            return [$this->resolvePhpName($repository[1][0], $namespace, $imports), $offset];
+            return [$php->resolveName($repository[1][0]), $offset];
         }
 
         return [null, null];
@@ -138,19 +138,18 @@ final class DoctrineExtractor
 
     /**
      * @param array{className: string, shortName: string, header: string, body: string, bodyOffset: int, attributes: string, attributesOffset: int, before: string, range: Range} $class
-     * @param array<string, string>                                                                                                                                               $imports
      */
-    private function repository(string $uri, string $text, array $class, string $namespace, array $imports): ?DoctrineRepository
+    private function repository(string $uri, string $text, array $class, PhpDocument $php): ?DoctrineRepository
     {
         if (!preg_match('/\bextends\s+([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)/', $class['header'], $parent)
-            || 'Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository' !== $this->resolvePhpName($parent[1], $namespace, $imports)) {
+            || 'Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository' !== $php->resolveName($parent[1])) {
             return null;
         }
         $entityClass = null;
         if (preg_match('/\bparent\s*::\s*__construct\s*\([^,]+,\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class/', $class['body'], $entity)) {
-            $entityClass = $this->resolvePhpName($entity[1], $namespace, $imports);
+            $entityClass = $php->resolveName($entity[1]);
         } elseif (preg_match('/@extends\s+(?:[A-Za-z_\\\\][A-Za-z0-9_\\\\]*\\\\)?ServiceEntityRepository\s*<\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*>/', $class['before'], $entity)) {
-            $entityClass = $this->resolvePhpName($entity[1], $namespace, $imports);
+            $entityClass = $php->resolveName($entity[1]);
         }
         if (null === $entityClass) {
             return null;
@@ -171,17 +170,13 @@ final class DoctrineExtractor
         return $class['bodyOffset'] + $entity[1][1];
     }
 
-    /**
-     * @param array<string, string> $imports
-     *
-     * @return list<DoctrineSourceSymbol>
-     */
-    private function formSymbols(string $uri, string $text, string $namespace, array $imports): array
+    /** @return list<DoctrineSourceSymbol> */
+    private function formSymbols(string $uri, string $text, PhpDocument $php): array
     {
         preg_match_all('/([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*,\s*\[/', $text, $formTypes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         $symbols = [];
         foreach ($formTypes as $formType) {
-            if ('Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $this->resolvePhpName($formType[1][0], $namespace, $imports)) {
+            if ('Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $php->resolveName($formType[1][0])) {
                 continue;
             }
             $open = $formType[0][1] + \strlen($formType[0][0]) - 1;
@@ -193,7 +188,7 @@ final class DoctrineExtractor
             if (!preg_match('/[\'"]class[\'"]\s*=>\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class/', $options, $entity, \PREG_OFFSET_CAPTURE)) {
                 continue;
             }
-            $entityClass = $this->resolvePhpName($entity[1][0], $namespace, $imports);
+            $entityClass = $php->resolveName($entity[1][0]);
             $entityOffset = $open + 1 + $entity[1][1];
             $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Entity, $entityClass, null, $uri, $this->offsetRange($text, $entityOffset, \strlen($entity[1][0])), false);
             preg_match_all('/[\'"](?:choice_label|choice_value|group_by)[\'"]\s*=>\s*([\'"])([A-Za-z_][A-Za-z0-9_]*)\1/', $options, $fields, \PREG_OFFSET_CAPTURE);
@@ -206,18 +201,17 @@ final class DoctrineExtractor
     }
 
     /**
-     * @param array<string, string>    $imports
      * @param list<DoctrineRepository> $localRepositories
      *
      * @return list<DoctrineSourceSymbol>
      */
-    private function repositorySymbols(string $uri, string $text, string $namespace, array $imports, array $localRepositories): array
+    private function repositorySymbols(string $uri, string $text, PhpDocument $php, array $localRepositories): array
     {
-        $repositoryVariables = $this->repositoryVariables($text, $namespace, $imports);
+        $repositoryVariables = $this->repositoryVariables($text, $php);
         $entityVariables = [];
         preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*[^;]*?->\s*getRepository\s*\(\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*\)/', $text, $assignments, \PREG_SET_ORDER);
         foreach ($assignments as $assignment) {
-            $entityVariables[$assignment[1]] = $this->resolvePhpName($assignment[2], $namespace, $imports);
+            $entityVariables[$assignment[1]] = $php->resolveName($assignment[2]);
         }
         $symbols = [];
         preg_match_all('/(\$this(?:->([A-Za-z_][A-Za-z0-9_]*))?|\$([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:findBy|findOneBy|count)\s*\(\s*\[/', $text, $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
@@ -237,7 +231,7 @@ final class DoctrineExtractor
         }
         preg_match_all('/getRepository\s*\(\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*\)\s*->\s*(?:findBy|findOneBy|count)\s*\(\s*\[/', $text, $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($calls as $call) {
-            $owner = $this->resolvePhpName($call[1][0], $namespace, $imports);
+            $owner = $php->resolveName($call[1][0]);
             $open = $call[0][1] + \strlen($call[0][0]) - 1;
             array_push($symbols, ...$this->criteriaSymbols($uri, $text, $open, $owner));
         }
@@ -262,22 +256,21 @@ final class DoctrineExtractor
         return $symbols;
     }
 
-    /** @param array<string, string> $imports */
-    private function repositoryCompletionContext(string $text, int $offset, string $namespace, array $imports): ?DoctrineCompletionContext
+    private function repositoryCompletionContext(string $text, int $offset, PhpDocument $php): ?DoctrineCompletionContext
     {
         $before = substr($text, 0, $offset);
         if (!preg_match('/(?:\[|,)\s*[\'"]([A-Za-z_][A-Za-z0-9_]*)$/s', $before, $prefix, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
-        $repositoryVariables = $this->repositoryVariables($text, $namespace, $imports);
+        $repositoryVariables = $this->repositoryVariables($text, $php);
         $entityVariables = [];
         preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*[^;]*?->\s*getRepository\s*\(\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*\)/', $text, $assignments, \PREG_SET_ORDER);
         foreach ($assignments as $assignment) {
-            $entityVariables[$assignment[1]] = $this->resolvePhpName($assignment[2], $namespace, $imports);
+            $entityVariables[$assignment[1]] = $php->resolveName($assignment[2]);
         }
         $localRepositories = [];
-        foreach ($this->classes($text, $namespace, $imports) as $class) {
-            $repository = $this->repository('', $text, $class, $namespace, $imports);
+        foreach ($this->classes($text, $php) as $class) {
+            $repository = $this->repository('', $text, $class, $php);
             if (null !== $repository) {
                 $localRepositories[] = $repository;
             }
@@ -304,48 +297,40 @@ final class DoctrineExtractor
         if ([] !== $calls) {
             $call = $calls[array_key_last($calls)];
 
-            return new DoctrineCompletionContext($this->resolvePhpName($call[1], $namespace, $imports), null, $prefix[1][0], $this->offsetRange($text, $prefix[1][1], \strlen($prefix[1][0])));
+            return new DoctrineCompletionContext($php->resolveName($call[1]), null, $prefix[1][0], $this->offsetRange($text, $prefix[1][1], \strlen($prefix[1][0])));
         }
 
         return null;
     }
 
-    /**
-     * @param array<string, string> $imports
-     *
-     * @return array<string, string>
-     */
-    private function repositoryVariables(string $text, string $namespace, array $imports): array
+    /** @return array<string, string> */
+    private function repositoryVariables(string $text, PhpDocument $php): array
     {
         preg_match_all('/([A-Za-z_\\\\][A-Za-z0-9_\\\\]*Repository)\s+\$([A-Za-z_][A-Za-z0-9_]*)/', $text, $types, \PREG_SET_ORDER);
         $variables = [];
         foreach ($types as $type) {
-            $variables[$type[2]] = $this->resolvePhpName($type[1], $namespace, $imports);
+            $variables[$type[2]] = $php->resolveName($type[1]);
         }
 
         return $variables;
     }
 
-    /** @param array<string, string> $imports */
-    private function associationTarget(string $attributes, ?string $type, string $namespace, array $imports): ?string
+    private function associationTarget(string $attributes, ?string $type, PhpDocument $php): ?string
     {
         if (preg_match('/\btargetEntity\s*:\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class/', $attributes, $target)) {
-            return $this->resolvePhpName($target[1], $namespace, $imports);
+            return $php->resolveName($target[1]);
         }
         if (null === $type || \in_array(strtolower($type), ['array', 'collection', 'iterable', 'mixed'], true)) {
             return null;
         }
 
-        return $this->resolvePhpName($type, $namespace, $imports);
+        return $php->resolveName($type);
     }
 
-    /**
-     * @param array<string, string> $imports
-     * @param list<string>          $names
-     */
-    private function hasMappingAttribute(string $text, array $imports, array $names): bool
+    /** @param list<string> $names */
+    private function hasMappingAttribute(string $text, PhpDocument $php, array $names): bool
     {
-        foreach ($this->attributes($text, $imports) as $attribute) {
+        foreach ($this->attributes($text, $php) as $attribute) {
             if (str_starts_with($attribute['class'], 'Doctrine\\ORM\\Mapping\\') && \in_array(substr($attribute['class'], \strlen('Doctrine\\ORM\\Mapping\\')), $names, true)) {
                 return true;
             }
@@ -354,18 +339,14 @@ final class DoctrineExtractor
         return false;
     }
 
-    /**
-     * @param array<string, string> $imports
-     *
-     * @return list<array{class: string, arguments: string, argumentsOffset: int}>
-     */
-    private function attributes(string $text, array $imports): array
+    /** @return list<array{class: string, arguments: string, argumentsOffset: int}> */
+    private function attributes(string $text, PhpDocument $php): array
     {
         preg_match_all('/#\[\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)(?:\s*\((.*?)\))?\s*]/s', $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL);
         $attributes = [];
         foreach ($matches as $match) {
             $attributes[] = [
-                'class' => $this->resolvePhpName((string) $match[1][0], '', $imports),
+                'class' => $php->resolveName((string) $match[1][0]),
                 'arguments' => \is_string($match[2][0] ?? null) ? $match[2][0] : '',
                 'argumentsOffset' => $match[2][1] >= 0 ? $match[2][1] : 0,
             ];
@@ -374,12 +355,8 @@ final class DoctrineExtractor
         return $attributes;
     }
 
-    /**
-     * @param array<string, string> $imports
-     *
-     * @return list<array{className: string, shortName: string, header: string, body: string, bodyOffset: int, attributes: string, attributesOffset: int, before: string, range: Range}>
-     */
-    private function classes(string $text, string $namespace, array $imports): array
+    /** @return list<array{className: string, shortName: string, header: string, body: string, bodyOffset: int, attributes: string, attributesOffset: int, before: string, range: Range}> */
+    private function classes(string $text, PhpDocument $php): array
     {
         preg_match_all('/(?:(?:final|abstract|readonly)\s+)*class\s+([A-Za-z_][A-Za-z0-9_]*)[^\{]*\{/', $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         $classes = [];
@@ -392,7 +369,7 @@ final class DoctrineExtractor
             $attributeOffset = $boundary + 1;
             $shortName = $match[1][0];
             $classes[] = [
-                'className' => '' === $namespace ? $shortName : $namespace.'\\'.$shortName,
+                'className' => $php->resolveName($shortName),
                 'shortName' => $shortName,
                 'header' => $match[0][0],
                 'body' => substr($text, $open + 1, $close - $open - 1),
@@ -405,41 +382,6 @@ final class DoctrineExtractor
         }
 
         return $classes;
-    }
-
-    /** @return array{string, array<string, string>} */
-    private function phpNames(string $text): array
-    {
-        preg_match('/\bnamespace\s+([^;{]+)[;{]/', $text, $namespace);
-        $namespace = isset($namespace[1]) ? trim($namespace[1]) : '';
-        preg_match_all('/^\s*use\s+(?!function\s|const\s)([^;]+);/m', $text, $uses);
-        $imports = [];
-        foreach ($uses[1] as $use) {
-            $use = trim($use);
-            if (str_contains($use, ',')) {
-                continue;
-            }
-            if (preg_match('/^(.+?)\s+as\s+(\w+)$/i', $use, $alias)) {
-                $imports[$alias[2]] = ltrim(trim($alias[1]), '\\');
-            } else {
-                $imports[substr($use, (int) strrpos($use, '\\') + 1)] = ltrim($use, '\\');
-            }
-        }
-
-        return [$namespace, $imports];
-    }
-
-    /** @param array<string, string> $imports */
-    private function resolvePhpName(string $name, string $namespace, array $imports): string
-    {
-        $name = ltrim($name, '\\');
-        $separator = strpos($name, '\\');
-        $head = false === $separator ? $name : substr($name, 0, $separator);
-        if (isset($imports[$head])) {
-            return $imports[$head].(false === $separator ? '' : substr($name, $separator));
-        }
-
-        return false !== $separator || '' === $namespace ? $name : $namespace.'\\'.$name;
     }
 
     private function matching(string $text, int $open, string $opening, string $closing): ?int
