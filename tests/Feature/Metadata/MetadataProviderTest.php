@@ -19,6 +19,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class MetadataProviderTest extends TestCase
 {
@@ -72,7 +73,7 @@ final class MetadataProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($entityUri, 'php', 1, $entityText));
         $documents->open(new Document($mappingUri, 'yaml', 1, $mappingText));
-        $provider = new MetadataProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $indexes, $sourceIndexes, $extractor);
+        $provider = new MetadataProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $sourceIndexes, $extractor);
 
         $formUri = 'file:///workspace/src/Controller/EventController.php';
         $formText = <<<'PHP'

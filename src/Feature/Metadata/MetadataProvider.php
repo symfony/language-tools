@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
@@ -13,15 +12,14 @@ use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class MetadataProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
-        private readonly DocumentStore $documents,
-        private readonly ProjectRegistry $projects,
         private readonly PositionConverter $converter,
+        private readonly LspProtocolMapper $protocol,
         private readonly MetadataIndexRegistry $indexes,
         private readonly MetadataSourceIndexRegistry $sourceIndexes,
         private readonly MetadataExtractor $extractor,
@@ -30,18 +28,17 @@ final class MetadataProvider implements CompletionProviderInterface, DefinitionP
 
     public function complete(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
+        $request = $this->resolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
-        [$document, $project, $position] = $request;
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        $context = $this->extractor->completionContext($document->languageId(), $document->text(), $offset);
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        $context = $this->extractor->completionContext($request->document->languageId(), $request->document->text(), $offset);
         if (null === $context) {
             return null;
         }
-        $index = $this->indexes->forProject($project);
-        $sourceIndex = $this->sourceIndexes->forProject($project);
+        $index = $this->indexes->forProject($request->project);
+        $sourceIndex = $this->sourceIndexes->forProject($request->project);
         $items = match ($context->kind()) {
             MetadataCompletionKind::FormOption => $this->formOptionItems($index, $context),
             MetadataCompletionKind::Constraint => $this->constraintItems($index, $sourceIndex),
@@ -61,7 +58,7 @@ final class MetadataProvider implements CompletionProviderInterface, DefinitionP
             $completion[] = [
                 ...$item,
                 'kind' => MetadataCompletionKind::Property === $context->kind() ? 10 : 14,
-                'textEdit' => ['range' => $this->range($context->range()), 'newText' => $label],
+                'textEdit' => $this->protocol->textEdit($context->range(), $label),
             ];
         }
 
@@ -81,36 +78,35 @@ final class MetadataProvider implements CompletionProviderInterface, DefinitionP
                 MetadataSymbolKind::SerializerGroup => \sprintf("Serializer group: `%s`\n\n%d known occurrence%s", $symbol->name(), $count, 1 === $count ? '' : 's'),
             };
 
-            return ['contents' => ['kind' => 'markdown', 'value' => $value]];
+            return $this->protocol->markdownHover($value);
         }
-        $request = $this->resolver->resolve($params);
+        $request = $this->resolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
-        [$document, $project, $position] = $request;
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        foreach ($this->extractor->formOptions($document->text()) as $option) {
-            if (!$this->contains($document, $option['range'], $offset)) {
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        foreach ($this->extractor->formOptions($request->document->text()) as $option) {
+            if (!$this->contains($request->document, $option['range'], $offset)) {
                 continue;
             }
-            $type = $this->indexes->forProject($project)->formType($option['class']);
+            $type = $this->indexes->forProject($request->project)->formType($option['class']);
             if (null === $type || !\in_array($option['option'], $type->options(), true)) {
                 return null;
             }
             $required = \in_array($option['option'], $type->requiredOptions(), true);
 
-            return ['contents' => ['kind' => 'markdown', 'value' => \sprintf("Form option: `%s`\n\nType: `%s`\n\nRequired: %s", $option['option'], $type->className(), $required ? 'yes' : 'no')]];
+            return $this->protocol->markdownHover(\sprintf("Form option: `%s`\n\nType: `%s`\n\nRequired: %s", $option['option'], $type->className(), $required ? 'yes' : 'no'));
         }
-        $constraintOptions = 'yaml' === $document->languageId()
-            ? $this->extractor->yamlConstraintOptions($document->text())
-            : $this->extractor->constraintOptions($document->text());
+        $constraintOptions = 'yaml' === $request->document->languageId()
+            ? $this->extractor->yamlConstraintOptions($request->document->text())
+            : $this->extractor->constraintOptions($request->document->text());
         foreach ($constraintOptions as $option) {
-            if (!$this->contains($document, $option['range'], $offset)) {
+            if (!$this->contains($request->document, $option['range'], $offset)) {
                 continue;
             }
-            $constraint = $this->indexes->forProject($project)->constraint($option['constraint']);
+            $constraint = $this->indexes->forProject($request->project)->constraint($option['constraint']);
 
-            return null === $constraint ? null : ['contents' => ['kind' => 'markdown', 'value' => \sprintf("Constraint option: `%s`\n\nConstraint: `%s`", $option['option'], $constraint->className())]];
+            return null === $constraint ? null : $this->protocol->markdownHover(\sprintf("Constraint option: `%s`\n\nConstraint: `%s`", $option['option'], $constraint->className()));
         }
 
         return null;
@@ -128,7 +124,7 @@ final class MetadataProvider implements CompletionProviderInterface, DefinitionP
             static fn (MetadataSourceSymbol $candidate): bool => $candidate->isDeclaration(),
         ));
 
-        return array_map(fn (MetadataSourceSymbol $candidate): array => ['uri' => $candidate->uri(), 'range' => $this->range($candidate->range())], $declarations);
+        return array_map(fn (MetadataSourceSymbol $candidate): array => $this->protocol->location($candidate->uri(), $candidate->range()), $declarations);
     }
 
     public function references(array $params): ?array
@@ -139,33 +135,28 @@ final class MetadataProvider implements CompletionProviderInterface, DefinitionP
         }
         [$symbol, $project] = $resolved;
 
-        return array_map(fn (MetadataSourceSymbol $candidate): array => ['uri' => $candidate->uri(), 'range' => $this->range($candidate->range())], $this->sourceIndexes->forProject($project)->symbols($symbol->kind(), $symbol->name()));
+        return array_map(fn (MetadataSourceSymbol $candidate): array => $this->protocol->location($candidate->uri(), $candidate->range()), $this->sourceIndexes->forProject($project)->symbols($symbol->kind(), $symbol->name()));
     }
 
     public function diagnostics(array $params): ?array
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
+        $request = $this->resolver->resolveDocument($params);
+        if (null === $request || !\in_array($request->document->languageId(), ['php', 'yaml'], true)) {
             return null;
         }
-        $document = $this->documents->get($textDocument['uri']);
-        $project = $this->projects->forDocumentUri($textDocument['uri']);
-        if (null === $document || null === $project || !\in_array($document->languageId(), ['php', 'yaml'], true)) {
-            return null;
-        }
-        $index = $this->indexes->forProject($project);
+        $index = $this->indexes->forProject($request->project);
         $diagnostics = [];
-        if ('php' === $document->languageId()) {
-            foreach ($this->extractor->formOptions($document->text()) as $option) {
+        if ('php' === $request->document->languageId()) {
+            foreach ($this->extractor->formOptions($request->document->text()) as $option) {
                 $type = $index->formType($option['class']);
                 if (null !== $type && !\in_array($option['option'], $type->options(), true)) {
                     $diagnostics[] = $this->diagnostic($option['range'], 'form.unknown_option', \sprintf('Unknown option "%s" for form type "%s".', $option['option'], $type->className()));
                 }
             }
         }
-        $constraintOptions = 'yaml' === $document->languageId()
-            ? $this->extractor->yamlConstraintOptions($document->text())
-            : $this->extractor->constraintOptions($document->text());
+        $constraintOptions = 'yaml' === $request->document->languageId()
+            ? $this->extractor->yamlConstraintOptions($request->document->text())
+            : $this->extractor->constraintOptions($request->document->text());
         foreach ($constraintOptions as $option) {
             $constraint = $index->constraint($option['constraint']);
             if (null !== $constraint && !\in_array($option['option'], $constraint->options(), true)) {
@@ -238,15 +229,14 @@ final class MetadataProvider implements CompletionProviderInterface, DefinitionP
      */
     private function resolveSourceSymbol(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
+        $request = $this->resolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
-        [$document, $project, $position] = $request;
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        foreach ($this->extractor->extract($document->uri(), $document->languageId(), $document->text())->symbols() as $symbol) {
-            if ($this->contains($document, $symbol->range(), $offset)) {
-                return [$symbol, $project];
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->symbols() as $symbol) {
+            if ($this->contains($request->document, $symbol->range(), $offset)) {
+                return [$symbol, $request->project];
             }
         }
 
@@ -262,12 +252,6 @@ final class MetadataProvider implements CompletionProviderInterface, DefinitionP
     /** @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, severity: int, source: string, code: string, message: string} */
     private function diagnostic(Range $range, string $code, string $message): array
     {
-        return ['range' => $this->range($range), 'severity' => 1, 'source' => 'symfony', 'code' => $code, 'message' => $message];
-    }
-
-    /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */
-    private function range(Range $range): array
-    {
-        return ['start' => ['line' => $range->start()->line(), 'character' => $range->start()->character()], 'end' => ['line' => $range->end()->line(), 'character' => $range->end()->character()]];
+        return $this->protocol->diagnostic($range, 1, $code, $message);
     }
 }
