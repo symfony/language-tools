@@ -30,8 +30,8 @@ const pageRows = [...pageTable.matchAll(/^\| ([^|:-][^|]*) \|(.+)\|$/gm)].map((m
     name: match[1].trim(),
     support: match[2].split('|').map((cell) => '✓' === cell.trim()),
 }));
-if (13 !== referenceRows.length || referenceRows.length !== pageRows.length) {
-    throw new Error(`Expected 13 matching integration rows, found ${referenceRows.length} reference and ${pageRows.length} overview rows`);
+if (14 !== referenceRows.length || referenceRows.length !== pageRows.length) {
+    throw new Error(`Expected 14 matching integration rows, found ${referenceRows.length} reference and ${pageRows.length} overview rows`);
 }
 
 for (const [index, row] of referenceRows.entries()) {
@@ -46,8 +46,8 @@ for (const [index, row] of referenceRows.entries()) {
 }
 
 const supported = pageRows.flatMap((row) => row.support).filter(Boolean).length;
-if (65 !== supported) {
-    throw new Error(`Expected 65 supported combinations, found ${supported}`);
+if (67 !== supported) {
+    throw new Error(`Expected 67 supported combinations, found ${supported}`);
 }
 
 const tourSlides = [...tourScript.matchAll(/^    "([a-z-]+)\|/gm)].map((match) => `${match[1]}.webp`);

@@ -52,6 +52,7 @@ It complements your PHP language server; keep it enabled.
 | Routing | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Dependency injection | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Twig template names | ✓ | ✓ | ✓ | ✓ | · | ✓ |
+| Twig functions and filters | · | ✓ | ✓ | · | · | · |
 | Translations | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Environment variables | ✓ | ✓ | ✓ | ✓ | · | ✓ |
 | Bundle configuration | ✓ | ✓ | · | · | · | ✓ |
