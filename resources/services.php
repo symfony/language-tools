@@ -43,6 +43,7 @@ use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Index\SourceIndexStoreInterface;
+use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
@@ -150,6 +151,9 @@ return static function (ContainerConfigurator $container): void {
 
     $services->alias(ClientInterface::class, JsonRpcClient::class);
     $services->alias(PhpParserInterface::class, TolerantPhpParser::class);
+    $services->get(LastResultPhpParser::class)
+        ->decorate(PhpParserInterface::class)
+        ->arg('$parser', service(LastResultPhpParser::class.'.inner'));
     $services->alias(ProcessRunnerInterface::class, NativeProcessRunner::class);
     $services->alias(ProgressReporterInterface::class, WorkDoneProgressReporter::class);
     $services->alias(RuntimeRefreshObserverInterface::class, DiagnosticProviderRegistry::class);

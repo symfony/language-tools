@@ -10,10 +10,10 @@ use Fabpot\JsonRpc\ContentLengthJsonRpcTransport;
 use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcPeer;
 use Fabpot\JsonRpc\JsonRpcValueDecoding;
-use Microsoft\PhpParser\Parser;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
@@ -277,9 +277,13 @@ function bootScanner(bool $countParsers): array
     $container->setParameter('server.version', 'benchmark');
     $container->setParameter('bridge.source', $resources.'/bridge.php');
     (new PhpFileLoader($container, new FileLocator($resources)))->load('services.php');
-    if ($countParsers) {
-        $container->removeAlias(PhpParserInterface::class);
-        $container->register(PhpParserInterface::class)->setSynthetic(true)->setPublic(true);
+    $counter = $countParsers ? new ParseCallCounter() : null;
+    if (null !== $counter) {
+        $container->register(ParseCallCounter::class)->setSynthetic(true)->setPublic(true);
+        $container->register(CountingPhpParser::class, CountingPhpParser::class)
+            ->setDecoratedService(TolerantPhpParser::class)
+            ->setArgument('$parser', new Reference(CountingPhpParser::class.'.inner'))
+            ->setArgument('$counter', new Reference(ParseCallCounter::class));
     }
     $container->getDefinition(ApplicationSourceScanner::class)->setPublic(true);
     $container->getDefinition(ProjectIndexStatusRegistry::class)->setPublic(true);
@@ -292,13 +296,12 @@ function bootScanner(bool $countParsers): array
     $container->set(JsonRpcPeer::class, $peer);
     $container->set(JsonRpcDispatcher::class, new JsonRpcDispatcher($peer));
     $container->set(ServerLogger::class, new ServerLogger(null));
-    $counter = $countParsers ? new ParseCallCounter() : null;
     $treeSitterParser = new NativeTreeSitterParser(new TreeSitterResultDecoder());
     if (null === $counter) {
         $container->set(TreeSitterParserInterface::class, $treeSitterParser);
     } else {
+        $container->set(ParseCallCounter::class, $counter);
         $container->set(TreeSitterParserInterface::class, new CountingTreeSitterParser($treeSitterParser, $counter));
-        $container->set(PhpParserInterface::class, new CountingPhpParser(new TolerantPhpParser(new Parser()), $counter));
     }
 
     /** @var ApplicationSourceScanner $scanner */
