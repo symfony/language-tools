@@ -18,6 +18,7 @@ use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class ConfigurationProviderTest extends TestCase
 {
@@ -170,7 +171,7 @@ final class ConfigurationProviderTest extends TestCase
             ],
         ]]]]);
 
-        return [new ConfigurationProvider(new DocumentContextResolver($documents, $projects), $documents, $projects, $converter, $indexes, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), $environmentIndexes, new UriToPathConverter()), $documents, $converter];
+        return [new ConfigurationProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), $environmentIndexes, new UriToPathConverter()), $documents, $converter];
     }
 
     /**

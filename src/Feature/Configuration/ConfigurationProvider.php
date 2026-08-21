@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Feature\Configuration;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
@@ -15,16 +14,15 @@ use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class ConfigurationProvider implements CompletionProviderInterface, DiagnosticProviderInterface, DocumentLinkProviderInterface, HoverProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
-        private readonly DocumentStore $documents,
-        private readonly ProjectRegistry $projects,
         private readonly PositionConverter $converter,
+        private readonly LspProtocolMapper $protocol,
         private readonly ConfigurationIndexRegistry $indexes,
         private readonly YamlConfigurationParser $yaml,
         private readonly EnvironmentIndexRegistry $environmentIndexes,
@@ -34,49 +32,47 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
 
     public function complete(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
+        $request = $this->resolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
-        [$document, $project, $position] = $request;
 
-        return match ($document->languageId()) {
-            'yaml' => $this->completeYaml($document, $project, $position),
-            'php' => $this->completePhp($document, $project, $position),
-            'xml' => $this->completeXml($document, $project, $position),
+        return match ($request->document->languageId()) {
+            'yaml' => $this->completeYaml($request->document, $request->project, $request->position),
+            'php' => $this->completePhp($request->document, $request->project, $request->position),
+            'xml' => $this->completeXml($request->document, $request->project, $request->position),
             default => null,
         };
     }
 
     public function hover(array $params): ?array
     {
-        $request = $this->resolver->resolve($params);
+        $request = $this->resolver->resolvePositioned($params);
         if (null === $request) {
             return null;
         }
-        [$document, $project, $position] = $request;
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        $index = $this->indexes->forProject($project);
-        if ('php' === $document->languageId()) {
-            $resolved = $this->resolvePhpNode($document, $index, $offset);
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        $index = $this->indexes->forProject($request->project);
+        if ('php' === $request->document->languageId()) {
+            $resolved = $this->resolvePhpNode($request->document, $index, $offset);
 
-            return null === $resolved ? null : ['contents' => ['kind' => 'markdown', 'value' => $this->description($resolved[0], $resolved[1])]];
+            return null === $resolved ? null : $this->protocol->markdownHover($this->description($resolved[0], $resolved[1]));
         }
-        if ('xml' === $document->languageId()) {
-            $resolved = $this->resolveXmlNode($document, $index, $offset);
+        if ('xml' === $request->document->languageId()) {
+            $resolved = $this->resolveXmlNode($request->document, $index, $offset);
 
-            return null === $resolved ? null : ['contents' => ['kind' => 'markdown', 'value' => $this->description($resolved[0], $resolved[1])]];
+            return null === $resolved ? null : $this->protocol->markdownHover($this->description($resolved[0], $resolved[1]));
         }
-        if ('yaml' !== $document->languageId()) {
+        if ('yaml' !== $request->document->languageId()) {
             return null;
         }
-        foreach ($this->yaml->parse($document->text()) as $occurrence) {
-            if (!$this->contains($document->text(), $occurrence->keyRange(), $offset)) {
+        foreach ($this->yaml->parse($request->document->text()) as $occurrence) {
+            if (!$this->contains($request->document->text(), $occurrence->keyRange(), $offset)) {
                 continue;
             }
             $node = $index->find($occurrence->path());
 
-            return null === $node ? null : ['contents' => ['kind' => 'markdown', 'value' => $this->description($occurrence->path(), $node)]];
+            return null === $node ? null : $this->protocol->markdownHover($this->description($occurrence->path(), $node));
         }
 
         return null;
@@ -84,26 +80,18 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
 
     public function diagnostics(array $params): ?array
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
+        $request = $this->resolver->resolveDocument($params);
+        if (null === $request || !\in_array($request->document->languageId(), ['php', 'xml', 'yaml'], true)) {
             return null;
         }
-        $document = $this->documents->get($textDocument['uri']);
-        if (null === $document || !\in_array($document->languageId(), ['php', 'xml', 'yaml'], true)) {
-            return null;
+        $index = $this->indexes->forProject($request->project);
+        if ('php' === $request->document->languageId()) {
+            return $this->diagnosePhp($request->document, $index);
         }
-        $project = $this->projects->forDocumentUri($document->uri());
-        if (null === $project) {
-            return null;
+        if ('xml' === $request->document->languageId()) {
+            return $this->diagnoseXml($request->document, $index);
         }
-        $index = $this->indexes->forProject($project);
-        if ('php' === $document->languageId()) {
-            return $this->diagnosePhp($document, $index);
-        }
-        if ('xml' === $document->languageId()) {
-            return $this->diagnoseXml($document, $index);
-        }
-        $occurrences = $this->yaml->parse($document->text());
+        $occurrences = $this->yaml->parse($request->document->text());
         $diagnostics = [];
         $seen = [];
         foreach ($occurrences as $occurrence) {
@@ -126,16 +114,16 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
             if ($node->deprecated()) {
                 $diagnostics[] = $this->diagnostic($occurrence->keyRange(), 2, 'config.deprecated_key', \sprintf('Configuration key "%s" is deprecated.', $key));
             }
-            $environmentType = $this->environmentType($project, $occurrence->value());
+            $environmentType = $this->environmentType($request->project, $occurrence->value());
             if (null !== $environmentType && !$this->compatibleType($node->type(), $environmentType)) {
                 $diagnostics[] = $this->diagnostic($occurrence->valueRange(), 1, 'env.incompatible_type', \sprintf('Environment expression returns %s, but "%s" expects %s.', $environmentType, $key, $node->type()));
             } elseif ('' !== $occurrence->value() && !$this->validValue($node, $occurrence->value())) {
                 $diagnostics[] = $this->diagnostic($occurrence->valueRange(), 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $node->type(), $key));
             }
         }
-        preg_match_all('/^\t+\S.*$/m', $document->text(), $tabbedLines, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/^\t+\S.*$/m', $request->document->text(), $tabbedLines, \PREG_OFFSET_CAPTURE);
         foreach ($tabbedLines[0] as [$line, $offset]) {
-            $diagnostics[] = $this->diagnostic($this->offsetRange($document->text(), $offset, \strlen($line)), 1, 'config.malformed_structure', 'YAML indentation cannot contain tabs.');
+            $diagnostics[] = $this->diagnostic($this->offsetRange($request->document->text(), $offset, \strlen($line)), 1, 'config.malformed_structure', 'YAML indentation cannot contain tabs.');
         }
         foreach ($occurrences as $occurrence) {
             $path = $occurrence->path();
@@ -162,27 +150,23 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
 
     public function links(array $params): ?array
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
+        $request = $this->resolver->resolveDocument($params);
+        if (null === $request || 'yaml' !== $request->document->languageId()) {
             return null;
         }
-        $document = $this->documents->get($textDocument['uri']);
-        if (null === $document || 'yaml' !== $document->languageId()) {
-            return null;
-        }
-        $documentPath = $this->uriToPathConverter->convert($document->uri());
+        $documentPath = $this->uriToPathConverter->convert($request->document->uri());
         if (null === $documentPath) {
             return [];
         }
         $links = [];
-        preg_match_all('/\bresource\s*:\s*(["\']?)([^"\'\s#]+)\1/', $document->text(), $matches, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/\bresource\s*:\s*(["\']?)([^"\'\s#]+)\1/', $request->document->text(), $matches, \PREG_OFFSET_CAPTURE);
         $basePath = Path::getDirectory($documentPath);
         foreach ($matches[2] as [$resource, $offset]) {
             if (str_contains($resource, '*') || str_starts_with($resource, '@')) {
                 continue;
             }
             $targetPath = Path::isAbsolute($resource) ? Path::canonicalize($resource) : Path::join($basePath, $resource);
-            $links[] = ['range' => $this->range(new Range($this->converter->toPosition($document->text(), $offset), $this->converter->toPosition($document->text(), $offset + \strlen($resource)))), 'target' => $this->uriToPathConverter->toUri($targetPath)];
+            $links[] = ['range' => $this->protocol->range(new Range($this->converter->toPosition($request->document->text(), $offset), $this->converter->toPosition($request->document->text(), $offset + \strlen($resource)))), 'target' => $this->uriToPathConverter->toUri($targetPath)];
         }
 
         return $links;
@@ -641,18 +625,12 @@ final class ConfigurationProvider implements CompletionProviderInterface, Diagno
     {
         $position = $this->converter->toPosition($text, $start);
 
-        return ['label' => $label, 'kind' => 10, 'detail' => $detail, 'insertTextFormat' => 2, 'textEdit' => ['range' => ['start' => ['line' => $position->line(), 'character' => $position->character()], 'end' => ['line' => $end->line(), 'character' => $end->character()]], 'newText' => $newText]];
+        return ['label' => $label, 'kind' => 10, 'detail' => $detail, 'insertTextFormat' => 2, 'textEdit' => $this->protocol->textEdit(new Range($position, $end), $newText)];
     }
 
     /** @return array{range: array<string, array<string, int>>, severity: int, source: string, code: string, message: string} */
     private function diagnostic(Range $range, int $severity, string $code, string $message): array
     {
-        return ['range' => $this->range($range), 'severity' => $severity, 'source' => 'symfony', 'code' => $code, 'message' => $message];
-    }
-
-    /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */
-    private function range(Range $range): array
-    {
-        return ['start' => ['line' => $range->start()->line(), 'character' => $range->start()->character()], 'end' => ['line' => $range->end()->line(), 'character' => $range->end()->character()]];
+        return $this->protocol->diagnostic($range, $severity, $code, $message);
     }
 }
