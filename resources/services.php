@@ -23,8 +23,8 @@ use Symfony\Lsp\Feature\DocumentLinkProviderRegistry;
 use Symfony\Lsp\Feature\Event\EventProvider;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderRegistry;
+use Symfony\Lsp\Feature\Messenger\MessengerCodeLensProvider;
 use Symfony\Lsp\Feature\Messenger\MessengerHandler;
-use Symfony\Lsp\Feature\Messenger\MessengerProvider;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderRegistry;
 use Symfony\Lsp\Feature\RenameProviderInterface;
@@ -201,7 +201,7 @@ return static function (ContainerConfigurator $container): void {
     $services->get(RuntimeSnapshotLoaderRegistry::class)
         ->arg('$loaders', tagged_iterator('lsp.runtime_snapshot_loader'));
 
-    foreach ([MessengerProvider::class, EventProvider::class, TwigComponentCodeLensProvider::class, StimulusProvider::class, DoctrineRelationshipCodeLensProvider::class] as $priority => $provider) {
+    foreach ([MessengerCodeLensProvider::class, EventProvider::class, TwigComponentCodeLensProvider::class, StimulusProvider::class, DoctrineRelationshipCodeLensProvider::class] as $priority => $provider) {
         $services->get($provider)->tag('lsp.provider.code_lens', ['priority' => -$priority]);
     }
     $services->get(CodeLensProviderRegistry::class)

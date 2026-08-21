@@ -14,11 +14,15 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Messenger\MessengerBus;
+use Symfony\Lsp\Feature\Messenger\MessengerCodeLensProvider;
+use Symfony\Lsp\Feature\Messenger\MessengerCompletionProvider;
+use Symfony\Lsp\Feature\Messenger\MessengerDiagnosticProvider;
 use Symfony\Lsp\Feature\Messenger\MessengerExtractor;
 use Symfony\Lsp\Feature\Messenger\MessengerHandler;
 use Symfony\Lsp\Feature\Messenger\MessengerIndexRegistry;
 use Symfony\Lsp\Feature\Messenger\MessengerMessage;
-use Symfony\Lsp\Feature\Messenger\MessengerProvider;
+use Symfony\Lsp\Feature\Messenger\MessengerRelationshipProvider;
+use Symfony\Lsp\Feature\Messenger\MessengerRelationshipResolver;
 use Symfony\Lsp\Feature\Messenger\MessengerSourceIndexRegistry;
 use Symfony\Lsp\Feature\Messenger\MessengerTransport;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -51,14 +55,14 @@ YAML;
         $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser);
         $facts = $extractor->extract('file:///workspace/config/packages/messenger.yaml', 'yaml', $text);
 
-        self::assertSame(
-            ['command.bus', 'async', 'failed', 'App\\Message\\Ping', 'async', 'command.bus', 'failed'],
-            array_map(static fn ($symbol): string => $symbol->name(), $facts->symbols()),
-        );
-        self::assertSame(
-            [true, true, true, false, false, false, false],
-            array_map(static fn ($symbol): bool => $symbol->isDeclaration(), $facts->symbols()),
-        );
+        $names = [];
+        $declarations = [];
+        foreach ($facts->symbols() as $symbol) {
+            $names[] = $symbol->name();
+            $declarations[] = $symbol->isDeclaration();
+        }
+        self::assertSame(['command.bus', 'async', 'failed', 'App\\Message\\Ping', 'async', 'command.bus', 'failed'], $names);
+        self::assertSame([true, true, true, false, false, false, false], $declarations);
         $phpFacts = $extractor->extract('file:///workspace/src/Example.php', 'php', "<?php\nfoo(bus: 'not_messenger');\n\$dispatcher->dispatch(new NotAMessage());\n");
         self::assertSame([], $phpFacts->symbols());
 
@@ -121,24 +125,30 @@ YAML;
             new DependencyInjectionSourceFacts($messageUri, classes: $classExtractor->extract($messageUri, $message)),
             new DependencyInjectionSourceFacts($handlerUri, classes: $classExtractor->extract($handlerUri, $handler)),
         );
-        $provider = new MessengerProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes, $yamlParser);
+        $documentResolver = new DocumentContextResolver($documents, $projects);
+        $protocol = new LspProtocolMapper();
+        $relationshipResolver = new MessengerRelationshipResolver($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
+        $completionProvider = new MessengerCompletionProvider($documentResolver, $converter, $protocol, $indexes, $yamlParser);
+        $relationshipProvider = new MessengerRelationshipProvider($protocol, $indexes, $relationshipResolver);
+        $diagnosticProvider = new MessengerDiagnosticProvider($documentResolver, $converter, $protocol, $indexes, $extractor, $classExtractor);
+        $codeLensProvider = new MessengerCodeLensProvider($documentResolver, $protocol, $indexes, $classExtractor, $relationshipResolver);
 
         $completionParams = $this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'command.bus }') + 4));
-        self::assertSame(['command.bus'], array_column($provider->complete($completionParams) ?? [], 'label'));
+        self::assertSame(['command.bus'], array_column($completionProvider->complete($completionParams) ?? [], 'label'));
         $routingCompletion = $this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, "async\nservices") + 3));
-        self::assertSame(['async'], array_column($provider->complete($routingCompletion) ?? [], 'label'));
-        $hover = $provider->hover($this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'async }') + 2)));
+        self::assertSame(['async'], array_column($completionProvider->complete($routingCompletion) ?? [], 'label'));
+        $hover = $relationshipProvider->hover($this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'async }') + 2)));
         self::assertStringContainsString('Messenger transport', json_encode($hover, \JSON_THROW_ON_ERROR));
-        self::assertSame([$yamlUri], array_column($provider->definition($this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'command.bus') + 2))) ?? [], 'uri'));
-        self::assertSame(['messenger.unknown_bus'], array_column($provider->diagnostics(['textDocument' => ['uri' => $yamlUri]]) ?? [], 'code'));
-        self::assertSame(['messenger.invalid_handler_signature'], array_column($provider->diagnostics(['textDocument' => ['uri' => $handlerUri]]) ?? [], 'code'));
+        self::assertSame([$yamlUri], array_column($relationshipProvider->definition($this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'command.bus') + 2))) ?? [], 'uri'));
+        self::assertSame(['messenger.unknown_bus'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $yamlUri]]) ?? [], 'code'));
+        self::assertSame(['messenger.invalid_handler_signature'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $handlerUri]]) ?? [], 'code'));
 
         $messagePosition = $converter->toPosition($message, (int) strpos($message, 'Ping'));
-        self::assertSame([$handlerUri], array_column($provider->definition($this->params($messageUri, $messagePosition)) ?? [], 'uri'));
-        self::assertContains($controllerUri, array_column($provider->references($this->params($messageUri, $messagePosition)) ?? [], 'uri'));
+        self::assertSame([$handlerUri], array_column($relationshipProvider->definition($this->params($messageUri, $messagePosition)) ?? [], 'uri'));
+        self::assertContains($controllerUri, array_column($relationshipProvider->references($this->params($messageUri, $messagePosition)) ?? [], 'uri'));
         $dispatchPosition = $converter->toPosition($controller, (int) strrpos($controller, 'Ping'));
-        self::assertSame([$messageUri, $handlerUri], array_column($provider->definition($this->params($controllerUri, $dispatchPosition)) ?? [], 'uri'));
-        $codeLens = $provider->codeLenses(['textDocument' => ['uri' => $messageUri]])[0] ?? null;
+        self::assertSame([$messageUri, $handlerUri], array_column($relationshipProvider->definition($this->params($controllerUri, $dispatchPosition)) ?? [], 'uri'));
+        $codeLens = $codeLensProvider->codeLenses(['textDocument' => ['uri' => $messageUri]])[0] ?? null;
         self::assertIsArray($codeLens);
         self::assertIsArray($codeLens['command'] ?? null);
         self::assertSame('1 Messenger handler', $codeLens['command']['title'] ?? null);
