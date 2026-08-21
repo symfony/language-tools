@@ -17,6 +17,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class StimulusProviderTest extends TestCase
 {
@@ -85,10 +86,9 @@ final class StimulusProviderTest extends TestCase
         );
         $provider = new StimulusProvider(
             new DocumentContextResolver($documents, $projects),
-            $documents,
-            $projects,
             $converter,
             new UriToPathConverter(),
+            new LspProtocolMapper(),
             $indexes,
             $sourceIndexes,
             $extractor,
