@@ -39,7 +39,7 @@ function bridgeContainerSection(SymfonyLspBridgeContext $context): ?array
                 'resources' => [],
                 'warnings' => [],
             ];
-            $section['generation'] = hash('sha256', json_encode($section, JSON_THROW_ON_ERROR));
+            $section = finalizeBridgeSection($section);
         } catch (Throwable) {
             $context->addError('container');
         }

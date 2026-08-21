@@ -120,7 +120,5 @@ function bridgeSecuritySection(SymfonyLspBridgeContext $context): ?array
         'resources' => [],
         'warnings' => $warnings,
     ];
-    $section['generation'] = hash('sha256', json_encode($section, JSON_THROW_ON_ERROR));
-
-    return $section;
+    return finalizeBridgeSection($section);
 }

@@ -1,5 +1,12 @@
 <?php
 
+function finalizeBridgeSection(array $section): array
+{
+    $section['generation'] = hash('sha256', json_encode($section, JSON_THROW_ON_ERROR));
+
+    return $section;
+}
+
 function runJsonCommand(object $application, array $arguments): array
 {
     static $cache = [];
