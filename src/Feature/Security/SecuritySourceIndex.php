@@ -2,46 +2,48 @@
 
 namespace Symfony\Lsp\Feature\Security;
 
+use Symfony\Lsp\Index\SourceFactsStore;
+
 final class SecuritySourceIndex
 {
-    /** @var array<string, SecuritySourceFacts> */
-    private array $sources = [];
-    /** @var array<string, SecuritySourceFacts> */
-    private array $overlays = [];
+    /** @var SourceFactsStore<SecuritySourceFacts> */
+    private readonly SourceFactsStore $sources;
+
+    public function __construct()
+    {
+        $this->sources = new SourceFactsStore();
+    }
 
     public function replace(SecuritySourceFacts ...$sources): void
     {
-        $this->sources = [];
-        foreach ($sources as $source) {
-            $this->sources[$source->uri()] = $source;
-        }
+        $this->sources->replaceSaved(...$sources);
     }
 
     public function replaceSource(SecuritySourceFacts $source): void
     {
-        $this->sources[$source->uri()] = $source;
+        $this->sources->replaceSavedFact($source);
     }
 
     public function removeSource(string $uri): void
     {
-        unset($this->sources[$uri]);
+        $this->sources->removeSaved($uri);
     }
 
     public function overlay(SecuritySourceFacts $source): void
     {
-        $this->overlays[$source->uri()] = $source;
+        $this->sources->replaceOverlay($source);
     }
 
     public function removeOverlay(string $uri): void
     {
-        unset($this->overlays[$uri]);
+        $this->sources->removeOverlay($uri);
     }
 
     /** @return list<SecuritySourceSymbol> */
     public function symbols(SecuritySymbolKind $kind, string $name): array
     {
         $symbols = [];
-        foreach ($this->sources() as $source) {
+        foreach ($this->sources->effective() as $source) {
             foreach ($source->symbols() as $symbol) {
                 if ($symbol->kind() === $kind && $symbol->name() === $name) {
                     $symbols[] = $symbol;
@@ -62,7 +64,7 @@ final class SecuritySourceIndex
     public function names(SecuritySymbolKind $kind, bool $declarationsOnly = false): array
     {
         $names = [];
-        foreach ($this->sources() as $source) {
+        foreach ($this->sources->effective() as $source) {
             foreach ($source->symbols() as $symbol) {
                 if ($symbol->kind() === $kind && (!$declarationsOnly || $symbol->isDeclaration())) {
                     $names[$symbol->name()] = true;
@@ -73,11 +75,5 @@ final class SecuritySourceIndex
         sort($names);
 
         return $names;
-    }
-
-    /** @return list<SecuritySourceFacts> */
-    private function sources(): array
-    {
-        return [...array_values(array_diff_key($this->sources, $this->overlays)), ...array_values($this->overlays)];
     }
 }

@@ -2,46 +2,49 @@
 
 namespace Symfony\Lsp\Feature\Asset;
 
+use Symfony\Lsp\Index\SourceFactsOverlayOrder;
+use Symfony\Lsp\Index\SourceFactsStore;
+
 final class AssetSourceIndex
 {
-    /** @var array<string, AssetSourceFacts> */
-    private array $sources = [];
-    /** @var array<string, AssetSourceFacts> */
-    private array $overlays = [];
+    /** @var SourceFactsStore<AssetSourceFacts> */
+    private readonly SourceFactsStore $facts;
+
+    public function __construct()
+    {
+        $this->facts = new SourceFactsStore(SourceFactsOverlayOrder::PreserveSavedPosition);
+    }
 
     public function replace(AssetSourceFacts ...$facts): void
     {
-        $this->sources = [];
-        foreach ($facts as $item) {
-            $this->sources[$item->uri()] = $item;
-        }
+        $this->facts->replaceSaved(...$facts);
     }
 
     public function replaceSource(AssetSourceFacts $facts): void
     {
-        $this->sources[$facts->uri()] = $facts;
+        $this->facts->replaceSavedFact($facts);
     }
 
     public function removeSource(string $uri): void
     {
-        unset($this->sources[$uri]);
+        $this->facts->removeSaved($uri);
     }
 
     public function overlay(AssetSourceFacts $facts): void
     {
-        $this->overlays[$facts->uri()] = $facts;
+        $this->facts->replaceOverlay($facts);
     }
 
     public function removeOverlay(string $uri): void
     {
-        unset($this->overlays[$uri]);
+        $this->facts->removeOverlay($uri);
     }
 
     /** @return list<AssetSourceSymbol> */
     public function symbols(AssetSymbolKind $kind, ?string $name = null): array
     {
         $symbols = [];
-        foreach ($this->facts() as $facts) {
+        foreach ($this->facts->effective() as $facts) {
             foreach ($facts->symbols() as $symbol) {
                 if ($symbol->kind() === $kind && (null === $name || $symbol->name() === $name)) {
                     $symbols[] = $symbol;
@@ -64,11 +67,5 @@ final class AssetSourceIndex
         ksort($names);
 
         return array_keys($names);
-    }
-
-    /** @return list<AssetSourceFacts> */
-    private function facts(): array
-    {
-        return array_values(array_replace($this->sources, $this->overlays));
     }
 }
