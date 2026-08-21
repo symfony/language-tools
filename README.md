@@ -14,10 +14,12 @@ Doctrine. See the [supported integrations](docs/features/index.rst) for details.
 ### Visual Studio Code
 
 Install the self-contained Symfony Language Tools extension from the
-[Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=symfony.language-tools):
+[Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=symfony.language-tools)
+or the [Open VSX Registry](https://open-vsx.org/extension/symfony/language-tools):
 
 ```console
 code --install-extension symfony.language-tools
+codium --install-extension symfony.language-tools
 ```
 
 Add `--pre-release` to install a version with a prerelease suffix. See the

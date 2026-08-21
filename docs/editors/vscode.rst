@@ -12,11 +12,13 @@ tour of every supported integration and editor workflow.
 Installing the Extension
 ------------------------
 
-Install the stable Symfony Language Tools extension from the Marketplace:
+Install the stable Symfony Language Tools extension from the
+`Visual Studio Marketplace`_ or `Open VSX Registry`_:
 
 .. code-block:: terminal
 
     $ code --install-extension symfony.language-tools
+    $ codium --install-extension symfony.language-tools
 
 Versions with a prerelease suffix are published separately on the prerelease
 channel:
@@ -24,8 +26,9 @@ channel:
 .. code-block:: terminal
 
     $ code --install-extension symfony.language-tools --pre-release
+    $ codium --install-extension symfony.language-tools --pre-release
 
-The Marketplace selects the package matching the extension host. Packages are
+The registry selects the package matching the extension host. Packages are
 available for Linux x64 and ARM64, macOS x64 and ARM64 and Windows x64. Each
 package contains the matching self-contained language server, so
 ``symfonyLsp.serverPath`` doesn't need to be configured.
@@ -161,3 +164,5 @@ the platform's native crash reports. On macOS, they are stored under
 .. _`Symfony integrations`: ../features/index.rst
 .. _`Docker support`: ../docker.rst
 .. _`Marketplace overview`: https://marketplace.visualstudio.com/items?itemName=symfony.language-tools
+.. _`Visual Studio Marketplace`: https://marketplace.visualstudio.com/items?itemName=symfony.language-tools
+.. _`Open VSX Registry`: https://open-vsx.org/extension/symfony/language-tools

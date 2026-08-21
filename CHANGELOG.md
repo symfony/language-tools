@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Publish the VS Code extension on Open VSX
+
 ## 0.15.0 (2026-08-21)
 
 - Ignore dynamic Twig expressions in Stimulus controller attributes

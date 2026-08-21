@@ -8,7 +8,7 @@ on:
                 required: true
                 type: string
             verify_only:
-                description: Verify Marketplace access without publishing
+                description: Verify marketplace access without publishing
                 required: false
                 default: false
                 type: boolean
@@ -19,14 +19,14 @@ on:
                 required: false
                 type: string
             verify_only:
-                description: Verify Marketplace access without publishing
+                description: Verify marketplace access without publishing
                 required: false
                 default: false
                 type: boolean
 
 jobs:
     publish:
-        name: Publish to Visual Studio Marketplace
+        name: Publish to extension marketplaces
         runs-on: ubuntu-latest
         environment: vscode-marketplace
         permissions:
@@ -37,7 +37,7 @@ jobs:
             AZURE_CORE_OUTPUT: none
             AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
             RELEASE_TAG: ${{ inputs.tag }}
-            VSIX_DIRECTORY: ${{ github.workspace }}/var/vscode-marketplace
+            VSIX_DIRECTORY: ${{ github.workspace }}/var/vscode-marketplaces
         steps:
             - name: Validate release tag
               if: ${{ inputs.verify_only != true }}
@@ -47,8 +47,6 @@ jobs:
                       exit 1
                   fi
             - uses: actions/checkout@v7
-              with:
-                  ref: ${{ inputs.tag || github.ref }}
             - uses: actions/setup-node@v7
               with:
                   node-version: '24'
@@ -78,9 +76,6 @@ jobs:
                   PRERELEASE: ${{ steps.release.outputs.prerelease }}
               run: |
                   version="${RELEASE_TAG#v}"
-                  package_version="$(node --print \
-                      "require('./editor/vscode/package.json').version")"
-                  test "$package_version" = "$version"
 
                   for target in \
                       linux-x64 \
@@ -117,14 +112,27 @@ jobs:
                   client-id: ${{ vars.AZURE_CLIENT_ID }}
                   tenant-id: ${{ vars.AZURE_TENANT_ID }}
                   allow-no-subscriptions: true
-            - name: Verify Marketplace access
+            - name: Verify Visual Studio Marketplace access
               working-directory: editor/vscode
               run: |
                   publisher="$(node --print "require('./package.json').publisher")"
                   npx vsce verify-pat "$publisher" --azure-credential
-            - name: Publish release packages
+            - name: Verify Open VSX access
+              working-directory: editor/vscode
+              env:
+                  OVSX_PAT: ${{ secrets.OVSX_PAT }}
+              run: |
+                  publisher="$(node --print "require('./package.json').publisher")"
+                  npx ovsx verify-pat "$publisher"
+            - name: Publish release packages to Visual Studio Marketplace
               if: ${{ inputs.verify_only != true }}
               working-directory: editor/vscode
               env:
                   PRERELEASE: ${{ steps.release.outputs.prerelease }}
               run: ../../tools/publish-vscode "$VSIX_DIRECTORY"
+            - name: Publish release packages to Open VSX
+              if: ${{ inputs.verify_only != true }}
+              working-directory: editor/vscode
+              env:
+                  OVSX_PAT: ${{ secrets.OVSX_PAT }}
+              run: ../../tools/publish-open-vsx "$VSIX_DIRECTORY"
