@@ -210,8 +210,16 @@ final class TranslationExtractor
             $domain = \is_string($matches[5][$i][0] ?? null) ? $matches[5][$i][0] : $defaultDomain;
             $parameters = \is_string($matches[3][$i][0] ?? null) ? $matches[3][$i][0] : '';
             preg_match_all('/[\'\"](%?[^\'\"]+%?)[\'\"]\s*(?:=>|:)/', $parameters, $placeholderMatches);
-            $placeholders = array_map(static fn (string $name): string => trim($name, '%'), $placeholderMatches[1]);
-            $result[] = new TranslationReference($key, $domain, $uri, $this->range($text, $offset, \strlen($key)), array_values(array_unique($placeholders)));
+            // Twig hash keys may be bare identifiers, as in {id: post.id}
+            preg_match_all('/(?<=[{,])\s*([A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)/', $parameters, $bareMatches);
+            $placeholders = array_map(static fn (string $name): string => trim($name, '%'), [...$placeholderMatches[1], ...$bareMatches[1]]);
+            $result[] = new TranslationReference(
+                $key,
+                $domain,
+                $uri,
+                $this->range($text, $offset, \strlen($key)),
+                $this->dynamicParameters($text, $matches[0][$i], $parameters) ? null : array_values(array_unique($placeholders)),
+            );
         }
         if ('twig' === $languageId) {
             foreach ($this->matcher->functionCalls($text, ['trans', 't']) as $call) {
@@ -229,9 +237,30 @@ final class TranslationExtractor
         return $result;
     }
 
+    /**
+     * Parameters passed as expressions, such as trans(params) or
+     * trans('key', $params), cannot be verified.
+     *
+     * @param array{string|null, int} $match
+     */
+    private function dynamicParameters(string $text, array $match, string $parameters): bool
+    {
+        if ('' !== $parameters || !\is_string($match[0])) {
+            return false;
+        }
+        $tail = ltrim(substr($text, $match[1] + \strlen($match[0]), 80));
+        if (str_ends_with(rtrim($match[0]), '(')) {
+            return '' !== $tail && ')' !== $tail[0];
+        }
+
+        return str_contains($match[0], '(') && str_starts_with($tail, ',');
+    }
+
     private function declaration(string $key, string $message, string $domain, string $locale, string $uri, string $text, int $offset, ?int $rangeLength = null): TranslationDeclaration
     {
-        return new TranslationDeclaration($key, $domain, $locale, $message, $uri, $this->range($text, $offset, $rangeLength ?? \strlen($key)));
+        $icu = str_ends_with($domain, '+intl-icu');
+
+        return new TranslationDeclaration($key, $icu ? substr($domain, 0, -\strlen('+intl-icu')) : $domain, $locale, $message, $uri, $this->range($text, $offset, $rangeLength ?? \strlen($key)), $icu);
     }
 
     private function range(string $text, int $offset, int $length): Range

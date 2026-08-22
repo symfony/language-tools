@@ -9,7 +9,13 @@ final class TranslationMessage
         private readonly string $domain,
         private readonly string $locale,
         private readonly string $message,
+        private readonly bool $icu = false,
     ) {
+    }
+
+    public function icu(): bool
+    {
+        return $this->icu;
     }
 
     public function key(): string
@@ -35,6 +41,6 @@ final class TranslationMessage
     /** @return list<string> */
     public function placeholders(): array
     {
-        return TranslationPlaceholders::extract($this->message);
+        return TranslationPlaceholders::extract($this->message, $this->icu);
     }
 }

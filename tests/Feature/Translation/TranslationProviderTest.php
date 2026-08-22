@@ -193,6 +193,21 @@ final class TranslationProviderTest extends TestCase
         self::assertSame(['translation.not_found'], array_column($provider->diagnostics(['textDocument' => ['uri' => $uri]]), 'code'));
     }
 
+    public function testFlagsOnlyMissingPlaceholdersFromLiteralParameters(): void
+    {
+        $uri = 'file:///workspace/templates/article.html.twig';
+        $text = "{{ 'article.title'|trans({name: article.name, extra: 1}) }}\n{{ 'article.title'|trans({extra: 1}) }}\n{{ 'article.title'|trans(params) }}\n";
+        [$provider] = $this->provider($uri, $text, 'twig');
+
+        $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
+
+        self::assertIsArray($diagnostics);
+        self::assertSame(['translation.placeholders'], array_column($diagnostics, 'code'));
+        /** @var array{start: array{line: int}} $range */
+        $range = $diagnostics[0]['range'];
+        self::assertSame(1, $range['start']['line']);
+    }
+
     public function testOffersNoTranslationCompletionsInsidePhpComments(): void
     {
         $uri = 'file:///workspace/src/Controller.php';

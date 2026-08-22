@@ -6,6 +6,10 @@ use Symfony\Lsp\Document\Range;
 
 final class TranslationDeclaration
 {
+    // declared with a default so payloads cached before the flag existed
+    // still unserialize into a valid object
+    private bool $icu = false;
+
     public function __construct(
         private readonly string $key,
         private readonly string $domain,
@@ -13,7 +17,14 @@ final class TranslationDeclaration
         private readonly string $message,
         private readonly string $uri,
         private readonly Range $range,
+        bool $icu = false,
     ) {
+        $this->icu = $icu;
+    }
+
+    public function icu(): bool
+    {
+        return $this->icu;
     }
 
     public function key(): string
@@ -49,6 +60,6 @@ final class TranslationDeclaration
     /** @return list<string> */
     public function placeholders(): array
     {
-        return TranslationPlaceholders::extract($this->message);
+        return TranslationPlaceholders::extract($this->message, $this->icu);
     }
 }

@@ -28,10 +28,17 @@ function bridgeTranslationsSection(SymfonyLspBridgeContext $context): ?array
                         }
                     }
                     foreach (array_values(array_unique(array_filter($locales, 'is_string'))) as $locale) {
-                        foreach ($translator->getCatalogue($locale)->all() as $domain => $messages) {
+                        $catalogue = $translator->getCatalogue($locale);
+                        foreach ($catalogue->all() as $domain => $messages) {
                             foreach (is_array($messages) ? $messages : [] as $key => $message) {
                                 if (is_string($domain) && is_string($key) && is_string($message)) {
-                                    $items[] = ['key' => $key, 'domain' => $domain, 'locale' => $locale, 'message' => $message];
+                                    $items[] = [
+                                        'key' => $key,
+                                        'domain' => $domain,
+                                        'locale' => $locale,
+                                        'message' => $message,
+                                        'icu' => method_exists($catalogue, 'defines') && $catalogue->defines($key, $domain.'+intl-icu'),
+                                    ];
                                 }
                             }
                         }

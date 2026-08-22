@@ -161,10 +161,12 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
                 continue;
             }
 
+            // extra parameters are legal and dynamic parameters are unknown,
+            // so only placeholders the message expects but a literal parameter
+            // list does not provide are proven mistakes
             $expected = ($messages[0] ?? $declarations[0])->placeholders();
-            if ([] !== array_diff($expected, $reference->placeholders())
-                || [] !== array_diff($reference->placeholders(), $expected)
-            ) {
+            $provided = $reference->placeholders();
+            if (null !== $provided && [] !== array_diff($expected, $provided)) {
                 $diagnostics[] = $this->diagnostic(
                     $reference,
                     'translation.placeholders',

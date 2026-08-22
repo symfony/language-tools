@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Feature\Translation;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Translation\TranslationDeclaration;
 use Symfony\Lsp\Feature\Translation\TranslationExtractor;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
@@ -34,6 +35,45 @@ final class TranslationExtractorTest extends TestCase
             ['article.title', 'messages', ['name']],
             ['admin.title', 'admin', []],
         ], array_map(static fn ($item): array => [$item->key(), $item->domain(), $item->placeholders()], $references->references()));
+    }
+
+    public function testExtractsBareTwigHashKeysAsPlaceholders(): void
+    {
+        $references = $this->extractor()->extract('file:///workspace/templates/edit.html.twig', 'twig', <<<'TWIG'
+            <h1>{{ 'title.edit_post'|trans({id: post.id, '%name%': post.name}) }}</h1>
+            TWIG);
+
+        self::assertSame(
+            [['title.edit_post', ['name', 'id']]],
+            array_map(static fn ($item): array => [$item->key(), $item->placeholders()], $references->references()),
+        );
+    }
+
+    public function testTreatsBracesAsPlaceholdersOnlyInIcuCatalogs(): void
+    {
+        $extractor = $this->extractor();
+        $icu = $extractor->extract('file:///workspace/translations/messages+intl-icu.en.xlf', 'xml', <<<'XLF'
+            <xliff><file><body>
+                <trans-unit id="title.edit_post">
+                    <source>title.edit_post</source>
+                    <target>Edit post #{id, number}</target>
+                </trans-unit>
+            </body></file></xliff>
+            XLF);
+        $plain = $extractor->extract('file:///workspace/translations/messages.en.yaml', 'yaml', "joomla_syntax: 'Joomla uses curly braces {mautic} in templates'\n");
+
+        self::assertSame('messages', $icu->declarations()[0]->domain());
+        self::assertTrue($icu->declarations()[0]->icu());
+        self::assertSame(['id'], $icu->declarations()[0]->placeholders());
+        self::assertFalse($plain->declarations()[0]->icu());
+        self::assertSame([], $plain->declarations()[0]->placeholders());
+    }
+
+    public function testCachedDeclarationsWithoutTheIcuFlagStayLoadable(): void
+    {
+        $declaration = (new \ReflectionClass(TranslationDeclaration::class))->newInstanceWithoutConstructor();
+
+        self::assertFalse($declaration->icu());
     }
 
     public function testPreservesHyphenatedYamlKeys(): void

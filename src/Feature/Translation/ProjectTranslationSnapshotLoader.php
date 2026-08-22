@@ -26,7 +26,7 @@ final class ProjectTranslationSnapshotLoader implements RuntimeSnapshotLoaderInt
         $messages = [];
         foreach ($section['items'] as $item) {
             if (\is_array($item) && \is_string($item['key'] ?? null) && \is_string($item['domain'] ?? null) && \is_string($item['locale'] ?? null) && \is_string($item['message'] ?? null)) {
-                $messages[] = new TranslationMessage($item['key'], $item['domain'], $item['locale'], $item['message']);
+                $messages[] = new TranslationMessage($item['key'], $item['domain'], $item['locale'], $item['message'], true === ($item['icu'] ?? false));
             }
         }
         $this->indexes->forProject($project)->replaceRuntime(true === ($section['complete'] ?? null), ...$messages);
