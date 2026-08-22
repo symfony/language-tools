@@ -12,6 +12,7 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexer;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
@@ -71,6 +72,7 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
             [new DependencyInjectionSourceIndexer(
                 $indexes,
                 new YamlDependencyInjectionExtractor($converter),
+                new XmlDependencyInjectionExtractor($converter),
                 new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser())),
                 new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser())),
             )],

@@ -12,6 +12,7 @@ final class DependencyInjectionSourceIndexer extends AbstractSourceIndexer
     public function __construct(
         private readonly DependencyInjectionSourceIndexRegistry $indexes,
         private readonly YamlDependencyInjectionExtractor $yamlExtractor,
+        private readonly XmlDependencyInjectionExtractor $xmlExtractor,
         private readonly PhpAutowireReferenceExtractor $autowireExtractor,
         private readonly PhpClassDeclarationExtractor $classExtractor,
     ) {
@@ -66,6 +67,9 @@ final class DependencyInjectionSourceIndexer extends AbstractSourceIndexer
     {
         if ('yaml' === $document->languageId()) {
             return $this->yamlExtractor->extract($document->uri(), $document->text());
+        }
+        if ('xml' === $document->languageId()) {
+            return $this->xmlExtractor->extract($document->uri(), $document->text());
         }
         if ('php' !== $document->languageId()) {
             return null;

@@ -12,6 +12,7 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexer;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
@@ -127,6 +128,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
                 new DependencyInjectionSourceIndexer(
                     $classIndexes,
                     new YamlDependencyInjectionExtractor($positionConverter),
+                    new XmlDependencyInjectionExtractor($positionConverter),
                     new PhpAutowireReferenceExtractor($positionConverter, $parser),
                     new PhpClassDeclarationExtractor($positionConverter, $parser),
                 ),

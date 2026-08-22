@@ -26,6 +26,7 @@ final class SourceFileEnumerator
         'twig' => 'twig',
         'xlf' => 'xml',
         'xliff' => 'xml',
+        'xml' => 'xml',
         'yaml' => 'yaml',
         'yml' => 'yaml',
     ];
