@@ -8,6 +8,32 @@ use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 
 final class YamlDependencyInjectionExtractorTest extends TestCase
 {
+    public function testExtractsParameterReferencesFromConfigurationSections(): void
+    {
+        $extractor = new YamlDependencyInjectionExtractor(new PositionConverter());
+        $yaml = <<<'YAML'
+            framework:
+                assets:
+                    json_manifest_path: '%kernel.project_dir%/public/build/manifest.json'
+            YAML;
+
+        $configuration = $extractor->extract('file:///workspace/config/packages/assets.yaml', $yaml);
+        self::assertSame(['kernel.project_dir'], array_map(static fn ($reference): string => $reference->name(), $configuration->references()));
+
+        // outside a config directory the same yaml could be a translation catalog with literal placeholders
+        $catalog = $extractor->extract('file:///workspace/translations/messages.en.yaml', "greeting: 'Hello %name%'\n");
+        self::assertSame([], $catalog->references());
+
+        // %% escapes a literal percent, as in monolog line formats
+        $monolog = $extractor->extract('file:///workspace/config/services.yaml', <<<'YAML'
+            monolog:
+                handlers:
+                    main:
+                        formatter: "[%%datetime%%] %%message%% in %kernel.environment%"
+            YAML);
+        self::assertSame(['kernel.environment'], array_map(static fn ($reference): string => $reference->name(), $monolog->references()));
+    }
+
     public function testExtractsDeclarationsMetadataAndStaticReferencesWithoutValues(): void
     {
         $facts = (new YamlDependencyInjectionExtractor(new PositionConverter()))->extract(

@@ -26,6 +26,7 @@ final class YamlDependencyInjectionExtractor
         $currentService = null;
         $tagsIndent = null;
         $environmentSection = false;
+        $scannedLines = [];
 
         preg_match_all('/^.*(?:\R|$)/m', $text, $lines, \PREG_OFFSET_CAPTURE);
         foreach ($lines[0] as [$rawLine, $lineOffset]) {
@@ -61,6 +62,7 @@ final class YamlDependencyInjectionExtractor
                 continue;
             }
 
+            $scannedLines[$lineOffset] = true;
             array_push($references, ...$this->references($uri, $text, $line, $lineOffset));
 
             if (null === $mapping) {
@@ -147,6 +149,18 @@ final class YamlDependencyInjectionExtractor
             $serviceDeclarations[] = $service->declaration($uri);
         }
 
+        // configuration files reference parameters outside the parameters
+        // and services sections, as in framework or doctrine packages
+        if (str_contains('/'.$uri, '/config/')) {
+            foreach ($lines[0] as [$rawLine, $lineOffset]) {
+                $line = rtrim($rawLine, "\r\n");
+                if (isset($scannedLines[$lineOffset]) || '' === trim($line) || str_starts_with(ltrim($line), '#')) {
+                    continue;
+                }
+                array_push($references, ...$this->parameterReferences($uri, $text, $line, $lineOffset));
+            }
+        }
+
         return new DependencyInjectionSourceFacts(
             $uri,
             $serviceDeclarations,
@@ -216,7 +230,15 @@ final class YamlDependencyInjectionExtractor
             );
         }
 
-        preg_match_all('/%([^%\s]+)%/', $line, $parameterMatches, \PREG_OFFSET_CAPTURE);
+        return [...$references, ...$this->parameterReferences($uri, $text, $line, $lineOffset)];
+    }
+
+    /** @return list<DependencyInjectionReference> */
+    private function parameterReferences(string $uri, string $text, string $line, int $lineOffset): array
+    {
+        $references = [];
+        // %% escapes a literal percent, as in monolog line formats
+        preg_match_all('/%([^%\s]+)%/', str_replace('%%', "\0\0", $line), $parameterMatches, \PREG_OFFSET_CAPTURE);
         foreach ($parameterMatches[1] as [$name, $offset]) {
             if (str_starts_with($name, 'env(')) {
                 continue;
