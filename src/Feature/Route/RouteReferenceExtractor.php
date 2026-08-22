@@ -77,7 +77,7 @@ final class RouteReferenceExtractor
     {
         $masked = $this->phpComments->mask($text);
         $references = [];
-        foreach ($this->matcher->methodCalls($masked, self::METHODS, $text) as $call) {
+        foreach ($this->matcher->methodCalls($masked, self::METHODS) as $call) {
             $receiverOffset = $call->nameOffset - 2;
             $receiver = RoutePhpReceiver::resolve(
                 substr($masked, 0, $receiverOffset),

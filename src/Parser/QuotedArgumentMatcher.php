@@ -26,9 +26,9 @@ final class QuotedArgumentMatcher
      *
      * @return list<QuotedArgument>
      */
-    public function methodCalls(string $text, array $names, ?string $positionText = null): array
+    public function methodCalls(string $text, array $names): array
     {
-        return $this->match($text, '/(?:->|::)(?<name>'.$this->alternation($names).')\s*\(\s*'.self::LITERAL.'/s', $positionText ?? $text);
+        return $this->match($text, '/(?:->|::)(?<name>'.$this->alternation($names).')\s*\(\s*'.self::LITERAL.'/s');
     }
 
     /**
@@ -36,9 +36,9 @@ final class QuotedArgumentMatcher
      *
      * @return list<QuotedArgument>
      */
-    public function functionCalls(string $text, array $names, ?string $positionText = null): array
+    public function functionCalls(string $text, array $names): array
     {
-        return $this->match($text, '/\b(?<name>'.$this->alternation($names).')\s*\(\s*'.self::LITERAL.'/s', $positionText ?? $text);
+        return $this->match($text, '/\b(?<name>'.$this->alternation($names).')\s*\(\s*'.self::LITERAL.'/s');
     }
 
     /** @param list<string> $names */
@@ -48,7 +48,7 @@ final class QuotedArgumentMatcher
     }
 
     /** @return list<QuotedArgument> */
-    private function match(string $text, string $pattern, string $positionText): array
+    private function match(string $text, string $pattern): array
     {
         preg_match_all($pattern, $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL);
         $arguments = [];
@@ -70,8 +70,8 @@ final class QuotedArgumentMatcher
                 $offset,
                 \strlen($raw),
                 new Range(
-                    $this->converter->toPosition($positionText, $offset),
-                    $this->converter->toPosition($positionText, $offset + \strlen($raw)),
+                    $this->converter->toPosition($text, $offset),
+                    $this->converter->toPosition($text, $offset + \strlen($raw)),
                 ),
             );
         }

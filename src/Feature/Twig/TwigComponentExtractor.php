@@ -81,7 +81,7 @@ final class TwigComponentExtractor
                     array_values($actions),
                 );
                 if ($live) {
-                    foreach ($this->matcher->functionCalls($masked, ['emit'], $text) as $emit) {
+                    foreach ($this->matcher->functionCalls($masked, ['emit']) as $emit) {
                         $events[] = new LiveComponentEvent($emit->value, $uri, $emit->range, false, $name);
                     }
                 }

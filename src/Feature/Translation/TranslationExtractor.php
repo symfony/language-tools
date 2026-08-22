@@ -27,8 +27,8 @@ final class TranslationExtractor
         $metadata = $this->resourceMetadata($uri);
         $declarations = null === $metadata ? [] : $this->declarations($uri, $text, ...$metadata);
         $references = match ($languageId) {
-            'twig' => $this->references($uri, $languageId, $masked = $this->commentParser->mask($text), $masked),
-            'php' => $this->references($uri, $languageId, $this->phpComments->mask($text), $text),
+            'twig' => $this->references($uri, $languageId, $this->commentParser->mask($text)),
+            'php' => $this->references($uri, $languageId, $this->phpComments->mask($text)),
             default => [],
         };
 
@@ -192,7 +192,7 @@ final class TranslationExtractor
     }
 
     /** @return list<TranslationReference> */
-    private function references(string $uri, string $languageId, string $text, string $positionText): array
+    private function references(string $uri, string $languageId, string $text): array
     {
         $defaultDomain = 'messages';
         if ('twig' === $languageId && preg_match('/{%\s*trans_default_domain\s+([\'\"])([^\'\"]+)\1/', $text, $domainMatch)) {
@@ -211,10 +211,10 @@ final class TranslationExtractor
             $parameters = \is_string($matches[3][$i][0] ?? null) ? $matches[3][$i][0] : '';
             preg_match_all('/[\'\"](%?[^\'\"]+%?)[\'\"]\s*(?:=>|:)/', $parameters, $placeholderMatches);
             $placeholders = array_map(static fn (string $name): string => trim($name, '%'), $placeholderMatches[1]);
-            $result[] = new TranslationReference($key, $domain, $uri, $this->range($positionText, $offset, \strlen($key)), array_values(array_unique($placeholders)));
+            $result[] = new TranslationReference($key, $domain, $uri, $this->range($text, $offset, \strlen($key)), array_values(array_unique($placeholders)));
         }
         if ('twig' === $languageId) {
-            foreach ($this->matcher->functionCalls($text, ['trans', 't'], $positionText) as $call) {
+            foreach ($this->matcher->functionCalls($text, ['trans', 't']) as $call) {
                 $result[] = new TranslationReference($call->value, $defaultDomain, $uri, $call->range);
             }
             preg_match_all('/{%\s*trans(?:\s+from\s+([\'\"])([^\'\"]+)\1)?\s*%}(.+?){%\s*endtrans\s*%}/s', $text, $tags, \PREG_OFFSET_CAPTURE);
@@ -222,7 +222,7 @@ final class TranslationExtractor
                 $domain = \is_string($tags[2][$i][0] ?? null) ? $tags[2][$i][0] : $defaultDomain;
                 $key = trim($message);
                 $offset += \strlen($message) - \strlen(ltrim($message));
-                $result[] = new TranslationReference($key, $domain, $uri, $this->range($positionText, $offset, \strlen($key)));
+                $result[] = new TranslationReference($key, $domain, $uri, $this->range($text, $offset, \strlen($key)));
             }
         }
 

@@ -24,7 +24,7 @@ final class AssetExtractor
     {
         $symbols = match ($languageId) {
             'twig' => $this->twigSymbols($uri, $this->commentParser->mask($text)),
-            'php' => 'importmap.php' === basename($this->uriToPathConverter->convert($uri) ?? '') ? $this->importMapSymbols($uri, $this->phpComments->mask($text), $text) : [],
+            'php' => 'importmap.php' === basename($this->uriToPathConverter->convert($uri) ?? '') ? $this->importMapSymbols($uri, $this->phpComments->mask($text)) : [],
             default => [],
         };
 
@@ -69,7 +69,7 @@ final class AssetExtractor
     }
 
     /** @return list<AssetSourceSymbol> */
-    private function importMapSymbols(string $uri, string $text, string $positionText): array
+    private function importMapSymbols(string $uri, string $text): array
     {
         if (!preg_match('/\breturn\s*\[/', $text, $return, \PREG_OFFSET_CAPTURE)) {
             return [];
@@ -125,7 +125,7 @@ final class AssetExtractor
             $options = substr($text, $optionsOpen + 1, $optionsClose - $optionsOpen - 1);
             if (preg_match('/["\']entrypoint["\']\s*=>\s*true\b/', $options)) {
                 $name = substr($text, $nameStart, $nameEnd - $nameStart);
-                $symbols[] = $this->symbol(AssetSymbolKind::Entrypoint, $name, $uri, $positionText, $nameStart, true);
+                $symbols[] = $this->symbol(AssetSymbolKind::Entrypoint, $name, $uri, $text, $nameStart, true);
             }
             $offset = $optionsClose;
         }

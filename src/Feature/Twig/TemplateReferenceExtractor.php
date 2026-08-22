@@ -30,7 +30,7 @@ final class TemplateReferenceExtractor
 
         $masked = $this->phpComments->mask($text);
         $references = [];
-        foreach ($this->matcher->methodCalls($masked, ['render', 'renderView'], $text) as $call) {
+        foreach ($this->matcher->methodCalls($masked, ['render', 'renderView']) as $call) {
             $variables = [];
             if (1 === preg_match('/^\s*,\s*\[([^\]]*)\]/', substr($masked, $call->end()), $arrayMatch)) {
                 preg_match_all('/([\'"])([^\'"]+)\1\s*=>/', $arrayMatch[1], $keys);

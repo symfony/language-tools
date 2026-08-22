@@ -107,17 +107,17 @@ final class QuotedArgumentMatcherTest extends TestCase
         self::assertSame(strpos($text, 'render'), $arguments[0]->nameOffset);
     }
 
-    public function testMeasuresPositionsAgainstTheGivenPositionText(): void
+    public function testMeasuresProtocolPositionsIdenticallyOnMaskedText(): void
     {
         $original = "<?php /* café */ \$x->generate('checkout');";
         $masked = (new PhpCommentParser())->mask($original);
 
-        $arguments = $this->matcher->methodCalls($masked, ['generate'], $original);
+        $arguments = $this->matcher->methodCalls($masked, ['generate']);
 
         self::assertCount(1, $arguments);
         self::assertSame('checkout', $arguments[0]->value);
         self::assertSame(31, $arguments[0]->range->start()->character());
         self::assertSame(39, $arguments[0]->range->end()->character());
-        self::assertSame(32, $this->matcher->methodCalls($masked, ['generate'])[0]->range->start()->character());
+        self::assertSame($arguments[0]->range->start()->character(), $this->converter->toPosition($original, $arguments[0]->offset)->character());
     }
 }

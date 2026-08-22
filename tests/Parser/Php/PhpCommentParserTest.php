@@ -46,13 +46,18 @@ final class PhpCommentParserTest extends TestCase
         self::assertSame($source, $this->parser->mask($source));
     }
 
-    public function testPreservesByteLengthForMultibyteComments(): void
+    public function testPreservesByteOffsetsAndUtf16PositionsForMultibyteComments(): void
     {
         $source = "<?php /* café ✓ */ \$a = 1;\n";
         $masked = $this->parser->mask($source);
 
+        self::assertSame("<?php       é ✓    \$a = 1;\n", $masked);
         self::assertSame(\strlen($source), \strlen($masked));
-        self::assertSame("<?php                 \$a = 1;\n", $masked);
+        self::assertSame(mb_strlen($source, 'UTF-8'), mb_strlen($masked, 'UTF-8'));
+        self::assertSame(
+            \strlen(mb_convert_encoding($source, 'UTF-16LE', 'UTF-8')),
+            \strlen(mb_convert_encoding($masked, 'UTF-16LE', 'UTF-8')),
+        );
     }
 
     public function testMasksUnterminatedBlockCommentsToTheEnd(): void

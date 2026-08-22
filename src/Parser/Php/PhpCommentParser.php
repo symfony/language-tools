@@ -2,6 +2,13 @@
 
 namespace Symfony\Lsp\Parser\Php;
 
+/**
+ * Blanks PHP comments while preserving byte offsets and UTF-16 positions.
+ *
+ * Only ASCII bytes are replaced with spaces: multibyte sequences keep their
+ * byte length and UTF-16 unit count, so positions measured on the masked
+ * text always match the original document.
+ */
 final class PhpCommentParser implements PhpCommentParserInterface
 {
     public function mask(string $source): string
@@ -13,7 +20,8 @@ final class PhpCommentParser implements PhpCommentParserInterface
             }
             $end = $token->pos + \strlen($token->text);
             for ($offset = $token->pos; $offset < $end; ++$offset) {
-                if ("\r" !== $masked[$offset] && "\n" !== $masked[$offset]) {
+                $byte = $masked[$offset];
+                if ("\r" !== $byte && "\n" !== $byte && \ord($byte) < 0x80) {
                     $masked[$offset] = ' ';
                 }
             }
