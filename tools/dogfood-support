@@ -3,6 +3,8 @@
 
 require \dirname(__DIR__).'/vendor/autoload.php';
 
+use Symfony\Lsp\Tools\Dogfood\SupportHtmlReport;
+use Symfony\Lsp\Tools\Dogfood\SupportLedger;
 use Symfony\Lsp\Tools\Dogfood\SupportScorer;
 
 const USAGE = <<<'USAGE'
@@ -17,16 +19,21 @@ const USAGE = <<<'USAGE'
     Options:
       --history    one row per matrix run instead of only the latest
       --json       machine-readable output
+      --record     append scores to .gerard/dogfood/support/ledger.jsonl and
+                   regenerate the index.html visualization next to it
     USAGE;
 
 $history = false;
 $json = false;
+$record = false;
 $matrixDirectory = \dirname(__DIR__).'/var/dogfood/matrix';
 foreach (array_slice($argv, 1) as $argument) {
     if ('--history' === $argument) {
         $history = true;
     } elseif ('--json' === $argument) {
         $json = true;
+    } elseif ('--record' === $argument) {
+        $record = true;
     } elseif (str_starts_with($argument, '--')) {
         fwrite(STDERR, USAGE."\n");
         exit(1);
@@ -61,6 +68,33 @@ if ([] === $runs) {
     exit(1);
 }
 ksort($runs, \SORT_STRING);
+
+if ($record) {
+    $supportDirectory = \dirname(__DIR__).'/.gerard/dogfood/support';
+    if (!is_dir(\dirname($supportDirectory))) {
+        fwrite(STDERR, "No .gerard workspace found; initialize it before recording.\n");
+        exit(1);
+    }
+    $entries = [];
+    foreach ($runs as $run => $projects) {
+        foreach ($projects as $project => $score) {
+            $entries[] = [
+                'run' => $run,
+                'project' => $project,
+                'score' => round($score['score'], 4),
+                'probeCount' => $score['probeCount'],
+                'fingerprint' => $score['fingerprint'],
+                'serverVersion' => $score['serverVersion'],
+                'categories' => array_map(static fn (float $s): float => round($s, 4), $score['categories']),
+            ];
+        }
+    }
+    $ledger = new SupportLedger($supportDirectory.'/ledger.jsonl');
+    $added = $ledger->record($entries);
+    file_put_contents($supportDirectory.'/index.html', (new SupportHtmlReport())->render($ledger->entries()));
+    printf("Recorded %d new entries; %s regenerated.\n", $added, $supportDirectory.'/index.html');
+    exit(0);
+}
 
 $fingerprintChanged = static function (array $runs, string $run, string $project, array $score): bool {
     $previous = null;

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Persist dogfood support scores to a ledger and render an HTML trend report
 - Score dogfood support per project to track feature coverage over time
 - Index ini translation catalogs with directory locales
 - Resolve asset() paths against the public document root
