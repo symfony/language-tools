@@ -67,6 +67,7 @@ final class ConfigurationLoaderTest extends TestCase
             'requestTimeout' => 20,
             'probeRoots' => ['project-base/src', 'project-base/templates'],
             'probesPerCategory' => 3,
+            'allowPlugins' => ['contao/manager-plugin'],
         ]);
 
         $configuration = (new ConfigurationLoader())->load([$this->directory], ['composer'])[0];
@@ -79,6 +80,24 @@ final class ConfigurationLoaderTest extends TestCase
         self::assertSame(20, $configuration->requestTimeout);
         self::assertSame(['project-base/src', 'project-base/templates'], $configuration->probeRoots);
         self::assertSame(3, $configuration->probesPerCategory);
+        self::assertSame(['contao/manager-plugin'], $configuration->allowPlugins);
+    }
+
+    public function testDiscoversAPinnedLockFileNextToTheConfiguration(): void
+    {
+        $this->write('kimai.json', $this->valid());
+        file_put_contents(Path::join($this->directory, 'kimai.lock'), '{}');
+
+        $configuration = (new ConfigurationLoader())->load([$this->directory], ['composer'])[0];
+
+        self::assertSame(Path::join($this->directory, 'kimai.lock'), $configuration->lockFile);
+    }
+
+    public function testHasNoLockFileWithoutASibling(): void
+    {
+        $this->write('kimai.json', $this->valid());
+
+        self::assertNull((new ConfigurationLoader())->load([$this->directory], ['composer'])[0]->lockFile);
     }
 
     public function testSortsProjectsByName(): void
@@ -170,6 +189,11 @@ final class ConfigurationLoaderTest extends TestCase
         yield 'comma probe root' => [['probeRoots' => ['src,templates']], 'non-empty list of relative paths'];
         yield 'zero probes per category' => [['probesPerCategory' => 0], 'between 1 and 10'];
         yield 'huge probes per category' => [['probesPerCategory' => 100], 'between 1 and 10'];
+        yield 'plugin map' => [['allowPlugins' => ['contao/manager-plugin' => true]], 'list of Composer plugin names'];
+        yield 'invalid plugin name' => [['allowPlugins' => ['not a plugin']], 'list of Composer plugin names'];
+        yield 'invalid platform requirement' => [['ignorePlatformRequirements' => ['symfony/imap']], 'platform package names'];
+        yield 'absolute setup change' => [['setupChanges' => ['/etc/passwd']], 'list of relative paths'];
+        yield 'parent setup change' => [['setupChanges' => ['../outside']], 'list of relative paths'];
     }
 
     /**

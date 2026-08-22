@@ -173,7 +173,20 @@ final class MatrixCommandTest extends TestCase
         self::assertSame([], $harness->applicationRoots);
         $report = $this->readReport();
         self::assertSame('setup', $report['failure']['layer'] ?? null);
-        self::assertStringContainsString('modified tracked upstream files', $report['failure']['message']);
+        self::assertStringContainsString('modified tracked upstream files: config/reference.php', $report['failure']['message']);
+    }
+
+    public function testAcceptsDeclaredSetupChanges(): void
+    {
+        $provisioner = new FakeProvisioner($this->checkout);
+        $harness = new FakeHarness($this->successfulRun(), $this->successfulRun());
+        $configuration = new ProjectConfiguration('acme', 'https://github.com/acme/app.git', str_repeat('a', 40), null, 'dev', 'composer', false, 120, setupChanges: ['.env.local.demo']);
+
+        $exitCode = $this->command($provisioner, $harness, ' D .env.local.demo')->run([$configuration], $this->output);
+
+        self::assertSame(0, $exitCode);
+        $report = $this->readReport();
+        self::assertSame(['modified' => ['.env.local.demo'], 'untracked' => 0], $report['workingTree']);
     }
 
     private function command(FakeProvisioner $provisioner, FakeHarness $harness, string $workingTree = '?? vendor/'): MatrixCommand

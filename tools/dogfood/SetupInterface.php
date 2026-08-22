@@ -9,5 +9,5 @@ interface SetupInterface
      *
      * @throws SetupException
      */
-    public function setUp(string $applicationRoot): void;
+    public function setUp(ProjectConfiguration $configuration, string $applicationRoot): void;
 }

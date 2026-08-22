@@ -5,7 +5,7 @@ namespace Symfony\Lsp\Tools\Dogfood;
 final class ConfigurationLoader
 {
     private const VERSION = 1;
-    private const KEYS = ['version', 'repository', 'revision', 'directory', 'environment', 'setup', 'ci', 'indexTimeout', 'requestTimeout', 'probeRoots', 'probesPerCategory'];
+    private const KEYS = ['version', 'repository', 'revision', 'directory', 'environment', 'setup', 'ci', 'indexTimeout', 'requestTimeout', 'probeRoots', 'probesPerCategory', 'allowPlugins', 'ignorePlatformRequirements', 'setupChanges'];
     private const DEFAULT_INDEX_TIMEOUT = 120;
     private const MAX_INDEX_TIMEOUT = 900;
     private const DEFAULT_REQUEST_TIMEOUT = 10;
@@ -81,6 +81,10 @@ final class ConfigurationLoader
             $this->requestTimeout($data, $file),
             $this->probeRoots($data, $file),
             $this->probesPerCategory($data, $file),
+            is_file($lockFile = substr($file, 0, -\strlen('.json')).'.lock') ? $lockFile : null,
+            $this->allowPlugins($data, $file),
+            $this->ignorePlatformRequirements($data, $file),
+            $this->setupChanges($data, $file),
         );
     }
 
@@ -216,6 +220,66 @@ final class ConfigurationLoader
         }
 
         return $probeRoots;
+    }
+
+    /**
+     * @param array<array-key, mixed> $data
+     *
+     * @return list<string>
+     */
+    private function allowPlugins(array $data, string $file): array
+    {
+        $allowPlugins = $data['allowPlugins'] ?? [];
+        if (!\is_array($allowPlugins) || !array_is_list($allowPlugins)) {
+            throw new ConfigurationException(\sprintf('The "allowPlugins" in "%s" must be a list of Composer plugin names.', $file));
+        }
+        foreach ($allowPlugins as $plugin) {
+            if (!\is_string($plugin) || 1 !== preg_match('{^[a-z0-9._-]+/[a-z0-9._-]+$}', $plugin)) {
+                throw new ConfigurationException(\sprintf('The "allowPlugins" in "%s" must be a list of Composer plugin names.', $file));
+            }
+        }
+
+        return $allowPlugins;
+    }
+
+    /**
+     * @param array<array-key, mixed> $data
+     *
+     * @return list<string>
+     */
+    private function setupChanges(array $data, string $file): array
+    {
+        $setupChanges = $data['setupChanges'] ?? [];
+        if (!\is_array($setupChanges) || !array_is_list($setupChanges)) {
+            throw new ConfigurationException(\sprintf('The "setupChanges" in "%s" must be a list of relative paths.', $file));
+        }
+        foreach ($setupChanges as $path) {
+            if (!\is_string($path) || '' === $path || 1 === preg_match('{^[/\\\\]|^[A-Za-z]:|(?:^|[/\\\\])\.\.(?:[/\\\\]|$)}', $path)) {
+                throw new ConfigurationException(\sprintf('The "setupChanges" in "%s" must be a list of relative paths.', $file));
+            }
+        }
+
+        return $setupChanges;
+    }
+
+    /**
+     * @param array<array-key, mixed> $data
+     *
+     * @return list<string>
+     */
+    private function ignorePlatformRequirements(array $data, string $file): array
+    {
+        $requirements = $data['ignorePlatformRequirements'] ?? [];
+        if (!\is_array($requirements) || !array_is_list($requirements)) {
+            throw new ConfigurationException(\sprintf('The "ignorePlatformRequirements" in "%s" must be a list of platform package names.', $file));
+        }
+        foreach ($requirements as $requirement) {
+            if (!\is_string($requirement) || 1 !== preg_match('{^(?:php(?:-64bit)?|(?:ext|lib)-[a-z0-9_.-]+)$}', $requirement)) {
+                throw new ConfigurationException(\sprintf('The "ignorePlatformRequirements" in "%s" must be a list of platform package names.', $file));
+            }
+        }
+
+        return $requirements;
     }
 
     /**

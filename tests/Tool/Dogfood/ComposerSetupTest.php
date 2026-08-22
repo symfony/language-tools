@@ -7,6 +7,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Tools\Dogfood\ComposerSetup;
 use Symfony\Lsp\Tools\Dogfood\ProcessResult;
+use Symfony\Lsp\Tools\Dogfood\ProjectConfiguration;
 use Symfony\Lsp\Tools\Dogfood\SetupException;
 
 final class ComposerSetupTest extends TestCase
@@ -29,7 +30,7 @@ final class ComposerSetupTest extends TestCase
         file_put_contents(Path::join($this->directory, 'composer.lock'), '{}');
         $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '', '', false));
 
-        (new ComposerSetup($processes))->setUp($this->directory);
+        (new ComposerSetup($processes))->setUp($this->configuration(), $this->directory);
 
         self::assertCount(1, $processes->calls);
         self::assertSame(['composer', 'install', '--no-interaction', '--no-progress'], $processes->calls[0]['command']);
@@ -41,9 +42,49 @@ final class ComposerSetupTest extends TestCase
         file_put_contents(Path::join($this->directory, 'composer.lock'), '{}');
         $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '', '', false));
 
-        (new ComposerSetup($processes, scripts: false))->setUp($this->directory);
+        (new ComposerSetup($processes, scripts: false))->setUp($this->configuration(), $this->directory);
 
         self::assertSame(['composer', 'install', '--no-interaction', '--no-progress', '--no-scripts'], $processes->calls[0]['command']);
+    }
+
+    public function testCopiesThePinnedLockFileWhenTheProjectCommitsNone(): void
+    {
+        file_put_contents(Path::join($this->directory, 'pinned.lock'), '{"pinned": true}');
+        $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '', '', false));
+
+        (new ComposerSetup($processes))->setUp($this->configuration(Path::join($this->directory, 'pinned.lock')), $this->directory);
+
+        self::assertSame('{"pinned": true}', file_get_contents(Path::join($this->directory, 'composer.lock')));
+    }
+
+    public function testKeepsTheUpstreamLockFileWhenPresent(): void
+    {
+        file_put_contents(Path::join($this->directory, 'composer.lock'), '{"upstream": true}');
+        file_put_contents(Path::join($this->directory, 'pinned.lock'), '{"pinned": true}');
+        $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '', '', false));
+
+        (new ComposerSetup($processes))->setUp($this->configuration(Path::join($this->directory, 'pinned.lock')), $this->directory);
+
+        self::assertSame('{"upstream": true}', file_get_contents(Path::join($this->directory, 'composer.lock')));
+    }
+
+    public function testAllowsConfiguredPluginsAndRestoresTheManifest(): void
+    {
+        file_put_contents(Path::join($this->directory, 'composer.json'), '{"name": "acme/app"}');
+        file_put_contents(Path::join($this->directory, 'composer.lock'), '{}');
+        $processes = new FakeProcessRunner(function (array $command): ProcessResult {
+            if ('config' === $command[1]) {
+                file_put_contents(Path::join($this->directory, 'composer.json'), '{"name": "acme/app", "config": {"allow-plugins": true}}');
+            }
+
+            return new ProcessResult(0, '', '', false);
+        });
+
+        (new ComposerSetup($processes))->setUp($this->configuration(allowPlugins: ['contao/manager-plugin']), $this->directory);
+
+        self::assertSame(['composer', 'config', '--no-plugins', '--no-interaction', 'allow-plugins.contao/manager-plugin', 'true'], $processes->calls[0]['command']);
+        self::assertSame(['composer', 'install', '--no-interaction', '--no-progress'], $processes->calls[1]['command']);
+        self::assertSame('{"name": "acme/app"}', file_get_contents(Path::join($this->directory, 'composer.json')));
     }
 
     public function testRejectsProjectsWithoutALockFile(): void
@@ -53,7 +94,7 @@ final class ComposerSetupTest extends TestCase
         $this->expectException(SetupException::class);
         $this->expectExceptionMessage('not reproducible');
 
-        (new ComposerSetup($processes))->setUp($this->directory);
+        (new ComposerSetup($processes))->setUp($this->configuration(), $this->directory);
     }
 
     public function testReportsInstallationFailures(): void
@@ -64,6 +105,14 @@ final class ComposerSetupTest extends TestCase
         $this->expectException(SetupException::class);
         $this->expectExceptionMessage('Your requirements could not be resolved.');
 
-        (new ComposerSetup($processes))->setUp($this->directory);
+        (new ComposerSetup($processes))->setUp($this->configuration(), $this->directory);
+    }
+
+    /**
+     * @param list<string> $allowPlugins
+     */
+    private function configuration(?string $lockFile = null, array $allowPlugins = []): ProjectConfiguration
+    {
+        return new ProjectConfiguration('acme', 'https://github.com/acme/app.git', str_repeat('a', 40), null, 'dev', 'composer', false, 120, lockFile: $lockFile, allowPlugins: $allowPlugins);
     }
 }

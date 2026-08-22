@@ -5,6 +5,7 @@
 - Discover applications that require the framework only through their lock file
 - Resolve nonstandard kernels through the application's own bootstrap conventions
 - Tolerate missing env files and console log noise in the project bridge
+- Pin dependency sets and reviewed setup metadata for dogfood projects
 - Load event metadata from container tags without instantiating listeners
 - Report a bootstrap indexing stage when the application bridge cannot boot
 - Discover dogfood probes deterministically with configurable roots and limits

@@ -68,10 +68,11 @@ final class MatrixCommand
                 if (!is_file(Path::join($applicationRoot, 'composer.json'))) {
                     throw new SetupException(\sprintf('No composer.json in "%s".', $applicationRoot));
                 }
-                $this->setups->get($configuration->setup)->setUp($applicationRoot);
+                $this->setups->get($configuration->setup)->setUp($configuration, $applicationRoot);
                 $report->workingTree = $this->workingTree($checkout);
-                if ([] !== $report->workingTree['modified']) {
-                    throw new SetupException('Setup modified tracked upstream files.');
+                $unexpected = array_values(array_diff($report->workingTree['modified'], $configuration->setupChanges));
+                if ([] !== $unexpected) {
+                    throw new SetupException(\sprintf('Setup modified tracked upstream files: %s.', implode(', ', $unexpected)));
                 }
             } catch (SetupException $e) {
                 $report->failure = new ProjectFailure('setup', $e->getMessage());
@@ -146,7 +147,7 @@ final class MatrixCommand
         }
         $modified = [];
         $untracked = 0;
-        foreach (preg_split('/\R/', trim($result->standardOutput), flags: \PREG_SPLIT_NO_EMPTY) ?: [] as $line) {
+        foreach (preg_split('/\R/', $result->standardOutput, flags: \PREG_SPLIT_NO_EMPTY) ?: [] as $line) {
             if (str_starts_with($line, '??')) {
                 ++$untracked;
             } elseif (\count($modified) < self::WORKING_TREE_LIMIT) {
