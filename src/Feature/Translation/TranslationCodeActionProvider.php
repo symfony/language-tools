@@ -46,7 +46,7 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
                 continue;
             }
             foreach ($references as $reference) {
-                if (!$this->sameRange($reference, $range)
+                if (!$this->protocol->sameRange($reference->range(), $range)
                     || [] !== $this->indexes->forProject($request->project)->declarations($reference->domain(), $reference->key())
                 ) {
                     continue;
@@ -105,19 +105,5 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
     private function uri(string $path): string
     {
         return $this->uriToPathConverter->toUri($path);
-    }
-
-    /** @param array<array-key, mixed> $range */
-    private function sameRange(TranslationReference $reference, array $range): bool
-    {
-        $start = $range['start'] ?? null;
-        $end = $range['end'] ?? null;
-
-        return \is_array($start)
-            && \is_array($end)
-            && $reference->range()->start()->line() === ($start['line'] ?? null)
-            && $reference->range()->start()->character() === ($start['character'] ?? null)
-            && $reference->range()->end()->line() === ($end['line'] ?? null)
-            && $reference->range()->end()->character() === ($end['character'] ?? null);
     }
 }

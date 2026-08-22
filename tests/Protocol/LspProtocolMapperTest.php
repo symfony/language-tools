@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Protocol;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\Range;
@@ -98,5 +99,23 @@ final class LspProtocolMapperTest extends TestCase
                 'arguments' => ['file:///workspace/src/Event.php', ['line' => 2, 'character' => 3], $locations],
             ],
         ], $this->mapper->referenceLens($this->range, '1 event listener', 'file:///workspace/src/Event.php', $locations));
+    }
+
+    /** @param array<array-key, mixed> $protocolRange */
+    #[DataProvider('protocolRangeProvider')]
+    public function testComparesInternalRangesWithProtocolRanges(bool $expected, array $protocolRange): void
+    {
+        self::assertSame($expected, $this->mapper->sameRange($this->range, $protocolRange));
+    }
+
+    /** @return iterable<string, array{bool, array<array-key, mixed>}> */
+    public static function protocolRangeProvider(): iterable
+    {
+        yield 'identical' => [true, ['start' => ['line' => 2, 'character' => 3], 'end' => ['line' => 4, 'character' => 5]]];
+        yield 'different line' => [false, ['start' => ['line' => 1, 'character' => 3], 'end' => ['line' => 4, 'character' => 5]]];
+        yield 'different character' => [false, ['start' => ['line' => 2, 'character' => 3], 'end' => ['line' => 4, 'character' => 6]]];
+        yield 'missing end' => [false, ['start' => ['line' => 2, 'character' => 3]]];
+        yield 'malformed positions' => [false, ['start' => 2, 'end' => 4]];
+        yield 'string coordinates' => [false, ['start' => ['line' => '2', 'character' => '3'], 'end' => ['line' => '4', 'character' => '5']]];
     }
 }

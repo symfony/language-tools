@@ -7,6 +7,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TemplateCodeActionProvider implements CodeActionProviderInterface
 {
@@ -16,6 +17,7 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
         private readonly TemplateIndexRegistry $indexes,
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly ProjectPathResolver $pathResolver,
+        private readonly LspProtocolMapper $protocol,
     ) {
     }
 
@@ -38,7 +40,7 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
                 continue;
             }
             foreach ($references as $reference) {
-                if (!$this->sameRange($reference, $range)
+                if (!$this->protocol->sameRange($reference->range(), $range)
                     || null !== $this->indexes->forProject($request->project)->get($reference->name())
                 ) {
                     continue;
@@ -79,19 +81,5 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
         }
 
         return Path::join($root, 'templates', $name);
-    }
-
-    /** @param array<array-key, mixed> $range */
-    private function sameRange(TemplateReference $reference, array $range): bool
-    {
-        $start = $range['start'] ?? null;
-        $end = $range['end'] ?? null;
-
-        return \is_array($start)
-            && \is_array($end)
-            && $reference->range()->start()->line() === ($start['line'] ?? null)
-            && $reference->range()->start()->character() === ($start['character'] ?? null)
-            && $reference->range()->end()->line() === ($end['line'] ?? null)
-            && $reference->range()->end()->character() === ($end['character'] ?? null);
     }
 }

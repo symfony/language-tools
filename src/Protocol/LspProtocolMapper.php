@@ -49,6 +49,20 @@ final class LspProtocolMapper
         return ['contents' => ['kind' => 'markdown', 'value' => $value]];
     }
 
+    /** @param array<array-key, mixed> $protocolRange */
+    public function sameRange(Range $range, array $protocolRange): bool
+    {
+        $start = $protocolRange['start'] ?? null;
+        $end = $protocolRange['end'] ?? null;
+
+        return \is_array($start)
+            && \is_array($end)
+            && $range->start()->line() === ($start['line'] ?? null)
+            && $range->start()->character() === ($start['character'] ?? null)
+            && $range->end()->line() === ($end['line'] ?? null)
+            && $range->end()->character() === ($end['character'] ?? null);
+    }
+
     /** @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, newText: string} */
     public function textEdit(Range $range, string $newText): array
     {

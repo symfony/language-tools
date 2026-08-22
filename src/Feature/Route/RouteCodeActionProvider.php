@@ -49,7 +49,7 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
                 continue;
             }
             foreach ($references as $reference) {
-                if (!$this->sameRange($reference, $range)) {
+                if (!$this->protocol->sameRange($reference->range(), $range)) {
                     continue;
                 }
                 $route = $this->indexes->forProject($request->project)->get($reference->name());
@@ -109,19 +109,5 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
         $position = $this->converter->toPosition($text, $offset);
 
         return $this->protocol->textEdit(new Range($position, $position), $newText);
-    }
-
-    /** @param array<array-key, mixed> $range */
-    private function sameRange(RouteReference $reference, array $range): bool
-    {
-        $start = $range['start'] ?? null;
-        $end = $range['end'] ?? null;
-
-        return \is_array($start)
-            && \is_array($end)
-            && $reference->range()->start()->line() === ($start['line'] ?? null)
-            && $reference->range()->start()->character() === ($start['character'] ?? null)
-            && $reference->range()->end()->line() === ($end['line'] ?? null)
-            && $reference->range()->end()->character() === ($end['character'] ?? null);
     }
 }
