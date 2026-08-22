@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Discover applications that require the framework only through their lock file
 - Load event metadata from container tags without instantiating listeners
 - Report a bootstrap indexing stage when the application bridge cannot boot
 - Discover dogfood probes deterministically with configurable roots and limits

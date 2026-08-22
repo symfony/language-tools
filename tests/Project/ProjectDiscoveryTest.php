@@ -152,6 +152,46 @@ final class ProjectDiscoveryTest extends TestCase
         self::assertNull($registry->forDocumentUri('file:///other/src/Service.php'));
     }
 
+    public function testDiscoversDistributionApplicationsWithATransitiveFrameworkBundle(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/composer.json', json_encode([
+            'type' => 'project',
+            'require' => ['contao/manager-bundle' => '5.3.*'],
+        ], \JSON_THROW_ON_ERROR));
+        file_put_contents($this->temporaryDirectory.'/composer.lock', json_encode([
+            'packages' => [
+                ['name' => 'contao/manager-bundle', 'version' => '5.3.49'],
+                ['name' => 'symfony/framework-bundle', 'version' => 'v6.4.43'],
+            ],
+        ], \JSON_THROW_ON_ERROR));
+        $uri = 'file://'.$this->temporaryDirectory;
+
+        $projects = (new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher()))->discover([
+            ['uri' => $uri, 'name' => 'application'],
+        ]);
+
+        self::assertCount(1, $projects);
+        self::assertSame('6.4.43', $projects[0]->frameworkBundleConstraint());
+    }
+
+    public function testIgnoresApplicationsWithoutTheFrameworkBundleInTheLock(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/composer.json', json_encode([
+            'type' => 'project',
+            'require' => ['laravel/framework' => '^12.0'],
+        ], \JSON_THROW_ON_ERROR));
+        file_put_contents($this->temporaryDirectory.'/composer.lock', json_encode([
+            'packages' => [
+                ['name' => 'laravel/framework', 'version' => 'v12.1.0'],
+                ['name' => 'symfony/console', 'version' => 'v7.4.1'],
+            ],
+        ], \JSON_THROW_ON_ERROR));
+
+        self::assertSame([], (new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher()))->discover([
+            ['uri' => 'file://'.$this->temporaryDirectory],
+        ]));
+    }
+
     public function testIgnoresNonFrameworkProjectsAndInvalidComposerFiles(): void
     {
         file_put_contents($this->temporaryDirectory.'/composer.json', '{');

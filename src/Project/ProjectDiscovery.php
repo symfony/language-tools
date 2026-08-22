@@ -130,6 +130,10 @@ final class ProjectDiscovery
         $constraint = $require['symfony/framework-bundle'] ?? null;
 
         if (!\is_string($constraint)) {
+            $constraint = $this->lockedFrameworkBundleVersion($rootPath);
+        }
+
+        if (!\is_string($constraint)) {
             return null;
         }
 
@@ -138,6 +142,39 @@ final class ProjectDiscovery
         }
 
         return new Project($rootPath, rtrim($rootUri, '/'), $constraint);
+    }
+
+    /**
+     * Applications built on a distribution kernel, such as Contao or Shopware,
+     * require the framework only transitively, so the lock file decides.
+     */
+    private function lockedFrameworkBundleVersion(string $rootPath): ?string
+    {
+        $lockPath = Path::join($rootPath, 'composer.lock');
+        if (!is_file($lockPath)) {
+            return null;
+        }
+
+        try {
+            $lock = json_decode((string) file_get_contents($lockPath), true, 512, \JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+
+        if (!\is_array($lock)) {
+            return null;
+        }
+        foreach (\is_array($lock['packages'] ?? null) ? $lock['packages'] : [] as $package) {
+            if (!\is_array($package) || 'symfony/framework-bundle' !== ($package['name'] ?? null)) {
+                continue;
+            }
+            $version = $package['version'] ?? null;
+            if (\is_string($version)) {
+                return ltrim($version, 'v');
+            }
+        }
+
+        return null;
     }
 
     private function uri(string $workspaceUri, string $workspacePath, string $projectPath): string
