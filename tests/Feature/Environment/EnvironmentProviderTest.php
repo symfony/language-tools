@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Environment\EnvironmentExtractor;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Environment\EnvironmentProvider;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -20,7 +21,7 @@ final class EnvironmentProviderTest extends TestCase
 {
     public function testIndexesNamesAndReferencesWithoutValues(): void
     {
-        $extractor = new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser());
+        $extractor = new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser(), new PhpCommentParser());
         $facts = $extractor->extract('file:///workspace/.env', 'dotenv', "APP_SECRET=CANARY_SECRET_VALUE\nAPP_URL=https://example.com\nEMPTY=\nCHILD=\${APP_URL:-\${FALLBACK_URL}}/\$EMPTY\nPARTIAL=\${UNFINISHED\nESCAPED=\\\$IGNORED\n");
 
         self::assertSame(['APP_SECRET', 'APP_URL', 'EMPTY', 'CHILD', 'PARTIAL', 'ESCAPED'], array_map(static fn ($item): string => $item->name(), $facts->declarations()));
@@ -42,7 +43,7 @@ final class EnvironmentProviderTest extends TestCase
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $commentParser);
+        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $commentParser, new PhpCommentParser());
         $indexes = new EnvironmentIndexRegistry();
         $indexes->forProject($project)->replaceSources($extractor->extract('file:///workspace/.env', 'dotenv', "APP_URL=CANARY_SECRET_VALUE\n"), $extractor->extract($uri, 'yaml', $text));
         $indexes->forProject($project)->replaceProcessors(['custom' => 'string', 'json' => 'array']);
@@ -67,5 +68,19 @@ final class EnvironmentProviderTest extends TestCase
         $documents->open(new Document($commentUri, 'twig', 1, $commentText));
         $commentPosition = $converter->toPosition($commentText, strpos($commentText, 'APP_UR') + \strlen('APP_UR'));
         self::assertNull($provider->complete(['textDocument' => ['uri' => $commentUri], 'position' => ['line' => $commentPosition->line(), 'character' => $commentPosition->character()]]));
+    }
+
+    public function testIgnoresEnvironmentReferencesInPhpComments(): void
+    {
+        $extractor = new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser(), new PhpCommentParser());
+
+        $facts = $extractor->extract('file:///workspace/src/Kernel.php', 'php', <<<'PHP'
+            <?php
+            // $dsn = '%env(COMMENTED_ENV)%';
+            /* uses '%env(BLOCKED_ENV)%' */
+            $dsn = '%env(LIVE_ENV)%';
+            PHP);
+
+        self::assertSame(['LIVE_ENV'], array_map(static fn ($reference): string => $reference->name(), $facts->references()));
     }
 }

@@ -13,6 +13,7 @@ use Symfony\Lsp\Feature\Asset\AssetIndexRegistry;
 use Symfony\Lsp\Feature\Asset\AssetProvider;
 use Symfony\Lsp\Feature\Asset\AssetSourceIndexRegistry;
 use Symfony\Lsp\Feature\Asset\ImportMapEntry;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
@@ -25,7 +26,7 @@ final class AssetProviderTest extends TestCase
     public function testProvidesAssetsAndImportmapEntrypoints(): void
     {
         $converter = new PositionConverter();
-        $extractor = new AssetExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new QuotedArgumentMatcher($converter));
+        $extractor = new AssetExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new PhpCommentParser());
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -133,5 +134,22 @@ final class AssetProviderTest extends TestCase
         $position = $converter->toPosition($text, $offset);
 
         return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+    }
+
+    public function testIgnoresImportMapEntriesInPhpComments(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new AssetExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+
+        $facts = $extractor->extract('file:///workspace/importmap.php', 'php', <<<'PHP'
+            <?php
+            return [
+                // 'commented' => ['path' => './assets/commented.js', 'entrypoint' => true],
+                /* 'blocked' => ['path' => './assets/blocked.js', 'entrypoint' => true], */
+                'live' => ['path' => './assets/live.js', 'entrypoint' => true],
+            ];
+            PHP);
+
+        self::assertSame(['live'], array_map(static fn ($symbol): string => $symbol->name(), $facts->symbols()));
     }
 }

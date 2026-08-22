@@ -17,6 +17,7 @@ use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -165,7 +166,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $indexes->forProject($project)->replace(new Route('article_show', '/article/{id}', ['GET'], [], null, null));
             $converter = new PositionConverter();
             $classIndexes = new DependencyInjectionSourceIndexRegistry();
-            $phpExtractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter));
+            $phpExtractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter), new PhpCommentParser());
             $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()));
             $diagnosticProvider = new RouteDiagnosticPublisher(new DocumentContextResolver($documents, $projects), new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor);
             $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -256,7 +257,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 new LspProtocolMapper(),
                 new RouteIndexRegistry(),
                 new DependencyInjectionSourceIndexRegistry(),
-                new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($positionConverter)),
+                new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($positionConverter), new PhpCommentParser()),
                 new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
             )],
         );
@@ -332,7 +333,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                     new LspProtocolMapper(),
                     $routeIndexes,
                     new DependencyInjectionSourceIndexRegistry(),
-                    new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($positionConverter)),
+                    new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($positionConverter), new PhpCommentParser()),
                     new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
                 )],
             ),

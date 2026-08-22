@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Environment;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\UriToPathConverter;
 
@@ -13,6 +14,7 @@ final class EnvironmentExtractor
         private readonly PositionConverter $converter,
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly TwigCommentParser $commentParser,
+        private readonly PhpCommentParserInterface $phpComments,
     ) {
     }
 
@@ -38,7 +40,11 @@ final class EnvironmentExtractor
             }
         }
         if (\in_array($languageId, ['php', 'twig', 'yaml', 'xml'], true)) {
-            $referenceText = 'twig' === $languageId ? $this->commentParser->mask($text) : $text;
+            $referenceText = match ($languageId) {
+                'twig' => $this->commentParser->mask($text),
+                'php' => $this->phpComments->mask($text),
+                default => $text,
+            };
             preg_match_all('/%env\(([^)%]+)\)%/', $referenceText, $matches, \PREG_OFFSET_CAPTURE);
             foreach ($matches[1] as [$expression, $offset]) {
                 $parts = explode(':', $expression);

@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
@@ -15,6 +16,7 @@ final class TwigComponentExtractor
         private readonly TemplateNameResolver $templateNameResolver,
         private readonly TwigCommentParser $commentParser,
         private readonly QuotedArgumentMatcher $matcher,
+        private readonly PhpCommentParserInterface $phpComments,
     ) {
     }
 
@@ -25,11 +27,12 @@ final class TwigComponentExtractor
         $actionReferences = [];
         $events = [];
         if ('php' === $languageId) {
-            preg_match('/\bnamespace\s+([^;{]+)[;{]/', $text, $namespace);
+            $masked = $this->phpComments->mask($text);
+            preg_match('/\bnamespace\s+([^;{]+)[;{]/', $masked, $namespace);
             $namespace = isset($namespace[1]) ? trim($namespace[1]).'\\' : '';
             preg_match_all(
                 '/#\[\s*[^\r\n]*?\b(?:AsTwigComponent|AsLiveComponent)\b\s*(?:\((.*?)\))?\s*]\s*(?:(?:final|readonly|abstract)\s+)*class\s+([A-Za-z_][A-Za-z0-9_]*)/s',
-                $text,
+                $masked,
                 $matches,
                 \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL,
             );
@@ -46,16 +49,16 @@ final class TwigComponentExtractor
                     ?? $this->nameFromTemplate($template)
                     ?? $this->nameFromClass($namespace.$class)
                     ?? $class;
-                preg_match_all('/\bpublic\s+(?:(?:readonly|static)\s+)*(?:[^$(),;=]+\s+)?\$([A-Za-z_][A-Za-z0-9_]*)/', $text, $properties);
-                preg_match_all('/#\[\s*(?:[^\]\r\n]*\\\\)?LiveProp\b[^]]*]\s*(?:(?:public|protected|private|readonly|static)\s+)*(?:[^$(),;=]+\s+)?\$([A-Za-z_][A-Za-z0-9_]*)/', $text, $liveProperties);
+                preg_match_all('/\bpublic\s+(?:(?:readonly|static)\s+)*(?:[^$(),;=]+\s+)?\$([A-Za-z_][A-Za-z0-9_]*)/', $masked, $properties);
+                preg_match_all('/#\[\s*(?:[^\]\r\n]*\\\\)?LiveProp\b[^]]*]\s*(?:(?:public|protected|private|readonly|static)\s+)*(?:[^$(),;=]+\s+)?\$([A-Za-z_][A-Za-z0-9_]*)/', $masked, $liveProperties);
                 $componentProperties = array_values(array_unique([...$properties[1], ...$liveProperties[1]]));
                 sort($componentProperties);
-                preg_match_all('/#\[\s*(?:[^\]\r\n]*\\\\)?(?:LiveAction|LiveListener)\b[^]]*](?:\s*#\[[^]]+])*\s*(?:(?:public|protected|private|final|static)\s+)*function\s+([A-Za-z_][A-Za-z0-9_]*)/', $text, $actionMatches, \PREG_OFFSET_CAPTURE);
+                preg_match_all('/#\[\s*(?:[^\]\r\n]*\\\\)?(?:LiveAction|LiveListener)\b[^]]*](?:\s*#\[[^]]+])*\s*(?:(?:public|protected|private|final|static)\s+)*function\s+([A-Za-z_][A-Za-z0-9_]*)/', $masked, $actionMatches, \PREG_OFFSET_CAPTURE);
                 $actions = [];
                 foreach ($actionMatches[1] as [$action, $actionOffset]) {
                     $actions[$action] = new TwigComponentAction($action, $this->range($text, $actionOffset, \strlen($action)));
                 }
-                preg_match_all('/#\[\s*(?:[^\]\r\n]*\\\\)?LiveListener\s*\(\s*(?:event\s*:\s*)?([\'"])([^\'"]+)\1[^]]*](?:\s*#\[[^]]+])*\s*(?:(?:public|protected|private|final|static)\s+)*function\s+([A-Za-z_][A-Za-z0-9_]*)/', $text, $listenerMatches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+                preg_match_all('/#\[\s*(?:[^\]\r\n]*\\\\)?LiveListener\s*\(\s*(?:event\s*:\s*)?([\'"])([^\'"]+)\1[^]]*](?:\s*#\[[^]]+])*\s*(?:(?:public|protected|private|final|static)\s+)*function\s+([A-Za-z_][A-Za-z0-9_]*)/', $masked, $listenerMatches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
                 foreach ($listenerMatches as $listener) {
                     $events[] = new LiveComponentEvent(
                         $listener[2][0],
@@ -78,7 +81,7 @@ final class TwigComponentExtractor
                     array_values($actions),
                 );
                 if ($live) {
-                    foreach ($this->matcher->functionCalls($text, ['emit']) as $emit) {
+                    foreach ($this->matcher->functionCalls($masked, ['emit'], $text) as $emit) {
                         $events[] = new LiveComponentEvent($emit->value, $uri, $emit->range, false, $name);
                     }
                 }

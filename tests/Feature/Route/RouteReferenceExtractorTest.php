@@ -10,9 +10,11 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
+use Symfony\Lsp\Feature\Route\RouteReference;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceLocation;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Project\Project;
@@ -51,7 +53,7 @@ final class RouteReferenceExtractorTest extends TestCase
             classes: $classExtractor->extract($uri, $source),
         ));
 
-        self::assertSame([], (new RouteReferenceExtractor($converter, $parser, new QuotedArgumentMatcher($converter)))->extract($source, $classIndex));
+        self::assertSame([], (new RouteReferenceExtractor($converter, $parser, new QuotedArgumentMatcher($converter), new PhpCommentParser()))->extract($source, $classIndex));
     }
 
     public function testRecognizesControllerReferencesThroughProjectBaseClasses(): void
@@ -98,7 +100,7 @@ final class RouteReferenceExtractorTest extends TestCase
             new DependencyInjectionSourceFacts($baseUri, classes: $classExtractor->extract($baseUri, $base)),
             new DependencyInjectionSourceFacts($controllerUri, classes: $classExtractor->extract($controllerUri, $controller)),
         );
-        $references = (new RouteReferenceExtractor($converter, $parser, new QuotedArgumentMatcher($converter)))->extract($controller, $classIndex);
+        $references = (new RouteReferenceExtractor($converter, $parser, new QuotedArgumentMatcher($converter), new PhpCommentParser()))->extract($controller, $classIndex);
 
         self::assertSame(['article_show'], array_map(static fn ($reference): string => $reference->name(), $references));
         self::assertSame('App\\Controller\\DemoController', $references[0]->controllerClass());
@@ -145,11 +147,31 @@ final class RouteReferenceExtractorTest extends TestCase
             }
             PHP;
         $converter = new PositionConverter();
-        $extractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter));
+        $extractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter), new PhpCommentParser());
 
         $references = $extractor->extract($source);
 
         self::assertCount(1, $references);
         self::assertSame("it's_a_route", $references[0]->name());
+    }
+
+    public function testIgnoresRouteCallsInPhpComments(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            class DemoController extends \Symfony\Bundle\FrameworkBundle\Controller\AbstractController
+            {
+                public function index(): void
+                {
+                    // $this->generateUrl('commented_route');
+                    /* $this->redirectToRoute('blocked_route'); */
+                    $this->generateUrl('live_route');
+                }
+            }
+            PHP;
+        $converter = new PositionConverter();
+        $extractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+
+        self::assertSame(['live_route'], array_map(static fn (RouteReference $reference): string => $reference->name(), $extractor->extract($source)));
     }
 }

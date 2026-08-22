@@ -7,6 +7,7 @@
 - Cancel indexing and release all project state when a workspace folder is removed
 - Compute translation quick fixes from unsaved editor contents and versioned edits
 - Recognize escaped quotes in route, template, asset, translation and component literals
+- Ignore route, template, translation, component, environment and importmap references in PHP comments
 
 ## 0.15.0 (2026-08-21)
 

@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
@@ -21,6 +22,7 @@ final class RouteReferenceExtractor
         private readonly PositionConverter $positionConverter,
         private readonly PhpParserInterface $parser,
         private readonly QuotedArgumentMatcher $matcher,
+        private readonly PhpCommentParserInterface $phpComments,
     ) {
     }
 
@@ -73,11 +75,12 @@ final class RouteReferenceExtractor
      */
     private function extractFromDocument(string $text, PhpDocument $document): array
     {
+        $masked = $this->phpComments->mask($text);
         $references = [];
-        foreach ($this->matcher->methodCalls($text, self::METHODS) as $call) {
+        foreach ($this->matcher->methodCalls($masked, self::METHODS, $text) as $call) {
             $receiverOffset = $call->nameOffset - 2;
             $receiver = RoutePhpReceiver::resolve(
-                substr($text, 0, $receiverOffset),
+                substr($masked, 0, $receiverOffset),
                 $receiverOffset,
                 $document->typeDeclarations(),
             );
@@ -88,7 +91,7 @@ final class RouteReferenceExtractor
             $references[] = new RouteReference(
                 $call->value,
                 $call->range,
-                $this->providedParameters(substr($text, $call->end())),
+                $this->providedParameters(substr($masked, $call->end())),
                 $receiver->controllerClass(),
             );
         }

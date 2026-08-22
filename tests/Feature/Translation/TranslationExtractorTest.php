@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Feature\Translation;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Translation\TranslationExtractor;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -121,6 +122,18 @@ final class TranslationExtractorTest extends TestCase
     {
         $converter = new PositionConverter();
 
-        return new TranslationExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new QuotedArgumentMatcher($converter));
+        return new TranslationExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+    }
+
+    public function testIgnoresTranslationCallsInPhpComments(): void
+    {
+        $facts = $this->extractor()->extract('file:///workspace/src/Controller.php', 'php', <<<'PHP'
+            <?php
+            // $translator->trans('commented.key');
+            /* $translator->trans('blocked.key'); */
+            $translator->trans('live.key');
+            PHP);
+
+        self::assertSame(['live.key'], array_map(static fn ($item): string => $item->key(), $facts->references()));
     }
 }

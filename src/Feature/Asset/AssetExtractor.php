@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -15,6 +16,7 @@ final class AssetExtractor
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly TwigCommentParser $commentParser,
         private readonly QuotedArgumentMatcher $matcher,
+        private readonly PhpCommentParserInterface $phpComments,
     ) {
     }
 
@@ -22,7 +24,7 @@ final class AssetExtractor
     {
         $symbols = match ($languageId) {
             'twig' => $this->twigSymbols($uri, $this->commentParser->mask($text)),
-            'php' => 'importmap.php' === basename($this->uriToPathConverter->convert($uri) ?? '') ? $this->importMapSymbols($uri, $text) : [],
+            'php' => 'importmap.php' === basename($this->uriToPathConverter->convert($uri) ?? '') ? $this->importMapSymbols($uri, $this->phpComments->mask($text), $text) : [],
             default => [],
         };
 
@@ -67,7 +69,7 @@ final class AssetExtractor
     }
 
     /** @return list<AssetSourceSymbol> */
-    private function importMapSymbols(string $uri, string $text): array
+    private function importMapSymbols(string $uri, string $text, string $positionText): array
     {
         if (!preg_match('/\breturn\s*\[/', $text, $return, \PREG_OFFSET_CAPTURE)) {
             return [];
@@ -123,7 +125,7 @@ final class AssetExtractor
             $options = substr($text, $optionsOpen + 1, $optionsClose - $optionsOpen - 1);
             if (preg_match('/["\']entrypoint["\']\s*=>\s*true\b/', $options)) {
                 $name = substr($text, $nameStart, $nameEnd - $nameStart);
-                $symbols[] = $this->symbol(AssetSymbolKind::Entrypoint, $name, $uri, $text, $nameStart, true);
+                $symbols[] = $this->symbol(AssetSymbolKind::Entrypoint, $name, $uri, $positionText, $nameStart, true);
             }
             $offset = $optionsClose;
         }

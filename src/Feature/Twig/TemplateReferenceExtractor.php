@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
@@ -13,6 +14,7 @@ final class TemplateReferenceExtractor
         private readonly PositionConverter $positionConverter,
         private readonly TwigDocumentParser $twigParser,
         private readonly QuotedArgumentMatcher $matcher,
+        private readonly PhpCommentParserInterface $phpComments,
     ) {
     }
 
@@ -26,10 +28,11 @@ final class TemplateReferenceExtractor
             return [];
         }
 
+        $masked = $this->phpComments->mask($text);
         $references = [];
-        foreach ($this->matcher->methodCalls($text, ['render', 'renderView']) as $call) {
+        foreach ($this->matcher->methodCalls($masked, ['render', 'renderView'], $text) as $call) {
             $variables = [];
-            if (1 === preg_match('/^\s*,\s*\[([^\]]*)\]/', substr($text, $call->end()), $arrayMatch)) {
+            if (1 === preg_match('/^\s*,\s*\[([^\]]*)\]/', substr($masked, $call->end()), $arrayMatch)) {
                 preg_match_all('/([\'"])([^\'"]+)\1\s*=>/', $arrayMatch[1], $keys);
                 $variables = array_values(array_unique($keys[2]));
             }

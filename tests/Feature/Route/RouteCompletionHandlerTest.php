@@ -15,6 +15,7 @@ use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Project\Project;
@@ -242,7 +243,7 @@ final class RouteCompletionHandlerTest extends TestCase
             new LspProtocolMapper(),
             $indexes,
             $classIndexes ?? new DependencyInjectionSourceIndexRegistry(),
-            new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter)),
+            new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter), new PhpCommentParser()),
         );
     }
 }

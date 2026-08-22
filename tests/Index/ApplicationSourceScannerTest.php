@@ -31,6 +31,7 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -293,7 +294,7 @@ PHP;
         $indexes = new EnvironmentIndexRegistry();
         $this->scanner(new EnvironmentSourceIndexer(
             $indexes,
-            new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser()),
+            new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser(), new PhpCommentParser()),
         ))->indexAll();
 
         self::assertSame(['APP_SECRET'], $indexes->forProject($this->project)->names());

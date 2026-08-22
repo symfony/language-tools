@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Translation\TranslationExtractor;
 use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationRenameHandler;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -34,7 +35,7 @@ final class TranslationRenameHandlerTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new TranslationExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new QuotedArgumentMatcher($converter));
+        $extractor = new TranslationExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new QuotedArgumentMatcher($converter), new PhpCommentParser());
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceSources(
             $extractor->extract($resourceUri, 'yaml', $resource),

@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Parser;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 
 final class QuotedArgumentMatcherTest extends TestCase
@@ -104,5 +105,19 @@ final class QuotedArgumentMatcherTest extends TestCase
         self::assertCount(1, $arguments);
         self::assertSame(',', $text[$arguments[0]->end()]);
         self::assertSame(strpos($text, 'render'), $arguments[0]->nameOffset);
+    }
+
+    public function testMeasuresPositionsAgainstTheGivenPositionText(): void
+    {
+        $original = "<?php /* café */ \$x->generate('checkout');";
+        $masked = (new PhpCommentParser())->mask($original);
+
+        $arguments = $this->matcher->methodCalls($masked, ['generate'], $original);
+
+        self::assertCount(1, $arguments);
+        self::assertSame('checkout', $arguments[0]->value);
+        self::assertSame(31, $arguments[0]->range->start()->character());
+        self::assertSame(39, $arguments[0]->range->end()->character());
+        self::assertSame(32, $this->matcher->methodCalls($masked, ['generate'])[0]->range->start()->character());
     }
 }

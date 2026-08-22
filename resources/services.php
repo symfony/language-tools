@@ -47,7 +47,10 @@ use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Index\SourceIndexStoreInterface;
+use Symfony\Lsp\Parser\Php\LastResultPhpCommentParser;
 use Symfony\Lsp\Parser\Php\LastResultPhpParser;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
@@ -168,6 +171,10 @@ return static function (ContainerConfigurator $container): void {
     $services->get(LastResultPhpParser::class)
         ->decorate(PhpParserInterface::class)
         ->arg('$parser', service(LastResultPhpParser::class.'.inner'));
+    $services->alias(PhpCommentParserInterface::class, PhpCommentParser::class);
+    $services->get(LastResultPhpCommentParser::class)
+        ->decorate(PhpCommentParserInterface::class)
+        ->arg('$parser', service(LastResultPhpCommentParser::class.'.inner'));
     $services->alias(TreeSitterParserInterface::class, NativeTreeSitterParser::class);
     $services->get(LastResultTreeSitterParser::class)
         ->decorate(TreeSitterParserInterface::class)

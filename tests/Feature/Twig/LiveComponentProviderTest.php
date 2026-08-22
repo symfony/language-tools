@@ -15,6 +15,7 @@ use Symfony\Lsp\Feature\Twig\TwigComponentExtractor;
 use Symfony\Lsp\Feature\Twig\TwigComponentIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigComponentRelationshipProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentResolver;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
@@ -30,7 +31,7 @@ final class LiveComponentProviderTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), $commentParser, new QuotedArgumentMatcher($converter));
+        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), $commentParser, new QuotedArgumentMatcher($converter), new PhpCommentParser());
         $classUri = 'file:///workspace/src/Twig/Components/Search.php';
         $classText = <<<'PHP'
             <?php
@@ -120,5 +121,29 @@ final class LiveComponentProviderTest extends TestCase
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line(), 'character' => $position->character()],
         ];
+    }
+
+    public function testIgnoresEmitCallsInPhpComments(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+
+        $facts = $extractor->extract(new Project('/workspace', 'file:///workspace', '^8.0'), 'file:///workspace/src/Twig/Components/Search.php', 'php', <<<'PHP'
+            <?php
+            namespace App\Twig\Components;
+
+            #[AsLiveComponent(name: 'Search', template: 'components/Search.html.twig')]
+            final class Search
+            {
+                #[LiveAction]
+                public function submit(): void
+                {
+                    // $this->emit('commented:event');
+                    $this->emit('live:event');
+                }
+            }
+            PHP);
+
+        self::assertSame(['live:event'], array_map(static fn ($event): string => $event->name(), $facts->events()));
     }
 }
