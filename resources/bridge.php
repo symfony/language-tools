@@ -40,6 +40,7 @@ require __DIR__.'/bridge/sections/metadata.php';
 require __DIR__.'/bridge/sections/assets.php';
 require __DIR__.'/bridge/sections/stimulus.php';
 require __DIR__.'/bridge/sections/configuration.php';
+require __DIR__.'/bridge/sections/doctrine.php';
 require __DIR__.'/bridge/sections/environment.php';
 
 $options = getopt('', ['project:', 'environment::', 'debug::', 'sections::', 'targeted-refresh::', 'rebuild-container::']);
@@ -120,6 +121,7 @@ foreach ($requestedSections as $sectionName) {
             'assets' => bridgeAssetsSection($context),
             'stimulus' => bridgeStimulusSection($context),
             'configuration' => bridgeConfigurationSection($context),
+            'doctrine' => bridgeDoctrineSection($context),
             'environment' => bridgeEnvironmentSection($context),
             default => null,
         };

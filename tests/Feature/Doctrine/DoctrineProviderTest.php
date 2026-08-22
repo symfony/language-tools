@@ -7,10 +7,14 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Doctrine\DoctrineCriteriaProvider;
+use Symfony\Lsp\Feature\Doctrine\DoctrineEntity;
 use Symfony\Lsp\Feature\Doctrine\DoctrineEntityTypeProvider;
 use Symfony\Lsp\Feature\Doctrine\DoctrineExtractor;
+use Symfony\Lsp\Feature\Doctrine\DoctrineField;
 use Symfony\Lsp\Feature\Doctrine\DoctrineFieldCompletionBuilder;
 use Symfony\Lsp\Feature\Doctrine\DoctrineIndexRegistry;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipCodeLensProvider;
@@ -186,6 +190,43 @@ final class DoctrineProviderTest extends TestCase
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line(), 'character' => $position->character()],
         ];
+    }
+
+    public function testNavigatesToRuntimeOnlyEntities(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $projects = new ProjectRegistry();
+        $projects->replace([$project]);
+        $indexes = new DoctrineIndexRegistry();
+        $entityUri = 'file:///workspace/vendor/acme/entity/Book.php';
+        $range = new Range(new Position(0, 0), new Position(0, 0));
+        $indexes->forProject($project)->replaceRuntime(new DoctrineEntity(
+            'Acme\Entity\Book',
+            $entityUri,
+            $range,
+            null,
+            [new DoctrineField('title', $entityUri, $range, false, 'string')],
+        ));
+        $usageUri = 'file:///workspace/src/Finder.php';
+        $usageText = <<<'PHP'
+            <?php
+            use Acme\Entity\Book;
+            $repository = $manager->getRepository(Book::class);
+            $repository->findBy(['title' => 'Symfony']);
+            PHP;
+        $documents = new DocumentStore();
+        $documents->open(new Document($usageUri, 'php', 1, $usageText));
+        $provider = new DoctrineRelationshipProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor);
+
+        $params = $this->params($converter, $usageUri, $usageText, strpos($usageText, "['title'") + 3);
+        self::assertSame([$entityUri], array_column($provider->definition($params) ?? [], 'uri'));
+        $hover = $provider->hover($params);
+        self::assertIsArray($hover);
+        self::assertIsArray($hover['contents'] ?? null);
+        self::assertIsString($hover['contents']['value'] ?? null);
+        self::assertStringContainsString('Doctrine field: `Acme\Entity\Book::$title`', $hover['contents']['value']);
     }
 
     public function testOffersNoDoctrineCompletionsInsidePhpComments(): void

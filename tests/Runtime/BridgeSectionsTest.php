@@ -165,6 +165,38 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
         self::assertContains('acme--widget', array_column(\is_array($stimulus['controllers'] ?? null) ? $stimulus['controllers'] : [], 'name'));
     }
 
+    public function testExportsDoctrineMetadataFromTheMetadataFactory(): void
+    {
+        $this->writeDoctrineApplication();
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=doctrine 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $snapshot = implode("\n", $output);
+        self::assertSame(0, $exitCode, $snapshot);
+        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null, $snapshot);
+        self::assertIsArray($result['sections'] ?? null);
+        $doctrine = $result['sections']['doctrine'] ?? null;
+        self::assertIsArray($doctrine);
+        self::assertTrue($doctrine['complete'] ?? null);
+        self::assertIsArray($doctrine['entities'] ?? null);
+        $entity = $doctrine['entities'][0] ?? null;
+        self::assertIsArray($entity);
+        self::assertSame('App\Entity\Book', $entity['className'] ?? null);
+        self::assertSame(realpath($this->temporaryDirectory).'/src/Entity/Book.php', $entity['file'] ?? null);
+        self::assertSame('App\Repository\BookRepository', $entity['repositoryClass'] ?? null);
+        self::assertSame([
+            ['name' => 'title', 'type' => 'string', 'association' => false, 'targetEntity' => null],
+            ['name' => 'author', 'type' => null, 'association' => true, 'targetEntity' => 'App\Entity\Author'],
+        ], $entity['fields'] ?? null);
+    }
+
     public function testReportsUnavailableOptionalStimulusBundle(): void
     {
         $this->writeAutoloader('8.0.6');

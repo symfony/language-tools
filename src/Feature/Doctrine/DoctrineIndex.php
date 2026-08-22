@@ -7,6 +7,14 @@ use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 /** @extends AbstractSourceFactsIndex<DoctrineSourceFacts> */
 final class DoctrineIndex extends AbstractSourceFactsIndex
 {
+    /** @var list<DoctrineEntity> */
+    private array $runtime = [];
+
+    public function replaceRuntime(DoctrineEntity ...$entities): void
+    {
+        $this->runtime = array_values($entities);
+    }
+
     public function entity(string $className): ?DoctrineEntity
     {
         foreach ($this->facts() as $facts) {
@@ -14,6 +22,11 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
                 if ($className === $entity->className()) {
                     return $entity;
                 }
+            }
+        }
+        foreach ($this->runtime as $entity) {
+            if ($className === $entity->className()) {
+                return $entity;
             }
         }
 
@@ -24,6 +37,10 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
     public function entities(): array
     {
         $entities = [];
+        foreach ($this->runtime as $entity) {
+            $entities[$entity->className()] = $entity;
+        }
+        // source facts win: they carry precise declaration ranges
         foreach ($this->facts() as $facts) {
             foreach ($facts->entities() as $entity) {
                 $entities[$entity->className()] = $entity;

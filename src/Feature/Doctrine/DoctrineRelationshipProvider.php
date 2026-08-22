@@ -72,10 +72,27 @@ final class DoctrineRelationshipProvider implements DefinitionProviderInterface,
             return null;
         }
         [$symbol, $project] = $resolved;
+        $index = $this->indexes->forProject($project);
         $locations = [];
-        foreach ($this->indexes->forProject($project)->relatedSymbols($symbol) as $candidate) {
+        foreach ($index->relatedSymbols($symbol) as $candidate) {
             if ($candidate->isDeclaration()) {
                 $locations[] = $this->protocol->location($candidate->uri(), $candidate->range());
+            }
+        }
+        if ([] === $locations) {
+            // runtime-only entities, such as XML mappings or vendor classes,
+            // have no source declaration symbols
+            if (DoctrineSymbolKind::Field === $symbol->kind() && null !== $symbol->owner()) {
+                $entity = $index->entity($symbol->owner()) ?? $index->entityForRepository($symbol->owner());
+                $field = $entity?->field($symbol->name());
+                if (null !== $field) {
+                    $locations[] = $this->protocol->location($field->uri(), $field->range());
+                }
+            } elseif (DoctrineSymbolKind::Entity === $symbol->kind()) {
+                $entity = $index->entity($symbol->name());
+                if (null !== $entity) {
+                    $locations[] = $this->protocol->location($entity->uri(), $entity->range());
+                }
             }
         }
 

@@ -4,6 +4,7 @@
 
 - Index ini translation catalogs with directory locales
 - Resolve asset() paths against the public document root
+- Export Doctrine metadata from the runtime so XML mappings and vendor entities resolve
 - Merge configuration shorthands and normalized values into the exported trees
 - Scope configuration diagnostics to the application configuration directory
 - Resolve themed Twig loader paths and bundle Stimulus registries
