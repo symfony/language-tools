@@ -125,7 +125,7 @@ final class MatrixCommandTest extends TestCase
         /** @var array<string, mixed> $cold */
         $cold = $report['cold'];
         self::assertSame(
-            ['layers', 'source', 'runtime', 'probes', 'requestErrors', 'violations', 'maxMilliseconds', 'serverVersion'],
+            ['layers', 'source', 'runtime', 'probes', 'requestErrors', 'violations', 'maxMilliseconds', 'serverVersion', 'supportScore'],
             array_keys($cold),
         );
         /** @var array<string, mixed> $summary */

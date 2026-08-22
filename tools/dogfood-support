@@ -1,0 +1,138 @@
+#!/usr/bin/env php
+<?php
+
+require \dirname(__DIR__).'/vendor/autoload.php';
+
+use Symfony\Lsp\Tools\Dogfood\SupportScorer;
+
+const USAGE = <<<'USAGE'
+    Usage: tools/dogfood-support [options] [matrix-dir]
+
+    Computes a support score per project from dogfood matrix artifacts. The
+    score is the fraction of expected request kinds (completion, hover,
+    definition, references) answered per probe, averaged per category and
+    project. A trailing * marks a probe set that changed since the previous
+    run of the same project, which limits comparability.
+
+    Options:
+      --history    one row per matrix run instead of only the latest
+      --json       machine-readable output
+    USAGE;
+
+$history = false;
+$json = false;
+$matrixDirectory = \dirname(__DIR__).'/var/dogfood/matrix';
+foreach (array_slice($argv, 1) as $argument) {
+    if ('--history' === $argument) {
+        $history = true;
+    } elseif ('--json' === $argument) {
+        $json = true;
+    } elseif (str_starts_with($argument, '--')) {
+        fwrite(STDERR, USAGE."\n");
+        exit(1);
+    } else {
+        $matrixDirectory = $argument;
+    }
+}
+if (!is_dir($matrixDirectory)) {
+    fwrite(STDERR, "Matrix directory not found: $matrixDirectory\n");
+    exit(1);
+}
+
+$scorer = new SupportScorer();
+$runs = [];
+foreach (glob($matrixDirectory.'/*/*/warm.json') ?: [] as $path) {
+    $parts = explode('/', $path);
+    $project = $parts[\count($parts) - 2];
+    $run = $parts[\count($parts) - 3];
+    $report = json_decode((string) file_get_contents($path), true);
+    if (!\is_array($report)) {
+        continue;
+    }
+    $score = $scorer->score($report);
+    if (null === $score) {
+        continue;
+    }
+    $score['serverVersion'] = \is_string($report['serverVersion'] ?? null) ? $report['serverVersion'] : null;
+    $runs[$run][$project] = $score;
+}
+if ([] === $runs) {
+    fwrite(STDERR, "No scorable matrix artifacts found.\n");
+    exit(1);
+}
+ksort($runs, \SORT_STRING);
+
+$fingerprintChanged = static function (array $runs, string $run, string $project, array $score): bool {
+    $previous = null;
+    foreach ($runs as $candidateRun => $projects) {
+        if ($candidateRun >= $run) {
+            break;
+        }
+        if (isset($projects[$project])) {
+            $previous = $projects[$project];
+        }
+    }
+
+    return null !== $previous && $previous['fingerprint'] !== $score['fingerprint'];
+};
+
+if ($history) {
+    $rows = [];
+    foreach ($runs as $run => $projects) {
+        ksort($projects);
+        $row = ['run' => $run, 'projects' => [], 'overall' => 0.0];
+        foreach ($projects as $project => $score) {
+            $row['projects'][$project] = [
+                'score' => round($score['score'], 4),
+                'probeCount' => $score['probeCount'],
+                'fingerprint' => $score['fingerprint'],
+                'probeSetChanged' => $fingerprintChanged($runs, $run, $project, $score),
+            ];
+        }
+        $row['overall'] = round(array_sum(array_map(static fn (array $s): float => $s['score'], $projects)) / \count($projects), 4);
+        $rows[] = $row;
+    }
+    if ($json) {
+        echo json_encode($rows, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)."\n";
+        exit(0);
+    }
+    foreach ($rows as $row) {
+        printf("%s  overall=%5.1f%%  (%d projects)\n", $row['run'], 100 * $row['overall'], \count($row['projects']));
+        foreach ($row['projects'] as $project => $score) {
+            printf("    %-28s %5.1f%%  probes=%2d%s\n", $project, 100 * $score['score'], $score['probeCount'], $score['probeSetChanged'] ? ' *' : '');
+        }
+    }
+    exit(0);
+}
+
+$latest = [];
+foreach ($runs as $run => $projects) {
+    foreach ($projects as $project => $score) {
+        $latest[$project] = ['run' => $run, 'score' => $score];
+    }
+}
+ksort($latest);
+if ($json) {
+    $output = ['projects' => [], 'overall' => 0.0];
+    foreach ($latest as $project => $entry) {
+        $output['projects'][$project] = [
+            'run' => $entry['run'],
+            'score' => round($entry['score']['score'], 4),
+            'probeCount' => $entry['score']['probeCount'],
+            'fingerprint' => $entry['score']['fingerprint'],
+            'categories' => array_map(static fn (float $s): float => round($s, 4), $entry['score']['categories']),
+        ];
+    }
+    $output['overall'] = round(array_sum(array_map(static fn (array $e): float => $e['score']['score'], $latest)) / \count($latest), 4);
+    echo json_encode($output, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)."\n";
+    exit(0);
+}
+foreach ($latest as $project => $entry) {
+    printf("%-28s %5.1f%%  probes=%2d  run=%s\n", $project, 100 * $entry['score']['score'], $entry['score']['probeCount'], $entry['run']);
+    $gaps = array_filter($entry['score']['categories'], static fn (float $s): bool => $s < 1.0);
+    asort($gaps);
+    foreach ($gaps as $category => $score) {
+        printf("    %-32s %5.1f%%\n", $category, 100 * $score);
+    }
+}
+printf("overall %.1f%% across %d projects\n", 100 * array_sum(array_map(static fn (array $e): float => $e['score']['score'], $latest)) / \count($latest), \count($latest));

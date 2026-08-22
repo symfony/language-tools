@@ -16,6 +16,7 @@ final class RunSummary
         public readonly int $violations,
         public readonly float $maxMilliseconds,
         public readonly ?string $serverVersion,
+        public readonly ?float $supportScore = null,
     ) {
     }
 
@@ -33,6 +34,7 @@ final class RunSummary
             'violations' => $this->violations,
             'maxMilliseconds' => $this->maxMilliseconds,
             'serverVersion' => $this->serverVersion,
+            'supportScore' => $this->supportScore,
         ];
     }
 }

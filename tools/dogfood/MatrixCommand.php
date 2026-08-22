@@ -20,6 +20,7 @@ final class MatrixCommand
         private ProcessRunnerInterface $processes,
         private Filesystem $filesystem,
         private \Closure $output,
+        private SupportScorer $scorer = new SupportScorer(),
     ) {
     }
 
@@ -133,6 +134,7 @@ final class MatrixCommand
             \is_array($violations) ? \count($violations) : 0,
             $maxMilliseconds,
             \is_string($serverVersion) ? $serverVersion : null,
+            $this->scorer->score($result)['score'] ?? null,
         );
     }
 
@@ -210,13 +212,14 @@ final class MatrixCommand
         $warm = $report->warm ?? throw new \LogicException('Missing warm run.');
 
         return \sprintf(
-            '%-28s cold=%-12s warm=%-12s probes=%2d max=%6.1fms errors=%d',
+            '%-28s cold=%-12s warm=%-12s probes=%2d max=%6.1fms errors=%d%s',
             $report->configuration->name,
             [] === $cold->layers ? 'ok' : implode(',', $cold->layers),
             [] === $warm->layers ? 'ok' : implode(',', $warm->layers),
             $warm->probes,
             max($cold->maxMilliseconds, $warm->maxMilliseconds),
             $cold->requestErrors + $warm->requestErrors,
+            null === $warm->supportScore ? '' : \sprintf(' support=%5.1f%%', 100 * $warm->supportScore),
         );
     }
 
