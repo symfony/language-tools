@@ -12,7 +12,6 @@ final class GitProvisioner implements ProvisionerInterface
         private Filesystem $filesystem,
         private string $mirrorsDirectory,
         private string $checkoutsDirectory,
-        private ?string $repositoryBase = null,
     ) {
     }
 
@@ -35,7 +34,7 @@ final class GitProvisioner implements ProvisionerInterface
 
     private function mirror(ProjectConfiguration $configuration): string
     {
-        $repository = $this->resolveRepository($configuration);
+        $repository = $configuration->repository;
         $mirror = Path::join($this->mirrorsDirectory, $configuration->name.'.git');
         if (!is_dir($mirror)) {
             $this->filesystem->mkdir($this->mirrorsDirectory);
@@ -50,22 +49,6 @@ final class GitProvisioner implements ProvisionerInterface
         }
 
         return $mirror;
-    }
-
-    private function resolveRepository(ProjectConfiguration $configuration): string
-    {
-        if (1 === preg_match('{^(?:[a-z+]+://|[^/]+@|[A-Za-z0-9.-]+:)}', $configuration->repository)) {
-            return $configuration->repository;
-        }
-        if (null === $this->repositoryBase) {
-            throw new ProvisioningException(\sprintf('Project "%s" uses the relative repository "%s"; pass --repository-base.', $configuration->name, $configuration->repository));
-        }
-        $repository = Path::join($this->repositoryBase, $configuration->repository);
-        if (!is_dir($repository)) {
-            throw new ProvisioningException(\sprintf('Repository "%s" does not exist.', $repository));
-        }
-
-        return $repository;
     }
 
     private function hasRevision(string $mirror, string $revision): bool

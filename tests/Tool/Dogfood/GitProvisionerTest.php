@@ -31,7 +31,6 @@ final class GitProvisionerTest extends TestCase
             new Filesystem(),
             Path::join($this->directory, 'mirrors'),
             Path::join($this->directory, 'checkouts'),
-            $this->directory,
         );
     }
 
@@ -86,21 +85,6 @@ final class GitProvisionerTest extends TestCase
         $this->provisioner->provision($this->configuration(str_repeat('b', 40)));
     }
 
-    public function testProvisionRejectsRelativeRepositoriesWithoutABase(): void
-    {
-        $provisioner = new GitProvisioner(
-            $this->processes,
-            new Filesystem(),
-            Path::join($this->directory, 'mirrors'),
-            Path::join($this->directory, 'checkouts'),
-        );
-
-        $this->expectException(ProvisioningException::class);
-        $this->expectExceptionMessage('--repository-base');
-
-        $provisioner->provision($this->configuration(str_repeat('a', 40)));
-    }
-
     public function testReleaseRemovesTheCheckout(): void
     {
         $pinned = $this->commit('composer.json', '{}');
@@ -114,7 +98,7 @@ final class GitProvisionerTest extends TestCase
 
     private function configuration(string $revision): ProjectConfiguration
     {
-        return new ProjectConfiguration('origin', 'origin', $revision, null, 'dev', 'composer', false, 120);
+        return new ProjectConfiguration('origin', $this->origin, $revision, null, 'dev', 'composer', false, 120);
     }
 
     private function commit(string $file, string $contents): string

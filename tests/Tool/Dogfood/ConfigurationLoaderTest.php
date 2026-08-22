@@ -137,10 +137,11 @@ final class ConfigurationLoaderTest extends TestCase
         yield 'missing version' => [['version' => null], '"version": 1'];
         yield 'unsupported version' => [['version' => 2], '"version": 1'];
         yield 'missing repository' => [['repository' => null], 'non-empty "repository"'];
-        yield 'absolute repository' => [['repository' => '/srv/app'], 'must not be a host path'];
-        yield 'home repository' => [['repository' => '~/app'], 'must not be a host path'];
-        yield 'windows repository' => [['repository' => 'C:/app'], 'must not be a host path'];
-        yield 'file repository' => [['repository' => 'file:///srv/app'], 'must not be a host path'];
+        yield 'absolute repository' => [['repository' => '/srv/app'], 'must be a remote Git URL'];
+        yield 'home repository' => [['repository' => '~/app'], 'must be a remote Git URL'];
+        yield 'windows repository' => [['repository' => 'C:/app'], 'must be a remote Git URL'];
+        yield 'file repository' => [['repository' => 'file:///srv/app'], 'must be a remote Git URL'];
+        yield 'relative repository' => [['repository' => 'tui.symfony.com'], 'must be a remote Git URL'];
         yield 'credential repository' => [['repository' => 'https://user:secret@github.com/a/b.git'], 'must not embed credentials'];
         yield 'short revision' => [['revision' => 'abc123'], 'full lowercase commit hash'];
         yield 'branch revision' => [['revision' => 'main'], 'full lowercase commit hash'];

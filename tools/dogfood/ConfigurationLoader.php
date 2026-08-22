@@ -87,11 +87,11 @@ final class ConfigurationLoader
         if (!\is_string($repository) || '' === $repository) {
             throw new ConfigurationException(\sprintf('The configuration in "%s" must declare a non-empty "repository" string.', $file));
         }
-        if (1 === preg_match('{^(?:/|~|[A-Za-z]:[/\\\\]|file://)}', $repository)) {
-            throw new ConfigurationException(\sprintf('The "repository" in "%s" must not be a host path.', $file));
-        }
         if (1 === preg_match('{://[^/@]*:[^/@]*@}', $repository)) {
             throw new ConfigurationException(\sprintf('The "repository" in "%s" must not embed credentials.', $file));
+        }
+        if (str_starts_with($repository, 'file://') || 1 !== preg_match('{^(?:[a-z][a-z0-9+.-]*://[^/]+/.|[^/@\s]+@[A-Za-z0-9.-]+:.)}', $repository)) {
+            throw new ConfigurationException(\sprintf('The "repository" in "%s" must be a remote Git URL.', $file));
         }
 
         return $repository;
