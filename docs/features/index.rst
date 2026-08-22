@@ -46,7 +46,7 @@ Supported Integrations
       - No
       - Yes
     * - `Twig functions and filters`_
-      - No
+      - Yes
       - Yes
       - Yes
       - No
@@ -101,7 +101,7 @@ Supported Integrations
       - Yes
       - No
       - Yes
-    * - `AssetMapper and importmaps`_
+    * - `AssetMapper and public assets`_
       - Yes
       - Yes
       - Yes
@@ -207,6 +207,6 @@ If a runtime-backed feature returns no results, verify that:
 .. _`Events`: events.rst
 .. _`Security`: security.rst
 .. _`Forms, validation and serializer metadata`: metadata.rst
-.. _`AssetMapper and importmaps`: assets.rst
+.. _`AssetMapper and public assets`: assets.rst
 .. _`Stimulus and Live Components`: stimulus.rst
 .. _`Doctrine entities and repositories`: doctrine.rst
