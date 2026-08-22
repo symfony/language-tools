@@ -84,6 +84,9 @@ final class MatrixCommand
             $report->composerLockSha256 = hash_file('sha256', Path::join($applicationRoot, 'composer.lock')) ?: null;
             $report->frameworkBundle = $this->frameworkBundleVersion($applicationRoot);
 
+            // dev caches are not invalidated by extractor changes, so a stale
+            // cache would report the previous build's behavior
+            $this->filesystem->remove(Path::join($applicationRoot, 'var/symfony-lsp/dev'));
             $cold = $this->harness->run($configuration, $applicationRoot);
             $this->filesystem->dumpFile(Path::join($artifactDirectory, 'cold.json'), '' !== $cold->rawOutput ? $cold->rawOutput : $cold->errorOutput);
             $report->cold = $this->summarize($cold, $configuration->name);

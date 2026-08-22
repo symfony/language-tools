@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix dogfood probe patterns and wipe stale dev caches before matrix cold runs
 - Complete Twig function and filter names in templates
 - Resolve parameter references in configuration files outside the services section
 - Exclude verified-impossible probe kinds from support scores and prune untracked projects

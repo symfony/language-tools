@@ -108,7 +108,8 @@ final class SupportScorer
     {
         $kinds = [];
         foreach ($this->exclusions as $exclusion) {
-            if (($exclusion['project'] ?? '') !== $project || ($exclusion['category'] ?? '') !== $category || ($exclusion['value'] ?? '') !== $value) {
+            $exclusionProject = $exclusion['project'] ?? '';
+            if (('*' !== $exclusionProject && $exclusionProject !== $project) || ($exclusion['category'] ?? '') !== $category || ($exclusion['value'] ?? '') !== $value) {
                 continue;
             }
             $excluded = $exclusion['kinds'] ?? null;

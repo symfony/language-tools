@@ -102,6 +102,24 @@ final class SupportScorerTest extends TestCase
         self::assertSame($unscoped['fingerprint'], $scoped['fingerprint']);
     }
 
+    public function testWildcardExclusionsApplyToEveryProject(): void
+    {
+        $report = ['probes' => [[
+            'category' => 'parameter.yaml',
+            'file' => 'config/packages/assets.yaml',
+            'value' => 'kernel.project_dir',
+            'requests' => [
+                'completion' => ['resultCount' => 1, 'error' => null],
+                'hover' => ['resultCount' => 1, 'error' => null],
+                'definition' => ['resultCount' => 0, 'error' => null],
+                'references' => ['resultCount' => 3, 'error' => null],
+            ],
+        ]]];
+        $scorer = new SupportScorer([['project' => '*', 'category' => 'parameter.yaml', 'value' => 'kernel.project_dir', 'kinds' => ['definition']]]);
+
+        self::assertEquals(1.0, $scorer->score($report, 'any-project')['score'] ?? null);
+    }
+
     public function testFullyExcludedProbesLeaveTheCategory(): void
     {
         $probe = [

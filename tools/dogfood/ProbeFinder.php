@@ -10,7 +10,7 @@ final class ProbeFinder
 
     private const DEFINITIONS = [
         ['category' => 'route.php', 'files' => '{\.php$}', 'pattern' => '{(?:generate|redirectToRoute)\(\s*[\'\"]([^\'\"]+)}'],
-        ['category' => 'route.twig', 'files' => '{\.twig$}', 'pattern' => '{\b(?:path|url)\(\s*[\'\"]([^\'\"]+)}'],
+        ['category' => 'route.twig', 'files' => '{\.twig$}', 'pattern' => '{(?<![.\w|])(?:path|url)\(\s*[\'\"]([^\'\"]+)}'],
         ['category' => 'template.php', 'files' => '{\.php$}', 'pattern' => '{(?:render|renderView)\(\s*[\'\"]([^\'\"]+\.twig)}'],
         ['category' => 'template.twig', 'files' => '{\.twig$}', 'pattern' => '{\b(?:extends|include|embed|import|from|use)\s+[\'\"]([^\'\"]+\.twig)}'],
         ['category' => 'component.twig', 'files' => '{\.twig$}', 'pattern' => '{<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\b}'],
@@ -23,11 +23,11 @@ final class ProbeFinder
         ['category' => 'doctrine.field.repository.php', 'files' => '{\.php$}', 'pattern' => '{\b(?:findBy|findOneBy|count)\s*\(\s*\[\s*[\'\"]([A-Za-z_][A-Za-z0-9_]*)[\'\"]\s*=>}'],
         ['category' => 'doctrine.field.form.php', 'files' => '{\.php$}', 'pattern' => '{EntityType::class\s*,\s*\[[^;]+?[\'\"](?:choice_label|choice_value|group_by)[\'\"]\s*=>\s*[\'\"]([A-Za-z_][A-Za-z0-9_]*)}s'],
         ['category' => 'form.option.php', 'files' => '{\.php$}', 'pattern' => '{createForm\s*\([^,);]+,\s*[^,);]+,\s*\[[^;]+?[\'\"]([A-Za-z_][A-Za-z0-9_]*)[\'\"]\s*=>}s'],
-        ['category' => 'constraint.option.php', 'files' => '{\.php$}', 'pattern' => '{Assert\\\\[A-Za-z_][A-Za-z0-9_]*\s*\([^\)]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*:}s'],
+        ['category' => 'constraint.option.php', 'files' => '{\.php$}', 'pattern' => '{Assert\\\\[A-Za-z_][A-Za-z0-9_]*\s*\([^\)]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)}s'],
         ['category' => 'translation.php', 'files' => '{\.php$}', 'pattern' => '{(?:->trans|\bt)\(\s*[\'\"]([^\'\"]+)}'],
         ['category' => 'translation.twig', 'files' => '{\.twig$}', 'pattern' => '{[\'\"]([^\'\"]+)[\'\"]\s*\|\s*trans\b}'],
-        ['category' => 'service.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{[\'\"]@([^\'\"]+)[\'\"]}'],
-        ['category' => 'parameter.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{%([^%()]+)%}'],
+        ['category' => 'service.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{[\'\"]@([A-Za-z_][A-Za-z0-9_.\\\\]*)[\'\"]}'],
+        ['category' => 'parameter.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{%([A-Za-z_][A-Za-z0-9_.]*)%}'],
         ['category' => 'environment', 'files' => '{\.(?:php|ya?ml)$}', 'pattern' => '{%env\([^)]*?([A-Z][A-Z0-9_]+)\)%}'],
     ];
 
