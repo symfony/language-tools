@@ -74,7 +74,8 @@ jobs:
               if: env.DOGFOOD_SELECTED == 'true'
               with:
                   php-version: '8.4'
-                  extensions: bcmath, gd, intl, pdo_mysql, soap, sodium, zip
+                  # the union of the applications' platform requirements; imap is unavailable on PHP >= 8.4 and ignored per configuration
+                  extensions: bcmath, curl, exif, ffi, gd, intl, mbstring, pdo_mysql, pdo_sqlite, sockets, sodium, xsl, zip
                   coverage: none
             - uses: ramsey/composer-install@v4
               if: env.DOGFOOD_SELECTED == 'true'
