@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Run the dogfooding matrix from disposable clones at pinned revisions
 - Honor the environment selected for a dogfooding run
 - Publish the VS Code extension on Open VSX
 - Serialize source index updates so saves survive concurrent full scans

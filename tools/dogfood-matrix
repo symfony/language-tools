@@ -1,0 +1,170 @@
+#!/usr/bin/env php
+<?php
+
+require \dirname(__DIR__).'/vendor/autoload.php';
+require __DIR__.'/dogfood/autoload.php';
+
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Tools\Dogfood\ComposerSetup;
+use Symfony\Lsp\Tools\Dogfood\ConfigurationException;
+use Symfony\Lsp\Tools\Dogfood\ConfigurationLoader;
+use Symfony\Lsp\Tools\Dogfood\GitProvisioner;
+use Symfony\Lsp\Tools\Dogfood\MatrixCommand;
+use Symfony\Lsp\Tools\Dogfood\NativeProcessRunner;
+use Symfony\Lsp\Tools\Dogfood\RunClassifier;
+use Symfony\Lsp\Tools\Dogfood\ServerHarness;
+use Symfony\Lsp\Tools\Dogfood\SetupInterface;
+use Symfony\Lsp\Tools\Dogfood\SetupRegistry;
+
+const USAGE = <<<'USAGE'
+    Usage: tools/dogfood-matrix [options] [project...]
+
+    Runs the dogfooding matrix from disposable clones at pinned revisions.
+
+    Options:
+        --config-dir DIR        Add a project configuration directory
+        --server PATH           Language server executable (default: bin/symfony-lsp)
+        --repository-base DIR   Resolve relative repository values against DIR
+        --setup FILE            PHP file returning extra setup implementations
+        --ci                    Only run CI-eligible projects
+        --list                  List configured projects and exit
+
+    Without project arguments, every configured project runs.
+
+    USAGE;
+
+/** @var list<string> $argv */
+$configurationDirectories = [];
+$server = null;
+$repositoryBase = null;
+$setupFile = null;
+$ciOnly = false;
+$list = false;
+$selection = [];
+$arguments = array_slice($argv, 1);
+while (null !== $argument = array_shift($arguments)) {
+    $value = static function () use ($argument, &$arguments): string {
+        if (str_contains($argument, '=')) {
+            return explode('=', $argument, 2)[1];
+        }
+        $next = array_shift($arguments);
+        if (null === $next) {
+            fwrite(\STDERR, USAGE."\n");
+            exit(2);
+        }
+
+        return $next;
+    };
+    if ('--config-dir' === $argument || str_starts_with($argument, '--config-dir=')) {
+        $configurationDirectories[] = $value();
+    } elseif ('--server' === $argument || str_starts_with($argument, '--server=')) {
+        $server = $value();
+    } elseif ('--repository-base' === $argument || str_starts_with($argument, '--repository-base=')) {
+        $repositoryBase = $value();
+    } elseif ('--setup' === $argument || str_starts_with($argument, '--setup=')) {
+        $setupFile = $value();
+    } elseif ('--ci' === $argument) {
+        $ciOnly = true;
+    } elseif ('--list' === $argument) {
+        $list = true;
+    } elseif (str_starts_with($argument, '-')) {
+        fwrite(\STDERR, USAGE."\n");
+        exit(2);
+    } else {
+        $selection[] = $argument;
+    }
+}
+
+$root = dirname(__DIR__);
+if ([] === $configurationDirectories) {
+    $default = $root.'/tools/dogfood/projects';
+    if (!is_dir($default)) {
+        fwrite(\STDERR, "No project configuration directory; pass --config-dir.\n");
+        exit(2);
+    }
+    $configurationDirectories[] = $default;
+}
+
+$processes = new NativeProcessRunner();
+$setups = ['composer' => new ComposerSetup($processes)];
+if (null !== $setupFile) {
+    if (!is_file($setupFile)) {
+        fwrite(\STDERR, sprintf("Setup file \"%s\" does not exist.\n", $setupFile));
+        exit(2);
+    }
+    $extra = require $setupFile;
+    if (!is_array($extra)) {
+        fwrite(\STDERR, sprintf("Setup file \"%s\" must return an array of setup implementations.\n", $setupFile));
+        exit(2);
+    }
+    foreach ($extra as $id => $setup) {
+        if (!is_string($id) || !$setup instanceof SetupInterface) {
+            fwrite(\STDERR, sprintf("Setup file \"%s\" must map string ids to %s implementations.\n", $setupFile, SetupInterface::class));
+            exit(2);
+        }
+        $setups[$id] = $setup;
+    }
+}
+$registry = new SetupRegistry($setups);
+
+try {
+    $configurations = (new ConfigurationLoader())->load($configurationDirectories, $registry->ids());
+} catch (ConfigurationException $e) {
+    fwrite(\STDERR, $e->getMessage()."\n");
+    exit(2);
+}
+
+if ($list) {
+    foreach ($configurations as $configuration) {
+        printf("%-28s %s ci=%s\n", $configuration->name, substr($configuration->revision, 0, 12), $configuration->ci ? 'yes' : 'no');
+    }
+    exit(0);
+}
+
+if ([] !== $selection) {
+    $known = array_column($configurations, 'name');
+    foreach ($selection as $name) {
+        if (!in_array($name, $known, true)) {
+            fwrite(\STDERR, sprintf("Unknown project \"%s\". Known projects: %s.\n", $name, implode(', ', $known)));
+            exit(2);
+        }
+    }
+    $configurations = array_values(array_filter($configurations, static fn ($configuration): bool => in_array($configuration->name, $selection, true)));
+}
+if ($ciOnly) {
+    $configurations = array_values(array_filter($configurations, static fn ($configuration): bool => $configuration->ci));
+}
+if ([] === $configurations) {
+    fwrite(\STDERR, "No projects selected.\n");
+    exit(2);
+}
+
+$server ??= $root.'/bin/symfony-lsp';
+$serverPath = realpath($server);
+if (false === $serverPath) {
+    fwrite(\STDERR, sprintf("Server \"%s\" does not exist.\n", $server));
+    exit(2);
+}
+if (null !== $repositoryBase) {
+    $resolvedBase = realpath($repositoryBase);
+    if (false === $resolvedBase) {
+        fwrite(\STDERR, sprintf("Repository base \"%s\" does not exist.\n", $repositoryBase));
+        exit(2);
+    }
+    $repositoryBase = $resolvedBase;
+}
+
+$command = new MatrixCommand(
+    new GitProvisioner($processes, new Filesystem(), $root.'/var/dogfood/mirrors', $root.'/var/dogfood/checkouts', $repositoryBase),
+    $registry,
+    new ServerHarness($processes, $root.'/tools/dogfood-server', $serverPath),
+    new RunClassifier(),
+    $processes,
+    new Filesystem(),
+    static function (string $line): void {
+        fwrite(\STDOUT, $line."\n");
+    },
+);
+
+exit($command->run($configurations, Path::join($root, 'var/dogfood/matrix', gmdate('Ymd-His'))));
