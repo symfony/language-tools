@@ -26,6 +26,7 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         private readonly AssetIndexRegistry $indexes,
         private readonly AssetSourceIndexRegistry $sourceIndexes,
         private readonly AssetExtractor $extractor,
+        private readonly PublicAssetResolver $publicAssets,
     ) {
     }
 
@@ -40,19 +41,28 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         if (null === $context) {
             return null;
         }
-        $names = AssetSymbolKind::Asset === $context->kind()
-            ? array_map(static fn (Asset $asset): string => $asset->logicalPath(), $this->indexes->forProject($request->project)->assets())
-            : $this->entrypointNames($request->project);
+        if (AssetSymbolKind::Asset === $context->kind()) {
+            $candidates = [];
+            foreach ($this->indexes->forProject($request->project)->assets() as $asset) {
+                $candidates[$asset->logicalPath()] = 'AssetMapper asset';
+            }
+            foreach ($this->publicAssets->logicalPaths($request->project) as $path) {
+                $candidates[$path] ??= 'Public asset';
+            }
+            ksort($candidates);
+        } else {
+            $candidates = array_fill_keys($this->entrypointNames($request->project), 'Importmap entrypoint');
+        }
         $items = [];
-        foreach ($names as $name) {
-            if (!str_starts_with($name, $context->prefix())) {
+        foreach ($candidates as $name => $detail) {
+            if (!str_starts_with((string) $name, $context->prefix())) {
                 continue;
             }
             $items[] = [
-                'label' => $name,
+                'label' => (string) $name,
                 'kind' => AssetSymbolKind::Asset === $context->kind() ? 17 : 12,
-                'detail' => AssetSymbolKind::Asset === $context->kind() ? 'AssetMapper asset' : 'Importmap entrypoint',
-                'textEdit' => $this->protocol->textEdit($context->range(), $name),
+                'detail' => $detail,
+                'textEdit' => $this->protocol->textEdit($context->range(), (string) $name),
             ];
         }
 
@@ -69,7 +79,13 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         if (AssetSymbolKind::Asset === $symbol->kind()) {
             $asset = $this->indexes->forProject($project)->asset($symbol->name());
             if (null === $asset) {
-                return null;
+                $path = $this->publicAssets->path($project, $symbol->name());
+
+                return null === $path ? null : $this->protocol->markdownHover(\sprintf(
+                    "Public asset: `%s`\n\nSource: `%s`",
+                    $symbol->name(),
+                    $path,
+                ));
             }
 
             return $this->protocol->markdownHover(\sprintf(
@@ -102,8 +118,9 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         [$symbol, $project] = $resolved;
         if (AssetSymbolKind::Asset === $symbol->kind()) {
             $asset = $this->indexes->forProject($project)->asset($symbol->name());
+            $path = null !== $asset ? $asset->sourcePath() : $this->publicAssets->path($project, $symbol->name());
 
-            return null === $asset ? [] : [['uri' => $this->uriConverter->toUri($asset->sourcePath()), 'range' => $this->protocol->zeroRange()]];
+            return null === $path ? [] : [['uri' => $this->uriConverter->toUri($path), 'range' => $this->protocol->zeroRange()]];
         }
         $declarations = array_values(array_filter(
             $this->sourceIndexes->forProject($project)->symbols(AssetSymbolKind::Entrypoint, $symbol->name()),
@@ -208,8 +225,9 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
     {
         if (AssetSymbolKind::Asset === $symbol->kind()) {
             $asset = $this->indexes->forProject($project)->asset($symbol->name());
+            $path = null !== $asset ? $asset->sourcePath() : $this->publicAssets->path($project, $symbol->name());
 
-            return null === $asset ? null : $this->uriConverter->toUri($asset->sourcePath());
+            return null === $path ? null : $this->uriConverter->toUri($path);
         }
         foreach ($this->sourceIndexes->forProject($project)->symbols(AssetSymbolKind::Entrypoint, $symbol->name()) as $candidate) {
             if ($candidate->isDeclaration()) {

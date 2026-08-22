@@ -13,6 +13,7 @@ use Symfony\Lsp\Feature\Asset\AssetIndexRegistry;
 use Symfony\Lsp\Feature\Asset\AssetProvider;
 use Symfony\Lsp\Feature\Asset\AssetSourceIndexRegistry;
 use Symfony\Lsp\Feature\Asset\ImportMapEntry;
+use Symfony\Lsp\Feature\Asset\PublicAssetResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -77,6 +78,7 @@ final class AssetProviderTest extends TestCase
             $indexes,
             $sourceIndexes,
             $extractor,
+            new PublicAssetResolver(),
         );
 
         $assetCompletionUri = 'file:///workspace/templates/asset.html.twig';
@@ -134,6 +136,54 @@ final class AssetProviderTest extends TestCase
         $position = $converter->toPosition($text, $offset);
 
         return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+    }
+
+    public function testFallsBackToPublicFilesWithoutAssetMapper(): void
+    {
+        $root = sys_get_temp_dir().'/lsp-public-assets-'.bin2hex(random_bytes(4));
+        mkdir($root.'/public/css', 0o777, true);
+        file_put_contents($root.'/public/css/app.css', 'body {}');
+        try {
+            $converter = new PositionConverter();
+            $extractor = new AssetExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+            $rootUri = 'file://'.$root;
+            $project = new Project($root, $rootUri, '^8.0');
+            $projects = new ProjectRegistry();
+            $projects->replace([$project]);
+            $uri = $rootUri.'/templates/layout.html.twig';
+            $text = "<link href=\"{{ asset('css/app.css') }}\">\n{{ asset('css/missing.css') }}\n";
+            $documents = new DocumentStore();
+            $documents->open(new Document($uri, 'twig', 1, $text));
+            $provider = new AssetProvider(
+                new DocumentContextResolver($documents, $projects),
+                $converter,
+                new UriToPathConverter(),
+                new LspProtocolMapper(),
+                new AssetIndexRegistry(),
+                new AssetSourceIndexRegistry(),
+                $extractor,
+                new PublicAssetResolver(),
+            );
+
+            $params = $this->params($converter, $uri, $text, strpos($text, 'css/app.css') + 2);
+            $hover = $provider->hover($params);
+            self::assertIsArray($hover);
+            self::assertIsArray($hover['contents'] ?? null);
+            self::assertIsString($hover['contents']['value'] ?? null);
+            self::assertStringContainsString('Public asset', $hover['contents']['value']);
+            self::assertSame(['file://'.$root.'/public/css/app.css'], array_column($provider->definition($params) ?? [], 'uri'));
+            self::assertSame([], $provider->definition($this->params($converter, $uri, $text, strpos($text, 'css/missing.css') + 2)));
+
+            $completionUri = $rootUri.'/templates/completion.html.twig';
+            $completionText = "{{ asset('css/";
+            $documents->open(new Document($completionUri, 'twig', 1, $completionText));
+            self::assertSame(['css/app.css'], $this->completionLabels($provider, $converter, $completionUri, $completionText));
+        } finally {
+            unlink($root.'/public/css/app.css');
+            rmdir($root.'/public/css');
+            rmdir($root.'/public');
+            rmdir($root);
+        }
     }
 
     public function testIgnoresImportMapEntriesInPhpComments(): void

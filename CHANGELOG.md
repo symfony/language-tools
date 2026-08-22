@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Index ini translation catalogs with directory locales
+- Resolve asset() paths against the public document root
 - Merge configuration shorthands and normalized values into the exported trees
 - Scope configuration diagnostics to the application configuration directory
 - Resolve themed Twig loader paths and bundle Stimulus registries
