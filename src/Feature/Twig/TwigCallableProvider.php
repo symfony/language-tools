@@ -6,15 +6,17 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\ProjectDocumentReader;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
-final class TwigCallableProvider implements DefinitionProviderInterface, HoverProviderInterface
+final class TwigCallableProvider implements CompletionProviderInterface, DefinitionProviderInterface, HoverProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documents,
@@ -25,7 +27,68 @@ final class TwigCallableProvider implements DefinitionProviderInterface, HoverPr
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly ProjectDocumentReader $reader,
         private readonly PhpParserInterface $phpParser,
+        private readonly TwigCommentParser $comments,
     ) {
+    }
+
+    public function complete(array $params): ?array
+    {
+        $request = $this->documents->resolvePositioned($params);
+        if (null === $request || 'twig' !== $request->document->languageId()) {
+            return null;
+        }
+        $text = $request->document->text();
+        $offset = $this->converter->toByteOffset($text, $request->position);
+        $before = substr($this->comments->mask($text), 0, $offset);
+        if (!$this->insideDirective($before)) {
+            return null;
+        }
+        if (1 === preg_match('/\|\s*([A-Za-z_][A-Za-z0-9_]*)?$/', $before, $matches)) {
+            $kind = TwigCallableKind::Filter;
+            $prefix = $matches[1] ?? '';
+        } elseif (1 === preg_match('/(?<![\w.\'\"|])([A-Za-z_][A-Za-z0-9_]*)$/', $before, $matches)) {
+            $kind = TwigCallableKind::Function;
+            $prefix = $matches[1];
+        } else {
+            return null;
+        }
+        $start = $this->converter->toPosition($text, $offset - \strlen($prefix));
+        $items = [];
+        foreach ($this->indexes->forProject($request->project)->names($kind) as $name) {
+            if (!str_starts_with($name, $prefix)) {
+                continue;
+            }
+            $items[] = [
+                'label' => $name,
+                'kind' => 3,
+                'detail' => 'Twig '.$kind->value,
+                'textEdit' => $this->protocol->textEdit(new Range($start, $request->position), $name),
+            ];
+        }
+
+        return $items;
+    }
+
+    private function insideDirective(string $before): bool
+    {
+        $open = -1;
+        foreach (['{{', '{%'] as $token) {
+            $position = strrpos($before, $token);
+            if (false !== $position) {
+                $open = max($open, $position);
+            }
+        }
+        if (-1 === $open) {
+            return false;
+        }
+        foreach (['}}', '%}'] as $token) {
+            $position = strrpos($before, $token);
+            if (false !== $position && $position > $open) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function hover(array $params): ?array

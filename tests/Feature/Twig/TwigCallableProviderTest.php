@@ -181,6 +181,7 @@ final class TwigCallableProviderTest extends TestCase
             $classIndexes,
             new ProjectDocumentReader($documents, new ProjectPathResolver(new UriToPathConverter())),
             $phpParser,
+            new TwigCommentParser(),
         );
 
         $functionHover = [
@@ -248,6 +249,26 @@ final class TwigCallableProviderTest extends TestCase
         self::assertNull($provider->hover($this->params($twigUri, $twigText, 'path', $converter)));
         self::assertNull($provider->hover($this->params($twigUri, $twigText, 'function_name', $converter, strrpos($twigText, 'function_name'))));
         self::assertNull($provider->hover($this->params($twigUri, $twigText, 'function_name', $converter, strpos($twigText, 'Plain function_name') + \strlen('Plain '))));
+
+        $completions = static function (string $text) use ($provider, $documents, $converter): ?array {
+            $uri = 'file:///workspace/templates/completion.html.twig';
+            $documents->open(new Document($uri, 'twig', 2, $text));
+            $position = $converter->toPosition($text, \strlen($text));
+            $items = $provider->complete([
+                'textDocument' => ['uri' => $uri],
+                'position' => ['line' => $position->line(), 'character' => $position->character()],
+            ]);
+
+            return null === $items ? null : array_column($items, 'label');
+        };
+        self::assertSame(['function_name'], $completions('{{ func'));
+        self::assertSame(['function_name'], $completions('{{ function_name'));
+        self::assertSame(['filter_name'], $completions('{{ item|'));
+        self::assertSame(['filter_name'], $completions('{{ item|fil'));
+        self::assertSame(['function_name'], $completions('{% if f'));
+        self::assertNull($completions('{{ item.func'));
+        self::assertNull($completions('Plain func'));
+        self::assertNull($completions('{{ done }} func'));
     }
 
     public function testKeepsUnsavedTwigCallableDeclarationsAuthoritative(): void
