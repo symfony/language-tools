@@ -39,7 +39,14 @@ final class TranslationExtractor
     private function resourceMetadata(string $uri): ?array
     {
         $path = $this->uriToPathConverter->convert($uri);
-        if (null === $path || !str_contains('/'.$path, '/translations/')) {
+        if (null === $path) {
+            return null;
+        }
+        // Mautic-style catalogs store the locale as a directory: Translations/en_US/messages.ini
+        if (preg_match('#/[Tt]ranslations/([A-Za-z][A-Za-z0-9_@-]*)/([^/]+)\.ini$#', '/'.$path, $matches)) {
+            return [$matches[2], $matches[1], 'ini'];
+        }
+        if (!str_contains('/'.$path, '/translations/')) {
             return null;
         }
         if (!preg_match('/^(.+)\.([A-Za-z][A-Za-z0-9_@-]*)\.(yaml|yml|json|xlf|xliff|php)$/', basename($path), $matches)) {
@@ -52,6 +59,15 @@ final class TranslationExtractor
     /** @return list<TranslationDeclaration> */
     private function declarations(string $uri, string $text, string $domain, string $locale, string $format): array
     {
+        if ('ini' === $format) {
+            preg_match_all('/^\s*([\w.\-]+)\s*=\s*"((?:\\\\.|[^"\\\\])*)"/m', $text, $matches, \PREG_OFFSET_CAPTURE);
+            $result = [];
+            foreach ($matches[1] as $i => [$key, $offset]) {
+                $result[] = $this->declaration($key, $matches[2][$i][0], $domain, $locale, $uri, $text, $offset);
+            }
+
+            return $result;
+        }
         if ('json' === $format) {
             return $this->jsonDeclarations($uri, $text, $domain, $locale);
         }

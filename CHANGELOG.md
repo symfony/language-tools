@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Index ini translation catalogs with directory locales
 - Merge configuration shorthands and normalized values into the exported trees
 - Scope configuration diagnostics to the application configuration directory
 - Resolve themed Twig loader paths and bundle Stimulus registries

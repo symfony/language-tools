@@ -69,6 +69,25 @@ final class TranslationExtractorTest extends TestCase
         self::assertSame([], $plain->declarations()[0]->placeholders());
     }
 
+    public function testExtractsIniDeclarationsWithDirectoryLocales(): void
+    {
+        $facts = $this->extractor()->extract('file:///workspace/app/bundles/ApiBundle/Translations/en_US/messages.ini', 'ini', <<<'INI'
+            mautic.api.auth.error.accessdenied="API authorization denied."
+            mautic.api.auth.error.granted="Access granted to %name%."
+            INI);
+
+        self::assertSame(
+            [
+                ['mautic.api.auth.error.accessdenied', 'messages', 'en_US', 'API authorization denied.', []],
+                ['mautic.api.auth.error.granted', 'messages', 'en_US', 'Access granted to %name%.', ['name']],
+            ],
+            array_map(
+                static fn ($item): array => [$item->key(), $item->domain(), $item->locale(), $item->message(), $item->placeholders()],
+                $facts->declarations(),
+            ),
+        );
+    }
+
     public function testCachedDeclarationsWithoutTheIcuFlagStayLoadable(): void
     {
         $declaration = (new \ReflectionClass(TranslationDeclaration::class))->newInstanceWithoutConstructor();

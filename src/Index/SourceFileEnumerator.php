@@ -17,6 +17,7 @@ final class SourceFileEnumerator
     ];
 
     private const LANGUAGE_IDS = [
+        'ini' => 'ini',
         'js' => 'javascript',
         'json' => 'json',
         'mjs' => 'javascript',
