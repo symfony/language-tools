@@ -1,0 +1,8 @@
+{
+    "version": 1,
+    "repository": "https://github.com/shopware/shopware.git",
+    "revision": "d4e452365f8125b7cacf046b7eef56dbef5f92d5",
+    "setup": "composer",
+    "ci": true,
+    "indexTimeout": 900
+}

@@ -1,0 +1,7 @@
+{
+    "version": 1,
+    "repository": "https://github.com/sulu/sulu-demo.git",
+    "revision": "fcbc11bd1bc657929be4bd52abfb1f308918fe36",
+    "setup": "composer",
+    "ci": true
+}

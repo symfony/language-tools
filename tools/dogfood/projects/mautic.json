@@ -1,0 +1,17 @@
+{
+    "version": 1,
+    "repository": "https://github.com/mautic/mautic.git",
+    "revision": "bd92ad789274317c82f6e1e1179d56f7406bc702",
+    "setup": "composer",
+    "ci": true,
+    "indexTimeout": 300,
+    "probeRoots": [
+        "app",
+        "plugins",
+        "themes",
+        "config"
+    ],
+    "ignorePlatformRequirements": [
+        "ext-imap"
+    ]
+}

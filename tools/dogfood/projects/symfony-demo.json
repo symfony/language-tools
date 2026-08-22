@@ -1,0 +1,10 @@
+{
+    "version": 1,
+    "repository": "https://github.com/symfony/demo.git",
+    "revision": "920d86dc809f837543cb519d3df5b364a2c36577",
+    "setup": "composer",
+    "ci": true,
+    "setupChanges": [
+        ".env.local.demo"
+    ]
+}

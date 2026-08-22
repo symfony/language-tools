@@ -1,0 +1,8 @@
+{
+    "version": 1,
+    "repository": "https://github.com/Sylius/Sylius.git",
+    "revision": "c4c61a0d66666e7dec5487cdd1b059bec418892c",
+    "setup": "composer",
+    "ci": true,
+    "indexTimeout": 300
+}
