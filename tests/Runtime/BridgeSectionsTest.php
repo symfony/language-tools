@@ -141,6 +141,30 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
         self::assertSame([], $result['sections']['assets']['importMap'] ?? null);
     }
 
+    public function testCollectsBundleControllersAndStaysIncompleteWithoutTheConfiguredRegistry(): void
+    {
+        $this->writeThemedStimulusApplication();
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=stimulus 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $snapshot = implode("\n", $output);
+        self::assertSame(0, $exitCode, $snapshot);
+        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null, $snapshot);
+        self::assertIsArray($result['sections'] ?? null);
+        $stimulus = $result['sections']['stimulus'] ?? null;
+        self::assertIsArray($stimulus);
+        self::assertFalse($stimulus['complete'] ?? null);
+        self::assertContains('The configured controllers.json was not found.', \is_array($stimulus['warnings'] ?? null) ? $stimulus['warnings'] : []);
+        self::assertContains('acme--widget', array_column(\is_array($stimulus['controllers'] ?? null) ? $stimulus['controllers'] : [], 'name'));
+    }
+
     public function testReportsUnavailableOptionalStimulusBundle(): void
     {
         $this->writeAutoloader('8.0.6');
@@ -183,6 +207,36 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
         self::assertFalse($result['sections']['metadata']['constraintsComplete'] ?? null);
         self::assertSame([], $result['sections']['metadata']['forms'] ?? null);
         self::assertSame([], $result['sections']['metadata']['constraints'] ?? null);
+    }
+
+    public function testDerivesLoaderPathsWhenAThemeLoaderHidesThem(): void
+    {
+        $this->writeThemedTwigApplication();
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=twig 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $snapshot = implode("\n", $output);
+        self::assertSame(0, $exitCode, $snapshot);
+        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null, $snapshot);
+        self::assertIsArray($result['sections'] ?? null);
+        self::assertIsArray($result['sections']['twig'] ?? null);
+        $paths = $result['sections']['twig']['paths'] ?? null;
+        self::assertIsArray($paths);
+        $byNamespace = [];
+        foreach ($paths as $path) {
+            self::assertIsArray($path);
+            self::assertIsString($path['namespace'] ?? null);
+            $byNamespace[$path['namespace']][] = $path['path'];
+        }
+        self::assertSame([realpath($this->temporaryDirectory).'/src/ShopBundle/templates'], $byNamespace['@Shop'] ?? null);
+        self::assertSame([realpath($this->temporaryDirectory).'/templates'], $byNamespace['(None)'] ?? null);
     }
 
     public function testReportsUnavailableTwigDebugCommandAsAWarning(): void

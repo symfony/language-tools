@@ -33,6 +33,16 @@ function bridgeStimulusSection(SymfonyLspBridgeContext $context): ?array
                     foreach (bridgeStimulusUxControllers($context->project(), $controllersJson, $warnings) as $name => $controller) {
                         $controllers[$name] = $controller;
                     }
+                } elseif (null !== $controllersJson) {
+                    // the application deviates from the standard layout, so the
+                    // registry cannot be treated as the complete controller set
+                    $warnings[] = 'The configured controllers.json was not found.';
+                }
+                foreach (bridgeStimulusBundleRegistries($context, $kernel, $warnings) as $bundleControllersJson) {
+                    $resources[] = realpath($bundleControllersJson) ?: $bundleControllersJson;
+                    foreach (bridgeStimulusUxControllers($context->project(), $bundleControllersJson, $warnings) as $name => $controller) {
+                        $controllers[$name] ??= $controller;
+                    }
                 }
                 foreach ($controllerPaths as $controllerPath) {
                     foreach (bridgeStimulusLocalControllers($context->project(), $controllerPath) as $name => $controller) {
@@ -56,6 +66,31 @@ function bridgeStimulusSection(SymfonyLspBridgeContext $context): ?array
         'warnings' => $warnings,
     ];
     return finalizeBridgeSection($section);
+}
+
+function bridgeStimulusBundleRegistries(SymfonyLspBridgeContext $context, object $kernel, array &$warnings): array
+{
+    $registries = [];
+    try {
+        if (!method_exists($kernel, 'getBundles')) {
+            return [];
+        }
+        foreach ($kernel->getBundles() as $bundle) {
+            if (!is_object($bundle) || !method_exists($bundle, 'getPath')) {
+                continue;
+            }
+            foreach (['/Resources/assets/controllers.json', '/assets/controllers.json'] as $suffix) {
+                $registry = rtrim((string) $bundle->getPath(), '/\\').$suffix;
+                if (is_file($registry)) {
+                    $registries[] = $registry;
+                }
+            }
+        }
+    } catch (Throwable) {
+        $warnings[] = 'The bundle Stimulus registries are unavailable.';
+    }
+
+    return $registries;
 }
 
 function bridgeStimulusLocalControllers(string $projectRoot, string $controllerPath): array

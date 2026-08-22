@@ -4,6 +4,7 @@
 
 - Merge configuration shorthands and normalized values into the exported trees
 - Scope configuration diagnostics to the application configuration directory
+- Resolve themed Twig loader paths and bundle Stimulus registries
 - Continuously test the server against six pinned open-source Symfony applications
 - Discover applications that require the framework only through their lock file
 - Resolve nonstandard kernels through the application's own bootstrap conventions

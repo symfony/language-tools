@@ -21,6 +21,19 @@ abstract class AbstractBridgeTestCase extends TestCase
         @unlink($this->temporaryDirectory.'/vendor/autoload_runtime.php');
         @unlink($this->temporaryDirectory.'/vendor/autoload.php');
         @rmdir($this->temporaryDirectory.'/vendor');
+        @rmdir($this->temporaryDirectory.'/templates');
+        @rmdir($this->temporaryDirectory.'/src/ShopBundle/templates');
+        @unlink($this->temporaryDirectory.'/src/ShopBundle/Resources/assets/controllers.json');
+        @rmdir($this->temporaryDirectory.'/src/ShopBundle/Resources/assets');
+        @rmdir($this->temporaryDirectory.'/src/ShopBundle/Resources');
+        @rmdir($this->temporaryDirectory.'/src/ShopBundle');
+        @rmdir($this->temporaryDirectory.'/src');
+        @unlink($this->temporaryDirectory.'/vendor/acme/ux-widget/assets/dist/widget_controller.js');
+        @rmdir($this->temporaryDirectory.'/vendor/acme/ux-widget/assets/dist');
+        @unlink($this->temporaryDirectory.'/vendor/acme/ux-widget/assets/package.json');
+        @rmdir($this->temporaryDirectory.'/vendor/acme/ux-widget/assets');
+        @rmdir($this->temporaryDirectory.'/vendor/acme/ux-widget');
+        @rmdir($this->temporaryDirectory.'/vendor/acme');
         @rmdir($this->temporaryDirectory);
     }
 
@@ -803,6 +816,147 @@ abstract class AbstractBridgeTestCase extends TestCase
                     ];
                     $output->write("[deprecation] Outdated application configuration.\n[\n  exception => configuration\n]\n");
                     $output->write(json_encode($result, JSON_THROW_ON_ERROR));
+
+                    return 0;
+                }
+            }
+            PHP);
+    }
+
+    protected function writeThemedTwigApplication(): void
+    {
+        mkdir($this->temporaryDirectory.'/templates', 0777, true);
+        mkdir($this->temporaryDirectory.'/src/ShopBundle/templates', 0777, true);
+        file_put_contents($this->temporaryDirectory.'/vendor/autoload.php', <<<'PHP'
+            <?php
+            namespace Composer;
+            final class InstalledVersions
+            {
+                public static function getPrettyVersion(string $package): ?string { return '8.0.6'; }
+            }
+            namespace Twig;
+            final class Environment {}
+            namespace Symfony\Component\Console\Input;
+            final class ArrayInput
+            {
+                public function __construct(public array $arguments) {}
+            }
+            namespace Symfony\Component\Console\Output;
+            final class BufferedOutput
+            {
+                private string $contents = '';
+                public function write(string $contents): void { $this->contents .= $contents; }
+                public function fetch(): string { return $this->contents; }
+            }
+            namespace App;
+            final class ShopBundle
+            {
+                public function __construct(private string $path) {}
+                public function getName(): string { return 'ShopBundle'; }
+                public function getPath(): string { return $this->path; }
+            }
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function shutdown(): void {}
+                public function getBundles(): array
+                {
+                    return [new ShopBundle(\dirname(__DIR__).'/src/ShopBundle')];
+                }
+            }
+            namespace Symfony\Bundle\FrameworkBundle\Console;
+            final class Application
+            {
+                public function __construct(object $kernel) {}
+                public function setAutoExit(bool $autoExit): void {}
+                public function has(string $name): bool { return true; }
+                public function run(object $input, object $output): int
+                {
+                    // a theme loader hides every filesystem path from debug:twig
+                    $result = 'debug:twig' === $input->arguments['command']
+                        ? ['globals' => ['app' => []], 'loader_paths' => []]
+                        : ['twig' => ['default_path' => \dirname(__DIR__).'/templates', 'paths' => []]];
+                    $output->write(json_encode($result, JSON_THROW_ON_ERROR));
+
+                    return 0;
+                }
+            }
+            PHP);
+    }
+
+    protected function writeThemedStimulusApplication(): void
+    {
+        mkdir($this->temporaryDirectory.'/src/ShopBundle/Resources/assets', 0777, true);
+        file_put_contents($this->temporaryDirectory.'/src/ShopBundle/Resources/assets/controllers.json', json_encode([
+            'controllers' => ['@acme/ux-widget' => ['widget' => ['enabled' => true, 'fetch' => 'eager']]],
+        ], \JSON_THROW_ON_ERROR));
+        mkdir($this->temporaryDirectory.'/vendor/acme/ux-widget/assets/dist', 0777, true);
+        file_put_contents($this->temporaryDirectory.'/vendor/acme/ux-widget/assets/package.json', json_encode([
+            'symfony' => ['controllers' => ['widget' => ['main' => 'dist/widget_controller.js', 'name' => 'acme/widget']]],
+        ], \JSON_THROW_ON_ERROR));
+        file_put_contents($this->temporaryDirectory.'/vendor/acme/ux-widget/assets/dist/widget_controller.js', "export default class extends Controller {\n    refresh() {}\n}\n");
+        file_put_contents($this->temporaryDirectory.'/vendor/autoload.php', <<<'PHP'
+            <?php
+            namespace Composer;
+            final class InstalledVersions
+            {
+                public static function getPrettyVersion(string $package): ?string { return '8.0.6'; }
+                public static function isInstalled(string $package): bool { return 'acme/ux-widget' === $package; }
+                public static function getInstallPath(string $package): string { return \dirname(__DIR__).'/vendor/acme/ux-widget'; }
+            }
+            namespace Symfony\UX\StimulusBundle;
+            final class StimulusBundle
+            {
+                public function getPath(): string { return __DIR__; }
+            }
+            namespace Symfony\Component\Filesystem;
+            final class Path
+            {
+                public static function join(string ...$parts): string { return implode('/', $parts); }
+                public static function canonicalize(string $path): string { return str_replace('\\', '/', $path); }
+                public static function isBasePath(string $base, string $path): bool { return str_starts_with($path, rtrim($base, '/').'/'); }
+            }
+            namespace Symfony\Component\Console\Input;
+            final class ArrayInput
+            {
+                public function __construct(public array $arguments) {}
+            }
+            namespace Symfony\Component\Console\Output;
+            final class BufferedOutput
+            {
+                private string $contents = '';
+                public function write(string $contents): void { $this->contents .= $contents; }
+                public function fetch(): string { return $this->contents; }
+            }
+            namespace App;
+            final class ShopBundle
+            {
+                public function __construct(private string $path) {}
+                public function getName(): string { return 'ShopBundle'; }
+                public function getPath(): string { return $this->path; }
+            }
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function shutdown(): void {}
+                public function getBundles(): array
+                {
+                    return [new \Symfony\UX\StimulusBundle\StimulusBundle(), new ShopBundle(\dirname(__DIR__).'/src/ShopBundle')];
+                }
+            }
+            namespace Symfony\Bundle\FrameworkBundle\Console;
+            final class Application
+            {
+                public function __construct(object $kernel) {}
+                public function setAutoExit(bool $autoExit): void {}
+                public function has(string $name): bool { return true; }
+                public function run(object $input, object $output): int
+                {
+                    $project = \dirname(__DIR__);
+                    $output->write(json_encode(['stimulus' => [
+                        'controller_paths' => [$project.'/assets/controllers'],
+                        'controllers_json' => $project.'/assets/controllers.json',
+                    ]], JSON_THROW_ON_ERROR));
 
                     return 0;
                 }
