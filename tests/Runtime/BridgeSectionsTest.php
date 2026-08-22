@@ -56,10 +56,12 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
         self::assertSame([
             ['name' => 'App\\Event\\OrderPlaced', 'class' => 'App\\Event\\OrderPlaced'],
             ['name' => 'legacy.order_placed', 'class' => null],
+            ['name' => 'order.shipped', 'class' => null],
         ], $result['sections']['events']['events'] ?? null);
         self::assertSame([
             ['event' => 'App\\Event\\OrderPlaced', 'class' => 'App\\EventListener\\NotifyCustomer', 'method' => 'onOrderPlaced', 'priority' => 10],
             ['event' => 'legacy.order_placed', 'class' => 'App\\EventListener\\AuditOrder', 'method' => '__invoke', 'priority' => 0],
+            ['event' => 'order.shipped', 'class' => 'App\\EventSubscriber\\ShipmentSubscriber', 'method' => 'recordShipment', 'priority' => 5],
         ], $result['sections']['events']['listeners'] ?? null);
     }
 

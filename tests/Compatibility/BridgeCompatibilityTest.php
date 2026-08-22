@@ -69,8 +69,16 @@ final class BridgeCompatibilityTest extends TestCase
         self::assertContains('async', array_column(\is_array($messenger['transports'] ?? null) ? $messenger['transports'] : [], 'name'));
         self::assertContains('App\\Message\\Ping', array_column(\is_array($messenger['messages'] ?? null) ? $messenger['messages'] : [], 'class'));
         self::assertContains('App\\MessageHandler\\PingHandler', array_column(\is_array($messenger['handlers'] ?? null) ? $messenger['handlers'] : [], 'class'));
-        self::assertContains('App\\Event\\OrderPlaced', array_column(\is_array($events['events'] ?? null) ? $events['events'] : [], 'name'));
-        self::assertContains('App\\EventListener\\NotifyCustomer', array_column(\is_array($events['listeners'] ?? null) ? $events['listeners'] : [], 'class'));
+        $eventItems = \is_array($events['events'] ?? null) ? $events['events'] : [];
+        $eventListeners = \is_array($events['listeners'] ?? null) ? $events['listeners'] : [];
+        self::assertContains('App\\Event\\OrderPlaced', array_column($eventItems, 'name'));
+        self::assertContains('App\\EventListener\\NotifyCustomer', array_column($eventListeners, 'class'));
+        // the listener constructor throws, so metadata must load without instantiating it
+        self::assertContains('legacy.order_placed', array_column($eventItems, 'name'));
+        self::assertContains(
+            ['event' => 'legacy.order_placed', 'class' => 'App\\EventListener\\AuditOrder', 'method' => '__invoke', 'priority' => 0],
+            $eventListeners,
+        );
         self::assertContains('main', array_column(\is_array($security['firewalls'] ?? null) ? $security['firewalls'] : [], 'name'));
         self::assertContains('fixture_users', array_column(\is_array($security['providers'] ?? null) ? $security['providers'] : [], 'name'));
         self::assertContains('ROLE_ADMIN', array_column(\is_array($security['roles'] ?? null) ? $security['roles'] : [], 'name'));
