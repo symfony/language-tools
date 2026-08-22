@@ -86,15 +86,19 @@ $targetedRefresh = !in_array($targetedRefreshOption, ['0', 'false'], true);
 $rebuildContainerOption = $options['rebuild-container'] ?? '0';
 $rebuildContainer = !in_array($rebuildContainerOption, ['0', 'false'], true);
 
+$projectRoot = rtrim($project, '/\\');
+$hasEnvFile = is_file($projectRoot.'/.env') || is_file($projectRoot.'/.env.dist') || is_file($projectRoot.'/.env.local.php');
 if (class_exists(Symfony\Component\Runtime\SymfonyRuntime::class)) {
     new Symfony\Component\Runtime\SymfonyRuntime([
         'project_dir' => $project,
         'env' => $environment,
         'debug' => $debug,
+        // applications such as Shopware ship no env file at all
+        'disable_dotenv' => !$hasEnvFile,
     ]);
-} elseif (class_exists(Symfony\Component\Dotenv\Dotenv::class)) {
+} elseif ($hasEnvFile && class_exists(Symfony\Component\Dotenv\Dotenv::class)) {
     (new Symfony\Component\Dotenv\Dotenv())->bootEnv(
-        rtrim($project, '/\\').'/.env',
+        $projectRoot.'/.env',
         $environment,
     );
 }

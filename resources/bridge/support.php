@@ -21,7 +21,7 @@ function runJsonCommand(object $application, array $arguments): array
         throw new RuntimeException(sprintf('%s exited with status %d.', $arguments['command'], $exitCode));
     }
 
-    $result = json_decode(firstJsonDocument($output->fetch()), true, 512, JSON_THROW_ON_ERROR);
+    $result = json_decode(commandJsonDocument($output->fetch()), true, 512, JSON_THROW_ON_ERROR);
     if (!is_array($result)) {
         throw new RuntimeException(sprintf('%s did not return a JSON object or array.', $arguments['command']));
     }
@@ -29,8 +29,13 @@ function runJsonCommand(object $application, array $arguments): array
     return $cache[$cacheKey] = $result;
 }
 
-function firstJsonDocument(string $output): string
+/*
+ * Commands may interleave console logging with their payload, and log context
+ * can itself decode as JSON, so the largest valid document wins.
+ */
+function commandJsonDocument(string $output): string
 {
+    $best = null;
     for ($start = 0, $length = strlen($output); $start < $length; ++$start) {
         if ('{' !== $output[$start] && '[' !== $output[$start]) {
             continue;
@@ -63,14 +68,17 @@ function firstJsonDocument(string $output): string
                 $document = substr($output, $start, $index - $start + 1);
                 json_decode($document);
                 if (\JSON_ERROR_NONE === json_last_error()) {
-                    return $document;
+                    if (null === $best || strlen($document) > strlen($best)) {
+                        $best = $document;
+                    }
+                    $start = $index;
                 }
                 break;
             }
         }
     }
 
-    return $output;
+    return $best ?? $output;
 }
 
 function splitDebugValues(mixed $value): array

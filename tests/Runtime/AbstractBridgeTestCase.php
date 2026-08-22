@@ -18,6 +18,7 @@ abstract class AbstractBridgeTestCase extends TestCase
     {
         @unlink($this->temporaryDirectory.'/bin/console');
         @rmdir($this->temporaryDirectory.'/bin');
+        @unlink($this->temporaryDirectory.'/vendor/autoload_runtime.php');
         @unlink($this->temporaryDirectory.'/vendor/autoload.php');
         @rmdir($this->temporaryDirectory.'/vendor');
         @rmdir($this->temporaryDirectory);
@@ -632,11 +633,112 @@ abstract class AbstractBridgeTestCase extends TestCase
                             'tags' => [['name' => 'kernel.event_subscriber']],
                         ],
                     ];
+                    // mimic console log noise whose context decodes as JSON, as Contao emits in dev
+                    $output->write("12:00:00 DEBUG [event] Notified {\"driverOptions\":[]}\n");
                     $output->write(json_encode(['definitions' => $definitions], JSON_THROW_ON_ERROR));
 
                     return 0;
                 }
             }
+            PHP);
+    }
+
+    protected function writeRuntimeFrontControllerApplication(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/vendor/autoload.php', <<<'PHP'
+            <?php
+            namespace Composer;
+            final class InstalledVersions
+            {
+                public static function getPrettyVersion(string $package): ?string { return '8.0.6'; }
+            }
+            namespace Symfony\Contracts\EventDispatcher;
+            interface EventDispatcherInterface {}
+            namespace Symfony\Component\HttpKernel;
+            interface KernelInterface {}
+            namespace Symfony\Component\Console\Input;
+            final class ArrayInput
+            {
+                public function __construct(public array $arguments) {}
+            }
+            namespace Symfony\Component\Console\Output;
+            final class BufferedOutput
+            {
+                private string $contents = '';
+                public function write(string $contents): void { $this->contents .= $contents; }
+                public function fetch(): string { return $this->contents; }
+            }
+            namespace Symfony\Component\Runtime;
+            final class SymfonyRuntime
+            {
+                public function __construct(private array $options = []) {}
+                public function getResolver(\Closure $app): object
+                {
+                    return new class($app, $this->options) {
+                        public function __construct(private \Closure $app, private array $options) {}
+                        public function resolve(): array
+                        {
+                            return [$this->app, [['APP_ENV' => $this->options['env'] ?? 'prod', 'APP_DEBUG' => $this->options['debug'] ?? false]]];
+                        }
+                    };
+                }
+            }
+            namespace App\Event;
+            final class OrderPlaced {}
+            namespace App\EventListener;
+            final class NotifyCustomer
+            {
+                public function __construct() { throw new \RuntimeException('Listeners must not be instantiated.'); }
+                public function onOrderPlaced(\App\Event\OrderPlaced $event): void {}
+            }
+            namespace Distribution;
+            final class Kernel implements \Symfony\Component\HttpKernel\KernelInterface
+            {
+                public function __construct(public string $environment, public bool $debug) {}
+                public function shutdown(): void {}
+            }
+            final class ConsoleApplication
+            {
+                public function __construct(private \Distribution\Kernel $kernel) {}
+                public function getKernel(): \Distribution\Kernel { return $this->kernel; }
+            }
+            namespace Symfony\Bundle\FrameworkBundle\Console;
+            final class Application
+            {
+                public function __construct(private object $kernel) {}
+                public function setAutoExit(bool $autoExit): void {}
+                public function run(object $input, object $output): int
+                {
+                    if (!$this->kernel instanceof \Distribution\Kernel || 'dev' !== $this->kernel->environment) {
+                        return 1;
+                    }
+                    $definitions = 'kernel.event_listener' === ($input->arguments['--tag'] ?? null) ? [
+                        'App\\EventListener\\NotifyCustomer' => [
+                            'class' => 'App\\EventListener\\NotifyCustomer',
+                            'tags' => [['name' => 'kernel.event_listener', 'parameters' => ['event' => null, 'method' => 'onOrderPlaced', 'priority' => 10]]],
+                        ],
+                    ] : [];
+                    $output->write(json_encode(['definitions' => $definitions], JSON_THROW_ON_ERROR));
+
+                    return 0;
+                }
+            }
+            PHP);
+        file_put_contents($this->temporaryDirectory.'/vendor/autoload_runtime.php', <<<'PHP'
+            <?php
+            if (true === (require_once __DIR__.'/autoload.php')) {
+                return;
+            }
+            throw new RuntimeException('The runtime must not run when the autoloader is already loaded.');
+            PHP);
+        mkdir($this->temporaryDirectory.'/bin');
+        file_put_contents($this->temporaryDirectory.'/bin/console', <<<'PHP'
+            <?php
+            require_once dirname(__DIR__).'/vendor/autoload_runtime.php';
+
+            return static function (array $context): object {
+                return new \Distribution\ConsoleApplication(new \Distribution\Kernel($context['APP_ENV'], (bool) $context['APP_DEBUG']));
+            };
             PHP);
     }
 

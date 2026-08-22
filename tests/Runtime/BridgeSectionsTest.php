@@ -65,6 +65,29 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
         ], $result['sections']['events']['listeners'] ?? null);
     }
 
+    public function testResolvesTheKernelThroughARuntimeFrontController(): void
+    {
+        $this->writeRuntimeFrontControllerApplication();
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=events 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $snapshot = implode("\n", $output);
+        self::assertSame(0, $exitCode, $snapshot);
+        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null, $snapshot);
+        self::assertIsArray($result['sections'] ?? null);
+        self::assertIsArray($result['sections']['events'] ?? null);
+        self::assertSame([
+            ['event' => 'App\\Event\\OrderPlaced', 'class' => 'App\\EventListener\\NotifyCustomer', 'method' => 'onOrderPlaced', 'priority' => 10],
+        ], $result['sections']['events']['listeners'] ?? null);
+    }
+
     public function testNormalizesSecurityMetadataWithoutExportingProviderValues(): void
     {
         $this->writeSecurityApplication();

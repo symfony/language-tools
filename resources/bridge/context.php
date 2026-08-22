@@ -68,7 +68,6 @@ final class SymfonyLspBridgeContext
         }
 
         try {
-            $kernelClass = $this->resolveKernelClass();
             $tracking = $_SERVER['SYMFONY_DISABLE_RESOURCE_TRACKING'] ?? null;
             if ($this->targetedRefresh) {
                 $skipAll = filter_var($tracking, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
@@ -81,7 +80,7 @@ final class SymfonyLspBridgeContext
                 }
             }
             try {
-                $kernel = new $kernelClass($this->environment, $this->debug);
+                $kernel = $this->createKernel();
                 if ($this->rebuildContainer) {
                     $directories = [];
                     foreach (['getCacheDir', 'getBuildDir'] as $method) {
@@ -112,7 +111,22 @@ final class SymfonyLspBridgeContext
         }
     }
 
-    private function resolveKernelClass(): string
+    private function createKernel(): object
+    {
+        $kernelClass = $this->conventionalKernelClass();
+        if (null !== $kernelClass) {
+            return new $kernelClass($this->environment, $this->debug);
+        }
+
+        $kernel = $this->frontControllerKernel();
+        if (null !== $kernel) {
+            return $kernel;
+        }
+
+        throw new RuntimeException('No kernel was found. Expected App\\Kernel, a Kernel class at a Composer PSR-4 autoload root, app/AppKernel.php or a front controller using the Symfony Runtime.');
+    }
+
+    private function conventionalKernelClass(): ?string
     {
         if (class_exists('App\\Kernel')) {
             return 'App\\Kernel';
@@ -131,7 +145,100 @@ final class SymfonyLspBridgeContext
             return $candidate;
         }
 
-        throw new RuntimeException('No kernel class was found. Expected App\\Kernel or a Kernel class at a Composer PSR-4 autoload root.');
+        $legacyKernelFile = rtrim($this->project, '/\\').'/app/AppKernel.php';
+        if (!class_exists('AppKernel') && is_file($legacyKernelFile)) {
+            require_once $legacyKernelFile;
+        }
+        if (class_exists('AppKernel')
+            && (!interface_exists(Symfony\Component\HttpKernel\KernelInterface::class)
+                || is_subclass_of('AppKernel', Symfony\Component\HttpKernel\KernelInterface::class))
+        ) {
+            return 'AppKernel';
+        }
+
+        return null;
+    }
+
+    /*
+     * Applications with a nonstandard kernel, such as Shopware, declare their
+     * bootstrap in their front controllers. Scripts following the Symfony
+     * Runtime convention can be included safely: with the autoloader already
+     * loaded, autoload_runtime.php is inert and the script returns its app
+     * closure instead of running it, so the application's own runtime can
+     * resolve the kernel exactly as the application would.
+     */
+    private function frontControllerKernel(): ?object
+    {
+        foreach (['bin/console', 'public/index.php'] as $frontController) {
+            $path = rtrim($this->project, '/\\').'/'.$frontController;
+            if (!is_file($path)) {
+                continue;
+            }
+            $contents = @file_get_contents($path);
+            if (false === $contents || !str_contains($contents, 'autoload_runtime.php')) {
+                continue;
+            }
+            $argv = $_SERVER['argv'] ?? null;
+            // front controllers parse argv, which must not expose the bridge options
+            $_SERVER['argv'] = [$path];
+            try {
+                $app = require $path;
+                if (!$app instanceof Closure) {
+                    continue;
+                }
+                $kernel = $this->resolveRuntimeApplication($app);
+            } finally {
+                if (null === $argv) {
+                    unset($_SERVER['argv']);
+                } else {
+                    $_SERVER['argv'] = $argv;
+                }
+            }
+            if (null !== $kernel) {
+                return $kernel;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveRuntimeApplication(Closure $app): ?object
+    {
+        $runtimeClass = $_SERVER['APP_RUNTIME'] ?? $_ENV['APP_RUNTIME'] ?? 'Symfony\\Component\\Runtime\\SymfonyRuntime';
+        if (!is_string($runtimeClass) || !class_exists($runtimeClass)) {
+            return null;
+        }
+        $options = $_SERVER['APP_RUNTIME_OPTIONS'] ?? $_ENV['APP_RUNTIME_OPTIONS'] ?? [];
+        $runtime = new $runtimeClass((is_array($options) ? $options : []) + [
+            'project_dir' => $this->project,
+            'env' => $this->environment,
+            'debug' => $this->debug,
+            // the bridge already booted the environment at startup
+            'disable_dotenv' => true,
+        ]);
+        if (!method_exists($runtime, 'getResolver')) {
+            return null;
+        }
+        [$callable, $arguments] = $runtime->getResolver($app)->resolve();
+
+        return $this->extractKernel($callable(...$arguments));
+    }
+
+    private function extractKernel(mixed $application): ?object
+    {
+        if (!is_object($application)) {
+            return null;
+        }
+        if (interface_exists(Symfony\Component\HttpKernel\KernelInterface::class)
+            && $application instanceof Symfony\Component\HttpKernel\KernelInterface
+        ) {
+            return $application;
+        }
+        if (method_exists($application, 'getKernel')) {
+            return $this->extractKernel($application->getKernel());
+        }
+
+        return null;
     }
 
     /** @return string[] */
