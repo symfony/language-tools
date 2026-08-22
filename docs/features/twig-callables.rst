@@ -20,6 +20,22 @@ Function names are completed in Twig expressions, and filter names after a
 ``|`` pipe. Suggestions come from the recognized application declarations
 and replace the identifier being typed.
 
+Inside a recognized call, argument names are completed from the resolved
+PHP callable. Parameters that Twig injects, the environment, the context
+and the filtered value, are never suggested, and names already used in the
+call are omitted.
+
+.. code-block:: twig
+
+    {{ product|image(width: 200, lazy: true) }}
+
+Diagnostics
+-----------
+
+A named argument that doesn't match any parameter of the resolved PHP
+callable is reported as an error. Calls to unrecognized callables, dynamic
+callables, variadic callables and hash literal keys aren't diagnosed.
+
 Hover
 -----
 
@@ -36,4 +52,5 @@ Limitations
 -----------
 
 Dynamic names and callables are ignored. Functions and filters provided only by
-dependencies are left to a general Twig language server.
+dependencies are left to a general Twig language server. Find All References
+isn't available because template usages aren't indexed.

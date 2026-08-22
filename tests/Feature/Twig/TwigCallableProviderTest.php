@@ -271,6 +271,98 @@ final class TwigCallableProviderTest extends TestCase
         self::assertNull($completions('{{ done }} func'));
     }
 
+    public function testCompletesAndValidatesNamedArguments(): void
+    {
+        $converter = new PositionConverter();
+        $phpParser = new TolerantPhpParser(new Parser());
+        $documents = new DocumentStore();
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $extensionUri = 'file:///workspace/src/Twig/MediaExtension.php';
+        $extensionText = <<<'PHP'
+            <?php
+            namespace App\Twig;
+
+            use Twig\TwigFilter;
+            use Twig\TwigFunction;
+
+            final class MediaExtension
+            {
+                public function getFilters(): array
+                {
+                    return [new TwigFilter('shorten', [MediaExtension::class, 'shorten'])];
+                }
+
+                public function getFunctions(): array
+                {
+                    return [new TwigFunction('image', [MediaExtension::class, 'render'])];
+                }
+
+                public function render(\Twig\Environment $environment, string $name, int $width = 200, bool $lazy = false): string
+                {
+                    return $name;
+                }
+
+                public function shorten(string $value, int $length = 30): string
+                {
+                    return $value;
+                }
+            }
+            PHP;
+        $documents->open(new Document($extensionUri, 'php', 1, $extensionText));
+        $indexes = new TwigCallableIndexRegistry();
+        $indexes->forProject($project)->replace($this->declarationExtractor($converter, $phpParser)->extract($extensionUri, $extensionText));
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $classIndexes->forProject($project)->replace(
+            new DependencyInjectionSourceFacts($extensionUri, classes: (new PhpClassDeclarationExtractor($converter, $phpParser))->extract($extensionUri, $extensionText)),
+        );
+        $provider = new TwigCallableProvider(
+            new DocumentContextResolver($documents, $projects),
+            $converter,
+            new LspProtocolMapper(),
+            $indexes,
+            new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()), $commentParser),
+            $classIndexes,
+            new ProjectDocumentReader($documents, new ProjectPathResolver(new UriToPathConverter())),
+            $phpParser,
+            new TwigCommentParser(),
+        );
+
+        $completions = static function (string $text) use ($provider, $documents, $converter): ?array {
+            $uri = 'file:///workspace/templates/arguments.html.twig';
+            $documents->open(new Document($uri, 'twig', 2, $text));
+            $position = $converter->toPosition($text, \strlen($text));
+            $items = $provider->complete([
+                'textDocument' => ['uri' => $uri],
+                'position' => ['line' => $position->line(), 'character' => $position->character()],
+            ]);
+
+            return null === $items ? null : array_column($items, 'label');
+        };
+        self::assertSame(['name', 'width', 'lazy'], $completions('{{ image('));
+        self::assertSame(['width'], $completions("{{ image(name: 'a', w"));
+        self::assertSame(['width', 'lazy'], $completions("{{ image(name: 'a', "));
+        self::assertSame(['length'], $completions('{{ text|shorten('));
+        self::assertNull($completions("{{ image(name: 'a"));
+
+        $diagnostics = static function (string $text) use ($provider, $documents): ?array {
+            $uri = 'file:///workspace/templates/diagnostics.html.twig';
+            $documents->open(new Document($uri, 'twig', 2, $text));
+
+            return $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
+        };
+        $unknown = $diagnostics("{{ image(name: 'a', wdith: 3) }}\n{{ text|shorten(size: 5) }}\n");
+        self::assertSame(
+            ['Unknown argument "wdith" for Twig function "image".', 'Unknown argument "size" for Twig filter "shorten".'],
+            array_column($unknown ?? [], 'message'),
+        );
+        self::assertSame([], $diagnostics("{{ image(name: 'a', width: 3, lazy: true) }}"));
+        self::assertSame([], $diagnostics("{{ image({name: 'a'}) }}"));
+        self::assertSame([], $diagnostics("{{ image(name ? 'a' : 'b') }}"));
+        self::assertSame([], $diagnostics('{{ unknown_callable(anything: 1) }}'));
+        self::assertSame([], $diagnostics('{# {{ image(wdith: 3) }} #}'));
+    }
+
     public function testKeepsUnsavedTwigCallableDeclarationsAuthoritative(): void
     {
         $extractor = $this->declarationExtractor(new PositionConverter());

@@ -51,7 +51,7 @@ Supported Integrations
       - Yes
       - No
       - No
-      - No
+      - Yes
     * - `Translations`_
       - Yes
       - Yes

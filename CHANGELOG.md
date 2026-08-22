@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Complete and validate named arguments for Twig functions and filters
 - Fix dogfood probe patterns and wipe stale dev caches before matrix cold runs
 - Complete Twig function and filter names in templates
 - Resolve parameter references in configuration files outside the services section
