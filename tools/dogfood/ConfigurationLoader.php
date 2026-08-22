@@ -5,9 +5,12 @@ namespace Symfony\Lsp\Tools\Dogfood;
 final class ConfigurationLoader
 {
     private const VERSION = 1;
-    private const KEYS = ['version', 'repository', 'revision', 'directory', 'environment', 'setup', 'ci', 'indexTimeout'];
+    private const KEYS = ['version', 'repository', 'revision', 'directory', 'environment', 'setup', 'ci', 'indexTimeout', 'requestTimeout', 'probeRoots', 'probesPerCategory'];
     private const DEFAULT_INDEX_TIMEOUT = 120;
     private const MAX_INDEX_TIMEOUT = 900;
+    private const DEFAULT_REQUEST_TIMEOUT = 10;
+    private const MAX_REQUEST_TIMEOUT = 120;
+    private const MAX_PROBES_PER_CATEGORY = 10;
 
     /**
      * @param list<string> $directories
@@ -75,6 +78,9 @@ final class ConfigurationLoader
             $this->setup($data, $setupIds, $file),
             $this->ci($data, $file),
             $this->indexTimeout($data, $file),
+            $this->requestTimeout($data, $file),
+            $this->probeRoots($data, $file),
+            $this->probesPerCategory($data, $file),
         );
     }
 
@@ -177,5 +183,51 @@ final class ConfigurationLoader
         }
 
         return $indexTimeout;
+    }
+
+    /**
+     * @param array<array-key, mixed> $data
+     */
+    private function requestTimeout(array $data, string $file): int
+    {
+        $requestTimeout = $data['requestTimeout'] ?? self::DEFAULT_REQUEST_TIMEOUT;
+        if (!\is_int($requestTimeout) || $requestTimeout < 1 || $requestTimeout > self::MAX_REQUEST_TIMEOUT) {
+            throw new ConfigurationException(\sprintf('The "requestTimeout" in "%s" must be between 1 and %d seconds.', $file, self::MAX_REQUEST_TIMEOUT));
+        }
+
+        return $requestTimeout;
+    }
+
+    /**
+     * @param array<array-key, mixed> $data
+     *
+     * @return list<string>
+     */
+    private function probeRoots(array $data, string $file): array
+    {
+        $probeRoots = $data['probeRoots'] ?? ProbeFinder::DEFAULT_ROOTS;
+        if (!\is_array($probeRoots) || [] === $probeRoots || !array_is_list($probeRoots)) {
+            throw new ConfigurationException(\sprintf('The "probeRoots" in "%s" must be a non-empty list of relative paths.', $file));
+        }
+        foreach ($probeRoots as $root) {
+            if (!\is_string($root) || '' === $root || 1 === preg_match('{^[/\\\\]|^[A-Za-z]:|(?:^|[/\\\\])\.\.(?:[/\\\\]|$)|,}', $root)) {
+                throw new ConfigurationException(\sprintf('The "probeRoots" in "%s" must be a non-empty list of relative paths.', $file));
+            }
+        }
+
+        return $probeRoots;
+    }
+
+    /**
+     * @param array<array-key, mixed> $data
+     */
+    private function probesPerCategory(array $data, string $file): int
+    {
+        $probesPerCategory = $data['probesPerCategory'] ?? 1;
+        if (!\is_int($probesPerCategory) || $probesPerCategory < 1 || $probesPerCategory > self::MAX_PROBES_PER_CATEGORY) {
+            throw new ConfigurationException(\sprintf('The "probesPerCategory" in "%s" must be between 1 and %d.', $file, self::MAX_PROBES_PER_CATEGORY));
+        }
+
+        return $probesPerCategory;
     }
 }

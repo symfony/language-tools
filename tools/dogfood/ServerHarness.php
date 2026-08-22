@@ -20,9 +20,12 @@ final class ServerHarness implements HarnessInterface
             $this->harnessPath,
             '--environment='.$configuration->environment,
             '--index-timeout='.$configuration->indexTimeout,
+            '--request-timeout='.$configuration->requestTimeout,
+            '--probe-roots='.implode(',', $configuration->probeRoots),
+            '--probes-per-category='.$configuration->probesPerCategory,
             $this->serverPath,
             $applicationRoot,
-        ], null, $configuration->indexTimeout + self::REQUEST_BUDGET);
+        ], null, $configuration->indexTimeout + self::REQUEST_BUDGET * $configuration->probesPerCategory);
         $decoded = null;
         if ('' !== $result->standardOutput) {
             try {

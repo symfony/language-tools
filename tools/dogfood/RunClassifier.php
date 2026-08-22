@@ -16,13 +16,23 @@ final class RunClassifier
             return ['process'];
         }
         $layers = [];
-        if ('ready' !== $this->indexState($run->result, 'source')) {
+        $timedOut = false;
+        $source = $this->indexState($run->result, 'source');
+        if ('failed' === $source) {
             $layers[] = 'source-index';
+        } elseif ('ready' !== $source) {
+            $timedOut = true;
         }
-        if ('ready' !== $this->indexState($run->result, 'runtime')) {
-            $layers[] = 'runtime-index';
+        $runtime = $this->indexState($run->result, 'runtime');
+        if ('failed' === $runtime || 'stale' === $runtime) {
+            $layers[] = 'bootstrap' === $this->runtimeStage($run->result) ? 'bootstrap' : 'runtime-index';
+        } elseif ('ready' !== $runtime) {
+            $timedOut = true;
         }
-        if ($this->hasRequestError($run->result)) {
+        if ($timedOut) {
+            $layers[] = 'timeout';
+        }
+        if ($this->hasRequestError($run->result) || [] !== ($run->result['violations'] ?? [])) {
             $layers[] = 'request';
         }
         if (0 !== ($run->result['exitCode'] ?? 0) || null !== ($run->result['serverError'] ?? null)) {
@@ -44,6 +54,20 @@ final class RunClassifier
         $part = $status[$section] ?? null;
 
         return \is_array($part) && \is_string($part['state'] ?? null) ? $part['state'] : 'unknown';
+    }
+
+    /**
+     * @param array<mixed> $result
+     */
+    private function runtimeStage(array $result): ?string
+    {
+        $status = $result['status'] ?? null;
+        if (!\is_array($status) || !\is_array($status['runtime'] ?? null)) {
+            return null;
+        }
+        $stage = $status['runtime']['stage'] ?? null;
+
+        return \is_string($stage) ? $stage : null;
     }
 
     /**

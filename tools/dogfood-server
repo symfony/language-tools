@@ -1,6 +1,11 @@
 #!/usr/bin/env php
 <?php
 
+require __DIR__.'/../vendor/autoload.php';
+
+use Symfony\Lsp\Tools\Dogfood\ProbeFinder;
+use Symfony\Lsp\Tools\Dogfood\ProtocolValidator;
+
 function writeMessage($stream, array $message): void
 {
     $json = json_encode($message, \JSON_THROW_ON_ERROR);
@@ -65,17 +70,6 @@ function awaitResponse($input, $output, int $id, float $timeout, array &$notific
     throw new RuntimeException(sprintf('Timed out waiting for response %d.', $id));
 }
 
-function position(string $contents, int $offset): array
-{
-    $before = substr($contents, 0, $offset);
-    $line = substr_count($before, "\n");
-    $lineStart = strrpos($before, "\n");
-    $lineText = false === $lineStart ? $before : substr($before, $lineStart + 1);
-    $character = intdiv(strlen(mb_convert_encoding($lineText, 'UTF-16LE', 'UTF-8')), 2);
-
-    return ['line' => $line, 'character' => $character];
-}
-
 function uri(string $path): string
 {
     return 'file://'.str_replace('%2F', '/', rawurlencode($path));
@@ -95,116 +89,34 @@ function languageId(string $path): string
     };
 }
 
-function findProbe(string $root, array $probe): ?array
-{
-    foreach (['src', 'templates', 'config'] as $sourceDirectory) {
-        $directory = $root.'/'.$sourceDirectory;
-        if (!is_dir($directory)) {
-            continue;
-        }
-        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS));
-        foreach ($iterator as $file) {
-            if (!$file instanceof SplFileInfo || !$file->isFile()) {
-                continue;
-            }
-            $path = str_replace('\\', '/', $file->getPathname());
-            if (!preg_match($probe['files'], $path)) {
-                continue;
-            }
-            $contents = file_get_contents($path);
-            if (false === $contents || !preg_match($probe['pattern'], $contents, $matches, \PREG_OFFSET_CAPTURE)) {
-                continue;
-            }
-            $value = $matches[1][0];
-            if (!is_string($value) || '' === $value) {
-                continue;
-            }
-
-            return [
-                'category' => $probe['category'],
-                'path' => $path,
-                'contents' => $contents,
-                'value' => $value,
-                'position' => position($contents, $matches[1][1] + max(0, intdiv(strlen($value), 2))),
-            ];
-        }
-    }
-
-    return null;
-}
-
-function findTwigCallableProbe(string $root, string $kind): ?array
-{
-    $names = [];
-    $sourceDirectory = $root.'/src';
-    if (!is_dir($sourceDirectory)) {
-        return null;
-    }
-    $sourceFiles = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($sourceDirectory, FilesystemIterator::SKIP_DOTS));
-    foreach ($sourceFiles as $file) {
-        if (!$file instanceof SplFileInfo || !$file->isFile() || 'php' !== strtolower($file->getExtension())) {
-            continue;
-        }
-        $contents = file_get_contents($file->getPathname());
-        if (false === $contents) {
-            continue;
-        }
-        preg_match_all('/\bnew\s+(?:\\\\?Twig\\\\)?Twig'.preg_quote($kind, '/').'\s*\(\s*([\'\"])([A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*)\1/', $contents, $matches);
-        foreach ($matches[2] as $name) {
-            $names[$name] = true;
-        }
-    }
-    if ([] === $names) {
-        return null;
-    }
-    $alternatives = implode('|', array_map(static fn (string $name): string => preg_quote($name, '/'), array_keys($names)));
-    $pattern = 'Function' === $kind
-        ? '/\b('.$alternatives.')\s*\(/'
-        : '/\|\s*('.$alternatives.')\b/';
-    $templateDirectory = $root.'/templates';
-    if (!is_dir($templateDirectory)) {
-        return null;
-    }
-    $templateFiles = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($templateDirectory, FilesystemIterator::SKIP_DOTS));
-    foreach ($templateFiles as $file) {
-        if (!$file instanceof SplFileInfo || !$file->isFile() || 'twig' !== strtolower($file->getExtension())) {
-            continue;
-        }
-        $contents = file_get_contents($file->getPathname());
-        if (false === $contents || !preg_match($pattern, $contents, $matches, \PREG_OFFSET_CAPTURE)) {
-            continue;
-        }
-        $value = $matches[1][0];
-
-        return [
-            'category' => 'twig.'.strtolower($kind),
-            'path' => str_replace('\\', '/', $file->getPathname()),
-            'contents' => $contents,
-            'value' => $value,
-            'position' => position($contents, $matches[1][1] + intdiv(strlen($value), 2)),
-        ];
-    }
-
-    return null;
-}
+const USAGE = "Usage: dogfood-server [--environment=ENV] [--index-timeout=SECONDS] [--request-timeout=SECONDS] [--probe-roots=DIR,DIR] [--probes-per-category=COUNT] <server> <project>\n";
 
 $environment = 'dev';
 $indexTimeout = 30.0;
+$requestTimeout = 10.0;
+$probeRoots = ProbeFinder::DEFAULT_ROOTS;
+$probesPerCategory = 1;
 $positional = [];
 foreach (array_slice($argv, 1) as $argument) {
     if (preg_match('/^--environment=(.+)$/', $argument, $matches)) {
         $environment = $matches[1];
     } elseif (preg_match('/^--index-timeout=(\d+)$/', $argument, $matches)) {
         $indexTimeout = (float) $matches[1];
+    } elseif (preg_match('/^--request-timeout=(\d+)$/', $argument, $matches)) {
+        $requestTimeout = (float) $matches[1];
+    } elseif (preg_match('/^--probe-roots=(.+)$/', $argument, $matches)) {
+        $probeRoots = array_values(array_filter(explode(',', $matches[1]), static fn (string $root): bool => '' !== $root));
+    } elseif (preg_match('/^--probes-per-category=(\d+)$/', $argument, $matches)) {
+        $probesPerCategory = max(1, (int) $matches[1]);
     } elseif (str_starts_with($argument, '-')) {
-        fwrite(\STDERR, "Usage: dogfood-server [--environment=ENV] [--index-timeout=SECONDS] <server> <project>\n");
+        fwrite(\STDERR, USAGE);
         exit(2);
     } else {
         $positional[] = $argument;
     }
 }
 if (2 !== count($positional)) {
-    fwrite(\STDERR, "Usage: dogfood-server [--environment=ENV] [--index-timeout=SECONDS] <server> <project>\n");
+    fwrite(\STDERR, USAGE);
     exit(2);
 }
 [$server, $project] = $positional;
@@ -229,92 +141,69 @@ $initialize = awaitResponse($pipes[0], $pipes[1], $id, 10.0, $notifications);
 writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []]);
 
 $status = null;
+$terminal = false;
 $deadline = microtime(true) + $indexTimeout;
 while (microtime(true) < $deadline) {
     ++$id;
     writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $id, 'method' => 'workspace/executeCommand', 'params' => ['command' => 'symfony.indexStatus']]);
-    $response = awaitResponse($pipes[0], $pipes[1], $id, 10.0, $notifications);
+    $response = awaitResponse($pipes[0], $pipes[1], $id, $requestTimeout, $notifications);
     $status = $response['result'][0] ?? null;
-    if (is_array($status) && in_array($status['source']['state'] ?? null, ['ready', 'failed'], true) && in_array($status['runtime']['state'] ?? null, ['ready', 'failed'], true)) {
+    if (is_array($status)
+        && in_array($status['source']['state'] ?? null, ['ready', 'failed'], true)
+        && in_array($status['runtime']['state'] ?? null, ['ready', 'failed', 'stale'], true)
+    ) {
+        $terminal = true;
         break;
     }
     usleep(250_000);
 }
 
-$definitions = [
-    ['category' => 'route.php', 'files' => '{\.php$}', 'pattern' => '{(?:generate|redirectToRoute)\(\s*[\'\"]([^\'\"]+)}'],
-    ['category' => 'route.twig', 'files' => '{\.twig$}', 'pattern' => '{\b(?:path|url)\(\s*[\'\"]([^\'\"]+)}'],
-    ['category' => 'template.php', 'files' => '{\.php$}', 'pattern' => '{(?:render|renderView)\(\s*[\'\"]([^\'\"]+\.twig)}'],
-    ['category' => 'template.twig', 'files' => '{\.twig$}', 'pattern' => '{\b(?:extends|include|embed|import|from|use)\s+[\'\"]([^\'\"]+\.twig)}'],
-    ['category' => 'component.twig', 'files' => '{\.twig$}', 'pattern' => '{<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\b}'],
-    ['category' => 'stimulus.controller.twig', 'files' => '{\.twig$}', 'pattern' => '{\bdata-controller\s*=\s*[\'"][^\'"]*?([A-Za-z0-9_@./-]+)}'],
-    ['category' => 'stimulus.action.twig', 'files' => '{\.twig$}', 'pattern' => '{\bdata-action\s*=\s*[\'"][^\'"]*?(?:[^\s\'"]+->)?[A-Za-z0-9_@./-]+#([A-Za-z_$][A-Za-z0-9_$]*)}'],
-    ['category' => 'live.action.twig', 'files' => '{\.twig$}', 'pattern' => '{\bdata-live-action-param\s*=\s*[\'"](?:[^\'"]*\|)?([A-Za-z_][A-Za-z0-9_]*)}'],
-    ['category' => 'live.event.php', 'files' => '{\.php$}', 'pattern' => '{\bemit\s*\(\s*[\'"]([^\'"]+)}'],
-    ['category' => 'asset.twig', 'files' => '{\.twig$}', 'pattern' => '{\basset\s*\(\s*[\'\"]([A-Za-z0-9_@.-][A-Za-z0-9_@./-]*)[\'\"]\s*\)}'],
-    ['category' => 'importmap.twig', 'files' => '{\.twig$}', 'pattern' => '{\bimportmap\s*\(\s*(?:\[\s*)?[\'\"]([A-Za-z0-9_@./-]+)}'],
-    ['category' => 'doctrine.field.repository.php', 'files' => '{\.php$}', 'pattern' => '{\b(?:findBy|findOneBy|count)\s*\(\s*\[\s*[\'\"]([A-Za-z_][A-Za-z0-9_]*)[\'\"]\s*=>}'],
-    ['category' => 'doctrine.field.form.php', 'files' => '{\.php$}', 'pattern' => '{EntityType::class\s*,\s*\[[^;]+?[\'\"](?:choice_label|choice_value|group_by)[\'\"]\s*=>\s*[\'\"]([A-Za-z_][A-Za-z0-9_]*)}s'],
-    ['category' => 'form.option.php', 'files' => '{\.php$}', 'pattern' => '{createForm\s*\([^,);]+,\s*[^,);]+,\s*\[[^;]+?[\'\"]([A-Za-z_][A-Za-z0-9_]*)[\'\"]\s*=>}s'],
-    ['category' => 'constraint.option.php', 'files' => '{\.php$}', 'pattern' => '{Assert\\\\[A-Za-z_][A-Za-z0-9_]*\s*\([^\)]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*:}s'],
-    ['category' => 'translation.php', 'files' => '{\.php$}', 'pattern' => '{(?:->trans|\bt)\(\s*[\'\"]([^\'\"]+)}'],
-    ['category' => 'translation.twig', 'files' => '{\.twig$}', 'pattern' => '{[\'\"]([^\'\"]+)[\'\"]\s*\|\s*trans\b}'],
-    ['category' => 'service.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{[\'\"]@([^\'\"]+)[\'\"]}'],
-    ['category' => 'parameter.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{%([^%()]+)%}'],
-    ['category' => 'environment', 'files' => '{\.(?:php|ya?ml)$}', 'pattern' => '{%env\([^)]*?([A-Z][A-Z0-9_]+)\)%}'],
-];
-$probes = [];
-foreach ($definitions as $definition) {
-    $probe = findProbe($project, $definition);
-    if (null !== $probe) {
-        $probes[] = $probe;
-    }
-}
-foreach (['Function', 'Filter'] as $kind) {
-    $probe = findTwigCallableProbe($project, $kind);
-    if (null !== $probe) {
-        $probes[] = $probe;
-    }
-}
+$probes = (new ProbeFinder($probeRoots, $probesPerCategory))->find($project);
+$validator = new ProtocolValidator();
 
 $opened = [];
 $results = [];
+$violations = [];
 foreach ($probes as $probe) {
-    $documentUri = uri($probe['path']);
+    $documentUri = uri($probe->path);
     if (!isset($opened[$documentUri])) {
         writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'textDocument/didOpen', 'params' => ['textDocument' => [
             'uri' => $documentUri,
-            'languageId' => languageId($probe['path']),
+            'languageId' => languageId($probe->path),
             'version' => 1,
-            'text' => $probe['contents'],
+            'text' => $probe->contents,
         ]]]);
         $opened[$documentUri] = true;
     }
+    $position = ['line' => $probe->line, 'character' => $probe->character];
     $entry = [
-        'category' => $probe['category'],
-        'file' => substr($probe['path'], strlen($project) + 1),
-        'value' => $probe['value'],
+        'category' => $probe->category,
+        'file' => substr($probe->path, strlen($project) + 1),
+        'value' => $probe->value,
         'requests' => [],
     ];
     foreach (['textDocument/completion', 'textDocument/hover', 'textDocument/definition', 'textDocument/references', 'textDocument/documentLink', 'textDocument/codeLens', 'textDocument/codeAction', 'textDocument/prepareRename', 'textDocument/rename'] as $method) {
         ++$id;
         $params = ['textDocument' => ['uri' => $documentUri]];
         if (!in_array($method, ['textDocument/documentLink', 'textDocument/codeLens', 'textDocument/codeAction'], true)) {
-            $params['position'] = $probe['position'];
+            $params['position'] = $position;
         }
         if ('textDocument/codeAction' === $method) {
-            $params['range'] = ['start' => $probe['position'], 'end' => $probe['position']];
+            $params['range'] = ['start' => $position, 'end' => $position];
             $params['context'] = ['diagnostics' => []];
         }
         if ('textDocument/references' === $method) {
             $params['context'] = ['includeDeclaration' => true];
         } elseif ('textDocument/rename' === $method) {
-            $params['newName'] = 'dogfood_'.str_replace(['.', '\\', '/'], '_', $probe['value']);
+            $params['newName'] = 'dogfood_'.str_replace(['.', '\\', '/'], '_', $probe->value);
         }
         $startedAt = microtime(true);
         writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $id, 'method' => $method, 'params' => $params]);
-        $response = awaitResponse($pipes[0], $pipes[1], $id, 10.0, $notifications);
+        $response = awaitResponse($pipes[0], $pipes[1], $id, $requestTimeout, $notifications);
         $result = $response['result'] ?? null;
+        foreach ($validator->validate($method, $result, $project) as $violation) {
+            $violations[] = ['category' => $probe->category, 'method' => substr($method, strlen('textDocument/')), 'message' => $violation];
+        }
         $entry['requests'][substr($method, strlen('textDocument/'))] = [
             'milliseconds' => round((microtime(true) - $startedAt) * 1000, 1),
             'resultCount' => is_array($result) && array_is_list($result) ? count($result) : (null === $result ? 0 : 1),
@@ -329,7 +218,7 @@ foreach (array_keys($opened) as $documentUri) {
 }
 ++$id;
 writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $id, 'method' => 'shutdown', 'params' => []]);
-awaitResponse($pipes[0], $pipes[1], $id, 10.0, $notifications);
+awaitResponse($pipes[0], $pipes[1], $id, $requestTimeout, $notifications);
 writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []]);
 fclose($pipes[0]);
 fclose($pipes[1]);
@@ -354,8 +243,10 @@ echo json_encode([
     'environment' => $environment,
     'serverVersion' => $initialize['result']['serverInfo']['version'] ?? null,
     'status' => $status,
+    'terminal' => $terminal,
     'probeCount' => count($results),
     'probes' => $results,
+    'violations' => $violations,
     'diagnostics' => $diagnostics,
     'serverError' => '' === trim($stderr) ? null : trim($stderr),
     'exitCode' => $exitCode,

@@ -121,6 +121,7 @@ final class MatrixCommand
             }
         }
         $serverVersion = $result['serverVersion'] ?? null;
+        $violations = $result['violations'] ?? null;
 
         return new RunSummary(
             $this->classifier->classify($run),
@@ -128,6 +129,7 @@ final class MatrixCommand
             $this->classifier->indexState($result, 'runtime'),
             \is_int($probeCount) ? $probeCount : 0,
             $requestErrors,
+            \is_array($violations) ? \count($violations) : 0,
             $maxMilliseconds,
             \is_string($serverVersion) ? $serverVersion : null,
         );

@@ -1,0 +1,176 @@
+<?php
+
+namespace Symfony\Lsp\Tools\Dogfood;
+
+final class ProbeFinder
+{
+    public const DEFAULT_ROOTS = ['src', 'templates', 'config'];
+
+    private const EXCLUDED_DIRECTORIES = ['.git', 'node_modules', 'var', 'vendor'];
+
+    private const DEFINITIONS = [
+        ['category' => 'route.php', 'files' => '{\.php$}', 'pattern' => '{(?:generate|redirectToRoute)\(\s*[\'\"]([^\'\"]+)}'],
+        ['category' => 'route.twig', 'files' => '{\.twig$}', 'pattern' => '{\b(?:path|url)\(\s*[\'\"]([^\'\"]+)}'],
+        ['category' => 'template.php', 'files' => '{\.php$}', 'pattern' => '{(?:render|renderView)\(\s*[\'\"]([^\'\"]+\.twig)}'],
+        ['category' => 'template.twig', 'files' => '{\.twig$}', 'pattern' => '{\b(?:extends|include|embed|import|from|use)\s+[\'\"]([^\'\"]+\.twig)}'],
+        ['category' => 'component.twig', 'files' => '{\.twig$}', 'pattern' => '{<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\b}'],
+        ['category' => 'stimulus.controller.twig', 'files' => '{\.twig$}', 'pattern' => '{\bdata-controller\s*=\s*[\'"][^\'"]*?([A-Za-z0-9_@./-]+)}'],
+        ['category' => 'stimulus.action.twig', 'files' => '{\.twig$}', 'pattern' => '{\bdata-action\s*=\s*[\'"][^\'"]*?(?:[^\s\'"]+->)?[A-Za-z0-9_@./-]+#([A-Za-z_$][A-Za-z0-9_$]*)}'],
+        ['category' => 'live.action.twig', 'files' => '{\.twig$}', 'pattern' => '{\bdata-live-action-param\s*=\s*[\'"](?:[^\'"]*\|)?([A-Za-z_][A-Za-z0-9_]*)}'],
+        ['category' => 'live.event.php', 'files' => '{\.php$}', 'pattern' => '{\bemit\s*\(\s*[\'"]([^\'"]+)}'],
+        ['category' => 'asset.twig', 'files' => '{\.twig$}', 'pattern' => '{\basset\s*\(\s*[\'\"]([A-Za-z0-9_@.-][A-Za-z0-9_@./-]*)[\'\"]\s*\)}'],
+        ['category' => 'importmap.twig', 'files' => '{\.twig$}', 'pattern' => '{\bimportmap\s*\(\s*(?:\[\s*)?[\'\"]([A-Za-z0-9_@./-]+)}'],
+        ['category' => 'doctrine.field.repository.php', 'files' => '{\.php$}', 'pattern' => '{\b(?:findBy|findOneBy|count)\s*\(\s*\[\s*[\'\"]([A-Za-z_][A-Za-z0-9_]*)[\'\"]\s*=>}'],
+        ['category' => 'doctrine.field.form.php', 'files' => '{\.php$}', 'pattern' => '{EntityType::class\s*,\s*\[[^;]+?[\'\"](?:choice_label|choice_value|group_by)[\'\"]\s*=>\s*[\'\"]([A-Za-z_][A-Za-z0-9_]*)}s'],
+        ['category' => 'form.option.php', 'files' => '{\.php$}', 'pattern' => '{createForm\s*\([^,);]+,\s*[^,);]+,\s*\[[^;]+?[\'\"]([A-Za-z_][A-Za-z0-9_]*)[\'\"]\s*=>}s'],
+        ['category' => 'constraint.option.php', 'files' => '{\.php$}', 'pattern' => '{Assert\\\\[A-Za-z_][A-Za-z0-9_]*\s*\([^\)]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*:}s'],
+        ['category' => 'translation.php', 'files' => '{\.php$}', 'pattern' => '{(?:->trans|\bt)\(\s*[\'\"]([^\'\"]+)}'],
+        ['category' => 'translation.twig', 'files' => '{\.twig$}', 'pattern' => '{[\'\"]([^\'\"]+)[\'\"]\s*\|\s*trans\b}'],
+        ['category' => 'service.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{[\'\"]@([^\'\"]+)[\'\"]}'],
+        ['category' => 'parameter.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{%([^%()]+)%}'],
+        ['category' => 'environment', 'files' => '{\.(?:php|ya?ml)$}', 'pattern' => '{%env\([^)]*?([A-Z][A-Z0-9_]+)\)%}'],
+    ];
+
+    /**
+     * @param list<string> $roots project-relative directories, scanned in order
+     */
+    public function __construct(
+        private array $roots = self::DEFAULT_ROOTS,
+        private int $probesPerCategory = 1,
+    ) {
+    }
+
+    /**
+     * @return list<Probe>
+     */
+    public function find(string $projectRoot): array
+    {
+        $files = $this->collectFiles($projectRoot);
+        $probes = [];
+        foreach (self::DEFINITIONS as $definition) {
+            $found = 0;
+            foreach ($files as $path => $contents) {
+                if ($found >= $this->probesPerCategory) {
+                    break;
+                }
+                if (1 !== preg_match($definition['files'], $path)) {
+                    continue;
+                }
+                $probe = $this->match($definition['category'], $definition['pattern'], $path, $contents);
+                if (null !== $probe) {
+                    $probes[] = $probe;
+                    ++$found;
+                }
+            }
+        }
+        foreach (['Function', 'Filter'] as $kind) {
+            array_push($probes, ...$this->findTwigCallables($files, $kind));
+        }
+
+        return $probes;
+    }
+
+    /**
+     * @param array<string, string> $files
+     *
+     * @return list<Probe>
+     */
+    private function findTwigCallables(array $files, string $kind): array
+    {
+        $names = [];
+        foreach ($files as $path => $contents) {
+            if (1 !== preg_match('{\.php$}', $path)) {
+                continue;
+            }
+            preg_match_all('/\bnew\s+(?:\\\\?Twig\\\\)?Twig'.preg_quote($kind, '/').'\s*\(\s*([\'\"])([A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*)\1/', $contents, $matches);
+            foreach ($matches[2] as $name) {
+                $names[$name] = true;
+            }
+        }
+        if ([] === $names) {
+            return [];
+        }
+        $alternatives = implode('|', array_map(static fn (string $name): string => preg_quote($name, '/'), array_keys($names)));
+        $pattern = 'Function' === $kind
+            ? '/\b('.$alternatives.')\s*\(/'
+            : '/\|\s*('.$alternatives.')\b/';
+        $probes = [];
+        foreach ($files as $path => $contents) {
+            if (\count($probes) >= $this->probesPerCategory) {
+                break;
+            }
+            if (1 !== preg_match('{\.twig$}', $path)) {
+                continue;
+            }
+            $probe = $this->match('twig.'.strtolower($kind), $pattern, $path, $contents);
+            if (null !== $probe) {
+                $probes[] = $probe;
+            }
+        }
+
+        return $probes;
+    }
+
+    private function match(string $category, string $pattern, string $path, string $contents): ?Probe
+    {
+        if (1 !== preg_match($pattern, $contents, $matches, \PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+        $value = $matches[1][0];
+        if ('' === $value) {
+            return null;
+        }
+        [$line, $character] = $this->position($contents, $matches[1][1] + intdiv(\strlen($value), 2));
+
+        return new Probe($category, $path, $contents, $value, $line, $character);
+    }
+
+    /**
+     * @return array<string, string> path => contents, deterministically ordered
+     */
+    private function collectFiles(string $projectRoot): array
+    {
+        $files = [];
+        foreach ($this->roots as $root) {
+            $directory = $projectRoot.'/'.$root;
+            if (!is_dir($directory)) {
+                continue;
+            }
+            $paths = [];
+            $iterator = new \RecursiveIteratorIterator(new \RecursiveCallbackFilterIterator(
+                new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
+                static fn (\SplFileInfo $file): bool => !$file->isDir() || !\in_array($file->getFilename(), self::EXCLUDED_DIRECTORIES, true),
+            ));
+            foreach ($iterator as $file) {
+                if ($file instanceof \SplFileInfo && $file->isFile()) {
+                    $paths[] = str_replace('\\', '/', $file->getPathname());
+                }
+            }
+            sort($paths, \SORT_STRING);
+            foreach ($paths as $path) {
+                if (isset($files[$path])) {
+                    continue;
+                }
+                $contents = @file_get_contents($path);
+                if (false !== $contents) {
+                    $files[$path] = $contents;
+                }
+            }
+        }
+
+        return $files;
+    }
+
+    /**
+     * @return array{int, int}
+     */
+    private function position(string $contents, int $offset): array
+    {
+        $before = substr($contents, 0, $offset);
+        $line = substr_count($before, "\n");
+        $lineStart = strrpos($before, "\n");
+        $lineText = false === $lineStart ? $before : substr($before, $lineStart + 1);
+
+        return [$line, intdiv(\strlen(mb_convert_encoding($lineText, 'UTF-16LE', 'UTF-8')), 2)];
+    }
+}

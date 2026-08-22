@@ -48,6 +48,9 @@ final class ConfigurationLoaderTest extends TestCase
         self::assertSame('composer', $configuration->setup);
         self::assertTrue($configuration->ci);
         self::assertSame(120, $configuration->indexTimeout);
+        self::assertSame(10, $configuration->requestTimeout);
+        self::assertSame(['src', 'templates', 'config'], $configuration->probeRoots);
+        self::assertSame(1, $configuration->probesPerCategory);
     }
 
     public function testLoadsFullConfiguration(): void
@@ -61,6 +64,9 @@ final class ConfigurationLoaderTest extends TestCase
             'setup' => 'composer',
             'ci' => false,
             'indexTimeout' => 300,
+            'requestTimeout' => 20,
+            'probeRoots' => ['project-base/src', 'project-base/templates'],
+            'probesPerCategory' => 3,
         ]);
 
         $configuration = (new ConfigurationLoader())->load([$this->directory], ['composer'])[0];
@@ -70,6 +76,9 @@ final class ConfigurationLoaderTest extends TestCase
         self::assertSame('test', $configuration->environment);
         self::assertFalse($configuration->ci);
         self::assertSame(300, $configuration->indexTimeout);
+        self::assertSame(20, $configuration->requestTimeout);
+        self::assertSame(['project-base/src', 'project-base/templates'], $configuration->probeRoots);
+        self::assertSame(3, $configuration->probesPerCategory);
     }
 
     public function testSortsProjectsByName(): void
@@ -153,6 +162,14 @@ final class ConfigurationLoaderTest extends TestCase
         yield 'string ci' => [['ci' => 'yes'], 'boolean "ci"'];
         yield 'zero index timeout' => [['indexTimeout' => 0], 'between 1 and 900'];
         yield 'huge index timeout' => [['indexTimeout' => 1000], 'between 1 and 900'];
+        yield 'zero request timeout' => [['requestTimeout' => 0], 'between 1 and 120'];
+        yield 'huge request timeout' => [['requestTimeout' => 600], 'between 1 and 120'];
+        yield 'empty probe roots' => [['probeRoots' => []], 'non-empty list of relative paths'];
+        yield 'absolute probe root' => [['probeRoots' => ['/srv']], 'non-empty list of relative paths'];
+        yield 'parent probe root' => [['probeRoots' => ['../other']], 'non-empty list of relative paths'];
+        yield 'comma probe root' => [['probeRoots' => ['src,templates']], 'non-empty list of relative paths'];
+        yield 'zero probes per category' => [['probesPerCategory' => 0], 'between 1 and 10'];
+        yield 'huge probes per category' => [['probesPerCategory' => 100], 'between 1 and 10'];
     }
 
     /**

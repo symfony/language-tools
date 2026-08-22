@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Report a bootstrap indexing stage when the application bridge cannot boot
+- Discover dogfood probes deterministically with configurable roots and limits
+- Validate protocol properties and classify dogfood failures by layer
 - Run the dogfooding matrix from disposable clones at pinned revisions
 - Honor the environment selected for a dogfooding run
 - Publish the VS Code extension on Open VSX

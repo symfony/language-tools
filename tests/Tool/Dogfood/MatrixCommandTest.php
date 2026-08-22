@@ -98,6 +98,41 @@ final class MatrixCommandTest extends TestCase
         self::assertStringContainsString('warm=runtime-index', $this->lines[0]);
     }
 
+    public function testReleasesTheCheckoutWhenTheHarnessTimesOut(): void
+    {
+        $provisioner = new FakeProvisioner($this->checkout);
+        $timedOut = new HarnessResult(-1, true, null, '', '');
+
+        $exitCode = $this->command($provisioner, new FakeHarness($timedOut, $timedOut))->run([$this->configuration()], $this->output);
+
+        self::assertSame(1, $exitCode);
+        self::assertSame(['acme'], $provisioner->released);
+        $report = $this->readReport();
+        self::assertSame(['timeout'], $report['cold']['layers'] ?? null);
+        self::assertSame(['timeout'], $report['warm']['layers'] ?? null);
+    }
+
+    public function testArtifactsExposeOnlyTheExpectedKeys(): void
+    {
+        $this->command(new FakeProvisioner($this->checkout), new FakeHarness($this->successfulRun(), $this->successfulRun()))->run([$this->configuration()], $this->output);
+
+        /** @var array<string, mixed> $report */
+        $report = json_decode((string) file_get_contents(Path::join($this->output, 'acme/project.json')), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertSame(
+            ['name', 'repository', 'revision', 'directory', 'environment', 'setup', 'ci', 'ok', 'failure', 'workingTree', 'dependencies', 'frameworkBundle', 'cold', 'warm'],
+            array_keys($report),
+        );
+        /** @var array<string, mixed> $cold */
+        $cold = $report['cold'];
+        self::assertSame(
+            ['layers', 'source', 'runtime', 'probes', 'requestErrors', 'violations', 'maxMilliseconds', 'serverVersion'],
+            array_keys($cold),
+        );
+        /** @var array<string, mixed> $summary */
+        $summary = json_decode((string) file_get_contents(Path::join($this->output, 'summary.json')), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertSame(['generatedAt', 'tools', 'projects', 'ok'], array_keys($summary));
+    }
+
     public function testReportsProvisioningFailures(): void
     {
         $provisioner = new FakeProvisioner($this->checkout, new ProvisioningException('Revision "b" does not exist.'));
@@ -182,12 +217,14 @@ final class MatrixCommandTest extends TestCase
     {
         $result = array_merge([
             'status' => ['source' => ['state' => 'ready'], 'runtime' => ['state' => 'ready']],
+            'terminal' => true,
             'serverVersion' => '0.15.0',
             'probeCount' => 2,
             'probes' => [
                 ['requests' => ['hover' => ['milliseconds' => 12.5, 'resultCount' => 1, 'error' => null]]],
                 ['requests' => ['definition' => ['milliseconds' => 3.1, 'resultCount' => 1, 'error' => null]]],
             ],
+            'violations' => [],
             'diagnostics' => [],
             'serverError' => null,
             'exitCode' => 0,

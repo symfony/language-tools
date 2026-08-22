@@ -13,6 +13,7 @@ final class RunSummary
         public readonly string $runtime,
         public readonly int $probes,
         public readonly int $requestErrors,
+        public readonly int $violations,
         public readonly float $maxMilliseconds,
         public readonly ?string $serverVersion,
     ) {
@@ -29,6 +30,7 @@ final class RunSummary
             'runtime' => $this->runtime,
             'probes' => $this->probes,
             'requestErrors' => $this->requestErrors,
+            'violations' => $this->violations,
             'maxMilliseconds' => $this->maxMilliseconds,
             'serverVersion' => $this->serverVersion,
         ];

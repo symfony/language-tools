@@ -31,7 +31,17 @@ final class RunClassifierTest extends TestCase
         yield 'server error output' => [self::harnessResult(['serverError' => 'warning']), ['process']];
         yield 'source index failed' => [self::harnessResult(['status' => self::indexStatus('failed', 'ready')]), ['source-index']];
         yield 'runtime index failed' => [self::harnessResult(['status' => self::indexStatus('ready', 'failed')]), ['runtime-index']];
-        yield 'missing status' => [self::harnessResult(['status' => null]), ['source-index', 'runtime-index']];
+        yield 'runtime index stale' => [self::harnessResult(['status' => self::indexStatus('ready', 'stale')]), ['runtime-index']];
+        yield 'bootstrap failed' => [
+            self::harnessResult(['status' => ['source' => ['state' => 'ready'], 'runtime' => ['state' => 'failed', 'stage' => 'bootstrap']]]),
+            ['bootstrap'],
+        ];
+        yield 'missing status' => [self::harnessResult(['status' => null]), ['timeout']];
+        yield 'nonterminal indexes' => [self::harnessResult(['status' => self::indexStatus('indexing', 'indexing')]), ['timeout']];
+        yield 'protocol violation' => [
+            self::harnessResult(['violations' => [['category' => 'route.twig', 'method' => 'rename', 'message' => 'Rename edits "vendor/a.twig".']]]),
+            ['request'],
+        ];
         yield 'request error' => [
             self::harnessResult(['probes' => [['requests' => ['hover' => ['error' => 'Internal error.']]]]]),
             ['request'],
@@ -63,7 +73,9 @@ final class RunClassifierTest extends TestCase
     {
         return array_merge([
             'status' => self::indexStatus('ready', 'ready'),
+            'terminal' => true,
             'probes' => [['requests' => ['hover' => ['error' => null]]]],
+            'violations' => [],
             'serverError' => null,
             'exitCode' => 0,
         ], $overrides);
