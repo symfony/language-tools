@@ -188,12 +188,26 @@ function findTwigCallableProbe(string $root, string $kind): ?array
     return null;
 }
 
-if ($argc < 3 || $argc > 4) {
-    fwrite(\STDERR, "Usage: dogfood-server <server> <project> [environment]\n");
+$environment = 'dev';
+$indexTimeout = 30.0;
+$positional = [];
+foreach (array_slice($argv, 1) as $argument) {
+    if (preg_match('/^--environment=(.+)$/', $argument, $matches)) {
+        $environment = $matches[1];
+    } elseif (preg_match('/^--index-timeout=(\d+)$/', $argument, $matches)) {
+        $indexTimeout = (float) $matches[1];
+    } elseif (str_starts_with($argument, '-')) {
+        fwrite(\STDERR, "Usage: dogfood-server [--environment=ENV] [--index-timeout=SECONDS] <server> <project>\n");
+        exit(2);
+    } else {
+        $positional[] = $argument;
+    }
+}
+if (2 !== count($positional)) {
+    fwrite(\STDERR, "Usage: dogfood-server [--environment=ENV] [--index-timeout=SECONDS] <server> <project>\n");
     exit(2);
 }
-
-[$script, $server, $project] = array_pad($argv, 4, 'dev');
+[$server, $project] = $positional;
 $project = realpath($project);
 if (false === $project) {
     throw new RuntimeException('Project does not exist.');
@@ -209,13 +223,13 @@ writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $id, 'method' => 'initializ
     'rootUri' => uri($project),
     'workspaceFolders' => [['uri' => uri($project), 'name' => basename($project)]],
     'capabilities' => new stdClass(),
-    'initializationOptions' => ['workspaceTrust' => true, 'runtimeIndexing' => true, 'environment' => $argv[4] ?? 'dev'],
+    'initializationOptions' => ['workspaceTrust' => true, 'runtimeIndexing' => true, 'environment' => $environment],
 ]]);
 $initialize = awaitResponse($pipes[0], $pipes[1], $id, 10.0, $notifications);
 writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []]);
 
 $status = null;
-$deadline = microtime(true) + 30.0;
+$deadline = microtime(true) + $indexTimeout;
 while (microtime(true) < $deadline) {
     ++$id;
     writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $id, 'method' => 'workspace/executeCommand', 'params' => ['command' => 'symfony.indexStatus']]);
@@ -337,7 +351,7 @@ foreach ($notifications as $notification) {
 
 echo json_encode([
     'project' => $project,
-    'environment' => $argv[4] ?? 'dev',
+    'environment' => $environment,
     'serverVersion' => $initialize['result']['serverInfo']['version'] ?? null,
     'status' => $status,
     'probeCount' => count($results),

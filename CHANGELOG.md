@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Honor the environment selected for a dogfooding run
 - Publish the VS Code extension on Open VSX
 - Serialize source index updates so saves survive concurrent full scans
 - Cancel indexing and release all project state when a workspace folder is removed
