@@ -12,11 +12,21 @@ use Symfony\Lsp\Feature\CodeLensProviderInterface;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
+use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Feature\RenameProviderInterface;
+use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
+use Symfony\Lsp\Index\ApplicationSourceScanner;
+use Symfony\Lsp\Index\PersistentSourceIndexStore;
+use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
+use Symfony\Lsp\Project\ProjectStateInterface;
+use Symfony\Lsp\Project\WorkspaceTrust;
+use Symfony\Lsp\Project\WorkspaceTrustManager;
+use Symfony\Lsp\Runtime\DebouncedRuntimeRefreshScheduler;
+use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
 
 final class ServiceConfigurationTest extends TestCase
@@ -37,13 +47,9 @@ final class ServiceConfigurationTest extends TestCase
 
     public function testRegistersEveryFeatureExtensionPoint(): void
     {
-        $root = \dirname(__DIR__, 2);
-        $container = new ContainerBuilder();
-        $container->setParameter('server.version', 'test');
-        $container->setParameter('bridge.source', $root.'/resources/bridge.php');
-        (new PhpFileLoader($container, new FileLocator($root.'/resources')))->load('services.php');
+        $container = $this->container();
 
-        $files = (new Finder())->files()->name('*.php')->in($root.'/src/Feature');
+        $files = (new Finder())->files()->name('*.php')->in(\dirname(__DIR__, 2).'/src/Feature');
         foreach ($files as $file) {
             $class = 'Symfony\\Lsp\\Feature\\'.str_replace(['/', '\\'], '\\', substr($file->getRelativePathname(), 0, -4));
             if (!class_exists($class)) {
@@ -56,5 +62,41 @@ final class ServiceConfigurationTest extends TestCase
                 }
             }
         }
+    }
+
+    public function testEveryProjectStateServiceIsReleasedOnProjectRemoval(): void
+    {
+        $container = $this->container();
+        $container->compile();
+        $tagged = array_keys($container->findTaggedServiceIds('lsp.project_state'));
+
+        foreach ([
+            ApplicationSourceScanner::class,
+            DebouncedRuntimeRefreshScheduler::class,
+            DiagnosticProviderRegistry::class,
+            PersistentSourceIndexStore::class,
+            ProjectIndexStatusRegistry::class,
+            RuntimeConfiguration::class,
+            TranslationConfigurationRegistry::class,
+            WorkspaceTrust::class,
+            WorkspaceTrustManager::class,
+        ] as $service) {
+            self::assertContains($service, $tagged, \sprintf('The project state holder "%s" is not released on project removal.', $service));
+        }
+
+        foreach ($tagged as $id) {
+            self::assertTrue(is_subclass_of($id, ProjectStateInterface::class), \sprintf('The tagged service "%s" does not implement the project state contract.', $id));
+        }
+    }
+
+    private function container(): ContainerBuilder
+    {
+        $root = \dirname(__DIR__, 2);
+        $container = new ContainerBuilder();
+        $container->setParameter('server.version', 'test');
+        $container->setParameter('bridge.source', $root.'/resources/bridge.php');
+        (new PhpFileLoader($container, new FileLocator($root.'/resources')))->load('services.php');
+
+        return $container;
     }
 }
