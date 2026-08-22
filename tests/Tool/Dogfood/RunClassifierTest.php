@@ -7,8 +7,6 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Tools\Dogfood\HarnessResult;
 use Symfony\Lsp\Tools\Dogfood\RunClassifier;
 
-require_once \dirname(__DIR__, 3).'/tools/dogfood/autoload.php';
-
 final class RunClassifierTest extends TestCase
 {
     /**

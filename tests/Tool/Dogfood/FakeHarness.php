@@ -6,8 +6,6 @@ use Symfony\Lsp\Tools\Dogfood\HarnessInterface;
 use Symfony\Lsp\Tools\Dogfood\HarnessResult;
 use Symfony\Lsp\Tools\Dogfood\ProjectConfiguration;
 
-require_once \dirname(__DIR__, 3).'/tools/dogfood/autoload.php';
-
 final class FakeHarness implements HarnessInterface
 {
     /** @var list<string> */

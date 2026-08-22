@@ -29,7 +29,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Symfony\\Lsp\\Tests\\": "tests/"
+            "Symfony\\Lsp\\Tests\\": "tests/",
+            "Symfony\\Lsp\\Tools\\Dogfood\\": "tools/dogfood/"
         }
     },
     "bin": [

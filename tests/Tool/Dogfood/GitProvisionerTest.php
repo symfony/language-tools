@@ -10,8 +10,6 @@ use Symfony\Lsp\Tools\Dogfood\NativeProcessRunner;
 use Symfony\Lsp\Tools\Dogfood\ProjectConfiguration;
 use Symfony\Lsp\Tools\Dogfood\ProvisioningException;
 
-require_once \dirname(__DIR__, 3).'/tools/dogfood/autoload.php';
-
 final class GitProvisionerTest extends TestCase
 {
     private string $directory;

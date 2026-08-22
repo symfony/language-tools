@@ -9,8 +9,6 @@ use Symfony\Lsp\Tools\Dogfood\ComposerSetup;
 use Symfony\Lsp\Tools\Dogfood\ProcessResult;
 use Symfony\Lsp\Tools\Dogfood\SetupException;
 
-require_once \dirname(__DIR__, 3).'/tools/dogfood/autoload.php';
-
 final class ComposerSetupTest extends TestCase
 {
     private string $directory;

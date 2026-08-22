@@ -6,8 +6,6 @@ use Symfony\Lsp\Tools\Dogfood\ProjectConfiguration;
 use Symfony\Lsp\Tools\Dogfood\ProvisionerInterface;
 use Symfony\Lsp\Tools\Dogfood\ProvisioningException;
 
-require_once \dirname(__DIR__, 3).'/tools/dogfood/autoload.php';
-
 final class FakeProvisioner implements ProvisionerInterface
 {
     /** @var list<string> */

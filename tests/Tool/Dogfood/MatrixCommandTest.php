@@ -14,8 +14,6 @@ use Symfony\Lsp\Tools\Dogfood\ProvisioningException;
 use Symfony\Lsp\Tools\Dogfood\RunClassifier;
 use Symfony\Lsp\Tools\Dogfood\SetupRegistry;
 
-require_once \dirname(__DIR__, 3).'/tools/dogfood/autoload.php';
-
 final class MatrixCommandTest extends TestCase
 {
     private string $directory;

@@ -9,8 +9,6 @@ use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Tools\Dogfood\ConfigurationException;
 use Symfony\Lsp\Tools\Dogfood\ConfigurationLoader;
 
-require_once \dirname(__DIR__, 3).'/tools/dogfood/autoload.php';
-
 final class ConfigurationLoaderTest extends TestCase
 {
     private const REVISION = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
