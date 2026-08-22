@@ -22,4 +22,17 @@ final class ProjectIndexStatusRegistryTest extends TestCase
             'runtime' => ['state' => 'failed', 'error' => 'Runtime indexing failed.'],
         ], $statuses->status($project));
     }
+
+    public function testExposesTheBootstrapFailureStage(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $statuses = new ProjectIndexStatusRegistry();
+
+        $statuses->runtimeFailed($project, 'bootstrap');
+
+        self::assertSame(
+            ['state' => 'failed', 'error' => 'The application failed to boot.', 'stage' => 'bootstrap'],
+            $statuses->status($project)['runtime'],
+        );
+    }
 }

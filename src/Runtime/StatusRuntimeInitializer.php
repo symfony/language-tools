@@ -32,7 +32,7 @@ final class StatusRuntimeInitializer implements RuntimeInitializerInterface
             throw $error;
         } catch (\Throwable $error) {
             if ($this->projects->contains($project)) {
-                $this->statuses->runtimeFailed($project);
+                $this->statuses->runtimeFailed($project, $error instanceof BridgeExecutionException ? 'bootstrap' : null);
             }
 
             throw $error;

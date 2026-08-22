@@ -47,7 +47,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         }
 
         if (0 !== $result->exitCode()) {
-            throw new \RuntimeException(\sprintf('The project bridge failed with status %d.', $result->exitCode()));
+            throw new BridgeExecutionException(\sprintf('The project bridge failed with status %d.', $result->exitCode()));
         }
 
         $snapshot = $this->decodeSnapshot($result);

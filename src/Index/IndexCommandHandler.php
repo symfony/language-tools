@@ -31,7 +31,7 @@ final class IndexCommandHandler
     /**
      * @param array<array-key, mixed> $params
      *
-     * @return list<array{root: string, environment: string, runtimeEnabled: bool, trusted: bool, source: array{state: string, error?: string}, runtime: array{state: string, error?: string}}>|null
+     * @return list<array{root: string, environment: string, runtimeEnabled: bool, trusted: bool, source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string}}>|null
      */
     public function execute(array $params, ?Cancellation $cancellation = null): ?array
     {

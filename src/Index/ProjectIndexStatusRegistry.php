@@ -7,7 +7,7 @@ use Symfony\Lsp\Project\ProjectStateInterface;
 
 final class ProjectIndexStatusRegistry implements ProjectStateInterface
 {
-    /** @var array<string, array{source: array{state: string, error?: string}, runtime: array{state: string, error?: string}}> */
+    /** @var array<string, array{source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string}}> */
     private array $statuses = [];
 
     /** @var array<string, true> */
@@ -44,10 +44,14 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
         $this->section($project, 'runtime', 'stale');
     }
 
-    public function runtimeFailed(Project $project): void
+    /**
+     * @param 'bootstrap'|null $stage
+     */
+    public function runtimeFailed(Project $project, ?string $stage = null): void
     {
         $state = isset($this->hasRuntimeSnapshot[$project->rootPath()]) ? 'stale' : 'failed';
-        $this->section($project, 'runtime', $state, 'Runtime indexing failed.');
+        $error = 'bootstrap' === $stage ? 'The application failed to boot.' : 'Runtime indexing failed.';
+        $this->section($project, 'runtime', $state, $error, $stage);
     }
 
     public function removeProject(Project $project): void
@@ -56,7 +60,7 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
     }
 
     /**
-     * @return array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string}}
+     * @return array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string}}
      */
     public function status(Project $project): array
     {
@@ -71,13 +75,16 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
     /**
      * @param 'source'|'runtime' $section
      */
-    private function section(Project $project, string $section, string $state, ?string $error = null): void
+    private function section(Project $project, string $section, string $state, ?string $error = null, ?string $stage = null): void
     {
         $status = $this->status($project);
         unset($status['root']);
         $status[$section] = ['state' => $state];
         if (null !== $error && '' !== $error) {
             $status[$section]['error'] = $error;
+        }
+        if (null !== $stage) {
+            $status[$section]['stage'] = $stage;
         }
 
         $this->statuses[$project->rootPath()] = $status;

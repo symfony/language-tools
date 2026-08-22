@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Report a bootstrap indexing stage when the application bridge cannot boot
 - Run the dogfooding matrix from disposable clones at pinned revisions
 - Honor the environment selected for a dogfooding run
 - Publish the VS Code extension on Open VSX
