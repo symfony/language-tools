@@ -59,7 +59,27 @@ final class BridgeCompatibilityTest extends TestCase
         self::assertSame(['fixture_localized', 'fixture_localized'], array_column($localizedRoutes, 'canonical'));
         self::assertContains('App\\Environment\\CustomEnvVarProcessor', array_column(\is_array($container['items'] ?? null) ? $container['items'] : [], 'class'));
         self::assertContains('fixture.message', array_column(\is_array($translations['items'] ?? null) ? $translations['items'] : [], 'key'));
-        self::assertContains('framework', array_column(\is_array($configuration['bundles'] ?? null) ? $configuration['bundles'] : [], 'alias'));
+        $configurationBundles = \is_array($configuration['bundles'] ?? null) ? $configuration['bundles'] : [];
+        self::assertContains('framework', array_column($configurationBundles, 'alias'));
+        $shorthandTrees = array_values(array_filter($configurationBundles, static fn (mixed $bundle): bool => \is_array($bundle) && 'fixture_shorthand' === ($bundle['alias'] ?? null)));
+        self::assertCount(1, $shorthandTrees);
+        $shorthandTree = $shorthandTrees[0]['tree'] ?? null;
+        self::assertIsArray($shorthandTree);
+        $shorthandChildren = [];
+        foreach (\is_array($shorthandTree['children'] ?? null) ? $shorthandTree['children'] : [] as $child) {
+            if (\is_array($child) && \is_string($child['name'] ?? null)) {
+                $shorthandChildren[$child['name']] = $child;
+            }
+        }
+        // shorthand keys relocated into the pools prototype must be merged as regular children
+        $storageNames = array_column(\is_array($shorthandChildren['storage']['children'] ?? null) ? $shorthandChildren['storage']['children'] : [], 'name');
+        foreach (['default_pool', 'pools', 'dsn', 'size', 'mode'] as $expectedChild) {
+            self::assertContains($expectedChild, $storageNames);
+        }
+        self::assertSame(
+            ['null' => true, 'true' => true, 'false' => true, 'scalar' => false, 'unknownKeys' => false],
+            $shorthandChildren['feature']['accepts'] ?? null,
+        );
         $configurationResources = $configuration['resources'] ?? null;
         self::assertIsArray($configurationResources);
         self::assertContains(realpath($project.'/config/services.yaml'), $configurationResources);

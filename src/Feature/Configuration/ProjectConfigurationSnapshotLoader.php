@@ -49,6 +49,12 @@ final class ProjectConfigurationSnapshotLoader implements RuntimeSnapshotLoaderI
                 $allowed[] = $value;
             }
         }
+        $accepts = [];
+        foreach (\is_array($data['accepts'] ?? null) ? $data['accepts'] : [] as $kind => $accepted) {
+            if (\is_string($kind) && \is_bool($accepted)) {
+                $accepts[$kind] = $accepted;
+            }
+        }
 
         return new ConfigurationNode(
             \is_string($data['name'] ?? null) ? $data['name'] : '',
@@ -62,6 +68,7 @@ final class ProjectConfigurationSnapshotLoader implements RuntimeSnapshotLoaderI
             $allowed,
             $children,
             $prototype,
+            $accepts,
         );
     }
 }

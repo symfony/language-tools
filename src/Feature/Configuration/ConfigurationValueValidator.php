@@ -34,6 +34,9 @@ final class ConfigurationValueValidator
         }
         $expected = 'integer' === $expected ? 'int' : $expected;
         $actualTypes = preg_split('/[|&]/', str_replace(['?', '"'], '', $actual), -1, \PREG_SPLIT_NO_EMPTY) ?: [];
+        if ('array' === $expected && $node->acceptsScalar() && [] !== array_diff($actualTypes, ['array'])) {
+            return true;
+        }
 
         return \in_array($expected, $actualTypes, true) || ('float' === $expected && \in_array('int', $actualTypes, true));
     }
@@ -42,6 +45,9 @@ final class ConfigurationValueValidator
     {
         $plain = trim($value, " \t\"'");
         if (str_contains($plain, '%') || str_starts_with($plain, '$')) {
+            return true;
+        }
+        if (\in_array(strtolower($plain), ['~', 'null'], true) && $node->acceptsNull()) {
             return true;
         }
         if ([] !== $node->allowedValues()) {
@@ -61,8 +67,26 @@ final class ConfigurationValueValidator
             'boolean' => \in_array(strtolower($plain), ['true', 'false', 'yes', 'no', '0', '1'], true),
             'integer' => 1 === preg_match('/^-?\d+$/', $plain),
             'float' => is_numeric($plain),
-            'array' => '' === $plain || str_starts_with($plain, '[') || str_starts_with($plain, '{'),
+            'array' => $this->acceptsArrayValue($node, $plain),
             default => true,
+        };
+    }
+
+    /**
+     * Array nodes commonly normalize scalars, such as null and true enabling a
+     * feature or a string expanding to a shorthand structure.
+     */
+    private function acceptsArrayValue(ConfigurationNode $node, string $plain): bool
+    {
+        if ('' === $plain || str_starts_with($plain, '[') || str_starts_with($plain, '{')) {
+            return true;
+        }
+
+        return match (strtolower($plain)) {
+            '~', 'null' => $node->acceptsNull(),
+            'true', 'yes' => $node->acceptsTrue(),
+            'false', 'no' => $node->acceptsFalse(),
+            default => $node->acceptsScalar(),
         };
     }
 }

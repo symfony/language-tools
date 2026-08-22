@@ -49,6 +49,38 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame(['config.invalid_type', 'config.deprecated_key', 'config.invalid_type', 'config.unknown_key', 'config.duplicate_key'], array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
     }
 
+    public function testAcceptsNormalizedShorthandValuesAndUnverifiableKeys(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = "framework:\n    assets: ~\n    loose:\n        anything: 1\n        known: true\n    dispatch:\n        App\\Message\\OrderPlaced: async\n";
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
+    public function testSkipsDiagnosticsOutsideTheApplicationConfiguration(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/src/AcmeBundle/test/app/config/config.yml';
+        $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    mystery: true\n"));
+
+        self::assertNull($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
+    public function testStillRejectsScalarsForStrictArrayNodesAndUnknownKeys(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = "framework:\n    router: maybe\n    assets: some-string\n    mystery: true\n";
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        self::assertSame(
+            ['config.invalid_type', 'config.invalid_type', 'config.unknown_key'],
+            array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'),
+        );
+    }
+
     public function testDoesNotTreatDependencyInjectionSectionsAsBundleConfiguration(): void
     {
         $fixture = $this->providers();
@@ -165,6 +197,15 @@ final class ConfigurationProviderTest extends TestCase
                     $this->node('items', 'array', prototype: $this->node('item', 'array', children: [
                         $this->node('name', 'boolean'),
                     ])),
+                    $this->node('assets', 'array', accepts: ['null' => true, 'true' => true, 'false' => true, 'scalar' => false, 'unknownKeys' => false], children: [
+                        $this->node('enabled', 'boolean'),
+                    ]),
+                    $this->node('loose', 'array', accepts: ['unknownKeys' => true], children: [
+                        $this->node('known', 'boolean'),
+                    ]),
+                    $this->node('dispatch', 'array', prototype: $this->node('sender', 'array', accepts: ['scalar' => true], children: [
+                        $this->node('senders', 'array'),
+                    ])),
                 ]),
             ],
             [
@@ -191,12 +232,13 @@ final class ConfigurationProviderTest extends TestCase
      * @param array<array-key, array<array-key, mixed>> $children
      * @param list<string>                              $allowedValues
      * @param array<array-key, mixed>|null              $prototype
+     * @param array<string, bool>                       $accepts
      *
      * @return array<array-key, mixed>
      */
-    private function node(string $name, string $type, array $children = [], ?string $info = null, bool $deprecated = false, array $allowedValues = [], bool $required = false, ?array $prototype = null): array
+    private function node(string $name, string $type, array $children = [], ?string $info = null, bool $deprecated = false, array $allowedValues = [], bool $required = false, ?array $prototype = null, array $accepts = []): array
     {
-        return ['name' => $name, 'type' => $type, 'required' => $required, 'hasDefault' => false, 'defaultSummary' => null, 'info' => $info, 'example' => null, 'deprecated' => $deprecated, 'allowedValues' => $allowedValues, 'children' => $children, 'prototype' => $prototype];
+        return ['name' => $name, 'type' => $type, 'required' => $required, 'hasDefault' => false, 'defaultSummary' => null, 'info' => $info, 'example' => null, 'deprecated' => $deprecated, 'allowedValues' => $allowedValues, 'children' => $children, 'prototype' => $prototype, 'accepts' => $accepts];
     }
 }
 

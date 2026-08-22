@@ -22,6 +22,25 @@ final class ConfigurationValueValidatorTest extends TestCase
         self::assertTrue($validator->acceptsValue($this->node('integer'), '$port'));
     }
 
+    public function testHonorsProbedArrayNormalization(): void
+    {
+        $validator = new ConfigurationValueValidator(new EnvironmentIndexRegistry());
+        $strict = $this->node('array');
+        $enableable = $this->node('array', accepts: ['null' => true, 'true' => true, 'false' => true]);
+        $shorthand = $this->node('array', accepts: ['scalar' => true]);
+
+        self::assertFalse($validator->acceptsValue($strict, '~'));
+        self::assertFalse($validator->acceptsValue($strict, 'true'));
+        self::assertFalse($validator->acceptsValue($strict, 'async'));
+        self::assertTrue($validator->acceptsValue($strict, '{ enabled: true }'));
+        self::assertTrue($validator->acceptsValue($enableable, '~'));
+        self::assertTrue($validator->acceptsValue($enableable, 'true'));
+        self::assertFalse($validator->acceptsValue($enableable, 'async'));
+        self::assertTrue($validator->acceptsValue($shorthand, 'async'));
+        self::assertTrue($validator->acceptsType($shorthand, 'string'));
+        self::assertFalse($validator->acceptsType($strict, 'string'));
+    }
+
     public function testResolvesAndChecksEnvironmentProcessorTypes(): void
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
@@ -36,9 +55,12 @@ final class ConfigurationValueValidatorTest extends TestCase
         self::assertFalse($validator->acceptsType($this->node('boolean'), 'array'));
     }
 
-    /** @param list<string|int|float|bool|null> $allowedValues */
-    private function node(string $type, array $allowedValues = []): ConfigurationNode
+    /**
+     * @param list<string|int|float|bool|null> $allowedValues
+     * @param array<string, bool>              $accepts
+     */
+    private function node(string $type, array $allowedValues = [], array $accepts = []): ConfigurationNode
     {
-        return new ConfigurationNode('option', $type, false, false, null, null, null, false, $allowedValues, [], null);
+        return new ConfigurationNode('option', $type, false, false, null, null, null, false, $allowedValues, [], null, $accepts);
     }
 }

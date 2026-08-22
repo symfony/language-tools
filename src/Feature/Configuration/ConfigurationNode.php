@@ -7,6 +7,7 @@ final class ConfigurationNode
     /**
      * @param list<ConfigurationNode>          $children
      * @param list<string|int|float|bool|null> $allowedValues
+     * @param array<string, bool>              $accepts       normalized value kinds probed on the real tree
      */
     public function __construct(
         private readonly string $name,
@@ -20,7 +21,33 @@ final class ConfigurationNode
         private readonly array $allowedValues,
         private readonly array $children,
         private readonly ?self $prototype,
+        private readonly array $accepts = [],
     ) {
+    }
+
+    public function acceptsNull(): bool
+    {
+        return true === ($this->accepts['null'] ?? false);
+    }
+
+    public function acceptsTrue(): bool
+    {
+        return true === ($this->accepts['true'] ?? false);
+    }
+
+    public function acceptsFalse(): bool
+    {
+        return true === ($this->accepts['false'] ?? false);
+    }
+
+    public function acceptsScalar(): bool
+    {
+        return true === ($this->accepts['scalar'] ?? false);
+    }
+
+    public function acceptsUnknownKeys(): bool
+    {
+        return true === ($this->accepts['unknownKeys'] ?? false);
     }
 
     public function name(): string

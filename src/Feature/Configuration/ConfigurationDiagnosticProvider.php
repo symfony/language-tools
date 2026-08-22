@@ -28,6 +28,11 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
         if (null === $request || !\in_array($request->document->languageId(), ['php', 'xml', 'yaml'], true)) {
             return null;
         }
+        // bundle-internal fixtures target other kernels, so only the
+        // application's own configuration is validated against its trees
+        if (!str_starts_with($request->document->uri(), $request->project->rootUri().'/config/')) {
+            return null;
+        }
         $index = $this->indexes->forProject($request->project);
         if ('php' === $request->document->languageId()) {
             return $this->diagnosePhp($request->document, $index);
@@ -52,7 +57,9 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
             $seen[$identity] = true;
             $node = $index->find($path);
             if (null === $node) {
-                $diagnostics[] = $this->diagnostic($occurrence->keyRange(), 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', $key));
+                if (!$index->allowsUnknownKeys($path)) {
+                    $diagnostics[] = $this->diagnostic($occurrence->keyRange(), 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', $key));
+                }
                 continue;
             }
             if ($node->deprecated()) {
@@ -109,7 +116,9 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
                 $offset = $chain[2][1] + $method[1][1];
                 $range = $this->offsetRange($document->text(), $offset, \strlen($method[1][0]));
                 if (null === $node) {
-                    $diagnostics[] = $this->diagnostic($range, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', implode('.', $path)));
+                    if (!$index->allowsUnknownKeys($path)) {
+                        $diagnostics[] = $this->diagnostic($range, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', implode('.', $path)));
+                    }
                     break;
                 }
                 if ($node->deprecated()) {
@@ -154,7 +163,9 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
             $node = $index->find($path);
             $nameRange = $this->offsetRange($document->text(), $tag[2][1], \strlen($name));
             if (null === $node) {
-                $diagnostics[] = $this->diagnostic($nameRange, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', implode('.', $path)));
+                if (!$index->allowsUnknownKeys($path)) {
+                    $diagnostics[] = $this->diagnostic($nameRange, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', implode('.', $path)));
+                }
             } elseif ($node->deprecated()) {
                 $diagnostics[] = $this->diagnostic($nameRange, 2, 'config.deprecated_key', \sprintf('Configuration key "%s" is deprecated.', implode('.', $path)));
             }
@@ -166,7 +177,9 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
                     $attributePath = [...$path, $attributeName];
                     $range = $this->offsetRange($document->text(), $tag[3][1] + $attribute[1][1], \strlen($attribute[1][0]));
                     if (null === $child) {
-                        $diagnostics[] = $this->diagnostic($range, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', implode('.', $attributePath)));
+                        if (!$index->allowsUnknownKeys($attributePath)) {
+                            $diagnostics[] = $this->diagnostic($range, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', implode('.', $attributePath)));
+                        }
                     } elseif (!$this->values->acceptsValue($child, $attribute[3][0])) {
                         $diagnostics[] = $this->diagnostic($range, 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $child->type(), implode('.', $attributePath)));
                     }

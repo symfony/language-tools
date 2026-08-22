@@ -20,6 +20,31 @@ final class ConfigurationIndex
         return $this->roots;
     }
 
+    /**
+     * Whether a node along the path tolerates keys outside its schema, which
+     * makes descendant keys unverifiable.
+     *
+     * @param list<string> $path
+     */
+    public function allowsUnknownKeys(array $path): bool
+    {
+        if ([] === $path) {
+            return false;
+        }
+        $node = $this->roots[array_shift($path)] ?? null;
+        while (null !== $node) {
+            if ($node->acceptsUnknownKeys()) {
+                return true;
+            }
+            if ([] === $path) {
+                return false;
+            }
+            $node = $node->child(array_shift($path));
+        }
+
+        return false;
+    }
+
     /** @param list<string> $path */
     public function find(array $path): ?ConfigurationNode
     {
