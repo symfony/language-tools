@@ -1,0 +1,115 @@
+name: Public dogfooding
+
+on:
+    pull_request:
+        paths:
+            - .github/workflows/dogfood.yaml
+            - bin/**
+            - composer.json
+            - composer.lock
+            - ext/**
+            - resources/**
+            - src/**
+            - tools/build-tree-sitter-extension
+            - tools/dogfood-matrix
+            - tools/dogfood-server
+            - tools/dogfood/**
+            - tools/php-with-tree-sitter
+    push:
+        branches: [main]
+        paths:
+            - .github/workflows/dogfood.yaml
+            - bin/**
+            - composer.json
+            - composer.lock
+            - ext/**
+            - resources/**
+            - src/**
+            - tools/build-tree-sitter-extension
+            - tools/dogfood-matrix
+            - tools/dogfood-server
+            - tools/dogfood/**
+            - tools/php-with-tree-sitter
+    workflow_dispatch:
+        inputs:
+            project:
+                description: Run a single project instead of the full matrix
+                required: false
+                default: ''
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+    contents: read
+
+jobs:
+    dogfood:
+        runs-on: ubuntu-latest
+        timeout-minutes: 45
+        env:
+            DOGFOOD_SELECTED: ${{ github.event_name != 'workflow_dispatch' || inputs.project == '' || inputs.project == matrix.project }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - project: kimai
+                    - project: mautic
+                    - project: sulu-demo
+                    - project: symfony-demo
+                    - project: sylius
+                      mysql: true
+                      environment: |
+                          DATABASE_URL=mysql://root:root@127.0.0.1:3306/dogfood
+                    - project: shopware
+                      environment: |
+                          DATABASE_URL=mysql://shopware:shopware@127.0.0.1:9/shopware
+                          COMPOSER_PLUGIN_LOADER=1
+                          APP_SECRET=dogfood-not-a-secret
+        name: ${{ matrix.project }}
+        steps:
+            - uses: actions/checkout@v7
+            - uses: shivammathur/setup-php@v2
+              if: env.DOGFOOD_SELECTED == 'true'
+              with:
+                  php-version: '8.4'
+                  extensions: bcmath, gd, intl, pdo_mysql, soap, sodium, zip
+                  coverage: none
+            - uses: ramsey/composer-install@v4
+              if: env.DOGFOOD_SELECTED == 'true'
+            - uses: actions/cache@v6
+              if: env.DOGFOOD_SELECTED == 'true'
+              with:
+                  path: |
+                      ~/.cache/composer
+                      var/dogfood/mirrors
+                  key: dogfood-${{ matrix.project }}-${{ hashFiles('tools/dogfood/projects/*') }}
+                  restore-keys: |
+                      dogfood-${{ matrix.project }}-
+            - name: Build the Tree-sitter extension
+              if: env.DOGFOOD_SELECTED == 'true'
+              run: composer tree-sitter:build
+            - name: Start MySQL
+              if: env.DOGFOOD_SELECTED == 'true' && matrix.mysql
+              run: |
+                  docker run -d --name dogfood-mysql \
+                      -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=dogfood \
+                      -p 127.0.0.1:3306:3306 mysql:8.0
+                  for attempt in $(seq 1 60); do
+                      docker exec dogfood-mysql mysqladmin -uroot -proot ping >/dev/null 2>&1 && exit 0
+                      sleep 2
+                  done
+                  exit 1
+            - name: Configure the project environment
+              if: env.DOGFOOD_SELECTED == 'true' && matrix.environment
+              run: echo "${{ matrix.environment }}" >> "$GITHUB_ENV"
+            - name: Run the project through the matrix
+              if: env.DOGFOOD_SELECTED == 'true'
+              run: ./tools/dogfood-matrix ${{ matrix.project }}
+            - uses: actions/upload-artifact@v7
+              if: always() && env.DOGFOOD_SELECTED == 'true'
+              with:
+                  name: dogfood-${{ matrix.project }}
+                  path: var/dogfood/matrix
+                  if-no-files-found: ignore
