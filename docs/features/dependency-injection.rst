@@ -18,7 +18,8 @@ Symfony Language Tools recognizes these YAML declarations and references:
 
 XML service definitions using the ``dic/services`` schema are recognized
 too: service, alias and parameter declarations, ``decorates`` targets,
-tags, and service and parameter references in arguments.
+tags, and service and parameter references in arguments. Completion is
+only available in YAML and PHP files.
 
 ``%parameter%`` references are also recognized outside the ``parameters``
 and ``services`` sections in configuration files, such as
@@ -84,9 +85,10 @@ Parameter values are never displayed.
 Definition
 ----------
 
-Definition requests navigate to application-owned YAML service or parameter
-declarations. Service results can also include alias declarations, decorators
-and the application PHP class associated with the service.
+Definition requests navigate to application-owned YAML or XML service or
+parameter declarations. Service results can also include alias
+declarations, decorators and the application PHP class associated with the
+service.
 
 References and Rename
 ---------------------
@@ -95,8 +97,9 @@ Reference requests include YAML service and parameter references and recognized
 PHP ``#[Autowire]`` attributes. Declarations can be included when requested by
 the Language Server Protocol client.
 
-Rename is available only when an application-owned YAML declaration exists. It
-updates that declaration and all statically recognized application references.
+Rename is available only when an application-owned YAML or XML declaration
+exists. It updates that declaration and all statically recognized
+application references.
 The edit requires confirmation because dynamic references may remain unchanged.
 A rename to an existing service or parameter name is rejected.
 

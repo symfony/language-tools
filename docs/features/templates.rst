@@ -69,7 +69,8 @@ Diagnostics
 A missing static template name is reported after the configured filesystem
 loader paths have been indexed. Dynamic template expressions are ignored.
 Files owned by dependencies, such as bundle templates under ``vendor/``, are
-never diagnosed.
+never diagnosed. A quick fix creates missing application templates under
+the ``templates/`` directory; namespaced ``@Bundle`` names are excluded.
 
 Limitations
 -----------

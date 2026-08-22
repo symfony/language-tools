@@ -103,7 +103,8 @@ A statically known route name that doesn't exist in the effective route
 collection is reported as an error. A route call with a complete literal
 parameter map also reports required path or host parameters that are missing.
 Parameters with route defaults are optional, while dynamic parameter maps aren't
-diagnosed.
+diagnosed. A quick fix adds the missing parameters to the literal parameter
+map.
 
 Diagnostics are limited to open PHP and Twig files and high-confidence Symfony
 contexts. They update while typing and are cleared when the file closes.

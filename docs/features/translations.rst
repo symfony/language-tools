@@ -49,6 +49,9 @@ Enable missing-key diagnostics in a project or workspace-folder setting:
         "symfonyLsp.translationDiagnostics": true
     }
 
+A quick fix on a missing-key diagnostic adds the key to an existing YAML
+catalog for the selected domain under ``translations/``.
+
 The setting is resource-scoped, so each folder in a multi-root workspace can
 choose independently. Runtime catalogue messages aren't written to logs or
 telemetry.
