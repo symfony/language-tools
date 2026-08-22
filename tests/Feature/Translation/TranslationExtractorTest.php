@@ -125,6 +125,19 @@ final class TranslationExtractorTest extends TestCase
         return new TranslationExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new QuotedArgumentMatcher($converter), new PhpCommentParser());
     }
 
+    public function testMeasuresTwigRangesCorrectlyAfterMultibyteComments(): void
+    {
+        $text = "{# vérifié #} {{ trans('greeting') }}";
+        $facts = $this->extractor()->extract('file:///workspace/templates/page.html.twig', 'twig', $text);
+
+        self::assertCount(1, $facts->references());
+        $start = $facts->references()[0]->range()->start();
+        self::assertSame(
+            (new PositionConverter())->toPosition($text, (int) strpos($text, 'greeting'))->character(),
+            $start->character(),
+        );
+    }
+
     public function testIgnoresTranslationCallsInPhpComments(): void
     {
         $facts = $this->extractor()->extract('file:///workspace/src/Controller.php', 'php', <<<'PHP'

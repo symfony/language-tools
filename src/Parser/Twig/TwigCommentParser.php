@@ -2,6 +2,14 @@
 
 namespace Symfony\Lsp\Parser\Twig;
 
+/**
+ * Blanks Twig comments and verbatim content while preserving byte offsets
+ * and UTF-16 positions.
+ *
+ * Only ASCII bytes are replaced with spaces: multibyte sequences keep their
+ * byte length and UTF-16 unit count, so positions measured on the masked
+ * text always match the original document.
+ */
 final class TwigCommentParser
 {
     public function mask(string $source): string
@@ -151,7 +159,8 @@ final class TwigCommentParser
     private function maskRange(string &$masked, string $source, int $start, int $end): void
     {
         for ($offset = $start; $offset < $end; ++$offset) {
-            if ("\r" !== $source[$offset] && "\n" !== $source[$offset]) {
+            $byte = $source[$offset];
+            if ("\r" !== $byte && "\n" !== $byte && \ord($byte) < 0x80) {
                 $masked[$offset] = ' ';
             }
         }

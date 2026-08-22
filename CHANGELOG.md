@@ -9,6 +9,7 @@
 - Recognize escaped quotes in route, template, asset, translation and component literals
 - Ignore route, template, translation, component, environment and importmap references in PHP comments
 - Stop offering completions inside PHP comments
+- Fix range drift after Twig comments containing multibyte characters
 
 ## 0.15.0 (2026-08-21)
 
