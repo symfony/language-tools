@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 
@@ -13,6 +14,7 @@ final class TwigComponentExtractor
         private readonly PositionConverter $converter,
         private readonly TemplateNameResolver $templateNameResolver,
         private readonly TwigCommentParser $commentParser,
+        private readonly QuotedArgumentMatcher $matcher,
     ) {
     }
 
@@ -76,9 +78,8 @@ final class TwigComponentExtractor
                     array_values($actions),
                 );
                 if ($live) {
-                    preg_match_all('/(?:->|\b)emit\s*\(\s*([\'"])([^\'"]+)\1/', $text, $emitMatches, \PREG_OFFSET_CAPTURE);
-                    foreach ($emitMatches[2] as [$event, $eventOffset]) {
-                        $events[] = new LiveComponentEvent($event, $uri, $this->range($text, $eventOffset, \strlen($event)), false, $name);
+                    foreach ($this->matcher->functionCalls($text, ['emit']) as $emit) {
+                        $events[] = new LiveComponentEvent($emit->value, $uri, $emit->range, false, $name);
                     }
                 }
             }
@@ -94,9 +95,8 @@ final class TwigComponentExtractor
                     $references[] = new TwigComponentReference($componentName, $uri, $this->range($text, $offset, \strlen($componentName)));
                 }
             }
-            preg_match_all('/\bcomponent\s*\(\s*([\'"])([^\'"]+)\1/', $text, $functions, \PREG_OFFSET_CAPTURE);
-            foreach ($functions[2] as [$componentName, $offset]) {
-                $references[] = new TwigComponentReference($componentName, $uri, $this->range($text, $offset, \strlen($componentName)));
+            foreach ($this->matcher->functionCalls($text, ['component']) as $function) {
+                $references[] = new TwigComponentReference($function->value, $uri, $function->range);
             }
             if (null === $name) {
                 preg_match_all('/<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\b([^>]*)>/s', $text, $componentTags, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
@@ -117,10 +117,9 @@ final class TwigComponentExtractor
                     $offset = $actionOffset + (int) strrpos($actionValue, $action);
                     $actionReferences[] = new TwigComponentActionReference($name, $action, $uri, $this->range($text, $offset, \strlen($action)));
                 }
-                preg_match_all('/\blive_action\s*\(\s*([\'"])([^\'"]+)\1/', $text, $liveActions, \PREG_OFFSET_CAPTURE);
-                foreach ($liveActions[2] as [$actionValue, $actionOffset]) {
-                    $action = $this->liveActionName($actionValue);
-                    $offset = $actionOffset + (int) strrpos($actionValue, $action);
+                foreach ($this->matcher->functionCalls($text, ['live_action']) as $liveAction) {
+                    $action = $this->liveActionName($liveAction->value);
+                    $offset = $liveAction->offset + (int) strrpos($liveAction->value, $action);
                     $actionReferences[] = new TwigComponentActionReference($name, $action, $uri, $this->range($text, $offset, \strlen($action)));
                 }
             }

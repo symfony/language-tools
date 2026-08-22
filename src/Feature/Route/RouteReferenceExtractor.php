@@ -3,10 +3,10 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 
 final class RouteReferenceExtractor
 {
@@ -20,6 +20,7 @@ final class RouteReferenceExtractor
     public function __construct(
         private readonly PositionConverter $positionConverter,
         private readonly PhpParserInterface $parser,
+        private readonly QuotedArgumentMatcher $matcher,
     ) {
     }
 
@@ -72,17 +73,9 @@ final class RouteReferenceExtractor
      */
     private function extractFromDocument(string $text, PhpDocument $document): array
     {
-        preg_match_all(
-            '/(?:->|::)('.implode('|', self::METHODS).')\s*\(\s*([\'"])([^\'"]+)\2/s',
-            $text,
-            $matches,
-            \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE,
-        );
         $references = [];
-
-        foreach ($matches as $match) {
-            $methodOffset = $match[1][1];
-            $receiverOffset = $methodOffset - 2;
+        foreach ($this->matcher->methodCalls($text, self::METHODS) as $call) {
+            $receiverOffset = $call->nameOffset - 2;
             $receiver = RoutePhpReceiver::resolve(
                 substr($text, 0, $receiverOffset),
                 $receiverOffset,
@@ -92,15 +85,10 @@ final class RouteReferenceExtractor
                 continue;
             }
 
-            $name = $match[3][0];
-            $offset = $match[3][1];
             $references[] = new RouteReference(
-                $name,
-                new Range(
-                    $this->positionConverter->toPosition($text, $offset),
-                    $this->positionConverter->toPosition($text, $offset + \strlen($name)),
-                ),
-                $this->providedParameters(substr($text, $match[0][1] + \strlen($match[0][0]))),
+                $call->value,
+                $call->range,
+                $this->providedParameters(substr($text, $call->end())),
                 $receiver->controllerClass(),
             );
         }

@@ -26,6 +26,7 @@ use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -118,7 +119,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
                     $referenceIndexes,
                     new PhpRouteDeclarationExtractor($positionConverter, $parser),
                     new YamlRouteDeclarationExtractor($positionConverter),
-                    new RouteReferenceExtractor($positionConverter, $parser),
+                    new RouteReferenceExtractor($positionConverter, $parser, new QuotedArgumentMatcher($positionConverter)),
                     new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
                     new ProjectPathResolver(new UriToPathConverter()),
                 ),
@@ -176,7 +177,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             $referenceIndexes,
             new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
             new YamlRouteDeclarationExtractor($positionConverter),
-            new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser())),
+            new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($positionConverter)),
             new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
             new ProjectPathResolver(new UriToPathConverter()),
         );

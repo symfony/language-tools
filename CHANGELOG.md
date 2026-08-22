@@ -6,6 +6,7 @@
 - Serialize source index updates so saves survive concurrent full scans
 - Cancel indexing and release all project state when a workspace folder is removed
 - Compute translation quick fixes from unsaved editor contents and versioned edits
+- Recognize escaped quotes in route, template, asset, translation and component literals
 
 ## 0.15.0 (2026-08-21)
 

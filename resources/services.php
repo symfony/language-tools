@@ -50,6 +50,7 @@ use Symfony\Lsp\Index\SourceIndexStoreInterface;
 use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\LastResultTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
@@ -149,6 +150,7 @@ return static function (ContainerConfigurator $container): void {
     $services->load('Symfony\\Lsp\\Document\\', '../src/Document/*{Resolver,Store,Synchronizer,Converter,Reader}.php');
     $services->load('Symfony\\Lsp\\Index\\', '../src/Index/*{Scanner,Handler,Store,Registry,Codec,Hasher,Enumerator}.php');
     $services->load('Symfony\\Lsp\\Parser\\', '../src/Parser/**/*{Parser,Decoder}.php');
+    $services->set(QuotedArgumentMatcher::class);
     $services->load('Symfony\\Lsp\\Project\\', '../src/Project/*{Discovery,Registry,Resolver,Settings,Converter,Configuration,Trust,Manager,Matcher,Cleaner}.php');
     $services->load('Symfony\\Lsp\\Protocol\\', '../src/Protocol/*Mapper.php');
     $services->load('Symfony\\Lsp\\Runtime\\', '../src/Runtime/*{Installer,Runner,Initializer,Refresher,Scheduler,Configuration,Registry,Planner,Mapper}.php');

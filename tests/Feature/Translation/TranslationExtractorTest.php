@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Feature\Translation;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Translation\TranslationExtractor;
+use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -118,6 +119,8 @@ final class TranslationExtractorTest extends TestCase
 
     private function extractor(): TranslationExtractor
     {
-        return new TranslationExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser(), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
+        $converter = new PositionConverter();
+
+        return new TranslationExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new QuotedArgumentMatcher($converter));
     }
 }

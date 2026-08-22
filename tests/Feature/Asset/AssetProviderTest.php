@@ -13,6 +13,7 @@ use Symfony\Lsp\Feature\Asset\AssetIndexRegistry;
 use Symfony\Lsp\Feature\Asset\AssetProvider;
 use Symfony\Lsp\Feature\Asset\AssetSourceIndexRegistry;
 use Symfony\Lsp\Feature\Asset\ImportMapEntry;
+use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -24,7 +25,7 @@ final class AssetProviderTest extends TestCase
     public function testProvidesAssetsAndImportmapEntrypoints(): void
     {
         $converter = new PositionConverter();
-        $extractor = new AssetExtractor($converter, new UriToPathConverter(), new TwigCommentParser());
+        $extractor = new AssetExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new QuotedArgumentMatcher($converter));
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);

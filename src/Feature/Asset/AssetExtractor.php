@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\UriToPathConverter;
 
@@ -13,6 +14,7 @@ final class AssetExtractor
         private readonly PositionConverter $converter,
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly TwigCommentParser $commentParser,
+        private readonly QuotedArgumentMatcher $matcher,
     ) {
     }
 
@@ -47,12 +49,11 @@ final class AssetExtractor
     private function twigSymbols(string $uri, string $text): array
     {
         $symbols = [];
-        preg_match_all('/\basset\s*\(\s*(["\'])([^"\']+)\1\s*\)/', $text, $assets, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-        foreach ($assets as $asset) {
-            if (str_starts_with($asset[2][0], '/')) {
+        foreach ($this->matcher->functionCalls($text, ['asset']) as $call) {
+            if (str_starts_with($call->value, '/') || 1 !== preg_match('/^\s*\)/', substr($text, $call->end()))) {
                 continue;
             }
-            $symbols[] = $this->symbol(AssetSymbolKind::Asset, $asset[2][0], $uri, $text, $asset[2][1], false);
+            $symbols[] = new AssetSourceSymbol(AssetSymbolKind::Asset, $call->value, $uri, $call->range, false);
         }
         preg_match_all('/\bimportmap\s*\(\s*(\[[^\]]*\]|["\'][^"\']+["\'])\s*\)/s', $text, $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($calls as $call) {

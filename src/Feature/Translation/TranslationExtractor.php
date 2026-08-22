@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -15,6 +16,7 @@ final class TranslationExtractor
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly TwigCommentParser $commentParser,
         private readonly YamlDocumentParser $yamlParser,
+        private readonly QuotedArgumentMatcher $matcher,
     ) {
     }
 
@@ -207,9 +209,8 @@ final class TranslationExtractor
             $result[] = new TranslationReference($key, $domain, $uri, $this->range($text, $offset, \strlen($key)), array_values(array_unique($placeholders)));
         }
         if ('twig' === $languageId) {
-            preg_match_all('/\b(?:trans|t)\s*\(\s*([\'\"])([^\'\"]+)\1/', $text, $functions, \PREG_OFFSET_CAPTURE);
-            foreach ($functions[2] as [$key, $offset]) {
-                $result[] = new TranslationReference($key, $defaultDomain, $uri, $this->range($text, $offset, \strlen($key)));
+            foreach ($this->matcher->functionCalls($text, ['trans', 't']) as $call) {
+                $result[] = new TranslationReference($call->value, $defaultDomain, $uri, $call->range);
             }
             preg_match_all('/{%\s*trans(?:\s+from\s+([\'\"])([^\'\"]+)\1)?\s*%}(.+?){%\s*endtrans\s*%}/s', $text, $tags, \PREG_OFFSET_CAPTURE);
             foreach ($tags[3] as $i => [$message, $offset]) {

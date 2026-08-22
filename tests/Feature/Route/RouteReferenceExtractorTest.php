@@ -14,6 +14,7 @@ use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceLocation;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Project\Project;
 
 final class RouteReferenceExtractorTest extends TestCase
@@ -50,7 +51,7 @@ final class RouteReferenceExtractorTest extends TestCase
             classes: $classExtractor->extract($uri, $source),
         ));
 
-        self::assertSame([], (new RouteReferenceExtractor($converter, $parser))->extract($source, $classIndex));
+        self::assertSame([], (new RouteReferenceExtractor($converter, $parser, new QuotedArgumentMatcher($converter)))->extract($source, $classIndex));
     }
 
     public function testRecognizesControllerReferencesThroughProjectBaseClasses(): void
@@ -97,7 +98,7 @@ final class RouteReferenceExtractorTest extends TestCase
             new DependencyInjectionSourceFacts($baseUri, classes: $classExtractor->extract($baseUri, $base)),
             new DependencyInjectionSourceFacts($controllerUri, classes: $classExtractor->extract($controllerUri, $controller)),
         );
-        $references = (new RouteReferenceExtractor($converter, $parser))->extract($controller, $classIndex);
+        $references = (new RouteReferenceExtractor($converter, $parser, new QuotedArgumentMatcher($converter)))->extract($controller, $classIndex);
 
         self::assertSame(['article_show'], array_map(static fn ($reference): string => $reference->name(), $references));
         self::assertSame('App\\Controller\\DemoController', $references[0]->controllerClass());
@@ -127,5 +128,28 @@ final class RouteReferenceExtractorTest extends TestCase
             static fn (RouteReferenceLocation $reference): string => $reference->uri(),
             $restoredReferences,
         ));
+    }
+
+    public function testDecodesRouteNamesWithEscapedQuotes(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+
+            class DemoController extends AbstractController
+            {
+                public function index(): void
+                {
+                    $this->redirectToRoute('it\'s_a_route');
+                }
+            }
+            PHP;
+        $converter = new PositionConverter();
+        $extractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter));
+
+        $references = $extractor->extract($source);
+
+        self::assertCount(1, $references);
+        self::assertSame("it's_a_route", $references[0]->name());
     }
 }

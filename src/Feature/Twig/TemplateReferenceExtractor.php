@@ -4,12 +4,16 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
 final class TemplateReferenceExtractor
 {
-    public function __construct(private readonly PositionConverter $positionConverter, private readonly TwigDocumentParser $twigParser)
-    {
+    public function __construct(
+        private readonly PositionConverter $positionConverter,
+        private readonly TwigDocumentParser $twigParser,
+        private readonly QuotedArgumentMatcher $matcher,
+    ) {
     }
 
     /** @return list<TemplateReference> */
@@ -22,25 +26,14 @@ final class TemplateReferenceExtractor
             return [];
         }
 
-        preg_match_all(
-            '/(?:->|::)(?:render|renderView)\s*\(\s*([\'"])([^\'"]+)\1\s*(?:,\s*\[([^\]]*)\])?/',
-            $text,
-            $matches,
-            \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL,
-        );
         $references = [];
-        foreach ($matches as $match) {
-            $name = $match[2][0] ?? null;
-            $offset = $match[2][1];
-            if (!\is_string($name)) {
-                continue;
-            }
+        foreach ($this->matcher->methodCalls($text, ['render', 'renderView']) as $call) {
             $variables = [];
-            if (\is_string($match[3][0] ?? null)) {
-                preg_match_all('/([\'"])([^\'"]+)\1\s*=>/', $match[3][0], $keys);
+            if (1 === preg_match('/^\s*,\s*\[([^\]]*)\]/', substr($text, $call->end()), $arrayMatch)) {
+                preg_match_all('/([\'"])([^\'"]+)\1\s*=>/', $arrayMatch[1], $keys);
                 $variables = array_values(array_unique($keys[2]));
             }
-            $references[] = $this->reference($name, $uri, $text, $offset, $variables);
+            $references[] = new TemplateReference($call->value, $uri, $call->range, $variables);
         }
 
         return $references;
