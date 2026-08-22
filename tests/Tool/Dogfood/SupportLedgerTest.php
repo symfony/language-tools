@@ -41,6 +41,19 @@ final class SupportLedgerTest extends TestCase
         self::assertSame(0.73, $entries[1]['score']);
     }
 
+    public function testPrunesProjectsThatAreNoLongerTracked(): void
+    {
+        $ledger = new SupportLedger($this->path);
+        $ledger->record([
+            ['run' => '20260822-1200', 'project' => 'kimai', 'score' => 0.73],
+            ['run' => '20260822-1200', 'project' => 'tui.symfony.com', 'score' => 0.84],
+        ]);
+
+        self::assertSame(1, $ledger->prune(['kimai']));
+        self::assertSame(0, $ledger->prune(['kimai']));
+        self::assertSame(['kimai'], array_column($ledger->entries(), 'project'));
+    }
+
     public function testHtmlReportEmbedsTheLedger(): void
     {
         $html = (new SupportHtmlReport())->render([

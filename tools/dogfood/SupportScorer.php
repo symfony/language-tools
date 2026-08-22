@@ -21,11 +21,35 @@ final class SupportScorer
     ];
 
     /**
+     * Exclusions remove verified-impossible request kinds from the
+     * denominator, such as build artifacts absent from a fresh checkout, so
+     * a full score means everything achievable is supported.
+     *
+     * @param list<array<array-key, mixed>> $exclusions
+     */
+    public function __construct(private readonly array $exclusions = [])
+    {
+    }
+
+    public static function withExclusionsFile(?string $path): self
+    {
+        if (null === $path || !is_file($path)) {
+            return new self();
+        }
+        $exclusions = json_decode((string) file_get_contents($path), true);
+        if (!\is_array($exclusions)) {
+            throw new \InvalidArgumentException(\sprintf('The exclusions file "%s" does not contain a JSON list.', $path));
+        }
+
+        return new self(array_values(array_filter($exclusions, 'is_array')));
+    }
+
+    /**
      * @param array<array-key, mixed> $report
      *
      * @return array{score: float, probeCount: int, categories: array<string, float>, fingerprint: string}|null
      */
-    public function score(array $report): ?array
+    public function score(array $report, string $project = ''): ?array
     {
         $probes = $report['probes'] ?? null;
         if (!\is_array($probes) || [] === $probes) {
@@ -39,7 +63,15 @@ final class SupportScorer
                 continue;
             }
             $category = $probe['category'];
-            $expected = self::EXPECTED_OVERRIDES[$category] ?? self::DEFAULT_EXPECTED;
+            $expected = array_values(array_diff(
+                self::EXPECTED_OVERRIDES[$category] ?? self::DEFAULT_EXPECTED,
+                $this->excludedKinds($project, $category, \is_string($probe['value'] ?? null) ? $probe['value'] : ''),
+            ));
+            $identities[] = \sprintf('%s|%s|%s', $category, \is_string($probe['file'] ?? null) ? $probe['file'] : '', \is_string($probe['value'] ?? null) ? $probe['value'] : '');
+            ++$probeCount;
+            if ([] === $expected) {
+                continue;
+            }
             $achieved = 0;
             foreach ($expected as $kind) {
                 $request = $probe['requests'][$kind] ?? null;
@@ -52,10 +84,6 @@ final class SupportScorer
                 }
             }
             $categoryScores[$category][] = $achieved / \count($expected);
-            $file = $probe['file'] ?? '';
-            $value = $probe['value'] ?? '';
-            $identities[] = \sprintf('%s|%s|%s', $category, \is_string($file) ? $file : '', \is_string($value) ? $value : '');
-            ++$probeCount;
         }
         if ([] === $categoryScores) {
             return null;
@@ -73,5 +101,23 @@ final class SupportScorer
             'categories' => $categories,
             'fingerprint' => substr(hash('sha256', implode("\n", $identities)), 0, 12),
         ];
+    }
+
+    /** @return list<string> */
+    private function excludedKinds(string $project, string $category, string $value): array
+    {
+        $kinds = [];
+        foreach ($this->exclusions as $exclusion) {
+            if (($exclusion['project'] ?? '') !== $project || ($exclusion['category'] ?? '') !== $category || ($exclusion['value'] ?? '') !== $value) {
+                continue;
+            }
+            $excluded = $exclusion['kinds'] ?? null;
+            if (!\is_array($excluded)) {
+                return self::DEFAULT_EXPECTED;
+            }
+            $kinds = [...$kinds, ...array_values(array_filter($excluded, 'is_string'))];
+        }
+
+        return $kinds;
     }
 }

@@ -71,6 +71,50 @@ final class SupportScorerTest extends TestCase
         self::assertNotSame($empty['score'], $full['score']);
     }
 
+    public function testExclusionsRemoveImpossibleKindsFromTheDenominator(): void
+    {
+        $report = ['probes' => [
+            [
+                'category' => 'asset.twig',
+                'file' => 'templates/base.html.twig',
+                'value' => 'build/app.css',
+                'requests' => [
+                    'completion' => ['resultCount' => 2, 'error' => null],
+                    'hover' => ['resultCount' => 0, 'error' => null],
+                    'definition' => ['resultCount' => 0, 'error' => null],
+                    'references' => ['resultCount' => 1, 'error' => null],
+                ],
+            ],
+        ]];
+        $exclusions = [[
+            'project' => 'sulu-demo',
+            'category' => 'asset.twig',
+            'value' => 'build/app.css',
+            'kinds' => ['hover', 'definition'],
+        ]];
+
+        $unscoped = (new SupportScorer($exclusions))->score($report, 'other-project');
+        $scoped = (new SupportScorer($exclusions))->score($report, 'sulu-demo');
+        self::assertNotNull($unscoped);
+        self::assertNotNull($scoped);
+        self::assertSame(0.5, $unscoped['score']);
+        self::assertEquals(1.0, $scoped['score']);
+        self::assertSame($unscoped['fingerprint'], $scoped['fingerprint']);
+    }
+
+    public function testFullyExcludedProbesLeaveTheCategory(): void
+    {
+        $probe = [
+            'category' => 'asset.twig',
+            'file' => 'templates/base.html.twig',
+            'value' => 'build/app.css',
+            'requests' => ['completion' => ['resultCount' => 0, 'error' => null]],
+        ];
+        $scorer = new SupportScorer([['project' => 'demo', 'category' => 'asset.twig', 'value' => 'build/app.css']]);
+
+        self::assertNull($scorer->score(['probes' => [$probe]], 'demo'));
+    }
+
     public function testReturnsNullWithoutProbes(): void
     {
         $scorer = new SupportScorer();

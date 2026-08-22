@@ -86,11 +86,11 @@ final class MatrixCommand
 
             $cold = $this->harness->run($configuration, $applicationRoot);
             $this->filesystem->dumpFile(Path::join($artifactDirectory, 'cold.json'), '' !== $cold->rawOutput ? $cold->rawOutput : $cold->errorOutput);
-            $report->cold = $this->summarize($cold);
+            $report->cold = $this->summarize($cold, $configuration->name);
 
             $warm = $this->harness->run($configuration, $applicationRoot);
             $this->filesystem->dumpFile(Path::join($artifactDirectory, 'warm.json'), '' !== $warm->rawOutput ? $warm->rawOutput : $warm->errorOutput);
-            $report->warm = $this->summarize($warm);
+            $report->warm = $this->summarize($warm, $configuration->name);
         } finally {
             $this->provisioner->release($configuration);
         }
@@ -99,7 +99,7 @@ final class MatrixCommand
         return $report;
     }
 
-    private function summarize(HarnessResult $run): RunSummary
+    private function summarize(HarnessResult $run, string $project): RunSummary
     {
         $result = $run->result ?? [];
         $probeCount = $result['probeCount'] ?? null;
@@ -134,7 +134,7 @@ final class MatrixCommand
             \is_array($violations) ? \count($violations) : 0,
             $maxMilliseconds,
             \is_string($serverVersion) ? $serverVersion : null,
-            $this->scorer->score($result)['score'] ?? null,
+            $this->scorer->score($result, $project)['score'] ?? null,
         );
     }
 

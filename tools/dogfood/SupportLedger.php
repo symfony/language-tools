@@ -33,6 +33,25 @@ final class SupportLedger
     }
 
     /**
+     * Removes entries for projects that are no longer tracked.
+     *
+     * @param list<string> $projects
+     *
+     * @return int the number of removed entries
+     */
+    public function prune(array $projects): int
+    {
+        $entries = $this->entries();
+        $kept = array_values(array_filter($entries, static fn (array $entry): bool => \in_array($entry['project'], $projects, true)));
+        $removed = \count($entries) - \count($kept);
+        if (0 < $removed) {
+            $this->write($kept);
+        }
+
+        return $removed;
+    }
+
+    /**
      * Appends entries whose run and project are not recorded yet, keeping the
      * file sorted for stable diffs.
      *
@@ -54,16 +73,22 @@ final class SupportLedger
             return 0;
         }
         ksort($merged, \SORT_STRING);
+        $this->write(array_values($merged));
+
+        return $added;
+    }
+
+    /** @param list<array<array-key, mixed>> $entries */
+    private function write(array $entries): void
+    {
         $directory = \dirname($this->path);
         if (!is_dir($directory)) {
             mkdir($directory, 0o777, true);
         }
         $lines = array_map(
             static fn (array $entry): string => json_encode($entry, \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR),
-            array_values($merged),
+            $entries,
         );
         file_put_contents($this->path, implode("\n", $lines)."\n");
-
-        return $added;
     }
 }

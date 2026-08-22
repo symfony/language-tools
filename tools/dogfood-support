@@ -46,17 +46,28 @@ if (!is_dir($matrixDirectory)) {
     exit(1);
 }
 
-$scorer = new SupportScorer();
+$root = \dirname(__DIR__);
+$tracked = [];
+foreach ([$root.'/tools/dogfood/projects', $root.'/.gerard/dogfood/projects'] as $configurationDirectory) {
+    foreach (glob($configurationDirectory.'/*.json') ?: [] as $configuration) {
+        $tracked[] = basename($configuration, '.json');
+    }
+}
+
+$scorer = SupportScorer::withExclusionsFile($root.'/.gerard/dogfood/support/exclusions.json');
 $runs = [];
 foreach (glob($matrixDirectory.'/*/*/warm.json') ?: [] as $path) {
     $parts = explode('/', $path);
     $project = $parts[\count($parts) - 2];
     $run = $parts[\count($parts) - 3];
+    if ([] !== $tracked && !\in_array($project, $tracked, true)) {
+        continue;
+    }
     $report = json_decode((string) file_get_contents($path), true);
     if (!\is_array($report)) {
         continue;
     }
-    $score = $scorer->score($report);
+    $score = $scorer->score($report, $project);
     if (null === $score) {
         continue;
     }
@@ -70,7 +81,7 @@ if ([] === $runs) {
 ksort($runs, \SORT_STRING);
 
 if ($record) {
-    $supportDirectory = \dirname(__DIR__).'/.gerard/dogfood/support';
+    $supportDirectory = $root.'/.gerard/dogfood/support';
     if (!is_dir(\dirname($supportDirectory))) {
         fwrite(STDERR, "No .gerard workspace found; initialize it before recording.\n");
         exit(1);
@@ -90,9 +101,10 @@ if ($record) {
         }
     }
     $ledger = new SupportLedger($supportDirectory.'/ledger.jsonl');
+    $pruned = [] === $tracked ? 0 : $ledger->prune($tracked);
     $added = $ledger->record($entries);
     file_put_contents($supportDirectory.'/index.html', (new SupportHtmlReport())->render($ledger->entries()));
-    printf("Recorded %d new entries; %s regenerated.\n", $added, $supportDirectory.'/index.html');
+    printf("Recorded %d new entries, pruned %d; %s regenerated.\n", $added, $pruned, $supportDirectory.'/index.html');
     exit(0);
 }
 
