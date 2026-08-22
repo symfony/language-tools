@@ -37,6 +37,35 @@ Doctrine. Each integration page documents its supported declarations, references
 and Language Server Protocol capabilities. See the `supported integrations`_
 for the complete feature matrix.
 
+Tested Against Real Applications
+--------------------------------
+
+Beyond its test suite, every change that affects the language server runs a
+full editing session against disposable checkouts of real open-source Symfony
+applications: the server indexes each application from a cold and a warm
+state, boots it to load runtime metadata, and exercises completion, hover,
+navigation, references, document links, code lenses, code actions and rename
+on references discovered in the application's own code.
+
+The matrix is pinned to exact revisions and spans supported Symfony versions
+and real-world architectures:
+
+* `Kimai`_ (Symfony 6.4): a conventional time-tracking application with
+  plugins, Doctrine, translations and security;
+* `Mautic`_ (Symfony 6.4): a marketing automation platform with a legacy
+  kernel layout and a large bundle and plugin ecosystem;
+* `Sulu Demo`_ (Symfony 7.4): a content management demo with CMS runtime
+  metadata;
+* `Sylius`_ (Symfony 7.4): an e-commerce platform covering Doctrine, workflow,
+  Messenger and Symfony UX;
+* `Shopware`_ (Symfony 7.4): a large commerce platform with a nonstandard
+  kernel, XML service definitions and thousands of routes;
+* `Symfony Demo`_ (Symfony 8.1): the canonical demo application on the newest
+  stable branch.
+
+The pinned revisions are updated with each release, and the same harness runs
+against additional private applications before every release.
+
 Requirements
 ------------
 
@@ -131,3 +160,9 @@ locally built parser extension on Unix systems. Verify that it starts:
 .. _`supported integrations`: features/index.rst
 .. _`Docker support`: docker.rst
 .. _`release metadata`: https://symfony.com/releases.json
+.. _`Kimai`: https://github.com/kimai/kimai
+.. _`Mautic`: https://github.com/mautic/mautic
+.. _`Sulu Demo`: https://github.com/sulu/sulu-demo
+.. _`Sylius`: https://github.com/Sylius/Sylius
+.. _`Shopware`: https://github.com/shopware/shopware
+.. _`Symfony Demo`: https://github.com/symfony/demo

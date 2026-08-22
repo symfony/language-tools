@@ -9,6 +9,17 @@ variables, bundle configuration, Messenger, events, Security, forms,
 validation, serializer metadata, AssetMapper, Stimulus, Live Components and
 Doctrine. See the [supported integrations](docs/features/index.rst) for details.
 
+Every change to the language server is continuously tested against pinned
+revisions of real open-source Symfony applications, from the oldest supported
+LTS to the newest stable branch: [Kimai](https://github.com/kimai/kimai) and
+[Mautic](https://github.com/mautic/mautic) on Symfony 6.4,
+[Sulu Demo](https://github.com/sulu/sulu-demo),
+[Sylius](https://github.com/Sylius/Sylius) and
+[Shopware](https://github.com/shopware/shopware) on Symfony 7.4, and
+[Symfony Demo](https://github.com/symfony/demo) on Symfony 8.1. See
+[the application matrix](docs/index.rst#tested-against-real-applications) for
+what each run exercises.
+
 ## Installation
 
 ### Visual Studio Code
