@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Doctrine;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
@@ -11,8 +12,11 @@ final class DoctrineExtractor
 {
     private const ASSOCIATIONS = ['Embedded', 'ManyToMany', 'ManyToOne', 'OneToMany', 'OneToOne'];
 
-    public function __construct(private readonly PositionConverter $converter, private readonly PhpParserInterface $phpParser)
-    {
+    public function __construct(
+        private readonly PositionConverter $converter,
+        private readonly PhpParserInterface $phpParser,
+        private readonly PhpCommentParserInterface $phpComments,
+    ) {
     }
 
     public function extract(string $uri, string $languageId, string $text): DoctrineSourceFacts
@@ -61,7 +65,7 @@ final class DoctrineExtractor
             return null;
         }
         $php = $this->phpParser->parse($text);
-        $before = substr($text, 0, $offset);
+        $before = substr($this->phpComments->mask($text), 0, $offset);
         if (preg_match('/[\'"](?:choice_label|choice_value|group_by)[\'"]\s*=>\s*[\'"]([A-Za-z_][A-Za-z0-9_]*)$/s', $before, $field, \PREG_OFFSET_CAPTURE)) {
             $statementStart = max((int) strrpos($before, ';'), (int) strrpos($before, '->add('), (int) strrpos($before, 'createForm('), (int) strrpos($before, 'createNamed('));
             $statement = substr($before, $statementStart);
@@ -259,7 +263,7 @@ final class DoctrineExtractor
 
     private function repositoryCompletionContext(string $text, int $offset, PhpDocument $php): ?DoctrineCompletionContext
     {
-        $before = substr($text, 0, $offset);
+        $before = substr($this->phpComments->mask($text), 0, $offset);
         if (!preg_match('/(?:\[|,)\s*[\'"]([A-Za-z_][A-Za-z0-9_]*)$/s', $before, $prefix, \PREG_OFFSET_CAPTURE)) {
             return null;
         }

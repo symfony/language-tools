@@ -230,6 +230,36 @@ final class RouteCompletionHandlerTest extends TestCase
         ]));
     }
 
+    public function testOffersNoRouteCompletionsInsidePhpComments(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = <<<'PHP'
+            <?php
+            use Symfony\Component\Routing\RouterInterface;
+            class Demo
+            {
+                public function index(RouterInterface $router): void
+                {
+                    // $router->generate('artic
+                }
+            }
+            PHP;
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $indexes = new RouteIndexRegistry();
+        $indexes->forProject($project)->replace(new Route('article_show', '/article/{slug}', [], [], null, null));
+        $converter = new PositionConverter();
+        $position = $converter->toPosition($text, strpos($text, 'artic') + \strlen('artic'));
+        $handler = $this->handler($documents, $projects, $converter, $indexes);
+
+        self::assertNull($handler->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line(), 'character' => $position->character()],
+        ]));
+    }
+
     private function handler(
         DocumentStore $documents,
         ProjectRegistry $projects,
@@ -244,6 +274,7 @@ final class RouteCompletionHandlerTest extends TestCase
             $indexes,
             $classIndexes ?? new DependencyInjectionSourceIndexRegistry(),
             new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter), new PhpCommentParser()),
+            new PhpCommentParser(),
         );
     }
 }

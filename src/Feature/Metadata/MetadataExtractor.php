@@ -5,13 +5,18 @@ namespace Symfony\Lsp\Feature\Metadata;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
 final class MetadataExtractor
 {
-    public function __construct(private readonly PositionConverter $converter, private readonly YamlConfigurationParser $yaml, private readonly PhpParserInterface $phpParser)
-    {
+    public function __construct(
+        private readonly PositionConverter $converter,
+        private readonly YamlConfigurationParser $yaml,
+        private readonly PhpParserInterface $phpParser,
+        private readonly PhpCommentParserInterface $phpComments,
+    ) {
     }
 
     public function extract(string $uri, string $languageId, string $text): MetadataSourceFacts
@@ -219,7 +224,7 @@ final class MetadataExtractor
 
     private function phpCompletionContext(string $text, int $offset): ?MetadataCompletionContext
     {
-        $before = substr($text, 0, $offset);
+        $before = substr($this->phpComments->mask($text), 0, $offset);
         if (preg_match('/(?:["\']groups["\']\s*=>\s*\[[^\]]*|(?:[A-Za-z_\\\\][A-Za-z0-9_\\\\]*\\\\)?Groups\s*\([^\)]*)["\']([A-Za-z_][A-Za-z0-9_.:-]*)$/s', $before, $match, \PREG_OFFSET_CAPTURE)) {
             return $this->context(MetadataCompletionKind::SerializerGroup, $match[1][0], $text, $match[1][1]);
         }
@@ -246,17 +251,18 @@ final class MetadataExtractor
     {
         $php = $this->phpParser->parse($text);
         $formBuilders = $this->formBuilderVariables($php);
-        preg_match_all('/(?:(->)\s*)?\b(createForm|createNamed|add)\s*\(/', substr($text, 0, $offset), $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        $masked = $this->phpComments->mask($text);
+        preg_match_all('/(?:(->)\s*)?\b(createForm|createNamed|add)\s*\(/', substr($masked, 0, $offset), $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach (array_reverse($calls) as $call) {
-            if ('add' === $call[2][0] && !$this->isFormBuilderCall($text, $call[0][1], $formBuilders)) {
+            if ('add' === $call[2][0] && !$this->isFormBuilderCall($masked, $call[0][1], $formBuilders)) {
                 continue;
             }
             $open = $call[0][1] + \strlen($call[0][0]) - 1;
-            $close = $this->matching($text, $open, '(', ')');
+            $close = $this->matching($masked, $open, '(', ')');
             if (null !== $close && $close < $offset) {
                 continue;
             }
-            $arguments = $this->arguments(substr($text, $open + 1, $offset - $open - 1), $open + 1);
+            $arguments = $this->arguments(substr($masked, $open + 1, $offset - $open - 1), $open + 1);
             $name = $call[2][0];
             $typeIndex = 'createNamed' === $name ? 1 : ('add' === $name ? 1 : 0);
             $optionsIndex = 'createNamed' === $name ? 3 : 2;

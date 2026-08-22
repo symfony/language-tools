@@ -100,7 +100,7 @@ final class LiveComponentProviderTest extends TestCase
         self::assertStringContainsString('Properties: `query`', $componentHover['contents']['value']);
         self::assertStringContainsString('Actions: `submit`, `refresh`', $componentHover['contents']['value']);
 
-        $eventProvider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor);
+        $eventProvider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser());
         self::assertSame(['search:completed'], array_column($eventProvider->complete($this->params($converter, $classUri, $classText, strpos($classText, "emit('search:co") + \strlen("emit('search:co"))) ?? [], 'label'));
         $eventParams = $this->params($converter, $classUri, $classText, strpos($classText, "emit('search:completed") + \strlen("emit('search:"));
         self::assertSame([$classUri], array_column($eventProvider->definition($eventParams) ?? [], 'uri'));
@@ -121,6 +121,33 @@ final class LiveComponentProviderTest extends TestCase
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line(), 'character' => $position->character()],
         ];
+    }
+
+    public function testOffersNoEmitCompletionsInsidePhpComments(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+        $uri = 'file:///workspace/src/Twig/Components/Search.php';
+        $text = <<<'PHP'
+            <?php
+            #[AsLiveComponent(name: 'Search')]
+            final class Search
+            {
+                public function submit(): void
+                {
+                    // $this->emit('search:c
+                }
+            }
+            PHP;
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $indexes = new TwigComponentIndexRegistry();
+        $indexes->forProject($project)->replace($extractor->extract($project, $uri, 'php', $text));
+        $provider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser());
+
+        self::assertNull($provider->complete($this->params($converter, $uri, $text, strpos($text, 'search:c') + \strlen('search:c'))));
     }
 
     public function testIgnoresEmitCallsInPhpComments(): void

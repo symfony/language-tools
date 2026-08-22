@@ -4,13 +4,17 @@ namespace Symfony\Lsp\Feature\Event;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
 final class EventExtractor
 {
-    public function __construct(private readonly PositionConverter $converter, private readonly PhpParserInterface $parser)
-    {
+    public function __construct(
+        private readonly PositionConverter $converter,
+        private readonly PhpParserInterface $parser,
+        private readonly PhpCommentParserInterface $phpComments,
+    ) {
     }
 
     public function extract(string $uri, string $languageId, string $text): EventSourceFacts
@@ -30,21 +34,23 @@ final class EventExtractor
         $before = substr($text, 0, $offset);
         if ('php' === $languageId) {
             $php = $this->parser->parse($text);
+            $masked = $this->phpComments->mask($text);
+            $before = substr($masked, 0, $offset);
             if (preg_match('/AsEventListener\s*\([^)]*\bevent\s*:\s*["\']([^"\']*)$/s', $before, $match)) {
                 return $match[1];
             }
-            preg_match_all('/function\s+getSubscribedEvents\s*\([^)]*\)[^{]*\{/', $text, $subscriberMethods, \PREG_OFFSET_CAPTURE);
+            preg_match_all('/function\s+getSubscribedEvents\s*\([^)]*\)[^{]*\{/', $masked, $subscriberMethods, \PREG_OFFSET_CAPTURE);
             foreach ($subscriberMethods[0] as [$declaration, $declarationOffset]) {
                 $open = $declarationOffset + \strlen($declaration) - 1;
-                if ($offset <= $open || $offset > $this->matchingBrace($text, $open)) {
+                if ($offset <= $open || $offset > $this->matchingBrace($masked, $open)) {
                     continue;
                 }
-                $bodyBefore = substr($text, $open + 1, $offset - $open - 1);
+                $bodyBefore = substr($masked, $open + 1, $offset - $open - 1);
                 if (preg_match('/(?:\[|,)\s*["\']([^"\']*)$/s', $bodyBefore, $match)) {
                     return $match[1];
                 }
             }
-            $dispatchers = $this->eventDispatcherVariables($text, $php);
+            $dispatchers = $this->eventDispatcherVariables($masked, $php);
             if (preg_match('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:addListener\s*\(\s*|dispatch\s*\([^,\r\n]+,\s*)["\']([^"\']*)$/', $before, $match)) {
                 $variable = '' !== $match[2] ? $match[2] : $match[1];
                 if (isset($dispatchers[$variable])) {

@@ -22,6 +22,7 @@ use Symfony\Lsp\Feature\Event\EventListener;
 use Symfony\Lsp\Feature\Event\EventRelationshipProvider;
 use Symfony\Lsp\Feature\Event\EventRelationshipResolver;
 use Symfony\Lsp\Feature\Event\EventSourceIndexRegistry;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -32,7 +33,7 @@ final class EventProviderTest extends TestCase
     public function testExtractsHighConfidenceEventReferences(): void
     {
         $converter = new PositionConverter();
-        $extractor = new EventExtractor($converter, new TolerantPhpParser(new Parser()));
+        $extractor = new EventExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
         $php = <<<'PHP'
 <?php
 namespace App;
@@ -122,7 +123,7 @@ PHP;
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new EventExtractor($converter, new TolerantPhpParser(new Parser()));
+        $extractor = new EventExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
         $indexes = new EventIndexRegistry();
         $indexes->forProject($project)->replace(
             [new Event('App\\Event\\OrderPlaced', 'App\\Event\\OrderPlaced')],
@@ -172,5 +173,13 @@ PHP;
     private function params(string $uri, Position $position): array
     {
         return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+    }
+
+    public function testOffersNoEventCompletionsInsidePhpComments(): void
+    {
+        $extractor = new EventExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $text = "<?php\n// #[AsEventListener(event: 'app.or";
+
+        self::assertNull($extractor->completionPrefix('php', $text, \strlen($text)));
     }
 }

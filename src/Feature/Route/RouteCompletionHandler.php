@@ -7,6 +7,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteCompletionHandler implements CompletionProviderInterface
@@ -18,6 +19,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         private readonly RouteIndexRegistry $routeIndexes,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly RouteReferenceExtractor $phpReferenceExtractor,
+        private readonly PhpCommentParserInterface $phpComments,
     ) {
     }
 
@@ -72,8 +74,9 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         }
         $classIndex = $this->classIndexes->forProject($request->project);
         $isSymfonyReceiver = fn (string $source): bool => $this->phpReferenceExtractor->isSymfonyReceiver($source, $classIndex);
+        $phpText = $this->phpComments->mask($request->document->text());
         $parameterContext = RouteParameterCompletionContext::fromPhp(
-            $request->document->text(),
+            $phpText,
             $request->position,
             $this->positionConverter,
             $isSymfonyReceiver,
@@ -95,7 +98,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         }
 
         $routeContext = RouteCompletionContext::fromPhp(
-            $request->document->text(),
+            $phpText,
             $request->position,
             $this->positionConverter,
             $isSymfonyReceiver,

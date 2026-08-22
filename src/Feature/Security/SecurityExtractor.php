@@ -6,6 +6,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\ConfigurationOccurrence;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -17,6 +18,7 @@ final class SecurityExtractor
         private readonly YamlConfigurationParser $yaml,
         private readonly TwigCommentParser $commentParser,
         private readonly PhpParserInterface $phpParser,
+        private readonly PhpCommentParserInterface $phpComments,
     ) {
     }
 
@@ -34,7 +36,11 @@ final class SecurityExtractor
 
     public function completionContext(string $languageId, string $text, int $offset): ?SecurityCompletionContext
     {
-        $before = substr('twig' === $languageId ? $this->commentParser->mask($text) : $text, 0, $offset);
+        $before = substr(match ($languageId) {
+            'twig' => $this->commentParser->mask($text),
+            'php' => $this->phpComments->mask($text),
+            default => $text,
+        }, 0, $offset);
         if ('twig' === $languageId && preg_match('/\bis_granted\s*\(\s*["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
             return $this->context(SecuritySymbolKind::Role, $match[1][0], $text, $match[1][1]);
         }

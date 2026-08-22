@@ -18,6 +18,7 @@ use Symfony\Lsp\Feature\Security\SecurityRole;
 use Symfony\Lsp\Feature\Security\SecuritySourceIndexRegistry;
 use Symfony\Lsp\Feature\Security\SecurityUserProvider;
 use Symfony\Lsp\Feature\Security\SecurityVoter;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -32,7 +33,7 @@ final class SecurityProviderTest extends TestCase
     public function testExtractsOnlyRecognizedSecuritySymbols(): void
     {
         $converter = new PositionConverter();
-        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TwigCommentParser(), new TolerantPhpParser(new Parser()));
+        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TwigCommentParser(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
         $php = <<<'PHP'
 <?php
 namespace App;
@@ -73,6 +74,25 @@ YAML;
         );
     }
 
+    public function testOffersNoSecurityCompletionsInsidePhpComments(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TwigCommentParser(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $text = <<<'PHP'
+            <?php
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+            class DemoController extends AbstractController
+            {
+                public function index(): void
+                {
+                    // $this->denyAccessUnlessGranted('ROLE_A
+                }
+            }
+            PHP;
+
+        self::assertNull($extractor->completionContext('php', $text, strpos($text, 'ROLE_A') + \strlen('ROLE_A')));
+    }
+
     public function testCompletesHoversNavigatesReferencesAndDiagnoses(): void
     {
         $yamlUri = 'file:///workspace/config/packages/security.yaml';
@@ -108,7 +128,7 @@ PHP;
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TwigCommentParser(), new TolerantPhpParser(new Parser()));
+        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TwigCommentParser(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
         $indexes = new SecurityIndexRegistry();
         $indexes->forProject($project)->replace(
             [new SecurityFirewall('main', 'users', true, false, true, ['App\\Security\\Authenticator'])],

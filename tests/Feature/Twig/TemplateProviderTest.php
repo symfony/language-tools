@@ -616,10 +616,30 @@ final class TemplateProviderTest extends TestCase
         $resolver = new DocumentContextResolver($documents, $projects);
 
         return [
-            new TemplateCompletionHandler($resolver, $converter, new LspProtocolMapper(), $indexes, $commentParser),
+            new TemplateCompletionHandler($resolver, $converter, new LspProtocolMapper(), $indexes, $commentParser, new PhpCommentParser()),
             new TemplateNavigationProvider($resolver, $converter, new LspProtocolMapper(), $extractor, $indexes),
             $converter,
         ];
+    }
+
+    public function testOffersNoTemplateCompletionsInsidePhpComments(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = "<?php // \$this->render('artic";
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $indexes = new TemplateIndexRegistry();
+        $converter = new PositionConverter();
+        $indexes->forProject($project)->replaceSources(new TemplateDeclaration('article/show.html.twig', 'file:///workspace/templates/article/show.html.twig', new Range(new Position(0, 0), new Position(0, 0))));
+        $handler = new TemplateCompletionHandler(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, new TwigCommentParser(), new PhpCommentParser());
+        $position = $converter->toPosition($text, \strlen($text));
+
+        self::assertNull($handler->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line(), 'character' => $position->character()],
+        ]));
     }
 
     public function testIgnoresRenderCallsInPhpComments(): void

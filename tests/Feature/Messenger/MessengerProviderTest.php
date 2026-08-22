@@ -25,6 +25,7 @@ use Symfony\Lsp\Feature\Messenger\MessengerRelationshipProvider;
 use Symfony\Lsp\Feature\Messenger\MessengerRelationshipResolver;
 use Symfony\Lsp\Feature\Messenger\MessengerSourceIndexRegistry;
 use Symfony\Lsp\Feature\Messenger\MessengerTransport;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -128,7 +129,7 @@ YAML;
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $relationshipResolver = new MessengerRelationshipResolver($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
-        $completionProvider = new MessengerCompletionProvider($documentResolver, $converter, $protocol, $indexes, $yamlParser);
+        $completionProvider = new MessengerCompletionProvider($documentResolver, $converter, $protocol, $indexes, $yamlParser, new PhpCommentParser());
         $relationshipProvider = new MessengerRelationshipProvider($protocol, $indexes, $relationshipResolver);
         $diagnosticProvider = new MessengerDiagnosticProvider($documentResolver, $converter, $protocol, $indexes, $extractor, $classExtractor);
         $codeLensProvider = new MessengerCodeLensProvider($documentResolver, $protocol, $indexes, $classExtractor, $relationshipResolver);
@@ -152,6 +153,30 @@ YAML;
         self::assertIsArray($codeLens);
         self::assertIsArray($codeLens['command'] ?? null);
         self::assertSame('1 Messenger handler', $codeLens['command']['title'] ?? null);
+    }
+
+    public function testOffersNoMessengerCompletionsInsidePhpComments(): void
+    {
+        $uri = 'file:///workspace/src/Service.php';
+        $text = "<?php // new BusNameStamp('comma";
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $converter = new PositionConverter();
+        $indexes = new MessengerIndexRegistry();
+        $indexes->forProject($project)->replace([new MessengerBus('command.bus', true)], [], [], [], true);
+        $provider = new MessengerCompletionProvider(
+            new DocumentContextResolver($documents, $projects),
+            $converter,
+            new LspProtocolMapper(),
+            $indexes,
+            new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
+            new PhpCommentParser(),
+        );
+        $position = $converter->toPosition($text, \strlen($text));
+
+        self::assertNull($provider->complete($this->params($uri, $position)));
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */

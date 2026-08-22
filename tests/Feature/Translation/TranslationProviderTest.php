@@ -95,7 +95,7 @@ final class TranslationProviderTest extends TestCase
         $indexes->forProject($project)->replaceSources($extractor->extract('file://'.$translationPath, 'yaml', "existing: Existing\n"));
         $configuration = new TranslationConfigurationRegistry();
         $configuration->configure($project, true);
-        $provider = new TranslationProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser);
+        $provider = new TranslationProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser, new PhpCommentParser());
 
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -151,7 +151,7 @@ final class TranslationProviderTest extends TestCase
         $indexes->forProject($project)->replaceSources($extractor->extract('file://'.$translationPath, 'yaml', "existing: Existing\n"));
         $configuration = new TranslationConfigurationRegistry();
         $configuration->configure($project, true);
-        $provider = new TranslationProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser);
+        $provider = new TranslationProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser, new PhpCommentParser());
 
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -193,6 +193,16 @@ final class TranslationProviderTest extends TestCase
         self::assertSame(['translation.not_found'], array_column($provider->diagnostics(['textDocument' => ['uri' => $uri]]), 'code'));
     }
 
+    public function testOffersNoTranslationCompletionsInsidePhpComments(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = "<?php // \$translator->trans('article.ti";
+        [$provider, $converter] = $this->provider($uri, $text);
+        $position = $converter->toPosition($text, strpos($text, 'article.ti') + \strlen('article.ti'));
+
+        self::assertNull($provider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]]));
+    }
+
     /** @return array{TranslationProvider, PositionConverter, TranslationConfigurationRegistry, Project} */
     private function provider(string $uri, string $text, string $languageId = 'php'): array
     {
@@ -207,6 +217,6 @@ final class TranslationProviderTest extends TestCase
         $indexes->forProject($project)->replaceRuntime(true, new TranslationMessage('article.title', 'messages', 'en', 'Article %name%'));
         $configuration = new TranslationConfigurationRegistry();
 
-        return [new TranslationProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser), $converter, $configuration, $project];
+        return [new TranslationProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser, new PhpCommentParser()), $converter, $configuration, $project];
     }
 }

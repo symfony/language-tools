@@ -47,7 +47,7 @@ final class EnvironmentProviderTest extends TestCase
         $indexes = new EnvironmentIndexRegistry();
         $indexes->forProject($project)->replaceSources($extractor->extract('file:///workspace/.env', 'dotenv', "APP_URL=CANARY_SECRET_VALUE\n"), $extractor->extract($uri, 'yaml', $text));
         $indexes->forProject($project)->replaceProcessors(['custom' => 'string', 'json' => 'array']);
-        $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $commentParser);
+        $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $commentParser, new PhpCommentParser());
         $position = $converter->toPosition($text, strpos($text, 'APP_UR') + \strlen('APP_UR'));
         $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
 
@@ -68,6 +68,25 @@ final class EnvironmentProviderTest extends TestCase
         $documents->open(new Document($commentUri, 'twig', 1, $commentText));
         $commentPosition = $converter->toPosition($commentText, strpos($commentText, 'APP_UR') + \strlen('APP_UR'));
         self::assertNull($provider->complete(['textDocument' => ['uri' => $commentUri], 'position' => ['line' => $commentPosition->line(), 'character' => $commentPosition->character()]]));
+    }
+
+    public function testOffersNoEnvironmentCompletionsInsidePhpComments(): void
+    {
+        $uri = 'file:///workspace/src/Kernel.php';
+        $text = "<?php // \$url = '%env(APP_U";
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $converter = new PositionConverter();
+        $commentParser = new TwigCommentParser();
+        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $commentParser, new PhpCommentParser());
+        $indexes = new EnvironmentIndexRegistry();
+        $indexes->forProject($project)->replaceSources($extractor->extract('file:///workspace/.env', 'dotenv', "APP_URL=value\n"));
+        $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $commentParser, new PhpCommentParser());
+        $position = $converter->toPosition($text, \strlen($text));
+
+        self::assertNull($provider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]]));
     }
 
     public function testIgnoresEnvironmentReferencesInPhpComments(): void

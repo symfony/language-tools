@@ -21,6 +21,7 @@ use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexRegistry;
 use Symfony\Lsp\Feature\Metadata\SerializerMetadataProvider;
 use Symfony\Lsp\Feature\Metadata\ValidationConstraint;
 use Symfony\Lsp\Feature\Metadata\ValidationMetadataProvider;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -34,7 +35,7 @@ final class MetadataProviderTest extends TestCase
     public function testProvidesFormConstraintSerializerAndMappingMetadata(): void
     {
         $converter = new PositionConverter();
-        $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TolerantPhpParser(new Parser()));
+        $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TolerantPhpParser(new Parser()), new PhpCommentParser());
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -234,5 +235,14 @@ final class MetadataProviderTest extends TestCase
         $position = $converter->toPosition($text, $offset);
 
         return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+    }
+
+    public function testOffersNoMetadataCompletionsInsidePhpComments(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $text = "<?php // #[Groups(['adm";
+
+        self::assertNull($extractor->completionContext('php', $text, \strlen($text)));
     }
 }

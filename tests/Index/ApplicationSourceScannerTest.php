@@ -680,6 +680,7 @@ PHP;
                 ),
                 new TwigCommentParser(),
                 new TolerantPhpParser(new Parser()),
+                new PhpCommentParser(),
             ),
         );
     }

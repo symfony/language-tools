@@ -10,6 +10,7 @@ use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -21,6 +22,7 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
         private readonly LspProtocolMapper $protocol,
         private readonly TwigComponentIndexRegistry $indexes,
         private readonly TwigComponentExtractor $extractor,
+        private readonly PhpCommentParserInterface $phpComments,
     ) {
     }
 
@@ -31,7 +33,7 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $before = substr($request->document->text(), 0, $offset);
+        $before = substr($this->phpComments->mask($request->document->text()), 0, $offset);
         if (!preg_match('/(?:->|\b)emit\s*\(\s*([\'"])([^\'"]*)$/s', $before, $match)) {
             return null;
         }

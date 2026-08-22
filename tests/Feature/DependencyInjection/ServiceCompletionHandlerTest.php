@@ -14,6 +14,7 @@ use Symfony\Lsp\Feature\DependencyInjection\ProjectServiceSnapshotLoader;
 use Symfony\Lsp\Feature\DependencyInjection\Service;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceCompletionHandler;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -68,6 +69,7 @@ final class ServiceCompletionHandlerTest extends TestCase
             $indexes,
             $parameterIndexes,
             $sourceIndexes,
+            new PhpCommentParser(),
         );
 
         $result = $handler->complete([
@@ -91,6 +93,34 @@ final class ServiceCompletionHandlerTest extends TestCase
             'CANARY_SECRET_VALUE',
             json_encode($result, \JSON_THROW_ON_ERROR),
         );
+    }
+
+    public function testOffersNoParameterCompletionsInsidePhpComments(): void
+    {
+        $documents = new DocumentStore();
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $parameterIndexes = new ParameterIndexRegistry();
+        $parameterIndexes->forProject($project)->replace(true, new Parameter('app.api_key', null));
+        $converter = new PositionConverter();
+        $handler = new ServiceCompletionHandler(
+            new DocumentContextResolver($documents, $projects),
+            $converter,
+            new LspProtocolMapper(),
+            new ServiceIndexRegistry(),
+            $parameterIndexes,
+            new DependencyInjectionSourceIndexRegistry(),
+            new PhpCommentParser(),
+        );
+        $uri = 'file:///workspace/src/Service.php';
+        $text = "<?php // #[Autowire(param: 'app.a";
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $position = $converter->toPosition($text, \strlen($text));
+
+        self::assertNull($handler->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line(), 'character' => $position->character()],
+        ]));
     }
 
     public function testCompletesParametersInYamlAndPhpAttributes(): void
@@ -124,6 +154,7 @@ final class ServiceCompletionHandlerTest extends TestCase
             $serviceIndexes,
             $parameterIndexes,
             new DependencyInjectionSourceIndexRegistry(),
+            new PhpCommentParser(),
         );
 
         $yamlUri = 'file:///workspace/config/services.yaml';

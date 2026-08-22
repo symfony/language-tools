@@ -11,6 +11,7 @@ use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -27,6 +28,7 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         private readonly EnvironmentIndexRegistry $indexes,
         private readonly EnvironmentExtractor $extractor,
         private readonly TwigCommentParser $commentParser,
+        private readonly PhpCommentParserInterface $phpComments,
     ) {
     }
 
@@ -37,7 +39,11 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
             return null;
         }
         $cursor = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $text = 'twig' === $request->document->languageId() ? $this->commentParser->mask($request->document->text()) : $request->document->text();
+        $text = match ($request->document->languageId()) {
+            'twig' => $this->commentParser->mask($request->document->text()),
+            'php' => $this->phpComments->mask($request->document->text()),
+            default => $request->document->text(),
+        };
         if (!preg_match('/%env\(([^)]*)$/', substr($text, 0, $cursor), $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }

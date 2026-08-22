@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class MessengerCompletionProvider implements CompletionProviderInterface
@@ -18,6 +19,7 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
         private readonly LspProtocolMapper $protocol,
         private readonly MessengerIndexRegistry $indexes,
         private readonly YamlConfigurationParser $yaml,
+        private readonly PhpCommentParserInterface $phpComments,
     ) {
     }
 
@@ -28,7 +30,11 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $before = substr($request->document->text(), 0, $offset);
+        $before = substr(
+            'php' === $request->document->languageId() ? $this->phpComments->mask($request->document->text()) : $request->document->text(),
+            0,
+            $offset,
+        );
         $lineOffset = (int) strrpos("\n".$before, "\n");
         $kind = null;
         $prefix = '';
