@@ -2,8 +2,10 @@ AssetMapper and Importmaps
 ==========================
 
 Symfony Language Tools understands effective AssetMapper logical paths and
-importmap entrypoints. The integration is enabled only when
-``symfony/asset-mapper`` is installed in the selected application.
+importmap entrypoints. AssetMapper features are enabled only when
+``symfony/asset-mapper`` is installed in the selected application; plain
+files under the ``public/`` document root are supported in every
+application.
 
 Completion
 ----------
@@ -34,3 +36,13 @@ has loaded. Dynamic entrypoint expressions are ignored.
 
 Unknown ``asset()`` paths aren't diagnosed. Symfony's asset package can
 legitimately fall back to a public path that isn't part of AssetMapper.
+
+Public Assets
+-------------
+
+When an ``asset()`` path doesn't match an AssetMapper logical path, it is
+resolved against the application's ``public/`` directory. Hover shows the
+resolved file, and Go to Definition and document links open it. Completion
+suggests files from ``public/``, including build artifacts and installed
+bundle assets when they exist on disk. Applications without AssetMapper,
+such as Webpack Encore setups, get the same behavior.

@@ -13,6 +13,13 @@ Functions and filters returned by extension ``getFunctions()`` and
 when their names are string literals. Statically resolvable class method
 callables declared as arrays or first-class callables are also resolved.
 
+Completion
+----------
+
+Function names are completed in Twig expressions, and filter names after a
+``|`` pipe. Suggestions come from the recognized application declarations
+and replace the identifier being typed.
+
 Hover
 -----
 

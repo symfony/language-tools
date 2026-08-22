@@ -4,6 +4,9 @@ Bundle Configuration
 Symfony Language Tools understands configuration trees for installed bundles in
 the selected environment, including node types, required and default markers,
 enum values, examples, deprecations, children and prototype nodes.
+Normalization is probed on the real trees, so shorthand keys such as the
+Doctrine default connection ``url`` and values that nodes normalize, such
+as ``~`` or ``true`` for array nodes, are understood.
 
 Completion
 ----------
@@ -31,7 +34,9 @@ or duplicate keys, invalid scalar types, invalid enum values, deprecated nodes,
 missing required children and malformed structures. Symfony Language Tools
 suppresses diagnostics when a root key doesn't belong to an installed bundle, so
 application service and import sections aren't mistaken for bundle
-configuration.
+configuration. Diagnostics are limited to the application's own ``config/``
+directory because configuration files elsewhere, such as bundle test
+fixtures, can target another kernel.
 
 Selected Environments
 ---------------------

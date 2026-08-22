@@ -17,7 +17,13 @@ Resources
 
 Definitions are read from YAML, JSON, XLIFF and PHP resources under a
 ``translations/`` directory. Nested YAML and JSON keys use dot notation.
-Unsaved resource changes are available immediately.
+INI catalogs using a locale directory, such as
+``Translations/en_US/messages.ini`` in Mautic, are recognized too. Unsaved
+resource changes are available immediately.
+
+ICU brace placeholders such as ``{name}`` are only interpreted in ICU
+catalogs, identified by the ``+intl-icu`` domain suffix. In plain catalogs,
+braces are literal text and only ``%name%`` placeholders are interpreted.
 
 Hover and Navigation
 --------------------
@@ -29,9 +35,11 @@ References and rename cover statically recognized PHP and Twig keys.
 Diagnostics
 -----------
 
-Missing and unexpected placeholders are reported when the call provides a
-static parameter map. Missing-key diagnostics are disabled by default because
-external translation providers can make the runtime catalogue incomplete.
+Placeholders the message expects but a literal parameter map doesn't
+provide are reported. Extra parameters are accepted, and calls passing
+dynamic parameter expressions aren't diagnosed. Missing-key diagnostics
+are disabled by default because external translation providers can make
+the runtime catalogue incomplete.
 
 Enable missing-key diagnostics in a project or workspace-folder setting:
 

@@ -76,6 +76,8 @@ Limitations
 
 Custom non-filesystem loaders cannot provide exhaustive completion. Their
 literal names are available only when another recognized project file exposes
-them.
+them. When a decorating loader hides the filesystem loader paths, as with
+theme engines like Sylius, the paths are derived from the application and
+bundle template conventions instead.
 
 .. _`Stimulus and Live Components`: stimulus.rst

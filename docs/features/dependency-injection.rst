@@ -16,6 +16,15 @@ Symfony Language Tools recognizes these YAML declarations and references:
 * aliases and decorators;
 * tags and bindings.
 
+XML service definitions using the ``dic/services`` schema are recognized
+too: service, alias and parameter declarations, ``decorates`` targets,
+tags, and service and parameter references in arguments.
+
+``%parameter%`` references are also recognized outside the ``parameters``
+and ``services`` sections in configuration files, such as
+``%kernel.project_dir%`` in a ``config/packages`` file. Double percents
+escape a literal percent and aren't treated as references.
+
 Symfony Language Tools also recognizes service and parameter references in PHP
 ``#[Autowire]`` attributes. Dynamic references aren't recognized.
 

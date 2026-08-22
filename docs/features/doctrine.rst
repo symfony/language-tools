@@ -48,12 +48,23 @@ and repository constructor entity references back to entity classes. Hover
 shows entity and repository relationships. Entity and repository declarations
 provide code lenses for navigating the relationship in either direction.
 
+Runtime Metadata
+----------------
+
+Effective entity metadata is also collected from the application's Doctrine
+metadata factory. This covers mappings that source scanning can't see, such
+as XML and YAML ORM mappings and entities shipped by dependencies under
+``vendor/``. Field completion, hover and navigation work for these entities
+too; Go to Definition opens the entity class file when no precise source
+declaration is available.
+
 Current Limitations
 -------------------
 
-Only PHP attribute mappings and direct ``ServiceEntityRepository`` subclasses
-are recognized. XML and YAML ORM mappings, inherited fields, DQL strings, Query
-Builder field expressions and dynamic repository lookups aren't interpreted.
-String callbacks used as ``EntityType`` choice labels aren't treated as mapped
-fields. Symfony Language Tools doesn't diagnose unknown Doctrine fields because
-custom mapping drivers and inherited metadata can extend the source model.
+Inherited fields, DQL strings, Query Builder field expressions and dynamic
+repository lookups aren't interpreted. String callbacks used as
+``EntityType`` choice labels aren't treated as mapped fields. Repositories
+bound to entities through interfaces, as in Sylius resource
+configuration, aren't resolved. Symfony Language Tools doesn't diagnose
+unknown Doctrine fields because custom mapping drivers and inherited
+metadata can extend the source model.
