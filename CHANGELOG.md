@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Capture dogfood server errors without pipe backpressure
 - Handle dynamically declared Twig callable options conservatively
 - Preserve parameter references inside YAML block scalar content
 - Honor absolute Symfony Runtime project directories

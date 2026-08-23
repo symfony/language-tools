@@ -124,8 +124,13 @@ $project = realpath($project);
 if (false === $project) {
     throw new RuntimeException('Project does not exist.');
 }
-$process = proc_open([$server], [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes, env_vars: getenv(), options: ['bypass_shell' => true]);
+$errorStream = tmpfile();
+if (false === $errorStream) {
+    throw new RuntimeException('Unable to create the Symfony Language Tools error stream.');
+}
+$process = proc_open([$server], [['pipe', 'r'], ['pipe', 'w'], $errorStream], $pipes, env_vars: getenv(), options: ['bypass_shell' => true]);
 if (!is_resource($process)) {
+    fclose($errorStream);
     throw new RuntimeException('Unable to start Symfony Language Tools.');
 }
 $notifications = [];
@@ -222,9 +227,10 @@ awaitResponse($pipes[0], $pipes[1], $id, $requestTimeout, $notifications);
 writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []]);
 fclose($pipes[0]);
 fclose($pipes[1]);
-$stderr = stream_get_contents($pipes[2]);
-fclose($pipes[2]);
 $exitCode = proc_close($process);
+rewind($errorStream);
+$stderr = stream_get_contents($errorStream);
+fclose($errorStream);
 $diagnostics = [];
 foreach ($notifications as $notification) {
     if ('textDocument/publishDiagnostics' === ($notification['method'] ?? null)) {
