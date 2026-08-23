@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ignore Twig member calls when validating callable arguments
 - Parse Twig callable completion and diagnostics outside string literals
 - Honor Twig callable injection and variadic options
 - Ignore unpacked translation parameter maps when checking placeholders

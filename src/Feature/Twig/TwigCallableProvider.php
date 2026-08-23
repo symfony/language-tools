@@ -145,6 +145,9 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
                 continue;
             }
             $kind = null !== ($calls[1][$index][0] ?? null) ? TwigCallableKind::Filter : TwigCallableKind::Function;
+            if (TwigCallableKind::Function === $kind && str_ends_with(rtrim(substr($syntax, 0, $calleeOffset)), '.')) {
+                continue;
+            }
             $parameters = $resolved[$kind->value.'|'.$callee] ??= $this->callableParameters($request->project, $kind, $callee) ?? false;
             $parameters = false === $parameters ? null : $parameters;
             if (null === $parameters || $parameters['variadic']) {

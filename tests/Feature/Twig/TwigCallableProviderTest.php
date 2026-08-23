@@ -383,6 +383,7 @@ final class TwigCallableProviderTest extends TestCase
         );
         self::assertSame([], $diagnostics("{{ image(name: 'a', width: 3, lazy: true) }}"));
         self::assertSame([], $diagnostics("{{ image(name: 'x, wdith: 3') }}"));
+        self::assertSame([], $diagnostics('{{ object.image(wdith: 3) }}'));
         self::assertSame([], $diagnostics("{{ attrs('div', data_test: 'x') }}"));
         self::assertSame([], $diagnostics("{{ image({name: 'a'}) }}"));
         self::assertSame([], $diagnostics("{{ image(name ? 'a' : 'b') }}"));
