@@ -213,6 +213,7 @@ final class YamlDependencyInjectionExtractor
     /** @return list<DependencyInjectionReference> */
     private function references(string $uri, string $text, string $line, int $lineOffset): array
     {
+        $line = $this->maskComment($line);
         $references = [];
         preg_match_all(
             '/(?<![A-Za-z0-9_@])@(\?)?([.A-Za-z_\\\\][A-Za-z0-9_.\\\\:$-]*)/',
@@ -236,6 +237,7 @@ final class YamlDependencyInjectionExtractor
     /** @return list<DependencyInjectionReference> */
     private function parameterReferences(string $uri, string $text, string $line, int $lineOffset): array
     {
+        $line = $this->maskComment($line);
         $references = [];
         // %% escapes a literal percent, as in monolog line formats
         preg_match_all('/%([^%\s]+)%/', str_replace('%%', "\0\0", $line), $parameterMatches, \PREG_OFFSET_CAPTURE);
@@ -255,9 +257,39 @@ final class YamlDependencyInjectionExtractor
         return $references;
     }
 
+    private function maskComment(string $line): string
+    {
+        $quote = null;
+        $escaped = false;
+        for ($offset = 0, $length = \strlen($line); $offset < $length; ++$offset) {
+            $character = $line[$offset];
+            if (null !== $quote) {
+                if ('"' === $quote && $escaped) {
+                    $escaped = false;
+                } elseif ('"' === $quote && '\\' === $character) {
+                    $escaped = true;
+                } elseif ($quote === $character) {
+                    if ("'" === $quote && "'" === ($line[$offset + 1] ?? null)) {
+                        ++$offset;
+                    } else {
+                        $quote = null;
+                    }
+                }
+                continue;
+            }
+            if (\in_array($character, ["'", '"'], true)) {
+                $quote = $character;
+            } elseif ('#' === $character && (0 === $offset || ctype_space($line[$offset - 1]))) {
+                return substr($line, 0, $offset).str_repeat(' ', $length - $offset);
+            }
+        }
+
+        return $line;
+    }
+
     private function scalar(string $value): string
     {
-        $value = trim(preg_replace('/\s+#.*$/', '', $value) ?? $value);
+        $value = trim($this->maskComment($value));
         if (\strlen($value) >= 2 && (("'" === $value[0] && str_ends_with($value, "'")) || ('"' === $value[0] && str_ends_with($value, '"')))) {
             return substr($value, 1, -1);
         }

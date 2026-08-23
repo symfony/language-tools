@@ -16,6 +16,8 @@ final class XmlDependencyInjectionExtractorTest extends TestCase
             <container xmlns="http://symfony.com/schema/dic/services">
                 <parameters>
                     <parameter key="shopware.cdn.url">%env(APP_URL)%</parameter>
+                    <parameter key='single.parameter'>value</parameter>
+                    <!-- <parameter key="commented.parameter">value</parameter> -->
                 </parameters>
                 <services>
                     <service id="Shopware\Core\Checkout\Cart\CartRuleLoader">
@@ -26,6 +28,12 @@ final class XmlDependencyInjectionExtractorTest extends TestCase
                     </service>
                     <service id="cart.alias" alias="Shopware\Core\Checkout\Cart\CartRuleLoader"/>
                     <service id="legacy.loader" class="Shopware\Legacy\Loader" decorates="cart.alias"/>
+                    <service id='single.quoted' class='App\SingleQuoted'>
+                        <argument type='service' id='single.dependency'/>
+                        <argument>%single.parameter%</argument>
+                        <tag name='single.tag'/>
+                    </service>
+                    <!-- <service id="commented.service"><argument type="service" id="commented.reference"/></service> -->
                 </services>
             </container>
             XML);
@@ -36,20 +44,23 @@ final class XmlDependencyInjectionExtractorTest extends TestCase
                 ['Shopware\Core\Checkout\Cart\CartRuleLoader', 'Shopware\Core\Checkout\Cart\CartRuleLoader', null, null, ['kernel.reset']],
                 ['cart.alias', null, 'Shopware\Core\Checkout\Cart\CartRuleLoader', null, []],
                 ['legacy.loader', 'Shopware\Legacy\Loader', null, 'cart.alias', []],
+                ['single.quoted', 'App\SingleQuoted', null, null, ['single.tag']],
             ],
             array_map(
                 static fn ($service): array => [$service->id(), $service->className(), $service->alias(), $service->decorates(), $service->tags()],
                 $facts->services(),
             ),
         );
-        self::assertSame(['shopware.cdn.url'], array_map(static fn ($parameter): string => $parameter->name(), $facts->parameters()));
+        self::assertSame(['shopware.cdn.url', 'single.parameter'], array_map(static fn ($parameter): string => $parameter->name(), $facts->parameters()));
         self::assertSame(
             [
                 [DependencyInjectionSymbolKind::Service, 'Shopware\Core\Checkout\Cart\CartRuleLoader', false],
                 [DependencyInjectionSymbolKind::Service, 'cart.alias', false],
                 [DependencyInjectionSymbolKind::Service, 'Shopware\Core\Content\Rule\RuleLoader', false],
                 [DependencyInjectionSymbolKind::Service, 'logger', true],
+                [DependencyInjectionSymbolKind::Service, 'single.dependency', false],
                 [DependencyInjectionSymbolKind::Parameter, 'shopware.cart.expire', false],
+                [DependencyInjectionSymbolKind::Parameter, 'single.parameter', false],
             ],
             array_map(
                 static fn ($reference): array => [$reference->kind(), $reference->name(), $reference->isOptional()],

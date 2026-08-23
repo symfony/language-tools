@@ -14,7 +14,7 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
         $yaml = <<<'YAML'
             framework:
                 assets:
-                    json_manifest_path: '%kernel.project_dir%/public/build/manifest.json'
+                    json_manifest_path: '%kernel.project_dir%/public/build/manifest.json' # keep %commented.parameter% in documentation
             YAML;
 
         $configuration = $extractor->extract('file:///workspace/config/packages/assets.yaml', $yaml);
@@ -45,7 +45,7 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
 
                 parameters:
                     app.api_key: 'CANARY_SECRET_VALUE'
-                    app.storage_dir: '%kernel.project_dir%/storage'
+                    app.storage_dir: '%kernel.project_dir%/storage' # @commented.service %commented.parameter%
 
                 services:
                     _defaults:

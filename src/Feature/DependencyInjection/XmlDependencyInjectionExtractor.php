@@ -14,13 +14,14 @@ final class XmlDependencyInjectionExtractor
 
     public function extract(string $uri, string $text): ?DependencyInjectionSourceFacts
     {
-        if (!str_contains($text, 'symfony.com/schema/dic/services')) {
+        $source = $this->maskComments($text);
+        if (!str_contains($source, 'symfony.com/schema/dic/services')) {
             return null;
         }
         $services = [];
         $references = [];
 
-        preg_match_all('/<service\b([^>]*?)(\/>|>)/s', $text, $matches, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/<service\b([^>]*?)(\/>|>)/s', $source, $matches, \PREG_OFFSET_CAPTURE);
         foreach ($matches[1] as $i => [$attributes, $attributesOffset]) {
             $id = $this->attribute($attributes, 'id');
             if (null === $id) {
@@ -30,10 +31,16 @@ final class XmlDependencyInjectionExtractor
             $tags = [];
             if ('>' === $matches[2][$i][0]) {
                 $bodyStart = $matches[2][$i][1] + 1;
-                $bodyEnd = strpos($text, '</service', $bodyStart);
-                $body = substr($text, $bodyStart, (false === $bodyEnd ? \strlen($text) : $bodyEnd) - $bodyStart);
-                preg_match_all('/<tag\b[^>]*?\bname="([^"]+)"/s', $body, $tagMatches);
-                $tags = array_values(array_unique(array_filter($tagMatches[1], 'is_string')));
+                $bodyEnd = strpos($source, '</service', $bodyStart);
+                $body = substr($source, $bodyStart, (false === $bodyEnd ? \strlen($source) : $bodyEnd) - $bodyStart);
+                preg_match_all('/<tag\b([^>]*?)\/?>/s', $body, $tagMatches);
+                foreach ($tagMatches[1] as $tagAttributes) {
+                    $tag = $this->attribute($tagAttributes, 'name');
+                    if (null !== $tag) {
+                        $tags[] = $tag[0];
+                    }
+                }
+                $tags = array_values(array_unique($tags));
             }
             $className = $this->attribute($attributes, 'class');
             $services[] = new ServiceDeclaration(
@@ -59,12 +66,15 @@ final class XmlDependencyInjectionExtractor
         }
 
         $parameters = [];
-        preg_match_all('/<parameter\b[^>]*?\bkey="([^"]+)"/s', $text, $matches, \PREG_OFFSET_CAPTURE);
-        foreach ($matches[1] as [$name, $offset]) {
-            $parameters[] = new ParameterDeclaration($name, $uri, $this->range($text, $offset, \strlen($name)));
+        preg_match_all('/<parameter\b([^>]*?)>/s', $source, $matches, \PREG_OFFSET_CAPTURE);
+        foreach ($matches[1] as [$attributes, $attributesOffset]) {
+            $key = $this->attribute($attributes, 'key');
+            if (null !== $key) {
+                $parameters[] = new ParameterDeclaration($key[0], $uri, $this->range($text, $attributesOffset + $key[1], \strlen($key[0])));
+            }
         }
 
-        preg_match_all('/<argument\b([^>]*?)\/?>/s', $text, $matches, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/<argument\b([^>]*?)\/?>/s', $source, $matches, \PREG_OFFSET_CAPTURE);
         foreach ($matches[1] as [$attributes, $attributesOffset]) {
             $type = $this->attribute($attributes, 'type');
             $id = $this->attribute($attributes, 'id');
@@ -80,7 +90,7 @@ final class XmlDependencyInjectionExtractor
             );
         }
 
-        preg_match_all('/%([^%\s"<>]+)%/', $text, $matches, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/%([^%\s"<>]+)%/', $source, $matches, \PREG_OFFSET_CAPTURE);
         foreach ($matches[1] as [$name, $offset]) {
             if (str_starts_with($name, 'env(')) {
                 continue;
@@ -99,11 +109,18 @@ final class XmlDependencyInjectionExtractor
     /** @return array{string, int}|null */
     private function attribute(string $attributes, string $name): ?array
     {
-        if (!preg_match('/\b'.preg_quote($name, '/').'="([^"]*)"/', $attributes, $match, \PREG_OFFSET_CAPTURE)) {
+        if (!preg_match('/\b'.preg_quote($name, '/').'\s*=\s*([\'\"])(.*?)\1/s', $attributes, $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
 
-        return [$match[1][0], $match[1][1]];
+        return [$match[2][0], $match[2][1]];
+    }
+
+    private function maskComments(string $text): string
+    {
+        return preg_replace_callback('/<!--.*?(?:-->|$)/s', static function (array $match): string {
+            return preg_replace('/[^\r\n]/', ' ', $match[0]) ?? $match[0];
+        }, $text) ?? $text;
     }
 
     private function range(string $text, int $offset, int $length): Range

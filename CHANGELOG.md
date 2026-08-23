@@ -6,6 +6,8 @@
 - Honor Twig callable injection and variadic options
 - Ignore unpacked translation parameter maps when checking placeholders
 - Validate strict bundle configuration children below extensible nodes
+- Ignore comments and accept single-quoted XML service attributes
+- Ignore inline YAML comments when extracting dependency injection references
 - Release cached public assets when a workspace project is removed
 - Find references for Twig functions and filters across templates
 - Resolve vendor Twig components such as ux:icon from runtime metadata
