@@ -9,3 +9,4 @@ out/**
 tsconfig.json
 tsconfig.test.json
 images/guide/
+images/blog/

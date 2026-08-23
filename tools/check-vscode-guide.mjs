@@ -110,5 +110,8 @@ if (!manifest.scripts.package.includes(`--baseImagesUrl ${manifest.repository.ur
 if (!packageIgnore.split('\n').includes('images/guide/')) {
     throw new Error('The guide images must be excluded from the extension package');
 }
+if (!packageIgnore.split('\n').includes('images/blog/')) {
+    throw new Error('The blog images must be excluded from the extension package');
+}
 
 console.log(`Marketplace overview covers ${referenceRows.length} integrations, ${supported} supported combinations, ${imageFiles.length} captures and ${tourSlides.length} tour slides.`);
