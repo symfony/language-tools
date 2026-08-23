@@ -58,5 +58,5 @@ framework:
             'bundle configuration diagnostics',
         );
         assert.ok(diagnostics.some((item) => item.message.includes('unknown_key')));
-    });
+    }, undefined, 'config/packages');
 }

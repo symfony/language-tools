@@ -20,8 +20,8 @@ export async function open(relativePath: string): Promise<vscode.TextDocument> {
     return document;
 }
 
-export async function withTemporaryDocument<T>(relativePath: string, contents: string, test: (document: vscode.TextDocument) => Promise<T>, languageId?: string): Promise<T> {
-    const directory = vscode.Uri.joinPath(currentWorkspace.uri, '.lsp-e2e');
+export async function withTemporaryDocument<T>(relativePath: string, contents: string, test: (document: vscode.TextDocument) => Promise<T>, languageId?: string, baseDirectory = '.lsp-e2e'): Promise<T> {
+    const directory = vscode.Uri.joinPath(currentWorkspace.uri, baseDirectory);
     const uri = vscode.Uri.joinPath(directory, relativePath);
     await vscode.workspace.fs.createDirectory(directory);
     await vscode.workspace.fs.writeFile(uri, Buffer.from(contents));
