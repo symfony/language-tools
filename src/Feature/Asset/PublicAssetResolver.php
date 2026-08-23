@@ -5,18 +5,24 @@ namespace Symfony\Lsp\Feature\Asset;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectStateInterface;
 
 /**
  * Resolves asset() paths against the public/ document root for projects
  * that serve plain files instead of AssetMapper logical paths.
  */
-final class PublicAssetResolver
+final class PublicAssetResolver implements ProjectStateInterface
 {
     private const CACHE_TTL_SECONDS = 10;
     private const MAX_FILES = 5000;
 
     /** @var array<string, array{int, list<string>}> */
     private array $cache = [];
+
+    public function removeProject(Project $project): void
+    {
+        unset($this->cache[Path::canonicalize(Path::join($project->rootPath(), 'public'))]);
+    }
 
     public function path(Project $project, string $logicalPath): ?string
     {

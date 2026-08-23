@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Release cached public assets when a workspace project is removed
 - Find references for Twig functions and filters across templates
 - Resolve vendor Twig components such as ux:icon from runtime metadata
 - Complete and validate named arguments for Twig functions and filters

@@ -154,6 +154,7 @@ final class AssetProviderTest extends TestCase
             $text = "<link href=\"{{ asset('css/app.css') }}\">\n{{ asset('css/missing.css') }}\n";
             $documents = new DocumentStore();
             $documents->open(new Document($uri, 'twig', 1, $text));
+            $publicAssets = new PublicAssetResolver();
             $provider = new AssetProvider(
                 new DocumentContextResolver($documents, $projects),
                 $converter,
@@ -162,7 +163,7 @@ final class AssetProviderTest extends TestCase
                 new AssetIndexRegistry(),
                 new AssetSourceIndexRegistry(),
                 $extractor,
-                new PublicAssetResolver(),
+                $publicAssets,
             );
 
             $params = $this->params($converter, $uri, $text, strpos($text, 'css/app.css') + 2);
@@ -178,8 +179,14 @@ final class AssetProviderTest extends TestCase
             $completionText = "{{ asset('css/";
             $documents->open(new Document($completionUri, 'twig', 1, $completionText));
             self::assertSame(['css/app.css'], $this->completionLabels($provider, $converter, $completionUri, $completionText));
-        } finally {
+
             unlink($root.'/public/css/app.css');
+            file_put_contents($root.'/public/css/admin.css', 'body {}');
+            $publicAssets->removeProject($project);
+            self::assertSame(['css/admin.css'], $this->completionLabels($provider, $converter, $completionUri, $completionText));
+        } finally {
+            @unlink($root.'/public/css/app.css');
+            @unlink($root.'/public/css/admin.css');
             rmdir($root.'/public/css');
             rmdir($root.'/public');
             rmdir($root);

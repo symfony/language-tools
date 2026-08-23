@@ -45,4 +45,5 @@ resolved against the application's ``public/`` directory. Hover shows the
 resolved file, and Go to Definition and document links open it. Completion
 suggests files from ``public/``, including build artifacts and installed
 bundle assets when they exist on disk. Applications without AssetMapper,
-such as Webpack Encore setups, get the same behavior.
+such as Webpack Encore setups, get the same behavior. Removing and re-adding
+a workspace folder refreshes the public file list.

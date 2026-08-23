@@ -7,6 +7,7 @@ use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 use Symfony\Component\Finder\Finder;
+use Symfony\Lsp\Feature\Asset\PublicAssetResolver;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Feature\CodeLensProviderInterface;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
@@ -76,6 +77,7 @@ final class ServiceConfigurationTest extends TestCase
             DiagnosticProviderRegistry::class,
             PersistentSourceIndexStore::class,
             ProjectIndexStatusRegistry::class,
+            PublicAssetResolver::class,
             RuntimeConfiguration::class,
             TranslationConfigurationRegistry::class,
             WorkspaceTrust::class,
