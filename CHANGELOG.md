@@ -32,7 +32,7 @@
 - Exclude verified-impossible probe kinds from support scores and prune untracked projects
 - Persist dogfood support scores to a ledger and render an HTML trend report
 - Score dogfood support per project to track feature coverage over time
-- Index ini translation catalogs with directory locales
+- Index INI translation catalogs with directory locales
 - Resolve asset() paths against the public document root
 - Export Doctrine metadata from the runtime so XML mappings and vendor entities resolve
 - Extract service declarations and references from XML service definitions
