@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Server;
 use Amp\ByteStream\ReadableBuffer;
 use Amp\ByteStream\ReadableIterableStream;
 use Fabpot\JsonRpc\ContentLengthJsonRpcTransport;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Server\LanguageServerFactory;
@@ -115,7 +116,8 @@ final class LanguageServerTest extends TestCase
         }
     }
 
-    public function testWatchedComposerChangeCanCreateProgressWithoutDeadlockingListener(): void
+    #[DataProvider('composerFileProvider')]
+    public function testWatchedComposerChangesCanCreateProgressWithoutDeadlockingListener(string $composerFile): void
     {
         $root = realpath(\dirname(__DIR__).'/Fixtures/RuntimeApplication');
         self::assertIsString($root);
@@ -126,7 +128,7 @@ final class LanguageServerTest extends TestCase
                 'initializationOptions' => ['runtimeIndexing' => false],
             ]]),
             $this->frame(['jsonrpc' => '2.0', 'method' => 'workspace/didChangeWatchedFiles', 'params' => [
-                'changes' => [['uri' => 'file://'.$root.'/composer.json', 'type' => 2]],
+                'changes' => [['uri' => 'file://'.$root.'/'.$composerFile, 'type' => 2]],
             ]]),
             $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'result' => null]),
             $this->frame(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'shutdown']),
@@ -146,6 +148,13 @@ final class LanguageServerTest extends TestCase
         } finally {
             $this->removeDirectory($root.'/var/symfony-lsp/dev');
         }
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function composerFileProvider(): iterable
+    {
+        yield 'manifest' => ['composer.json'];
+        yield 'lock file' => ['composer.lock'];
     }
 
     public function testReportsCancelledFeatureRequestsWithoutAnInternalError(): void

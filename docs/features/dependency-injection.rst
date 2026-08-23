@@ -19,8 +19,9 @@ Symfony Language Tools recognizes these YAML declarations and references:
 XML service definitions using the ``dic/services`` schema are recognized
 too: service, alias and parameter declarations, ``decorates`` targets,
 tags, and service and parameter references in arguments. Single-quoted and
-double-quoted attributes are supported, and XML comments are ignored.
-Completion is only available in YAML and PHP files.
+double-quoted attributes are supported, and XML comments are ignored. Saved
+XML changes refresh the effective container metadata. Completion is only
+available in YAML and PHP files.
 
 ``%parameter%`` references are also recognized outside the ``parameters``
 and ``services`` sections in configuration files, such as

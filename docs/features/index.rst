@@ -181,14 +181,16 @@ Troubleshooting
 ---------------
 
 Automatic discovery recognizes Composer projects that require
-``symfony/framework-bundle`` in ``require``. Legacy applications without
-``"type": "project"`` are also recognized when ``bin/console`` exists. Set
-``projectRoots`` explicitly for applications with a custom layout.
+``symfony/framework-bundle`` in ``require`` or contain it in ``composer.lock``
+as a transitive dependency. Legacy applications without ``"type": "project"``
+are also recognized when ``bin/console`` exists. Set ``projectRoots`` explicitly
+for applications with a custom layout.
 
 If a runtime-backed feature returns no results, verify that:
 
 * the workspace root contains ``composer.json``;
-* ``composer.json`` requires ``symfony/framework-bundle`` in ``require``;
+* ``composer.json`` requires ``symfony/framework-bundle`` in ``require`` or
+  ``composer.lock`` contains it as a transitive dependency;
 * ``vendor/autoload.php`` exists;
 * the application kernel boots through one of the supported conventions in the
   configured environment;

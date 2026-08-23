@@ -73,15 +73,20 @@ final class ProjectRuntimeRefresher
             return true;
         }
         if ('xml' === $extension) {
-            return str_starts_with($path, 'config/');
+            return true;
         }
-        if (\in_array($extension, ['json', 'xlf', 'xliff'], true)) {
-            return str_contains('/'.$path, '/translations/');
+        if (\in_array($extension, ['ini', 'json', 'xlf', 'xliff'], true)) {
+            return $this->isTranslationPath($path);
         }
         if (!\in_array($extension, ['yaml', 'yml'], true)) {
             return false;
         }
 
-        return str_starts_with($path, 'config/') || str_contains('/'.$path, '/translations/');
+        return str_starts_with($path, 'config/') || $this->isTranslationPath($path);
+    }
+
+    private function isTranslationPath(string $path): bool
+    {
+        return false !== stripos('/'.$path, '/translations/');
     }
 }

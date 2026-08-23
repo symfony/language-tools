@@ -19,7 +19,8 @@ Definitions are read from YAML, JSON, XLIFF and PHP resources under a
 ``translations/`` directory. Nested YAML and JSON keys use dot notation.
 INI catalogs using a locale directory, such as
 ``Translations/en_US/messages.ini`` in Mautic, are recognized too. Unsaved
-resource changes are available immediately.
+resource changes are available immediately, and changes made by external tools
+are picked up while the server is running.
 
 ICU brace placeholders such as ``{name}`` are only interpreted in ICU
 catalogs, identified by the ``+intl-icu`` domain suffix. In plain catalogs,

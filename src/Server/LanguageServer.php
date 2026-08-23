@@ -233,7 +233,7 @@ final class LanguageServer
             $sourceFileChange = $this->sourceScanner->refreshUri($change['uri'], $deleted);
             $this->projectRuntimeRefresher->refreshUri($change['uri'], $sourceFileChange);
             $basename = basename($this->uriToPathConverter->convert($change['uri']) ?? '');
-            if ('composer.json' === $basename) {
+            if (\in_array($basename, ['composer.json', 'composer.lock'], true)) {
                 $rediscover = true;
             }
             if ('.gitignore' === $basename) {

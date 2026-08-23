@@ -12,7 +12,7 @@ final class WorkspaceFileWatcher
 {
     private const DIRECTORY_CHANGE_KIND = 1 | 4;
     private const EXCLUDED_DIRECTORIES = ['.git', 'node_modules', 'var', 'vendor'];
-    private const SOURCE_PATTERN = '*.{php,twig,yaml,yml,json,xml,xlf,xliff,css,js,mjs,ts,svg,png,jpg,jpeg,gif,webp,woff,woff2,ttf,otf,wasm}';
+    private const SOURCE_PATTERN = '*.{php,twig,yaml,yml,ini,json,xml,xlf,xliff,css,js,mjs,ts,svg,png,jpg,jpeg,gif,webp,woff,woff2,ttf,otf,wasm}';
 
     private bool $supported = false;
     private bool $relativePatternSupported = false;

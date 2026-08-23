@@ -4,6 +4,9 @@
 
 - Honor Composer and environment options for Symfony Runtime bootstraps
 - Select console command JSON without mistaking log context for metadata
+- Refresh runtime metadata after INI translation and XML service changes
+- Watch INI translation catalogs for external changes
+- Rediscover projects after composer.lock changes
 - Ignore Twig member calls when validating callable arguments
 - Parse Twig callable completion and diagnostics outside string literals
 - Honor Twig callable injection and variadic options

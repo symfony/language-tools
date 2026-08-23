@@ -42,7 +42,7 @@ final class WorkspaceFileWatcherTest extends TestCase
         $watcher->register();
         $watcher->register();
 
-        $sourcePattern = '*.{php,twig,yaml,yml,json,xml,xlf,xliff,css,js,mjs,ts,svg,png,jpg,jpeg,gif,webp,woff,woff2,ttf,otf,wasm}';
+        $sourcePattern = '*.{php,twig,yaml,yml,ini,json,xml,xlf,xliff,css,js,mjs,ts,svg,png,jpg,jpeg,gif,webp,woff,woff2,ttf,otf,wasm}';
         self::assertSame([[
             'method' => 'client/registerCapability',
             'params' => ['registrations' => [[
@@ -92,7 +92,7 @@ final class WorkspaceFileWatcherTest extends TestCase
                 'id' => 'symfony-lsp-workspace-files',
                 'method' => 'workspace/didChangeWatchedFiles',
                 'registerOptions' => ['watchers' => [
-                    ['globPattern' => '**/*.{php,twig,yaml,yml,json,xml,xlf,xliff,css,js,mjs,ts,svg,png,jpg,jpeg,gif,webp,woff,woff2,ttf,otf,wasm}'],
+                    ['globPattern' => '**/*.{php,twig,yaml,yml,ini,json,xml,xlf,xliff,css,js,mjs,ts,svg,png,jpg,jpeg,gif,webp,woff,woff2,ttf,otf,wasm}'],
                     ['globPattern' => '**/.env*'],
                     ['globPattern' => '**/.gitignore'],
                     ['globPattern' => '**/composer.{json,lock}'],
