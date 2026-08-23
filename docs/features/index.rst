@@ -176,6 +176,8 @@ The current version has these general limitations:
 * references and rename cover only statically recognized values.
 
 See each integration page for its supported contexts and specific limitations.
+Symfony Runtime front controllers honor the class, options and project directory
+configured under ``extra.runtime`` as well as ``APP_RUNTIME_OPTIONS``.
 
 Troubleshooting
 ---------------

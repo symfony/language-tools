@@ -4,6 +4,7 @@
 
 - Handle dynamically declared Twig callable options conservatively
 - Preserve parameter references inside YAML block scalar content
+- Honor absolute Symfony Runtime project directories
 - Honor Composer and environment options for Symfony Runtime bootstraps
 - Select console command JSON without mistaking log context for metadata
 - Refresh runtime metadata after INI translation and XML service changes

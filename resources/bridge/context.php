@@ -254,11 +254,18 @@ final class SymfonyLspBridgeContext
         $projectDir = $runtime['project_dir'] ?? null;
         unset($runtime['class'], $runtime['autoload_template'], $runtime['project_dir']);
         if (is_string($projectDir) && '' !== $projectDir) {
-            $projectDir = rtrim($this->project, '/\\').'/'.trim($projectDir, '/\\');
+            if (!$this->isAbsolutePath($projectDir)) {
+                $projectDir = rtrim($this->project, '/\\').'/'.trim($projectDir, '/\\');
+            }
             $options['project_dir'] = realpath($projectDir) ?: $projectDir;
         }
 
         return [$runtimeClass, array_replace($runtime, $options)];
+    }
+
+    private function isAbsolutePath(string $path): bool
+    {
+        return 1 === preg_match('{^(?:[/\\\\]|[A-Za-z]:[/\\\\]|[A-Za-z][A-Za-z0-9+.-]*://)}', $path);
     }
 
     private function extractKernel(mixed $application): ?object

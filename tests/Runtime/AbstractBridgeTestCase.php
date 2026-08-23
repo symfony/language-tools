@@ -697,7 +697,10 @@ abstract class AbstractBridgeTestCase extends TestCase
             {
                 public function __construct(private array $options = [])
                 {
-                    if ('composer' !== ($options['configured_option'] ?? null) || 'environment' !== ($options['environment_option'] ?? null)) {
+                    if ('composer' !== ($options['configured_option'] ?? null)
+                        || 'environment' !== ($options['environment_option'] ?? null)
+                        || realpath(dirname(__DIR__)) !== realpath($options['project_dir'] ?? '')
+                    ) {
                         throw new \RuntimeException('The configured runtime options were not loaded.');
                     }
                 }
@@ -748,6 +751,7 @@ abstract class AbstractBridgeTestCase extends TestCase
             'extra' => ['runtime' => [
                 'class' => 'Distribution\\ConfiguredRuntime',
                 'configured_option' => 'composer',
+                'project_dir' => $this->temporaryDirectory,
             ]],
         ], \JSON_THROW_ON_ERROR));
         file_put_contents($this->temporaryDirectory.'/vendor/autoload_runtime.php', <<<'PHP'
