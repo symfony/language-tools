@@ -44,6 +44,14 @@ final class WorkflowTriggerTest extends TestCase
         self::assertStringContainsString("              if: \${{ inputs.verify_only != true && steps.open-vsx.outputs.enabled == 'true' }}", $contents);
     }
 
+    public function testAzureOutputSuppressionDoesNotHideTheLoginVersion(): void
+    {
+        $contents = file_get_contents(self::ROOT.'/.github/workflows/publish-vscode.yaml');
+        self::assertIsString($contents);
+        self::assertDoesNotMatchRegularExpression('/^ {12}AZURE_CORE_OUTPUT:/m', $contents);
+        self::assertSame(2, preg_match_all('/^ {18}AZURE_CORE_OUTPUT: none$/m', $contents));
+    }
+
     /** @return iterable<string, array{string}> */
     public static function regularWorkflowProvider(): iterable
     {

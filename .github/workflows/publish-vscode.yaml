@@ -34,7 +34,6 @@ jobs:
             id-token: write
         env:
             AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
-            AZURE_CORE_OUTPUT: none
             AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
             RELEASE_TAG: ${{ inputs.tag }}
             VSIX_DIRECTORY: ${{ github.workspace }}/var/vscode-marketplaces
@@ -125,6 +124,8 @@ jobs:
                   allow-no-subscriptions: true
             - name: Verify Visual Studio Marketplace access
               working-directory: editor/vscode
+              env:
+                  AZURE_CORE_OUTPUT: none
               run: |
                   publisher="$(node --print "require('./package.json').publisher")"
                   npx vsce verify-pat "$publisher" --azure-credential
@@ -140,6 +141,7 @@ jobs:
               if: ${{ inputs.verify_only != true }}
               working-directory: editor/vscode
               env:
+                  AZURE_CORE_OUTPUT: none
                   PRERELEASE: ${{ steps.release.outputs.prerelease }}
               run: ../../tools/publish-vscode "$VSIX_DIRECTORY"
             - name: Publish release packages to Open VSX

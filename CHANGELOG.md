@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep Azure CLI version detection visible during marketplace login
 - Skip Open VSX verification and publication when credentials are unavailable
 - Capture dogfood server errors without pipe backpressure
 - Handle dynamically declared Twig callable options conservatively
