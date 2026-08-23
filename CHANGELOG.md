@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Find references for Twig functions and filters across templates
+- Resolve vendor Twig components such as ux:icon from runtime metadata
 - Complete and validate named arguments for Twig functions and filters
 - Fix dogfood probe patterns and wipe stale dev caches before matrix cold runs
 - Complete Twig function and filter names in templates

@@ -9,6 +9,8 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
 {
     private bool $complete = false;
     private bool $runtimeComplete = false;
+    /** @var array<string, TwigComponent> */
+    private array $runtimeComponents = [];
     /** @var array<string, true> */
     private array $runtimeNames = [];
     /** @var array<string, true> */
@@ -52,16 +54,27 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
             }
         }
 
-        return null;
+        // vendor components, such as ux:icon, only exist in runtime metadata
+        $component = $this->runtimeComponents[$name] ?? null;
+        if (null === $component && isset($this->caseInsensitiveRuntimeNames[strtolower($name)])) {
+            foreach ($this->runtimeComponents as $candidate) {
+                if (0 === strcasecmp($candidate->name(), $name)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return $component;
     }
 
     /** @return list<TwigComponentReference> */
     public function references(string $name): array
     {
+        $caseInsensitive = isset($this->caseInsensitiveRuntimeNames[strtolower($name)]);
         $references = [];
         foreach ($this->facts() as $facts) {
             foreach ($facts->references() as $reference) {
-                if ($reference->name() === $name) {
+                if ($reference->name() === $name || ($caseInsensitive && 0 === strcasecmp($reference->name(), $name))) {
                     $references[] = $reference;
                 }
             }
@@ -123,15 +136,20 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     }
 
     /**
-     * @param list<string> $names
-     * @param list<string> $caseInsensitiveNames
+     * @param list<string>        $names
+     * @param list<string>        $caseInsensitiveNames
+     * @param list<TwigComponent> $components
      */
-    public function replaceRuntime(bool $complete, array $names, string $anonymousTemplateDirectory, array $caseInsensitiveNames = []): void
+    public function replaceRuntime(bool $complete, array $names, string $anonymousTemplateDirectory, array $caseInsensitiveNames = [], array $components = []): void
     {
         $this->runtimeComplete = $complete;
         $this->runtimeNames = array_fill_keys($names, true);
         $this->caseInsensitiveRuntimeNames = array_fill_keys(array_map('strtolower', $caseInsensitiveNames), true);
         $this->anonymousTemplateDirectory = $anonymousTemplateDirectory;
+        $this->runtimeComponents = [];
+        foreach ($components as $component) {
+            $this->runtimeComponents[$component->name()] = $component;
+        }
     }
 
     public function isRuntimeComplete(): bool

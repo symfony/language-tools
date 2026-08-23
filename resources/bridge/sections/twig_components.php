@@ -65,20 +65,33 @@ function bridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
             $complete = true;
             $warnings = [];
             $names = [];
+            $components = [];
             foreach ($definitionsByTag['twig.component'] as $definition) {
+                $class = is_string($definition['class'] ?? null) ? $definition['class'] : null;
                 foreach (definitionTagParameters($definition, 'twig.component') as $parameters) {
-                    if (is_string($parameters['key'] ?? null) && '' !== $parameters['key']) {
-                        $names[$parameters['key']] = true;
-                        continue;
-                    }
-                    $class = is_string($definition['class'] ?? null) ? $definition['class'] : null;
-                    $name = null === $class ? null : autoTwigComponentName($class, $defaults);
+                    $name = is_string($parameters['key'] ?? null) && '' !== $parameters['key']
+                        ? $parameters['key']
+                        : (null === $class ? null : autoTwigComponentName($class, $defaults));
                     if (null === $name) {
                         $complete = false;
                         $warnings[] = sprintf('Unable to derive the component name of "%s".', $class ?? 'an unnamed component service');
                         continue;
                     }
                     $names[$name] = true;
+                    $file = null;
+                    if (null !== $class && class_exists($class)) {
+                        try {
+                            $file = (new ReflectionClass($class))->getFileName() ?: null;
+                        } catch (Throwable) {
+                        }
+                    }
+                    $components[$name] = [
+                        'name' => $name,
+                        'class' => $class,
+                        'file' => $file,
+                        'template' => is_string($parameters['template'] ?? null) ? $parameters['template'] : null,
+                        'live' => true === ($parameters['live'] ?? null),
+                    ];
                 }
             }
             $caseInsensitiveNames = [];
@@ -102,12 +115,15 @@ function bridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
             sort($names);
             $caseInsensitiveNames = array_keys($caseInsensitiveNames);
             sort($caseInsensitiveNames);
+            ksort($components);
+            $components = array_values($components);
             $section = [
                 'complete' => $complete,
-                'generation' => hash('sha256', json_encode([$complete, $names, $caseInsensitiveNames, $anonymousTemplateDirectory], JSON_THROW_ON_ERROR)),
+                'generation' => hash('sha256', json_encode([$complete, $names, $caseInsensitiveNames, $anonymousTemplateDirectory, $components], JSON_THROW_ON_ERROR)),
                 'names' => $names,
                 'caseInsensitiveNames' => $caseInsensitiveNames,
                 'anonymousTemplateDirectory' => $anonymousTemplateDirectory,
+                'components' => $components,
                 'warnings' => $warnings,
             ];
         } catch (Throwable) {

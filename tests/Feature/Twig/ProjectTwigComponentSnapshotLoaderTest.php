@@ -6,6 +6,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\Twig\ProjectTwigComponentSnapshotLoader;
 use Symfony\Lsp\Feature\Twig\TwigComponentIndexRegistry;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Runtime\ContainerPathMapper;
+use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
 {
@@ -13,16 +16,34 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
     {
         $indexes = new TwigComponentIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
-        $loader = new ProjectTwigComponentSnapshotLoader($indexes);
+        $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
 
         $loader->load($project, ['sections' => ['twig_components' => [
             'complete' => true,
             'names' => ['ux:icon', 'Alert', 42, ['nested']],
             'caseInsensitiveNames' => ['ux:icon', 42, ['nested']],
             'anonymousTemplateDirectory' => 'ui',
+            'components' => [
+                [
+                    'name' => 'UX:Icon',
+                    'class' => 'Symfony\UX\Icons\Twig\UXIconComponent',
+                    'file' => '/workspace/vendor/symfony/ux-icons/src/Twig/UXIconComponent.php',
+                    'template' => '@UXIcons/Icon.html.twig',
+                    'live' => false,
+                ],
+                ['name' => 'broken', 'class' => 'App\Broken', 'file' => null],
+            ],
         ]]]);
 
         $index = $indexes->forProject($project);
+        // UX Icons registers UX:Icon with a case-insensitive renderer alias
+        $vendor = $index->get('ux:icon');
+        self::assertNotNull($vendor);
+        self::assertSame('file:///workspace/vendor/symfony/ux-icons/src/Twig/UXIconComponent.php', $vendor->uri());
+        self::assertSame('Symfony\UX\Icons\Twig\UXIconComponent', $vendor->className());
+        self::assertSame('@UXIcons/Icon.html.twig', $vendor->template());
+        self::assertNotNull($index->get('UX:Icon'));
+        self::assertNull($index->get('broken'));
         self::assertTrue($index->isRuntimeComplete());
         self::assertTrue($index->hasRuntimeName('ux:icon'));
         self::assertTrue($index->hasRuntimeName('UX:Icon'));
@@ -37,7 +58,7 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
     {
         $indexes = new TwigComponentIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
-        $loader = new ProjectTwigComponentSnapshotLoader($indexes);
+        $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
         $indexes->forProject($project)->replaceRuntime(true, ['stale_component'], 'ui', ['stale_component']);
 
         $loader->load($project, ['sections' => ['twig_components' => [
@@ -57,7 +78,7 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
     {
         $indexes = new TwigComponentIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
-        $loader = new ProjectTwigComponentSnapshotLoader($indexes);
+        $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
 
         $loader->load($project, ['sections' => ['twig_components' => [
             'complete' => false,
@@ -75,7 +96,7 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
     {
         $indexes = new TwigComponentIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
-        $loader = new ProjectTwigComponentSnapshotLoader($indexes);
+        $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
 
         $loader->load($project, ['sections' => ['twig_components' => ['names' => 'invalid']]]);
         $loader->load($project, ['sections' => 'invalid']);

@@ -75,6 +75,10 @@ final class TwigComponentRelationshipProvider implements DefinitionProviderInter
         foreach ($this->indexes->forProject($project)->declarations($component->name()) as $declaration) {
             $locations[] = $this->protocol->location($declaration->uri(), $declaration->range());
         }
+        if ([] === $locations && '' !== $component->uri()) {
+            // vendor components have no source declaration; open the class
+            $locations[] = $this->protocol->location($component->uri(), $component->range());
+        }
 
         return $locations;
     }

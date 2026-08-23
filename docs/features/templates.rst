@@ -49,7 +49,9 @@ Component names and public properties are completed in ``<twig:...>`` tags,
 including bundle-provided and anonymous component names found in runtime
 metadata.
 Hover shows the component class, template, and public properties. Go to
-Definition opens the component class and anonymous component template. Find All
+Definition opens the component class and anonymous component template. For
+components shipped by bundles, such as ``ux:icon``, the class and template
+come from runtime metadata and definition opens the vendor class. Find All
 References and code lenses expose statically recognized component usages.
 
 Symfony Language Tools recognizes ``#[AsTwigComponent]`` and
