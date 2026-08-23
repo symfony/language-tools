@@ -23,6 +23,22 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
         return array_keys($names);
     }
 
+    /** @return list<TwigCallableUsage> */
+    public function usages(TwigCallableKind $kind, string $name): array
+    {
+        $usages = [];
+        foreach ($this->facts() as $facts) {
+            foreach ($facts->usages() as $usage) {
+                if ($kind === $usage->kind() && $name === $usage->name()) {
+                    $usages[] = $usage;
+                }
+            }
+        }
+        usort($usages, static fn (TwigCallableUsage $left, TwigCallableUsage $right): int => [$left->uri(), $left->range()->start()->line(), $left->range()->start()->character()] <=> [$right->uri(), $right->range()->start()->line(), $right->range()->start()->character()]);
+
+        return $usages;
+    }
+
     /** @return list<TwigCallableDeclaration> */
     public function declarations(TwigCallableKind $kind, string $name): array
     {

@@ -18,6 +18,7 @@ use Symfony\Lsp\Feature\Twig\TwigCallableIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigCallableKind;
 use Symfony\Lsp\Feature\Twig\TwigCallableProvider;
 use Symfony\Lsp\Feature\Twig\TwigCallableReferenceExtractor;
+use Symfony\Lsp\Feature\Twig\TwigCallableSourceFacts;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -164,8 +165,12 @@ final class TwigCallableProviderTest extends TestCase
         $documents->open(new Document($twigUri, 'twig', 1, $twigText));
         $documents->open(new Document($runtimeUri, 'php', 1, $runtimeText));
         $documents->open(new Document($outsideUri, 'php', 1, $outsideText));
+        $referenceExtractor = new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()), $commentParser, $converter);
         $indexes = new TwigCallableIndexRegistry();
-        $indexes->forProject($project)->replace($this->declarationExtractor($converter, $phpParser)->extract($extensionUri, $extensionText));
+        $indexes->forProject($project)->replace(
+            $this->declarationExtractor($converter, $phpParser)->extract($extensionUri, $extensionText),
+            new TwigCallableSourceFacts($twigUri, [], $referenceExtractor->all($twigUri, $twigText)),
+        );
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
         $classExtractor = new PhpClassDeclarationExtractor($converter, $phpParser);
         $classIndexes->forProject($project)->replace(
@@ -177,7 +182,7 @@ final class TwigCallableProviderTest extends TestCase
             $converter,
             $protocol = new LspProtocolMapper(),
             $indexes,
-            new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()), $commentParser),
+            $referenceExtractor,
             $classIndexes,
             new ProjectDocumentReader($documents, new ProjectPathResolver(new UriToPathConverter())),
             $phpParser,
@@ -245,6 +250,11 @@ final class TwigCallableProviderTest extends TestCase
                 ),
             ),
         ], $provider->definition($this->params($twigUri, $twigText, 'outside_name', $converter)));
+
+        $functionReferences = $provider->references($this->params($twigUri, $twigText, 'function_name', $converter));
+        self::assertCount(2, $functionReferences ?? []);
+        self::assertSame([$twigUri, $twigUri], array_column($functionReferences ?? [], 'uri'));
+        self::assertCount(2, $provider->references($this->params($twigUri, $twigText, 'filter_name', $converter)) ?? []);
 
         self::assertNull($provider->hover($this->params($twigUri, $twigText, 'path', $converter)));
         self::assertNull($provider->hover($this->params($twigUri, $twigText, 'function_name', $converter, strrpos($twigText, 'function_name'))));
@@ -321,7 +331,7 @@ final class TwigCallableProviderTest extends TestCase
             $converter,
             new LspProtocolMapper(),
             $indexes,
-            new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()), $commentParser),
+            new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()), $commentParser, $converter),
             $classIndexes,
             new ProjectDocumentReader($documents, new ProjectPathResolver(new UriToPathConverter())),
             $phpParser,

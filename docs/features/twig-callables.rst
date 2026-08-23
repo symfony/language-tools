@@ -29,6 +29,12 @@ call are omitted.
 
     {{ product|image(width: 200, lazy: true) }}
 
+References
+----------
+
+Find All References lists the recognized function and filter usages across
+indexed application templates.
+
 Diagnostics
 -----------
 
@@ -52,5 +58,4 @@ Limitations
 -----------
 
 Dynamic names and callables are ignored. Functions and filters provided only by
-dependencies are left to a general Twig language server. Find All References
-isn't available because template usages aren't indexed.
+dependencies are left to a general Twig language server.

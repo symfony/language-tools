@@ -6,11 +6,30 @@ use Symfony\Lsp\Index\SourceFactsInterface;
 
 final class TwigCallableSourceFacts implements SourceFactsInterface
 {
-    /** @param list<TwigCallableDeclaration> $declarations */
+    /**
+     * Declared with a default so payloads cached before usages existed
+     * still unserialize into a valid object.
+     *
+     * @var list<TwigCallableUsage>
+     */
+    private array $usages = [];
+
+    /**
+     * @param list<TwigCallableDeclaration> $declarations
+     * @param list<TwigCallableUsage>       $usages
+     */
     public function __construct(
         private readonly string $uri,
         private readonly array $declarations,
+        array $usages = [],
     ) {
+        $this->usages = $usages;
+    }
+
+    /** @return list<TwigCallableUsage> */
+    public function usages(): array
+    {
+        return $this->usages;
     }
 
     public function uri(): string
@@ -26,6 +45,6 @@ final class TwigCallableSourceFacts implements SourceFactsInterface
 
     public function isEmpty(): bool
     {
-        return [] === $this->declarations;
+        return [] === $this->declarations && [] === $this->usages;
     }
 }

@@ -49,7 +49,7 @@ Supported Integrations
       - Yes
       - Yes
       - Yes
-      - No
+      - Yes
       - No
       - Yes
     * - `Translations`_

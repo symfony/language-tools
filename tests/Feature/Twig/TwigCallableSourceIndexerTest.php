@@ -8,11 +8,16 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Twig\TwigCallableDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigCallableKind;
+use Symfony\Lsp\Feature\Twig\TwigCallableReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableSourceFacts;
 use Symfony\Lsp\Feature\Twig\TwigCallableSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 
 final class TwigCallableSourceIndexerTest extends TestCase
@@ -58,9 +63,12 @@ final class TwigCallableSourceIndexerTest extends TestCase
 
     private function indexer(TwigCallableIndexRegistry $indexes): TwigCallableSourceIndexer
     {
+        $converter = new PositionConverter();
+
         return new TwigCallableSourceIndexer(
             $indexes,
-            new TwigCallableDeclarationExtractor(new PositionConverter(), new TolerantPhpParser(new Parser())),
+            new TwigCallableDeclarationExtractor($converter, new TolerantPhpParser(new Parser())),
+            new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()), $commentParser, $converter),
         );
     }
 }

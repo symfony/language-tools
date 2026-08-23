@@ -12,6 +12,7 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
     public function __construct(
         private readonly TwigCallableIndexRegistry $indexes,
         private readonly TwigCallableDeclarationExtractor $extractor,
+        private readonly TwigCallableReferenceExtractor $references,
     ) {
     }
 
@@ -22,7 +23,7 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
 
     public function payloadClasses(): array
     {
-        return [TwigCallableDeclaration::class, TwigCallableKind::class, TwigCallableSourceFacts::class];
+        return [TwigCallableDeclaration::class, TwigCallableKind::class, TwigCallableSourceFacts::class, TwigCallableUsage::class];
     }
 
     public function runtimeDeclarations(mixed $data): array
@@ -49,6 +50,13 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
 
     protected function extract(Project $project, SourceDocument $document): ?TwigCallableSourceFacts
     {
-        return 'php' === $document->languageId() ? $this->extractor->extract($document->uri(), $document->text()) : null;
+        if ('php' === $document->languageId()) {
+            return $this->extractor->extract($document->uri(), $document->text());
+        }
+        if ('twig' === $document->languageId()) {
+            return new TwigCallableSourceFacts($document->uri(), [], $this->references->all($document->uri(), $document->text()));
+        }
+
+        return null;
     }
 }

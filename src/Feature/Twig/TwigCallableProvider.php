@@ -12,13 +12,14 @@ use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
+use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
-final class TwigCallableProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface
+final class TwigCallableProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documents,
@@ -108,6 +109,20 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
         }
 
         return $items;
+    }
+
+    public function references(array $params): ?array
+    {
+        $resolved = $this->resolve($params);
+        if (null === $resolved) {
+            return null;
+        }
+        [$reference, , $project] = $resolved;
+
+        return array_map(
+            fn (TwigCallableUsage $usage): array => $this->protocol->location($usage->uri(), $usage->range()),
+            $this->indexes->forProject($project)->usages($reference->kind(), $reference->name()),
+        );
     }
 
     public function diagnostics(array $params): ?array
