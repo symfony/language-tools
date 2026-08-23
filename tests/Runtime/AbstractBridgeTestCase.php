@@ -20,6 +20,7 @@ abstract class AbstractBridgeTestCase extends TestCase
         @rmdir($this->temporaryDirectory.'/bin');
         @unlink($this->temporaryDirectory.'/vendor/autoload_runtime.php');
         @unlink($this->temporaryDirectory.'/vendor/autoload.php');
+        @unlink($this->temporaryDirectory.'/composer.json');
         @rmdir($this->temporaryDirectory.'/vendor');
         @rmdir($this->temporaryDirectory.'/templates');
         @rmdir($this->temporaryDirectory.'/src/ShopBundle/templates');
@@ -649,7 +650,7 @@ abstract class AbstractBridgeTestCase extends TestCase
                         ],
                     ];
                     // mimic console log noise whose context decodes as JSON, as Contao emits in dev
-                    $output->write("12:00:00 DEBUG [event] Notified {\"driverOptions\":[]}\n");
+                    $output->write('12:00:00 DEBUG [event] Notified '.json_encode(['driverOptions' => str_repeat('x', 2000)], JSON_THROW_ON_ERROR)."\n");
                     $output->write(json_encode(['definitions' => $definitions], JSON_THROW_ON_ERROR));
 
                     return 0;
@@ -683,10 +684,23 @@ abstract class AbstractBridgeTestCase extends TestCase
                 public function write(string $contents): void { $this->contents .= $contents; }
                 public function fetch(): string { return $this->contents; }
             }
-            namespace Symfony\Component\Runtime;
-            final class SymfonyRuntime
+            namespace App\Event;
+            final class OrderPlaced {}
+            namespace App\EventListener;
+            final class NotifyCustomer
             {
-                public function __construct(private array $options = []) {}
+                public function __construct() { throw new \RuntimeException('Listeners must not be instantiated.'); }
+                public function onOrderPlaced(\App\Event\OrderPlaced $event): void {}
+            }
+            namespace Distribution;
+            final class ConfiguredRuntime
+            {
+                public function __construct(private array $options = [])
+                {
+                    if ('composer' !== ($options['configured_option'] ?? null) || 'environment' !== ($options['environment_option'] ?? null)) {
+                        throw new \RuntimeException('The configured runtime options were not loaded.');
+                    }
+                }
                 public function getResolver(\Closure $app): object
                 {
                     return new class($app, $this->options) {
@@ -698,15 +712,6 @@ abstract class AbstractBridgeTestCase extends TestCase
                     };
                 }
             }
-            namespace App\Event;
-            final class OrderPlaced {}
-            namespace App\EventListener;
-            final class NotifyCustomer
-            {
-                public function __construct() { throw new \RuntimeException('Listeners must not be instantiated.'); }
-                public function onOrderPlaced(\App\Event\OrderPlaced $event): void {}
-            }
-            namespace Distribution;
             final class Kernel implements \Symfony\Component\HttpKernel\KernelInterface
             {
                 public function __construct(public string $environment, public bool $debug) {}
@@ -739,6 +744,12 @@ abstract class AbstractBridgeTestCase extends TestCase
                 }
             }
             PHP);
+        file_put_contents($this->temporaryDirectory.'/composer.json', json_encode([
+            'extra' => ['runtime' => [
+                'class' => 'Distribution\\ConfiguredRuntime',
+                'configured_option' => 'composer',
+            ]],
+        ], \JSON_THROW_ON_ERROR));
         file_put_contents($this->temporaryDirectory.'/vendor/autoload_runtime.php', <<<'PHP'
             <?php
             if (true === (require_once __DIR__.'/autoload.php')) {

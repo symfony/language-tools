@@ -169,8 +169,9 @@ Current Limitations
 
 The current version has these general limitations:
 
-* the kernel must be ``App\Kernel`` or a ``Kernel`` class at a Composer PSR-4
-  autoload root;
+* custom kernel bootstraps must follow a recognized convention: ``App\Kernel``,
+  a ``Kernel`` class at a Composer PSR-4 autoload root, legacy
+  ``app/AppKernel.php`` or a Symfony Runtime front controller;
 * one Symfony environment is active at a time for each application root;
 * references and rename cover only statically recognized values.
 
@@ -189,7 +190,8 @@ If a runtime-backed feature returns no results, verify that:
 * the workspace root contains ``composer.json``;
 * ``composer.json`` requires ``symfony/framework-bundle`` in ``require``;
 * ``vendor/autoload.php`` exists;
-* the application kernel boots in the configured environment;
+* the application kernel boots through one of the supported conventions in the
+  configured environment;
 * the configured PHP command is compatible with the application;
 * ``containerProjectRoot`` matches the container-side project path when the
   PHP command runs in Docker (see `Docker support`_);

@@ -30,14 +30,20 @@ function runJsonCommand(object $application, array $arguments): array
 }
 
 /*
- * Commands may interleave console logging with their payload, and log context
- * can itself decode as JSON, so the largest valid document wins.
+ * Commands may interleave console logging with their payload. Only JSON that
+ * begins a line can be the command document; JSON embedded in a log line is
+ * context data.
  */
 function commandJsonDocument(string $output): string
 {
     $best = null;
     for ($start = 0, $length = strlen($output); $start < $length; ++$start) {
         if ('{' !== $output[$start] && '[' !== $output[$start]) {
+            continue;
+        }
+        $lineStart = strrpos(substr($output, 0, $start), "\n");
+        $prefix = substr($output, false === $lineStart ? 0 : $lineStart + 1, $start - (false === $lineStart ? 0 : $lineStart + 1));
+        if ('' !== trim($prefix)) {
             continue;
         }
 

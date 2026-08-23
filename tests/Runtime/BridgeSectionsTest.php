@@ -68,6 +68,8 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
     public function testResolvesTheKernelThroughARuntimeFrontController(): void
     {
         $this->writeRuntimeFrontControllerApplication();
+        $previousOptions = getenv('APP_RUNTIME_OPTIONS');
+        putenv('APP_RUNTIME_OPTIONS={"environment_option":"environment"}');
 
         exec(\sprintf(
             '%s %s --project=%s --sections=events 2>&1',
@@ -75,6 +77,11 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
             escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
             escapeshellarg($this->temporaryDirectory),
         ), $output, $exitCode);
+        if (false === $previousOptions) {
+            putenv('APP_RUNTIME_OPTIONS');
+        } else {
+            putenv('APP_RUNTIME_OPTIONS='.$previousOptions);
+        }
 
         $snapshot = implode("\n", $output);
         self::assertSame(0, $exitCode, $snapshot);

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Honor Composer and environment options for Symfony Runtime bootstraps
+- Select console command JSON without mistaking log context for metadata
 - Ignore Twig member calls when validating callable arguments
 - Parse Twig callable completion and diagnostics outside string literals
 - Honor Twig callable injection and variadic options

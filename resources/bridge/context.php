@@ -204,24 +204,61 @@ final class SymfonyLspBridgeContext
 
     private function resolveRuntimeApplication(Closure $app): ?object
     {
-        $runtimeClass = $_SERVER['APP_RUNTIME'] ?? $_ENV['APP_RUNTIME'] ?? 'Symfony\\Component\\Runtime\\SymfonyRuntime';
+        [$configuredRuntimeClass, $configuredOptions] = $this->runtimeConfiguration();
+        $runtimeClass = $_SERVER['APP_RUNTIME'] ?? $_ENV['APP_RUNTIME'] ?? $configuredRuntimeClass;
         if (!is_string($runtimeClass) || !class_exists($runtimeClass)) {
             return null;
         }
-        $options = $_SERVER['APP_RUNTIME_OPTIONS'] ?? $_ENV['APP_RUNTIME_OPTIONS'] ?? [];
-        $runtime = new $runtimeClass((is_array($options) ? $options : []) + [
-            'project_dir' => $this->project,
+        $environmentOptions = $_SERVER['APP_RUNTIME_OPTIONS'] ?? $_ENV['APP_RUNTIME_OPTIONS'] ?? [];
+        if (is_string($environmentOptions)) {
+            $environmentOptions = json_decode($environmentOptions, true, 512, JSON_THROW_ON_ERROR);
+        }
+        if (!is_array($environmentOptions)) {
+            return null;
+        }
+        $runtime = new $runtimeClass(array_replace($configuredOptions, $environmentOptions, [
             'env' => $this->environment,
             'debug' => $this->debug,
             // the bridge already booted the environment at startup
             'disable_dotenv' => true,
-        ]);
+        ]));
         if (!method_exists($runtime, 'getResolver')) {
             return null;
         }
         [$callable, $arguments] = $runtime->getResolver($app)->resolve();
 
         return $this->extractKernel($callable(...$arguments));
+    }
+
+    /** @return array{string, array<string, mixed>} */
+    private function runtimeConfiguration(): array
+    {
+        $runtimeClass = 'Symfony\\Component\\Runtime\\SymfonyRuntime';
+        $options = ['project_dir' => $this->project];
+        $composerFile = rtrim($this->project, '/\\').'/composer.json';
+        if (!is_file($composerFile)) {
+            return [$runtimeClass, $options];
+        }
+        try {
+            $composer = json_decode((string) file_get_contents($composerFile), true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return [$runtimeClass, $options];
+        }
+        $runtime = is_array($composer) ? ($composer['extra']['runtime'] ?? null) : null;
+        if (!is_array($runtime)) {
+            return [$runtimeClass, $options];
+        }
+        if (is_string($runtime['class'] ?? null)) {
+            $runtimeClass = $runtime['class'];
+        }
+        $projectDir = $runtime['project_dir'] ?? null;
+        unset($runtime['class'], $runtime['autoload_template'], $runtime['project_dir']);
+        if (is_string($projectDir) && '' !== $projectDir) {
+            $projectDir = rtrim($this->project, '/\\').'/'.trim($projectDir, '/\\');
+            $options['project_dir'] = realpath($projectDir) ?: $projectDir;
+        }
+
+        return [$runtimeClass, array_replace($runtime, $options)];
     }
 
     private function extractKernel(mixed $application): ?object
