@@ -261,7 +261,10 @@ final class TranslationExtractor
      */
     private function dynamicParameters(string $text, array $match, string $parameters): bool
     {
-        if ('' !== $parameters || !\is_string($match[0])) {
+        if ('' !== $parameters) {
+            return $this->containsUnpack($parameters);
+        }
+        if (!\is_string($match[0])) {
             return false;
         }
         $tail = ltrim(substr($text, $match[1] + \strlen($match[0]), 80));
@@ -270,6 +273,32 @@ final class TranslationExtractor
         }
 
         return str_contains($match[0], '(') && str_starts_with($tail, ',');
+    }
+
+    private function containsUnpack(string $parameters): bool
+    {
+        $quote = null;
+        $escaped = false;
+        for ($offset = 0, $length = \strlen($parameters) - 2; $offset < $length; ++$offset) {
+            $character = $parameters[$offset];
+            if (null !== $quote) {
+                if ($escaped) {
+                    $escaped = false;
+                } elseif ('\\' === $character) {
+                    $escaped = true;
+                } elseif ($quote === $character) {
+                    $quote = null;
+                }
+                continue;
+            }
+            if (\in_array($character, ["'", '"'], true)) {
+                $quote = $character;
+            } elseif ('...' === substr($parameters, $offset, 3)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function declaration(string $key, string $message, string $domain, string $locale, string $uri, string $text, int $offset, ?int $rangeLength = null): TranslationDeclaration

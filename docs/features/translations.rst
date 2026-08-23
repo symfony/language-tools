@@ -36,10 +36,10 @@ Diagnostics
 -----------
 
 Placeholders the message expects but a literal parameter map doesn't
-provide are reported. Extra parameters are accepted, and calls passing
-dynamic parameter expressions aren't diagnosed. Missing-key diagnostics
-are disabled by default because external translation providers can make
-the runtime catalogue incomplete.
+provide are reported. Extra parameters are accepted. Calls passing dynamic
+parameter expressions or unpacked parameter arrays aren't diagnosed.
+Missing-key diagnostics are disabled by default because external translation
+providers can make the runtime catalogue incomplete.
 
 Enable missing-key diagnostics in a project or workspace-folder setting:
 

@@ -206,6 +206,10 @@ final class TranslationProviderTest extends TestCase
         /** @var array{start: array{line: int}} $range */
         $range = $diagnostics[0]['range'];
         self::assertSame(1, $range['start']['line']);
+
+        $phpText = "<?php \$translator->trans('article.title', [...\$parameters, 'extra' => 1]);";
+        [$phpProvider] = $this->provider('file:///workspace/src/Controller.php', $phpText);
+        self::assertSame([], $phpProvider->diagnostics(['textDocument' => ['uri' => 'file:///workspace/src/Controller.php']]));
     }
 
     public function testOffersNoTranslationCompletionsInsidePhpComments(): void
