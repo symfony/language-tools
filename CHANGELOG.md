@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Handle dynamically declared Twig callable options conservatively
 - Honor Composer and environment options for Symfony Runtime bootstraps
 - Select console command JSON without mistaking log context for metadata
 - Refresh runtime metadata after INI translation and XML service changes

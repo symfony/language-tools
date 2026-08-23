@@ -61,6 +61,7 @@ final class TwigCallableSourceIndexerTest extends TestCase
         self::assertSame('render', $declarations[0]->method());
         self::assertTrue($declarations[0]->needsContext());
         self::assertTrue($declarations[0]->isVariadic());
+        self::assertTrue($declarations[0]->optionsKnown());
     }
 
     private function indexer(TwigCallableIndexRegistry $indexes): TwigCallableSourceIndexer

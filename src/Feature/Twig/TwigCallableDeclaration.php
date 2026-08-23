@@ -16,6 +16,7 @@ final class TwigCallableDeclaration
         private readonly bool $needsEnvironment = false,
         private readonly bool $needsContext = false,
         private readonly bool $variadic = false,
+        private readonly bool $optionsKnown = true,
     ) {
     }
 
@@ -62,5 +63,10 @@ final class TwigCallableDeclaration
     public function isVariadic(): bool
     {
         return $this->variadic;
+    }
+
+    public function optionsKnown(): bool
+    {
+        return $this->optionsKnown;
     }
 }

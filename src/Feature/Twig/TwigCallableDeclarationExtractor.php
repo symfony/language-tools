@@ -28,6 +28,7 @@ final class TwigCallableDeclarationExtractor
                 continue;
             }
             $callable = ($creation->argument('callable') ?? $creation->argument(1))?->callable();
+            $options = $this->options($creation);
             $declarations[] = new TwigCallableDeclaration(
                 $kind,
                 $name->value(),
@@ -38,20 +39,37 @@ final class TwigCallableDeclarationExtractor
                 ),
                 $callable?->className(),
                 $callable?->method(),
-                $this->option($creation, 'needs_environment'),
-                $this->option($creation, 'needs_context'),
-                $this->option($creation, 'is_variadic'),
+                $options['needsEnvironment'],
+                $options['needsContext'],
+                $options['variadic'],
+                $options['known'],
             );
         }
 
         return new TwigCallableSourceFacts($uri, $declarations);
     }
 
-    private function option(PhpObjectCreation $creation, string $name): bool
+    /** @return array{needsEnvironment: bool, needsContext: bool, variadic: bool, known: bool} */
+    private function options(PhpObjectCreation $creation): array
     {
-        $options = ($creation->argument('options') ?? $creation->argument(2))?->expression();
+        $argument = $creation->argument('options') ?? $creation->argument(2);
+        if (null === $argument) {
+            return ['needsEnvironment' => false, 'needsContext' => false, 'variadic' => false, 'known' => true];
+        }
+        $expression = trim((string) $argument->expression());
+        $known = str_starts_with($expression, '[') || 1 === preg_match('/^array\s*\(/i', $expression);
 
-        return null !== $options && 1 === preg_match('/([\'\"])'.preg_quote($name, '/').'\\1\s*=>\s*true\b/i', $options);
+        return [
+            'needsEnvironment' => $this->option($expression, 'needs_environment'),
+            'needsContext' => $this->option($expression, 'needs_context'),
+            'variadic' => $this->option($expression, 'is_variadic'),
+            'known' => $known,
+        ];
+    }
+
+    private function option(string $options, string $name): bool
+    {
+        return 1 === preg_match('/([\'\"])'.preg_quote($name, '/').'\\1\s*=>\s*true\b/i', $options);
     }
 
     private function kind(PhpObjectCreation $creation): ?TwigCallableKind

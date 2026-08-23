@@ -324,22 +324,31 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
         $parameterList = substr($method->signature(), $open + 1, $close - $open - 1);
         preg_match_all('/(?:([\\\\\w|?]+)\s+)?(\.\.\.)?\$([A-Za-z_][A-Za-z0-9_]*)/', $parameterList, $matches, \PREG_SET_ORDER);
         $all = [];
-        $variadic = false;
+        $types = [];
+        $phpVariadic = false;
         foreach ($matches as $match) {
             $all[] = $match[3];
-            $variadic = $variadic || '' !== $match[2];
+            $types[] = $match[1];
+            $phpVariadic = $phpVariadic || '' !== $match[2];
         }
-        $skip = (int) $matchedDeclaration->needsEnvironment() + (int) $matchedDeclaration->needsContext();
+        if ($matchedDeclaration->optionsKnown()) {
+            $skip = (int) $matchedDeclaration->needsEnvironment() + (int) $matchedDeclaration->needsContext();
+        } else {
+            $skip = str_contains($types[0] ?? '', 'Environment') ? 1 : 0;
+            if ('array' === ($types[$skip] ?? '') && 'context' === ($all[$skip] ?? '')) {
+                ++$skip;
+            }
+        }
         if (TwigCallableKind::Filter === $kind) {
             ++$skip;
         }
-        $variadic = $variadic || $matchedDeclaration->isVariadic();
+        $variadic = $phpVariadic || $matchedDeclaration->isVariadic();
         $nameable = \array_slice($all, $skip);
         if ($variadic) {
             array_pop($nameable);
         }
 
-        return ['all' => $all, 'nameable' => $nameable, 'variadic' => $variadic];
+        return ['all' => $all, 'nameable' => $nameable, 'variadic' => $variadic || !$matchedDeclaration->optionsKnown()];
     }
 
     public function hover(array $params): ?array
