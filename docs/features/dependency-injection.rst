@@ -26,7 +26,8 @@ available in YAML and PHP files.
 ``%parameter%`` references are also recognized outside the ``parameters``
 and ``services`` sections in configuration files, such as
 ``%kernel.project_dir%`` in a ``config/packages`` file. Double percents
-escape a literal percent, and references in YAML comments are ignored.
+escape a literal percent, and references in YAML comments are ignored. A
+``#`` inside block scalar content remains literal and doesn't hide references.
 
 Symfony Language Tools also recognizes service and parameter references in PHP
 ``#[Autowire]`` attributes. Dynamic references aren't recognized.

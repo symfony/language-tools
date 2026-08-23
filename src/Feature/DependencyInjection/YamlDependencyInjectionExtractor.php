@@ -27,15 +27,28 @@ final class YamlDependencyInjectionExtractor
         $tagsIndent = null;
         $environmentSection = false;
         $scannedLines = [];
+        $blockScalarLines = [];
+        $blockScalarIndent = null;
 
         preg_match_all('/^.*(?:\R|$)/m', $text, $lines, \PREG_OFFSET_CAPTURE);
         foreach ($lines[0] as [$rawLine, $lineOffset]) {
             $line = rtrim($rawLine, "\r\n");
-            if ('' === trim($line) || str_starts_with(ltrim($line), '#')) {
+            $indent = \strlen($line) - \strlen(ltrim($line, " \t"));
+            $blockScalarContent = null !== $blockScalarIndent && ('' === trim($line) || $indent > $blockScalarIndent);
+            if (!$blockScalarContent) {
+                $blockScalarIndent = null;
+            }
+            if ('' === trim($line) || (!$blockScalarContent && str_starts_with(ltrim($line), '#'))) {
                 continue;
             }
+            if ($blockScalarContent) {
+                $blockScalarLines[$lineOffset] = true;
+            }
 
-            $mapping = $this->mapping($line);
+            $mapping = $blockScalarContent ? null : $this->mapping($line);
+            if (null !== $mapping && 1 === preg_match('/^\s*[|>](?:[+-][1-9]?|[1-9][+-]?)?\s*(?:#.*)?$/', $mapping['rest'])) {
+                $blockScalarIndent = $mapping['indent'];
+            }
             if (null !== $mapping && 0 === $mapping['indent']) {
                 $environmentSection = str_starts_with($mapping['key'], 'when@');
             }
@@ -53,7 +66,6 @@ final class YamlDependencyInjectionExtractor
                 continue;
             }
 
-            $indent = \strlen($line) - \strlen(ltrim($line, " \t"));
             if (null === $section || $indent <= $sectionIndent) {
                 $section = null;
                 $currentService = null;
@@ -63,7 +75,7 @@ final class YamlDependencyInjectionExtractor
             }
 
             $scannedLines[$lineOffset] = true;
-            array_push($references, ...$this->references($uri, $text, $line, $lineOffset));
+            array_push($references, ...$this->references($uri, $text, $line, $lineOffset, !$blockScalarContent));
 
             if (null === $mapping) {
                 if (null !== $currentService && null !== $tagsIndent && $indent > $tagsIndent) {
@@ -154,10 +166,10 @@ final class YamlDependencyInjectionExtractor
         if (str_contains('/'.$uri, '/config/')) {
             foreach ($lines[0] as [$rawLine, $lineOffset]) {
                 $line = rtrim($rawLine, "\r\n");
-                if (isset($scannedLines[$lineOffset]) || '' === trim($line) || str_starts_with(ltrim($line), '#')) {
+                if (isset($scannedLines[$lineOffset]) || '' === trim($line) || (!isset($blockScalarLines[$lineOffset]) && str_starts_with(ltrim($line), '#'))) {
                     continue;
                 }
-                array_push($references, ...$this->parameterReferences($uri, $text, $line, $lineOffset));
+                array_push($references, ...$this->parameterReferences($uri, $text, $line, $lineOffset, !isset($blockScalarLines[$lineOffset])));
             }
         }
 
@@ -211,9 +223,11 @@ final class YamlDependencyInjectionExtractor
     }
 
     /** @return list<DependencyInjectionReference> */
-    private function references(string $uri, string $text, string $line, int $lineOffset): array
+    private function references(string $uri, string $text, string $line, int $lineOffset, bool $maskComment): array
     {
-        $line = $this->maskComment($line);
+        if ($maskComment) {
+            $line = $this->maskComment($line);
+        }
         $references = [];
         preg_match_all(
             '/(?<![A-Za-z0-9_@])@(\?)?([.A-Za-z_\\\\][A-Za-z0-9_.\\\\:$-]*)/',
@@ -231,13 +245,15 @@ final class YamlDependencyInjectionExtractor
             );
         }
 
-        return [...$references, ...$this->parameterReferences($uri, $text, $line, $lineOffset)];
+        return [...$references, ...$this->parameterReferences($uri, $text, $line, $lineOffset, false)];
     }
 
     /** @return list<DependencyInjectionReference> */
-    private function parameterReferences(string $uri, string $text, string $line, int $lineOffset): array
+    private function parameterReferences(string $uri, string $text, string $line, int $lineOffset, bool $maskComment = true): array
     {
-        $line = $this->maskComment($line);
+        if ($maskComment) {
+            $line = $this->maskComment($line);
+        }
         $references = [];
         // %% escapes a literal percent, as in monolog line formats
         preg_match_all('/%([^%\s]+)%/', str_replace('%%', "\0\0", $line), $parameterMatches, \PREG_OFFSET_CAPTURE);

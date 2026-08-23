@@ -46,6 +46,8 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
                 parameters:
                     app.api_key: 'CANARY_SECRET_VALUE'
                     app.storage_dir: '%kernel.project_dir%/storage' # @commented.service %commented.parameter%
+                    app.message: |
+                        Prefix # %kernel.project_dir%/suffix
 
                 services:
                     _defaults:
@@ -65,7 +67,7 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
         );
 
         self::assertSame(
-            ['app.api_key', 'app.storage_dir'],
+            ['app.api_key', 'app.storage_dir', 'app.message'],
             array_map(static fn ($declaration): string => $declaration->name(), $facts->parameters()),
         );
         self::assertSame(
@@ -77,6 +79,7 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
         self::assertSame('app.mailer', $facts->services()[1]->alias());
         self::assertSame('app.mailer', $facts->services()[2]->decorates());
         self::assertSame([
+            ['parameter', 'kernel.project_dir', false],
             ['parameter', 'kernel.project_dir', false],
             ['parameter', 'app.storage_dir', false],
             ['service', 'logger', false],
