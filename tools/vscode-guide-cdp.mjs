@@ -106,6 +106,12 @@ if ('evaluate' === action) {
         x: Number(arguments_[0]),
         y: Number(arguments_[1]),
     });
+} else if ('drag' === action) {
+    const [fromX, fromY, toX, toY] = arguments_.map(Number);
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: fromX, y: fromY });
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: fromX, y: fromY, button: 'left', clickCount: 1 });
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: toX, y: toY, button: 'left' });
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: toX, y: toY, button: 'left', clickCount: 1 });
 } else if ('close' === action) {
     const closed = new Promise((resolve) => socket.addEventListener('close', resolve, { once: true }));
     await Promise.race([send('Browser.close'), closed]);
