@@ -32,14 +32,12 @@ final class ConfigurationIndex
             return false;
         }
         $node = $this->roots[array_shift($path)] ?? null;
-        while (null !== $node) {
-            if ($node->acceptsUnknownKeys()) {
-                return true;
+        while (null !== $node && [] !== $path) {
+            $child = $node->child(array_shift($path));
+            if (null === $child) {
+                return $node->acceptsUnknownKeys();
             }
-            if ([] === $path) {
-                return false;
-            }
-            $node = $node->child(array_shift($path));
+            $node = $child;
         }
 
         return false;

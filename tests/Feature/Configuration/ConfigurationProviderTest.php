@@ -59,6 +59,15 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
+    public function testValidatesKnownChildrenOfNodesThatAcceptUnknownKeys(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    loose:\n        strict:\n            typo: true\n"));
+
+        self::assertSame(['config.unknown_key'], array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+    }
+
     public function testSkipsDiagnosticsOutsideTheApplicationConfiguration(): void
     {
         $fixture = $this->providers();
@@ -202,6 +211,9 @@ final class ConfigurationProviderTest extends TestCase
                     ]),
                     $this->node('loose', 'array', accepts: ['unknownKeys' => true], children: [
                         $this->node('known', 'boolean'),
+                        $this->node('strict', 'array', children: [
+                            $this->node('known', 'boolean'),
+                        ]),
                     ]),
                     $this->node('dispatch', 'array', prototype: $this->node('sender', 'array', accepts: ['scalar' => true], children: [
                         $this->node('senders', 'array'),

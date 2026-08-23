@@ -5,6 +5,7 @@
 - Parse Twig callable completion and diagnostics outside string literals
 - Honor Twig callable injection and variadic options
 - Ignore unpacked translation parameter maps when checking placeholders
+- Validate strict bundle configuration children below extensible nodes
 - Release cached public assets when a workspace project is removed
 - Find references for Twig functions and filters across templates
 - Resolve vendor Twig components such as ux:icon from runtime metadata

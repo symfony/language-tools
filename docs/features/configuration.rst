@@ -6,7 +6,8 @@ the selected environment, including node types, required and default markers,
 enum values, examples, deprecations, children and prototype nodes.
 Normalization is probed on the real trees, so shorthand keys such as the
 Doctrine default connection ``url`` and values that nodes normalize, such
-as ``~`` or ``true`` for array nodes, are understood.
+as ``~`` or ``true`` for array nodes, are understood. Extensible nodes allow
+custom keys while their declared children keep their own validation rules.
 
 Completion
 ----------
