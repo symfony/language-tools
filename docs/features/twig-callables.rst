@@ -13,6 +13,30 @@ Functions and filters returned by extension ``getFunctions()`` and
 when their names are string literals. Statically resolvable class method
 callables declared as arrays or first-class callables are also resolved.
 
+Public methods declared with Twig's ``#[AsTwigFunction]`` and
+``#[AsTwigFilter]`` attributes are recognized too::
+
+    use Twig\Attribute\AsTwigFilter;
+    use Twig\Attribute\AsTwigFunction;
+
+    final class ProductExtension
+    {
+        #[AsTwigFunction('product_label')]
+        public function productLabel(Product $product): string
+        {
+            return $product->name;
+        }
+
+        #[AsTwigFilter('short_description')]
+        public function shortDescription(string $description): string
+        {
+            return mb_strimwidth($description, 0, 80, '...');
+        }
+    }
+
+The attribute's injected-parameter options and variadic methods are honored
+when completing and validating arguments.
+
 Completion
 ----------
 
@@ -61,5 +85,6 @@ otherwise opens the function or filter registration.
 Limitations
 -----------
 
-Dynamic names and callables are ignored. Functions and filters provided only by
-dependencies are left to a general Twig language server.
+Dynamic names, dynamic callables and non-public attributed methods are ignored.
+Functions and filters provided only by dependencies are left to a general Twig
+language server.

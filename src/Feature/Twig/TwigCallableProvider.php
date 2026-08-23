@@ -332,7 +332,10 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
             $phpVariadic = $phpVariadic || '' !== $match[2];
         }
         if ($matchedDeclaration->optionsKnown()) {
-            $skip = (int) $matchedDeclaration->needsEnvironment() + (int) $matchedDeclaration->needsContext();
+            $skip = (int) $matchedDeclaration->needsCharset()
+                + (int) $matchedDeclaration->needsEnvironment()
+                + (int) $matchedDeclaration->needsContext()
+                + (int) $matchedDeclaration->needsIsSandboxed();
         } else {
             $skip = str_contains($types[0] ?? '', 'Environment') ? 1 : 0;
             if ('array' === ($types[$skip] ?? '') && 'context' === ($all[$skip] ?? '')) {

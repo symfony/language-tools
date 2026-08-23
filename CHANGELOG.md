@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Recognize Twig functions and filters declared with PHP attributes
+
 ## 0.16.0 (2026-08-23)
 
 - Keep Azure CLI version detection visible during marketplace login

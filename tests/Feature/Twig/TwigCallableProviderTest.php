@@ -40,6 +40,9 @@ final class TwigCallableProviderTest extends TestCase
             namespace App\Twig;
 
             use App\Twig\AppExtensionRuntime as Runtime;
+            use Twig\Attribute\AsTwigFilter as FilterAttribute;
+            use Twig\Attribute\AsTwigFunction;
+            use Twig\Environment;
             use Twig\TwigFilter as Filter;
             use Twig\TwigFunction as FunctionDefinition;
 
@@ -58,7 +61,7 @@ final class TwigCallableProviderTest extends TestCase
                 public function getFunctions(): array
                 {
                     return [
-                        new FunctionDefinition('function_name', [Runtime::class, 'doSomething'], ['needs_environment' => true, 'is_variadic' => true]),
+                        new FunctionDefinition('function_name', [Runtime::class, 'doSomething'], ['needs_charset' => true, 'needs_environment' => true, 'needs_is_sandboxed' => true, 'is_variadic' => true]),
                         new FunctionDefinition('constant_options', [Runtime::class, 'doSomething'], self::OPTIONS),
                         new FunctionDefinition('dynamic_name', $dynamicCallable),
                         new OtherDefinition('ignored_name', [Runtime::class, 'ignored']),
@@ -71,25 +74,56 @@ final class TwigCallableProviderTest extends TestCase
                     new Filter('ignored_direct_filter', [Runtime::class, 'ignored']);
                 }
 
+                #[FilterAttribute('attribute_filter', needsContext: true, needsIsSandboxed: true)]
+                public function attributeFilter(Environment $environment, array $context, bool $isSandboxed, string $value): string { return $value; }
+
+                #[AsTwigFunction(name: 'attribute_function', needsCharset: true)]
+                public function attributeFunction(string $charset, string $value, mixed ...$options): string { return $value; }
+
+                #[AsTwigFunction('auto_environment')]
+                public function autoEnvironment(Environment $environment, string $value): string { return $value; }
+
+                #[AsTwigFunction('legacy_safe', null, null, null, ['html'])]
+                public function legacySafe(string $value): string { return $value; }
+
+                #[AsTwigFunction(self::DYNAMIC_NAME)]
+                public function dynamicAttribute(): string { return ''; }
+
+                #[AsTwigFunction('private_attribute')]
+                private function privateAttribute(): string { return ''; }
+
                 private function localFilter(string $value): string { return $value; }
+            }
+
+            trait SharedExtension
+            {
+                #[AsTwigFunction('trait_function')]
+                public function traitFunction(string $value): string { return $value; }
             }
             PHP;
 
         $declarations = $extractor->extract('file:///workspace/src/Twig/AppExtension.php', $source)->declarations();
 
         self::assertSame([
-            [TwigCallableKind::Filter, 'filter_name', 'App\Twig\AppExtensionRuntime', 'doSomething', false, true, false, true],
-            [TwigCallableKind::Filter, 'named_filter', 'App\Twig\AppExtension', 'localFilter', false, false, false, true],
-            [TwigCallableKind::Function, 'function_name', 'App\Twig\AppExtensionRuntime', 'doSomething', true, false, true, true],
-            [TwigCallableKind::Function, 'constant_options', 'App\Twig\AppExtensionRuntime', 'doSomething', false, false, false, false],
-            [TwigCallableKind::Function, 'dynamic_name', null, null, false, false, false, true],
+            [TwigCallableKind::Filter, 'filter_name', 'App\Twig\AppExtensionRuntime', 'doSomething', false, false, true, false, false, true],
+            [TwigCallableKind::Filter, 'named_filter', 'App\Twig\AppExtension', 'localFilter', false, false, false, false, false, true],
+            [TwigCallableKind::Function, 'function_name', 'App\Twig\AppExtensionRuntime', 'doSomething', true, true, false, true, true, true],
+            [TwigCallableKind::Function, 'constant_options', 'App\Twig\AppExtensionRuntime', 'doSomething', false, false, false, false, false, false],
+            [TwigCallableKind::Function, 'dynamic_name', null, null, false, false, false, false, false, true],
+            [TwigCallableKind::Filter, 'attribute_filter', 'App\Twig\AppExtension', 'attributeFilter', false, true, true, true, false, true],
+            [TwigCallableKind::Function, 'attribute_function', 'App\Twig\AppExtension', 'attributeFunction', true, false, false, false, true, true],
+            [TwigCallableKind::Function, 'auto_environment', 'App\Twig\AppExtension', 'autoEnvironment', false, true, false, false, false, true],
+            [TwigCallableKind::Function, 'legacy_safe', 'App\Twig\AppExtension', 'legacySafe', false, false, false, false, false, true],
+            [TwigCallableKind::Function, 'trait_function', 'App\Twig\SharedExtension', 'traitFunction', false, false, false, false, false, true],
         ], array_map(static fn ($declaration): array => [
             $declaration->kind(),
             $declaration->name(),
             $declaration->className(),
             $declaration->method(),
+            $declaration->needsCharset(),
             $declaration->needsEnvironment(),
             $declaration->needsContext(),
+            $declaration->needsIsSandboxed(),
             $declaration->isVariadic(),
             $declaration->optionsKnown(),
         ], $declarations));
@@ -97,6 +131,27 @@ final class TwigCallableProviderTest extends TestCase
         self::assertIsInt($functionOffset);
         self::assertSame($converter->toPosition($source, $functionOffset)->line(), $declarations[2]->range()->start()->line());
         self::assertSame($converter->toPosition($source, $functionOffset)->character(), $declarations[2]->range()->start()->character());
+    }
+
+    public function testIgnoresIncompleteAttributedDeclarations(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            use Twig\Attribute\AsTwigFunction;
+
+            final class AppExtension
+            {
+                #[AsTwigFunction('complete')]
+                public function complete(): string { return ''; }
+
+                #[AsTwigFunction(
+                public function incomplete(): string { return ''; }
+            }
+            PHP;
+
+        $declarations = $this->declarationExtractor(new PositionConverter())->extract('file:///workspace/src/Twig/AppExtension.php', $source)->declarations();
+
+        self::assertSame(['complete'], array_map(static fn ($declaration): string => $declaration->name(), $declarations));
     }
 
     public function testProvidesHoverAndDefinitionForCustomTwigFunctionsAndFilters(): void
@@ -111,6 +166,8 @@ final class TwigCallableProviderTest extends TestCase
             <?php
             namespace App\Twig;
 
+            use Twig\Attribute\AsTwigFilter;
+            use Twig\Attribute\AsTwigFunction;
             use Twig\TwigFilter;
             use Twig\TwigFunction;
 
@@ -129,6 +186,13 @@ final class TwigCallableProviderTest extends TestCase
                         new TwigFunction('outside_name', [OutsideRuntime::class, 'outside']),
                     ];
                 }
+
+                /** Builds an attributed value. */
+                #[AsTwigFunction('attribute_function')]
+                public function attributeFunction(string $value): string { return $value; }
+
+                #[AsTwigFilter('attribute_filter')]
+                public function attributeFilter(string $value): string { return $value; }
             }
             PHP;
         $runtimeUri = 'file:///workspace/src/Twig/AppExtensionRuntime.php';
@@ -163,6 +227,8 @@ final class TwigCallableProviderTest extends TestCase
             {{ broken ??? }}
             {{ item|filter_name }}
             {{ {'nested': {}}|filter_name }}
+            {{ attribute_function('value') }}
+            {{ item|attribute_filter }}
             {{ dynamic_name() }}
             {{ outside_name() }}
             {{ object.function_name() }}
@@ -171,6 +237,7 @@ final class TwigCallableProviderTest extends TestCase
             Plain function_name() text
             TWIG;
         $documents->open(new Document($twigUri, 'twig', 1, $twigText));
+        $documents->open(new Document($extensionUri, 'php', 1, $extensionText));
         $documents->open(new Document($runtimeUri, 'php', 1, $runtimeText));
         $documents->open(new Document($outsideUri, 'php', 1, $outsideText));
         $referenceExtractor = new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()), $commentParser, $converter);
@@ -182,6 +249,7 @@ final class TwigCallableProviderTest extends TestCase
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
         $classExtractor = new PhpClassDeclarationExtractor($converter, $phpParser);
         $classIndexes->forProject($project)->replace(
+            new DependencyInjectionSourceFacts($extensionUri, classes: $classExtractor->extract($extensionUri, $extensionText)),
             new DependencyInjectionSourceFacts($runtimeUri, classes: $classExtractor->extract($runtimeUri, $runtimeText)),
             new DependencyInjectionSourceFacts($outsideUri, classes: $classExtractor->extract($outsideUri, $outsideText)),
         );
@@ -217,6 +285,12 @@ final class TwigCallableProviderTest extends TestCase
         $nestedFilterOffset = strpos($twigText, 'filter_name', strpos($twigText, 'filter_name') + 1);
         self::assertIsInt($nestedFilterOffset);
         self::assertSame($filterHover, $provider->hover($this->params($twigUri, $twigText, 'filter_name', $converter, $nestedFilterOffset)));
+        self::assertSame([
+            'contents' => [
+                'kind' => 'markdown',
+                'value' => "Twig function: `attribute_function`\n\nCallable: `App\\Twig\\AppExtension::attributeFunction`\n\n```php\npublic function attributeFunction(string \$value): string\n```\n\nBuilds an attributed value.",
+            ],
+        ], $provider->hover($this->params($twigUri, $twigText, 'attribute_function', $converter)));
         $methodOffset = strpos($runtimeText, 'doSomething');
         self::assertIsInt($methodOffset);
         self::assertSame([
@@ -228,6 +302,17 @@ final class TwigCallableProviderTest extends TestCase
                 ),
             ),
         ], $provider->definition($this->params($twigUri, $twigText, 'function_name', $converter)));
+        $attributeMethodOffset = strpos($extensionText, 'attributeFunction');
+        self::assertIsInt($attributeMethodOffset);
+        self::assertSame([
+            $protocol->location(
+                $extensionUri,
+                new Range(
+                    $converter->toPosition($extensionText, $attributeMethodOffset),
+                    $converter->toPosition($extensionText, $attributeMethodOffset + \strlen('attributeFunction')),
+                ),
+            ),
+        ], $provider->definition($this->params($twigUri, $twigText, 'attribute_function', $converter)));
 
         $dynamicOffset = strpos($extensionText, 'dynamic_name');
         self::assertIsInt($dynamicOffset);
@@ -281,8 +366,10 @@ final class TwigCallableProviderTest extends TestCase
         };
         self::assertSame(['function_name'], $completions('{{ func'));
         self::assertSame(['function_name'], $completions('{{ function_name'));
-        self::assertSame(['filter_name'], $completions('{{ item|'));
+        self::assertSame(['attribute_function'], $completions('{{ attribute_f'));
+        self::assertSame(['attribute_filter', 'filter_name'], $completions('{{ item|'));
         self::assertSame(['filter_name'], $completions('{{ item|fil'));
+        self::assertSame(['attribute_filter'], $completions('{{ item|attribute_f'));
         self::assertSame(['function_name'], $completions('{% if f'));
         self::assertSame(['function_name'], $completions('{{ "}}" ~ func'));
         self::assertNull($completions('{{ "say func'));
@@ -303,6 +390,9 @@ final class TwigCallableProviderTest extends TestCase
             <?php
             namespace App\Twig;
 
+            use Twig\Attribute\AsTwigFilter;
+            use Twig\Attribute\AsTwigFunction;
+            use Twig\Environment;
             use Twig\TwigFilter;
             use Twig\TwigFunction;
 
@@ -343,6 +433,30 @@ final class TwigCallableProviderTest extends TestCase
                 {
                     return $value;
                 }
+
+                #[AsTwigFunction('attribute_image', needsContext: true)]
+                public function attributeImage(Environment $environment, array $context, string $name, int $width = 200): string
+                {
+                    return $name;
+                }
+
+                #[AsTwigFilter('attribute_shorten')]
+                public function attributeShorten(string $value, int $length = 30): string
+                {
+                    return $value;
+                }
+
+                #[AsTwigFunction('attribute_variadic')]
+                public function attributeVariadic(string $name, mixed ...$options): string
+                {
+                    return $name;
+                }
+
+                #[AsTwigFunction('legacy_safe', null, null, null, ['html'])]
+                public function legacySafe(string $name, int $width = 200): string
+                {
+                    return $name;
+                }
             }
             PHP;
         $documents->open(new Document($extensionUri, 'php', 1, $extensionText));
@@ -382,6 +496,10 @@ final class TwigCallableProviderTest extends TestCase
         self::assertSame(['tag'], $completions('{{ attrs('));
         self::assertSame(['name'], $completions('{{ dynamic_image('));
         self::assertSame(['length'], $completions('{{ text|shorten('));
+        self::assertSame(['name', 'width'], $completions('{{ attribute_image('));
+        self::assertSame(['length'], $completions('{{ text|attribute_shorten('));
+        self::assertSame(['name'], $completions('{{ attribute_variadic('));
+        self::assertSame(['name', 'width'], $completions('{{ legacy_safe('));
         self::assertNull($completions("{{ image(name: 'a"));
 
         $diagnostics = static function (string $text) use ($provider, $documents): ?array {
@@ -396,9 +514,14 @@ final class TwigCallableProviderTest extends TestCase
             array_column($unknown ?? [], 'message'),
         );
         self::assertSame([], $diagnostics("{{ image(name: 'a', width: 3, lazy: true) }}"));
+        self::assertSame(
+            ['Unknown argument "wdith" for Twig function "attribute_image".', 'Unknown argument "size" for Twig filter "attribute_shorten".'],
+            array_column($diagnostics("{{ attribute_image(name: 'a', wdith: 3) }}\n{{ text|attribute_shorten(size: 5) }}\n") ?? [], 'message'),
+        );
         self::assertSame([], $diagnostics("{{ image(name: 'x, wdith: 3') }}"));
         self::assertSame([], $diagnostics('{{ object.image(wdith: 3) }}'));
         self::assertSame([], $diagnostics("{{ attrs('div', data_test: 'x') }}"));
+        self::assertSame([], $diagnostics("{{ attribute_variadic(name: 'a', unknown: 1) }}"));
         self::assertSame([], $diagnostics('{{ dynamic_image(unknown: 1) }}'));
         self::assertSame([], $diagnostics("{{ image({name: 'a'}) }}"));
         self::assertSame([], $diagnostics("{{ image(name ? 'a' : 'b') }}"));

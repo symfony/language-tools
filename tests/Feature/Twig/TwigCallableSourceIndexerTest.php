@@ -29,6 +29,7 @@ final class TwigCallableSourceIndexerTest extends TestCase
         $document = new SourceDocument($uri, 'php', <<<'PHP'
             <?php
             use App\Twig\Runtime;
+            use Twig\Attribute\AsTwigFunction;
             use Twig\TwigFunction;
 
             final class AppExtension
@@ -36,6 +37,12 @@ final class TwigCallableSourceIndexerTest extends TestCase
                 public function getFunctions(): array
                 {
                     return [new TwigFunction('function_name', [Runtime::class, 'render'], ['needs_context' => true, 'is_variadic' => true])];
+                }
+
+                #[AsTwigFunction('attribute_name', needsCharset: true, needsContext: true, needsIsSandboxed: true)]
+                public function attributed(string $charset, array $context, bool $isSandboxed, string ...$values): string
+                {
+                    return implode('', $values);
                 }
             }
             PHP);
@@ -62,6 +69,16 @@ final class TwigCallableSourceIndexerTest extends TestCase
         self::assertTrue($declarations[0]->needsContext());
         self::assertTrue($declarations[0]->isVariadic());
         self::assertTrue($declarations[0]->optionsKnown());
+
+        $attributes = $restoredIndexes->forProject($project)->declarations(TwigCallableKind::Function, 'attribute_name');
+        self::assertCount(1, $attributes);
+        self::assertSame('AppExtension', $attributes[0]->className());
+        self::assertSame('attributed', $attributes[0]->method());
+        self::assertTrue($attributes[0]->needsCharset());
+        self::assertTrue($attributes[0]->needsContext());
+        self::assertTrue($attributes[0]->needsIsSandboxed());
+        self::assertTrue($attributes[0]->isVariadic());
+        self::assertTrue($attributes[0]->optionsKnown());
     }
 
     private function indexer(TwigCallableIndexRegistry $indexes): TwigCallableSourceIndexer

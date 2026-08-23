@@ -6,6 +6,10 @@ use Symfony\Lsp\Document\Range;
 
 final class TwigCallableDeclaration
 {
+    // Defaults keep older cached payloads readable
+    private bool $needsCharset = false;
+    private bool $needsIsSandboxed = false;
+
     public function __construct(
         private readonly TwigCallableKind $kind,
         private readonly string $name,
@@ -17,7 +21,11 @@ final class TwigCallableDeclaration
         private readonly bool $needsContext = false,
         private readonly bool $variadic = false,
         private readonly bool $optionsKnown = true,
+        bool $needsCharset = false,
+        bool $needsIsSandboxed = false,
     ) {
+        $this->needsCharset = $needsCharset;
+        $this->needsIsSandboxed = $needsIsSandboxed;
     }
 
     public function kind(): TwigCallableKind
@@ -50,6 +58,11 @@ final class TwigCallableDeclaration
         return $this->method;
     }
 
+    public function needsCharset(): bool
+    {
+        return $this->needsCharset;
+    }
+
     public function needsEnvironment(): bool
     {
         return $this->needsEnvironment;
@@ -58,6 +71,11 @@ final class TwigCallableDeclaration
     public function needsContext(): bool
     {
         return $this->needsContext;
+    }
+
+    public function needsIsSandboxed(): bool
+    {
+        return $this->needsIsSandboxed;
     }
 
     public function isVariadic(): bool

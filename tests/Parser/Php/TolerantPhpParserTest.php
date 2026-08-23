@@ -161,6 +161,46 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame('Formats the value.', $method->description());
     }
 
+    public function testExposesMethodAttributesAndCallableShape(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Twig;
+
+            use Twig\Attribute\AsTwigFunction as FunctionAttribute;
+            use Twig\Environment as TwigEnvironment;
+
+            final class AppExtension
+            {
+                #[FunctionAttribute('format')]
+                public function format(TwigEnvironment $environment, string $value, mixed ...$options): string
+                {
+                    return $value;
+                }
+
+                public function union(TwigEnvironment|null $environment): void {}
+
+                #[FunctionAttribute('hidden')]
+                private function hidden(): void {}
+
+                public function parameter(#[FunctionAttribute('invalid')] string $value): void {}
+            }
+            PHP;
+
+        $methods = (new TolerantPhpParser(new Parser()))->parse($source)->methodDeclarations();
+
+        self::assertSame('Twig\Attribute\AsTwigFunction', $methods[0]->attributes()[0]->name());
+        self::assertSame('format', $methods[0]->attributes()[0]->argument(0)?->stringLiteral()?->value());
+        self::assertSame('Twig\Environment', $methods[0]->firstParameterType());
+        self::assertFalse($methods[0]->isFirstParameterVariadic());
+        self::assertTrue($methods[0]->isVariadic());
+        self::assertTrue($methods[0]->isPublic());
+        self::assertStringStartsWith('public function format', $methods[0]->signature());
+        self::assertNull($methods[1]->firstParameterType());
+        self::assertFalse($methods[2]->isPublic());
+        self::assertSame([], $methods[3]->attributes());
+    }
+
     public function testKeepsImportsFromIncompleteGroupedSyntax(): void
     {
         $document = (new TolerantPhpParser(new Parser()))->parse("<?php\n// café\nnamespace App;\nuse Vendor\\Package\\{First, Second as Alias");

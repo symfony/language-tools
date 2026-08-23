@@ -80,6 +80,17 @@ final class ProbeFinderTest extends TestCase
         self::assertSame('app_short', $this->probes($finder, 'twig.filter')[0]->value);
     }
 
+    public function testFindsAttributedTwigCallables(): void
+    {
+        $this->write('src/AppExtension.php', "<?php\n#[AsTwigFunction('app_widget')]\nfunction widget() {}\n#[\\Twig\\Attribute\\AsTwigFilter(name: 'app_short')]\nfunction shorten() {}\n");
+        $this->write('templates/home.html.twig', "{{ app_widget() }}\n{{ 'text'|app_short }}\n");
+
+        $finder = new ProbeFinder();
+
+        self::assertSame('app_widget', $this->probes($finder, 'twig.function')[0]->value);
+        self::assertSame('app_short', $this->probes($finder, 'twig.filter')[0]->value);
+    }
+
     public function testReportsThePositionInsideTheMatchedValue(): void
     {
         $this->write('src/Controller.php', "<?php\n\$this->redirectToRoute('abcd');\n");

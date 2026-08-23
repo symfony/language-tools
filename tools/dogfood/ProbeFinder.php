@@ -86,6 +86,10 @@ final class ProbeFinder
             foreach ($matches[2] as $name) {
                 $names[$name] = true;
             }
+            preg_match_all('/#\[\s*(?:\\\\?Twig\\\\Attribute\\\\)?AsTwig'.preg_quote($kind, '/').'\s*\(\s*(?:name\s*:\s*)?([\'"])([A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*)\1/', $contents, $matches);
+            foreach ($matches[2] as $name) {
+                $names[$name] = true;
+            }
         }
         if ([] === $names) {
             return [];

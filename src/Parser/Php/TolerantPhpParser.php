@@ -9,6 +9,7 @@ use Microsoft\PhpParser\Node\Attribute;
 use Microsoft\PhpParser\Node\ClassBaseClause;
 use Microsoft\PhpParser\Node\DelimitedList\ArrayElementList;
 use Microsoft\PhpParser\Node\DelimitedList\ExpressionList;
+use Microsoft\PhpParser\Node\DelimitedList\ParameterDeclarationList;
 use Microsoft\PhpParser\Node\DelimitedList\QualifiedNameList;
 use Microsoft\PhpParser\Node\Expression\ArgumentExpression;
 use Microsoft\PhpParser\Node\Expression\ArrayCreationExpression;
@@ -34,6 +35,7 @@ use Microsoft\PhpParser\Node\Statement\TraitDeclaration;
 use Microsoft\PhpParser\Node\StringLiteral;
 use Microsoft\PhpParser\Parser;
 use Microsoft\PhpParser\Token;
+use Microsoft\PhpParser\TokenKind;
 
 final class TolerantPhpParser implements PhpParserInterface
 {
@@ -102,7 +104,7 @@ final class TolerantPhpParser implements PhpParserInterface
         }
         $methodDeclarations = [];
         foreach ($methodDeclarationNodes as $node) {
-            $declaration = $this->methodDeclaration($node, $source);
+            $declaration = $this->methodDeclaration($node, $source, $names);
             if (null !== $declaration) {
                 $methodDeclarations[] = $declaration;
             }
@@ -271,11 +273,11 @@ final class TolerantPhpParser implements PhpParserInterface
         );
     }
 
-    private function methodDeclaration(MethodDeclaration $declaration, string $source): ?PhpMethodDeclaration
+    private function methodDeclaration(MethodDeclaration $declaration, string $source, PhpNameContext $names): ?PhpMethodDeclaration
     {
-        $owner = $declaration->getFirstAncestor(ClassDeclaration::class);
+        $owner = $declaration->getFirstAncestor(ClassDeclaration::class, TraitDeclaration::class);
         $nameToken = $declaration->name;
-        if (!$owner instanceof ClassDeclaration || !$nameToken instanceof Token) {
+        if ((!$owner instanceof ClassDeclaration && !$owner instanceof TraitDeclaration) || !$nameToken instanceof Token) {
             return null;
         }
         $name = $nameToken->getText($source);
@@ -284,8 +286,35 @@ final class TolerantPhpParser implements PhpParserInterface
         }
         $body = get_object_vars($declaration)['compoundStatementOrSemicolon'] ?? null;
         $signatureEnd = $body instanceof Node || $body instanceof Token ? $body->getStartPosition() : $declaration->getEndPosition();
-        $signature = trim(substr($source, $declaration->getStartPosition(), $signatureEnd - $declaration->getStartPosition()));
+        $signatureStart = $declaration->functionKeyword->getStartPosition();
+        foreach ($declaration->modifiers as $modifier) {
+            $signatureStart = min($signatureStart, $modifier->getStartPosition());
+        }
+        $signature = trim(substr($source, $signatureStart, $signatureEnd - $signatureStart));
         $description = trim($declaration->getDescriptionFormatted());
+        $attributes = [];
+        foreach ($declaration->attributes ?? [] as $group) {
+            foreach ($group->attributes->children as $attribute) {
+                if ($attribute instanceof Attribute) {
+                    $attributes[] = $this->attribute($attribute, $source);
+                }
+            }
+        }
+        $parameters = [];
+        $parameterList = get_object_vars($declaration)['parameters'] ?? null;
+        if ($parameterList instanceof ParameterDeclarationList) {
+            foreach ($parameterList->children as $parameter) {
+                if ($parameter instanceof Parameter) {
+                    $parameters[] = $parameter;
+                }
+            }
+        }
+        $firstParameterType = null;
+        $firstTypeDeclaration = $parameters[0]->typeDeclarationList ?? null;
+        if ($firstTypeDeclaration instanceof QualifiedNameList && 1 !== preg_match('/[|&()]/', $firstTypeDeclaration->getText($source))) {
+            $firstParameterTypes = $this->resolvedTypes($firstTypeDeclaration, $source, $names);
+            $firstParameterType = 1 === \count($firstParameterTypes) ? $firstParameterTypes[0] : null;
+        }
 
         return new PhpMethodDeclaration(
             (string) $owner->getNamespacedName(),
@@ -294,6 +323,11 @@ final class TolerantPhpParser implements PhpParserInterface
             $nameToken->getEndPosition(),
             $signature,
             '' === $description ? null : $description,
+            $attributes,
+            $firstParameterType,
+            isset($parameters[0]) && $parameters[0]->dotDotDotToken instanceof Token,
+            array_any($parameters, static fn (Parameter $parameter): bool => $parameter->dotDotDotToken instanceof Token),
+            !$declaration->hasModifier(TokenKind::ProtectedKeyword) && !$declaration->hasModifier(TokenKind::PrivateKeyword),
         );
     }
 

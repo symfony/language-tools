@@ -4,6 +4,8 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Php\PhpAttribute;
+use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpObjectCreation;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
@@ -18,8 +20,9 @@ final class TwigCallableDeclarationExtractor
     public function extract(string $uri, string $text): TwigCallableSourceFacts
     {
         $declarations = [];
-        foreach ($this->parser->parse($text)->objectCreations() as $creation) {
-            $kind = $this->kind($creation);
+        $document = $this->parser->parse($text);
+        foreach ($document->objectCreations() as $creation) {
+            $kind = $this->objectKind($creation);
             if (null === $kind) {
                 continue;
             }
@@ -28,55 +31,162 @@ final class TwigCallableDeclarationExtractor
                 continue;
             }
             $callable = ($creation->argument('callable') ?? $creation->argument(1))?->callable();
-            $options = $this->options($creation);
+            $options = $this->objectOptions($creation);
             $declarations[] = new TwigCallableDeclaration(
-                $kind,
-                $name->value(),
-                $uri,
-                new Range(
+                kind: $kind,
+                name: $name->value(),
+                uri: $uri,
+                range: new Range(
                     $this->converter->toPosition($text, $name->startOffset()),
                     $this->converter->toPosition($text, $name->endOffset()),
                 ),
-                $callable?->className(),
-                $callable?->method(),
-                $options['needsEnvironment'],
-                $options['needsContext'],
-                $options['variadic'],
-                $options['known'],
+                className: $callable?->className(),
+                method: $callable?->method(),
+                needsEnvironment: $options['needsEnvironment'],
+                needsContext: $options['needsContext'],
+                variadic: $options['variadic'],
+                optionsKnown: $options['known'],
+                needsCharset: $options['needsCharset'],
+                needsIsSandboxed: $options['needsIsSandboxed'],
             );
+        }
+
+        foreach ($document->methodDeclarations() as $method) {
+            if (!$method->isPublic()) {
+                continue;
+            }
+            foreach ($method->attributes() as $attribute) {
+                $kind = $this->attributeKind($attribute);
+                if (null === $kind) {
+                    continue;
+                }
+                $name = ($attribute->argument('name') ?? $attribute->argument(0))?->stringLiteral();
+                if (null === $name || '' === $name->value()) {
+                    continue;
+                }
+                $options = $this->attributeOptions($attribute, $method);
+                $declarations[] = new TwigCallableDeclaration(
+                    kind: $kind,
+                    name: $name->value(),
+                    uri: $uri,
+                    range: new Range(
+                        $this->converter->toPosition($text, $name->startOffset()),
+                        $this->converter->toPosition($text, $name->endOffset()),
+                    ),
+                    className: $method->className(),
+                    method: $method->name(),
+                    needsEnvironment: $options['needsEnvironment'],
+                    needsContext: $options['needsContext'],
+                    variadic: $method->isVariadic(),
+                    optionsKnown: $options['known'],
+                    needsCharset: $options['needsCharset'],
+                    needsIsSandboxed: $options['needsIsSandboxed'],
+                );
+            }
         }
 
         return new TwigCallableSourceFacts($uri, $declarations);
     }
 
-    /** @return array{needsEnvironment: bool, needsContext: bool, variadic: bool, known: bool} */
-    private function options(PhpObjectCreation $creation): array
+    /** @return array{needsCharset: bool, needsEnvironment: bool, needsContext: bool, needsIsSandboxed: bool, variadic: bool, known: bool} */
+    private function objectOptions(PhpObjectCreation $creation): array
     {
         $argument = $creation->argument('options') ?? $creation->argument(2);
         if (null === $argument) {
-            return ['needsEnvironment' => false, 'needsContext' => false, 'variadic' => false, 'known' => true];
+            return ['needsCharset' => false, 'needsEnvironment' => false, 'needsContext' => false, 'needsIsSandboxed' => false, 'variadic' => false, 'known' => true];
         }
         $expression = trim((string) $argument->expression());
         $known = str_starts_with($expression, '[') || 1 === preg_match('/^array\s*\(/i', $expression);
 
         return [
-            'needsEnvironment' => $this->option($expression, 'needs_environment'),
-            'needsContext' => $this->option($expression, 'needs_context'),
-            'variadic' => $this->option($expression, 'is_variadic'),
+            'needsCharset' => $this->objectOption($expression, 'needs_charset'),
+            'needsEnvironment' => $this->objectOption($expression, 'needs_environment'),
+            'needsContext' => $this->objectOption($expression, 'needs_context'),
+            'needsIsSandboxed' => $this->objectOption($expression, 'needs_is_sandboxed'),
+            'variadic' => $this->objectOption($expression, 'is_variadic'),
             'known' => $known,
         ];
     }
 
-    private function option(string $options, string $name): bool
+    /** @return array{needsCharset: bool, needsEnvironment: bool, needsContext: bool, needsIsSandboxed: bool, known: bool} */
+    private function attributeOptions(PhpAttribute $attribute, PhpMethodDeclaration $method): array
+    {
+        [$needsCharset, $charsetKnown] = $this->attributeOption($attribute, 'needsCharset', 1, false);
+        [$needsEnvironment, $environmentKnown] = $this->attributeOption(
+            $attribute,
+            'needsEnvironment',
+            2,
+            'Twig\Environment' === $method->firstParameterType() && !$method->isFirstParameterVariadic(),
+        );
+        [$needsContext, $contextKnown] = $this->attributeOption($attribute, 'needsContext', 3, false);
+        [$needsIsSandboxed, $sandboxKnown] = $this->attributeSandboxOption($attribute);
+
+        return [
+            'needsCharset' => $needsCharset,
+            'needsEnvironment' => $needsEnvironment,
+            'needsContext' => $needsContext,
+            'needsIsSandboxed' => $needsIsSandboxed,
+            'known' => $charsetKnown && $environmentKnown && $contextKnown && $sandboxKnown,
+        ];
+    }
+
+    /** @return array{bool, bool} */
+    private function attributeSandboxOption(PhpAttribute $attribute): array
+    {
+        if (null !== $attribute->argument('needsIsSandboxed')) {
+            return $this->attributeOption($attribute, 'needsIsSandboxed', 4, false);
+        }
+        $positional = $attribute->argument(4);
+        if (null === $positional || null !== $positional->name()) {
+            return [false, true];
+        }
+        $expression = trim((string) $positional->expression());
+        if (str_starts_with($expression, '[') || 1 === preg_match('/^array\s*\(/i', $expression)) {
+            return [false, true];
+        }
+
+        return $this->attributeOption($attribute, 'needsIsSandboxed', 4, false);
+    }
+
+    /** @return array{bool, bool} */
+    private function attributeOption(PhpAttribute $attribute, string $name, int $position, bool $default): array
+    {
+        $argument = $attribute->argument($name);
+        if (null === $argument) {
+            $positional = $attribute->argument($position);
+            $argument = null === $positional?->name() ? $positional : null;
+        }
+        if (null === $argument) {
+            return [$default, true];
+        }
+
+        return match (strtolower(trim((string) $argument->expression()))) {
+            'true' => [true, true],
+            'false' => [false, true],
+            'null' => [$default, true],
+            default => [$default, false],
+        };
+    }
+
+    private function objectOption(string $options, string $name): bool
     {
         return 1 === preg_match('/([\'\"])'.preg_quote($name, '/').'\\1\s*=>\s*true\b/i', $options);
     }
 
-    private function kind(PhpObjectCreation $creation): ?TwigCallableKind
+    private function objectKind(PhpObjectCreation $creation): ?TwigCallableKind
     {
         return match ([$creation->className(), $creation->enclosingMethod()]) {
-            ['Twig\\TwigFilter', 'getFilters'] => TwigCallableKind::Filter,
-            ['Twig\\TwigFunction', 'getFunctions'] => TwigCallableKind::Function,
+            ['Twig\TwigFilter', 'getFilters'] => TwigCallableKind::Filter,
+            ['Twig\TwigFunction', 'getFunctions'] => TwigCallableKind::Function,
+            default => null,
+        };
+    }
+
+    private function attributeKind(PhpAttribute $attribute): ?TwigCallableKind
+    {
+        return match ($attribute->name()) {
+            'Twig\Attribute\AsTwigFilter' => TwigCallableKind::Filter,
+            'Twig\Attribute\AsTwigFunction' => TwigCallableKind::Function,
             default => null,
         };
     }
