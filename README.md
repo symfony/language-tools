@@ -25,13 +25,14 @@ what each run exercises.
 ### Visual Studio Code
 
 Install the self-contained Symfony Language Tools extension from the
-[Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=symfony.language-tools)
-or the [Open VSX Registry](https://open-vsx.org/extension/symfony/language-tools):
+[Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=symfony.language-tools):
 
 ```console
 code --install-extension symfony.language-tools
-codium --install-extension symfony.language-tools
 ```
+
+VSCodium users can install the matching `.vsix` package from
+[GitHub Releases](https://github.com/symfony/language-tools/releases).
 
 Add `--pre-release` to install a version with a prerelease suffix. See the
 [Visual Studio Code guide](docs/editors/vscode.rst) for configuration and

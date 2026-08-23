@@ -14,8 +14,8 @@ Symfony Language Tools officially supports the following clients. Use the
 corresponding page for installation, configuration and troubleshooting:
 
 * `VS Code`_: install the Symfony Language Tools extension from the Visual
-  Studio Marketplace or Open VSX Registry. It bundles the language server, so
-  no separate download is needed;
+  Studio Marketplace. It bundles the language server, so no separate download
+  is needed;
 * `Neovim`_: install the server with Mason or from a standalone release, then
   enable it through ``nvim-lspconfig``;
 * `Zed`_: install the extension to download and run the server automatically on

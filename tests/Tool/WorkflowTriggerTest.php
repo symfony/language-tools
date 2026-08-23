@@ -29,6 +29,21 @@ final class WorkflowTriggerTest extends TestCase
         self::assertStringContainsString('            - CHANGELOG.md', $push);
     }
 
+    public function testOpenVsxStepsAreSkippedWithoutCredentials(): void
+    {
+        $contents = file_get_contents(self::ROOT.'/.github/workflows/publish-vscode.yaml');
+        self::assertIsString($contents);
+        self::assertStringContainsString('            - name: Detect Open VSX credentials', $contents);
+        self::assertStringContainsString('              id: open-vsx', $contents);
+        self::assertStringContainsString('                  OVSX_PAT: ${{ secrets.OVSX_PAT }}', $contents);
+        self::assertStringContainsString("                      echo 'enabled=false' >> \"\$GITHUB_OUTPUT\"", $contents);
+        self::assertStringContainsString('skipping Open VSX verification and publication', $contents);
+        self::assertStringContainsString('            - name: Verify Open VSX access', $contents);
+        self::assertStringContainsString("              if: \${{ steps.open-vsx.outputs.enabled == 'true' }}", $contents);
+        self::assertStringContainsString('            - name: Publish release packages to Open VSX', $contents);
+        self::assertStringContainsString("              if: \${{ inputs.verify_only != true && steps.open-vsx.outputs.enabled == 'true' }}", $contents);
+    }
+
     /** @return iterable<string, array{string}> */
     public static function regularWorkflowProvider(): iterable
     {

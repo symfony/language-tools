@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Skip Open VSX verification and publication when credentials are unavailable
 - Capture dogfood server errors without pipe backpressure
 - Handle dynamically declared Twig callable options conservatively
 - Preserve parameter references inside YAML block scalar content
@@ -51,7 +52,7 @@
 - Validate protocol properties and classify dogfood failures by layer
 - Run the dogfooding matrix from disposable clones at pinned revisions
 - Honor the environment selected for a dogfooding run
-- Publish the VS Code extension on Open VSX
+- Add optional Open VSX publication support
 - Serialize source index updates so saves survive concurrent full scans
 - Cancel indexing and release all project state when a workspace folder is removed
 - Compute translation quick fixes from unsaved editor contents and versioned edits
