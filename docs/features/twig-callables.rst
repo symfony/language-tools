@@ -21,9 +21,10 @@ Function names are completed in Twig expressions, and filter names after a
 and replace the identifier being typed.
 
 Inside a recognized call, argument names are completed from the resolved
-PHP callable. Parameters that Twig injects, the environment, the context
-and the filtered value, are never suggested, and names already used in the
-call are omitted.
+PHP callable. Registration options such as ``needs_environment``,
+``needs_context`` and ``is_variadic`` determine which names Twig injects or
+accepts dynamically. Injected parameters and the filtered value are never
+suggested, and names already used in the call are omitted.
 
 .. code-block:: twig
 
@@ -39,8 +40,9 @@ Diagnostics
 -----------
 
 A named argument that doesn't match any parameter of the resolved PHP
-callable is reported as an error. Calls to unrecognized callables, dynamic
-callables, variadic callables and hash literal keys aren't diagnosed.
+callable is reported as an error. String contents and hash literal keys
+aren't interpreted as arguments. Calls to unrecognized callables, dynamic
+callables and variadic callables aren't diagnosed.
 
 Hover
 -----

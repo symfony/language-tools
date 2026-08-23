@@ -339,10 +339,12 @@ final class TolerantPhpParser implements PhpParserInterface
             }
 
             $name = $child->name?->getText($source);
+            $expression = $child->expression?->getText($source);
             $arguments[] = new PhpArgument(
                 \is_string($name) ? $name : null,
                 $child->expression instanceof StringLiteral ? $this->stringLiteral($child->expression, $source) : null,
                 null === $names ? null : $this->phpCallable($child->expression, $source, $names, $owner),
+                \is_string($expression) ? $expression : null,
             );
         }
 

@@ -38,10 +38,20 @@ final class TwigCallableDeclarationExtractor
                 ),
                 $callable?->className(),
                 $callable?->method(),
+                $this->option($creation, 'needs_environment'),
+                $this->option($creation, 'needs_context'),
+                $this->option($creation, 'is_variadic'),
             );
         }
 
         return new TwigCallableSourceFacts($uri, $declarations);
+    }
+
+    private function option(PhpObjectCreation $creation, string $name): bool
+    {
+        $options = ($creation->argument('options') ?? $creation->argument(2))?->expression();
+
+        return null !== $options && 1 === preg_match('/([\'\"])'.preg_quote($name, '/').'\\1\s*=>\s*true\b/i', $options);
     }
 
     private function kind(PhpObjectCreation $creation): ?TwigCallableKind

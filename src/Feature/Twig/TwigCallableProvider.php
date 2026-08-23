@@ -42,18 +42,20 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
         }
         $text = $request->document->text();
         $offset = $this->converter->toByteOffset($text, $request->position);
-        $before = substr($this->comments->mask($text), 0, $offset);
-        if (!$this->insideDirective($before)) {
+        $masked = $this->comments->mask($text);
+        $before = substr($masked, 0, $offset);
+        if (!$this->references->insideDirective($masked, $offset)) {
             return null;
         }
         $argumentItems = $this->completeArgumentNames($request->project, $text, $before, $request->position);
         if (null !== $argumentItems) {
             return $argumentItems;
         }
-        if (1 === preg_match('/\|\s*([A-Za-z_][A-Za-z0-9_]*)?$/', $before, $matches)) {
+        $syntax = $this->maskStringContents($before);
+        if (1 === preg_match('/\|\s*([A-Za-z_][A-Za-z0-9_]*)?$/', $syntax, $matches)) {
             $kind = TwigCallableKind::Filter;
             $prefix = $matches[1] ?? '';
-        } elseif (1 === preg_match('/(?<![\w.\'\"|])([A-Za-z_][A-Za-z0-9_]*)$/', $before, $matches)) {
+        } elseif (1 === preg_match('/(?<![\w.\'\"|])([A-Za-z_][A-Za-z0-9_]*)$/', $syntax, $matches)) {
             $kind = TwigCallableKind::Function;
             $prefix = $matches[1];
         } else {
@@ -79,25 +81,26 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
     /** @return list<array<string, mixed>>|null */
     private function completeArgumentNames(Project $project, string $text, string $before, Position $position): ?array
     {
-        if (1 !== preg_match('/(\|\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\(([^()]*?)([A-Za-z_][A-Za-z0-9_]*)?$/', $before, $matches)) {
+        $context = $this->callContext($before);
+        if (null === $context) {
             return null;
         }
-        [, $pipe, $callee, $arguments] = $matches;
-        $prefix = $matches[4] ?? '';
-        // only an argument-list position right after ( or , can start a name
-        if ('' !== trim($arguments) && 1 !== preg_match('/,\s*$/', $arguments)) {
-            return null;
-        }
-        $kind = '' !== $pipe ? TwigCallableKind::Filter : TwigCallableKind::Function;
-        $parameters = $this->callableParameters($project, $kind, $callee);
+        $kind = $context['filter'] ? TwigCallableKind::Filter : TwigCallableKind::Function;
+        $parameters = $this->callableParameters($project, $kind, $context['callee']);
         if (null === $parameters) {
             return null;
         }
-        preg_match_all('/(?<=\(|,)\s*([A-Za-z_][A-Za-z0-9_]*)\s*[:=]/', '('.$matches[3], $used);
+        $used = [];
+        foreach ($this->argumentSegments($context['arguments']) as $argument) {
+            if (1 === preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*[:=](?![=>])/', $argument, $match)) {
+                $used[] = $match[1];
+            }
+        }
+        $prefix = $context['prefix'];
         $start = $this->converter->toPosition($text, $this->converter->toByteOffset($text, $position) - \strlen($prefix));
         $items = [];
         foreach ($parameters['nameable'] as $name) {
-            if (!str_starts_with($name, $prefix) || \in_array($name, $used[1], true)) {
+            if (!str_starts_with($name, $prefix) || \in_array($name, $used, true)) {
                 continue;
             }
             $items[] = [
@@ -133,11 +136,12 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
         }
         $text = $request->document->text();
         $masked = $this->comments->mask($text);
+        $syntax = $this->maskStringContents($masked);
         $diagnostics = [];
         $resolved = [];
-        preg_match_all('/(\|\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\(([^()]*)\)/', $masked, $calls, \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL);
+        preg_match_all('/(\|\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\(([^()]*)\)/', $syntax, $calls, \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL);
         foreach ($calls[2] as $index => [$callee, $calleeOffset]) {
-            if (!\is_string($callee) || !$this->insideDirective(substr($masked, 0, $calleeOffset))) {
+            if (!\is_string($callee) || !$this->references->insideDirective($masked, $calleeOffset)) {
                 continue;
             }
             $kind = null !== ($calls[1][$index][0] ?? null) ? TwigCallableKind::Filter : TwigCallableKind::Function;
@@ -170,6 +174,124 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
         return $diagnostics;
     }
 
+    /** @return array{filter: bool, callee: string, arguments: string, prefix: string}|null */
+    private function callContext(string $before): ?array
+    {
+        $stack = [];
+        $quote = null;
+        $escaped = false;
+        for ($offset = 0, $length = \strlen($before); $offset < $length; ++$offset) {
+            $character = $before[$offset];
+            if (null !== $quote) {
+                if ($escaped) {
+                    $escaped = false;
+                } elseif ('\\' === $character) {
+                    $escaped = true;
+                } elseif ($quote === $character) {
+                    $quote = null;
+                }
+                continue;
+            }
+            if (\in_array($character, ["'", '"'], true)) {
+                $quote = $character;
+            } elseif (\in_array($character, ['(', '[', '{'], true)) {
+                $stack[] = [$character, $offset];
+            } elseif ([] !== $stack && $character === ['(' => ')', '[' => ']', '{' => '}'][$stack[array_key_last($stack)][0]]) {
+                array_pop($stack);
+            }
+        }
+        if (null !== $quote || [] === $stack || '(' !== $stack[array_key_last($stack)][0]) {
+            return null;
+        }
+        $open = $stack[array_key_last($stack)][1];
+        $head = substr($before, 0, $open);
+        if (1 === preg_match('/\|\s*([A-Za-z_][A-Za-z0-9_]*)\s*$/', $head, $callee)) {
+            $filter = true;
+        } elseif (1 === preg_match('/(?<![\w.|])([A-Za-z_][A-Za-z0-9_]*)\s*$/', $head, $callee)) {
+            $filter = false;
+        } else {
+            return null;
+        }
+        $arguments = substr($before, $open + 1);
+        $segments = $this->argumentSegments($arguments);
+        $current = $segments[\count($segments) - 1];
+        if (1 !== preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)?$/', $current, $prefix)) {
+            return null;
+        }
+
+        return [
+            'filter' => $filter,
+            'callee' => $callee[1],
+            'arguments' => $arguments,
+            'prefix' => $prefix[1] ?? '',
+        ];
+    }
+
+    /** @return list<string> */
+    private function argumentSegments(string $arguments): array
+    {
+        $segments = [];
+        $start = 0;
+        $stack = [];
+        $quote = null;
+        $escaped = false;
+        for ($offset = 0, $length = \strlen($arguments); $offset < $length; ++$offset) {
+            $character = $arguments[$offset];
+            if (null !== $quote) {
+                if ($escaped) {
+                    $escaped = false;
+                } elseif ('\\' === $character) {
+                    $escaped = true;
+                } elseif ($quote === $character) {
+                    $quote = null;
+                }
+                continue;
+            }
+            if (\in_array($character, ["'", '"'], true)) {
+                $quote = $character;
+            } elseif (\in_array($character, ['(', '[', '{'], true)) {
+                $stack[] = ['(' => ')', '[' => ']', '{' => '}'][$character];
+            } elseif ([] !== $stack && $character === $stack[array_key_last($stack)]) {
+                array_pop($stack);
+            } elseif (',' === $character && [] === $stack) {
+                $segments[] = substr($arguments, $start, $offset - $start);
+                $start = $offset + 1;
+            }
+        }
+        $segments[] = substr($arguments, $start);
+
+        return $segments;
+    }
+
+    private function maskStringContents(string $text): string
+    {
+        $masked = $text;
+        $quote = null;
+        $escaped = false;
+        for ($offset = 0, $length = \strlen($text); $offset < $length; ++$offset) {
+            $character = $text[$offset];
+            if (null === $quote) {
+                if (\in_array($character, ["'", '"'], true)) {
+                    $quote = $character;
+                }
+                continue;
+            }
+            if ($escaped) {
+                $escaped = false;
+            } elseif ('\\' === $character) {
+                $escaped = true;
+            } elseif ($quote === $character) {
+                $quote = null;
+                continue;
+            }
+            if ("\n" !== $character) {
+                $masked[$offset] = ' ';
+            }
+        }
+
+        return $masked;
+    }
+
     /**
      * Argument names come from the resolved PHP callable. Injected
      * parameters, the environment, the context, and the filtered value,
@@ -180,13 +302,15 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
     private function callableParameters(Project $project, TwigCallableKind $kind, string $callee): ?array
     {
         $method = null;
+        $matchedDeclaration = null;
         foreach ($this->indexes->forProject($project)->declarations($kind, $callee) as $declaration) {
             $method = $this->callableMethods($project, $declaration)[0]['method'] ?? null;
             if ($method instanceof PhpMethodDeclaration) {
+                $matchedDeclaration = $declaration;
                 break;
             }
         }
-        if (!$method instanceof PhpMethodDeclaration) {
+        if (!$method instanceof PhpMethodDeclaration || null === $matchedDeclaration) {
             return null;
         }
         $open = strpos($method->signature(), '(');
@@ -198,46 +322,21 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
         preg_match_all('/(?:([\\\\\w|?]+)\s+)?(\.\.\.)?\$([A-Za-z_][A-Za-z0-9_]*)/', $parameterList, $matches, \PREG_SET_ORDER);
         $all = [];
         $variadic = false;
-        $types = [];
         foreach ($matches as $match) {
             $all[] = $match[3];
-            $types[] = $match[1];
             $variadic = $variadic || '' !== $match[2];
         }
-        $skip = 0;
-        if (str_contains($types[0] ?? '', 'Environment')) {
-            ++$skip;
-        }
-        if ('array' === ($types[$skip] ?? '') && 'context' === ($all[$skip] ?? '')) {
-            ++$skip;
-        }
+        $skip = (int) $matchedDeclaration->needsEnvironment() + (int) $matchedDeclaration->needsContext();
         if (TwigCallableKind::Filter === $kind) {
             ++$skip;
         }
-
-        return ['all' => $all, 'nameable' => \array_slice($all, $skip), 'variadic' => $variadic];
-    }
-
-    private function insideDirective(string $before): bool
-    {
-        $open = -1;
-        foreach (['{{', '{%'] as $token) {
-            $position = strrpos($before, $token);
-            if (false !== $position) {
-                $open = max($open, $position);
-            }
-        }
-        if (-1 === $open) {
-            return false;
-        }
-        foreach (['}}', '%}'] as $token) {
-            $position = strrpos($before, $token);
-            if (false !== $position && $position > $open) {
-                return false;
-            }
+        $variadic = $variadic || $matchedDeclaration->isVariadic();
+        $nameable = \array_slice($all, $skip);
+        if ($variadic) {
+            array_pop($nameable);
         }
 
-        return true;
+        return ['all' => $all, 'nameable' => $nameable, 'variadic' => $variadic];
     }
 
     public function hover(array $params): ?array

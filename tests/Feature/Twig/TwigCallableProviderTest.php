@@ -48,7 +48,7 @@ final class TwigCallableProviderTest extends TestCase
                 public function getFilters(): array
                 {
                     return [
-                        new Filter('filter_name', [Runtime::class, 'doSomething']),
+                        new Filter('filter_name', [Runtime::class, 'doSomething'], ['needs_context' => true]),
                         new Filter(name: 'named_filter', callable: $this->localFilter(...)),
                     ];
                 }
@@ -56,7 +56,7 @@ final class TwigCallableProviderTest extends TestCase
                 public function getFunctions(): array
                 {
                     return [
-                        new FunctionDefinition('function_name', [Runtime::class, 'doSomething']),
+                        new FunctionDefinition('function_name', [Runtime::class, 'doSomething'], ['needs_environment' => true, 'is_variadic' => true]),
                         new FunctionDefinition('dynamic_name', $dynamicCallable),
                         new OtherDefinition('ignored_name', [Runtime::class, 'ignored']),
                     ];
@@ -75,15 +75,18 @@ final class TwigCallableProviderTest extends TestCase
         $declarations = $extractor->extract('file:///workspace/src/Twig/AppExtension.php', $source)->declarations();
 
         self::assertSame([
-            [TwigCallableKind::Filter, 'filter_name', 'App\Twig\AppExtensionRuntime', 'doSomething'],
-            [TwigCallableKind::Filter, 'named_filter', 'App\Twig\AppExtension', 'localFilter'],
-            [TwigCallableKind::Function, 'function_name', 'App\Twig\AppExtensionRuntime', 'doSomething'],
-            [TwigCallableKind::Function, 'dynamic_name', null, null],
+            [TwigCallableKind::Filter, 'filter_name', 'App\Twig\AppExtensionRuntime', 'doSomething', false, true, false],
+            [TwigCallableKind::Filter, 'named_filter', 'App\Twig\AppExtension', 'localFilter', false, false, false],
+            [TwigCallableKind::Function, 'function_name', 'App\Twig\AppExtensionRuntime', 'doSomething', true, false, true],
+            [TwigCallableKind::Function, 'dynamic_name', null, null, false, false, false],
         ], array_map(static fn ($declaration): array => [
             $declaration->kind(),
             $declaration->name(),
             $declaration->className(),
             $declaration->method(),
+            $declaration->needsEnvironment(),
+            $declaration->needsContext(),
+            $declaration->isVariadic(),
         ], $declarations));
         $functionOffset = strpos($source, 'function_name');
         self::assertIsInt($functionOffset);
@@ -276,6 +279,8 @@ final class TwigCallableProviderTest extends TestCase
         self::assertSame(['filter_name'], $completions('{{ item|'));
         self::assertSame(['filter_name'], $completions('{{ item|fil'));
         self::assertSame(['function_name'], $completions('{% if f'));
+        self::assertSame(['function_name'], $completions('{{ "}}" ~ func'));
+        self::assertNull($completions('{{ "say func'));
         self::assertNull($completions('{{ item.func'));
         self::assertNull($completions('Plain func'));
         self::assertNull($completions('{{ done }} func'));
@@ -305,12 +310,20 @@ final class TwigCallableProviderTest extends TestCase
 
                 public function getFunctions(): array
                 {
-                    return [new TwigFunction('image', [MediaExtension::class, 'render'])];
+                    return [
+                        new TwigFunction('image', [MediaExtension::class, 'render'], ['needs_environment' => true, 'needs_context' => true]),
+                        new TwigFunction('attrs', [MediaExtension::class, 'attrs'], ['is_variadic' => true]),
+                    ];
                 }
 
-                public function render(\Twig\Environment $environment, string $name, int $width = 200, bool $lazy = false): string
+                public function render(\Twig\Environment $environment, array $context, string $name, int $width = 200, bool $lazy = false): string
                 {
                     return $name;
+                }
+
+                public function attrs(string $tag, array $arguments): string
+                {
+                    return $tag;
                 }
 
                 public function shorten(string $value, int $length = 30): string
@@ -351,7 +364,9 @@ final class TwigCallableProviderTest extends TestCase
         };
         self::assertSame(['name', 'width', 'lazy'], $completions('{{ image('));
         self::assertSame(['width'], $completions("{{ image(name: 'a', w"));
+        self::assertSame(['width'], $completions("{{ image(name: 'a, lazy: false', w"));
         self::assertSame(['width', 'lazy'], $completions("{{ image(name: 'a', "));
+        self::assertSame(['tag'], $completions('{{ attrs('));
         self::assertSame(['length'], $completions('{{ text|shorten('));
         self::assertNull($completions("{{ image(name: 'a"));
 
@@ -367,6 +382,8 @@ final class TwigCallableProviderTest extends TestCase
             array_column($unknown ?? [], 'message'),
         );
         self::assertSame([], $diagnostics("{{ image(name: 'a', width: 3, lazy: true) }}"));
+        self::assertSame([], $diagnostics("{{ image(name: 'x, wdith: 3') }}"));
+        self::assertSame([], $diagnostics("{{ attrs('div', data_test: 'x') }}"));
         self::assertSame([], $diagnostics("{{ image({name: 'a'}) }}"));
         self::assertSame([], $diagnostics("{{ image(name ? 'a' : 'b') }}"));
         self::assertSame([], $diagnostics('{{ unknown_callable(anything: 1) }}'));

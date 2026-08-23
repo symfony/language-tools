@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Parse Twig callable completion and diagnostics outside string literals
+- Honor Twig callable injection and variadic options
 - Release cached public assets when a workspace project is removed
 - Find references for Twig functions and filters across templates
 - Resolve vendor Twig components such as ux:icon from runtime metadata

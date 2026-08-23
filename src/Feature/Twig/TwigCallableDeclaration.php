@@ -13,6 +13,9 @@ final class TwigCallableDeclaration
         private readonly Range $range,
         private readonly ?string $className = null,
         private readonly ?string $method = null,
+        private readonly bool $needsEnvironment = false,
+        private readonly bool $needsContext = false,
+        private readonly bool $variadic = false,
     ) {
     }
 
@@ -44,5 +47,20 @@ final class TwigCallableDeclaration
     public function method(): ?string
     {
         return $this->method;
+    }
+
+    public function needsEnvironment(): bool
+    {
+        return $this->needsEnvironment;
+    }
+
+    public function needsContext(): bool
+    {
+        return $this->needsContext;
+    }
+
+    public function isVariadic(): bool
+    {
+        return $this->variadic;
     }
 }

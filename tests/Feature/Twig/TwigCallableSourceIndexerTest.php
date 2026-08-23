@@ -35,7 +35,7 @@ final class TwigCallableSourceIndexerTest extends TestCase
             {
                 public function getFunctions(): array
                 {
-                    return [new TwigFunction('function_name', [Runtime::class, 'render'])];
+                    return [new TwigFunction('function_name', [Runtime::class, 'render'], ['needs_context' => true, 'is_variadic' => true])];
                 }
             }
             PHP);
@@ -59,6 +59,8 @@ final class TwigCallableSourceIndexerTest extends TestCase
         self::assertCount(1, $declarations);
         self::assertSame('App\Twig\Runtime', $declarations[0]->className());
         self::assertSame('render', $declarations[0]->method());
+        self::assertTrue($declarations[0]->needsContext());
+        self::assertTrue($declarations[0]->isVariadic());
     }
 
     private function indexer(TwigCallableIndexRegistry $indexes): TwigCallableSourceIndexer

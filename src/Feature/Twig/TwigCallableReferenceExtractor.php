@@ -82,7 +82,7 @@ final class TwigCallableReferenceExtractor
         return $offset >= $node->startByte() && $offset <= $node->endByte();
     }
 
-    private function insideDirective(string $text, int $offset): bool
+    public function insideDirective(string $text, int $offset): bool
     {
         $close = null;
         $quote = null;
