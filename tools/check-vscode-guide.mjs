@@ -46,8 +46,8 @@ for (const [index, row] of referenceRows.entries()) {
 }
 
 const supported = pageRows.flatMap((row) => row.support).filter(Boolean).length;
-if (67 !== supported) {
-    throw new Error(`Expected 67 supported combinations, found ${supported}`);
+if (70 !== supported) {
+    throw new Error(`Expected 70 supported combinations, found ${supported}`);
 }
 
 const tourSlides = [...tourScript.matchAll(/^    "([a-z-]+)\|/gm)].map((match) => `${match[1]}.webp`);

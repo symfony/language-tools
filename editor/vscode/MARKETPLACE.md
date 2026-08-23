@@ -52,7 +52,7 @@ It complements your PHP language server; keep it enabled.
 | Routing | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Dependency injection | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Twig template names | ✓ | ✓ | ✓ | ✓ | · | ✓ |
-| Twig functions and filters | · | ✓ | ✓ | · | · | · |
+| Twig functions and filters | ✓ | ✓ | ✓ | ✓ | · | ✓ |
 | Translations | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Environment variables | ✓ | ✓ | ✓ | ✓ | · | ✓ |
 | Bundle configuration | ✓ | ✓ | · | · | · | ✓ |
@@ -60,7 +60,7 @@ It complements your PHP language server; keep it enabled.
 | Events | ✓ | ✓ | ✓ | ✓ | · | ✓ |
 | Security | ✓ | ✓ | ✓ | ✓ | · | ✓ |
 | Forms, validation and serializer metadata | ✓ | ✓ | ✓ | ✓ | · | ✓ |
-| AssetMapper and importmaps | ✓ | ✓ | ✓ | ✓ | · | ✓ |
+| AssetMapper and public assets | ✓ | ✓ | ✓ | ✓ | · | ✓ |
 | Stimulus and Live Components | ✓ | ✓ | ✓ | ✓ | · | ✓ |
 | Doctrine entities and repositories | ✓ | ✓ | ✓ | ✓ | · | · |
 
