@@ -65,6 +65,15 @@ final class ProjectRuntimeRefresherTest extends TestCase
         self::assertTrue($scheduler->plans[0]->preservesContainer());
     }
 
+    public function testDoesNotRefreshUnrelatedNewXmlFiles(): void
+    {
+        [$refresher, $scheduler] = $this->refresher(TrustStatus::Trusted);
+
+        $refresher->refreshUri('file:///workspace/public/sitemap.xml', SourceFileChange::untracked());
+
+        self::assertSame([], $scheduler->plans);
+    }
+
     public function testDoesNotRefreshUntrustedProjects(): void
     {
         [$refresher, $scheduler] = $this->refresher(TrustStatus::Untrusted);

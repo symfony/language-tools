@@ -44,7 +44,7 @@ final class ProjectRuntimeRefresher
             || !$this->configuration->runtimeIndexing($project)
             || TrustStatus::Trusted !== $this->workspaceTrust->status($project)
             || null === $path
-            || !$this->affectsRuntime($path)
+            || !$this->affectsRuntime($path, $sourceFileChange)
         ) {
             return;
         }
@@ -58,7 +58,7 @@ final class ProjectRuntimeRefresher
         $this->refreshScheduler->schedule($project, $plan);
     }
 
-    private function affectsRuntime(string $path): bool
+    private function affectsRuntime(string $path, SourceFileChange $sourceFileChange): bool
     {
         if (str_starts_with($path, 'var/') || str_starts_with($path, 'vendor/')) {
             return false;
@@ -73,7 +73,9 @@ final class ProjectRuntimeRefresher
             return true;
         }
         if ('xml' === $extension) {
-            return true;
+            return [] !== $sourceFileChange->domains()
+                || str_starts_with($path, 'config/')
+                || false !== stripos('/'.$path, '/resources/config/');
         }
         if (\in_array($extension, ['ini', 'json', 'xlf', 'xliff'], true)) {
             return $this->isTranslationPath($path);
