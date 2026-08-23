@@ -7,6 +7,9 @@
 - Refresh runtime metadata after INI translation and XML service changes
 - Watch INI translation catalogs for external changes
 - Rediscover projects after composer.lock changes
+- Reject dogfood locations outside the canonical application path
+- Refresh dogfood mirrors when configured repositories change
+- Restrict manual public dogfood runs to configured projects
 - Ignore Twig member calls when validating callable arguments
 - Parse Twig callable completion and diagnostics outside string literals
 - Honor Twig callable injection and variadic options

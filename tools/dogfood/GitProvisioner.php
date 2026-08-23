@@ -40,7 +40,8 @@ final class GitProvisioner implements ProvisionerInterface
             $this->filesystem->mkdir($this->mirrorsDirectory);
             $this->git(['clone', '--mirror', '--', $repository, $mirror], \sprintf('Unable to mirror "%s".', $repository));
         }
-        if ($this->hasRevision($mirror, $configuration->revision)) {
+        $remoteChanged = $this->ensureRemote($mirror, $repository);
+        if (!$remoteChanged && $this->hasRevision($mirror, $configuration->revision)) {
             return $mirror;
         }
         $this->git(['-C', $mirror, 'remote', 'update', '--prune'], \sprintf('Unable to update the mirror of "%s".', $repository));
@@ -49,6 +50,17 @@ final class GitProvisioner implements ProvisionerInterface
         }
 
         return $mirror;
+    }
+
+    private function ensureRemote(string $mirror, string $repository): bool
+    {
+        $remote = $this->processes->run(['git', '-C', $mirror, 'remote', 'get-url', 'origin']);
+        if ($remote->successful() && $repository === trim($remote->standardOutput)) {
+            return false;
+        }
+        $this->git(['-C', $mirror, 'remote', 'set-url', 'origin', $repository], \sprintf('Unable to update the mirror remote to "%s".', $repository));
+
+        return true;
     }
 
     private function hasRevision(string $mirror, string $revision): bool

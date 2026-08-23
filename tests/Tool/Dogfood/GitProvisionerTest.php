@@ -75,6 +75,23 @@ final class GitProvisionerTest extends TestCase
         self::assertSame($second, $this->head($checkout));
     }
 
+    public function testProvisionUpdatesAnExistingMirrorWhenTheRepositoryChanges(): void
+    {
+        $first = $this->commit('composer.json', '{"name": "first/app"}');
+        $this->provisioner->provision($this->configuration($first));
+        $secondOrigin = Path::join($this->directory, 'second-origin');
+        (new Filesystem())->mkdir($secondOrigin);
+        $this->git(['init', '--initial-branch=main'], $secondOrigin);
+        $this->git(['config', 'user.email', 'dogfood@example.com'], $secondOrigin);
+        $this->git(['config', 'user.name', 'Dogfood'], $secondOrigin);
+        $second = $this->commit('composer.json', '{"name": "second/app"}', $secondOrigin);
+
+        $checkout = $this->provisioner->provision($this->configuration($second, $secondOrigin));
+
+        self::assertSame('{"name": "second/app"}', file_get_contents(Path::join($checkout, 'composer.json')));
+        self::assertSame($second, $this->head($checkout));
+    }
+
     public function testProvisionRejectsUnknownRevisions(): void
     {
         $this->commit('composer.json', '{}');
@@ -96,18 +113,19 @@ final class GitProvisionerTest extends TestCase
         self::assertDirectoryDoesNotExist($checkout);
     }
 
-    private function configuration(string $revision): ProjectConfiguration
+    private function configuration(string $revision, ?string $repository = null): ProjectConfiguration
     {
-        return new ProjectConfiguration('origin', $this->origin, $revision, null, 'dev', 'composer', false, 120);
+        return new ProjectConfiguration('origin', $repository ?? $this->origin, $revision, null, 'dev', 'composer', false, 120);
     }
 
-    private function commit(string $file, string $contents): string
+    private function commit(string $file, string $contents, ?string $repository = null): string
     {
-        file_put_contents(Path::join($this->origin, $file), $contents);
-        $this->git(['add', $file], $this->origin);
-        $this->git(['commit', '-m', 'Update '.$file], $this->origin);
+        $repository ??= $this->origin;
+        file_put_contents(Path::join($repository, $file), $contents);
+        $this->git(['add', $file], $repository);
+        $this->git(['commit', '-m', 'Update '.$file], $repository);
 
-        return $this->head($this->origin);
+        return $this->head($repository);
     }
 
     private function head(string $repository): string

@@ -46,6 +46,16 @@ final class ProtocolValidatorTest extends TestCase
         self::assertStringContainsString('outside the application', $violations[0]);
     }
 
+    public function testRejectsLexicallyContainedLocationsThatEscapeTheApplication(): void
+    {
+        $result = [['uri' => 'file:///workspace/app/../outside.php', 'range' => self::range(0, 0, 0, 1)]];
+
+        $violations = (new ProtocolValidator())->validate('textDocument/definition', $result, self::PROJECT);
+
+        self::assertCount(1, $violations);
+        self::assertStringContainsString('outside the application', $violations[0]);
+    }
+
     public function testIgnoresNonFileTargets(): void
     {
         $result = [['target' => 'https://symfony.com/doc/current/routing.html', 'range' => self::range(0, 0, 0, 1)]];
@@ -77,6 +87,18 @@ final class ProtocolValidatorTest extends TestCase
 
         self::assertCount(1, $violations);
         self::assertStringContainsString('dependency-owned or generated', $violations[0]);
+    }
+
+    public function testRejectsRenameEditsOutsideTheApplication(): void
+    {
+        $result = ['changes' => [
+            'file:///workspace/other/Controller.php' => [['range' => self::range(0, 0, 0, 4), 'newText' => 'renamed']],
+        ]];
+
+        $violations = (new ProtocolValidator())->validate('textDocument/rename', $result, self::PROJECT);
+
+        self::assertCount(1, $violations);
+        self::assertStringContainsString('outside the application', $violations[0]);
     }
 
     public function testAcceptsRenameEditsInApplicationSources(): void

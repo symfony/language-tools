@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Tools\Dogfood;
 
+use Symfony\Component\Filesystem\Path;
+
 final class ProtocolValidator
 {
     private const RENAME_PROTECTED_DIRECTORIES = ['vendor/', 'var/'];
@@ -11,15 +13,17 @@ final class ProtocolValidator
      */
     public function validate(string $method, mixed $result, string $projectRoot): array
     {
+        $projectRoot = Path::canonicalize($projectRoot);
         $violations = [];
         $this->walk($result, $projectRoot, $violations);
         if ('textDocument/rename' === $method && \is_array($result)) {
             foreach ($this->renameTargets($result) as $uri) {
                 $path = $this->path($uri);
-                if (null === $path || !str_starts_with($path, $projectRoot.'/')) {
+                if (null === $path || !$this->isProjectPath($path, $projectRoot)) {
+                    $violations[] = \sprintf('Rename edits location "%s", which is outside the application.', $uri);
                     continue;
                 }
-                $relativePath = substr($path, \strlen($projectRoot) + 1);
+                $relativePath = Path::makeRelative($path, $projectRoot);
                 foreach (self::RENAME_PROTECTED_DIRECTORIES as $directory) {
                     if (str_starts_with($relativePath, $directory)) {
                         $violations[] = \sprintf('Rename edits "%s", which is dependency-owned or generated.', $relativePath);
@@ -43,11 +47,11 @@ final class ProtocolValidator
         if (\is_array($range) && !$this->isValidRange($range)) {
             $violations[] = \sprintf('Invalid range %s.', json_encode($range));
         }
-        foreach (['uri', 'target'] as $key) {
+        foreach (['uri', 'target', 'targetUri'] as $key) {
             $uri = $value[$key] ?? null;
             if (\is_string($uri) && str_starts_with($uri, 'file://')) {
                 $path = $this->path($uri);
-                if (null === $path || ($path !== $projectRoot && !str_starts_with($path, $projectRoot.'/'))) {
+                if (null === $path || !$this->isProjectPath($path, $projectRoot)) {
                     $violations[] = \sprintf('Location "%s" is outside the application.', $uri);
                 }
             }
@@ -110,6 +114,16 @@ final class ProtocolValidator
             return null;
         }
 
-        return rawurldecode(substr($uri, \strlen('file://')));
+        $path = rawurldecode(substr($uri, \strlen('file://')));
+        if (preg_match('{^/[A-Za-z]:/}', $path)) {
+            $path = substr($path, 1);
+        }
+
+        return Path::canonicalize(str_replace('\\', '/', $path));
+    }
+
+    private function isProjectPath(string $path, string $projectRoot): bool
+    {
+        return $path === $projectRoot || Path::isBasePath($projectRoot, $path);
     }
 }
