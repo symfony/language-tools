@@ -96,6 +96,13 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         unset($this->activeScans[$root], $this->entries[$root]);
     }
 
+    public function indexedHash(Project $project, string $path): ?string
+    {
+        $relativePath = $this->files->relativePath($project, $path);
+
+        return null === $relativePath ? null : ($this->entries[$project->rootPath()][$relativePath]['hash'] ?? null);
+    }
+
     private function refreshProjectUnlocked(Project $project, Cancellation $cancellation): void
     {
         $this->statuses->sourceIndexing($project);
@@ -377,6 +384,11 @@ final class ApplicationSourceScanner implements ProjectStateInterface
                 delay(0, cancellation: $cancellation);
             }
             $cancellation->throwIfRequested();
+            $uri = $this->uri($project, $path);
+            $owner = $this->projects->forDocumentUri($uri);
+            if (null !== $owner && $owner->rootPath() !== $project->rootPath()) {
+                continue;
+            }
             $relativePath = $this->files->relativePath($project, $path);
             $languageId = $this->files->languageId($path);
             if (null === $relativePath || null === $languageId) {
@@ -409,7 +421,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
             if (false === $text) {
                 continue;
             }
-            $document = new SourceDocument($this->uri($project, $path), $languageId, $text);
+            $document = new SourceDocument($uri, $languageId, $text);
             $payloads = [];
             foreach ($this->providers as $provider) {
                 $payloads[$provider->name()] = $this->encodePayload($provider, $provider->index($project, $document));

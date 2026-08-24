@@ -58,8 +58,11 @@ Set ``workspaceTrust`` to ``false`` to keep every project in static-only mode.
 Configuration
 -------------
 
-Configure startup options and project settings under the
-``symfony-language-tools`` language server:
+Put shared project and analysis settings in ``.symfony-lsp.json`` so Zed and
+the `headless diagnostics checker`_ use the same values.
+
+Configure Zed-only overrides under the ``symfony-language-tools`` language
+server:
 
 .. code-block:: json
 
@@ -67,23 +70,11 @@ Configure startup options and project settings under the
         "lsp": {
             "symfony-language-tools": {
                 "initialization_options": {
-                    "phpCommand": ["php"],
-                    "containerProjectRoot": "",
-                    "environment": "dev",
-                    "debug": true,
-                    "runtimeIndexing": true,
-                    "bridgeTimeout": 300,
-                    "projectRoots": [],
+                    "workspaceTrust": true,
                     "trace": "off"
                 },
                 "settings": {
-                    "phpCommand": ["php"],
-                    "containerProjectRoot": "",
-                    "environment": "dev",
-                    "debug": true,
-                    "runtimeIndexing": true,
-                    "bridgeTimeout": 300,
-                    "translationDiagnostics": false
+                    "environment": "test"
                 }
             }
         }
@@ -147,3 +138,4 @@ application. Set ``trace`` to ``messages`` or ``verbose`` temporarily for
 redacted protocol logging, then restore it to ``off``.
 
 .. _`Docker support`: ../docker.rst
+.. _`headless diagnostics checker`: ../features/headless-diagnostics.rst

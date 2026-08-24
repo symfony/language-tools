@@ -6,6 +6,7 @@ use Fabpot\JsonRpc\JsonRpcPeer;
 use Microsoft\PhpParser\Parser;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Lsp\Check\CheckCommand;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Client\JsonRpcClient;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
@@ -15,6 +16,7 @@ use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\CompletionProviderRegistry;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DefinitionProviderRegistry;
+use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipCodeLensProvider;
@@ -110,6 +112,7 @@ return static function (ContainerConfigurator $container): void {
     }
 
     $services->load('Symfony\\Lsp\\Feature\\', '../src/Feature/*Registry.php');
+    $services->set(DiagnosticCollector::class);
     $featureGroups = [
         'Route' => [],
         'DependencyInjection' => [],
@@ -149,6 +152,7 @@ return static function (ContainerConfigurator $container): void {
         $services->remove($class);
     }
 
+    $services->load('Symfony\\Lsp\\Check\\', '../src/Check/*{Manager,Registry,Parser,Selector,Runner,Reporter,Command,Client}.php');
     $services->load('Symfony\\Lsp\\Client\\', '../src/Client/*Client.php');
     $services->load('Symfony\\Lsp\\Document\\', '../src/Document/*{Resolver,Store,Synchronizer,Converter,Reader}.php');
     $services->load('Symfony\\Lsp\\Index\\', '../src/Index/*{Scanner,Handler,Store,Registry,Codec,Hasher,Enumerator}.php');
@@ -202,7 +206,7 @@ return static function (ContainerConfigurator $container): void {
         CompletionProviderRegistry::class => 'lsp.provider.completion',
         CodeActionProviderRegistry::class => 'lsp.provider.code_action',
         HoverProviderRegistry::class => 'lsp.provider.hover',
-        DiagnosticProviderRegistry::class => 'lsp.provider.diagnostic',
+        DiagnosticCollector::class => 'lsp.provider.diagnostic',
         DefinitionProviderRegistry::class => 'lsp.provider.definition',
         DocumentLinkProviderRegistry::class => 'lsp.provider.document_link',
         ReferencesProviderRegistry::class => 'lsp.provider.references',
@@ -225,5 +229,6 @@ return static function (ContainerConfigurator $container): void {
     $services->get(CodeLensProviderRegistry::class)
         ->arg('$providers', tagged_iterator('lsp.provider.code_lens'));
 
+    $services->get(CheckCommand::class)->public();
     $services->get(LanguageServer::class)->public();
 };

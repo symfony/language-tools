@@ -6,6 +6,9 @@ from the selected Symfony environment. Features based on project files remain
 available without running the application. Features that depend on the compiled
 container or another runtime service require runtime indexing.
 
+Use the `headless diagnostics checker`_ to run the same Symfony diagnostics
+against saved files in local automation and CI.
+
 Project file scanning honors your ``.gitignore`` rules, so machine-generated
 files such as build caches and package manager lock files are never indexed.
 Dotenv files like ``.env.local`` are the exception: they stay indexed to power
@@ -201,6 +204,7 @@ If a runtime-backed feature returns no results, verify that:
   PHP command runs in Docker (see `Docker support`_);
 * runtime indexing is enabled and the workspace is trusted.
 
+.. _`headless diagnostics checker`: headless-diagnostics.rst
 .. _`Docker support`: ../docker.rst
 .. _`Routing`: routing.rst
 .. _`Dependency injection`: dependency-injection.rst

@@ -78,24 +78,27 @@ The command palette provides these commands:
 Configuration
 -------------
 
-Open the Symfony application as a VS Code workspace. Add these settings to the
-workspace's ``.vscode/settings.json`` file:
+Open the Symfony application as a VS Code workspace. Put shared project and
+analysis settings in ``.symfony-lsp.json`` so the editor and the
+`headless diagnostics checker`_ use the same values.
+
+Use ``.vscode/settings.json`` for VS Code-specific settings or explicit editor
+overrides:
 
 .. code-block:: json
 
     {
-        "symfonyLsp.memoryLimit": "",
-        "symfonyLsp.phpCommand": ["php"],
-        "symfonyLsp.containerProjectRoot": "",
-        "symfonyLsp.environment": "dev",
-        "symfonyLsp.debug": true,
-        "symfonyLsp.runtimeIndexing": true,
-        "symfonyLsp.bridgeTimeout": 300,
-        "symfonyLsp.projectRoots": [],
+        "symfonyLsp.memoryLimit": "4G",
         "symfonyLsp.trace": "off",
-        "symfonyLsp.translationDiagnostics": false,
         "php.suggest.basic": false
     }
+
+Any explicitly configured ``symfonyLsp.phpCommand``,
+``symfonyLsp.containerProjectRoot``, ``symfonyLsp.environment``,
+``symfonyLsp.debug``, ``symfonyLsp.runtimeIndexing``,
+``symfonyLsp.bridgeTimeout``, ``symfonyLsp.projectRoots`` or
+``symfonyLsp.translationDiagnostics`` value overrides the corresponding shared
+configuration for VS Code only.
 
 ``symfonyLsp.serverPath`` overrides the bundled executable and must be an
 absolute path. Use it for a server built from source or a separately downloaded
@@ -161,6 +164,7 @@ the platform's native crash reports. On macOS, they are stored under
 * the workspace settings contain a valid project PHP command.
 
 .. _`Symfony integrations`: ../features/index.rst
+.. _`headless diagnostics checker`: ../features/headless-diagnostics.rst
 .. _`Docker support`: ../docker.rst
 .. _`Marketplace overview`: https://marketplace.visualstudio.com/items?itemName=symfony.language-tools
 .. _`Visual Studio Marketplace`: https://marketplace.visualstudio.com/items?itemName=symfony.language-tools

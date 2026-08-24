@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteCodeActionProvider;
@@ -247,8 +248,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([new Project('/workspace', 'file:///workspace', '^8.0')]);
         $positionConverter = new PositionConverter();
-        $publisher = new DiagnosticProviderRegistry(
-            $client,
+        $collector = new DiagnosticCollector(
             $documents,
             $projects,
             new ProjectPathResolver(new UriToPathConverter()),
@@ -261,6 +261,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
             )],
         );
+        $publisher = new DiagnosticProviderRegistry($client, $documents, $projects, $collector);
 
         $publisher->publish(['textDocument' => ['uri' => $uri]]);
 
@@ -322,21 +323,22 @@ final class RouteDiagnosticPublisherTest extends TestCase
         ]));
         $positionConverter = new PositionConverter();
 
+        $collector = new DiagnosticCollector(
+            $documents,
+            $projects,
+            new ProjectPathResolver(new UriToPathConverter()),
+            [new RouteDiagnosticPublisher(
+                new DocumentContextResolver($documents, $projects),
+                new LspProtocolMapper(),
+                $routeIndexes,
+                new DependencyInjectionSourceIndexRegistry(),
+                new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($positionConverter), new PhpCommentParser()),
+                new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
+            )],
+        );
+
         return [
-            new DiagnosticProviderRegistry(
-                $client,
-                $documents,
-                $projects,
-                new ProjectPathResolver(new UriToPathConverter()),
-                [new RouteDiagnosticPublisher(
-                    new DocumentContextResolver($documents, $projects),
-                    new LspProtocolMapper(),
-                    $routeIndexes,
-                    new DependencyInjectionSourceIndexRegistry(),
-                    new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($positionConverter), new PhpCommentParser()),
-                    new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
-                )],
-            ),
+            new DiagnosticProviderRegistry($client, $documents, $projects, $collector),
             $client,
             $project,
         ];

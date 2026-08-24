@@ -110,39 +110,31 @@
           "items": {
             "type": "string"
           },
-          "default": [
-            "php"
-          ],
           "scope": "resource",
           "description": "Command and arguments used to run the project bridge."
         },
         "symfonyLsp.containerProjectRoot": {
           "type": "string",
-          "default": "",
           "scope": "resource",
-          "description": "Absolute project root as seen by the PHP command when it runs in a Docker container. Leave empty when the PHP command runs on this machine."
+          "description": "Absolute project root as seen by the PHP command when it runs in a Docker container. The built-in default runs the PHP command on this machine."
         },
         "symfonyLsp.environment": {
           "type": "string",
-          "default": "dev",
           "scope": "resource",
-          "description": "Symfony environment used for runtime indexing."
+          "description": "Symfony environment used for runtime indexing. The built-in default is dev."
         },
         "symfonyLsp.debug": {
           "type": "boolean",
-          "default": true,
           "scope": "resource",
-          "description": "Enable kernel debug mode, which is required for runtime indexing."
+          "description": "Enable kernel debug mode, which is required for runtime indexing and defaults to true."
         },
         "symfonyLsp.runtimeIndexing": {
           "type": "boolean",
-          "default": true,
           "scope": "resource",
-          "description": "Enable trusted runtime indexing."
+          "description": "Enable trusted runtime indexing. The built-in default is true."
         },
         "symfonyLsp.bridgeTimeout": {
           "type": "number",
-          "default": 300,
           "minimum": 1,
           "scope": "resource",
           "description": "Maximum number of seconds allowed for each project bridge run."
@@ -152,9 +144,8 @@
           "items": {
             "type": "string"
           },
-          "default": [],
           "scope": "window",
-          "description": "Explicit application roots, relative to each workspace folder or absolute."
+          "description": "Explicit application roots, relative to each workspace folder or absolute. The built-in default discovers projects automatically."
         },
         "symfonyLsp.trace": {
           "type": "string",
@@ -169,9 +160,8 @@
         },
         "symfonyLsp.translationDiagnostics": {
           "type": "boolean",
-          "default": false,
           "scope": "resource",
-          "description": "Report statically known translation keys missing from the effective catalogue."
+          "description": "Report statically known translation keys missing from the effective catalogue. The built-in default is false."
         }
       }
     }

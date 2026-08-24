@@ -20,6 +20,8 @@ use Symfony\Lsp\Feature\ReferencesProviderRegistry;
 use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\IndexCommandHandler;
+use Symfony\Lsp\Project\InvalidConfigurationException;
+use Symfony\Lsp\Project\ProjectConfiguration;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
 use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
@@ -206,11 +208,15 @@ final class LanguageServer
     private function changeWorkspaceFolders(array $params): void
     {
         async(function () use ($params): void {
-            $this->workspaceConfiguration->changeWorkspaceFolders($params);
-            $this->workspaceFileWatcher->refresh();
-            $this->workspaceConfiguration->refreshProjectSettings();
-            $this->sourceScanner->indexAll();
-            $this->workspaceConfiguration->requestWorkspaceTrust();
+            try {
+                $this->workspaceConfiguration->changeWorkspaceFolders($params);
+                $this->workspaceFileWatcher->refresh();
+                $this->workspaceConfiguration->refreshProjectSettings();
+                $this->sourceScanner->indexAll();
+                $this->workspaceConfiguration->requestWorkspaceTrust();
+            } catch (InvalidConfigurationException $error) {
+                $this->logger->error($error);
+            }
         })->ignore();
     }
 
@@ -223,6 +229,7 @@ final class LanguageServer
         }
 
         $rediscover = false;
+        $reloadConfiguration = false;
         $refreshWatchers = false;
         $rescanSources = false;
         foreach ($changes as $change) {
@@ -236,6 +243,9 @@ final class LanguageServer
             if (\in_array($basename, ['composer.json', 'composer.lock'], true)) {
                 $rediscover = true;
             }
+            if (ProjectConfiguration::FILE_NAME === $basename) {
+                $reloadConfiguration = true;
+            }
             if ('.gitignore' === $basename) {
                 $rescanSources = true;
             }
@@ -244,20 +254,28 @@ final class LanguageServer
             }
         }
 
-        if (!$rediscover && !$refreshWatchers && !$rescanSources) {
+        if (!$rediscover && !$reloadConfiguration && !$refreshWatchers && !$rescanSources) {
             return;
         }
 
-        async(function () use ($rediscover, $refreshWatchers): void {
-            if ($rediscover) {
-                $this->workspaceConfiguration->rediscoverProjects();
-            }
-            if ($rediscover || $refreshWatchers) {
-                $this->workspaceFileWatcher->refresh();
-            }
-            $this->sourceScanner->indexAll();
-            if ($rediscover) {
-                $this->workspaceConfiguration->requestWorkspaceTrust();
+        async(function () use ($rediscover, $reloadConfiguration, $refreshWatchers): void {
+            try {
+                if ($reloadConfiguration) {
+                    $this->workspaceConfiguration->reloadProjectConfiguration();
+                    $this->workspaceConfiguration->refreshProjectSettings();
+                } elseif ($rediscover) {
+                    $this->workspaceConfiguration->rediscoverProjects();
+                    $this->workspaceConfiguration->refreshProjectSettings();
+                }
+                if ($rediscover || $reloadConfiguration || $refreshWatchers) {
+                    $this->workspaceFileWatcher->refresh();
+                }
+                $this->sourceScanner->indexAll();
+                if ($rediscover || $reloadConfiguration) {
+                    $this->workspaceConfiguration->requestWorkspaceTrust();
+                }
+            } catch (InvalidConfigurationException $error) {
+                $this->logger->error($error);
             }
         })->ignore();
     }

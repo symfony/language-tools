@@ -89,13 +89,19 @@ local function test()
       vim.deepcopy(vim.lsp.config.symfony_lsp.init_options),
       {
         workspaceTrust = true,
+        phpCommand = { 'php' },
+        bridgeTimeout = 300,
       }
     ),
     settings = {
       symfonyLsp = vim.tbl_deep_extend(
         'force',
         vim.deepcopy(vim.lsp.config.symfony_lsp.settings.symfonyLsp),
-        { translationDiagnostics = true }
+        {
+          phpCommand = { 'php' },
+          bridgeTimeout = 300,
+          translationDiagnostics = true,
+        }
       ),
     },
   }

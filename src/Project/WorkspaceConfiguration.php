@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Project;
 
+use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
@@ -16,7 +17,9 @@ final class WorkspaceConfiguration
         private readonly WorkspaceTrustManager $workspaceTrustManager,
         private readonly RuntimeConfiguration $runtimeConfiguration,
         private readonly ProjectSettings $projectSettings,
+        private readonly ProjectConfiguration $projectConfiguration,
         private readonly PositionConverter $positionConverter,
+        private readonly UriToPathConverter $uriToPathConverter,
         private readonly ProjectStateCleaner $projectStateCleaner,
     ) {
     }
@@ -26,16 +29,18 @@ final class WorkspaceConfiguration
      */
     public function initialize(array $params): void
     {
+        $this->negotiatePositionEncoding($params);
+        $this->projectSettings->initialize($params);
+        $this->workspaceFolders = $this->workspaceFolders($params);
+        $this->projectConfiguration->load($this->workspaceFolders);
+
         $initializationOptions = $params['initializationOptions'] ?? null;
         if (\is_array($initializationOptions)) {
             $this->runtimeConfiguration->configure($initializationOptions);
         }
 
-        $this->negotiatePositionEncoding($params);
-        $this->projectSettings->initialize($params);
-        $this->workspaceFolders = $this->workspaceFolders($params);
         $this->rediscoverProjects();
-        if ($this->runtimeConfiguration->runtimeIndexing()) {
+        if (\is_array($initializationOptions)) {
             $this->workspaceTrustManager->applyInitializationOptions($params, $this->projectRegistry->all());
         }
     }
@@ -48,6 +53,12 @@ final class WorkspaceConfiguration
     public function refreshProjectSettings(): void
     {
         $this->projectSettings->refresh();
+    }
+
+    public function reloadProjectConfiguration(): void
+    {
+        $this->projectConfiguration->load($this->workspaceFolders);
+        $this->rediscoverProjects();
     }
 
     public function requestWorkspaceTrust(): void
@@ -95,17 +106,75 @@ final class WorkspaceConfiguration
                 : ['uri' => $folder['uri']];
         }
 
+        $this->projectConfiguration->load($this->workspaceFolders);
         $this->rediscoverProjects();
     }
 
     public function rediscoverProjects(): void
     {
-        $change = $this->projectRegistry->replace($this->projectDiscovery->discover(
-            $this->workspaceFolders,
-            $this->runtimeConfiguration->projectRoots(),
-        ));
+        $projects = [];
+        $initializationRoots = $this->runtimeConfiguration->projectRoots();
+        if ([] !== $initializationRoots) {
+            $projects = $this->projectDiscovery->discover($this->workspaceFolders, $initializationRoots);
+        } else {
+            foreach ($this->workspaceFolders as $folder) {
+                $path = $this->workspaceFolderPath($folder);
+                $roots = null === $path ? null : $this->projectConfiguration->projectRoots($path);
+                array_push($projects, ...$this->projectDiscovery->discover([$folder], $roots ?? []));
+            }
+        }
+
+        $unique = [];
+        foreach ($projects as $project) {
+            $unique[$project->rootPath()] = $project;
+        }
+        $projects = array_values($unique);
+        usort($projects, static fn (Project $left, Project $right): int => strcmp($left->rootPath(), $right->rootPath()));
+        if ([] !== $initializationRoots) {
+            $this->validateInitializationRoots($initializationRoots, $projects);
+        }
+        $this->projectConfiguration->validateProjects($projects);
+
+        $change = $this->projectRegistry->replace($projects);
         foreach ($change->removed as $project) {
             $this->projectStateCleaner->remove($project);
+        }
+        $this->projectSettings->applyFileSettings();
+    }
+
+    /**
+     * @param list<string>  $roots
+     * @param list<Project> $projects
+     */
+    private function validateInitializationRoots(array $roots, array $projects): void
+    {
+        $discovered = [];
+        foreach ($projects as $project) {
+            $discovered[$project->rootPath()] = true;
+        }
+        foreach ($roots as $root) {
+            $paths = [];
+            if (str_starts_with($root, 'file:')) {
+                $path = $this->uriToPathConverter->convert($root);
+                $paths = null === $path ? [] : [$path];
+            } elseif (Path::isAbsolute($root)) {
+                $paths = [Path::canonicalize($root)];
+            } else {
+                foreach ($this->workspaceFolders as $folder) {
+                    $workspace = $this->uriToPathConverter->convert($folder['uri']);
+                    if (null !== $workspace) {
+                        $paths[] = Path::join($workspace, $root);
+                    }
+                }
+            }
+            if ([] === $paths) {
+                throw new InvalidConfigurationException(\sprintf('The configured project root "%s" is invalid.', $root));
+            }
+            foreach ($paths as $path) {
+                if (!isset($discovered[$path])) {
+                    throw new InvalidConfigurationException(\sprintf('The configured project root "%s" was not discovered as a Symfony project.', $root));
+                }
+            }
         }
     }
 
@@ -144,5 +213,11 @@ final class WorkspaceConfiguration
         }
 
         return $folders;
+    }
+
+    /** @param array{uri: string, name?: string} $folder */
+    private function workspaceFolderPath(array $folder): ?string
+    {
+        return $this->uriToPathConverter->convert($folder['uri']);
     }
 }

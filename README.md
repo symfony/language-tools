@@ -82,6 +82,21 @@ before configuring your Language Server Protocol client:
 See the [standalone installation guide](docs/index.rst#installing-a-standalone-release)
 for supported platforms, checksum verification and source installation.
 
+## Continuous Integration
+
+Run Symfony diagnostics against saved project files without an editor or LSP
+client:
+
+```console
+symfony-lsp check
+```
+
+The checker supports deterministic human, JSON and GitHub Actions output,
+code-based failure policies, source-only analysis and occurrence-specific
+baselines. Running it with runtime indexing enabled executes application code.
+See the [headless diagnostics guide](docs/features/headless-diagnostics.rst) for
+configuration, CI examples and stable exit statuses.
+
 ## Requirements
 
 Symfony Language Tools supports maintained Symfony versions listed in Symfony's
@@ -92,6 +107,7 @@ compatible with its Symfony version.
 ## Documentation
 
 - [Supported Symfony integrations](docs/features/index.rst)
+- [Headless diagnostics and CI](docs/features/headless-diagnostics.rst)
 - [Visual Studio Code guide](docs/editors/vscode.rst)
 - [Neovim guide](docs/editors/neovim.rst)
 - [Zed guide](docs/editors/zed.rst)

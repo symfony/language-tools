@@ -23,7 +23,8 @@ final class DocumentationTest extends TestCase
         sort($matches[1]);
 
         self::assertSame($pages, $matches[1]);
-        self::assertSame(\count($pages), preg_match_all('/^    \* - `[^`]+`_$/m', $index));
+        $integrationPages = array_values(array_diff($pages, ['headless-diagnostics.rst']));
+        self::assertSame(\count($integrationPages), preg_match_all('/^    \* - `[^`]+`_$/m', $index));
     }
 
     public function testDocumentationUsesGitHubCompatibleRst(): void

@@ -8,8 +8,11 @@ use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Project\AnalysisSettings;
 use Symfony\Lsp\Project\GitignoreMatcher;
+use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectConfiguration;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\ProjectSettings;
@@ -39,6 +42,7 @@ final class WorkspaceConfigurationTest extends TestCase
 
     protected function tearDown(): void
     {
+        @unlink($this->temporaryDirectory.'/.symfony-lsp.json');
         @unlink($this->temporaryDirectory.'/composer.json');
         @rmdir($this->temporaryDirectory);
     }
@@ -68,6 +72,40 @@ final class WorkspaceConfigurationTest extends TestCase
         self::assertFalse($runtimeConfiguration->runtimeIndexing());
         self::assertSame(90.0, $runtimeConfiguration->bridgeTimeout());
         self::assertSame('utf-8', $configuration->positionEncoding());
+    }
+
+    public function testLoadsCheckedInAnalysisSettingsBeforeTrustResolution(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/.symfony-lsp.json', json_encode([
+            'version' => 1,
+            'environment' => 'test',
+            'runtimeIndexing' => false,
+        ], \JSON_THROW_ON_ERROR));
+        $registry = new ProjectRegistry();
+        $runtimeConfiguration = new RuntimeConfiguration();
+        $configuration = $this->workspaceConfiguration($registry, $runtimeConfiguration);
+
+        $configuration->initialize([
+            'rootUri' => 'file://'.$this->temporaryDirectory,
+            'initializationOptions' => ['workspaceTrust' => true],
+        ]);
+
+        self::assertCount(1, $registry->all());
+        self::assertSame('test', $runtimeConfiguration->environment($registry->all()[0]));
+        self::assertFalse($runtimeConfiguration->runtimeIndexing($registry->all()[0]));
+    }
+
+    public function testRejectsEveryInvalidInitializationProjectRoot(): void
+    {
+        $configuration = $this->workspaceConfiguration(new ProjectRegistry(), new RuntimeConfiguration());
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('missing');
+
+        $configuration->initialize([
+            'rootUri' => 'file://'.$this->temporaryDirectory,
+            'initializationOptions' => ['projectRoots' => ['.', 'missing']],
+        ]);
     }
 
     public function testRediscoversProjectsAfterWorkspaceFolderChanges(): void
@@ -111,13 +149,19 @@ final class WorkspaceConfigurationTest extends TestCase
 
     private function workspaceConfiguration(ProjectRegistry $registry, RuntimeConfiguration $runtimeConfiguration, ?ProjectStateInterface $state = null): WorkspaceConfiguration
     {
+        $uriToPathConverter = new UriToPathConverter();
+        $analysisSettings = new AnalysisSettings();
+        $projectConfiguration = new ProjectConfiguration($uriToPathConverter, $analysisSettings);
+
         return new WorkspaceConfiguration(
-            new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher()),
+            new ProjectDiscovery($uriToPathConverter, new GitignoreMatcher()),
             $registry,
             new WorkspaceTrustManager($this->client(), new WorkspaceTrust(), $this->runtimeInitializer(), new ProjectIndexStatusRegistry(), $runtimeConfiguration, $registry),
             $runtimeConfiguration,
-            new ProjectSettings($this->client(), $registry, new TranslationConfigurationRegistry(), $runtimeConfiguration),
+            new ProjectSettings($this->client(), $registry, new TranslationConfigurationRegistry(), $runtimeConfiguration, $projectConfiguration, $analysisSettings),
+            $projectConfiguration,
             new PositionConverter(),
+            $uriToPathConverter,
             new ProjectStateCleaner(null === $state ? [] : [$state]),
         );
     }

@@ -62,31 +62,21 @@ project ``.nvim.lua`` file rather than enabling runtime indexing globally.
 Configuration
 -------------
 
-Override the built-in configuration before enabling the language server:
+Put shared project and analysis settings in ``.symfony-lsp.json`` so Neovim
+and the `headless diagnostics checker`_ use the same values.
+
+Override settings for Neovim only before enabling the language server:
 
 .. code-block:: lua
 
     vim.lsp.config('symfony_lsp', {
         init_options = {
-            phpCommand = { 'php' },
-            containerProjectRoot = '',
-            environment = 'dev',
-            debug = true,
-            runtimeIndexing = true,
-            bridgeTimeout = 300,
-            projectRoots = {},
+            workspaceTrust = true,
             trace = 'off',
         },
         settings = {
             symfonyLsp = {
-                phpCommand = { 'php' },
-                containerProjectRoot = '',
-                environment = 'dev',
-                debug = true,
-                runtimeIndexing = true,
-                bridgeTimeout = 300,
-                projectRoots = {},
-                translationDiagnostics = false,
+                environment = 'test',
             },
         },
     })
@@ -129,5 +119,6 @@ protocol traffic to Neovim's LSP log. Restore it to ``off`` after
 troubleshooting.
 
 .. _`standalone guide`: ../index.rst#installing-a-standalone-release
+.. _`headless diagnostics checker`: ../features/headless-diagnostics.rst
 .. _`Docker support`: ../docker.rst
 .. _`nvim-lspconfig`: https://github.com/neovim/nvim-lspconfig

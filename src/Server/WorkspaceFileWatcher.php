@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Server;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectConfiguration;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 
@@ -84,10 +85,14 @@ final class WorkspaceFileWatcher
                 ['globPattern' => '**/.env*'],
                 ['globPattern' => '**/.gitignore'],
                 ['globPattern' => '**/composer.{json,lock}'],
+                ['globPattern' => '**/'.ProjectConfiguration::FILE_NAME],
             ];
         }
 
-        $watchers = [['globPattern' => '**/composer.{json,lock}']];
+        $watchers = [
+            ['globPattern' => '**/composer.{json,lock}'],
+            ['globPattern' => '**/'.ProjectConfiguration::FILE_NAME],
+        ];
         foreach ($this->projects->all() as $project) {
             $watchers[] = $this->relative($project, self::SOURCE_PATTERN);
             $watchers[] = $this->relative($project, '.env*');

@@ -11,7 +11,15 @@ use Fabpot\JsonRpc\JsonRpcValueDecoding;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Check\CheckClient;
+use Symfony\Lsp\Check\CheckCommand;
+use Symfony\Lsp\Check\CheckProgressReporter;
+use Symfony\Lsp\Client\ClientInterface;
+use Symfony\Lsp\Progress\ProgressReporterInterface;
+use Symfony\Lsp\Runtime\SerializedRuntimeInitializer;
+use Symfony\Lsp\Runtime\StatusRuntimeInitializer;
 
 final class LanguageServerFactory
 {
@@ -24,7 +32,6 @@ final class LanguageServerFactory
 
     public function create(ReadableStream $input, WritableStream $output, ?WritableStream $errorOutput = null): LanguageServer
     {
-        $version = $this->serverVersion->value();
         $logger = new ServerLogger($errorOutput);
         $peer = new JsonRpcPeer(
             new ContentLengthJsonRpcTransport($input, $output),
@@ -36,12 +43,7 @@ final class LanguageServerFactory
             $logger->error($error);
         });
 
-        $resources = Path::join(\dirname(__DIR__, 2), 'resources');
-        $container = new ContainerBuilder();
-        $container->setParameter('server.version', $version);
-        $container->setParameter('bridge.source', Path::join($resources, 'bridge.php'));
-        $loader = new PhpFileLoader($container, new FileLocator($resources));
-        $loader->load('services.php');
+        $container = $this->container();
         $container->compile();
         $container->set(JsonRpcPeer::class, $peer);
         $container->set(JsonRpcDispatcher::class, $dispatcher);
@@ -51,5 +53,33 @@ final class LanguageServerFactory
         $server = $container->get(LanguageServer::class);
 
         return $server;
+    }
+
+    public function createCheck(?WritableStream $errorOutput = null): CheckCommand
+    {
+        $container = $this->container();
+        $container->setAlias(ClientInterface::class, CheckClient::class);
+        $container->setAlias(ProgressReporterInterface::class, CheckProgressReporter::class);
+        $container->getDefinition(SerializedRuntimeInitializer::class)
+            ->setArgument('$initializer', new Reference(StatusRuntimeInitializer::class));
+        $container->compile();
+        $container->set(ServerLogger::class, new ServerLogger($errorOutput));
+
+        /** @var CheckCommand $command */
+        $command = $container->get(CheckCommand::class);
+
+        return $command;
+    }
+
+    private function container(): ContainerBuilder
+    {
+        $resources = Path::join(\dirname(__DIR__, 2), 'resources');
+        $container = new ContainerBuilder();
+        $container->setParameter('server.version', $this->serverVersion->value());
+        $container->setParameter('bridge.source', Path::join($resources, 'bridge.php'));
+        $loader = new PhpFileLoader($container, new FileLocator($resources));
+        $loader->load('services.php');
+
+        return $container;
     }
 }

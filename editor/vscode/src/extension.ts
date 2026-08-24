@@ -30,6 +30,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
     }
 
+    const analysisOptions = configuredAnalysisOptions(configuration);
     const serverOptions: ServerOptions = {
         command: serverPath,
         // micro cannot serve stdio on Windows, so the client listens on a loopback socket there.
@@ -70,16 +71,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
                 return codeLenses?.map((codeLens) => convertReferenceCodeLens(codeLens, protocolConverter));
             },
+            workspace: {
+                configuration: async (params, token, next) => {
+                    const resolved = await next(params, token);
+
+                    return params.items.map((item, index) => {
+                        if ('symfonyLsp' !== item.section) {
+                            return Array.isArray(resolved) ? resolved[index] : null;
+                        }
+                        const resource = item.scopeUri ? vscode.Uri.parse(item.scopeUri) : null;
+
+                        return configuredAnalysisOptions(vscode.workspace.getConfiguration('symfonyLsp', resource));
+                    });
+                },
+            },
         },
         initializationOptions: {
             workspaceTrust: vscode.workspace.isTrusted,
-            phpCommand: configuration.get<string[]>('phpCommand', ['php']),
-            containerProjectRoot: configuration.get<string>('containerProjectRoot', ''),
-            environment: configuration.get<string>('environment', 'dev'),
-            debug: configuration.get<boolean>('debug', true),
-            runtimeIndexing: configuration.get<boolean>('runtimeIndexing', true),
-            bridgeTimeout: configuration.get<number>('bridgeTimeout', 300),
-            projectRoots: configuration.get<string[]>('projectRoots', []),
+            ...(undefined === analysisOptions.projectRoots ? {} : { projectRoots: analysisOptions.projectRoots }),
             trace: configuration.get<string>('trace', 'off'),
         },
         synchronize: {
@@ -145,6 +154,33 @@ export function serverStartupMessage(
 
 export function useSocketTransport(): boolean {
     return 'win32' === process.platform;
+}
+
+export function configuredAnalysisOptions(configuration: vscode.WorkspaceConfiguration): Record<string, unknown> {
+    const options: Record<string, unknown> = {};
+    for (const name of [
+        'phpCommand',
+        'containerProjectRoot',
+        'environment',
+        'debug',
+        'runtimeIndexing',
+        'bridgeTimeout',
+        'projectRoots',
+        'translationDiagnostics',
+    ]) {
+        const inspected = configuration.inspect(name);
+        const value = inspected?.workspaceFolderLanguageValue
+            ?? inspected?.workspaceFolderValue
+            ?? inspected?.workspaceLanguageValue
+            ?? inspected?.workspaceValue
+            ?? inspected?.globalLanguageValue
+            ?? inspected?.globalValue;
+        if (undefined !== value) {
+            options[name] = value;
+        }
+    }
+
+    return options;
 }
 
 function convertReferenceCodeLens(codeLens: vscode.CodeLens, converter: Protocol2CodeConverter): vscode.CodeLens {

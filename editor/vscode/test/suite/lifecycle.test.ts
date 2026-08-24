@@ -2,7 +2,12 @@ import * as assert from 'node:assert/strict';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { State } from 'vscode-languageclient/node';
-import { serverEnvironment, serverStartupMessage, useSocketTransport } from '../../src/extension';
+import {
+    configuredAnalysisOptions,
+    serverEnvironment,
+    serverStartupMessage,
+    useSocketTransport,
+} from '../../src/extension';
 import { indexStatusPollingEnabled } from '../../src/indexStatus';
 import {
     completions,
@@ -25,6 +30,7 @@ interface IndexStatus {
 
 export const lifecycleTests: TestCase[] = [
     ['Server environment carries the configured memory limit', testServerEnvironment],
+    ['Only explicit analysis settings are forwarded at startup', testConfiguredAnalysisOptions],
     ['Index status polling follows the language client state', testIndexStatusPolling],
     ['Server reports and refreshes indexes', testIndexCommands],
     ['Server remains responsive after workspace configuration changes', testConfigurationChange],
@@ -40,6 +46,16 @@ async function testServerEnvironment(): Promise<void> {
         serverStartupMessage('1.2.3', serverPath, 'bundled', 'stdio'),
         `Symfony Language Tools extension 1.2.3 starting on ${process.platform}-${process.arch}; server (bundled): ${serverPath}; transport: stdio.`,
     );
+}
+
+async function testConfiguredAnalysisOptions(): Promise<void> {
+    const configuration = {
+        inspect: (name: string): { workspaceValue: unknown } | undefined => 'environment' === name
+            ? { workspaceValue: 'test' }
+            : undefined,
+    } as vscode.WorkspaceConfiguration;
+
+    assert.deepEqual(configuredAnalysisOptions(configuration), { environment: 'test' });
 }
 
 async function testIndexStatusPolling(): Promise<void> {

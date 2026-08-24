@@ -86,8 +86,13 @@ the next time OpenCode accesses them through its LSP integration.
 Configuration
 -------------
 
+Put shared project and analysis settings in ``.symfony-lsp.json`` so OpenCode
+and the `headless diagnostics checker`_ use the same values. This also enables
+project-scoped settings and missing
+translation diagnostics without an OpenCode configuration channel.
+
 OpenCode forwards the ``initialization`` object as Language Server Protocol
-initialization options. Use it to override the default runtime configuration:
+initialization options. Use it for trust, tracing or an OpenCode-only override:
 
 .. code-block:: json
 
@@ -99,13 +104,7 @@ initialization options. Use it to override the default runtime configuration:
                 "extensions": [".php", ".twig", ".yaml", ".yml", ".xml"],
                 "initialization": {
                     "workspaceTrust": true,
-                    "phpCommand": ["symfony", "php"],
-                    "containerProjectRoot": "",
-                    "environment": "dev",
-                    "debug": true,
-                    "runtimeIndexing": true,
-                    "bridgeTimeout": 300,
-                    "projectRoots": [],
+                    "environment": "test",
                     "trace": "off"
                 },
                 "env": {
@@ -145,5 +144,6 @@ See the `OpenCode LSP documentation`_ for its custom language server settings
 and debugging commands.
 
 .. _`standalone guide`: ../index.rst#installing-a-standalone-release
+.. _`headless diagnostics checker`: ../features/headless-diagnostics.rst
 .. _`Docker support`: ../docker.rst
 .. _`OpenCode LSP documentation`: https://opencode.ai/docs/lsp/

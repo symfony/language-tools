@@ -67,6 +67,24 @@ final class ApplicationSourceScannerTest extends TestCase
         (new Filesystem())->remove($this->temporaryDirectory);
     }
 
+    public function testIndexesNestedProjectFilesOnlyForTheirMostSpecificProject(): void
+    {
+        mkdir($this->temporaryDirectory.'/nested/src', 0777, true);
+        file_put_contents($this->temporaryDirectory.'/src/Parent.php', '<?php final class ParentClass {}');
+        file_put_contents($this->temporaryDirectory.'/nested/src/Child.php', '<?php final class ChildClass {}');
+        $child = new Project(
+            $this->temporaryDirectory.'/nested',
+            'file://'.$this->temporaryDirectory.'/nested',
+            '^8.0',
+        );
+        $this->projects->replace([$this->project, $child]);
+        $provider = new RecordingSourceIndexProvider();
+
+        $this->scanner($provider)->indexAll();
+
+        self::assertSame(2, $provider->extractions);
+    }
+
     public function testRestoresPersistentFactsAndRebuildsCorruptedEntries(): void
     {
         file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');

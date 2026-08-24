@@ -15,6 +15,8 @@ final class ProjectSettings
         private readonly ProjectRegistry $projects,
         private readonly TranslationConfigurationRegistry $translationConfiguration,
         private readonly RuntimeConfiguration $runtimeConfiguration,
+        private readonly ProjectConfiguration $projectConfiguration,
+        private readonly AnalysisSettings $analysisSettings,
     ) {
     }
 
@@ -26,8 +28,18 @@ final class ProjectSettings
         $this->configurationSupported = \is_array($workspace) && true === ($workspace['configuration'] ?? null);
     }
 
+    /** @param array<array-key, mixed> $overrides */
+    public function applyFileSettings(array $overrides = []): void
+    {
+        $overrides = $this->analysisSettings->normalizeProject($overrides, false);
+        foreach ($this->projects->all() as $project) {
+            $this->apply($project, $overrides);
+        }
+    }
+
     public function refresh(): void
     {
+        $this->applyFileSettings();
         if (!$this->configurationSupported) {
             return;
         }
@@ -49,11 +61,21 @@ final class ProjectSettings
 
         foreach ($projects as $index => $project) {
             $settings = $response[$index] ?? null;
-            if (!\is_array($settings)) {
-                continue;
+            if (\is_array($settings)) {
+                $this->apply($project, $this->analysisSettings->normalizeProject($settings, false));
             }
-            $this->translationConfiguration->configure($project, true === ($settings['translationDiagnostics'] ?? null));
-            $this->runtimeConfiguration->configureProject($project, $settings);
         }
+    }
+
+    /** @param array<string, mixed> $overrides */
+    private function apply(Project $project, array $overrides): void
+    {
+        $settings = [
+            ...$this->projectConfiguration->settings($project),
+            ...$this->runtimeConfiguration->initializationSettings(),
+            ...$overrides,
+        ];
+        $this->translationConfiguration->configure($project, true === ($settings['translationDiagnostics'] ?? false));
+        $this->runtimeConfiguration->configureProject($project, $settings);
     }
 }

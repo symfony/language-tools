@@ -11,6 +11,72 @@ function progress(string $message): void
     fflush(\STDOUT);
 }
 
+function checkSavedDiagnostics(string $server, ?string $expectedVersion): void
+{
+    $directory = sys_get_temp_dir().'/symfony-lsp-smoke-'.bin2hex(random_bytes(6));
+    $outputPath = tempnam(sys_get_temp_dir(), 'lsp-check-out-');
+    $errorPath = tempnam(sys_get_temp_dir(), 'lsp-check-err-');
+    if (false === $outputPath || false === $errorPath) {
+        throw new RuntimeException('Unable to create the diagnostics smoke test output files.');
+    }
+    mkdir($directory.'/config', 0777, true);
+    file_put_contents($directory.'/composer.json', '{"type":"project","require":{"symfony/framework-bundle":"^8.0"}}');
+    file_put_contents($directory.'/config/services.yaml', "parameters:\n    broken: '%env(APP_SECRET%'\n");
+
+    try {
+        progress('Starting the headless diagnostics check');
+        $process = proc_open(
+            [$server, 'check', '--source-only', '--format=json', '--workspace='.$directory],
+            [
+                ['file', 'Windows' === \PHP_OS_FAMILY ? 'NUL' : '/dev/null', 'r'],
+                ['file', $outputPath, 'w'],
+                ['file', $errorPath, 'w'],
+            ],
+            $pipes,
+            options: ['bypass_shell' => true],
+        );
+        if (!is_resource($process)) {
+            throw new RuntimeException('Unable to start the headless diagnostics check.');
+        }
+        $status = proc_close($process);
+        $stdout = (string) file_get_contents($outputPath);
+        $stderr = (string) file_get_contents($errorPath);
+        if (1 !== $status) {
+            throw new RuntimeException('The headless diagnostics check exited with status '.$status.":\n".$stderr);
+        }
+        $report = json_decode($stdout, true, flags: \JSON_THROW_ON_ERROR);
+        if (!is_array($report)
+            || true !== ($report['complete'] ?? null)
+            || 'env.malformed_chain' !== ($report['diagnostics'][0]['code'] ?? null)
+        ) {
+            throw new RuntimeException('The headless diagnostics check returned an unexpected report.');
+        }
+        if (null !== $expectedVersion && $expectedVersion !== ($report['tool']['version'] ?? null)) {
+            throw new RuntimeException('The headless diagnostics check reported an unexpected version.');
+        }
+        progress('Headless diagnostics check passed');
+    } finally {
+        removeTree($directory);
+        @unlink($outputPath);
+        @unlink($errorPath);
+    }
+}
+
+function removeTree(string $path): void
+{
+    if (!is_dir($path)) {
+        @unlink($path);
+
+        return;
+    }
+    foreach (scandir($path) ?: [] as $entry) {
+        if ('.' !== $entry && '..' !== $entry) {
+            removeTree($path.'/'.$entry);
+        }
+    }
+    @rmdir($path);
+}
+
 final class ServerConnection
 {
     /** @var resource */
@@ -231,4 +297,5 @@ if (2 !== ($shutdown['id'] ?? null) || !array_key_exists('result', $shutdown)) {
     throw new RuntimeException('Symfony Language Tools did not shut down successfully.');
 }
 
+checkSavedDiagnostics($arguments[0], $arguments[1] ?? null);
 fwrite(\STDOUT, "Symfony Language Tools smoke test passed.\n");

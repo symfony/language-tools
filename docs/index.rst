@@ -120,6 +120,22 @@ is lower. Set the ``SYMFONY_LSP_MEMORY_LIMIT`` environment variable to
 override the limit with any PHP memory limit value, such as ``512M``, ``4G``
 or ``-1`` for no limit.
 
+Running Diagnostics Without an Editor
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Use the same executable to check saved Symfony project files in local automation
+or CI:
+
+.. code-block:: terminal
+
+    $ ./symfony-lsp check
+
+The command can produce human, JSON and GitHub Actions reports, select blocking
+diagnostic codes and maintain an occurrence-specific baseline. Runtime analysis
+executes application code; pass ``--source-only`` when it must remain disabled.
+See `Running Diagnostics in CI`_ for the configuration, output, baseline and
+exit-status contracts.
+
 Upgrading
 ~~~~~~~~~
 
@@ -158,6 +174,7 @@ locally built parser extension on Unix systems. Verify that it starts:
 .. _`Zed`: editors/zed.rst
 .. _`OpenCode`: editors/opencode.rst
 .. _`supported integrations`: features/index.rst
+.. _`Running Diagnostics in CI`: features/headless-diagnostics.rst
 .. _`Docker support`: docker.rst
 .. _`release metadata`: https://symfony.com/releases.json
 .. _`Kimai`: https://github.com/kimai/kimai

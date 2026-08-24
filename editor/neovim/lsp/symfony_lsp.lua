@@ -24,27 +24,9 @@ return {
       },
     },
   },
-  init_options = {
-    phpCommand = { 'php' },
-    containerProjectRoot = '',
-    environment = 'dev',
-    debug = true,
-    runtimeIndexing = true,
-    bridgeTimeout = 300,
-    projectRoots = {},
-    trace = 'off',
-  },
+  init_options = {},
   settings = {
-    symfonyLsp = {
-      phpCommand = { 'php' },
-      containerProjectRoot = '',
-      environment = 'dev',
-      debug = true,
-      runtimeIndexing = true,
-      bridgeTimeout = 300,
-      projectRoots = {},
-      translationDiagnostics = false,
-    },
+    symfonyLsp = {},
   },
   commands = {
     ['editor.action.showReferences'] = function(command, ctx)

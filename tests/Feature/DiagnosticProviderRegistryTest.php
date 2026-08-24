@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Project\Project;
@@ -15,16 +16,20 @@ use Symfony\Lsp\Project\UriToPathConverter;
 
 final class DiagnosticProviderRegistryTest extends TestCase
 {
-    public function testPublishesProviderDiagnosticsForProjectDocuments(): void
+    public function testCollectsAndPublishesProviderDiagnosticsForProjectDocuments(): void
     {
-        [$registry, $client] = $this->registry('file:///workspace/templates/page.html.twig');
+        [$registry, $client, $collector] = $this->registry('file:///workspace/templates/page.html.twig');
+        $params = ['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']];
 
-        $registry->publish(['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']]);
+        $collected = $collector->collect($params);
+        $registry->publish($params);
 
+        self::assertIsArray($collected);
+        self::assertSame(['stub'], array_column($collected, 'code'));
         self::assertCount(1, $client->notifications);
         $diagnostics = $client->notifications[0]['params']['diagnostics'];
         self::assertIsArray($diagnostics);
-        self::assertSame(['stub'], array_column($diagnostics, 'code'));
+        self::assertSame($collected, $diagnostics);
     }
 
     public function testDoesNotPublishWhenNoProviderMatches(): void
@@ -85,13 +90,13 @@ final class DiagnosticProviderRegistryTest extends TestCase
         }
     }
 
-    /** @return array{DiagnosticProviderRegistry, CollectingClient} */
+    /** @return array{DiagnosticProviderRegistry, CollectingClient, DiagnosticCollector} */
     private function registry(string $uri): array
     {
         return $this->registryWithProviders($uri, new StubDiagnosticProvider([$this->diagnostic('stub')]));
     }
 
-    /** @return array{DiagnosticProviderRegistry, CollectingClient} */
+    /** @return array{DiagnosticProviderRegistry, CollectingClient, DiagnosticCollector} */
     private function registryWithProviders(string $uri, DiagnosticProviderInterface ...$providers): array
     {
         $client = new CollectingClient();
@@ -100,13 +105,19 @@ final class DiagnosticProviderRegistryTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([new Project('/workspace', 'file:///workspace', '^8.0')]);
 
-        return [new DiagnosticProviderRegistry(
-            $client,
+        $collector = new DiagnosticCollector(
             $documents,
             $projects,
             new ProjectPathResolver(new UriToPathConverter()),
             $providers,
-        ), $client];
+        );
+
+        return [new DiagnosticProviderRegistry(
+            $client,
+            $documents,
+            $projects,
+            $collector,
+        ), $client, $collector];
     }
 
     /** @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, severity: int, source: string, code: string, message: string} */

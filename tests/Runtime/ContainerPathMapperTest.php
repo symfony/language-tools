@@ -67,7 +67,7 @@ final class ContainerPathMapperTest extends TestCase
         self::assertSame('/workspace/composer.json', $mapper->toHost($project, '/srv/api/composer.json'));
     }
 
-    public function testFallsBackToTheGlobalContainerProjectRootForInvalidProjectValues(): void
+    public function testClearsTheGlobalContainerProjectRootForAnEmptyProjectValue(): void
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $configuration = new RuntimeConfiguration();
@@ -75,7 +75,7 @@ final class ContainerPathMapperTest extends TestCase
         $configuration->configureProject($project, ['containerProjectRoot' => '']);
         $mapper = new ContainerPathMapper($configuration);
 
-        self::assertSame('/app/composer.json', $mapper->toContainer($project, '/workspace/composer.json'));
+        self::assertSame('/workspace/composer.json', $mapper->toContainer($project, '/workspace/composer.json'));
     }
 
     public function testIgnoresRelativeContainerProjectRoots(): void

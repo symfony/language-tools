@@ -1,6 +1,7 @@
 #!/usr/bin/env php
 <?php
 
+use Symfony\Lsp\Check\CheckCommand;
 use Symfony\Lsp\Server\LanguageServerFactory;
 use Symfony\Lsp\Server\MemoryLimit;
 use Symfony\Lsp\Server\ServerLogger;
@@ -34,15 +35,8 @@ if (in_array($argv[1] ?? null, ['--version', '-V'], true)) {
     exit(0);
 }
 if (in_array($argv[1] ?? null, ['--help', '-h'], true)) {
-    fwrite(\STDOUT, "Usage: symfony-lsp [--help] [--version] [--socket=<port>]\n");
+    fwrite(\STDOUT, "Usage: symfony-lsp [--help] [--version] [--socket=<port>]\n       symfony-lsp check [options] [files, directories or patterns]\n");
     exit(0);
-}
-
-$socketPort = null;
-foreach (array_slice($argv, 1) as $argument) {
-    if (1 === preg_match('/^--socket=(\d+)$/', $argument, $match)) {
-        $socketPort = (int) $match[1];
-    }
 }
 
 if (!function_exists('symfony_lsp_tree_sitter_parse')) {
@@ -50,14 +44,36 @@ if (!function_exists('symfony_lsp_tree_sitter_parse')) {
     if (is_file($extension) && function_exists('pcntl_exec')) {
         pcntl_exec(\PHP_BINARY, ['-d', 'extension='.$extension, __FILE__, ...array_slice($argv, 1)]);
     }
+}
 
+$errorOutput = getStderr();
+$factory = new LanguageServerFactory();
+if ('check' === ($argv[1] ?? null)) {
+    $execution = $factory->createCheck($errorOutput)->run(array_values(array_slice($argv, 2)));
+    if (!writeAll(\STDOUT, $execution->stdout)) {
+        writeAll(\STDERR, "Unable to write the diagnostics report to standard output.\n");
+        exit(CheckCommand::EXIT_OPERATIONAL);
+    }
+    if ('' !== $execution->stderr) {
+        writeAll(\STDERR, $execution->stderr);
+    }
+    exit($execution->exitCode);
+}
+
+if (!function_exists('symfony_lsp_tree_sitter_parse')) {
     fwrite(\STDERR, "The Symfony Language Tools Tree-sitter parser is unavailable. Run: composer tree-sitter:build\n");
     exit(1);
 }
 
-$errorOutput = getStderr();
 $logger = new ServerLogger($errorOutput);
 try {
+    $socketPort = null;
+    foreach (array_slice($argv, 1) as $argument) {
+        if (1 === preg_match('/^--socket=(\d+)$/', $argument, $match)) {
+            $socketPort = (int) $match[1];
+        }
+    }
+
     if (null !== $socketPort) {
         $socket = @stream_socket_client('tcp://127.0.0.1:'.$socketPort, $errorCode, $errorMessage, 10);
         if (false === $socket) {
@@ -70,10 +86,24 @@ try {
         $input = getStdin();
         $output = getStdout();
     }
-    $exitCode = (new LanguageServerFactory())->create($input, $output, $errorOutput)->run();
+    $exitCode = $factory->create($input, $output, $errorOutput)->run();
 } catch (\Throwable $error) {
     $logger->fatal($error);
     exit(1);
 }
 
 exit($exitCode);
+
+/** @param resource $stream */
+function writeAll($stream, string $contents): bool
+{
+    while ('' !== $contents) {
+        $written = fwrite($stream, $contents);
+        if (false === $written || 0 === $written) {
+            return false;
+        }
+        $contents = substr($contents, $written);
+    }
+
+    return true;
+}

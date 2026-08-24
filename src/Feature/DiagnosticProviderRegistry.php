@@ -4,22 +4,18 @@ namespace Symfony\Lsp\Feature;
 
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\ProjectStateInterface;
 use Symfony\Lsp\Runtime\RuntimeRefreshObserverInterface;
 
 final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterface, ProjectStateInterface
 {
-    /** @param iterable<DiagnosticProviderInterface> $providers */
     public function __construct(
         private readonly ClientInterface $client,
         private readonly DocumentStore $documents,
         private readonly ProjectRegistry $projects,
-        private readonly ProjectPathResolver $pathResolver,
-        private readonly iterable $providers,
+        private readonly DiagnosticCollector $collector,
     ) {
     }
 
@@ -34,33 +30,7 @@ final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterfac
         }
 
         $document = $this->documents->get($textDocument['uri']);
-        if (null === $document) {
-            return;
-        }
-
-        if ($this->isDependencyOwned($document->uri())) {
-            $this->client->notify('textDocument/publishDiagnostics', [
-                'uri' => $document->uri(),
-                'version' => $document->version(),
-                'diagnostics' => [],
-            ]);
-
-            return;
-        }
-
-        $diagnostics = [];
-        $matched = false;
-        foreach ($this->providers as $provider) {
-            $providedDiagnostics = $provider->diagnostics($params);
-            if (null === $providedDiagnostics) {
-                continue;
-            }
-
-            $matched = true;
-            array_push($diagnostics, ...$providedDiagnostics);
-        }
-
-        if (!$matched) {
+        if (null === $document || null === $diagnostics = $this->collector->collect($params)) {
             return;
         }
 
@@ -117,25 +87,5 @@ final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterfac
             'uri' => $textDocument['uri'],
             'diagnostics' => [],
         ]);
-    }
-
-    private function isDependencyOwned(string $uri): bool
-    {
-        $project = $this->projects->forDocumentUri($uri);
-        if (null === $project) {
-            return false;
-        }
-        $relativePath = $this->pathResolver->relative($project, $uri);
-        if (null === $relativePath) {
-            return false;
-        }
-
-        foreach (explode('/', $relativePath) as $segment) {
-            if (\in_array($segment, SourceFileEnumerator::EXCLUDED_DIRECTORIES, true)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

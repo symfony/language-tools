@@ -50,6 +50,7 @@ final class WorkspaceFileWatcherTest extends TestCase
                 'method' => 'workspace/didChangeWatchedFiles',
                 'registerOptions' => ['watchers' => [
                     ['globPattern' => '**/composer.{json,lock}'],
+                    ['globPattern' => '**/.symfony-lsp.json'],
                     ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => $sourcePattern]],
                     ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => '.env*']],
                     ['globPattern' => ['baseUri' => 'file:///workspace', 'pattern' => '.gitignore']],
@@ -96,6 +97,7 @@ final class WorkspaceFileWatcherTest extends TestCase
                     ['globPattern' => '**/.env*'],
                     ['globPattern' => '**/.gitignore'],
                     ['globPattern' => '**/composer.{json,lock}'],
+                    ['globPattern' => '**/.symfony-lsp.json'],
                 ]],
             ]]],
         ]], $client->requests);
