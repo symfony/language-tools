@@ -16,6 +16,7 @@ final class RouteCompletionProviderTest extends TestCase
             'sections' => [
                 'routes' => [
                     'complete' => true,
+                    'resources' => ['config/routes.yaml', 'config/http_endpoints.yaml'],
                     'items' => [
                         ['name' => 'admin_user', 'path' => '/admin/user'],
                         ['name' => 'article_show', 'path' => '/article/{id}', 'methods' => ['GET']],
@@ -29,6 +30,8 @@ final class RouteCompletionProviderTest extends TestCase
             ['label' => 'article_edit', 'kind' => 12, 'detail' => '/article/{id}/edit'],
             ['label' => 'article_show', 'kind' => 12, 'detail' => '/article/{id}'],
         ], (new RouteCompletionProvider($index))->complete('article_'));
+        self::assertTrue($index->isResource('config/routes.yaml'));
+        self::assertTrue($index->isResource('config/http_endpoints.yaml'));
     }
 
     public function testCompletesInternationalizedRoutesWithCanonicalNames(): void
@@ -55,9 +58,30 @@ final class RouteCompletionProviderTest extends TestCase
     {
         $index = new RouteIndex();
         (new RouteSnapshotLoader($index))->load([
-            'sections' => ['routes' => ['complete' => true, 'items' => [null, ['path' => '/']]]],
+            'sections' => ['routes' => [
+                'complete' => true,
+                'resources' => [null, 'config/routes.yaml'],
+                'items' => [null, ['path' => '/']],
+            ]],
         ]);
 
         self::assertSame([], (new RouteCompletionProvider($index))->complete(''));
+        self::assertTrue($index->isResource('config/routes.yaml'));
+    }
+
+    public function testReplacesRouteResourcesFromCompleteSnapshots(): void
+    {
+        $index = new RouteIndex();
+        $index->replaceRuntime(['config/old_routes.yaml']);
+        (new RouteSnapshotLoader($index))->load([
+            'sections' => ['routes' => [
+                'complete' => true,
+                'resources' => ['config/new_routes.yaml'],
+                'items' => [],
+            ]],
+        ]);
+
+        self::assertFalse($index->isResource('config/old_routes.yaml'));
+        self::assertTrue($index->isResource('config/new_routes.yaml'));
     }
 }

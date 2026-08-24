@@ -7,6 +7,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
+use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -18,6 +19,7 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly ConfigurationIndexRegistry $indexes,
+        private readonly RouteIndexRegistry $routeIndexes,
         private readonly ConfigurationPathResolver $paths,
         private readonly YamlConfigurationParser $yaml,
         private readonly ConfigurationValueValidator $values,
@@ -33,7 +35,10 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
         // bundle-internal fixtures target other kernels, so only the
         // application's own configuration is validated against its trees
         $relativePath = $this->projectPaths->relative($request->project, $request->document->uri());
-        if (null === $relativePath || !str_starts_with($relativePath, 'config/') || $this->isRouteResource($relativePath)) {
+        if (null === $relativePath
+            || !str_starts_with($relativePath, 'config/')
+            || $this->routeIndexes->forProject($request->project)->isResource($relativePath)
+        ) {
             return null;
         }
         $index = $this->indexes->forProject($request->project);
@@ -178,12 +183,6 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
         }
 
         return $diagnostics;
-    }
-
-    private function isRouteResource(string $relativePath): bool
-    {
-        return str_starts_with($relativePath, 'config/routes/')
-            || 1 === preg_match('/^config\/routes(?:\.[^\/]+)*\.(?:php|xml|ya?ml)$/i', $relativePath);
     }
 
     private function offsetRange(string $text, int $offset, int $length): Range

@@ -10,12 +10,22 @@ final class RouteIndex
     /** @var array<string, Route> */
     private array $completionRoutes = [];
 
+    /** @var array<string, true> */
+    private array $resources = [];
+
     private bool $complete = false;
 
     public function replace(Route ...$routes): void
     {
+        $this->replaceRuntime([], ...$routes);
+    }
+
+    /** @param list<string> $resources */
+    public function replaceRuntime(array $resources, Route ...$routes): void
+    {
         $this->routes = [];
         $this->completionRoutes = [];
+        $this->resources = array_fill_keys($resources, true);
         $localizedRoutes = [];
         foreach ($routes as $route) {
             $this->routes[$route->name()] = $route;
@@ -58,6 +68,11 @@ final class RouteIndex
     public function get(string $name): ?Route
     {
         return $this->routes[$name] ?? null;
+    }
+
+    public function isResource(string $relativePath): bool
+    {
+        return isset($this->resources[$relativePath]);
     }
 
     /**

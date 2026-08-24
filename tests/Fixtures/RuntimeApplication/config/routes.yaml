@@ -1,3 +1,6 @@
+fixture_http_endpoints:
+    resource: http_endpoints.yaml
+
 fixture_home:
     path: /fixture
     controller: App\Controller\HomeController

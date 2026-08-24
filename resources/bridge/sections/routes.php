@@ -67,11 +67,12 @@ function bridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
             }
 
             usort($items, static fn (array $a, array $b): int => $a['name'] <=> $b['name']);
+            $resources = bridgeRouteResourcePaths($context);
             $section = [
                 'complete' => true,
-                'generation' => hash('sha256', json_encode($items, JSON_THROW_ON_ERROR)),
+                'generation' => hash('sha256', json_encode([$items, $resources], JSON_THROW_ON_ERROR)),
                 'items' => $items,
-                'resources' => [],
+                'resources' => $resources,
                 'warnings' => [],
             ];
         } catch (Throwable) {
@@ -80,4 +81,46 @@ function bridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
     }
 
     return $section ?? null;
+}
+
+/** @return list<string> */
+function bridgeRouteResourcePaths(SymfonyLspBridgeContext $context): array
+{
+    try {
+        $router = $context->kernel()->getContainer()->get('router');
+        if (!$router instanceof Symfony\Component\Routing\RouterInterface) {
+            return [];
+        }
+        $collection = $router->getRouteCollection();
+    } catch (Throwable) {
+        return [];
+    }
+
+    $projectRoot = realpath($context->project());
+    if (false === $projectRoot) {
+        return [];
+    }
+    $projectRoot = Symfony\Component\Filesystem\Path::canonicalize($projectRoot);
+    $resources = [];
+    foreach ($collection->getResources() as $resource) {
+        if (!$resource instanceof Symfony\Component\Config\Resource\FileResource) {
+            continue;
+        }
+        $path = realpath($resource->getResource());
+        if (false === $path || !is_file($path)) {
+            continue;
+        }
+        $path = Symfony\Component\Filesystem\Path::canonicalize($path);
+        if (!Symfony\Component\Filesystem\Path::isBasePath($projectRoot, $path)) {
+            continue;
+        }
+        $relativePath = Symfony\Component\Filesystem\Path::makeRelative($path, $projectRoot);
+        if ([] !== array_intersect(explode('/', $relativePath), ['.git', 'node_modules', 'var', 'vendor'])) {
+            continue;
+        }
+        $resources[$relativePath] = true;
+    }
+    ksort($resources);
+
+    return array_keys($resources);
 }

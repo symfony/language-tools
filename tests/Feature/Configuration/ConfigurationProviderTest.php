@@ -17,6 +17,7 @@ use Symfony\Lsp\Feature\Configuration\ConfigurationValueValidator;
 use Symfony\Lsp\Feature\Configuration\ProjectConfigurationSnapshotLoader;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
+use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
@@ -100,10 +101,10 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
-    public function testSkipsRouteResources(): void
+    public function testSkipsOnlyResourcesLoadedByTheRouter(): void
     {
         $fixture = $this->providers();
-        foreach (['config/routes/framework.yaml', 'config/routes.yaml', 'config/routes.dev.yaml'] as $path) {
+        foreach (['config/routes/framework.yaml', 'config/http_endpoints.yaml'] as $path) {
             $uri = 'file:///workspace/'.$path;
             $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    mystery: true\n"));
 
@@ -111,10 +112,13 @@ final class ConfigurationProviderTest extends TestCase
             $fixture->documents->close($uri);
         }
 
-        $uri = 'file:///workspace/config/packages/framework.yaml';
-        $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    mystery: true\n"));
+        foreach (['config/routes.yaml', 'config/packages/framework.yaml'] as $path) {
+            $uri = 'file:///workspace/'.$path;
+            $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    mystery: true\n"));
 
-        self::assertSame(['config.unknown_key'], array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+            self::assertSame(['config.unknown_key'], array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+            $fixture->documents->close($uri);
+        }
     }
 
     public function testDoesNotTreatEnvironmentOverridesAsDuplicates(): void
@@ -317,6 +321,8 @@ final class ConfigurationProviderTest extends TestCase
         $projects->replace([$project]);
         $converter = new PositionConverter();
         $indexes = new ConfigurationIndexRegistry();
+        $routeIndexes = new RouteIndexRegistry();
+        $routeIndexes->forProject($project)->replaceRuntime(['config/http_endpoints.yaml', 'config/routes/framework.yaml']);
         $environmentIndexes = new EnvironmentIndexRegistry();
         $environmentIndexes->forProject($project)->replaceProcessors(['bool' => 'bool', 'json' => 'array']);
         (new ProjectConfigurationSnapshotLoader($indexes))->load($project, ['sections' => ['configuration' => ['bundles' => [
@@ -386,7 +392,7 @@ final class ConfigurationProviderTest extends TestCase
         return new ConfigurationProviderFixture(
             new ConfigurationCompletionProvider($resolver, $converter, $protocol, $indexes, $paths, $yaml),
             new ConfigurationHoverProvider($resolver, $converter, $protocol, $indexes, $paths, $yaml),
-            new ConfigurationDiagnosticProvider($resolver, new ProjectPathResolver(new UriToPathConverter()), $converter, $protocol, $indexes, $paths, $yaml, new ConfigurationValueValidator($environmentIndexes)),
+            new ConfigurationDiagnosticProvider($resolver, new ProjectPathResolver(new UriToPathConverter()), $converter, $protocol, $indexes, $routeIndexes, $paths, $yaml, new ConfigurationValueValidator($environmentIndexes)),
             new ConfigurationDocumentLinkProvider($resolver, $converter, $protocol, new UriToPathConverter()),
             $documents,
             $converter,

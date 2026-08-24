@@ -7,6 +7,10 @@ final class BridgeRoutesTest extends AbstractBridgeTestCase
     public function testNormalizesStructuredRouteOutput(): void
     {
         $this->writeRouteApplication();
+        mkdir($this->temporaryDirectory.'/config');
+        mkdir($this->temporaryDirectory.'/var/cache', 0777, true);
+        file_put_contents($this->temporaryDirectory.'/config/http_endpoints.yaml', 'routes');
+        file_put_contents($this->temporaryDirectory.'/var/cache/container.php', '<?php');
 
         exec(\sprintf(
             '%s %s --project=%s --sections=routes --targeted-refresh=1 2>&1',
@@ -83,6 +87,7 @@ final class BridgeRoutesTest extends AbstractBridgeTestCase
                 'alias' => null,
             ],
         ], $result['sections']['routes']['items']);
+        self::assertSame(['config/http_endpoints.yaml'], $result['sections']['routes']['resources']);
         self::assertTrue($result['sections']['routes']['complete']);
     }
 }

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recognize route configuration files outside conventional directories
 - Avoid false diagnostics for valid configuration, validation attributes and Twig expressions
 - Limit GitHub release notes to the current version
 - Retry partial terminal writes when printing check reports

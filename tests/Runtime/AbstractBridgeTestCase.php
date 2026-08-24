@@ -21,6 +21,11 @@ abstract class AbstractBridgeTestCase extends TestCase
         @unlink($this->temporaryDirectory.'/vendor/autoload_runtime.php');
         @unlink($this->temporaryDirectory.'/vendor/autoload.php');
         @unlink($this->temporaryDirectory.'/composer.json');
+        @unlink($this->temporaryDirectory.'/config/http_endpoints.yaml');
+        @rmdir($this->temporaryDirectory.'/config');
+        @unlink($this->temporaryDirectory.'/var/cache/container.php');
+        @rmdir($this->temporaryDirectory.'/var/cache');
+        @rmdir($this->temporaryDirectory.'/var');
         @rmdir($this->temporaryDirectory.'/vendor');
         @rmdir($this->temporaryDirectory.'/templates');
         @rmdir($this->temporaryDirectory.'/src/ShopBundle/templates');
@@ -193,12 +198,59 @@ abstract class AbstractBridgeTestCase extends TestCase
             interface TranslatorBagInterface
             {
             }
+            namespace Symfony\Component\Filesystem;
+            final class Path
+            {
+                public static function canonicalize(string $path): string { return rtrim(str_replace('\\', '/', $path), '/'); }
+                public static function isBasePath(string $base, string $path): bool { return $base === $path || str_starts_with($path, $base.'/'); }
+                public static function makeRelative(string $path, string $base): string { return ltrim(substr($path, strlen($base)), '/'); }
+            }
+            namespace Symfony\Component\Config\Resource;
+            final class FileResource
+            {
+                public function __construct(private string $resource) {}
+                public function getResource(): string { return $this->resource; }
+            }
+            final class DirectoryResource
+            {
+            }
+            namespace Symfony\Component\Routing;
+            interface RouterInterface
+            {
+                public function getRouteCollection(): RouteCollection;
+            }
+            final class RouteCollection
+            {
+                public function __construct(private array $resources) {}
+                public function getResources(): array { return $this->resources; }
+            }
             namespace App;
+            final class Router implements \Symfony\Component\Routing\RouterInterface
+            {
+                public function getRouteCollection(): \Symfony\Component\Routing\RouteCollection
+                {
+                    $root = dirname(__DIR__);
+
+                    return new \Symfony\Component\Routing\RouteCollection([
+                        new \Symfony\Component\Config\Resource\FileResource($root.'/config/http_endpoints.yaml'),
+                        new \Symfony\Component\Config\Resource\FileResource($root.'/config/http_endpoints.yaml'),
+                        new \Symfony\Component\Config\Resource\FileResource($root.'/vendor/autoload.php'),
+                        new \Symfony\Component\Config\Resource\FileResource($root.'/var/cache/container.php'),
+                        new \Symfony\Component\Config\Resource\DirectoryResource(),
+                    ]);
+                }
+            }
+            final class Container
+            {
+                public function has(string $id): bool { return 'router' === $id; }
+                public function get(string $id): object { return new Router(); }
+            }
             final class Kernel
             {
                 public function __construct(string $environment, bool $debug) {}
                 public function getCacheDir(): string { return dirname(__DIR__).'/var/cache'; }
                 public function getBuildDir(): string { return $this->getCacheDir(); }
+                public function getContainer(): Container { return new Container(); }
                 public function shutdown(): void {}
             }
             namespace Symfony\Bundle\FrameworkBundle\Console;

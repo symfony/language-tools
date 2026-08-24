@@ -1,0 +1,4 @@
+fixture_health:
+    path: /health
+    controller: App\Controller\HomeController
+    methods: [GET]

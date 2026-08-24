@@ -41,7 +41,7 @@ final class RouteSnapshotLoader
             );
         }
 
-        $this->routeIndex->replace(...$routes);
+        $this->routeIndex->replaceRuntime($this->strings($routesSection['resources'] ?? null), ...$routes);
     }
 
     /** @return list<string> */

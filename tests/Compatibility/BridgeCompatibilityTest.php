@@ -50,6 +50,10 @@ final class BridgeCompatibilityTest extends TestCase
 
         $routeItems = \is_array($routes['items'] ?? null) ? $routes['items'] : [];
         self::assertContains('fixture_home', array_column($routeItems, 'name'));
+        self::assertContains('fixture_health', array_column($routeItems, 'name'));
+        $routeResources = \is_array($routes['resources'] ?? null) ? $routes['resources'] : [];
+        self::assertContains('config/routes.yaml', $routeResources);
+        self::assertContains('config/http_endpoints.yaml', $routeResources);
         $localizedRoutes = array_values(array_filter(
             $routeItems,
             static fn (mixed $route): bool => \is_array($route)
