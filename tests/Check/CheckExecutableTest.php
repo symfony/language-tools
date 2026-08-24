@@ -18,7 +18,7 @@ use function Amp\Future\await;
  *     projects: list<array{environment: string, analysis: array{mode: string, reason: string|null}}>,
  *     diagnostics: list<array{code: string, path: string}>,
  *     summary: array{blocking: int, stale: int},
- *     errors: list<array{category: string}>
+ *     errors: list<array{category: string, cause?: array{class: string, message: string}}>
  * }
  */
 final class CheckExecutableTest extends TestCase
@@ -62,6 +62,24 @@ final class CheckExecutableTest extends TestCase
         self::assertSame('env.malformed_chain', $report['diagnostics'][0]['code']);
         self::assertSame('config/services.yaml', $report['diagnostics'][0]['path']);
         self::assertSame(1, $report['summary']['blocking']);
+    }
+
+    public function testExcludesConfiguredPathsUnlessTheyAreExplicitlySelected(): void
+    {
+        file_put_contents($this->directory.'/.symfony-lsp.json', json_encode([
+            'version' => 1,
+            'excludePaths' => ['config/**'],
+        ], \JSON_THROW_ON_ERROR));
+
+        $default = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->directory]);
+        $defaultReport = $this->decodeReport($default['stdout']);
+        $explicit = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->directory, 'config/services.yaml']);
+        $explicitReport = $this->decodeReport($explicit['stdout']);
+
+        self::assertSame(CheckCommand::EXIT_SUCCESS, $default['exitCode'], $default['stderr']);
+        self::assertSame([], $defaultReport['diagnostics']);
+        self::assertSame(CheckCommand::EXIT_DIAGNOSTICS, $explicit['exitCode'], $explicit['stderr']);
+        self::assertSame('env.malformed_chain', $explicitReport['diagnostics'][0]['code']);
     }
 
     public function testBlockingCodeSelectionDoesNotFilterOtherDiagnostics(): void
@@ -183,6 +201,7 @@ final class CheckExecutableTest extends TestCase
         self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode']);
         self::assertFalse($report['complete']);
         self::assertSame('operational', $report['errors'][0]['category']);
+        self::assertIsArray($report['errors'][0]['cause'] ?? null);
         self::assertStringNotContainsString('APP_SECRET', $result['stdout'].$result['stderr']);
     }
 
@@ -246,6 +265,30 @@ final class CheckExecutableTest extends TestCase
             self::assertStringContainsString('unreadable', $result['stderr']);
         } finally {
             chmod($directory, 0700);
+        }
+    }
+
+    public function testExplicitSelectionIgnoresUnrelatedExcludedSymlinks(): void
+    {
+        $external = $this->directory.'-external.php';
+        file_put_contents($external, '<?php');
+        mkdir($this->directory.'/fixtures');
+        try {
+            if (!@symlink($external, $this->directory.'/fixtures/external.php')) {
+                self::markTestSkipped('The platform cannot create file symlinks.');
+            }
+            file_put_contents($this->directory.'/.symfony-lsp.json', json_encode([
+                'version' => 1,
+                'excludePaths' => ['fixtures/**'],
+            ], \JSON_THROW_ON_ERROR));
+
+            $result = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->directory, 'config/services.yaml']);
+            $report = $this->decodeReport($result['stdout']);
+
+            self::assertSame(CheckCommand::EXIT_DIAGNOSTICS, $result['exitCode'], $result['stderr']);
+            self::assertSame('env.malformed_chain', $report['diagnostics'][0]['code']);
+        } finally {
+            @unlink($external);
         }
     }
 

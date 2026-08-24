@@ -40,6 +40,7 @@ use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Tests\Support\NullProgressReporter;
@@ -53,6 +54,7 @@ final class ApplicationSourceScannerTest extends TestCase
     private string $temporaryDirectory;
     private Project $project;
     private ProjectRegistry $projects;
+    private ProjectFileScopeRegistry $fileScope;
 
     protected function setUp(): void
     {
@@ -61,6 +63,7 @@ final class ApplicationSourceScannerTest extends TestCase
         $this->project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
         $this->projects = new ProjectRegistry();
         $this->projects->replace([$this->project]);
+        $this->fileScope = new ProjectFileScopeRegistry();
     }
 
     protected function tearDown(): void
@@ -84,6 +87,20 @@ final class ApplicationSourceScannerTest extends TestCase
         $this->scanner($provider)->indexAll();
 
         self::assertSame(2, $provider->extractions);
+    }
+
+    public function testExcludesConfiguredPathsFromPersistentSourceIndexing(): void
+    {
+        file_put_contents($path = $this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $provider = new RecordingSourceIndexProvider();
+        $scanner = $this->scanner($provider);
+        $scanner->indexAll();
+        $this->fileScope->configure($this->project, ['src/**']);
+
+        $scanner->indexAll();
+
+        self::assertSame(1, $provider->extractions);
+        self::assertNull($scanner->indexedHash($this->project, $path));
     }
 
     public function testRestoresPersistentFactsAndRebuildsCorruptedEntries(): void
@@ -738,7 +755,7 @@ PHP;
             new SourceIndexPayloadCodec(),
             new PhpRuntimeStructureHasher(),
             new UriToPathConverter(),
-            new SourceFileEnumerator(new GitignoreMatcher()),
+            new SourceFileEnumerator(new GitignoreMatcher(), $this->fileScope),
             $mutex,
             $providers,
         );

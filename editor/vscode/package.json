@@ -139,6 +139,14 @@
           "scope": "resource",
           "description": "Maximum number of seconds allowed for each project bridge run."
         },
+        "symfonyLsp.excludePaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "scope": "resource",
+          "description": "Project-relative path patterns excluded from indexing and diagnostics. Explicit check paths remain selectable."
+        },
         "symfonyLsp.projectRoots": {
           "type": "array",
           "items": {

@@ -4,8 +4,10 @@ namespace Symfony\Lsp\Feature;
 
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Index\SourceFileEnumerator;
+use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 
 final class DiagnosticCollector
 {
@@ -14,6 +16,8 @@ final class DiagnosticCollector
         private readonly DocumentStore $documents,
         private readonly ProjectRegistry $projects,
         private readonly ProjectPathResolver $pathResolver,
+        private readonly ProjectFileScopeRegistry $fileScope,
+        private readonly UriToPathConverter $uriToPathConverter,
         private readonly iterable $providers,
     ) {
     }
@@ -23,7 +27,7 @@ final class DiagnosticCollector
      *
      * @return list<array<array-key, mixed>>|null
      */
-    public function collect(array $params): ?array
+    public function collect(array $params, bool $includeExcluded = false): ?array
     {
         $textDocument = $params['textDocument'] ?? null;
         if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
@@ -34,7 +38,7 @@ final class DiagnosticCollector
         if (null === $document) {
             return null;
         }
-        if ($this->isDependencyOwned($document->uri())) {
+        if ($this->isExcluded($document->uri(), $includeExcluded)) {
             return [];
         }
 
@@ -53,7 +57,7 @@ final class DiagnosticCollector
         return $matched ? $diagnostics : null;
     }
 
-    private function isDependencyOwned(string $uri): bool
+    private function isExcluded(string $uri, bool $includeExcluded): bool
     {
         $project = $this->projects->forDocumentUri($uri);
         if (null === $project) {
@@ -62,6 +66,10 @@ final class DiagnosticCollector
         $relativePath = $this->pathResolver->relative($project, $uri);
         if (null === $relativePath) {
             return false;
+        }
+        $path = $this->uriToPathConverter->convert($uri);
+        if (!$includeExcluded && null !== $path && $this->fileScope->isExcluded($project, $path)) {
+            return true;
         }
 
         foreach (explode('/', $relativePath) as $segment) {

@@ -23,6 +23,7 @@ use Symfony\Lsp\Project\ProjectSettings;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
+use Symfony\Lsp\Server\SensitiveDataRedactor;
 
 use function Amp\delay;
 
@@ -44,6 +45,7 @@ final class CheckRunner
         private readonly PositionConverter $positions,
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly BaselineManager $baseline,
+        private readonly SensitiveDataRedactor $redactor,
         private readonly string $version,
     ) {
     }
@@ -96,6 +98,8 @@ final class CheckRunner
         $errors = [];
         $incompleteProjects = [];
         $preparedHashes = [];
+        $preparedTexts = [];
+        $openExcluded = [];
         $diagnosable = [];
         try {
             foreach ($selectedProjects as $project) {
@@ -139,10 +143,10 @@ final class CheckRunner
                         break;
                     }
                     $hash = hash('sha256', $text);
-                    if ($hash !== $this->sourceScanner->indexedHash($project, $file->path)) {
+                    if (!$file->excluded && $hash !== $this->sourceScanner->indexedHash($project, $file->path)) {
                         $this->sourceScanner->refreshUri($file->uri);
                     }
-                    if ($hash !== $this->sourceScanner->indexedHash($project, $file->path)) {
+                    if (!$file->excluded && $hash !== $this->sourceScanner->indexedHash($project, $file->path)) {
                         $errors[] = [
                             'category' => 'operational',
                             'message' => \sprintf('The selected file "%s" could not be prepared for diagnostics.', $file->workspacePath),
@@ -152,6 +156,7 @@ final class CheckRunner
                         break;
                     }
                     $preparedHashes[$file->path] = $hash;
+                    $preparedTexts[$file->path] = $text;
                 }
                 if (!$prepared) {
                     $projectResults[] = $this->projectResult($project, $status, false);
@@ -172,11 +177,16 @@ final class CheckRunner
                     $status = $this->statuses->status($project);
                     if ('ready' !== $status['runtime']['state']) {
                         $configurationFailure = $runtimeError instanceof ConfigurationValidationException;
-                        $errors[] = [
+                        $reportedError = [
                             'category' => $configurationFailure ? 'configuration' : 'operational',
                             'message' => $this->runtimeError($runtimeError, $status['runtime']['error'] ?? 'Runtime indexing did not complete.'),
                             'project' => $this->projectConfiguration->projectId($project),
+                            'environment' => $this->runtimeConfiguration->environment($project),
                         ];
+                        if (null !== $runtimeError && !$configurationFailure) {
+                            $reportedError['cause'] = $this->exceptionDetails($runtimeError, $workspace);
+                        }
+                        $errors[] = $reportedError;
                         $projectResults[] = $this->projectResult($project, $status, false);
                         if ($configurationFailure) {
                             $diagnosable[$project->rootPath()] = true;
@@ -187,6 +197,15 @@ final class CheckRunner
 
                 $diagnosable[$project->rootPath()] = true;
                 $projectResults[] = $this->projectResult($project, $status, true);
+            }
+
+            foreach ($files as $file) {
+                if (!$file->excluded || !isset($diagnosable[$file->project->rootPath()], $preparedTexts[$file->path])) {
+                    continue;
+                }
+                $this->documents->open(new Document($file->uri, $file->languageId, 0, $preparedTexts[$file->path]));
+                $this->sourceScanner->updateOpenDocument(['textDocument' => ['uri' => $file->uri]], true);
+                $openExcluded[$file->uri] = true;
             }
 
             $diagnostics = [];
@@ -222,10 +241,12 @@ final class CheckRunner
                     continue;
                 }
 
-                $this->documents->open(new Document($file->uri, $file->languageId, 0, $text));
+                if (!$file->excluded) {
+                    $this->documents->open(new Document($file->uri, $file->languageId, 0, $text));
+                }
                 try {
                     $params = ['textDocument' => ['uri' => $file->uri]];
-                    foreach ($this->diagnostics->collect($params) ?? [] as $diagnostic) {
+                    foreach ($this->diagnostics->collect($params, $file->excluded) ?? [] as $diagnostic) {
                         $this->expireDeadline($deadline, $signal, $timedOut);
                         $cancellation->throwIfRequested();
                         $collected = CheckDiagnostic::fromProtocol(
@@ -242,15 +263,20 @@ final class CheckRunner
                     }
                 } catch (CancelledException $error) {
                     throw $error;
-                } catch (\Throwable) {
+                } catch (\Throwable $error) {
                     $errors[] = [
                         'category' => 'operational',
                         'message' => \sprintf('Diagnostic collection failed for "%s".', $file->workspacePath),
                         'project' => $projectId,
+                        'environment' => $this->runtimeConfiguration->environment($file->project),
+                        'workspacePath' => $file->workspacePath,
+                        'cause' => $this->exceptionDetails($error, $workspace),
                     ];
                     $incompleteProjects[$projectId] = true;
                 } finally {
-                    $this->documents->close($file->uri);
+                    if (!$file->excluded) {
+                        $this->documents->close($file->uri);
+                    }
                 }
             }
             $this->expireDeadline($deadline, $signal, $timedOut);
@@ -264,6 +290,10 @@ final class CheckRunner
             ];
             $diagnostics ??= [];
         } finally {
+            foreach (array_keys($openExcluded) as $uri) {
+                $this->sourceScanner->restoreClosedDocument(['textDocument' => ['uri' => $uri]]);
+                $this->documents->close($uri);
+            }
             $this->restoreSignalHandlers();
         }
 
@@ -346,6 +376,15 @@ final class CheckRunner
             $errors,
             $blockingCount,
         );
+    }
+
+    /** @return array{class: class-string<\Throwable>, message: string} */
+    private function exceptionDetails(\Throwable $error, string $workspace): array
+    {
+        return [
+            'class' => $error::class,
+            'message' => $this->redactor->redact($error->getMessage(), [$workspace]),
+        ];
     }
 
     /** @param array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string}} $status */

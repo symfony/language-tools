@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Check;
 
 use Symfony\Lsp\Project\InvalidConfigurationException;
+use Symfony\Lsp\Server\SensitiveDataRedactor;
 
 final class CheckCommand
 {
@@ -16,6 +17,7 @@ final class CheckCommand
         private readonly CheckRunner $runner,
         private readonly CheckReporter $reporter,
         private readonly DiagnosticCodeRegistry $diagnosticCodes,
+        private readonly SensitiveDataRedactor $redactor,
         private readonly string $version,
     ) {
     }
@@ -24,6 +26,7 @@ final class CheckCommand
     public function run(array $arguments): CheckExecution
     {
         $format = 'human';
+        $verbose = \in_array('--verbose', $arguments, true);
         try {
             $format = $this->optionsParser->selectedFormat($arguments);
             $options = $this->optionsParser->parse($arguments);
@@ -39,17 +42,17 @@ final class CheckCommand
                 ? self::EXIT_OPERATIONAL
                 : (0 === $result->blockingCount ? self::EXIT_SUCCESS : self::EXIT_DIAGNOSTICS);
             $stderr = implode('', array_map(
-                static fn (array $error): string => (isset($error['project']) ? '['.$error['project'].'] ' : '').$error['message']."\n",
+                fn (array $error): string => $this->errorOutput($error, $options->verbose),
                 $result->errors,
             ));
 
-            return new CheckExecution($exitCode, $this->reporter->render($result, $format), $stderr);
+            return new CheckExecution($exitCode, $this->reporter->render($result, $format, $options->verbose), $stderr);
         } catch (InvalidConfigurationException $error) {
             $result = $this->errorResult('invocation', $error->getMessage());
 
             return new CheckExecution(
                 self::EXIT_INVOCATION,
-                $this->reporter->render($result, $format),
+                $this->reporter->render($result, $format, $verbose),
                 $error->getMessage()."\n",
             );
         } catch (CheckOperationalException $error) {
@@ -57,23 +60,32 @@ final class CheckCommand
 
             return new CheckExecution(
                 self::EXIT_OPERATIONAL,
-                $this->reporter->render($result, $format),
+                $this->reporter->render($result, $format, $verbose),
                 $error->getMessage()."\n",
             );
-        } catch (\Throwable) {
+        } catch (\Throwable $error) {
             $message = 'The diagnostics check failed because of an internal error.';
-            $result = $this->errorResult('operational', $message);
+            $result = $this->errorResult('operational', $message, $error);
 
             return new CheckExecution(
                 self::EXIT_OPERATIONAL,
-                $this->reporter->render($result, $format),
-                $message."\n",
+                $this->reporter->render($result, $format, $verbose),
+                $this->errorOutput($result->errors[0], $verbose),
             );
         }
     }
 
-    private function errorResult(string $category, string $message): CheckResult
+    private function errorResult(string $category, string $message, ?\Throwable $cause = null): CheckResult
     {
+        $error = ['category' => $category, 'message' => $message];
+        if (null !== $cause) {
+            $workspace = getcwd();
+            $error['cause'] = [
+                'class' => $cause::class,
+                'message' => $this->redactor->redact($cause->getMessage(), false === $workspace ? [] : [$workspace]),
+            ];
+        }
+
         return new CheckResult(
             $this->version,
             false,
@@ -83,8 +95,19 @@ final class CheckCommand
             null,
             'none',
             false,
-            [['category' => $category, 'message' => $message]],
+            [$error],
             0,
         );
+    }
+
+    /** @param array{category: string, message: string, project?: string, cause?: array{class: string, message: string}} $error */
+    private function errorOutput(array $error, bool $verbose): string
+    {
+        $output = (isset($error['project']) ? '['.$error['project'].'] ' : '').$error['message']."\n";
+        if ($verbose && isset($error['cause'])) {
+            $output .= \sprintf('Cause: %s: %s', $error['cause']['class'], $error['cause']['message'])."\n";
+        }
+
+        return $output;
     }
 }

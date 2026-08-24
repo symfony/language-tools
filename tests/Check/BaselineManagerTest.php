@@ -89,6 +89,7 @@ final class BaselineManagerTest extends TestCase
             'config/services.yaml',
             'file://'.$this->directory.'/config/services.yaml',
             'yaml',
+            false,
         );
         $protocol = static fn (int $line): array => [
             'range' => [
@@ -142,6 +143,7 @@ final class BaselineManagerTest extends TestCase
             $mode,
             false,
             60.0,
+            false,
             false,
             false,
         );

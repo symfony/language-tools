@@ -22,6 +22,7 @@ final class CheckOptions
         public readonly string $baselineMode,
         public readonly bool $strictBaseline,
         public readonly float $timeout,
+        public readonly bool $verbose,
         public readonly bool $listCodes,
         public readonly bool $help,
     ) {

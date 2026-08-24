@@ -10,6 +10,7 @@ use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -74,6 +75,21 @@ final class DiagnosticProviderRegistryTest extends TestCase
         self::assertSame(['second', 'third'], array_column($diagnostics, 'code'));
     }
 
+    public function testSuppressesConfiguredPathsUnlessExplicitlyIncluded(): void
+    {
+        [$registry, $client, $collector] = $this->registryWithScope(
+            'file:///workspace/tests/Fixtures/page.html.twig',
+            ['tests/Fixtures/**'],
+            new StubDiagnosticProvider([$this->diagnostic('stub')]),
+        );
+        $params = ['textDocument' => ['uri' => 'file:///workspace/tests/Fixtures/page.html.twig']];
+
+        $registry->publish($params);
+
+        self::assertSame([], $client->notifications[0]['params']['diagnostics']);
+        self::assertSame(['stub'], array_column($collector->collect($params, true) ?? [], 'code'));
+    }
+
     public function testSuppressesDiagnosticsInDependencyOwnedDocuments(): void
     {
         foreach ([
@@ -99,16 +115,31 @@ final class DiagnosticProviderRegistryTest extends TestCase
     /** @return array{DiagnosticProviderRegistry, CollectingClient, DiagnosticCollector} */
     private function registryWithProviders(string $uri, DiagnosticProviderInterface ...$providers): array
     {
+        return $this->registryWithScope($uri, [], ...$providers);
+    }
+
+    /**
+     * @param list<string> $excludePaths
+     *
+     * @return array{DiagnosticProviderRegistry, CollectingClient, DiagnosticCollector}
+     */
+    private function registryWithScope(string $uri, array $excludePaths, DiagnosticProviderInterface ...$providers): array
+    {
         $client = new CollectingClient();
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'twig', 1, ''));
         $projects = new ProjectRegistry();
-        $projects->replace([new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $fileScope = new ProjectFileScopeRegistry();
+        $fileScope->configure($project, $excludePaths);
 
+        $converter = new UriToPathConverter();
         $collector = new DiagnosticCollector(
             $documents,
             $projects,
-            new ProjectPathResolver(new UriToPathConverter()),
+            new ProjectPathResolver($converter),
+            $fileScope,
+            $converter,
             $providers,
         );
 

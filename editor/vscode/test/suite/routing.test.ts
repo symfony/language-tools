@@ -65,6 +65,7 @@ async function testRouteLinksAndOverlays(): Promise<void> {
             'route document link',
         );
         assert.ok(links.some((item) => item.tooltip?.includes('fixture_home')));
+        await vscode.commands.executeCommand('symfonyLsp.refreshIndex');
 
         await waitFor(
             async () => vscode.languages.getDiagnostics(document.uri),
@@ -82,7 +83,7 @@ async function testRouteLinksAndOverlays(): Promise<void> {
             (items) => !items.some((item) => 'route.not_found' === item.code),
             'cleared route diagnostic after an unsaved edit',
         );
-    });
+    }, undefined, 'templates');
 
     await withTemporaryDocument('html-associated.html.twig', "{{ path('fixture_home') }}\n", async (document) => {
         assert.equal(document.languageId, 'html');
@@ -92,5 +93,5 @@ async function testRouteLinksAndOverlays(): Promise<void> {
             'route document link for an HTML-associated Twig file',
         );
         assert.ok(links.some((item) => item.tooltip?.includes('fixture_home')));
-    }, 'html');
+    }, 'html', 'templates');
 }

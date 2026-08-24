@@ -13,6 +13,7 @@ final class CheckFile
         public readonly string $workspacePath,
         public readonly string $uri,
         public readonly string $languageId,
+        public readonly bool $excluded,
     ) {
     }
 }

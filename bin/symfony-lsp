@@ -5,6 +5,7 @@ use Symfony\Lsp\Check\CheckCommand;
 use Symfony\Lsp\Check\CheckOutputWriter;
 use Symfony\Lsp\Server\LanguageServerFactory;
 use Symfony\Lsp\Server\MemoryLimit;
+use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Server\ServerVersion;
 
@@ -67,7 +68,7 @@ if (!function_exists('symfony_lsp_tree_sitter_parse')) {
     exit(1);
 }
 
-$logger = new ServerLogger($errorOutput);
+$logger = new ServerLogger($errorOutput, new SensitiveDataRedactor());
 try {
     $socketPort = null;
     foreach (array_slice($argv, 1) as $argument) {

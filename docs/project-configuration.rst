@@ -36,7 +36,9 @@ These settings can be configured globally or for one project:
   application to load routes, services and other information;
 * ``bridgeTimeout``: maximum duration in seconds for each application run;
 * ``translationDiagnostics``: whether to report statically known missing
-  translation keys.
+  translation keys;
+* ``excludePaths``: project-relative path patterns excluded from source
+  indexing and diagnostics.
 
 The defaults are automatic project discovery, ``["php"]``, no container
 project root, the ``dev`` environment, debug and runtime indexing enabled, a
@@ -73,11 +75,37 @@ A project entry must match a discovered Symfony application. Unknown settings,
 invalid values and unmatched project entries are reported as configuration
 errors.
 
+Excluding Project Paths
+-----------------------
+
+Use ``excludePaths`` for embedded fixtures, generated sources or other files
+that don't belong to the running application:
+
+.. code-block:: json
+
+    {
+        "version": 1,
+        "excludePaths": [
+            "tests/Insight/Rule/Fixtures/**",
+            "generated/"
+        ]
+    }
+
+Patterns are relative to each Symfony project root. ``*`` and ``?`` match
+within one path segment, while ``**`` can cross directories. A pattern ending
+in ``/`` excludes the complete directory.
+
+Excluded files don't contribute source facts and don't receive editor
+diagnostics. A path passed explicitly to ``symfony-lsp check`` remains
+selectable, which lets you inspect an excluded fixture when needed.
+
 Overrides and Workspace Trust
 -----------------------------
 
-Project entries override top-level values. Explicit editor settings override the
-shared file for that editor only. Command-line options passed to
+Project entries override top-level values. List settings such as
+``excludePaths`` are replaced rather than merged, so an empty project list
+clears the top-level exclusions. Explicit editor settings override the shared
+file for that editor only. Command-line options passed to
 ``symfony-lsp check`` override both.
 
 Workspace trust, protocol tracing, the server executable and its memory limit

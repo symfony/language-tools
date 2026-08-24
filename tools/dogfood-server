@@ -236,10 +236,7 @@ foreach ($notifications as $notification) {
     if ('textDocument/publishDiagnostics' === ($notification['method'] ?? null)) {
         $diagnostics[] = [
             'uri' => $notification['params']['uri'] ?? null,
-            'items' => array_map(static fn (array $diagnostic): array => [
-                'severity' => $diagnostic['severity'] ?? null,
-                'message' => $diagnostic['message'] ?? null,
-            ], $notification['params']['diagnostics'] ?? []),
+            'items' => $notification['params']['diagnostics'] ?? [],
         ];
     }
 }

@@ -79,6 +79,7 @@ The defaults work for standard projects. Add settings to
 | `symfonyLsp.environment` | Index another environment than `dev`. |
 | `symfonyLsp.runtimeIndexing` | Disable application execution while keeping source-only features. |
 | `symfonyLsp.bridgeTimeout` | Allow an application more than five minutes to collect runtime metadata. |
+| `symfonyLsp.excludePaths` | Exclude embedded fixtures or generated sources from indexing and diagnostics. |
 | `symfonyLsp.translationDiagnostics` | Enable missing translation-key diagnostics. |
 | `php.suggest.basic` | Disable VS Code's word suggestions while keeping your PHP language server. |
 

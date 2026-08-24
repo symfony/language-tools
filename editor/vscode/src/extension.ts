@@ -165,6 +165,7 @@ export function configuredAnalysisOptions(configuration: vscode.WorkspaceConfigu
         'debug',
         'runtimeIndexing',
         'bridgeTimeout',
+        'excludePaths',
         'projectRoots',
         'translationDiagnostics',
     ]) {

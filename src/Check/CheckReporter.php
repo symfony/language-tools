@@ -4,12 +4,12 @@ namespace Symfony\Lsp\Check;
 
 final class CheckReporter
 {
-    public function render(CheckResult $result, string $format): string
+    public function render(CheckResult $result, string $format, bool $verbose = false): string
     {
         return match ($format) {
             'json' => $this->json($result),
             'github' => $this->github($result),
-            default => $this->human($result),
+            default => $this->human($result, $verbose),
         };
     }
 
@@ -49,6 +49,7 @@ Options:
   --no-runtime-indexing            Disable runtime indexing
   --bridge-timeout=SECONDS         Set each project bridge deadline
   --timeout=SECONDS                Set the complete check deadline; defaults to 600
+  --verbose                        Show sanitized operational failure causes
   --translation-diagnostics        Enable missing-translation diagnostics
   --no-translation-diagnostics     Disable missing-translation diagnostics
   --fail-on=CODE,...               Restrict blocking diagnostics to selected codes
@@ -63,7 +64,7 @@ Runtime analysis executes application code. Use --source-only for untrusted code
 HELP;
     }
 
-    private function human(CheckResult $result): string
+    private function human(CheckResult $result, bool $verbose): string
     {
         $lines = [];
         foreach ($result->projects as $project) {
@@ -107,6 +108,9 @@ HELP;
                 isset($error['project']) ? ' ['.$error['project'].']' : '',
                 $error['message'],
             );
+            if ($verbose && isset($error['cause'])) {
+                $lines[] = \sprintf('  Cause: %s: %s', $error['cause']['class'], $error['cause']['message']);
+            }
         }
 
         $active = \count(array_filter($result->diagnostics, static fn (CheckDiagnostic $diagnostic): bool => 'active' === $diagnostic->baselineState));
@@ -126,6 +130,11 @@ HELP;
     private function json(CheckResult $result): string
     {
         $active = \count(array_filter($result->diagnostics, static fn (CheckDiagnostic $diagnostic): bool => 'active' === $diagnostic->baselineState));
+
+        $projects = [];
+        foreach ($result->projects as $project) {
+            $projects[$project->id] = $project;
+        }
 
         return json_encode([
             'schemaVersion' => 1,
@@ -164,6 +173,11 @@ HELP;
                 'source' => $diagnostic->source,
                 'message' => $diagnostic->message,
                 'baseline' => $diagnostic->baselineState,
+                'provenance' => [
+                    'feature' => strstr($diagnostic->code, '.', true) ?: $diagnostic->code,
+                    'environment' => $projects[$diagnostic->project]->environment ?? null,
+                    'analysisMode' => $projects[$diagnostic->project]->mode ?? null,
+                ],
             ], $result->diagnostics),
             'baseline' => [
                 'path' => $result->baselinePath,

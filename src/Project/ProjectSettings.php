@@ -16,6 +16,7 @@ final class ProjectSettings
         private readonly TranslationConfigurationRegistry $translationConfiguration,
         private readonly RuntimeConfiguration $runtimeConfiguration,
         private readonly ProjectConfiguration $projectConfiguration,
+        private readonly ProjectFileScopeRegistry $fileScope,
         private readonly AnalysisSettings $analysisSettings,
     ) {
     }
@@ -76,6 +77,9 @@ final class ProjectSettings
             ...$overrides,
         ];
         $this->translationConfiguration->configure($project, true === ($settings['translationDiagnostics'] ?? false));
+        /** @var list<string> $excludePaths */
+        $excludePaths = $settings['excludePaths'] ?? [];
+        $this->fileScope->configure($project, $excludePaths);
         $this->runtimeConfiguration->configureProject($project, $settings);
     }
 }

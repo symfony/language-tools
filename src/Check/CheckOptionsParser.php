@@ -31,6 +31,7 @@ final class CheckOptionsParser
         $baselineMode = 'none';
         $strictBaseline = false;
         $timeout = 600.0;
+        $verbose = false;
         $listCodes = false;
         $help = false;
         $positionals = false;
@@ -50,6 +51,10 @@ final class CheckOptionsParser
             }
             if (\in_array($argument, ['--help', '-h'], true)) {
                 $help = true;
+                continue;
+            }
+            if ('--verbose' === $argument) {
+                $verbose = true;
                 continue;
             }
             if ('--list-codes' === $argument) {
@@ -134,6 +139,7 @@ final class CheckOptionsParser
             $baselineMode,
             $strictBaseline,
             $timeout,
+            $verbose,
             $listCodes,
             $help,
         );

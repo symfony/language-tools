@@ -27,7 +27,33 @@ final class CheckReporterTest extends TestCase
         self::assertSame(1, $report['schemaVersion'] ?? null);
         self::assertSame('utf-16', $coordinates['characterEncoding'] ?? null);
         self::assertSame('matched', $diagnostics[0]['baseline'] ?? null);
+        self::assertSame([
+            'feature' => 'service',
+            'environment' => 'test',
+            'analysisMode' => 'source-only',
+        ], $diagnostics[0]['provenance'] ?? null);
         self::assertSame(1, $summary['stale'] ?? null);
+    }
+
+    public function testShowsSanitizedCausesOnlyInJsonAndVerboseHumanReports(): void
+    {
+        $result = $this->fixtureResult([[
+            'category' => 'operational',
+            'message' => 'Diagnostic collection failed.',
+            'project' => 'apps/api',
+            'cause' => ['class' => \UnexpectedValueException::class, 'message' => 'Invalid diagnostic.'],
+        ]]);
+
+        /** @var array{errors: list<array{cause?: array{message: string}}>} $json */
+        $json = json_decode((new CheckReporter())->render($result, 'json'), true, flags: \JSON_THROW_ON_ERROR);
+        $human = (new CheckReporter())->render($result, 'human');
+        $verbose = (new CheckReporter())->render($result, 'human', true);
+        $github = (new CheckReporter())->render($result, 'github');
+
+        self::assertSame('Invalid diagnostic.', $json['errors'][0]['cause']['message'] ?? null);
+        self::assertStringNotContainsString('Invalid diagnostic.', $human);
+        self::assertStringContainsString('Cause: UnexpectedValueException: Invalid diagnostic.', $verbose);
+        self::assertStringNotContainsString('Invalid diagnostic.', $github);
     }
 
     public function testEscapesGitHubWorkflowCommands(): void
@@ -39,7 +65,8 @@ final class CheckReporterTest extends TestCase
         self::assertStringContainsString('Missing 100%25%0Aservice', $output);
     }
 
-    private function fixtureResult(): CheckResult
+    /** @param list<array{category: string, message: string, project?: string, cause?: array{class: string, message: string}}> $errors */
+    private function fixtureResult(array $errors = []): CheckResult
     {
         return new CheckResult(
             '1.2.3',
@@ -81,7 +108,7 @@ final class CheckReporterTest extends TestCase
             '.symfony-lsp-baseline.json',
             'none',
             false,
-            [],
+            $errors,
             0,
         );
     }

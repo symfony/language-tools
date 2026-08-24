@@ -28,8 +28,8 @@ final class CheckFileSelector
     public function select(string $workspace, array $selectors): array
     {
         $workspace = Path::canonicalize($workspace);
-        $candidates = $this->candidates($workspace);
         if ([] === $selectors) {
+            $candidates = $this->candidates($workspace, false);
             if ([] === $candidates) {
                 throw new InvalidConfigurationException('No recognized application-owned files were found in the discovered Symfony projects.');
             }
@@ -39,7 +39,7 @@ final class CheckFileSelector
 
         $selected = [];
         foreach ($selectors as $selector) {
-            $matches = $this->matches($workspace, $selector, $candidates);
+            $matches = $this->matches($workspace, $selector, $this->candidates($workspace, true, $selector));
             if ([] === $matches) {
                 throw new InvalidConfigurationException($this->selectionError($workspace, $selector));
             }
@@ -53,18 +53,24 @@ final class CheckFileSelector
     }
 
     /** @return array<string, CheckFile> */
-    private function candidates(string $workspace): array
+    private function candidates(string $workspace, bool $includeExcluded, ?string $selector = null): array
     {
         $candidates = [];
         foreach ($this->projects->all() as $project) {
-            $this->assertReadableDirectories($project);
-            foreach ($this->files->files($project->rootPath()) as $path) {
+            if (!$includeExcluded) {
+                $this->assertReadableDirectories($project);
+            }
+            foreach ($this->files->files($project, $includeExcluded) as $path) {
                 $path = Path::canonicalize($path);
                 $uri = $this->uriToPathConverter->toUri($path);
                 if ($this->projects->forDocumentUri($uri)?->rootPath() !== $project->rootPath()) {
                     continue;
                 }
                 $projectPath = $this->files->relativePath($project, $path);
+                $workspacePath = $this->projectConfiguration->workspaceRelativePath($project, $path);
+                if (null !== $selector && !$this->candidateMatchesSelector($workspace, $selector, $path, $workspacePath)) {
+                    continue;
+                }
                 $languageId = $this->files->languageId($path);
                 if (null === $projectPath || null === $languageId) {
                     continue;
@@ -79,9 +85,10 @@ final class CheckFileSelector
                     $project,
                     $path,
                     $projectPath,
-                    $this->projectConfiguration->workspaceRelativePath($project, $path),
+                    $workspacePath,
                     $uri,
                     $languageId,
+                    $this->files->isExcluded($project, $path),
                 );
             }
         }
@@ -171,6 +178,20 @@ final class CheckFileSelector
         }
     }
 
+    private function candidateMatchesSelector(string $workspace, string $selector, string $path, string $workspacePath): bool
+    {
+        if ($this->isPattern($selector)) {
+            return preg_match($this->patternRegex(str_replace('\\', '/', $selector)), str_replace('\\', '/', $workspacePath)) > 0;
+        }
+
+        $selectedPath = Path::canonicalize(Path::isAbsolute($selector) ? $selector : Path::join($workspace, $selector));
+        if (is_file($selectedPath)) {
+            return $selectedPath === $path;
+        }
+
+        return is_dir($selectedPath) && Path::isBasePath($selectedPath, $path);
+    }
+
     private function assertReadableDirectories(Project $project): void
     {
         $directories = [$project->rootPath()];
@@ -186,6 +207,9 @@ final class CheckFileSelector
                 }
                 $path = Path::join($directory, $entry);
                 if (!is_dir($path)) {
+                    continue;
+                }
+                if ($this->files->isDirectoryExcluded($project, $path)) {
                     continue;
                 }
                 if ($this->files->gitignoreExcluded($project->rootPath(), $path)) {

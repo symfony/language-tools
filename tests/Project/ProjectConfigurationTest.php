@@ -34,10 +34,12 @@ final class ProjectConfigurationTest extends TestCase
             'projectRoots' => ['.', 'apps/admin'],
             'environment' => 'prod',
             'bridgeTimeout' => 90,
+            'excludePaths' => ['tests/**'],
             'projects' => [
                 'apps/admin' => [
                     'environment' => 'admin',
                     'translationDiagnostics' => true,
+                    'excludePaths' => ['./tests/Fixtures/**', 'var/generated/'],
                 ],
             ],
         ], \JSON_THROW_ON_ERROR));
@@ -48,6 +50,7 @@ final class ProjectConfigurationTest extends TestCase
         self::assertSame([
             'environment' => 'admin',
             'bridgeTimeout' => 90.0,
+            'excludePaths' => ['tests/Fixtures/**', 'var/generated/**'],
             'translationDiagnostics' => true,
         ], $this->configuration->settings($project));
         self::assertSame('apps/admin', $this->configuration->projectId($project));
@@ -90,6 +93,19 @@ final class ProjectConfigurationTest extends TestCase
         $this->expectExceptionMessage('apps/admin');
 
         $this->configuration->validateProjects([]);
+    }
+
+    public function testRejectsExcludePathsOutsideProjects(): void
+    {
+        file_put_contents($this->directory.'/.symfony-lsp.json', json_encode([
+            'version' => 1,
+            'excludePaths' => ['../outside/**'],
+        ], \JSON_THROW_ON_ERROR));
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('inside each Symfony project');
+
+        $this->configuration->load([['uri' => (new UriToPathConverter())->toUri($this->directory)]]);
     }
 
     public function testRejectsUnknownAndInvalidOptions(): void

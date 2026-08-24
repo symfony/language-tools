@@ -26,6 +26,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterTree;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 
 require dirname(__DIR__).'/vendor/autoload.php';
@@ -299,7 +300,7 @@ function bootScanner(bool $countParsers): array
     );
     $container->set(JsonRpcPeer::class, $peer);
     $container->set(JsonRpcDispatcher::class, new JsonRpcDispatcher($peer));
-    $container->set(ServerLogger::class, new ServerLogger(null));
+    $container->set(ServerLogger::class, new ServerLogger(null, new SensitiveDataRedactor()));
     if (null !== $counter) {
         $container->set(ParseCallCounter::class, $counter);
     }

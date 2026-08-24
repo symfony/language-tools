@@ -9,6 +9,7 @@ use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
 use Symfony\Lsp\Project\AnalysisSettings;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectConfiguration;
+use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\ProjectSettings;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -24,12 +25,14 @@ final class ProjectSettingsTest extends TestCase
         $client = new ProjectSettingsClient();
         $runtime = new RuntimeConfiguration();
         $analysisSettings = new AnalysisSettings();
+        $fileScope = new ProjectFileScopeRegistry();
         $settings = new ProjectSettings(
             $client,
             $projects,
             $configuration,
             $runtime,
             new ProjectConfiguration(new UriToPathConverter(), $analysisSettings),
+            $fileScope,
             $analysisSettings,
         );
         $settings->initialize(['capabilities' => ['workspace' => ['configuration' => true]]]);
@@ -39,6 +42,7 @@ final class ProjectSettingsTest extends TestCase
         self::assertTrue($configuration->missingKeyDiagnostics($project));
         self::assertSame('test', $runtime->environment($project));
         self::assertSame(120.0, $runtime->bridgeTimeout($project));
+        self::assertTrue($fileScope->isExcluded($project, '/workspace/tests/Fixtures/Rule.php'));
         self::assertSame([
             'items' => [[
                 'scopeUri' => 'file:///workspace',
@@ -56,6 +60,7 @@ final class ProjectSettingsTest extends TestCase
                 'version' => 1,
                 'environment' => 'file',
                 'translationDiagnostics' => true,
+                'excludePaths' => ['tests/**'],
             ], \JSON_THROW_ON_ERROR));
             $projects = new ProjectRegistry();
             $projects->replace([$project = new Project($directory, 'file://'.$directory, '^8.0')]);
@@ -65,12 +70,14 @@ final class ProjectSettingsTest extends TestCase
             $analysisSettings = new AnalysisSettings();
             $projectConfiguration = new ProjectConfiguration(new UriToPathConverter(), $analysisSettings);
             $projectConfiguration->load([['uri' => 'file://'.$directory]]);
+            $fileScope = new ProjectFileScopeRegistry();
             $settings = new ProjectSettings(
-                new ProjectSettingsClient([['environment' => 'resource', 'translationDiagnostics' => false]]),
+                new ProjectSettingsClient([['environment' => 'resource', 'translationDiagnostics' => false, 'excludePaths' => ['fixtures/**']]]),
                 $projects,
                 $translation,
                 $runtime,
                 $projectConfiguration,
+                $fileScope,
                 $analysisSettings,
             );
             $settings->initialize(['capabilities' => ['workspace' => ['configuration' => true]]]);
@@ -79,6 +86,8 @@ final class ProjectSettingsTest extends TestCase
 
             self::assertSame('resource', $runtime->environment($project));
             self::assertFalse($translation->missingKeyDiagnostics($project));
+            self::assertFalse($fileScope->isExcluded($project, $directory.'/tests/Rule.php'));
+            self::assertTrue($fileScope->isExcluded($project, $directory.'/fixtures/Rule.php'));
         } finally {
             (new Filesystem())->remove($directory);
         }
@@ -91,7 +100,7 @@ final class ProjectSettingsClient implements ClientInterface
     public array $params = [];
 
     /** @param array<array-key, mixed> $response */
-    public function __construct(private readonly array $response = [['translationDiagnostics' => true, 'environment' => 'test', 'bridgeTimeout' => 120]])
+    public function __construct(private readonly array $response = [['translationDiagnostics' => true, 'environment' => 'test', 'bridgeTimeout' => 120, 'excludePaths' => ['tests/Fixtures/**']]])
     {
     }
 

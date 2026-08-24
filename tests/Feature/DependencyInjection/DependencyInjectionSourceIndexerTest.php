@@ -22,6 +22,7 @@ use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
@@ -67,7 +68,7 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
             new SourceIndexPayloadCodec(),
             new PhpRuntimeStructureHasher(),
             new UriToPathConverter(),
-            new SourceFileEnumerator(new GitignoreMatcher()),
+            new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry()),
             new LocalKeyedMutex(),
             [new DependencyInjectionSourceIndexer(
                 $indexes,

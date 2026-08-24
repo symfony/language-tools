@@ -6,6 +6,7 @@ use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 
 final class SourceFileEnumerator
 {
@@ -37,13 +38,16 @@ final class SourceFileEnumerator
         'pnpm-lock.yaml',
     ];
 
-    public function __construct(private readonly GitignoreMatcher $gitignore)
-    {
+    public function __construct(
+        private readonly GitignoreMatcher $gitignore,
+        private readonly ProjectFileScopeRegistry $fileScope,
+    ) {
     }
 
     /** @return \Generator<int, string> */
-    public function files(string $directory): \Generator
+    public function files(Project $project, bool $includeExcluded = false): \Generator
     {
+        $directory = $project->rootPath();
         if (!is_dir($directory)) {
             return;
         }
@@ -58,6 +62,9 @@ final class SourceFileEnumerator
             ->ignoreUnreadableDirs()
             ->filter(fn (\SplFileInfo $file): bool => null !== $this->languageId($file->getPathname()));
         foreach ($this->gitignore->filter($files, $directory) as $path) {
+            if (!$includeExcluded && $this->fileScope->isExcluded($project, $path)) {
+                continue;
+            }
             if ('dotenv' === $this->languageId($path)) {
                 $dotenvPaths[$path] = true;
             }
@@ -65,7 +72,7 @@ final class SourceFileEnumerator
         }
 
         foreach (glob($directory.'/.env*') ?: [] as $path) {
-            if (is_file($path) && !isset($dotenvPaths[$path])) {
+            if (is_file($path) && !isset($dotenvPaths[$path]) && ($includeExcluded || !$this->fileScope->isExcluded($project, $path))) {
                 yield $path;
             }
         }
@@ -97,6 +104,16 @@ final class SourceFileEnumerator
         }
 
         return $this->gitignore->isIgnored($rootPath, $path);
+    }
+
+    public function isExcluded(Project $project, string $path): bool
+    {
+        return $this->fileScope->isExcluded($project, $path);
+    }
+
+    public function isDirectoryExcluded(Project $project, string $path): bool
+    {
+        return $this->fileScope->isDirectoryExcluded($project, $path);
     }
 
     public function belongsToProject(Project $project, string $path): bool

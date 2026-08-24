@@ -138,7 +138,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
     /**
      * @param array<array-key, mixed> $params
      */
-    public function updateOpenDocument(array $params): void
+    public function updateOpenDocument(array $params, bool $includeExcluded = false): void
     {
         $textDocument = $params['textDocument'] ?? null;
         if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
@@ -151,7 +151,10 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         if (null === $document || null === $project || null === $path) {
             return;
         }
-        if (!$this->files->belongsToProject($project, $path) || $this->files->gitignoreExcluded($project->rootPath(), $path)) {
+        if (!$this->files->belongsToProject($project, $path)
+            || (!$includeExcluded && $this->files->isExcluded($project, $path))
+            || $this->files->gitignoreExcluded($project->rootPath(), $path)
+        ) {
             foreach ($this->providers as $provider) {
                 $provider->removeOverlay($project, $document->uri());
             }
@@ -228,7 +231,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         $projectKey = $project->rootPath();
         $indexed = \array_key_exists($projectKey, $this->entries);
         $entries = $indexed ? $this->entries[$projectKey] : $this->store->loadMetadata($project);
-        if ($this->files->gitignoreExcluded($project->rootPath(), $path)) {
+        if ($this->files->isExcluded($project, $path) || $this->files->gitignoreExcluded($project->rootPath(), $path)) {
             if (isset($entries[$relativePath])) {
                 foreach ($this->providers as $provider) {
                     $provider->remove($project, $uri);
@@ -379,7 +382,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         $entries = [];
         $fileCount = 0;
         $parsedCount = 0;
-        foreach ($this->files->files($project->rootPath()) as $path) {
+        foreach ($this->files->files($project) as $path) {
             if (0 === ++$fileCount % 64) {
                 delay(0, cancellation: $cancellation);
             }

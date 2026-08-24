@@ -199,6 +199,7 @@ final class LanguageServer
     {
         async(function (): void {
             $this->workspaceConfiguration->refreshProjectSettings();
+            $this->sourceScanner->indexAll();
             $this->workspaceConfiguration->requestWorkspaceTrust();
             $this->diagnosticProviders->refreshAll();
         })->ignore();
@@ -274,6 +275,7 @@ final class LanguageServer
                 if ($rediscover || $reloadConfiguration) {
                     $this->workspaceConfiguration->requestWorkspaceTrust();
                 }
+                $this->diagnosticProviders->refreshAll();
             } catch (InvalidConfigurationException $error) {
                 $this->logger->error($error);
             }

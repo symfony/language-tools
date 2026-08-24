@@ -10,8 +10,10 @@ final class ServerLogger implements TrafficLoggerInterface
 {
     private string $trace = 'off';
 
-    public function __construct(private readonly ?WritableStream $output)
-    {
+    public function __construct(
+        private readonly ?WritableStream $output,
+        private readonly SensitiveDataRedactor $redactor,
+    ) {
     }
 
     public function configure(string $trace): void
@@ -33,9 +35,9 @@ final class ServerLogger implements TrafficLoggerInterface
 
     public function error(\Throwable $error): void
     {
-        $message = $this->redactString($error->getMessage());
+        $message = $this->redactor->redact($error->getMessage());
         if ('verbose' === $this->trace) {
-            $message .= "\n".$this->redactString($error->getTraceAsString());
+            $message .= "\n".$this->redactor->redact($error->getTraceAsString());
         }
         $this->write('[error] '.$message."\n");
     }
@@ -47,7 +49,7 @@ final class ServerLogger implements TrafficLoggerInterface
             $error::class,
             $this->relativeFile($error->getFile()),
             $error->getLine(),
-            $this->redactString($error->getMessage()),
+            $this->redactor->redact($error->getMessage()),
         ));
     }
 
@@ -72,7 +74,7 @@ final class ServerLogger implements TrafficLoggerInterface
             return '[redacted]';
         }
         if (!\is_array($value)) {
-            return \is_string($value) ? $this->redactString($value) : $value;
+            return \is_string($value) ? $this->redactor->redact($value) : $value;
         }
 
         $redacted = [];
@@ -81,11 +83,6 @@ final class ServerLogger implements TrafficLoggerInterface
         }
 
         return $redacted;
-    }
-
-    private function redactString(string $value): string
-    {
-        return preg_replace('/\b(password|passwd|secret|token|authorization|credential|cookie|api[_-]?key|private[_-]?key)\s*[=:]\s*[^\s,;]+/i', '$1=[redacted]', $value) ?? '[redacted]';
     }
 
     private function relativeFile(string $file): string

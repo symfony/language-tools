@@ -29,6 +29,7 @@ final class CheckOptionsParserTest extends TestCase
             '--fail-on=route.not_found,config.deprecated_key',
             '--baseline=diagnostics.json',
             '--strict-baseline',
+            '--verbose',
             'src',
         ]);
 
@@ -44,6 +45,7 @@ final class CheckOptionsParserTest extends TestCase
         self::assertSame(['config.deprecated_key', 'route.not_found'], $options->blockingCodes);
         self::assertSame('diagnostics.json', $options->baselinePath);
         self::assertTrue($options->strictBaseline);
+        self::assertTrue($options->verbose);
     }
 
     public function testAcceptsAnExplicitEmptyBlockingCodeList(): void

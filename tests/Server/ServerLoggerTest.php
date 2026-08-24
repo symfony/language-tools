@@ -3,15 +3,29 @@
 namespace Symfony\Lsp\Tests\Server;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\CapturingWritableStream;
 
 final class ServerLoggerTest extends TestCase
 {
+    public function testRedactsEnvironmentAssignmentsCredentialsAndWorkspacePaths(): void
+    {
+        $redactor = new SensitiveDataRedactor();
+
+        self::assertSame(
+            'Failed at ./src/Kernel.php with [redacted], [redacted]@database and authorization=[redacted]',
+            $redactor->redact(
+                'Failed at /workspace/src/Kernel.php with DATABASE_URL=mysql://user:pass@database, mysql://user:pass@database and Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.',
+                ['/workspace'],
+            ),
+        );
+    }
+
     public function testReportsFatalErrorsWithLocationAndRedaction(): void
     {
         $output = new CapturingWritableStream();
-        $logger = new ServerLogger($output);
+        $logger = new ServerLogger($output, new SensitiveDataRedactor());
 
         $logger->fatal(new \RuntimeException('secret=exposed'));
 
@@ -24,7 +38,7 @@ final class ServerLoggerTest extends TestCase
     public function testTrafficLoggingIsDisabledByDefaultAndRecursivelyRedactsContent(): void
     {
         $output = new CapturingWritableStream();
-        $logger = new ServerLogger($output);
+        $logger = new ServerLogger($output, new SensitiveDataRedactor());
         $payload = json_encode([
             'method' => 'textDocument/didOpen',
             'params' => [

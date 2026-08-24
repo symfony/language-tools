@@ -2,13 +2,14 @@
 
 namespace Symfony\Lsp\Check;
 
+/** @phpstan-type CheckError array{category: string, message: string, project?: string, environment?: string, workspacePath?: string, cause?: array{class: string, message: string}} */
 final class CheckResult
 {
     /**
-     * @param list<CheckProjectResult>                                         $projects
-     * @param list<CheckDiagnostic>                                            $diagnostics
-     * @param list<BaselineEntry>                                              $staleBaseline
-     * @param list<array{category: string, message: string, project?: string}> $errors
+     * @param list<CheckProjectResult> $projects
+     * @param list<CheckDiagnostic>    $diagnostics
+     * @param list<BaselineEntry>      $staleBaseline
+     * @param list<CheckError>         $errors
      */
     public function __construct(
         public readonly string $version,

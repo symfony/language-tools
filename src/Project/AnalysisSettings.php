@@ -14,6 +14,7 @@ final class AnalysisSettings
         'runtimeIndexing',
         'bridgeTimeout',
         'translationDiagnostics',
+        'excludePaths',
     ];
 
     /**
@@ -40,6 +41,7 @@ final class AnalysisSettings
                     'environment' => $this->environment($value, $context),
                     'debug', 'runtimeIndexing', 'translationDiagnostics' => $this->boolean($name, $value, $context),
                     'bridgeTimeout' => $this->positiveNumber($name, $value, $context),
+                    'excludePaths' => $this->excludePaths($value, $context),
                 };
             } catch (InvalidConfigurationException $error) {
                 if ($strict) {
@@ -96,6 +98,34 @@ final class AnalysisSettings
         }
 
         return $value;
+    }
+
+    /** @return list<string> */
+    private function excludePaths(mixed $value, string $context): array
+    {
+        if (!\is_array($value) || !array_is_list($value)) {
+            throw new InvalidConfigurationException(\sprintf('The %s option "excludePaths" must be a list of relative path patterns.', $context));
+        }
+
+        $patterns = [];
+        foreach ($value as $pattern) {
+            if (!\is_string($pattern) || '' === $pattern) {
+                throw new InvalidConfigurationException(\sprintf('The %s option "excludePaths" must contain non-empty relative path patterns.', $context));
+            }
+            $pattern = str_replace('\\', '/', $pattern);
+            while (str_starts_with($pattern, './')) {
+                $pattern = substr($pattern, 2);
+            }
+            if ('' === $pattern || Path::isAbsolute($pattern) || \in_array('..', explode('/', $pattern), true)) {
+                throw new InvalidConfigurationException(\sprintf('The %s option "excludePaths" must contain paths inside each Symfony project.', $context));
+            }
+            if (str_ends_with($pattern, '/')) {
+                $pattern .= '**';
+            }
+            $patterns[] = $pattern;
+        }
+
+        return array_values(array_unique($patterns));
     }
 
     private function positiveNumber(string $name, mixed $value, string $context): float

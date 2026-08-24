@@ -68,6 +68,52 @@ final class MatrixCommandTest extends TestCase
         self::assertStringContainsString('warm=ok', $this->lines[0]);
     }
 
+    public function testIgnoresDiagnosticAndFieldOrderingForCacheParity(): void
+    {
+        $first = [
+            'severity' => 1,
+            'code' => 'route.not_found',
+            'range' => ['start' => ['line' => 1, 'character' => 2], 'end' => ['line' => 1, 'character' => 4]],
+            'message' => 'Missing route.',
+        ];
+        $second = [
+            'code' => 'template.not_found',
+            'message' => 'Missing template.',
+            'severity' => 1,
+        ];
+        $cold = $this->harnessRun(['diagnostics' => [[
+            'uri' => 'file:///workspace/config/services.yaml',
+            'items' => [$first, $second],
+        ]]]);
+        $warm = $this->harnessRun(['diagnostics' => [[
+            'items' => [array_reverse($second, true), array_reverse($first, true)],
+            'uri' => 'file:///workspace/config/services.yaml',
+        ]]]);
+
+        $exitCode = $this->command(new FakeProvisioner($this->checkout), new FakeHarness($cold, $warm))->run([$this->configuration()], $this->output);
+
+        self::assertSame(0, $exitCode);
+    }
+
+    public function testFailsWhenColdAndWarmDiagnosticsDiffer(): void
+    {
+        $cold = $this->harnessRun(['diagnostics' => [[
+            'uri' => 'file:///workspace/config/services.yaml',
+            'items' => [['code' => 'service.not_found']],
+        ]]]);
+        $warm = $this->harnessRun(['diagnostics' => [[
+            'uri' => 'file:///workspace/config/services.yaml',
+            'items' => [],
+        ]]]);
+
+        $exitCode = $this->command(new FakeProvisioner($this->checkout), new FakeHarness($cold, $warm))->run([$this->configuration()], $this->output);
+
+        self::assertSame(1, $exitCode);
+        $report = $this->readReport();
+        self::assertSame('cache-parity', $report['failure']['layer'] ?? null);
+        self::assertStringContainsString('Cold and warm diagnostic publications differ.', $report['failure']['message']);
+    }
+
     public function testUsesTheConfiguredApplicationDirectory(): void
     {
         $application = Path::join($this->checkout, 'app');

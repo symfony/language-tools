@@ -43,7 +43,10 @@ selection:
 
 Paths and patterns are resolved from the workspace root. Files excluded by
 ``.gitignore`` and files under ``.git/``, ``node_modules/``, ``var/`` or
-``vendor/`` are skipped.
+``vendor/`` are skipped. The default selection also skips project
+``excludePaths``. An explicit file, directory or pattern can select those
+configured exclusions, but it can't bypass dependency, cache or ``.gitignore``
+rules.
 
 Runtime analysis is enabled by default and boots the application with the
 configured PHP command. Use source-only mode for code that you don't trust or
@@ -81,7 +84,8 @@ summary. Use JSON for automation:
 The JSON document uses ``schemaVersion`` 1. Diagnostic ranges are zero-based,
 end-exclusive and encoded as UTF-16 character offsets. It contains project
 identity, project-relative and workspace-relative paths, analysis mode, project
-status, baseline state and summary counts.
+status, baseline state, diagnostic provenance and summary counts. Operational
+errors include a sanitized cause when an exception is available.
 
 Use GitHub Actions annotations for pull request feedback:
 
@@ -90,9 +94,10 @@ Use GitHub Actions annotations for pull request feedback:
     $ symfony-lsp check --format=github
 
 Standard output contains only the selected report format. Operational details
-go to standard error. Once JSON is selected successfully, later invocation,
-configuration, indexing and internal failures still produce a valid JSON report
-with ``complete`` set to ``false``.
+go to standard error. Add ``--verbose`` to human output to show sanitized
+exception classes and messages. GitHub annotations remain generic. Once JSON is
+selected successfully, later invocation, configuration, indexing and internal
+failures still produce a valid JSON report with ``complete`` set to ``false``.
 
 Selecting Blocking Diagnostics
 ------------------------------

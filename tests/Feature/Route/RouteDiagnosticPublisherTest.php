@@ -30,6 +30,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -296,10 +297,13 @@ final class RouteDiagnosticPublisherTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([new Project('/workspace', 'file:///workspace', '^8.0')]);
         $positionConverter = new PositionConverter();
+        $uriConverter = new UriToPathConverter();
         $collector = new DiagnosticCollector(
             $documents,
             $projects,
-            new ProjectPathResolver(new UriToPathConverter()),
+            new ProjectPathResolver($uriConverter),
+            new ProjectFileScopeRegistry(),
+            $uriConverter,
             [new RouteDiagnosticPublisher(
                 new DocumentContextResolver($documents, $projects),
                 new LspProtocolMapper(),
@@ -378,10 +382,13 @@ final class RouteDiagnosticPublisherTest extends TestCase
             ...('twig' === $languageId && $runtimeTemplate ? [new TemplateDeclaration(basename($uri), $uri, new Range(new Position(0, 0), new Position(0, 0)))] : []),
         );
 
+        $uriConverter = new UriToPathConverter();
         $collector = new DiagnosticCollector(
             $documents,
             $projects,
-            new ProjectPathResolver(new UriToPathConverter()),
+            new ProjectPathResolver($uriConverter),
+            new ProjectFileScopeRegistry(),
+            $uriConverter,
             [new RouteDiagnosticPublisher(
                 new DocumentContextResolver($documents, $projects),
                 new LspProtocolMapper(),

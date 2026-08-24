@@ -14,6 +14,7 @@ use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectConfiguration;
 use Symfony\Lsp\Project\ProjectDiscovery;
+use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\ProjectSettings;
 use Symfony\Lsp\Project\ProjectStateCleaner;
@@ -158,7 +159,7 @@ final class WorkspaceConfigurationTest extends TestCase
             $registry,
             new WorkspaceTrustManager($this->client(), new WorkspaceTrust(), $this->runtimeInitializer(), new ProjectIndexStatusRegistry(), $runtimeConfiguration, $registry),
             $runtimeConfiguration,
-            new ProjectSettings($this->client(), $registry, new TranslationConfigurationRegistry(), $runtimeConfiguration, $projectConfiguration, $analysisSettings),
+            new ProjectSettings($this->client(), $registry, new TranslationConfigurationRegistry(), $runtimeConfiguration, $projectConfiguration, new ProjectFileScopeRegistry(), $analysisSettings),
             $projectConfiguration,
             new PositionConverter(),
             $uriToPathConverter,

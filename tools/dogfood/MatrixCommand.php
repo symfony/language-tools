@@ -94,12 +94,60 @@ final class MatrixCommand
             $warm = $this->harness->run($configuration, $applicationRoot);
             $this->filesystem->dumpFile(Path::join($artifactDirectory, 'warm.json'), '' !== $warm->rawOutput ? $warm->rawOutput : $warm->errorOutput);
             $report->warm = $this->summarize($warm, $configuration->name);
+            if ([] === $report->cold->layers
+                && [] === $report->warm->layers
+                && $this->diagnostics($cold) !== $this->diagnostics($warm)
+            ) {
+                $report->failure = new ProjectFailure('cache-parity', 'Cold and warm diagnostic publications differ.');
+            }
         } finally {
             $this->provisioner->release($configuration);
         }
         $this->writeJson(Path::join($artifactDirectory, 'project.json'), $report->toArray());
 
         return $report;
+    }
+
+    /** @return list<array<array-key, mixed>> */
+    private function diagnostics(HarnessResult $run): array
+    {
+        $diagnostics = $run->result['diagnostics'] ?? null;
+        if (!\is_array($diagnostics)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach (array_filter($diagnostics, 'is_array') as $publication) {
+            $items = $publication['items'] ?? null;
+            if (\is_array($items)) {
+                $items = array_map($this->normalizeDiagnosticValue(...), array_filter($items, 'is_array'));
+                usort($items, static fn (array $left, array $right): int => serialize($left) <=> serialize($right));
+                $publication['items'] = $items;
+            }
+            $normalized[] = $this->normalizeDiagnosticValue($publication);
+        }
+        usort($normalized, static fn (array $left, array $right): int => serialize($left) <=> serialize($right));
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<array-key, mixed> $value
+     *
+     * @return array<array-key, mixed>
+     */
+    private function normalizeDiagnosticValue(array $value): array
+    {
+        foreach ($value as $key => $child) {
+            if (\is_array($child)) {
+                $value[$key] = $this->normalizeDiagnosticValue($child);
+            }
+        }
+        if (!array_is_list($value)) {
+            ksort($value);
+        }
+
+        return $value;
     }
 
     private function summarize(HarnessResult $run, string $project): RunSummary
