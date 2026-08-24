@@ -3,11 +3,37 @@ Running Diagnostics in CI
 
 The ``symfony-lsp check`` command runs Symfony Language Tools diagnostics
 against saved application files without an editor or Language Server Protocol
-client.
-Use it in local automation, pre-commit checks and continuous integration.
+client. Use it in local automation, pre-commit checks and continuous
+integration.
 
 The checker reports Symfony-specific diagnostics only. Keep your PHP syntax,
 type, style, dependency-security and test tools in the same CI pipeline.
+
+Installing the Executable
+-------------------------
+
+The checker is included in the standalone ``symfony-lsp`` executable. For local
+automation and CI, follow the `standalone guide`_ to download the
+archive for your platform, verify its checksum and extract the executable. Add
+its directory to ``PATH`` or invoke it by its full path:
+
+.. code-block:: terminal
+
+    $ /path/to/symfony-lsp check
+
+The VS Code extension bundles the executable and the Zed extension manages its
+own downloaded copy, but those editor-managed locations aren't stable CI
+interfaces. Install a standalone release for scripts and CI jobs.
+
+When running Symfony Language Tools from a source checkout, install its Composer
+dependencies and build the Tree-sitter extension first. The executable is then
+available under ``bin/``:
+
+.. code-block:: terminal
+
+    $ composer install
+    $ composer tree-sitter:build
+    $ ./bin/symfony-lsp check
 
 Running a Check
 ---------------
@@ -34,9 +60,8 @@ Every file belongs to the most-specific discovered project.
 
 Runtime analysis is enabled by default. Invoking ``symfony-lsp check``
 explicitly authorizes the configured PHP command to boot each selected
-application. Use
-source-only mode for code that you don't trust or when CI must not execute the
-application:
+application. Use source-only mode for code that you don't trust or when CI must
+not execute the application:
 
 .. code-block:: terminal
 
@@ -44,9 +69,8 @@ application:
 
 Every report identifies whether each project used runtime metadata or
 source-only analysis. When runtime analysis is enabled, a failed, stale,
-canceled or timed
-out runtime index makes the check incomplete. The checker never falls back to a
-clean source-only result after a runtime failure.
+canceled or timed out runtime index makes the check incomplete. The checker
+never falls back to a clean source-only result after a runtime failure.
 
 Configuring Projects
 --------------------
@@ -254,3 +278,5 @@ Current Limitations
 The initial checker has no watch mode, doesn't analyze unsaved editor contents
 and doesn't modify application files. It supports human, JSON and GitHub Actions
 output; SARIF isn't currently provided.
+
+.. _`standalone guide`: ../index.rst#installing-a-standalone-release
