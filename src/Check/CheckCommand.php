@@ -7,9 +7,9 @@ use Symfony\Lsp\Project\InvalidConfigurationException;
 final class CheckCommand
 {
     public const EXIT_SUCCESS = 0;
-    public const EXIT_DIAGNOSTICS = 1;
-    public const EXIT_INVOCATION = 2;
-    public const EXIT_OPERATIONAL = 3;
+    public const EXIT_DIAGNOSTICS = 10;
+    public const EXIT_INVOCATION = 11;
+    public const EXIT_OPERATIONAL = 12;
 
     public function __construct(
         private readonly CheckOptionsParser $optionsParser,

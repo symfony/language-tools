@@ -7,6 +7,7 @@ use Amp\ByteStream\ReadableIterableStream;
 use Fabpot\JsonRpc\ContentLengthJsonRpcTransport;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Lsp\Check\CheckCommand;
 use Symfony\Lsp\Server\LanguageServerFactory;
 use Symfony\Lsp\Tests\Support\CapturingWritableStream;
 
@@ -171,7 +172,7 @@ final class CheckParityTest extends TestCase
             array_unshift($arguments, '--source-only');
         }
         $execution = (new LanguageServerFactory())->createCheck()->run($arguments);
-        self::assertSame(1, $execution->exitCode, $execution->stderr);
+        self::assertSame(CheckCommand::EXIT_DIAGNOSTICS, $execution->exitCode, $execution->stderr);
         $report = json_decode($execution->stdout, true, flags: \JSON_THROW_ON_ERROR);
         self::assertIsArray($report);
         $items = $report['diagnostics'] ?? null;

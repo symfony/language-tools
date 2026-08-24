@@ -6,6 +6,7 @@ use Amp\Process\Process;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Check\CheckCommand;
 
 use function Amp\async;
 use function Amp\ByteStream\buffer;
@@ -40,12 +41,20 @@ final class CheckExecutableTest extends TestCase
         (new Filesystem())->remove($this->directory);
     }
 
+    public function testUsesApplicationSpecificExitStatuses(): void
+    {
+        self::assertSame(0, CheckCommand::EXIT_SUCCESS);
+        self::assertSame(10, CheckCommand::EXIT_DIAGNOSTICS);
+        self::assertSame(11, CheckCommand::EXIT_INVOCATION);
+        self::assertSame(12, CheckCommand::EXIT_OPERATIONAL);
+    }
+
     public function testReportsSavedFileDiagnosticsWithoutAnLspClient(): void
     {
         $result = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->directory, 'config/**/*.yaml']);
         $report = $this->decodeReport($result['stdout']);
 
-        self::assertSame(1, $result['exitCode'], $result['stderr']);
+        self::assertSame(CheckCommand::EXIT_DIAGNOSTICS, $result['exitCode'], $result['stderr']);
         self::assertSame('', $result['stderr']);
         self::assertTrue($report['complete']);
         self::assertSame('source-only', $report['projects'][0]['analysis']['mode']);
@@ -87,7 +96,7 @@ final class CheckExecutableTest extends TestCase
         ]);
         $report = $this->decodeReport($result['stdout']);
 
-        self::assertSame(1, $result['exitCode'], $result['stderr']);
+        self::assertSame(CheckCommand::EXIT_DIAGNOSTICS, $result['exitCode'], $result['stderr']);
         self::assertSame('test', $report['projects'][0]['environment']);
         self::assertSame('source-only', $report['projects'][0]['analysis']['mode']);
     }
@@ -97,7 +106,7 @@ final class CheckExecutableTest extends TestCase
         $result = $this->execute(['check', '--format=json', '--workspace='.$this->directory]);
         $report = $this->decodeReport($result['stdout']);
 
-        self::assertSame(3, $result['exitCode']);
+        self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode']);
         self::assertFalse($report['complete']);
         self::assertSame('operational', $report['errors'][0]['category']);
         self::assertStringNotContainsString('APP_SECRET', $result['stdout'].$result['stderr']);
@@ -140,7 +149,7 @@ final class CheckExecutableTest extends TestCase
         ]);
         $report = $this->decodeReport($strict['stdout']);
 
-        self::assertSame(1, $strict['exitCode'], $strict['stderr']);
+        self::assertSame(CheckCommand::EXIT_DIAGNOSTICS, $strict['exitCode'], $strict['stderr']);
         self::assertSame(1, $report['summary']['stale']);
         self::assertSame(1, $report['summary']['blocking']);
     }
@@ -158,7 +167,7 @@ final class CheckExecutableTest extends TestCase
             $result = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->directory]);
             $report = $this->decodeReport($result['stdout']);
 
-            self::assertSame(2, $result['exitCode']);
+            self::assertSame(CheckCommand::EXIT_INVOCATION, $result['exitCode']);
             self::assertFalse($report['complete']);
             self::assertStringContainsString('unreadable', $result['stderr']);
         } finally {
@@ -178,7 +187,7 @@ final class CheckExecutableTest extends TestCase
             $result = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->directory]);
             $report = $this->decodeReport($result['stdout']);
 
-            self::assertSame(2, $result['exitCode']);
+            self::assertSame(CheckCommand::EXIT_INVOCATION, $result['exitCode']);
             self::assertFalse($report['complete']);
             self::assertStringContainsString('resolves outside', $result['stderr']);
         } finally {
@@ -197,7 +206,7 @@ final class CheckExecutableTest extends TestCase
         ]);
         $report = $this->decodeReport($result['stdout']);
 
-        self::assertSame(3, $result['exitCode']);
+        self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode']);
         self::assertFalse($report['complete']);
         self::assertStringContainsString('timed out', $result['stderr']);
     }
@@ -212,7 +221,7 @@ final class CheckExecutableTest extends TestCase
         ]);
         $report = $this->decodeReport($result['stdout']);
 
-        self::assertSame(2, $result['exitCode']);
+        self::assertSame(CheckCommand::EXIT_INVOCATION, $result['exitCode']);
         self::assertFalse($report['complete']);
         self::assertStringContainsString('does not exist', $result['stderr']);
     }
@@ -229,7 +238,7 @@ final class CheckExecutableTest extends TestCase
         ]);
         $report = $this->decodeReport($result['stdout']);
 
-        self::assertSame(2, $result['exitCode']);
+        self::assertSame(CheckCommand::EXIT_INVOCATION, $result['exitCode']);
         self::assertFalse($report['complete']);
         self::assertStringContainsString('was not discovered', $result['stderr']);
     }
@@ -239,7 +248,7 @@ final class CheckExecutableTest extends TestCase
         $result = $this->execute(['check', '--format=json', '--workspace='.$this->directory, 'missing.php']);
         $report = $this->decodeReport($result['stdout']);
 
-        self::assertSame(2, $result['exitCode']);
+        self::assertSame(CheckCommand::EXIT_INVOCATION, $result['exitCode']);
         self::assertFalse($report['complete']);
         self::assertSame('invocation', $report['errors'][0]['category']);
         self::assertStringContainsString('does not exist', $result['stderr']);

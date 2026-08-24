@@ -4,6 +4,7 @@
 $deadlineSeconds = (float) (getenv('SYMFONY_LSP_SMOKE_DEADLINE') ?: 60);
 define('READ_DEADLINE_SECONDS', $deadlineSeconds);
 define('SMOKE_TEST_START', microtime(true));
+define('CHECK_DIAGNOSTICS_EXIT', 10);
 
 function progress(string $message): void
 {
@@ -41,7 +42,7 @@ function checkSavedDiagnostics(string $server, ?string $expectedVersion): void
         $status = proc_close($process);
         $stdout = (string) file_get_contents($outputPath);
         $stderr = (string) file_get_contents($errorPath);
-        if (1 !== $status) {
+        if (CHECK_DIAGNOSTICS_EXIT !== $status) {
             throw new RuntimeException('The headless diagnostics check exited with status '.$status.":\n".$stderr);
         }
         $report = json_decode($stdout, true, flags: \JSON_THROW_ON_ERROR);

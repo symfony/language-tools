@@ -217,14 +217,18 @@ Exit Statuses
 The exit statuses are stable automation contracts:
 
 * ``0``: analysis completed without blocking diagnostics;
-* ``1``: analysis completed with blocking diagnostics or strict stale entries;
-* ``2``: invalid invocation, configuration, code policy, baseline or selection;
-* ``3``: incomplete analysis caused by indexing, timeout, cancellation, process
+* ``10``: analysis completed with blocking diagnostics or strict stale entries;
+* ``11``: invalid invocation, configuration, code policy, baseline or selection;
+* ``12``: incomplete analysis caused by indexing, timeout, cancellation, process
   or internal failure.
+
+The nonzero values are application-specific. They avoid the conventional
+``sysexits`` range, shell-reserved statuses 126 and 127 and statuses above 128
+that shells use for signal termination.
 
 Operational failure takes precedence over diagnostic findings. A partial report
 can contain diagnostics from completed projects, but ``complete`` remains
-``false`` and the exit status is ``3``.
+``false`` and the exit status is ``12``.
 
 Caching and Privacy
 -------------------
