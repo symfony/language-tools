@@ -21,10 +21,6 @@ its directory to ``PATH`` or invoke it by its full path:
 
     $ /path/to/symfony-lsp check
 
-The VS Code extension bundles the executable and the Zed extension manages its
-own downloaded copy, but those editor-managed locations aren't stable CI
-interfaces. Install a standalone release for scripts and CI jobs.
-
 When running Symfony Language Tools from a source checkout, install its Composer
 dependencies and build the Tree-sitter extension first. The executable is then
 available under ``bin/``:
@@ -45,32 +41,29 @@ Run the checker from the workspace root:
     $ symfony-lsp check
 
 With no path arguments, the command discovers Symfony projects and analyzes all
-recognized application-owned files. Pass files, directories or patterns to
-narrow the selection:
+supported project files. Pass files, directories or patterns to narrow the
+selection:
 
 .. code-block:: terminal
 
     $ symfony-lsp check src/ templates/
     $ symfony-lsp check 'config/**/*.yaml'
 
-Paths and patterns are resolved from the workspace root. Selection uses the same
-language recognition, project ownership, ``.gitignore`` and fixed ``.git/``,
-``node_modules/``, ``var/`` and ``vendor/`` exclusions as editor indexing.
-Every file belongs to the most-specific discovered project.
+Paths and patterns are resolved from the workspace root. Files excluded by
+``.gitignore`` and files under ``.git/``, ``node_modules/``, ``var/`` or
+``vendor/`` are skipped.
 
-Runtime analysis is enabled by default. Invoking ``symfony-lsp check``
-explicitly authorizes the configured PHP command to boot each selected
-application. Use source-only mode for code that you don't trust or when CI must
-not execute the application:
+Runtime analysis is enabled by default and boots the application with the
+configured PHP command. Use source-only mode for code that you don't trust or
+when CI must not execute the application:
 
 .. code-block:: terminal
 
     $ symfony-lsp check --source-only
 
-Every report identifies whether each project used runtime metadata or
-source-only analysis. When runtime analysis is enabled, a failed, stale,
-canceled or timed out runtime index makes the check incomplete. The checker
-never falls back to a clean source-only result after a runtime failure.
+Reports indicate whether each project used runtime or source-only analysis. If
+runtime analysis cannot complete, the command exits with status ``12`` instead
+of silently switching to source-only analysis.
 
 Configuring Projects
 --------------------
@@ -123,11 +116,8 @@ For the checker, command-line values override project entries, which override
 top-level file values and built-in defaults. Use ``--config=PATH`` to select a
 different configuration file.
 
-Editor integrations load the same file through the language server. Explicit
-resource-scoped editor settings override file values. Workspace trust, protocol
-tracing, the server executable and its memory limit remain client-specific and
-aren't accepted in the checked-in file. A checked-in configuration never grants
-workspace trust or executes application code by itself.
+Editor settings override values from this file. A checked-in configuration
+never grants workspace trust or executes application code by itself.
 
 Use ``symfony-lsp check --help`` for every command-line override, including the
 PHP command, environment, project roots and timeouts.
@@ -220,11 +210,9 @@ but never modify the baseline:
 
     $ symfony-lsp check --baseline=.symfony-lsp-baseline.json
 
-Matched occurrences remain visible and don't block. Matching is
-multiplicity-aware: one known occurrence doesn't hide a second identical
-occurrence in the same file. Fingerprints ignore line positions, so unrelated
-line movement remains matched, while changed diagnostic evidence becomes
-active.
+Matched occurrences remain visible and don't block. A second identical
+occurrence in the same file remains active, and known diagnostics continue to
+match after unrelated line movement.
 
 Refresh the baseline explicitly after reviewing current diagnostics:
 
@@ -246,10 +234,6 @@ The exit statuses are stable automation contracts:
 * ``12``: incomplete analysis caused by indexing, timeout, cancellation, process
   or internal failure.
 
-The nonzero values are application-specific. They avoid the conventional
-``sysexits`` range, shell-reserved statuses 126 and 127 and statuses above 128
-that shells use for signal termination.
-
 Operational failure takes precedence over diagnostic findings. A partial report
 can contain diagnostics from completed projects, but ``complete`` remains
 ``false`` and the exit status is ``12``.
@@ -257,25 +241,23 @@ can contain diagnostics from completed projects, but ``complete`` remains
 Caching and Privacy
 -------------------
 
-The checker uses the source index and bridge installation under
-``var/symfony-lsp/<server-version>/`` in each application. Runtime analysis can
-also update the application's normal Symfony cache. These directories must be
-writable.
+The checker stores its cache under ``var/symfony-lsp/<server-version>/`` in
+each application. Runtime analysis can also update the application's Symfony
+cache. These directories must be writable.
 
 CI can cache ``var/symfony-lsp/`` by project revision, platform and Symfony
 Language Tools version. Don't publish it as a build artifact or share it between
 untrusted projects. Treat the application's Symfony cache according to the same
 policy you use when running its console and tests.
 
-Reports and baselines contain diagnostic messages and structural names, but not
-parameter values, environment values, credentials, resolved secrets, raw
-runtime snapshots or application objects. Baselines contain no absolute
-checkout paths or source snippets.
+Reports and baselines can contain diagnostic messages and application names,
+but not parameter values, environment values, credentials or resolved secrets.
+Baselines contain no absolute checkout paths or source snippets.
 
 Current Limitations
 -------------------
 
-The initial checker has no watch mode, doesn't analyze unsaved editor contents
+The checker has no watch mode, doesn't analyze unsaved editor contents
 and doesn't modify application files. It supports human, JSON and GitHub Actions
 output; SARIF isn't currently provided.
 
