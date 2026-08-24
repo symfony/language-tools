@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Avoid false diagnostics for valid configuration, validation attributes and Twig expressions
 - Limit GitHub release notes to the current version
 - Retry partial terminal writes when printing check reports
 - Add a headless diagnostics check with CI reports and baselines

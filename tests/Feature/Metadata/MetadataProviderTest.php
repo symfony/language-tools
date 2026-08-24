@@ -42,7 +42,12 @@ final class MetadataProviderTest extends TestCase
         $indexes = new MetadataIndexRegistry();
         $indexes->forProject($project)->replace(
             [new FormType('App\\Form\\EventType', 'event', ['action', 'required'], ['required'])],
-            [new ValidationConstraint('Length', 'Symfony\\Component\\Validator\\Constraints\\Length', ['groups', 'max', 'message', 'min'])],
+            [
+                new ValidationConstraint('Choice', 'Symfony\\Component\\Validator\\Constraints\\Choice', ['choices', 'groups']),
+                new ValidationConstraint('Ip', 'Symfony\\Component\\Validator\\Constraints\\Ip', ['version']),
+                new ValidationConstraint('Length', 'Symfony\\Component\\Validator\\Constraints\\Length', ['groups', 'max', 'message', 'min']),
+                new ValidationConstraint('Type', 'Symfony\\Component\\Validator\\Constraints\\Type', ['groups', 'type']),
+            ],
             true,
             true,
         );
@@ -128,12 +133,18 @@ final class MetadataProviderTest extends TestCase
             {
                 #[Assert\Length(ma)]
                 #[Assert\Length(unknown: 1)]
+                #[Assert\Ip(version: Assert\Ip::ALL)]
+                #[Assert\Choice(choices: [MapMarkerType::Community->value, MapMarkerType::Ecosystem->value], groups: ['Submit'])]
+                #[Assert\Choice(MapMarkerType::cases())]
+                #[Assert\Type(\DateTimeInterface::class, groups: ['Submit'])]
                 public string $value;
             }
             PHP;
         $documents->open(new Document($constraintUri, 'php', 1, $constraintText));
         self::assertSame(['max'], $this->completionLabels($completionProviders, $converter, $constraintUri, $constraintText, strpos($constraintText, 'ma)') + 2));
-        self::assertSame(['validation.unknown_constraint_option'], array_column($this->diagnostics($diagnosticProviders, $constraintUri), 'code'));
+        $diagnostics = $this->diagnostics($diagnosticProviders, $constraintUri);
+        self::assertSame(['validation.unknown_constraint_option'], array_column($diagnostics, 'code'));
+        self::assertSame('Unknown option "unknown" for constraint "Length".', $diagnostics[0]['message'] ?? null);
         $validationUri = 'file:///workspace/config/validator/User.yaml';
         $validationText = <<<'YAML'
             App\Entity\User:

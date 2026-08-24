@@ -51,14 +51,15 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
             if (!$this->contains($document->text(), $occurrence->valueRange(), $offset)) {
                 continue;
             }
-            $node = $index->find($occurrence->path());
+            $node = $index->find($occurrence->path(), $occurrence->sequenceItem());
             if (null === $node || [] === $node->allowedValues()) {
                 continue;
             }
             $prefix = trim(substr($document->text(), $this->converter->toByteOffset($document->text(), $occurrence->valueRange()->start()), $offset));
             $items = [];
             foreach ($node->allowedValues() as $value) {
-                $items[] = $this->completion((string) $value, (string) $value, 'Allowed value', $document->text(), $offset - \strlen($prefix), $position);
+                $value = $this->formatValue($value);
+                $items[] = $this->completion($value, $value, 'Allowed value', $document->text(), $offset - \strlen($prefix), $position);
             }
 
             return $items;
@@ -69,14 +70,16 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         $indent = \strlen($match[1]);
         $prefix = $match[2] ?? '';
         $parent = [];
+        $parentSequenceItem = false;
         $previous = array_reverse($this->yaml->parse(substr($document->text(), 0, $lineStart)));
         foreach ($previous as $occurrence) {
             if ($occurrence->keyRange()->start()->character() < $indent) {
                 $parent = $occurrence->path();
+                $parentSequenceItem = $occurrence->sequenceItem();
                 break;
             }
         }
-        $nodes = [] === $parent ? array_values($index->roots()) : $this->completionChildren($index->find($parent));
+        $nodes = [] === $parent ? array_values($index->roots()) : $this->completionChildren($index->find($parent, $parentSequenceItem));
         $items = [];
         foreach ($nodes as $node) {
             if (str_starts_with($node->name(), $prefix)) {
@@ -183,7 +186,10 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
             return '${1:true}';
         }
         if ([] !== $node->allowedValues()) {
-            return "'".'${1:'.(string) $node->allowedValues()[0]."}'";
+            $value = $node->allowedValues()[0];
+            $snippet = '${1:'.$this->formatValue($value).'}';
+
+            return \is_string($value) ? "'".$snippet."'" : $snippet;
         }
 
         return '${1}';
@@ -193,6 +199,16 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
     {
         return match ($node->type()) {
             'boolean' => ' ${1:true}', 'integer', 'float', 'scalar', 'enum', 'variable' => ' ${1}', default => '',
+        };
+    }
+
+    private function formatValue(string|int|float|bool|null $value): string
+    {
+        return match ($value) {
+            true => 'true',
+            false => 'false',
+            null => 'null',
+            default => (string) $value,
         };
     }
 

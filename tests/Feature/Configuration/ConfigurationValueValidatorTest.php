@@ -18,6 +18,14 @@ final class ConfigurationValueValidatorTest extends TestCase
         self::assertFalse($validator->acceptsValue($this->node('boolean'), 'maybe'));
         self::assertTrue($validator->acceptsValue($this->node('enum', ['dev', 'prod']), 'prod'));
         self::assertFalse($validator->acceptsValue($this->node('enum', ['dev', 'prod']), 'old'));
+        self::assertTrue($validator->acceptsValue($this->node('enum', [true, false, 'auto']), 'true'));
+        self::assertTrue($validator->acceptsValue($this->node('enum', [true, false, 'auto']), 'false'));
+        self::assertTrue($validator->acceptsValue($this->node('enum', [true, false, 'auto']), 'auto'));
+        self::assertFalse($validator->acceptsValue($this->node('enum', [true, false, 'auto']), "'true'"));
+        self::assertTrue($validator->acceptsValue($this->node('enum', ['yes', 'no']), 'yes'));
+        self::assertFalse($validator->acceptsValue($this->node('boolean'), "'true'"));
+        self::assertFalse($validator->acceptsValue($this->node('boolean'), 'yes'));
+        self::assertFalse($validator->acceptsValue($this->node('integer'), "'12'"));
         self::assertTrue($validator->acceptsValue($this->node('integer'), '%app.port%'));
         self::assertTrue($validator->acceptsValue($this->node('integer'), '$port'));
     }
@@ -35,6 +43,7 @@ final class ConfigurationValueValidatorTest extends TestCase
         self::assertTrue($validator->acceptsValue($strict, '{ enabled: true }'));
         self::assertTrue($validator->acceptsValue($enableable, '~'));
         self::assertTrue($validator->acceptsValue($enableable, 'true'));
+        self::assertFalse($validator->acceptsValue($enableable, 'yes'));
         self::assertFalse($validator->acceptsValue($enableable, 'async'));
         self::assertTrue($validator->acceptsValue($shorthand, 'async'));
         self::assertTrue($validator->acceptsType($shorthand, 'string'));

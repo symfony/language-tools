@@ -78,25 +78,52 @@ final class TwigRouteReferenceExtractor
             return null;
         }
         $hash = $document->firstDescendant($argument, 'hash');
-        if (null === $hash) {
+        if (null === $hash || $hash->hasError()) {
             return null;
         }
 
         $parameters = [];
-        foreach ($document->children($hash) as $key) {
-            if ('hash_key' !== $key->type()) {
+        $explicitValue = false;
+        foreach ($document->children($hash) as $child) {
+            if ('hash_key' === $child->type()) {
+                $parameter = $this->hashKey($document, $child);
+                if ($explicitValue || null === $parameter) {
+                    return null;
+                }
+                $parameters[] = $parameter;
+                $explicitValue = true;
+
                 continue;
             }
-            $string = $document->firstString($key);
-            if (null !== $string && null !== $literal = $document->string($string)) {
-                $parameters[] = $literal[0];
+            if ('hash_value' !== $child->type()) {
+                return null;
+            }
+            if ($explicitValue) {
+                $explicitValue = false;
+
                 continue;
             }
-            if (null !== $name = $document->firstDescendant($key, 'name')) {
-                $parameters[] = $document->text($name);
+            $parameter = trim($document->text($child));
+            if (1 !== preg_match('/^[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*$/D', $parameter)) {
+                return null;
             }
+            $parameters[] = $parameter;
         }
 
-        return array_values(array_unique($parameters));
+        return $explicitValue ? null : array_values(array_unique($parameters));
+    }
+
+    private function hashKey(TwigDocument $document, TreeSitterNode $key): ?string
+    {
+        $children = $document->children($key);
+        if (1 !== \count($children)) {
+            return null;
+        }
+        $key = $children[0];
+        if (null !== $literal = $document->string($key)) {
+            return $literal[0];
+        }
+
+        return \in_array($key->type(), ['name', 'number'], true) ? $document->text($key) : null;
     }
 }

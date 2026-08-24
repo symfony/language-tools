@@ -43,6 +43,30 @@ final class TwigRouteReferenceExtractorTest extends TestCase
         self::assertSame([], $references[1]->providedParameters());
     }
 
+    public function testExtractsShorthandMappingParametersConservatively(): void
+    {
+        $references = (new TwigRouteReferenceExtractor(new PositionConverter(), new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())))->extract(<<<'TWIG'
+            {{ url('blog_archives', {year, month}) }}
+            {{ path('blog_new_in_symfony', { version }) }}
+            {{ path('legacy_doc', { version, section, page: slug, locale, orm}) }}
+            {{ path('dynamic_argument', parameters) }}
+            {{ path('dynamic_key', {(parameter): value}) }}
+            {{ path('dynamic_spread', { version, ...parameters}) }}
+            TWIG);
+
+        self::assertSame(
+            [
+                ['year', 'month'],
+                ['version'],
+                ['version', 'section', 'page', 'locale', 'orm'],
+                null,
+                null,
+                null,
+            ],
+            array_map(static fn (RouteReference $reference): ?array => $reference->providedParameters(), $references),
+        );
+    }
+
     public function testIgnoresUnclosedVerbatimContent(): void
     {
         $references = (new TwigRouteReferenceExtractor(new PositionConverter(), new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())))->extract(<<<'TWIG'

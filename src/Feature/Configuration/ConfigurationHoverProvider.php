@@ -45,7 +45,7 @@ final class ConfigurationHoverProvider implements HoverProviderInterface
             if (!$this->contains($request->document->text(), $occurrence->keyRange(), $offset)) {
                 continue;
             }
-            $node = $index->find($occurrence->path());
+            $node = $index->find($occurrence->path(), $occurrence->sequenceItem());
 
             return null === $node ? null : $this->protocol->markdownHover($this->description($occurrence->path(), $node));
         }
@@ -72,7 +72,12 @@ final class ConfigurationHoverProvider implements HoverProviderInterface
         if ([] !== $node->allowedValues()) {
             $allowedValues = [];
             foreach ($node->allowedValues() as $value) {
-                $allowedValues[] = (string) $value;
+                $allowedValues[] = match ($value) {
+                    true => 'true',
+                    false => 'false',
+                    null => 'null',
+                    default => (string) $value,
+                };
             }
             $lines[] = '';
             $lines[] = 'Allowed values: `'.implode('`, `', $allowedValues).'`';

@@ -28,7 +28,7 @@ final class QuotedArgumentMatcher
      */
     public function methodCalls(string $text, array $names): array
     {
-        return $this->match($text, '/(?:->|::)(?<name>'.$this->alternation($names).')\s*\(\s*'.self::LITERAL.'/s');
+        return $this->match($text, '/(?:->|::)(?<name>'.$this->alternation($names).')\s*\(\s*'.self::LITERAL.'(?=\s*[,\)])/s');
     }
 
     /**
@@ -38,7 +38,7 @@ final class QuotedArgumentMatcher
      */
     public function functionCalls(string $text, array $names): array
     {
-        return $this->match($text, '/\b(?<name>'.$this->alternation($names).')\s*\(\s*'.self::LITERAL.'/s');
+        return $this->match($text, '/\b(?<name>'.$this->alternation($names).')\s*\(\s*'.self::LITERAL.'(?=\s*[,\)])/s');
     }
 
     /** @param list<string> $names */

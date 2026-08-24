@@ -9,7 +9,6 @@ final class DiagnosticCodeRegistry
         'config.duplicate_key',
         'config.invalid_type',
         'config.malformed_structure',
-        'config.missing_required_key',
         'config.unknown_key',
         'env.incompatible_type',
         'env.malformed_chain',

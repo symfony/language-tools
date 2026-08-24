@@ -76,6 +76,18 @@ final class QuotedArgumentMatcherTest extends TestCase
         self::assertSame([], $this->matcher->methodCalls($text, ['trans']));
     }
 
+    public function testNeverMatchesLiteralPrefixesOfDynamicArguments(): void
+    {
+        $text = <<<'PHP'
+            <?php
+            $this->render('contributors/contributors.'.$format.'.twig');
+            asset('build/'.$entrypoint);
+            PHP;
+
+        self::assertSame([], $this->matcher->methodCalls($text, ['render']));
+        self::assertSame([], $this->matcher->functionCalls($text, ['asset']));
+    }
+
     public function testNeverMatchesEmptyLiteralsOrOtherNames(): void
     {
         $text = "<?php \$t->trans(''); \$t->translate('key');";

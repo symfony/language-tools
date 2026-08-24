@@ -43,32 +43,44 @@ final class ConfigurationValueValidator
 
     public function acceptsValue(ConfigurationNode $node, string $value): bool
     {
-        $plain = trim($value, " \t\"'");
+        $source = trim($value);
+        $plain = trim($source, "\"'");
         if (str_contains($plain, '%') || str_starts_with($plain, '$')) {
             return true;
         }
-        if (\in_array(strtolower($plain), ['~', 'null'], true) && $node->acceptsNull()) {
+        $literal = $this->literal($source);
+        if (null === $literal && $node->acceptsNull()) {
             return true;
         }
-        if ([] !== $node->allowedValues()) {
-            $allowed = false;
-            foreach ($node->allowedValues() as $value) {
-                if ($plain === (string) $value) {
-                    $allowed = true;
-                    break;
-                }
-            }
-            if (!$allowed) {
-                return false;
-            }
+        if ([] !== $node->allowedValues() && !\in_array($literal, $node->allowedValues(), true)) {
+            return false;
         }
 
         return match ($node->type()) {
-            'boolean' => \in_array(strtolower($plain), ['true', 'false', 'yes', 'no', '0', '1'], true),
-            'integer' => 1 === preg_match('/^-?\d+$/', $plain),
-            'float' => is_numeric($plain),
+            'boolean' => \is_bool($literal) || \in_array($literal, [0, 1], true),
+            'integer' => \is_int($literal),
+            'float' => \is_int($literal) || \is_float($literal),
             'array' => $this->acceptsArrayValue($node, $plain),
             default => true,
+        };
+    }
+
+    private function literal(string $source): string|int|float|bool|null
+    {
+        $length = \strlen($source);
+        if ($length >= 2 && \in_array($source[0], ['"', "'"], true) && str_ends_with($source, $source[0])) {
+            return substr($source, 1, -1);
+        }
+
+        return match (strtolower($source)) {
+            '~', 'null' => null,
+            'true' => true,
+            'false' => false,
+            default => match (true) {
+                1 === preg_match('/^-?\d+$/', $source) => (int) $source,
+                is_numeric($source) => (float) $source,
+                default => $source,
+            },
         };
     }
 
@@ -84,8 +96,8 @@ final class ConfigurationValueValidator
 
         return match (strtolower($plain)) {
             '~', 'null' => $node->acceptsNull(),
-            'true', 'yes' => $node->acceptsTrue(),
-            'false', 'no' => $node->acceptsFalse(),
+            'true' => $node->acceptsTrue(),
+            'false' => $node->acceptsFalse(),
             default => $node->acceptsScalar(),
         };
     }

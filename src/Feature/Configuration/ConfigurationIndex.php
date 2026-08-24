@@ -26,35 +26,39 @@ final class ConfigurationIndex
      *
      * @param list<string> $path
      */
-    public function allowsUnknownKeys(array $path): bool
+    public function allowsUnknownKeys(array $path, bool $sequenceItem = false): bool
     {
         if ([] === $path) {
             return false;
         }
         $node = $this->roots[array_shift($path)] ?? null;
         while (null !== $node && [] !== $path) {
-            $child = $node->child(array_shift($path));
+            $sequenceChild = $sequenceItem && null !== $node->prototype();
+            $child = $node->child(array_shift($path), $sequenceChild);
             if (null === $child) {
                 return $node->acceptsUnknownKeys();
             }
             $node = $child;
+            $sequenceItem = $sequenceItem && !$sequenceChild;
         }
 
         return false;
     }
 
     /** @param list<string> $path */
-    public function find(array $path): ?ConfigurationNode
+    public function find(array $path, bool $sequenceItem = false): ?ConfigurationNode
     {
         if ([] === $path) {
             return null;
         }
         $node = $this->roots[array_shift($path)] ?? null;
         foreach ($path as $name) {
-            $node = $node?->child($name);
+            $sequenceChild = $sequenceItem && null !== $node?->prototype();
+            $node = $node?->child($name, $sequenceChild);
             if (null === $node) {
                 return null;
             }
+            $sequenceItem = $sequenceItem && !$sequenceChild;
         }
 
         return $node;

@@ -61,6 +61,19 @@ final class BridgeCompatibilityTest extends TestCase
         self::assertContains('fixture.message', array_column(\is_array($translations['items'] ?? null) ? $translations['items'] : [], 'key'));
         $configurationBundles = \is_array($configuration['bundles'] ?? null) ? $configuration['bundles'] : [];
         self::assertContains('framework', array_column($configurationBundles, 'alias'));
+        $frameworkTrees = array_values(array_filter($configurationBundles, static fn (mixed $bundle): bool => \is_array($bundle) && 'framework' === ($bundle['alias'] ?? null)));
+        self::assertCount(1, $frameworkTrees);
+        $frameworkTree = $frameworkTrees[0]['tree'] ?? null;
+        self::assertIsArray($frameworkTree);
+        $frameworkChildren = array_column(\is_array($frameworkTree['children'] ?? null) ? $frameworkTree['children'] : [], null, 'name');
+        self::assertIsArray($frameworkChildren['cache'] ?? null);
+        $cacheChildren = array_column(\is_array($frameworkChildren['cache']['children'] ?? null) ? $frameworkChildren['cache']['children'] : [], null, 'name');
+        $cachePools = $cacheChildren['pools'] ?? null;
+        self::assertIsArray($cachePools);
+        self::assertSame('name', $cachePools['keyAttribute'] ?? null);
+        $cachePoolPrototype = $cachePools['prototype'] ?? null;
+        self::assertIsArray($cachePoolPrototype);
+        self::assertSame(['adapter' => 'adapters'], $cachePoolPrototype['aliases'] ?? null);
         $shorthandTrees = array_values(array_filter($configurationBundles, static fn (mixed $bundle): bool => \is_array($bundle) && 'fixture_shorthand' === ($bundle['alias'] ?? null)));
         self::assertCount(1, $shorthandTrees);
         $shorthandTree = $shorthandTrees[0]['tree'] ?? null;
@@ -72,10 +85,14 @@ final class BridgeCompatibilityTest extends TestCase
             }
         }
         // shorthand keys relocated into the pools prototype must be merged as regular children
-        $storageNames = array_column(\is_array($shorthandChildren['storage']['children'] ?? null) ? $shorthandChildren['storage']['children'] : [], 'name');
+        $storageChildren = array_column(\is_array($shorthandChildren['storage']['children'] ?? null) ? $shorthandChildren['storage']['children'] : [], null, 'name');
+        $storageNames = array_keys($storageChildren);
         foreach (['default_pool', 'pools', 'dsn', 'size', 'mode'] as $expectedChild) {
             self::assertContains($expectedChild, $storageNames);
         }
+        $storagePools = $storageChildren['pools'] ?? null;
+        self::assertIsArray($storagePools);
+        self::assertSame('name', $storagePools['keyAttribute'] ?? null);
         self::assertSame(
             ['null' => true, 'true' => true, 'false' => true, 'scalar' => false, 'unknownKeys' => false],
             $shorthandChildren['feature']['accepts'] ?? null,

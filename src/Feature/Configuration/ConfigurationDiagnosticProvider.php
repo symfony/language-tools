@@ -7,12 +7,14 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
+        private readonly ProjectPathResolver $projectPaths,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly ConfigurationIndexRegistry $indexes,
@@ -30,7 +32,8 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
         }
         // bundle-internal fixtures target other kernels, so only the
         // application's own configuration is validated against its trees
-        if (!str_starts_with($request->document->uri(), $request->project->rootUri().'/config/')) {
+        $relativePath = $this->projectPaths->relative($request->project, $request->document->uri());
+        if (null === $relativePath || !str_starts_with($relativePath, 'config/') || $this->isRouteResource($relativePath)) {
             return null;
         }
         $index = $this->indexes->forProject($request->project);
@@ -55,9 +58,9 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
                 $diagnostics[] = $this->diagnostic($occurrence->keyRange(), 1, 'config.duplicate_key', \sprintf('Configuration key "%s" is duplicated.', $key));
             }
             $seen[$identity] = true;
-            $node = $index->find($path);
+            $node = $index->find($path, $occurrence->sequenceItem());
             if (null === $node) {
-                if (!$index->allowsUnknownKeys($path)) {
+                if (!$index->allowsUnknownKeys($path, $occurrence->sequenceItem())) {
                     $diagnostics[] = $this->diagnostic($occurrence->keyRange(), 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', $key));
                 }
                 continue;
@@ -75,25 +78,6 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
         preg_match_all('/^\t+\S.*$/m', $request->document->text(), $tabbedLines, \PREG_OFFSET_CAPTURE);
         foreach ($tabbedLines[0] as [$line, $offset]) {
             $diagnostics[] = $this->diagnostic($this->offsetRange($request->document->text(), $offset, \strlen($line)), 1, 'config.malformed_structure', 'YAML indentation cannot contain tabs.');
-        }
-        foreach ($occurrences as $occurrence) {
-            $path = $occurrence->path();
-            if (\in_array($path[0] ?? null, ['parameters', 'services'], true)) {
-                continue;
-            }
-            $node = $index->find($path);
-            if (null === $node || '' !== $occurrence->value()) {
-                continue;
-            }
-            foreach ($node->children() as $child) {
-                if (!$child->required() || $child->hasDefault()) {
-                    continue;
-                }
-                $childKey = implode('.', [...$occurrence->path(), $child->name()]);
-                if (!isset($seen[$occurrence->scope().'|'.$childKey])) {
-                    $diagnostics[] = $this->diagnostic($occurrence->keyRange(), 1, 'config.missing_required_key', \sprintf('Required configuration key "%s" is missing.', $childKey));
-                }
-            }
         }
 
         return $diagnostics;
@@ -194,6 +178,12 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
         }
 
         return $diagnostics;
+    }
+
+    private function isRouteResource(string $relativePath): bool
+    {
+        return str_starts_with($relativePath, 'config/routes/')
+            || 1 === preg_match('/^config\/routes(?:\.[^\/]+)*\.(?:php|xml|ya?ml)$/i', $relativePath);
     }
 
     private function offsetRange(string $text, int $offset, int $length): Range

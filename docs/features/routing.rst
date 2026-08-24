@@ -19,7 +19,8 @@ Controller helpers remain recognized when an application controller inherits
 from ``AbstractController`` through one or more project base classes. Twig's
 ``path()`` and ``url()`` functions are also supported. The server avoids
 suggestions when it can't establish that a similarly named method belongs to a
-Symfony API.
+Symfony API. Twig parameter mappings support explicit entries such as
+``{slug: article.slug}`` and shorthand entries such as ``{year, month}``.
 
 Route Name Completion
 ---------------------

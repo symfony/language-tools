@@ -97,6 +97,8 @@ function normalizeConfigNode(object $node, int $depth = 0): array
         'allowedValues' => method_exists($node, 'getValues') ? normalizeConfigExample($node->getValues()) : null,
         'children' => [],
         'prototype' => null,
+        'aliases' => [],
+        'keyAttribute' => method_exists($node, 'getKeyAttribute') && is_string($node->getKeyAttribute()) ? $node->getKeyAttribute() : null,
     ];
     $normalized['accepts'] = [
         'null' => configNodeNormalizes($node, null),
@@ -105,6 +107,14 @@ function normalizeConfigNode(object $node, int $depth = 0): array
         'scalar' => configNodeNormalizes($node, 'symfony-lsp-probe'),
         'unknownKeys' => configNodeNormalizes($node, ['symfony_lsp_unknown_probe' => null]),
     ];
+    if (method_exists($node, 'getXmlRemappings')) {
+        foreach ($node->getXmlRemappings() as $remapping) {
+            if (is_array($remapping) && is_string($remapping[0] ?? null) && is_string($remapping[1] ?? null)) {
+                $normalized['aliases'][$remapping[0]] = $remapping[1];
+            }
+        }
+        ksort($normalized['aliases']);
+    }
     if ($depth >= 32) {
         return $normalized;
     }

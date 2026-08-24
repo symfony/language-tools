@@ -143,6 +143,33 @@ final class RouteDiagnosticPublisherTest extends TestCase
         );
     }
 
+    public function testDiagnosesOnlyGenuinelyMissingTwigShorthandParameters(): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        [$publisher, $client] = $this->publisher($uri, <<<'TWIG'
+            {{ path('complete', { version }) }}
+            {{ path('incomplete', { year }) }}
+            {{ path('dynamic_argument', parameters) }}
+            {{ path('dynamic_key', {(parameter): value}) }}
+            {{ path('dynamic_spread', { year, ...parameters}) }}
+            TWIG, [
+            new Route('complete', '/{version}', [], [], null, null),
+            new Route('incomplete', '/{year}/{month}', [], [], null, null),
+            new Route('dynamic_argument', '/{id}', [], [], null, null),
+            new Route('dynamic_key', '/{id}', [], [], null, null),
+            new Route('dynamic_spread', '/{year}/{month}', [], [], null, null),
+        ], 'twig');
+
+        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+
+        $diagnostics = $client->notifications[0]['params']['diagnostics'];
+        self::assertIsArray($diagnostics);
+        self::assertCount(1, $diagnostics);
+        self::assertIsArray($diagnostics[0]);
+        self::assertSame('route.missing_parameters', $diagnostics[0]['code'] ?? null);
+        self::assertSame('Route "incomplete" requires parameter "month".', $diagnostics[0]['message'] ?? null);
+    }
+
     public function testAddsMissingRouteParameters(): void
     {
         $cases = [

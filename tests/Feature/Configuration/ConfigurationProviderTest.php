@@ -21,6 +21,7 @@ use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -99,6 +100,23 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
+    public function testSkipsRouteResources(): void
+    {
+        $fixture = $this->providers();
+        foreach (['config/routes/framework.yaml', 'config/routes.yaml', 'config/routes.dev.yaml'] as $path) {
+            $uri = 'file:///workspace/'.$path;
+            $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    mystery: true\n"));
+
+            self::assertNull($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+            $fixture->documents->close($uri);
+        }
+
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    mystery: true\n"));
+
+        self::assertSame(['config.unknown_key'], array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+    }
+
     public function testDoesNotTreatEnvironmentOverridesAsDuplicates(): void
     {
         $fixture = $this->providers();
@@ -138,13 +156,123 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame(['name'], array_column($fixture->completion->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]]) ?? [], 'label'));
     }
 
-    public function testReportsMissingRequiredChildren(): void
+    public function testDoesNotDiagnoseRequiredChildrenBeforeConfigurationIsMerged(): void
     {
         $fixture = $this->providers();
         $uri = 'file:///workspace/config/framework.yaml';
-        $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    required_parent:\n"));
+        $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    required_parent:\n        known: true\nwhen@test:\n    framework:\n        required_parent:\n            known: false\n"));
 
-        self::assertSame(['config.missing_required_key'], array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
+    public function testAcceptsAliasesAndKeyedPrototypeEntryNames(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $fixture->documents->open(new Document($uri, 'yaml', 1, <<<'YAML'
+            framework:
+                cache:
+                    pools:
+                        valid:
+                            adapter: cache.app
+                        invalid:
+                            typo: cache.app
+            monolog:
+                handlers:
+                    nested:
+                        type: stream
+                        path: php://stderr
+                        level: debug
+                        typo: true
+            YAML));
+
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.unknown_key', 'config.unknown_key'], array_column($diagnostics, 'code'));
+        self::assertSame([
+            'Unknown configuration key "framework.cache.pools.invalid.typo".',
+            'Unknown configuration key "monolog.handlers.nested.typo".',
+        ], array_column($diagnostics, 'message'));
+    }
+
+    public function testSupportsKeyedPrototypeSequenceItems(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/monolog.yaml';
+        $text = <<<'YAML'
+            framework:
+                items:
+                    - name: true
+                      handlers:
+                          nested:
+                              type: stream
+            monolog:
+                handlers:
+                    - name: nested
+                      type: stream
+                      path: php://stderr
+                      level:
+            YAML;
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        $position = $fixture->converter->toPosition($text, \strlen($text));
+        self::assertSame(['debug', 'info'], array_column($fixture->completion->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line(), 'character' => $position->character()],
+        ]) ?? [], 'label'));
+    }
+
+    public function testComparesEnumValuesWithoutLosingTheirTypes(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $fixture->documents->open(new Document($uri, 'yaml', 1, <<<'YAML'
+            framework:
+                session:
+                    cookie_secure: auto
+            when@prod:
+                framework:
+                    session:
+                        cookie_secure: true
+            when@test:
+                framework:
+                    session:
+                        cookie_secure: 'true'
+            YAML));
+
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
+
+        $text = "framework:\n    session:\n        cookie_secure: ";
+        $fixture->documents->update($uri, 2, $text);
+        $position = $fixture->converter->toPosition($text, \strlen($text));
+        self::assertSame(['true', 'false', 'auto'], array_column($fixture->completion->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line(), 'character' => $position->character()],
+        ]) ?? [], 'label'));
+        $position = $fixture->converter->toPosition($text, strpos($text, 'cookie_secure') + 2);
+        $hover = $fixture->hover->hover([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line(), 'character' => $position->character()],
+        ]);
+        self::assertIsArray($hover);
+        self::assertIsArray($hover['contents'] ?? null);
+        self::assertIsString($hover['contents']['value'] ?? null);
+        self::assertStringContainsString('Allowed values: `true`, `false`, `auto`', $hover['contents']['value']);
+
+        $fixture->documents->close($uri);
+        $uri = 'file:///workspace/config/framework.php';
+        $text = '<?php $framework->session()->cookieS';
+        $fixture->documents->open(new Document($uri, 'php', 1, $text));
+        $position = $fixture->converter->toPosition($text, \strlen($text));
+        $completion = $fixture->completion->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line(), 'character' => $position->character()],
+        ]);
+        self::assertIsArray($completion);
+        self::assertIsArray($completion[0] ?? null);
+        self::assertIsArray($completion[0]['textEdit'] ?? null);
+        self::assertSame('cookieSecure(${1:true})', $completion[0]['textEdit']['newText'] ?? null);
     }
 
     public function testReportsPhpAndXmlDiagnosticsAndProvidesHover(): void
@@ -201,11 +329,24 @@ final class ConfigurationProviderTest extends TestCase
                         $this->node('mode', 'enum', deprecated: true, allowedValues: ['dev', 'prod']),
                     ]),
                     $this->node('required_parent', 'array', children: [
+                        $this->node('known', 'boolean'),
                         $this->node('token', 'scalar', required: true),
+                    ]),
+                    $this->node('cache', 'array', children: [
+                        $this->node('pools', 'array', prototype: $this->node('pool', 'array', children: [
+                            $this->node('adapters', 'array', accepts: ['scalar' => true]),
+                        ], aliases: ['adapter' => 'adapters']), keyAttribute: 'name'),
+                    ]),
+                    $this->node('session', 'array', children: [
+                        $this->node('cookie_secure', 'enum', allowedValues: [true, false, 'auto']),
                     ]),
                     $this->node('items', 'array', prototype: $this->node('item', 'array', children: [
                         $this->node('name', 'boolean'),
-                    ])),
+                        $this->node('handlers', 'array', prototype: $this->node('handler', 'array', children: [
+                            $this->node('type', 'scalar'),
+                            $this->node('nested', 'boolean'),
+                        ]), keyAttribute: 'name'),
+                    ]), keyAttribute: 'name'),
                     $this->node('assets', 'array', accepts: ['null' => true, 'true' => true, 'false' => true, 'scalar' => false, 'unknownKeys' => false], children: [
                         $this->node('enabled', 'boolean'),
                     ]),
@@ -221,6 +362,18 @@ final class ConfigurationProviderTest extends TestCase
                 ]),
             ],
             [
+                'alias' => 'monolog',
+                'tree' => $this->node('monolog', 'array', children: [
+                    $this->node('handlers', 'array', prototype: $this->node('handler', 'array', children: [
+                        $this->node('name', 'scalar'),
+                        $this->node('type', 'scalar'),
+                        $this->node('path', 'scalar'),
+                        $this->node('level', 'enum', allowedValues: ['debug', 'info']),
+                        $this->node('nested', 'boolean'),
+                    ]), keyAttribute: 'name'),
+                ]),
+            ],
+            [
                 'alias' => 'services',
                 'tree' => $this->node('services', 'array'),
             ],
@@ -233,7 +386,7 @@ final class ConfigurationProviderTest extends TestCase
         return new ConfigurationProviderFixture(
             new ConfigurationCompletionProvider($resolver, $converter, $protocol, $indexes, $paths, $yaml),
             new ConfigurationHoverProvider($resolver, $converter, $protocol, $indexes, $paths, $yaml),
-            new ConfigurationDiagnosticProvider($resolver, $converter, $protocol, $indexes, $paths, $yaml, new ConfigurationValueValidator($environmentIndexes)),
+            new ConfigurationDiagnosticProvider($resolver, new ProjectPathResolver(new UriToPathConverter()), $converter, $protocol, $indexes, $paths, $yaml, new ConfigurationValueValidator($environmentIndexes)),
             new ConfigurationDocumentLinkProvider($resolver, $converter, $protocol, new UriToPathConverter()),
             $documents,
             $converter,
@@ -242,15 +395,16 @@ final class ConfigurationProviderTest extends TestCase
 
     /**
      * @param array<array-key, array<array-key, mixed>> $children
-     * @param list<string>                              $allowedValues
+     * @param list<string|int|float|bool|null>          $allowedValues
      * @param array<array-key, mixed>|null              $prototype
      * @param array<string, bool>                       $accepts
+     * @param array<string, string>                     $aliases
      *
      * @return array<array-key, mixed>
      */
-    private function node(string $name, string $type, array $children = [], ?string $info = null, bool $deprecated = false, array $allowedValues = [], bool $required = false, ?array $prototype = null, array $accepts = []): array
+    private function node(string $name, string $type, array $children = [], ?string $info = null, bool $deprecated = false, array $allowedValues = [], bool $required = false, ?array $prototype = null, array $accepts = [], array $aliases = [], ?string $keyAttribute = null): array
     {
-        return ['name' => $name, 'type' => $type, 'required' => $required, 'hasDefault' => false, 'defaultSummary' => null, 'info' => $info, 'example' => null, 'deprecated' => $deprecated, 'allowedValues' => $allowedValues, 'children' => $children, 'prototype' => $prototype, 'accepts' => $accepts];
+        return ['name' => $name, 'type' => $type, 'required' => $required, 'hasDefault' => false, 'defaultSummary' => null, 'info' => $info, 'example' => null, 'deprecated' => $deprecated, 'allowedValues' => $allowedValues, 'children' => $children, 'prototype' => $prototype, 'accepts' => $accepts, 'aliases' => $aliases, 'keyAttribute' => $keyAttribute];
     }
 }
 

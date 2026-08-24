@@ -526,6 +526,8 @@ abstract class AbstractBridgeTestCase extends TestCase
             final class ArrayNode extends TestNode
             {
                 public function getChildren(): array { return [new ScalarNode('secret')]; }
+                public function getXmlRemappings(): array { return [['alias', 'secret']]; }
+                public function getKeyAttribute(): string { return 'name'; }
             }
             namespace App;
             final class TreeBuilder

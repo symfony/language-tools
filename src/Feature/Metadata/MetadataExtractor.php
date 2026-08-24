@@ -73,9 +73,12 @@ final class MetadataExtractor
             if (str_contains($attribute[2][0], 'new ')) {
                 continue;
             }
-            preg_match_all('/\b([A-Za-z_][A-Za-z0-9_]*)\s*:/', $attribute[2][0], $named, \PREG_OFFSET_CAPTURE);
-            foreach ($named[1] as [$name, $offset]) {
-                $absolute = $attribute[2][1] + $offset;
+            foreach ($this->arguments($attribute[2][0], $attribute[2][1]) as $argument) {
+                if (!preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)/', $argument['text'], $named, \PREG_OFFSET_CAPTURE)) {
+                    continue;
+                }
+                $name = $named[1][0];
+                $absolute = $argument['offset'] + $named[1][1];
                 $options[] = ['constraint' => $attribute[1][0], 'option' => $name, 'range' => $this->offsetRange($text, $absolute, \strlen($name))];
             }
         }

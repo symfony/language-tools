@@ -8,6 +8,7 @@ final class ConfigurationNode
      * @param list<ConfigurationNode>          $children
      * @param list<string|int|float|bool|null> $allowedValues
      * @param array<string, bool>              $accepts       normalized value kinds probed on the real tree
+     * @param array<string, string>            $aliases
      */
     public function __construct(
         private readonly string $name,
@@ -22,6 +23,8 @@ final class ConfigurationNode
         private readonly array $children,
         private readonly ?self $prototype,
         private readonly array $accepts = [],
+        private readonly array $aliases = [],
+        private readonly ?string $keyAttribute = null,
     ) {
     }
 
@@ -107,13 +110,17 @@ final class ConfigurationNode
         return $this->prototype;
     }
 
-    public function child(string $name): ?self
+    public function child(string $name, bool $sequenceItem = false): ?self
     {
+        $name = $this->aliases[$name] ?? $name;
         if (null !== $child = $this->definedChild($name)) {
             return $child;
         }
         if (null === $this->prototype) {
             return null;
+        }
+        if (null !== $this->keyAttribute && !$sequenceItem) {
+            return $this->prototype;
         }
 
         return $this->prototype->definedChild($name) ?? $this->prototype;

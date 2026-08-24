@@ -26,6 +26,8 @@ final class BridgeConfigurationTest extends AbstractBridgeTestCase
         $bundle = $result['sections']['configuration']['bundles'][0] ?? null;
         self::assertIsArray($bundle);
         self::assertIsArray($bundle['tree'] ?? null);
+        self::assertSame(['alias' => 'secret'], $bundle['tree']['aliases'] ?? null);
+        self::assertSame('name', $bundle['tree']['keyAttribute'] ?? null);
         self::assertIsArray($bundle['tree']['children'] ?? null);
         $child = $bundle['tree']['children'][0] ?? null;
         self::assertIsArray($child);

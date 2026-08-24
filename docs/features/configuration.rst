@@ -3,10 +3,10 @@ Bundle Configuration
 
 Symfony Language Tools understands configuration options for installed bundles
 in the selected environment, including required options, default values, enum
-values, examples and deprecations. It supports common shorthand and normalized
-values such as Doctrine's default connection ``url``, ``~`` and ``true`` for
-array options. Extensible sections allow custom keys while validating their
-known children.
+values, examples and deprecations. It supports common aliases, shorthand and
+normalized values such as a cache pool's ``adapter``, Doctrine's default
+connection ``url``, ``~`` and ``true`` for array options. Extensible sections
+allow custom keys while validating their known children.
 
 Completion
 ----------
@@ -30,13 +30,14 @@ Diagnostics
 -----------
 
 Diagnostics report statically provable configuration errors, including unknown
-or duplicate keys, invalid scalar types, invalid enum values, deprecated nodes,
-missing required children and malformed structures. Symfony Language Tools
-suppresses diagnostics when a root key doesn't belong to an installed bundle, so
-application service and import sections aren't mistaken for bundle
-configuration. Diagnostics are limited to the application's own ``config/``
-directory because configuration files elsewhere, such as bundle test
-fixtures, can target another kernel.
+or duplicate keys, invalid scalar types, invalid enum values, deprecated nodes
+and malformed structures. Symfony Language Tools suppresses diagnostics when a
+root key doesn't belong to an installed bundle, so application service and
+import sections aren't mistaken for bundle configuration. Route resources under
+``config/routes/`` and ``config/routes.*`` are analyzed as routes instead.
+Diagnostics are limited to the application's own ``config/`` directory because
+configuration files elsewhere, such as bundle test fixtures, can target another
+kernel.
 
 Selected Environments
 ---------------------
