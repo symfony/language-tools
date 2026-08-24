@@ -35,6 +35,7 @@ final class BridgeCompatibilityTest extends TestCase
         if (false !== $expectedBranch) {
             self::assertSame(rtrim($expectedBranch, '.*'), $result['project']['symfonyBranch'] ?? null);
         }
+        self::assertSame(['status' => 'valid'], $result['configurationValidation'] ?? null);
         self::assertIsArray($result['sections'] ?? null);
         $routes = $this->section($result['sections'], 'routes');
         $container = $this->section($result['sections'], 'container');
@@ -139,6 +140,46 @@ final class BridgeCompatibilityTest extends TestCase
         self::assertIsArray($stimulusTargets);
         self::assertContains('open', $stimulusActions);
         self::assertContains('results', $stimulusTargets);
+    }
+
+    public function testRealInvalidBundleConfiguration(): void
+    {
+        $project = getenv('SYMFONY_LSP_COMPAT_PROJECT');
+        if (false === $project || !is_file($project.'/vendor/autoload.php')) {
+            self::markTestSkipped('The real Symfony compatibility fixture is not installed.');
+        }
+
+        $configurationFile = $project.'/config/packages/symfony_lsp_invalid.yaml';
+        file_put_contents($configurationFile, <<<'YAML'
+            framework:
+                canary_invalid_option: CANARY_SECRET_CONFIGURATION_VALUE
+            YAML);
+        try {
+            $process = (new NativeProcessRunner(30.0))->run([
+                \PHP_BINARY,
+                \dirname(__DIR__, 2).'/resources/bridge.php',
+                '--project='.$project,
+                '--environment=test',
+                '--debug=1',
+                '--rebuild-container=1',
+            ], $project);
+        } finally {
+            @unlink($configurationFile);
+        }
+
+        $snapshot = $process->stdout();
+        self::assertSame(0, $process->exitCode(), $process->stderr()."\n".$snapshot);
+        self::assertStringNotContainsString('CANARY_SECRET_CONFIGURATION_VALUE', $snapshot);
+        self::assertStringNotContainsString('Unrecognized option', $snapshot);
+        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($result);
+        self::assertSame([
+            'status' => 'invalid',
+            'kind' => 'configuration',
+            'path' => 'framework',
+        ], $result['configurationValidation'] ?? null);
+        self::assertSame([], $result['sections'] ?? null);
+        self::assertSame([], $result['errors'] ?? null);
     }
 
     /**

@@ -21,6 +21,8 @@ abstract class AbstractBridgeTestCase extends TestCase
         @unlink($this->temporaryDirectory.'/vendor/autoload_runtime.php');
         @unlink($this->temporaryDirectory.'/vendor/autoload.php');
         @unlink($this->temporaryDirectory.'/composer.json');
+        @unlink($this->temporaryDirectory.'/config/broken.php');
+        @unlink($this->temporaryDirectory.'/config/framework.yaml');
         @unlink($this->temporaryDirectory.'/config/http_endpoints.yaml');
         @rmdir($this->temporaryDirectory.'/config');
         @unlink($this->temporaryDirectory.'/var/cache/container.php');

@@ -158,6 +158,7 @@ final class BridgeTest extends AbstractBridgeTestCase
         self::assertStringNotContainsString('CANARY_RUNTIME_EXCEPTION', $snapshot);
         $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
         self::assertIsArray($result);
+        self::assertSame(['status' => 'unavailable'], $result['configurationValidation'] ?? null);
         self::assertSame([[
             'section' => 'routes',
             'message' => 'Unable to load the "routes" runtime metadata section.',

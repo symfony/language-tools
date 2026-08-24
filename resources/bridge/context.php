@@ -2,6 +2,13 @@
 
 final class SymfonyLspBridgeContext
 {
+    private const CONFIGURATION_EXCEPTIONS = [
+        'Symfony\\Component\\Config\\Definition\\Exception\\DuplicateKeyException',
+        'Symfony\\Component\\Config\\Definition\\Exception\\ForbiddenOverwriteException',
+        'Symfony\\Component\\Config\\Definition\\Exception\\InvalidConfigurationException',
+        'Symfony\\Component\\Config\\Definition\\Exception\\InvalidTypeException',
+    ];
+
     private ?object $kernel = null;
     private ?object $application = null;
     private ?Throwable $kernelError = null;
@@ -108,6 +115,17 @@ final class SymfonyLspBridgeContext
         } catch (Throwable $error) {
             $this->kernelError = $error;
             throw $error;
+        }
+    }
+
+    public function configurationValidation(): array
+    {
+        try {
+            $this->kernel();
+
+            return ['status' => 'valid'];
+        } catch (Throwable $error) {
+            return $this->classifyConfigurationValidation($error);
         }
     }
 
@@ -266,6 +284,125 @@ final class SymfonyLspBridgeContext
     private function isAbsolutePath(string $path): bool
     {
         return 1 === preg_match('{^(?:[/\\\\]|[A-Za-z]:[/\\\\]|[A-Za-z][A-Za-z0-9+.-]*://)}', $path);
+    }
+
+    private function classifyConfigurationValidation(Throwable $error): array
+    {
+        for ($candidate = $error, $depth = 0; $candidate instanceof Throwable && $depth < 32; $candidate = $candidate->getPrevious(), ++$depth) {
+            $class = $candidate::class;
+            if (in_array($class, self::CONFIGURATION_EXCEPTIONS, true)) {
+                $result = ['status' => 'invalid', 'kind' => 'configuration'];
+                $path = $this->normalizedConfigurationPath($candidate);
+                if (null !== $path) {
+                    $result['path'] = $path;
+                }
+
+                return $result;
+            }
+            if ('Symfony\\Component\\Yaml\\Exception\\ParseException' === $class) {
+                return array_replace(
+                    ['status' => 'invalid', 'kind' => 'yaml'],
+                    $this->projectLocation($candidate, true),
+                );
+            }
+            if ('Symfony\\Component\\Config\\Util\\Exception\\XmlParsingException' === $class) {
+                return ['status' => 'invalid', 'kind' => 'xml'];
+            }
+            if (ParseError::class === $class) {
+                return array_replace(
+                    ['status' => 'invalid', 'kind' => 'php'],
+                    $this->projectLocation($candidate, false),
+                );
+            }
+        }
+
+        return ['status' => 'unavailable'];
+    }
+
+    private function normalizedConfigurationPath(Throwable $error): ?string
+    {
+        if (!method_exists($error, 'getPath')) {
+            return null;
+        }
+        try {
+            $path = $error->getPath();
+        } catch (Throwable) {
+            return null;
+        }
+        if (!is_string($path)) {
+            return null;
+        }
+        $path = trim($path);
+        $path = trim($path, '.');
+        $path = trim($path);
+        if ('' === $path || 512 < strlen($path)) {
+            return null;
+        }
+        $segments = preg_split('/\\.+/', $path, -1, PREG_SPLIT_NO_EMPTY);
+        if (!is_array($segments) || [] === $segments) {
+            return null;
+        }
+        foreach ($segments as $segment) {
+            if (1 !== preg_match('/\\A[A-Za-z0-9_:\\\\-]+\\z/D', $segment)) {
+                return null;
+            }
+        }
+
+        return implode('.', $segments);
+    }
+
+    private function projectLocation(Throwable $error, bool $yaml): array
+    {
+        $location = [];
+        try {
+            $file = $yaml && method_exists($error, 'getParsedFile') ? $error->getParsedFile() : $error->getFile();
+            if (is_string($file)) {
+                $file = $this->projectRelativeFile($file);
+                if (null !== $file) {
+                    $location['file'] = $file;
+                }
+            }
+        } catch (Throwable) {
+        }
+        try {
+            $line = $yaml && method_exists($error, 'getParsedLine') ? $error->getParsedLine() : $error->getLine();
+            if (is_int($line) && 0 < $line) {
+                $location['line'] = $line;
+            }
+        } catch (Throwable) {
+        }
+
+        return $location;
+    }
+
+    private function projectRelativeFile(string $file): ?string
+    {
+        $root = realpath($this->project);
+        if (false === $root) {
+            return null;
+        }
+        if (!$this->isAbsolutePath($file)) {
+            $file = rtrim($this->project, '/\\').'/'.$file;
+        }
+        $file = realpath($file);
+        if (false === $file) {
+            return null;
+        }
+        $root = rtrim(str_replace('\\', '/', $root), '/');
+        $file = str_replace('\\', '/', $file);
+        $prefix = $root.'/';
+        $inside = '\\' === DIRECTORY_SEPARATOR
+            ? 0 === strncasecmp($file, $prefix, strlen($prefix))
+            : str_starts_with($file, $prefix);
+        if (!$inside) {
+            return null;
+        }
+        $relative = substr($file, strlen($prefix));
+        if ([] !== array_intersect(explode('/', $relative), ['.git', 'node_modules', 'var', 'vendor'])) {
+            return null;
+        }
+
+        return $relative;
     }
 
     private function extractKernel(mixed $application): ?object

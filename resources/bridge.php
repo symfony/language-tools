@@ -105,6 +105,7 @@ if (class_exists(Symfony\Component\Runtime\SymfonyRuntime::class)) {
 }
 
 $context = new SymfonyLspBridgeContext($project, $environment, $debug, $targetedRefresh, $rebuildContainer);
+$configurationValidation = $context->configurationValidation();
 $sections = [];
 foreach ($requestedSections as $sectionName) {
     try {
@@ -140,7 +141,7 @@ try {
 
 $result = [
     'schemaVersion' => 1,
-    'generation' => hash('sha256', json_encode($sections, JSON_THROW_ON_ERROR)),
+    'generation' => hash('sha256', json_encode([$configurationValidation, $sections], JSON_THROW_ON_ERROR)),
     'project' => [
         'root' => realpath($project) ?: $project,
         'symfonyVersion' => $version,
@@ -149,6 +150,7 @@ $result = [
         'environment' => $environment,
         'debug' => $debug,
     ],
+    'configurationValidation' => $configurationValidation,
     'sections' => $sections,
     'errors' => $context->errors(),
 ];
