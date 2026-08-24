@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Runtime;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Feature\Configuration\ConfigurationValidationRegistry;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceFileChange;
 use Symfony\Lsp\Project\Project;
@@ -132,6 +133,7 @@ final class ProjectRuntimeRefresherTest extends TestCase
                 new ProjectIndexStatusRegistry(),
                 new RuntimeConfiguration(),
                 new RuntimeRefreshPlanner(),
+                new ConfigurationValidationRegistry(),
             ),
             $scheduler,
         ];

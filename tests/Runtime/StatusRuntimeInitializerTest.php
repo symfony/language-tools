@@ -5,6 +5,8 @@ namespace Symfony\Lsp\Tests\Runtime;
 use Amp\Cancellation;
 use Amp\CancelledException;
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Feature\Configuration\ConfigurationValidationException;
+use Symfony\Lsp\Feature\Configuration\ConfigurationValidationResult;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -77,6 +79,30 @@ final class StatusRuntimeInitializerTest extends TestCase
 
         self::assertSame(
             ['state' => 'failed', 'error' => 'The application failed to boot.', 'stage' => 'bootstrap'],
+            $statuses->status($project)['runtime'],
+        );
+    }
+
+    public function testRecordsTheConfigurationStageForValidationFailures(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $registry = new ProjectRegistry();
+        $registry->replace([$project]);
+        $statuses = new ProjectIndexStatusRegistry();
+        $initializer = new StatusRuntimeInitializer(
+            new ThrowingInitializer(new ConfigurationValidationException(new ConfigurationValidationResult(ConfigurationValidationResult::INVALID, 'dev'))),
+            $statuses,
+            $registry,
+        );
+
+        try {
+            $initializer->initialize($project);
+            self::fail('The failure should have propagated.');
+        } catch (ConfigurationValidationException) {
+        }
+
+        self::assertSame(
+            ['state' => 'failed', 'error' => 'The application configuration is invalid.', 'stage' => 'configuration'],
             $statuses->status($project)['runtime'],
         );
     }

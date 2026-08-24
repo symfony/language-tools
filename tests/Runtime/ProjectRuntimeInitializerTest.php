@@ -6,6 +6,10 @@ use Amp\Cancellation;
 use Amp\CancelledException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Lsp\Feature\Configuration\ConfigurationValidationException;
+use Symfony\Lsp\Feature\Configuration\ConfigurationValidationRegistry;
+use Symfony\Lsp\Feature\Configuration\ConfigurationValidationResult;
+use Symfony\Lsp\Feature\Configuration\ProjectConfigurationValidationSnapshotLoader;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\ProjectServiceSnapshotLoader;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
@@ -91,6 +95,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             $configuration,
             new ContainerPathMapper($configuration),
             self::projects($project),
+            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
         );
 
         $initializer->initialize($project);
@@ -103,6 +108,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame('--environment=test', $processRunner->command[4]);
         self::assertSame('--debug=1', $processRunner->command[5]);
         self::assertSame('--sections=routes,container', $processRunner->command[6]);
+        self::assertSame('--configuration-generation=0', $processRunner->command[7]);
         self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
         self::assertSame(90.0, $processRunner->timeout);
     }
@@ -133,6 +139,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             $configuration,
             new ContainerPathMapper($configuration),
             $registry,
+            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
         );
 
         try {
@@ -165,6 +172,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             $configuration,
             new ContainerPathMapper($configuration),
             self::projects($project),
+            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
         );
 
         $initializer->initialize($project);
@@ -191,6 +199,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             $configuration,
             new ContainerPathMapper($configuration),
             self::projects($project),
+            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -214,6 +223,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             new RuntimeConfiguration(),
             new ContainerPathMapper(new RuntimeConfiguration()),
             self::projects($project),
+            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
         );
 
         $initializer->initialize(
@@ -242,6 +252,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             new RuntimeConfiguration(),
             new ContainerPathMapper(new RuntimeConfiguration()),
             self::projects($project),
+            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
         );
 
         $initializer->initialize(
@@ -280,6 +291,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             new RuntimeConfiguration(),
             new ContainerPathMapper(new RuntimeConfiguration()),
             self::projects($project),
+            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
         );
 
         $routeIndexes->forProject($project)->replace(new Route('existing', '/existing', [], [], null, null));
@@ -292,6 +304,77 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame('app.mailer', $serviceIndexes->forProject($project)->get('app.mailer')?->id());
         self::assertSame('existing', $routeIndexes->forProject($project)->get('existing')?->name());
         self::assertNull($routeIndexes->forProject($project)->get('replacement'));
+    }
+
+    public function testRejectsStaleConfigurationValidationResults(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $validations = new ConfigurationValidationRegistry();
+        $validations->pending($project);
+        $routeIndexes = new RouteIndexRegistry();
+        $processRunner = new CapturingProcessRunner(new ProcessResult(0, json_encode([
+            'schemaVersion' => 1,
+            'configurationGeneration' => 0,
+            'project' => ['environment' => 'dev'],
+            'configurationValidation' => ['status' => 'valid'],
+            'sections' => ['routes' => ['complete' => true, 'items' => [['name' => 'stale', 'path' => '/stale']]]],
+        ], \JSON_THROW_ON_ERROR), ''));
+        $initializer = new ProjectRuntimeInitializer(
+            new BridgeInstaller($source, 'test', new Filesystem()),
+            $processRunner,
+            new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($routeIndexes)]),
+            new RuntimeConfiguration(),
+            new ContainerPathMapper(new RuntimeConfiguration()),
+            self::projects($project),
+            new ProjectConfigurationValidationSnapshotLoader($validations),
+        );
+
+        try {
+            $initializer->initialize($project);
+            self::fail('The stale configuration validation was accepted.');
+        } catch (CancelledException) {
+        }
+
+        self::assertContains('--configuration-generation=1', $processRunner->command);
+        self::assertSame(ConfigurationValidationResult::PENDING, $validations->result($project)->state);
+        self::assertNull($routeIndexes->forProject($project)->get('stale'));
+    }
+
+    public function testLoadsConfigurationValidationBeforeReportingRuntimeFailure(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $validations = new ConfigurationValidationRegistry();
+        $initializer = new ProjectRuntimeInitializer(
+            new BridgeInstaller($source, 'test', new Filesystem()),
+            new CapturingProcessRunner(new ProcessResult(0, json_encode([
+                'schemaVersion' => 1,
+                'project' => ['environment' => 'dev'],
+                'configurationValidation' => [
+                    'status' => 'invalid',
+                    'kind' => 'configuration',
+                    'path' => 'framework.router',
+                ],
+                'sections' => [],
+                'errors' => [['section' => 'runtime', 'message' => 'CANARY_RUNTIME_SECTION_ERROR']],
+            ], \JSON_THROW_ON_ERROR), '')),
+            new RuntimeSnapshotLoaderRegistry([]),
+            new RuntimeConfiguration(),
+            new ContainerPathMapper(new RuntimeConfiguration()),
+            self::projects($project),
+            new ProjectConfigurationValidationSnapshotLoader($validations),
+        );
+
+        try {
+            $initializer->initialize($project);
+            self::fail('The configuration validation failure was not reported.');
+        } catch (ConfigurationValidationException $error) {
+            self::assertSame('framework.router', $error->validation->path);
+        }
+        self::assertSame(ConfigurationValidationResult::INVALID, $validations->result($project)->state);
     }
 
     public function testRejectsFailedBridgeExecutionWithoutExposingErrorOutput(): void
@@ -308,6 +391,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             new RuntimeConfiguration(),
             new ContainerPathMapper(new RuntimeConfiguration()),
             self::projects($project),
+            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
         );
 
         try {
@@ -341,6 +425,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             new RuntimeConfiguration(),
             new ContainerPathMapper(new RuntimeConfiguration()),
             self::projects($project),
+            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
         );
 
         $initializer->initialize($project);
@@ -364,6 +449,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             new RuntimeConfiguration(),
             new ContainerPathMapper(new RuntimeConfiguration()),
             self::projects($project),
+            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
         );
 
         try {

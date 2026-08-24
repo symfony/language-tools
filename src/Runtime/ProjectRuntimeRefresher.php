@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Runtime;
 
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Feature\Configuration\ConfigurationValidationRegistry;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceFileChange;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -20,6 +21,7 @@ final class ProjectRuntimeRefresher
         private readonly ProjectIndexStatusRegistry $statuses,
         private readonly RuntimeConfiguration $configuration,
         private readonly RuntimeRefreshPlanner $planner,
+        private readonly ConfigurationValidationRegistry $configurationValidations,
     ) {
     }
 
@@ -54,6 +56,7 @@ final class ProjectRuntimeRefresher
             return;
         }
 
+        $this->configurationValidations->pending($project);
         $this->statuses->runtimeStale($project);
         $this->refreshScheduler->schedule($project, $plan);
     }

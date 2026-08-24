@@ -10,6 +10,7 @@ use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Configuration\ConfigurationValidationException;
 use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
@@ -95,7 +96,7 @@ final class CheckRunner
         $errors = [];
         $incompleteProjects = [];
         $preparedHashes = [];
-        $ready = [];
+        $diagnosable = [];
         try {
             foreach ($selectedProjects as $project) {
                 $this->expireDeadline($deadline, $signal, $timedOut);
@@ -170,17 +171,21 @@ final class CheckRunner
                     $cancellation->throwIfRequested();
                     $status = $this->statuses->status($project);
                     if ('ready' !== $status['runtime']['state']) {
+                        $configurationFailure = $runtimeError instanceof ConfigurationValidationException;
                         $errors[] = [
-                            'category' => 'operational',
+                            'category' => $configurationFailure ? 'configuration' : 'operational',
                             'message' => $this->runtimeError($runtimeError, $status['runtime']['error'] ?? 'Runtime indexing did not complete.'),
                             'project' => $this->projectConfiguration->projectId($project),
                         ];
                         $projectResults[] = $this->projectResult($project, $status, false);
+                        if ($configurationFailure) {
+                            $diagnosable[$project->rootPath()] = true;
+                        }
                         continue;
                     }
                 }
 
-                $ready[$project->rootPath()] = true;
+                $diagnosable[$project->rootPath()] = true;
                 $projectResults[] = $this->projectResult($project, $status, true);
             }
 
@@ -192,7 +197,7 @@ final class CheckRunner
                 if (0 === ++$diagnosedCount % 64) {
                     delay(0, cancellation: $cancellation);
                 }
-                if (!isset($ready[$file->project->rootPath()])) {
+                if (!isset($diagnosable[$file->project->rootPath()])) {
                     continue;
                 }
                 $cancellation->throwIfRequested();

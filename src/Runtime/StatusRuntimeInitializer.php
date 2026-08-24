@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Runtime;
 
 use Amp\Cancellation;
 use Amp\CancelledException;
+use Symfony\Lsp\Feature\Configuration\ConfigurationValidationException;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -32,7 +33,12 @@ final class StatusRuntimeInitializer implements RuntimeInitializerInterface
             throw $error;
         } catch (\Throwable $error) {
             if ($this->projects->contains($project)) {
-                $this->statuses->runtimeFailed($project, $error instanceof BridgeExecutionException ? 'bootstrap' : null);
+                $stage = match (true) {
+                    $error instanceof BridgeExecutionException => 'bootstrap',
+                    $error instanceof ConfigurationValidationException => 'configuration',
+                    default => null,
+                };
+                $this->statuses->runtimeFailed($project, $stage);
             }
 
             throw $error;

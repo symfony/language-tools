@@ -99,19 +99,14 @@ final class BridgeValidationTest extends AbstractBridgeTestCase
         ], $result['configurationValidation'] ?? null);
     }
 
-    public function testReportsPhpParseLocationWithoutRawDetails(): void
+    public function testDoesNotClassifyProjectPhpParseErrorsAsConfigurationFailures(): void
     {
         $this->writeValidationApplication("require dirname(__DIR__).'/config/broken.php';");
         file_put_contents($this->temporaryDirectory.'/config/broken.php', "<?php\n\nfunction broken( {\n    CANARY_SECRET_PHP_VALUE\n");
 
         $result = $this->runBridge();
 
-        self::assertSame([
-            'status' => 'invalid',
-            'kind' => 'php',
-            'file' => 'config/broken.php',
-            'line' => 3,
-        ], $result['configurationValidation'] ?? null);
+        self::assertSame(['status' => 'unavailable'], $result['configurationValidation'] ?? null);
     }
 
     public function testReportsUnrelatedApplicationExceptionsAsUnavailable(): void

@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Runtime;
 
 use Amp\Cancellation;
 use Amp\CancelledException;
+use Symfony\Lsp\Feature\Configuration\ProjectConfigurationValidationSnapshotLoader;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -16,6 +17,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         private readonly RuntimeConfiguration $configuration,
         private readonly ContainerPathMapper $pathMapper,
         private readonly ProjectRegistry $projects,
+        private readonly ProjectConfigurationValidationSnapshotLoader $configurationValidation,
     ) {
     }
 
@@ -36,6 +38,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             '--environment='.$this->configuration->environment($project),
             '--debug=1',
             '--sections='.implode(',', $sections),
+            '--configuration-generation='.$this->configurationValidation->generation($project),
             ...($plan->preservesContainer() ? ['--targeted-refresh=1'] : []),
             ...(RuntimeRefreshMode::Clear === $mode ? ['--rebuild-container=1'] : []),
         ], $project->rootPath(), $cancellation, $this->configuration->bridgeTimeout($project));
@@ -54,6 +57,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         if (1 !== ($snapshot['schemaVersion'] ?? null)) {
             throw new \RuntimeException('The project bridge returned an unsupported snapshot.');
         }
+        $this->configurationValidation->load($project, $snapshot);
 
         $errors = $snapshot['errors'] ?? null;
         $loadableSnapshot = $snapshot;

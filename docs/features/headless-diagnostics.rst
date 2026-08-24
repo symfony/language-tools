@@ -54,8 +54,10 @@ when CI must not execute the application:
     $ symfony-lsp check --source-only
 
 Reports indicate whether each project used runtime or source-only analysis. If
-runtime analysis cannot complete, the command exits with status ``12`` instead
-of silently switching to source-only analysis.
+invalid application configuration prevents runtime analysis, the report
+identifies the configuration failure and remains incomplete. Other runtime
+failures also exit with status ``12`` instead of silently switching to
+source-only analysis.
 
 Configuring the Check
 ---------------------
@@ -96,7 +98,8 @@ Selecting Blocking Diagnostics
 ------------------------------
 
 By default, every active error-severity diagnostic blocks the check. Warnings,
-such as ``config.deprecated_key``, remain visible but don't block.
+such as ``config.deprecated_key`` and provisional source-only configuration
+findings, remain visible but don't block.
 
 Use ``--fail-on`` to make only selected codes blocking without filtering other
 diagnostics from the report:

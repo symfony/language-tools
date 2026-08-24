@@ -45,12 +45,16 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
     }
 
     /**
-     * @param 'bootstrap'|null $stage
+     * @param 'bootstrap'|'configuration'|null $stage
      */
     public function runtimeFailed(Project $project, ?string $stage = null): void
     {
         $state = isset($this->hasRuntimeSnapshot[$project->rootPath()]) ? 'stale' : 'failed';
-        $error = 'bootstrap' === $stage ? 'The application failed to boot.' : 'Runtime indexing failed.';
+        $error = match ($stage) {
+            'bootstrap' => 'The application failed to boot.',
+            'configuration' => 'The application configuration is invalid.',
+            default => 'Runtime indexing failed.',
+        };
         $this->section($project, 'runtime', $state, $error, $stage);
     }
 

@@ -43,7 +43,7 @@ require __DIR__.'/bridge/sections/configuration.php';
 require __DIR__.'/bridge/sections/doctrine.php';
 require __DIR__.'/bridge/sections/environment.php';
 
-$options = getopt('', ['project:', 'environment::', 'debug::', 'sections::', 'targeted-refresh::', 'rebuild-container::']);
+$options = getopt('', ['project:', 'environment::', 'debug::', 'sections::', 'targeted-refresh::', 'rebuild-container::', 'configuration-generation::']);
 $project = $options['project'] ?? null;
 if (!is_string($project) || '' === $project) {
     fwrite(STDERR, "The --project option is required.\n");
@@ -86,6 +86,10 @@ $targetedRefreshOption = $options['targeted-refresh'] ?? '0';
 $targetedRefresh = !in_array($targetedRefreshOption, ['0', 'false'], true);
 $rebuildContainerOption = $options['rebuild-container'] ?? '0';
 $rebuildContainer = !in_array($rebuildContainerOption, ['0', 'false'], true);
+$configurationGenerationOption = $options['configuration-generation'] ?? '0';
+$configurationGeneration = is_string($configurationGenerationOption) && ctype_digit($configurationGenerationOption)
+    ? (int) $configurationGenerationOption
+    : 0;
 
 $projectRoot = rtrim($project, '/\\');
 $hasEnvFile = is_file($projectRoot.'/.env') || is_file($projectRoot.'/.env.dist') || is_file($projectRoot.'/.env.local.php');
@@ -141,7 +145,7 @@ try {
 
 $result = [
     'schemaVersion' => 1,
-    'generation' => hash('sha256', json_encode([$configurationValidation, $sections], JSON_THROW_ON_ERROR)),
+    'generation' => hash('sha256', json_encode([$configurationGeneration, $configurationValidation, $sections], JSON_THROW_ON_ERROR)),
     'project' => [
         'root' => realpath($project) ?: $project,
         'symfonyVersion' => $version,
@@ -151,6 +155,7 @@ $result = [
         'debug' => $debug,
     ],
     'configurationValidation' => $configurationValidation,
+    'configurationGeneration' => $configurationGeneration,
     'sections' => $sections,
     'errors' => $context->errors(),
 ];

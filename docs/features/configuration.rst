@@ -39,11 +39,15 @@ limited to the application's own ``config/`` directory because
 configuration files elsewhere, such as bundle test fixtures, can target another
 kernel.
 
+Unknown keys, invalid types and invalid enum values are reported as warnings.
+When runtime analysis confirms that saved application configuration is invalid,
+the confirmed failure is reported as an error.
+
 Selected Environments
 ---------------------
 
-Completion and validation use the configured Symfony environment. YAML sections
-such as ``when@test`` are resolved within their environment wrapper.
+Completion and validation use the configured Symfony environment. Only the
+selected environment can produce confirmed semantic errors.
 
 Imports and Refreshes
 ---------------------

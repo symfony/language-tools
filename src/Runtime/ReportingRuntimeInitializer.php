@@ -27,15 +27,19 @@ final class ReportingRuntimeInitializer implements RuntimeInitializerInterface
             throw $error;
         } catch (\Throwable $error) {
             $this->logger->error($error);
-            $stale = 'stale' === $this->statuses->status($project)['runtime']['state'];
-            $this->client->notify('window/showMessage', [
-                'type' => 1,
-                'message' => \sprintf(
+            $runtimeStatus = $this->statuses->status($project)['runtime'];
+            $stale = 'stale' === $runtimeStatus['state'];
+            $message = 'configuration' === ($runtimeStatus['stage'] ?? null)
+                ? \sprintf('Symfony Language Tools found invalid application configuration for "%s".', $project->rootPath())
+                : \sprintf(
                     $stale
                         ? 'Symfony Language Tools could not refresh runtime metadata for "%s". The last valid metadata remains active.'
                         : 'Symfony Language Tools could not initialize runtime metadata for "%s". Static-only features remain active.',
                     $project->rootPath(),
-                ),
+                );
+            $this->client->notify('window/showMessage', [
+                'type' => 1,
+                'message' => $message,
             ]);
         }
     }

@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Feature\Configuration;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
@@ -13,6 +14,8 @@ use Symfony\Lsp\Feature\Configuration\ConfigurationDocumentLinkProvider;
 use Symfony\Lsp\Feature\Configuration\ConfigurationHoverProvider;
 use Symfony\Lsp\Feature\Configuration\ConfigurationIndexRegistry;
 use Symfony\Lsp\Feature\Configuration\ConfigurationPathResolver;
+use Symfony\Lsp\Feature\Configuration\ConfigurationValidationRegistry;
+use Symfony\Lsp\Feature\Configuration\ConfigurationValidationResult;
 use Symfony\Lsp\Feature\Configuration\ConfigurationValueValidator;
 use Symfony\Lsp\Feature\Configuration\ProjectConfigurationSnapshotLoader;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
@@ -24,8 +27,10 @@ use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\SavedDocumentMatcher;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 final class ConfigurationProviderTest extends TestCase
 {
@@ -86,10 +91,12 @@ final class ConfigurationProviderTest extends TestCase
         $text = "framework:\n    router: maybe\n    assets: some-string\n    mystery: true\n";
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
         self::assertSame(
             ['config.invalid_type', 'config.invalid_type', 'config.unknown_key'],
-            array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'),
+            array_column($diagnostics, 'code'),
         );
+        self::assertSame([2, 2, 2], array_column($diagnostics, 'severity'));
     }
 
     public function testDoesNotTreatDependencyInjectionSectionsAsBundleConfiguration(): void
@@ -119,6 +126,15 @@ final class ConfigurationProviderTest extends TestCase
             self::assertSame(['config.unknown_key'], array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
             $fixture->documents->close($uri);
         }
+    }
+
+    public function testIgnoresInactiveEnvironmentSemantics(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/framework.yaml';
+        $fixture->documents->open(new Document($uri, 'yaml', 1, "when@test:\n    framework:\n        mystery: true\n"));
+
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
     public function testDoesNotTreatEnvironmentOverridesAsDuplicates(): void
@@ -228,7 +244,7 @@ final class ConfigurationProviderTest extends TestCase
 
     public function testComparesEnumValuesWithoutLosingTheirTypes(): void
     {
-        $fixture = $this->providers();
+        $fixture = $this->providers(environment: 'test');
         $uri = 'file:///workspace/config/packages/framework.yaml';
         $fixture->documents->open(new Document($uri, 'yaml', 1, <<<'YAML'
             framework:
@@ -313,11 +329,53 @@ final class ConfigurationProviderTest extends TestCase
         }
     }
 
-    private function providers(): ConfigurationProviderFixture
+    public function testUsesVendorAuthorityForSavedConfiguration(): void
+    {
+        $root = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
+        mkdir($root.'/config/packages', 0777, true);
+        $text = "framework:\n    router:\n        utf8: maybe\n    mystery: true\n";
+        file_put_contents($root.'/config/packages/framework.yaml', $text);
+        $uri = (new UriToPathConverter())->toUri($root.'/config/packages/framework.yaml');
+
+        try {
+            $valid = $this->providers($root, validation: new ConfigurationValidationResult(ConfigurationValidationResult::VALID, 'dev'));
+            $valid->documents->open(new Document($uri, 'yaml', 1, $text));
+            $savedWarnings = $valid->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+            self::assertIsArray($savedWarnings);
+            self::assertSame(['config.invalid_type', 'config.unknown_key'], array_column($savedWarnings, 'code'));
+            self::assertSame([2, 2], array_column($savedWarnings, 'severity'));
+            $valid->documents->update($uri, 2, $text."    another_mystery: true\n");
+            $provisional = $valid->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+            self::assertIsArray($provisional);
+            self::assertSame([2, 2, 2], array_column($provisional, 'severity'));
+
+            $invalidText = $text."framework:\n    router:\n        utf8: true\n";
+            file_put_contents($root.'/config/packages/framework.yaml', $invalidText);
+            $invalid = $this->providers($root, validation: new ConfigurationValidationResult(
+                ConfigurationValidationResult::INVALID,
+                'dev',
+                'yaml',
+                file: 'config/packages/framework.yaml',
+                line: 3,
+            ));
+            $invalid->documents->open(new Document($uri, 'yaml', 1, $invalidText));
+            $diagnostics = $invalid->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+            self::assertIsArray($diagnostics);
+            self::assertSame('config.malformed_structure', $diagnostics[0]['code'] ?? null);
+            self::assertSame(1, $diagnostics[0]['severity'] ?? null);
+            self::assertContains('config.duplicate_key', array_column($diagnostics, 'code'));
+            self::assertSame(array_fill(0, \count($diagnostics) - 1, 2), array_column(\array_slice($diagnostics, 1), 'severity'));
+        } finally {
+            (new Filesystem())->remove($root);
+        }
+    }
+
+    private function providers(string $root = '/workspace', string $environment = 'dev', ?ConfigurationValidationResult $validation = null): ConfigurationProviderFixture
     {
         $documents = new DocumentStore();
         $projects = new ProjectRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $uriConverter = new UriToPathConverter();
+        $project = new Project($root, $uriConverter->toUri($root), '^8.0');
         $projects->replace([$project]);
         $converter = new PositionConverter();
         $indexes = new ConfigurationIndexRegistry();
@@ -325,6 +383,12 @@ final class ConfigurationProviderTest extends TestCase
         $routeIndexes->forProject($project)->replaceRuntime(['config/http_endpoints.yaml', 'config/routes/framework.yaml']);
         $environmentIndexes = new EnvironmentIndexRegistry();
         $environmentIndexes->forProject($project)->replaceProcessors(['bool' => 'bool', 'json' => 'array']);
+        $validations = new ConfigurationValidationRegistry();
+        if (null !== $validation) {
+            $validations->replace($project, $validation);
+        }
+        $runtimeConfiguration = new RuntimeConfiguration();
+        $runtimeConfiguration->configure(['environment' => $environment]);
         (new ProjectConfigurationSnapshotLoader($indexes))->load($project, ['sections' => ['configuration' => ['bundles' => [
             [
                 'alias' => 'framework',
@@ -392,8 +456,8 @@ final class ConfigurationProviderTest extends TestCase
         return new ConfigurationProviderFixture(
             new ConfigurationCompletionProvider($resolver, $converter, $protocol, $indexes, $paths, $yaml),
             new ConfigurationHoverProvider($resolver, $converter, $protocol, $indexes, $paths, $yaml),
-            new ConfigurationDiagnosticProvider($resolver, new ProjectPathResolver(new UriToPathConverter()), $converter, $protocol, $indexes, $routeIndexes, $paths, $yaml, new ConfigurationValueValidator($environmentIndexes)),
-            new ConfigurationDocumentLinkProvider($resolver, $converter, $protocol, new UriToPathConverter()),
+            new ConfigurationDiagnosticProvider($resolver, new ProjectPathResolver($uriConverter), $converter, $protocol, $indexes, $routeIndexes, $validations, new SavedDocumentMatcher(new ProjectPathResolver($uriConverter)), $runtimeConfiguration, $paths, $yaml, new ConfigurationValueValidator($environmentIndexes)),
+            new ConfigurationDocumentLinkProvider($resolver, $converter, $protocol, $uriConverter),
             $documents,
             $converter,
         );

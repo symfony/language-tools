@@ -6,6 +6,8 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Feature\Asset\AssetIndexRegistry;
 use Symfony\Lsp\Feature\Asset\ProjectAssetSnapshotLoader;
+use Symfony\Lsp\Feature\Configuration\ConfigurationValidationRegistry;
+use Symfony\Lsp\Feature\Configuration\ProjectConfigurationValidationSnapshotLoader;
 use Symfony\Lsp\Feature\Stimulus\ProjectStimulusSnapshotLoader;
 use Symfony\Lsp\Feature\Stimulus\StimulusIndexRegistry;
 use Symfony\Lsp\Feature\Twig\ProjectTemplateSnapshotLoader;
@@ -69,6 +71,7 @@ final class ContainerProjectRootBridgeTest extends TestCase
             $configuration,
             $pathMapper,
             self::projects($project),
+            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
         );
 
         try {

@@ -302,17 +302,11 @@ final class SymfonyLspBridgeContext
             if ('Symfony\\Component\\Yaml\\Exception\\ParseException' === $class) {
                 return array_replace(
                     ['status' => 'invalid', 'kind' => 'yaml'],
-                    $this->projectLocation($candidate, true),
+                    $this->projectLocation($candidate),
                 );
             }
             if ('Symfony\\Component\\Config\\Util\\Exception\\XmlParsingException' === $class) {
                 return ['status' => 'invalid', 'kind' => 'xml'];
-            }
-            if (ParseError::class === $class) {
-                return array_replace(
-                    ['status' => 'invalid', 'kind' => 'php'],
-                    $this->projectLocation($candidate, false),
-                );
             }
         }
 
@@ -351,11 +345,11 @@ final class SymfonyLspBridgeContext
         return implode('.', $segments);
     }
 
-    private function projectLocation(Throwable $error, bool $yaml): array
+    private function projectLocation(Throwable $error): array
     {
         $location = [];
         try {
-            $file = $yaml && method_exists($error, 'getParsedFile') ? $error->getParsedFile() : $error->getFile();
+            $file = $error->getParsedFile();
             if (is_string($file)) {
                 $file = $this->projectRelativeFile($file);
                 if (null !== $file) {
@@ -365,7 +359,7 @@ final class SymfonyLspBridgeContext
         } catch (Throwable) {
         }
         try {
-            $line = $yaml && method_exists($error, 'getParsedLine') ? $error->getParsedLine() : $error->getLine();
+            $line = $error->getParsedLine();
             if (is_int($line) && 0 < $line) {
                 $location['line'] = $line;
             }

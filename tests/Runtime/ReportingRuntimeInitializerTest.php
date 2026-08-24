@@ -51,6 +51,22 @@ final class ReportingRuntimeInitializerTest extends TestCase
         );
     }
 
+    public function testReportsConfigurationFailuresWithoutRawDetails(): void
+    {
+        $client = new ReportingClient();
+        $statuses = new ProjectIndexStatusRegistry();
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $statuses->runtimeFailed($project, 'configuration');
+        $initializer = new ReportingRuntimeInitializer($this->failingInitializer(), $client, $statuses, new ServerLogger(null));
+
+        $initializer->initialize($project);
+
+        self::assertSame(
+            'Symfony Language Tools found invalid application configuration for "/workspace".',
+            $client->notifications[0]['params']['message'],
+        );
+    }
+
     public function testLogsTheUnderlyingErrorWithRedaction(): void
     {
         $client = new ReportingClient();

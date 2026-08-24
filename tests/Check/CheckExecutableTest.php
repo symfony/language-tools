@@ -101,6 +101,80 @@ final class CheckExecutableTest extends TestCase
         self::assertSame('source-only', $report['projects'][0]['analysis']['mode']);
     }
 
+    public function testReportsVendorConfigurationFailuresAndIncompleteAnalysis(): void
+    {
+        file_put_contents($this->directory.'/config/services.yaml', "parameters:\n    valid: value\n");
+        mkdir($this->directory.'/vendor');
+        file_put_contents($this->directory.'/vendor/autoload.php', <<<'PHP'
+            <?php
+            namespace Composer;
+            final class InstalledVersions
+            {
+                public static function getPrettyVersion(string $package): ?string { return '8.0.6'; }
+            }
+            namespace Symfony\Component\Yaml\Exception;
+            final class ParseException extends \RuntimeException
+            {
+                public function getParsedFile(): string { return dirname(__DIR__).'/config/services.yaml'; }
+                public function getParsedLine(): int { return 2; }
+            }
+            namespace App;
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function boot(): void { throw new \Symfony\Component\Yaml\Exception\ParseException('CANARY_SECRET_CONFIGURATION_VALUE'); }
+                public function shutdown(): void {}
+            }
+            PHP);
+
+        $result = $this->execute(['check', '--format=json', '--workspace='.$this->directory, 'config/services.yaml']);
+        $report = $this->decodeReport($result['stdout']);
+
+        self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode']);
+        self::assertFalse($report['complete']);
+        self::assertSame('configuration', $report['errors'][0]['category']);
+        self::assertSame('config.malformed_structure', $report['diagnostics'][0]['code']);
+        self::assertSame('config/services.yaml', $report['diagnostics'][0]['path']);
+        self::assertSame(1, $report['summary']['blocking']);
+        self::assertStringNotContainsString('CANARY_SECRET', $result['stdout'].$result['stderr']);
+    }
+
+    public function testKeepsUnmappableVendorConfigurationFailuresAtProjectLevel(): void
+    {
+        file_put_contents($this->directory.'/config/services.yaml', "parameters:\n    valid: value\n");
+        mkdir($this->directory.'/vendor');
+        file_put_contents($this->directory.'/vendor/autoload.php', <<<'PHP'
+            <?php
+            namespace Composer;
+            final class InstalledVersions
+            {
+                public static function getPrettyVersion(string $package): ?string { return '8.0.6'; }
+            }
+            namespace Symfony\Component\Config\Definition\Exception;
+            final class InvalidConfigurationException extends \RuntimeException
+            {
+                public function getPath(): ?string { return 'framework.router'; }
+            }
+            namespace App;
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function boot(): void { throw new \Symfony\Component\Config\Definition\Exception\InvalidConfigurationException('CANARY_SECRET_CONFIGURATION_VALUE'); }
+                public function shutdown(): void {}
+            }
+            PHP);
+
+        $result = $this->execute(['check', '--format=json', '--workspace='.$this->directory, 'config/services.yaml']);
+        $report = $this->decodeReport($result['stdout']);
+
+        self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode']);
+        self::assertFalse($report['complete']);
+        self::assertSame('configuration', $report['errors'][0]['category']);
+        self::assertSame([], $report['diagnostics']);
+        self::assertSame(0, $report['summary']['blocking']);
+        self::assertStringNotContainsString('CANARY_SECRET', $result['stdout'].$result['stderr']);
+    }
+
     public function testDoesNotReportACleanResultWhenRuntimeIndexingFails(): void
     {
         $result = $this->execute(['check', '--format=json', '--workspace='.$this->directory]);
