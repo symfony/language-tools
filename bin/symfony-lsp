@@ -2,6 +2,7 @@
 <?php
 
 use Symfony\Lsp\Check\CheckCommand;
+use Symfony\Lsp\Check\CheckOutputWriter;
 use Symfony\Lsp\Server\LanguageServerFactory;
 use Symfony\Lsp\Server\MemoryLimit;
 use Symfony\Lsp\Server\ServerLogger;
@@ -50,12 +51,13 @@ $errorOutput = getStderr();
 $factory = new LanguageServerFactory();
 if ('check' === ($argv[1] ?? null)) {
     $execution = $factory->createCheck($errorOutput)->run(array_values(array_slice($argv, 2)));
-    if (!writeAll(\STDOUT, $execution->stdout)) {
-        writeAll(\STDERR, "Unable to write the diagnostics report to standard output.\n");
+    $writer = new CheckOutputWriter();
+    if (!$writer->write(\STDOUT, $execution->stdout)) {
+        $writer->write(\STDERR, "Unable to write the diagnostics report to standard output.\n");
         exit(CheckCommand::EXIT_OPERATIONAL);
     }
     if ('' !== $execution->stderr) {
-        writeAll(\STDERR, $execution->stderr);
+        $writer->write(\STDERR, $execution->stderr);
     }
     exit($execution->exitCode);
 }
@@ -93,17 +95,3 @@ try {
 }
 
 exit($exitCode);
-
-/** @param resource $stream */
-function writeAll($stream, string $contents): bool
-{
-    while ('' !== $contents) {
-        $written = fwrite($stream, $contents);
-        if (false === $written || 0 === $written) {
-            return false;
-        }
-        $contents = substr($contents, $written);
-    }
-
-    return true;
-}
