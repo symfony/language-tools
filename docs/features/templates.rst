@@ -46,21 +46,18 @@ Twig Components
 ---------------
 
 Component names and public properties are completed in ``<twig:...>`` tags,
-including bundle-provided and anonymous component names found in runtime
-metadata.
-Hover shows the component class, template, and public properties. Go to
-Definition opens the component class and anonymous component template. For
-components shipped by bundles, such as ``ux:icon``, the class and template
-come from runtime metadata and definition opens the vendor class. Find All
-References and code lenses expose statically recognized component usages.
+including bundle-provided and anonymous components. Hover shows the component
+class, template and public properties. Go to Definition opens the component
+class or anonymous component template. For bundle components such as
+``ux:icon``, it opens the vendor class. Find All References and code lenses
+show statically recognized component usages.
 
 Symfony Language Tools recognizes ``#[AsTwigComponent]`` and
 ``#[AsLiveComponent]`` classes, templates under ``templates/components/``,
 ``<twig:...>`` tags and static ``component()`` function calls. Live Component
-properties and actions are included in component metadata. Unknown static
-component names are reported once project files have been analyzed and runtime
-metadata lists the registered component names, so components provided by
-bundles are recognized.
+properties and actions are included in completion and navigation. Unknown
+static component names are reported only after all registered components,
+including bundle components, are known.
 
 Stimulus controllers and Live Component actions and events are documented in
 `Stimulus and Live Components`_.
@@ -68,8 +65,8 @@ Stimulus controllers and Live Component actions and events are documented in
 Diagnostics
 -----------
 
-A missing static template name is reported after the configured filesystem
-loader paths have been indexed. Dynamic template expressions are ignored.
+A missing static template name is reported after the configured Twig loader
+paths are known. Dynamic template expressions are ignored.
 Files owned by dependencies, such as bundle templates under ``vendor/``, are
 never diagnosed. A quick fix creates missing application templates under
 the ``templates/`` directory; namespaced ``@Bundle`` names are excluded.
@@ -77,10 +74,8 @@ the ``templates/`` directory; namespaced ``@Bundle`` names are excluded.
 Limitations
 -----------
 
-Custom non-filesystem loaders cannot provide exhaustive completion. Their
-literal names are available only when another recognized project file exposes
-them. When a decorating loader hides the filesystem loader paths, as with
-theme engines like Sylius, the paths are derived from the application and
-bundle template conventions instead.
+Custom non-filesystem loaders can limit completion and navigation. Theme engines
+such as Sylius are supported through common application and bundle template
+conventions.
 
 .. _`Stimulus and Live Components`: stimulus.rst

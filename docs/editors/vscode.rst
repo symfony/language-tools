@@ -78,9 +78,8 @@ The command palette provides these commands:
 Configuration
 -------------
 
-Open the Symfony application as a VS Code workspace. Put shared project and
-analysis settings in ``.symfony-lsp.json`` so the editor and the
-`headless diagnostics checker`_ use the same values.
+Open the Symfony application as a VS Code workspace. Put shared settings in
+``.symfony-lsp.json``; see the `project configuration`_.
 
 Use ``.vscode/settings.json`` for VS Code-specific settings or explicit editor
 overrides:
@@ -93,12 +92,8 @@ overrides:
         "php.suggest.basic": false
     }
 
-Any explicitly configured ``symfonyLsp.phpCommand``,
-``symfonyLsp.containerProjectRoot``, ``symfonyLsp.environment``,
-``symfonyLsp.debug``, ``symfonyLsp.runtimeIndexing``,
-``symfonyLsp.bridgeTimeout``, ``symfonyLsp.projectRoots`` or
-``symfonyLsp.translationDiagnostics`` value overrides the corresponding shared
-configuration for VS Code only.
+VS Code settings under ``symfonyLsp`` override values from
+``.symfony-lsp.json`` for VS Code only.
 
 ``symfonyLsp.serverPath`` overrides the bundled executable and must be an
 absolute path. Use it for a server built from source or a separately downloaded
@@ -110,31 +105,11 @@ it empty to keep the server default of ``2G``.
 
 The extension forwards VS Code's workspace trust decision to the server.
 Untrusted workspaces remain in static-only mode. See `Symfony integrations`_
-for runtime indexing and static-only behavior.
+for details.
 
-``symfonyLsp.phpCommand`` is the argument array used to inspect the Symfony
-application. For example, use ``["symfony", "php"]`` for Symfony CLI. The
-command must be compatible with the Symfony application.
-``symfonyLsp.containerProjectRoot`` supports a ``phpCommand`` that runs in a
-Docker container: set it to the absolute project path inside the container.
-See `Docker support`_ for the complete setup.
-
-``symfonyLsp.environment`` selects the Symfony runtime whose effective metadata
-is indexed. Runtime indexing requires ``symfonyLsp.debug`` to be ``true``.
-``symfonyLsp.runtimeIndexing`` can disable application execution even in a
-trusted workspace. ``symfonyLsp.bridgeTimeout`` sets the maximum duration in
-seconds of each application bridge run; increase it when an application needs
-more than the default 300 seconds to collect runtime metadata.
-
-``symfonyLsp.projectRoots`` can list application roots relative to the
-workspace folder or as absolute paths. Leave it empty to discover nested
-FrameworkBundle applications automatically.
-
-``symfonyLsp.trace`` writes recursively redacted protocol traffic to the output
-channel. It is disabled by default.
-
-``symfonyLsp.translationDiagnostics`` enables missing-key diagnostics. It is a
-resource-scoped setting and defaults to ``false``.
+Use `Docker support`_ when the PHP command runs in a container.
+``symfonyLsp.trace`` adds redacted protocol messages to the output channel and
+is disabled by default.
 
 The PHP suggestion setting is optional. Symfony Language Tools is designed to
 coexist with a general PHP language server such as Intelephense or PHP Tools.
@@ -148,23 +123,15 @@ without restarting the extension.
 Troubleshooting
 ---------------
 
-Open ``View > Output`` and select ``Symfony Language Tools`` to inspect
-extension and protocol messages. Startup records identify the extension and
-server versions, platform and resolved executable. An
-uncaught PHP failure is reported on a ``Symfony Language Tools failed:`` line
-with its class, source location and redacted message; index status polling stops
-when the language client is no longer running.
-
-If the process exits without a ``Symfony Language Tools failed:`` line, inspect
-the platform's native crash reports. On macOS, they are stored under
-``~/Library/Logs/DiagnosticReports``. If the server doesn't start, verify that:
+Open ``View > Output`` and select ``Symfony Language Tools`` to inspect startup,
+configuration and indexing errors. If the server doesn't start, verify that:
 
 * the installed extension package matches the extension host's platform;
 * a configured ``symfonyLsp.serverPath`` points to an executable file;
 * the workspace settings contain a valid project PHP command.
 
 .. _`Symfony integrations`: ../features/index.rst
-.. _`headless diagnostics checker`: ../features/headless-diagnostics.rst
+.. _`project configuration`: ../project-configuration.rst
 .. _`Docker support`: ../docker.rst
 .. _`Marketplace overview`: https://marketplace.visualstudio.com/items?itemName=symfony.language-tools
 .. _`Visual Studio Marketplace`: https://marketplace.visualstudio.com/items?itemName=symfony.language-tools

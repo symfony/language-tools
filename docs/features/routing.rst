@@ -1,9 +1,8 @@
 Routing Integration
 ===================
 
-The routing integration understands effective route names and parameters in the
-selected Symfony environment, together with their application-owned PHP, YAML
-and Twig declarations and references.
+The routing integration understands route names and parameters in the selected
+Symfony environment, together with PHP, YAML and Twig declarations and usages.
 
 Supported Contexts
 ------------------
@@ -42,9 +41,8 @@ Place the cursor after a route-name prefix and invoke completion:
         }
     }
 
-The suggestions come from the effective route collection for the configured
-Symfony environment. Internationalized routes use their canonical names without
-locale suffixes.
+The suggestions come from the configured Symfony environment. Internationalized
+routes use their canonical names without locale suffixes.
 
 Route Parameter Completion
 --------------------------
@@ -64,12 +62,12 @@ The equivalent Twig context is:
 
 If ``article_show`` has the path ``/article/{slug}``, completion suggests
 ``slug``. Parameters already present in the map aren't suggested again.
-Suggestions include placeholders from the effective route path and host.
+Suggestions include placeholders from the route path and host.
 
 Hover
 -----
 
-Hover over a recognized route name to display available runtime metadata:
+Hover over a recognized route name to display:
 
 * the route name and alias target;
 * the path and host;
@@ -94,17 +92,17 @@ include statically recognized PHP and Twig usages.
 Rename updates application-owned declarations and static references. The edit
 requires confirmation because dynamic route references may remain unchanged.
 It never edits ``vendor/`` or generated files, and a rename to an existing
-effective route name is rejected.
+route name is rejected.
 
 Diagnostics
 -----------
 
-A statically known route name that doesn't exist in the effective route
-collection is reported as an error. A route call with a complete literal
+A statically known route name that doesn't exist is reported as an error. A
+route call with a complete literal
 parameter map also reports required path or host parameters that are missing.
 Parameters with route defaults are optional, while dynamic parameter maps aren't
 diagnosed. A quick fix adds the missing parameters to the literal parameter
 map.
 
-Diagnostics are limited to open PHP and Twig files and high-confidence Symfony
-contexts. They update while typing and are cleared when the file closes.
+Only high-confidence Symfony contexts are diagnosed. Editor diagnostics update
+while typing, while ``symfony-lsp check`` analyzes saved files.

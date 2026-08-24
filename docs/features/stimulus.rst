@@ -33,10 +33,9 @@ files or member declarations. Find All References connects controller and
 member declarations to their static Twig usages. Controller files also provide
 usage code lenses.
 
-An unknown static controller name is reported only after the trusted runtime
-index confirms that the effective controller map is complete. Unknown actions
-and targets aren't diagnosed because controllers can inherit or register them
-dynamically.
+An unknown static controller name is reported only after all registered
+controllers are known. Unknown actions and targets aren't diagnosed because
+controllers can inherit or register them dynamically.
 
 Live Components
 ---------------
@@ -55,14 +54,11 @@ Events declared by ``#[LiveListener]`` are completed in static ``emit()`` calls
 inside Live Components. Hover shows listeners, Go to Definition opens listener
 declarations and Find All References lists static emitters and listeners.
 
-Current Limitations
--------------------
+Limitations
+-----------
 
-Only conventional ``*_controller.js`` and ``*_controller.ts`` application
-controllers are recognized directly from project files. Runtime indexing also
-discovers custom controller paths, installed Symfony UX package controllers
-and ``controllers.json`` registries shipped by bundles. When the configured
-``controllers.json`` is missing, as in multi-entrypoint asset layouts, the
-controller set is treated as incomplete and unknown controllers aren't
-diagnosed. Dynamic controller registration, computed action names, inherited
-actions and Live Component event names are ignored.
+Project controllers using the conventional ``*_controller.js`` and
+``*_controller.ts`` names are recognized. Runtime indexing adds custom paths,
+installed Symfony UX controllers and bundle ``controllers.json`` registries.
+Dynamic controller registration, computed action names, inherited actions and
+dynamic Live Component event names are ignored.

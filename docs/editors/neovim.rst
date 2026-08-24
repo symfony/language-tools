@@ -62,8 +62,8 @@ project ``.nvim.lua`` file rather than enabling runtime indexing globally.
 Configuration
 -------------
 
-Put shared project and analysis settings in ``.symfony-lsp.json`` so Neovim
-and the `headless diagnostics checker`_ use the same values.
+Put shared settings in ``.symfony-lsp.json``; see the
+`project configuration`_.
 
 Override settings for Neovim only before enabling the language server:
 
@@ -83,14 +83,9 @@ Override settings for Neovim only before enabling the language server:
 
     vim.lsp.enable('symfony_lsp')
 
-``phpCommand`` is the argument list used to inspect the Symfony application.
-For example, use ``{ 'symfony', 'php' }`` with Symfony CLI, or a Docker
-command with ``containerProjectRoot`` as described in `Docker support`_.
-
-``containerProjectRoot``, ``environment``, ``debug``, ``runtimeIndexing``,
-``bridgeTimeout``, ``projectRoots``, ``trace`` and
-``translationDiagnostics`` have the same behavior as their VS Code
-counterparts. Restart the language client after changing its configuration.
+Use the same setting names as ``.symfony-lsp.json`` for client-only overrides.
+See `Docker support`_ when the PHP command runs in a container. Restart the
+language client after changing its configuration.
 
 Set the ``SYMFONY_LSP_MEMORY_LIMIT`` environment variable to change the
 server's PHP memory limit for large projects:
@@ -119,6 +114,6 @@ protocol traffic to Neovim's LSP log. Restore it to ``off`` after
 troubleshooting.
 
 .. _`standalone guide`: ../index.rst#installing-a-standalone-release
-.. _`headless diagnostics checker`: ../features/headless-diagnostics.rst
+.. _`project configuration`: ../project-configuration.rst
 .. _`Docker support`: ../docker.rst
 .. _`nvim-lspconfig`: https://github.com/neovim/nvim-lspconfig

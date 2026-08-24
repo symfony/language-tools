@@ -2,9 +2,8 @@ Environment Variables
 =====================
 
 Symfony Language Tools recognizes environment variable declarations from
-``.env`` files and references from ``%env(...)%`` expressions. It uses names,
-locations, processor chains and default availability without storing or
-returning values.
+``.env`` files and references from ``%env(...)%`` expressions without reading
+or displaying their values.
 
 Completion
 ----------
@@ -40,5 +39,4 @@ can be supplied by the shell, a deployment platform or a secrets provider.
 Privacy
 -------
 
-Environment values aren't included in indexes, hover output, logs or Language
-Server Protocol responses.
+Environment values are never displayed or written to logs.

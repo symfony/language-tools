@@ -1,13 +1,12 @@
 Bundle Configuration
 ====================
 
-Symfony Language Tools understands configuration trees for installed bundles in
-the selected environment, including node types, required and default markers,
-enum values, examples, deprecations, children and prototype nodes.
-Normalization is probed on the real trees, so shorthand keys such as the
-Doctrine default connection ``url`` and values that nodes normalize, such
-as ``~`` or ``true`` for array nodes, are understood. Extensible nodes allow
-custom keys while their declared children keep their own validation rules.
+Symfony Language Tools understands configuration options for installed bundles
+in the selected environment, including required options, default values, enum
+values, examples and deprecations. It supports common shorthand and normalized
+values such as Doctrine's default connection ``url``, ``~`` and ``true`` for
+array options. Extensible sections allow custom keys while validating their
+known children.
 
 Completion
 ----------
@@ -42,22 +41,18 @@ fixtures, can target another kernel.
 Selected Environments
 ---------------------
 
-The runtime tree is built for the configured Symfony environment. YAML sections
-such as ``when@test`` keep their environment wrapper while completion and
-validation resolve the enclosed bundle configuration path.
+Completion and validation use the configured Symfony environment. YAML sections
+such as ``when@test`` are resolved within their environment wrapper.
 
 Imports and Refreshes
 ---------------------
 
-Relative YAML ``resource`` imports are exposed as document links. Saving PHP,
-YAML or XML configuration, or ``composer.json``, schedules a debounced runtime
-refresh. Open documents continue to use their unsaved contents while runtime
-metadata is refreshed.
+Relative YAML ``resource`` imports are exposed as document links. Configuration
+changes are picked up after saving, while the current open file continues to
+reflect unsaved edits.
 
 Limitations
 -----------
 
-Diagnostics only report constraints represented by public configuration tree
-metadata. Dynamic validation callbacks and options built from arbitrary
-application code can require a successful kernel boot before updated metadata
-becomes available.
+Custom validation callbacks and options built dynamically by application code
+may not be diagnosed.

@@ -1,10 +1,9 @@
 Dependency Injection: Services and Parameters
 =============================================
 
-The dependency injection integration understands effective services, aliases,
-autowiring types and parameter names from the selected Symfony environment. It
-also finds application-owned YAML declarations and recognized PHP
-``#[Autowire]`` attributes.
+The dependency injection integration understands services, aliases, autowiring
+types and parameter names from the selected Symfony environment. It also finds
+YAML and XML declarations and recognized PHP ``#[Autowire]`` attributes.
 
 Supported Declarations and References
 -------------------------------------
@@ -19,16 +18,13 @@ Symfony Language Tools recognizes these YAML declarations and references:
 XML service definitions using the ``dic/services`` schema are recognized
 too: service, alias and parameter declarations, ``decorates`` targets,
 tags, and service and parameter references in arguments. Single-quoted and
-double-quoted attributes are supported, and XML comments are ignored. Saved
-service XML changes refresh the effective container metadata without treating
-unrelated XML files as container configuration. Completion is only available
-in YAML and PHP files.
+double-quoted attributes are supported, and XML comments are ignored.
+Completion is only available in YAML and PHP files.
 
 ``%parameter%`` references are also recognized outside the ``parameters``
 and ``services`` sections in configuration files, such as
-``%kernel.project_dir%`` in a ``config/packages`` file. Double percents
-escape a literal percent, and references in YAML comments are ignored. A
-``#`` inside block scalar content remains literal and doesn't hide references.
+``%kernel.project_dir%`` in a ``config/packages`` file. Double percents escape
+a literal percent, and references in YAML comments are ignored.
 
 Symfony Language Tools also recognizes service and parameter references in PHP
 ``#[Autowire]`` attributes. Dynamic references aren't recognized.
@@ -46,8 +42,8 @@ In YAML service configuration, type ``@`` followed by a service ID prefix or
         App\Controller\ArticleController:
             arguments: ['@app.ma', '%app.storage_']
 
-Completion includes private and hidden services, aliases, application-owned
-static declarations and effective parameter names. The ``service`` and ``param``
+Completion includes private and hidden services, aliases, project declarations
+and parameter names. The ``service`` and ``param``
 arguments of PHP ``#[Autowire]`` attributes are also supported:
 
 .. code-block:: php
@@ -97,9 +93,8 @@ service.
 References and Rename
 ---------------------
 
-Reference requests include YAML service and parameter references and recognized
-PHP ``#[Autowire]`` attributes. Declarations can be included when requested by
-the Language Server Protocol client.
+Reference results include YAML service and parameter references, recognized PHP
+``#[Autowire]`` attributes and, when requested, declarations.
 
 Rename is available only when an application-owned YAML or XML declaration
 exists. It updates that declaration and all statically recognized
@@ -110,14 +105,12 @@ A rename to an existing service or parameter name is rejected.
 Diagnostics
 -----------
 
-After complete runtime container metadata is available, definitely unknown
-service and parameter references are reported as errors. Optional service
+Once runtime indexing completes, definitely unknown service and parameter
+references are reported as errors. Optional service
 references such as ``@?app.mailer`` aren't diagnosed. Unknown tags are accepted
 because applications and compiler passes can define their own tags.
 
 Privacy
 -------
 
-Parameter values aren't required for these features. Symfony Language Tools uses
-parameter names and deprecation metadata without including values in indexes,
-logs, hover output or other Language Server Protocol responses.
+Parameter values are never displayed or written to logs.

@@ -1,18 +1,17 @@
 Symfony Integrations
 ====================
 
-Symfony Language Tools combines information from project files with metadata
-from the selected Symfony environment. Features based on project files remain
-available without running the application. Features that depend on the compiled
-container or another runtime service require runtime indexing.
+Symfony Language Tools combines project files with information from the
+selected Symfony environment. Many features remain available without running
+the application; others require runtime indexing.
 
 Use the `headless diagnostics checker`_ to run the same Symfony diagnostics
 against saved files in local automation and CI.
 
-Project file scanning honors your ``.gitignore`` rules, so machine-generated
-files such as build caches and package manager lock files are never indexed.
-Dotenv files like ``.env.local`` are the exception: they stay indexed to power
-environment variable features, and only variable names are read.
+Symfony Language Tools honors your ``.gitignore`` rules and always skips
+``.git/``, ``node_modules/``, ``var/``, ``vendor/`` and frontend lock files.
+Project-root dotenv files remain available for environment variable names, but
+their values aren't read.
 
 Supported Integrations
 ----------------------
@@ -138,21 +137,21 @@ It is available only in debug mode and for workspaces that you trust. Do not
 enable it for a project whose code you would not run from the command line.
 
 Without runtime indexing, Symfony Language Tools continues to provide features
-derived from project files. Suggestions that depend on the effective router,
-compiled container or another runtime service may be incomplete. Diagnostics are
-suppressed when the server cannot prove that the available metadata is complete.
+from project files. Features that need the application's current routes,
+services or other runtime information may be incomplete. Diagnostics that need
+this information are omitted.
 
 Unsaved Files and Refreshes
 ---------------------------
 
-Navigation, references, rename and diagnostics derived from project files
-reflect unsaved changes. Runtime metadata is refreshed after relevant files are
-saved. If a refresh fails, the last valid metadata remains available and the
-editor reports that the runtime index is stale.
+Navigation, references, rename and diagnostics from project files reflect
+unsaved changes. Information from the running application is refreshed after
+relevant files are saved. If a refresh fails, the editor reports the project as
+stale and keeps the last successful information.
 
-Use the editor's index commands to refresh project data, inspect the current
-status or switch the selected Symfony environment. Language Server Protocol
-clients can invoke the corresponding commands directly:
+Use the editor's commands to refresh project data, inspect the current status
+or switch the selected Symfony environment. Custom Language Server Protocol
+clients can invoke these command identifiers directly:
 
 * ``symfony.refreshIndex``;
 * ``symfony.indexStatus``;
@@ -161,26 +160,23 @@ clients can invoke the corresponding commands directly:
 Privacy
 -------
 
-Symfony Language Tools uses names, types, relationships and other structural
-metadata to provide editor features. Parameter values, environment values,
-credentials and application objects are never included in indexes, logs, hover
-output, diagnostics or protocol traces. Protocol tracing is disabled by default
-and redacts values when enabled.
+Parameter values, environment values, credentials and application objects are
+never displayed or written to logs. Protocol tracing is disabled by default and
+redacts values when enabled.
 
-Current Limitations
+General Limitations
 -------------------
 
-The current version has these general limitations:
+Symfony Language Tools has these general limitations:
 
 * custom kernel bootstraps must follow a recognized convention: ``App\Kernel``,
   a ``Kernel`` class at a Composer PSR-4 autoload root, legacy
-  ``app/AppKernel.php`` or a Symfony Runtime front controller;
+  ``app/AppKernel.php`` or a Symfony Runtime front controller. Symfony Runtime
+  options under ``extra.runtime`` and ``APP_RUNTIME_OPTIONS`` are supported;
 * one Symfony environment is active at a time for each application root;
 * references and rename cover only statically recognized values.
 
 See each integration page for its supported contexts and specific limitations.
-Symfony Runtime front controllers honor the class, options and project directory
-configured under ``extra.runtime`` as well as ``APP_RUNTIME_OPTIONS``.
 
 Troubleshooting
 ---------------

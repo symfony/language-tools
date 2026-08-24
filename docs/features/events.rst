@@ -1,9 +1,9 @@
 Events and Listeners
 ====================
 
-The Events integration understands effective event classes, legacy event names,
-listeners, subscribers, priorities and recognized dispatch sites in the
-configured Symfony environment.
+The Events integration understands event classes, legacy event names, listeners,
+subscribers, priorities and recognized dispatch sites in the configured Symfony
+environment.
 
 Completion
 ----------
@@ -24,7 +24,7 @@ Definition and References
 -------------------------
 
 Definition requests from dispatch sites and static event-name references
-navigate to the event class and effective listener classes. Event classes
+navigate to the event class and registered listener classes. Event classes
 navigate to their listeners, while listener classes navigate back to event
 classes. References include recognized dispatch calls, listener attributes,
 subscriber declarations and service tags.
@@ -41,10 +41,9 @@ The server recognizes event references in these contexts:
 Code Lenses
 -----------
 
-Event classes display the number of effective listeners above the class name.
-Listener and subscriber classes display the number of events they handle.
-Clients that support the returned reference command can open the related
-locations from the code lens.
+Event classes display the number of listeners above the class name. Listener
+and subscriber classes display the number of events they handle. Selecting a
+code lens opens the related locations.
 
 Diagnostics
 -----------

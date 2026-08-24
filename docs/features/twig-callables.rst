@@ -59,8 +59,8 @@ and names already used in the call are omitted.
 References
 ----------
 
-Find All References lists the recognized function and filter usages across
-indexed application templates.
+Find All References lists recognized function and filter usages across
+application templates.
 
 Diagnostics
 -----------

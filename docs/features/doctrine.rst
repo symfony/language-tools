@@ -2,8 +2,8 @@ Doctrine Entities and Repositories
 ==================================
 
 Symfony Language Tools provides navigation between Doctrine entities,
-repositories and mapped fields without executing the application. Doctrine
-packages don't need to be installed in the language server itself.
+repositories and mapped fields. PHP attribute mappings work without executing
+the application.
 
 Entity Fields
 -------------
@@ -48,23 +48,19 @@ and repository constructor entity references back to entity classes. Hover
 shows entity and repository relationships. Entity and repository declarations
 provide code lenses for navigating the relationship in either direction.
 
-Runtime Metadata
-----------------
+Other Mapping Formats
+---------------------
 
-Effective entity metadata is also collected from the application's Doctrine
-metadata factory. This covers mappings that source scanning can't see, such
-as XML and YAML ORM mappings and entities shipped by dependencies under
-``vendor/``. Field completion, hover and navigation work for these entities
-too; Go to Definition opens the entity class file when no precise source
-declaration is available.
+With runtime indexing, XML and YAML ORM mappings and entities shipped by
+dependencies under ``vendor/`` are also supported. Field completion, hover and
+navigation work for these entities; Go to Definition opens the entity class when
+no more precise mapping location is available.
 
-Current Limitations
--------------------
+Limitations
+-----------
 
-Inherited fields, DQL strings, Query Builder field expressions and dynamic
-repository lookups aren't interpreted. String callbacks used as
-``EntityType`` choice labels aren't treated as mapped fields. Repositories
-bound to entities through interfaces, as in Sylius resource
-configuration, aren't resolved. Symfony Language Tools doesn't diagnose
-unknown Doctrine fields because custom mapping drivers and inherited
-metadata can extend the source model.
+DQL strings, Query Builder field expressions and dynamic repository lookups
+aren't interpreted. String callbacks used as ``EntityType`` choice labels
+aren't treated as mapped fields. Without runtime indexing, inherited fields and
+repositories bound through interfaces may be incomplete. Unknown Doctrine
+fields aren't diagnosed because Doctrine supports custom mappings.

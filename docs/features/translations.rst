@@ -1,8 +1,8 @@
 Translations
 ============
 
-Symfony Language Tools combines effective runtime catalogues with
-application-owned translation resources.
+Symfony Language Tools combines the selected environment's translation
+catalogue with translation resources from the project.
 
 Completion
 ----------
@@ -18,7 +18,7 @@ Resources
 Definitions are read from YAML, JSON, XLIFF and PHP resources under a
 ``translations/`` directory. Nested YAML and JSON keys use dot notation.
 INI catalogs using a locale directory, such as
-``Translations/en_US/messages.ini`` in Mautic, are recognized too. Unsaved
+``Translations/en_US/messages.ini``, are recognized too. Unsaved
 resource changes are available immediately, and changes made by external tools
 are picked up while the server is running.
 
@@ -42,17 +42,19 @@ parameter expressions or unpacked parameter arrays aren't diagnosed.
 Missing-key diagnostics are disabled by default because external translation
 providers can make the runtime catalogue incomplete.
 
-Enable missing-key diagnostics in a project or workspace-folder setting:
+Enable missing-key diagnostics in ``.symfony-lsp.json``:
 
 .. code-block:: json
 
     {
-        "symfonyLsp.translationDiagnostics": true
+        "version": 1,
+        "translationDiagnostics": true
     }
 
 A quick fix on a missing-key diagnostic adds the key to an existing YAML
 catalog for the selected domain under ``translations/``.
 
-The setting is resource-scoped, so each folder in a multi-root workspace can
-choose independently. Runtime catalogue messages aren't written to logs or
-telemetry.
+Project-specific overrides can enable the setting independently for each
+application in a multi-project workspace. See the `project configuration`_.
+
+.. _`project configuration`: ../project-configuration.rst

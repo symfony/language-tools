@@ -58,8 +58,8 @@ Set ``workspaceTrust`` to ``false`` to keep every project in static-only mode.
 Configuration
 -------------
 
-Put shared project and analysis settings in ``.symfony-lsp.json`` so Zed and
-the `headless diagnostics checker`_ use the same values.
+Put shared settings in ``.symfony-lsp.json``; see the
+`project configuration`_.
 
 Configure Zed-only overrides under the ``symfony-language-tools`` language
 server:
@@ -80,15 +80,9 @@ server:
         }
     }
 
-``phpCommand`` is the argument list used to inspect the Symfony application.
-For example, use ``["symfony", "php"]`` with Symfony CLI, or a Docker command
-with ``containerProjectRoot`` as described in `Docker support`_.
-
-``containerProjectRoot``, ``environment``, ``debug``, ``runtimeIndexing``,
-``bridgeTimeout``, ``projectRoots``, ``trace`` and
-``translationDiagnostics`` have the same behavior as their VS Code
-counterparts. Restart the language server after changing initialization
-options.
+Use the same setting names as ``.symfony-lsp.json`` for Zed-only overrides.
+See `Docker support`_ when the PHP command runs in a container. Restart the
+language server after changing its configuration.
 
 Override the executable or set its memory limit through the binary settings:
 
@@ -138,4 +132,4 @@ application. Set ``trace`` to ``messages`` or ``verbose`` temporarily for
 redacted protocol logging, then restore it to ``off``.
 
 .. _`Docker support`: ../docker.rst
-.. _`headless diagnostics checker`: ../features/headless-diagnostics.rst
+.. _`project configuration`: ../project-configuration.rst

@@ -1,10 +1,10 @@
 Security
 ========
 
-The Security integration understands effective SecurityBundle configuration
-and recognized authorization checks in application-owned PHP, Twig and YAML
-files. It supports firewalls, user providers, role hierarchy, configured
-authenticators and registered voters in the selected Symfony environment.
+The Security integration understands SecurityBundle configuration and
+recognized authorization checks in PHP, Twig and YAML files. It supports
+firewalls, user providers, role hierarchy, configured authenticators and
+registered voters in the selected Symfony environment.
 
 Completion
 ----------
@@ -39,14 +39,13 @@ SecurityBundle YAML configuration.
 Diagnostics
 -----------
 
-After complete runtime metadata is available, definitely unknown user providers
-and firewall names are reported. Unknown authorization attributes and
+After runtime indexing completes, definitely unknown user providers and
+firewall names are reported. Unknown authorization attributes and
 roles aren't diagnosed because custom voters define an open set of valid
 attributes.
 
 Privacy
 -------
 
-Symfony Language Tools uses names, relationships, types and boolean metadata for
-Security features. User names, password hashes, LDAP settings and other provider
-values never enter indexes or Language Server Protocol responses.
+User names, password hashes, LDAP settings and other provider values are never
+displayed or written to logs.

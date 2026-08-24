@@ -1,5 +1,5 @@
-Running Diagnostics in CI
-=========================
+Running Diagnostics Without an Editor
+=====================================
 
 The ``symfony-lsp check`` command runs Symfony Language Tools diagnostics
 against saved application files without an editor or Language Server Protocol
@@ -21,15 +21,7 @@ its directory to ``PATH`` or invoke it by its full path:
 
     $ /path/to/symfony-lsp check
 
-When running Symfony Language Tools from a source checkout, install its Composer
-dependencies and build the Tree-sitter extension first. The executable is then
-available under ``bin/``:
-
-.. code-block:: terminal
-
-    $ composer install
-    $ composer tree-sitter:build
-    $ ./bin/symfony-lsp check
+To build the executable yourself, follow the `source installation guide`_.
 
 Running a Check
 ---------------
@@ -65,62 +57,14 @@ Reports indicate whether each project used runtime or source-only analysis. If
 runtime analysis cannot complete, the command exits with status ``12`` instead
 of silently switching to source-only analysis.
 
-Configuring Projects
---------------------
+Configuring the Check
+---------------------
 
-Create ``.symfony-lsp.json`` in the workspace root to share analysis settings
-between the checker and editor integrations:
+The checker and editor integrations share ``.symfony-lsp.json``. See the
+`project configuration`_ for available settings and multi-project examples.
 
-.. code-block:: json
-
-    {
-        "version": 1,
-        "projectRoots": [".", "apps/admin"],
-        "phpCommand": ["php"],
-        "environment": "dev",
-        "debug": true,
-        "runtimeIndexing": true,
-        "bridgeTimeout": 300,
-        "translationDiagnostics": false,
-        "projects": {
-            "apps/admin": {
-                "phpCommand": [
-                    "docker",
-                    "compose",
-                    "exec",
-                    "-T",
-                    "php",
-                    "php"
-                ],
-                "containerProjectRoot": "/app"
-            }
-        }
-    }
-
-All fields except ``version`` are optional. The built-in defaults are:
-
-* automatic project discovery;
-* ``["php"]`` for ``phpCommand``;
-* no ``containerProjectRoot``;
-* ``dev`` for ``environment``;
-* ``true`` for ``debug`` and ``runtimeIndexing``;
-* 300 seconds for ``bridgeTimeout``;
-* ``false`` for ``translationDiagnostics``.
-
-Top-level analysis settings apply to every discovered project. Entries under
-``projects`` override them for one workspace-relative project root. Unknown
-keys, invalid values and project entries that don't match a discovered Symfony
-project are configuration errors.
-
-For the checker, command-line values override project entries, which override
-top-level file values and built-in defaults. Use ``--config=PATH`` to select a
-different configuration file.
-
-Editor settings override values from this file. A checked-in configuration
-never grants workspace trust or executes application code by itself.
-
-Use ``symfony-lsp check --help`` for every command-line override, including the
-PHP command, environment, project roots and timeouts.
+Command-line options override the shared configuration. Use ``--config=PATH``
+to select another file and ``symfony-lsp check --help`` to list every option.
 
 Choosing an Output Format
 -------------------------
@@ -134,8 +78,8 @@ summary. Use JSON for automation:
 
 The JSON document uses ``schemaVersion`` 1. Diagnostic ranges are zero-based,
 end-exclusive and encoded as UTF-16 character offsets. It contains project
-identity, project-relative and workspace-relative paths, effective analysis
-mode, index status, baseline state and summary counts.
+identity, project-relative and workspace-relative paths, analysis mode, project
+status, baseline state and summary counts.
 
 Use GitHub Actions annotations for pull request feedback:
 
@@ -170,27 +114,6 @@ with:
 
     $ symfony-lsp check --list-codes
     $ symfony-lsp check --format=json --list-codes
-
-The current codes are:
-
-* ``config.deprecated_key``, ``config.duplicate_key``,
-  ``config.invalid_type``, ``config.malformed_structure``,
-  ``config.missing_required_key`` and ``config.unknown_key``;
-* ``env.incompatible_type``, ``env.malformed_chain`` and
-  ``env.unknown_processor``;
-* ``event.invalid_listener_method``;
-* ``form.unknown_option`` and ``validation.unknown_constraint_option``;
-* ``importmap.unknown_entrypoint``;
-* ``messenger.invalid_handler_signature``, ``messenger.unknown_bus`` and
-  ``messenger.unknown_transport``;
-* ``parameter.not_found`` and ``service.not_found``;
-* ``route.missing_parameters`` and ``route.not_found``;
-* ``security.unknown_firewall`` and ``security.unknown_provider``;
-* ``stimulus.unknown_controller``;
-* ``template.not_found``;
-* ``translation.domain_not_found``, ``translation.not_found`` and
-  ``translation.placeholders``;
-* ``twig_callable.unknown_argument`` and ``twig_component.not_found``.
 
 Using a Baseline
 ----------------
@@ -254,11 +177,11 @@ Reports and baselines can contain diagnostic messages and application names,
 but not parameter values, environment values, credentials or resolved secrets.
 Baselines contain no absolute checkout paths or source snippets.
 
-Current Limitations
--------------------
+Limitations
+-----------
 
-The checker has no watch mode, doesn't analyze unsaved editor contents
-and doesn't modify application files. It supports human, JSON and GitHub Actions
-output; SARIF isn't currently provided.
+The checker has no watch mode or SARIF output and doesn't apply fixes.
 
 .. _`standalone guide`: ../index.rst#installing-a-standalone-release
+.. _`source installation guide`: ../index.rst#installing-the-server-from-source
+.. _`project configuration`: ../project-configuration.rst

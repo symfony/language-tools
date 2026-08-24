@@ -51,9 +51,8 @@ Use an absolute executable path in ``command`` when ``symfony-lsp`` isn't on
 the configured extensions. Add other project-specific dotenv suffixes, such as
 ``.env.dev``, when the agent needs to initiate requests from those files.
 
-Keep OpenCode's general PHP language server enabled. OpenCode can connect all
-matching language servers to the same PHP file, and Symfony Language Tools
-complements the general server with Symfony-specific information.
+Keep OpenCode's general PHP language server enabled. Symfony Language Tools
+adds Symfony-specific information alongside it.
 
 Workspace Trust
 ---------------
@@ -65,7 +64,7 @@ application code.
 
 Set ``workspaceTrust`` to ``false`` to keep the project in static-only mode.
 Source-based navigation and diagnostics remain available, but features that
-need effective runtime metadata are unavailable.
+need information from the running application are unavailable.
 
 Supported Features
 ------------------
@@ -74,25 +73,15 @@ OpenCode can consume Symfony-aware diagnostics and use hover, go-to-definition
 and find-references requests while its agent works on PHP, Twig, configuration
 and frontend files.
 
-OpenCode doesn't currently request completion, rename, code actions, document
-links or code lenses from custom language servers. Use VS Code or Neovim when
-you need those interactive editor features.
-
-OpenCode sends watched-file notifications after its built-in editing tools
-write a file, so Symfony Language Tools refreshes its source and runtime indexes
-without restarting OpenCode. Files changed outside those tools are refreshed
-the next time OpenCode accesses them through its LSP integration.
+Changes made with OpenCode are picked up without restarting it. Files changed
+outside OpenCode are refreshed the next time OpenCode accesses them.
 
 Configuration
 -------------
 
-Put shared project and analysis settings in ``.symfony-lsp.json`` so OpenCode
-and the `headless diagnostics checker`_ use the same values. This also enables
-project-scoped settings and missing
-translation diagnostics without an OpenCode configuration channel.
-
-OpenCode forwards the ``initialization`` object as Language Server Protocol
-initialization options. Use it for trust, tracing or an OpenCode-only override:
+Put shared settings in ``.symfony-lsp.json``; see the `project configuration`_.
+Use the ``initialization`` object for trust, tracing or an OpenCode-only
+override:
 
 .. code-block:: json
 
@@ -114,10 +103,8 @@ initialization options. Use it for trust, tracing or an OpenCode-only override:
         }
     }
 
-``phpCommand``, ``containerProjectRoot``, ``environment``, ``debug``,
-``runtimeIndexing``, ``bridgeTimeout``, ``projectRoots`` and
-``trace`` have the same behavior as their VS Code counterparts, including
-`Docker support`_. The
+Use the same setting names as ``.symfony-lsp.json`` for OpenCode-only
+overrides. See `Docker support`_ when the PHP command runs in a container. The
 ``env`` object configures environment variables for the server process.
 
 Troubleshooting
@@ -144,6 +131,6 @@ See the `OpenCode LSP documentation`_ for its custom language server settings
 and debugging commands.
 
 .. _`standalone guide`: ../index.rst#installing-a-standalone-release
-.. _`headless diagnostics checker`: ../features/headless-diagnostics.rst
+.. _`project configuration`: ../project-configuration.rst
 .. _`Docker support`: ../docker.rst
 .. _`OpenCode LSP documentation`: https://opencode.ai/docs/lsp/

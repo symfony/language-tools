@@ -1,8 +1,8 @@
-Forms, Validation, and Serializer Metadata
-==========================================
+Forms, Validation and Serializer Metadata
+=========================================
 
-Symfony Language Tools combines effective Form and Validator metadata with
-application source mappings.
+Symfony Language Tools understands form options, validation constraints,
+serializer groups and project mappings.
 
 Forms
 -----
@@ -12,16 +12,15 @@ to ``createForm()``, ``createNamed()``, and form builder ``add()`` calls when
 the form type is a static ``::class`` reference. Required options are identified
 in completion and hover details.
 
-Definitely unknown literal options are diagnosed for form types successfully
-resolved from the selected application's Form registry. Dynamic option arrays
-and unresolved form types are ignored.
+After runtime indexing, definitely unknown literal options are diagnosed for
+known form types. Dynamic option arrays and unresolved form types are ignored.
 
 Validation
 ----------
 
 Constraint and constraint-option completion is available in PHP attributes and
-YAML validation mappings. Symfony's installed constraints and their constructor
-options come from runtime reflection. Application constraint classes extending
+YAML validation mappings. Runtime indexing adds installed Symfony constraints
+and their constructor options. Project constraint classes extending
 ``Constraint`` are recognized from project files.
 
 Definitely unknown options are diagnosed only when the constraint itself is
@@ -39,6 +38,5 @@ Go to Definition connects YAML validation and serializer class and property
 mappings to application PHP declarations. Property completion is available
 under YAML ``properties`` and ``attributes`` mappings.
 
-Serializer groups and form options remain extensible at runtime. Symfony
-Language Tools does not diagnose unknown groups, dynamic arrays, or metadata it
-cannot resolve exactly.
+Unknown serializer groups, dynamic arrays and options that cannot be resolved
+exactly aren't diagnosed.

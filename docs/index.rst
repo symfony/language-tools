@@ -27,44 +27,35 @@ Any other editor with a Language Server Protocol client can run the
 standalone server: see `installing a release`_ below and configure your client
 to start ``symfony-lsp``.
 
+Project Configuration
+---------------------
+
+Use ``.symfony-lsp.json`` to share project settings between editors and the
+command-line checker. See `project configuration`_ for all options and
+multi-project examples.
+
 Features
 --------
 
 Symfony Language Tools understands routing, dependency injection, Twig
 templates, translations, environment variables, bundle configuration, Messenger,
 events, security, form and validation metadata, AssetMapper, Stimulus and
-Doctrine. Each integration page documents its supported declarations, references
-and Language Server Protocol capabilities. See the `supported integrations`_
+Doctrine. Each integration page documents its supported declarations,
+references and editor features. See the `supported integrations`_
 for the complete feature matrix.
 
-Tested Against Real Applications
---------------------------------
+Tested with Real Applications
+-----------------------------
 
-Beyond its test suite, every change that affects the language server runs a
-full editing session against disposable checkouts of real open-source Symfony
-applications: the server indexes each application from a cold and a warm
-state, boots it to load runtime metadata, and exercises completion, hover,
-navigation, references, document links, code lenses, code actions and rename
-on references discovered in the application's own code.
+Symfony Language Tools is continuously tested with real open-source projects
+across supported Symfony versions:
 
-The matrix is pinned to exact revisions and spans supported Symfony versions
-and real-world architectures:
+* `Kimai`_ and `Mautic`_ on Symfony 6.4;
+* `Sulu Demo`_, `Sylius`_ and `Shopware`_ on Symfony 7.4;
+* `Symfony Demo`_ on Symfony 8.1.
 
-* `Kimai`_ (Symfony 6.4): a conventional time-tracking application with
-  plugins, Doctrine, translations and security;
-* `Mautic`_ (Symfony 6.4): a marketing automation platform with a legacy
-  kernel layout and a large bundle and plugin ecosystem;
-* `Sulu Demo`_ (Symfony 7.4): a content management demo with CMS runtime
-  metadata;
-* `Sylius`_ (Symfony 7.4): an e-commerce platform covering Doctrine, workflow,
-  Messenger and Symfony UX;
-* `Shopware`_ (Symfony 7.4): a large commerce platform with a nonstandard
-  kernel, XML service definitions and thousands of routes;
-* `Symfony Demo`_ (Symfony 8.1): the canonical demo application on the newest
-  stable branch.
-
-The pinned revisions are updated with each release, and the same harness runs
-against additional private applications before every release.
+These applications cover conventional and legacy layouts, large codebases,
+bundle ecosystems and different Symfony features.
 
 Requirements
 ------------
@@ -106,7 +97,7 @@ from the extracted directory after verifying where the archive came from:
 
 .. code-block:: terminal
 
-    $ xattr -dr com.apple.quarantine /path/to/symfony-lsp-v0.16.0-macos-arm64
+    $ xattr -dr com.apple.quarantine /path/to/symfony-lsp-vX.Y.Z-macos-arm64
 
 Run ``./symfony-lsp`` without arguments to start the Language Server Protocol
 connection over standard input and standard output. Pass ``--socket=<port>``
@@ -133,8 +124,8 @@ or CI:
 The command can produce human, JSON and GitHub Actions reports, select blocking
 diagnostic codes and maintain an occurrence-specific baseline. Runtime analysis
 executes application code; pass ``--source-only`` when it must remain disabled.
-See `Running Diagnostics in CI`_ for the configuration, output, baseline and
-exit-status contracts.
+See `Running Diagnostics Without an Editor`_ for configuration, output,
+baseline and exit-status details.
 
 Upgrading
 ~~~~~~~~~
@@ -155,15 +146,15 @@ Installing the Server from Source
 
 Source installations require PHP 8.4.1 or later and Composer 2. Clone this
 repository outside the Symfony application that you want to edit. Install the
-server dependencies and build the bundled Twig and YAML parser extension:
+server dependencies and build the native parser extension:
 
 .. code-block:: terminal
 
     $ composer install
     $ composer tree-sitter:build
 
-The development executable is ``bin/symfony-lsp``. It automatically loads the
-locally built parser extension on Unix systems. Verify that it starts:
+The development executable is ``bin/symfony-lsp``. On Unix, no additional PHP
+extension configuration is required. Verify that it starts:
 
 .. code-block:: terminal
 
@@ -173,8 +164,9 @@ locally built parser extension on Unix systems. Verify that it starts:
 .. _`Neovim`: editors/neovim.rst
 .. _`Zed`: editors/zed.rst
 .. _`OpenCode`: editors/opencode.rst
+.. _`project configuration`: project-configuration.rst
 .. _`supported integrations`: features/index.rst
-.. _`Running Diagnostics in CI`: features/headless-diagnostics.rst
+.. _`Running Diagnostics Without an Editor`: features/headless-diagnostics.rst
 .. _`Docker support`: docker.rst
 .. _`release metadata`: https://symfony.com/releases.json
 .. _`Kimai`: https://github.com/kimai/kimai

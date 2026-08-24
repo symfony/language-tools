@@ -2,8 +2,8 @@ Messenger Integration
 =====================
 
 The Messenger integration understands buses, transports, routed message
-classes and effective handler registrations in the configured Symfony
-environment, together with their application-owned PHP and YAML declarations.
+classes and handlers in the configured Symfony environment, together with PHP
+and YAML declarations.
 
 Completion
 ----------
@@ -23,8 +23,7 @@ routing entries also complete transport names:
             routing:
                 App\Message\GenerateReport: asy
 
-The suggestions use effective bus and transport names from the compiled
-container.
+The suggestions use bus and transport names from the configured application.
 
 Hover
 -----
@@ -33,7 +32,7 @@ Hover over a recognized bus to display whether it is the default bus and how
 many message classes it handles. Transport hover displays whether it is the
 failure transport and how many message classes are routed to it.
 
-Hover over an indexed message or handler class to display its transports,
+Hover over a message or handler class to display its transports,
 handlers and buses.
 
 Definition and References
@@ -50,7 +49,7 @@ The server recognizes message classes in these PHP contexts:
 * the ``handles`` argument of ``#[AsMessageHandler]``.
 
 From a dispatch site, definition results include the message class and its
-effective handlers. From a message class, definition navigates to handlers and
+registered handlers. From a message class, definition navigates to handlers and
 references include recognized dispatch sites. Handler classes navigate back to
 the message classes they handle. Handler relationships inherited through
 application-owned parent classes and interfaces are included.
@@ -58,20 +57,17 @@ application-owned parent classes and interfaces are included.
 Code Lenses
 -----------
 
-Message classes display the number of effective handlers above the class
-name. Handler classes display the number of message classes they handle.
-Clients that support the returned reference command can open the related
-locations from the code lens.
+Message classes display the number of handlers above the class name. Handler
+classes display the number of message classes they handle. Selecting a code lens
+opens the related locations.
 
 Diagnostics
 -----------
 
-After complete runtime metadata is available, unknown bus and transport
-references are reported as errors. PHP handlers with a scalar first parameter
-are reported when effective Messenger configuration assigns an object message
-to that method.
-Diagnostics that depend on effective Messenger configuration are suppressed
-when runtime indexing is unavailable or incomplete.
+After runtime indexing completes, unknown bus and transport references are
+reported as errors. PHP handlers with a scalar first parameter are reported when
+Messenger assigns an object message to that method. These diagnostics are
+suppressed when runtime indexing is unavailable or incomplete.
 
 Limitations
 -----------
