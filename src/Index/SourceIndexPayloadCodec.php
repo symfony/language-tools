@@ -131,6 +131,11 @@ final class SourceIndexPayloadCodec
             return;
         }
         $visited->offsetSet($value, null);
+        foreach ((new \ReflectionObject($value))->getProperties() as $property) {
+            if (!$property->isStatic() && !$property->isInitialized($value)) {
+                throw new \UnexpectedValueException(\sprintf('The source index payload contains an uninitialized property on "%s".', $value::class));
+            }
+        }
         foreach ((array) $value as $item) {
             $this->assertComplete($item, $visited);
         }

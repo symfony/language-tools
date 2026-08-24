@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderInterface
 {
@@ -13,9 +14,9 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
         private readonly LspProtocolMapper $protocol,
         private readonly ServiceIndexRegistry $serviceIndexes,
         private readonly ParameterIndexRegistry $parameterIndexes,
-        private readonly DependencyInjectionSourceIndexRegistry $sourceIndexes,
         private readonly YamlDependencyInjectionExtractor $yamlExtractor,
         private readonly PhpAutowireReferenceExtractor $autowireExtractor,
+        private readonly RuntimeConfiguration $runtimeConfiguration,
     ) {
     }
 
@@ -26,10 +27,16 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
             return null;
         }
 
-        $references = 'yaml' === $request->document->languageId()
-            ? $this->yamlExtractor->extract($request->document->uri(), $request->document->text())->references()
-            : $this->autowireExtractor->extract($request->document->uri(), $request->document->text());
-        $sourceIndex = $this->sourceIndexes->forProject($request->project);
+        $localServices = [];
+        $localParameters = [];
+        if ('yaml' === $request->document->languageId()) {
+            $facts = $this->yamlExtractor->extract($request->document->uri(), $request->document->text(), $this->runtimeConfiguration->environment($request->project));
+            $references = $facts->references();
+            $localServices = array_fill_keys(array_map(static fn (ServiceDeclaration $declaration): string => $declaration->id(), $facts->services()), true);
+            $localParameters = array_fill_keys(array_map(static fn (ParameterDeclaration $declaration): string => $declaration->name(), $facts->parameters()), true);
+        } else {
+            $references = $this->autowireExtractor->extract($request->document->uri(), $request->document->text());
+        }
         $serviceIndex = $this->serviceIndexes->forProject($request->project);
         $parameterIndex = $this->parameterIndexes->forProject($request->project);
         if (!$serviceIndex->isComplete() && !$parameterIndex->isComplete()) {
@@ -42,7 +49,7 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
                 if ($reference->isOptional()
                     || !$serviceIndex->isComplete()
                     || null !== $serviceIndex->get($reference->name())
-                    || [] !== $sourceIndex->serviceDeclarations($reference->name())
+                    || isset($localServices[$reference->name()])
                 ) {
                     continue;
                 }
@@ -52,7 +59,7 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
             } else {
                 if (!$parameterIndex->isComplete()
                     || null !== $parameterIndex->get($reference->name())
-                    || [] !== $sourceIndex->parameterDeclarations($reference->name())
+                    || isset($localParameters[$reference->name()])
                 ) {
                     continue;
                 }

@@ -4,7 +4,10 @@ namespace Symfony\Lsp\Tests\Feature\Twig;
 
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\Twig\TwigCallableDeclaration;
 use Symfony\Lsp\Feature\Twig\TwigCallableDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigCallableKind;
@@ -79,6 +82,55 @@ final class TwigCallableSourceIndexerTest extends TestCase
         self::assertTrue($attributes[0]->needsIsSandboxed());
         self::assertTrue($attributes[0]->isVariadic());
         self::assertTrue($attributes[0]->optionsKnown());
+    }
+
+    public function testDefaultsFieldsMissingFromOlderCachedDeclarations(): void
+    {
+        $declaration = new TwigCallableDeclaration(
+            TwigCallableKind::Function,
+            'legacy_function',
+            'file:///workspace/src/Twig/LegacyExtension.php',
+            new Range(new Position(0, 0), new Position(0, 15)),
+            needsEnvironment: true,
+            needsContext: true,
+            variadic: true,
+            optionsKnown: true,
+            needsCharset: true,
+            needsIsSandboxed: true,
+        );
+        $unsetNewFields = \Closure::bind(
+            static function (TwigCallableDeclaration $declaration): void {
+                unset(
+                    $declaration->needsCharset,
+                    $declaration->needsContext,
+                    $declaration->needsEnvironment,
+                    $declaration->needsIsSandboxed,
+                    $declaration->optionsKnown,
+                    $declaration->variadic,
+                );
+            },
+            null,
+            TwigCallableDeclaration::class,
+        );
+        self::assertInstanceOf(\Closure::class, $unsetNewFields);
+        $unsetNewFields($declaration);
+
+        $indexer = $this->indexer(new TwigCallableIndexRegistry());
+        $codec = new SourceIndexPayloadCodec();
+        $codec->validate([$indexer]);
+        $restored = $codec->decode($indexer->name(), $codec->encode(
+            $indexer->name(),
+            new TwigCallableSourceFacts('file:///workspace/src/Twig/LegacyExtension.php', [$declaration]),
+        ));
+        self::assertInstanceOf(TwigCallableSourceFacts::class, $restored);
+        $declarations = $restored->declarations();
+        self::assertCount(1, $declarations);
+        self::assertFalse($declarations[0]->needsCharset());
+        self::assertFalse($declarations[0]->needsContext());
+        self::assertFalse($declarations[0]->needsEnvironment());
+        self::assertFalse($declarations[0]->needsIsSandboxed());
+        self::assertFalse($declarations[0]->isVariadic());
+        self::assertTrue($declarations[0]->optionsKnown());
     }
 
     private function indexer(TwigCallableIndexRegistry $indexes): TwigCallableSourceIndexer

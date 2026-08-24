@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Ignore runtime-backed diagnostics in Twig files outside configured loader paths
+- Handle ICU translation branches and nested Twig parameter maps conservatively
+- Validate dependency injection references only in the selected environment
+- Restore older cached Twig callable declarations safely
 - Validate saved bundle configuration with the selected application environment
 - Recognize route configuration files outside conventional directories
 - Avoid false diagnostics for valid configuration, validation attributes and Twig expressions

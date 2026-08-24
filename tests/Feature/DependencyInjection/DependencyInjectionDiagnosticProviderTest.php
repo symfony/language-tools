@@ -9,7 +9,6 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDiagnosticProvider;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
@@ -18,6 +17,7 @@ use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 final class DependencyInjectionDiagnosticProviderTest extends TestCase
 {
@@ -30,8 +30,13 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
             services:
                 app.known: ~
                 app.consumer:
-                    arguments: ['@missing.service', '@?optional.service', '@app.known', '%missing.parameter%', '%app.known%']
+                    arguments: ['@missing.service', '@test.only', '@?optional.service', '@app.known', '%missing.parameter%', '%app.known%']
                     tags: ['unknown.tag']
+            when@test:
+                services:
+                    test.only: ~
+                    app.test_consumer:
+                        arguments: ['%test.client.parameters%']
             YAML;
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'yaml', 1, $text));
@@ -43,26 +48,25 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
         $parameterIndexes->forProject($project)->replace(true);
         $converter = new PositionConverter();
         $yamlExtractor = new YamlDependencyInjectionExtractor($converter);
-        $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace($yamlExtractor->extract($uri, $text));
         $provider = new DependencyInjectionDiagnosticProvider(
             new DocumentContextResolver($documents, $projects),
             new LspProtocolMapper(),
             $serviceIndexes,
             $parameterIndexes,
-            $sourceIndexes,
             $yamlExtractor,
             new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser())),
+            new RuntimeConfiguration(),
         );
 
         $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
 
         self::assertSame(
-            ['service.not_found', 'parameter.not_found'],
+            ['service.not_found', 'service.not_found', 'parameter.not_found'],
             array_column($diagnostics ?? [], 'code'),
         );
         self::assertSame([
             'Service "missing.service" does not exist in the selected environment.',
+            'Service "test.only" does not exist in the selected environment.',
             'Parameter "missing.parameter" does not exist in the selected environment.',
         ], array_column($diagnostics ?? [], 'message'));
     }

@@ -34,7 +34,7 @@ final class ProjectConfigurationSnapshotLoader implements RuntimeSnapshotLoaderI
     }
 
     /** @param array<array-key, mixed> $data */
-    private function node(array $data): ConfigurationNode
+    private function node(array $data, ?string $entryKeyAttribute = null): ConfigurationNode
     {
         $children = [];
         foreach (\is_array($data['children'] ?? null) ? $data['children'] : [] as $child) {
@@ -42,7 +42,8 @@ final class ProjectConfigurationSnapshotLoader implements RuntimeSnapshotLoaderI
                 $children[] = $this->node($child);
             }
         }
-        $prototype = \is_array($data['prototype'] ?? null) ? $this->node($data['prototype']) : null;
+        $keyAttribute = \is_string($data['keyAttribute'] ?? null) ? $data['keyAttribute'] : null;
+        $prototype = \is_array($data['prototype'] ?? null) ? $this->node($data['prototype'], $keyAttribute) : null;
         $allowed = [];
         foreach (\is_array($data['allowedValues'] ?? null) ? $data['allowedValues'] : [] as $value) {
             if (null === $value || \is_scalar($value)) {
@@ -76,7 +77,8 @@ final class ProjectConfigurationSnapshotLoader implements RuntimeSnapshotLoaderI
             $prototype,
             $accepts,
             $aliases,
-            \is_string($data['keyAttribute'] ?? null) ? $data['keyAttribute'] : null,
+            $keyAttribute,
+            $entryKeyAttribute,
         );
     }
 }

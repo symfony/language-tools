@@ -4,6 +4,8 @@ namespace Symfony\Lsp\Feature\Configuration;
 
 final class ConfigurationNode
 {
+    private readonly ?self $entryKeyNode;
+
     /**
      * @param list<ConfigurationNode>          $children
      * @param list<string|int|float|bool|null> $allowedValues
@@ -25,7 +27,21 @@ final class ConfigurationNode
         private readonly array $accepts = [],
         private readonly array $aliases = [],
         private readonly ?string $keyAttribute = null,
+        ?string $entryKeyAttribute = null,
     ) {
+        $this->entryKeyNode = null === $entryKeyAttribute ? null : new self(
+            $entryKeyAttribute,
+            'scalar',
+            false,
+            false,
+            null,
+            null,
+            null,
+            false,
+            [],
+            [],
+            null,
+        );
     }
 
     public function acceptsNull(): bool
@@ -112,6 +128,9 @@ final class ConfigurationNode
 
     public function child(string $name, bool $sequenceItem = false): ?self
     {
+        if ($name === $this->entryKeyNode?->name()) {
+            return $this->entryKeyNode;
+        }
         $name = $this->aliases[$name] ?? $name;
         if (null !== $child = $this->definedChild($name)) {
             return $child;

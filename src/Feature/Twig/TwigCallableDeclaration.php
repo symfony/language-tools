@@ -8,7 +8,11 @@ final class TwigCallableDeclaration
 {
     // Defaults keep older cached payloads readable
     private bool $needsCharset = false;
+    private bool $needsContext = false;
+    private bool $needsEnvironment = false;
     private bool $needsIsSandboxed = false;
+    private bool $optionsKnown = true;
+    private bool $variadic = false;
 
     public function __construct(
         private readonly TwigCallableKind $kind,
@@ -17,15 +21,19 @@ final class TwigCallableDeclaration
         private readonly Range $range,
         private readonly ?string $className = null,
         private readonly ?string $method = null,
-        private readonly bool $needsEnvironment = false,
-        private readonly bool $needsContext = false,
-        private readonly bool $variadic = false,
-        private readonly bool $optionsKnown = true,
+        bool $needsEnvironment = false,
+        bool $needsContext = false,
+        bool $variadic = false,
+        bool $optionsKnown = true,
         bool $needsCharset = false,
         bool $needsIsSandboxed = false,
     ) {
         $this->needsCharset = $needsCharset;
+        $this->needsContext = $needsContext;
+        $this->needsEnvironment = $needsEnvironment;
         $this->needsIsSandboxed = $needsIsSandboxed;
+        $this->optionsKnown = $optionsKnown;
+        $this->variadic = $variadic;
     }
 
     public function kind(): TwigCallableKind

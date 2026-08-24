@@ -214,6 +214,24 @@ final class ConfigurationProviderTest extends TestCase
         ], array_column($diagnostics, 'message'));
     }
 
+    public function testAcceptsKeyAttributesInsideMappedPrototypeEntries(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/security.yaml';
+        $fixture->documents->open(new Document($uri, 'yaml', 1, <<<'YAML'
+            security:
+                password_hashers:
+                    user:
+                        class: App\Model\User
+                        algorithm: bcrypt
+                        typo: true
+            YAML));
+
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.unknown_key'], array_column($diagnostics, 'code'));
+        self::assertSame([2], array_column($diagnostics, 'severity'));
+    }
+
     public function testSupportsKeyedPrototypeSequenceItems(): void
     {
         $fixture = $this->providers();
@@ -441,6 +459,15 @@ final class ConfigurationProviderTest extends TestCase
                         $this->node('level', 'enum', allowedValues: ['debug', 'info']),
                         $this->node('nested', 'boolean'),
                     ]), keyAttribute: 'name'),
+                ]),
+            ],
+            [
+                'alias' => 'security',
+                'tree' => $this->node('security', 'array', children: [
+                    $this->node('password_hashers', 'array', prototype: $this->node('password_hasher', 'array', children: [
+                        $this->node('algorithm', 'scalar'),
+                        $this->node('migrate_from', 'array'),
+                    ]), keyAttribute: 'class'),
                 ]),
             ],
             [

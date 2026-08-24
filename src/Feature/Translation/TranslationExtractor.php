@@ -216,25 +216,26 @@ final class TranslationExtractor
         }
         $pattern = 'php' === $languageId
             ? '/(?:->trans|\bt|new\s+TranslatableMessage)\s*\(\s*([\'\"])([^\'\"]+)\1(?:\s*,\s*(\[[^\]]*\]))?(?:\s*,\s*([\'\"])([^\'\"]+)\4)?/s'
-            : '/([\'\"])([^\'\"]+)\1\s*\|\s*trans(?:\s*\((\{[^}]*\})?(?:\s*,\s*([\'\"])([^\'\"]+)\4)?)?/s';
+            : '/([\'\"])([^\'\"]+)\1\s*\|\s*trans\b/s';
         preg_match_all($pattern, $text, $matches, \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL);
         $result = [];
         foreach ($matches[2] as $i => [$key, $offset]) {
             if (!\is_string($key)) {
                 continue;
             }
-            $domain = \is_string($matches[5][$i][0] ?? null) ? $matches[5][$i][0] : $defaultDomain;
-            $parameters = \is_string($matches[3][$i][0] ?? null) ? $matches[3][$i][0] : '';
-            preg_match_all('/[\'\"](%?[^\'\"]+%?)[\'\"]\s*(?:=>|:)/', $parameters, $placeholderMatches);
-            // Twig hash keys may be bare identifiers, as in {id: post.id}
-            preg_match_all('/(?<=[{,])\s*([A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)/', $parameters, $bareMatches);
-            $placeholders = array_map(static fn (string $name): string => trim($name, '%'), [...$placeholderMatches[1], ...$bareMatches[1]]);
+            if ('twig' === $languageId) {
+                [$parameters, $domain] = $this->twigTransArguments($text, $matches[0][$i], $defaultDomain);
+            } else {
+                $domain = \is_string($matches[5][$i][0] ?? null) ? $matches[5][$i][0] : $defaultDomain;
+                $parameters = \is_string($matches[3][$i][0] ?? null) ? $matches[3][$i][0] : null;
+            }
+            $placeholders = null === $parameters ? null : $this->parameterKeys($parameters);
             $result[] = new TranslationReference(
                 $key,
                 $domain,
                 $uri,
                 $this->range($text, $offset, \strlen($key)),
-                $this->dynamicParameters($text, $matches[0][$i], $parameters) ? null : array_values(array_unique($placeholders)),
+                null === $parameters || $this->dynamicParameters($text, $matches[0][$i], $parameters) ? null : array_values(array_unique($placeholders ?? [])),
             );
         }
         if ('twig' === $languageId) {
@@ -251,6 +252,139 @@ final class TranslationExtractor
         }
 
         return $result;
+    }
+
+    /** @return list<string> */
+    private function parameterKeys(string $parameters): array
+    {
+        $parameters = trim($parameters);
+        if (\strlen($parameters) >= 2 && \in_array($parameters[0], ['[', '{'], true)) {
+            $parameters = substr($parameters, 1, -1);
+        }
+        $keys = [];
+        foreach ($this->splitArguments($parameters) as $argument) {
+            if (preg_match('/^\s*([\'\"])(%?[^\'\"]+%?)\1\s*(?:=>|:)/', $argument, $match)) {
+                $keys[] = trim($match[2], '%');
+            } elseif (preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)/', $argument, $match)) {
+                $keys[] = $match[1];
+            }
+        }
+
+        $keys = array_values(array_unique($keys));
+        sort($keys);
+
+        return $keys;
+    }
+
+    /**
+     * @param array{string|null, int} $match
+     *
+     * @return array{string|null, string}
+     */
+    private function twigTransArguments(string $text, array $match, string $defaultDomain): array
+    {
+        if (!\is_string($match[0])) {
+            return [null, $defaultDomain];
+        }
+        $open = $match[1] + \strlen($match[0]);
+        while (isset($text[$open]) && ctype_space($text[$open])) {
+            ++$open;
+        }
+        if ('(' !== ($text[$open] ?? null)) {
+            return [null, $defaultDomain];
+        }
+        $close = $this->matchingDelimiter($text, $open);
+        if (null === $close) {
+            return [null, $defaultDomain];
+        }
+        $arguments = $this->splitArguments(substr($text, $open + 1, $close - $open - 1));
+        $parameters = trim($arguments[0] ?? '');
+        if (!str_starts_with($parameters, '{') || !str_ends_with($parameters, '}') || $this->containsUnpack($parameters)) {
+            $parameters = null;
+        }
+        $domain = trim($arguments[1] ?? '');
+        if (\strlen($domain) < 2 || !\in_array($domain[0], ["'", '"'], true) || !str_ends_with($domain, $domain[0])) {
+            $domain = $defaultDomain;
+        } else {
+            $domain = substr($domain, 1, -1);
+        }
+
+        return [$parameters, $domain];
+    }
+
+    private function matchingDelimiter(string $text, int $open): ?int
+    {
+        $pairs = ['(' => ')', '[' => ']', '{' => '}'];
+        $stack = [$text[$open]];
+        $quote = null;
+        $escaped = false;
+        for ($offset = $open + 1, $length = \strlen($text); $offset < $length; ++$offset) {
+            $character = $text[$offset];
+            if (null !== $quote) {
+                if ($escaped) {
+                    $escaped = false;
+                } elseif ('\\' === $character) {
+                    $escaped = true;
+                } elseif ($quote === $character) {
+                    $quote = null;
+                }
+                continue;
+            }
+            if (\in_array($character, ["'", '"'], true)) {
+                $quote = $character;
+                continue;
+            }
+            if (isset($pairs[$character])) {
+                $stack[] = $character;
+                continue;
+            }
+            $current = $stack[array_key_last($stack)];
+            if ($pairs[$current] !== $character) {
+                continue;
+            }
+            array_pop($stack);
+            if ([] === $stack) {
+                return $offset;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return list<string> */
+    private function splitArguments(string $text): array
+    {
+        $arguments = [];
+        $start = 0;
+        $stack = [];
+        $quote = null;
+        $escaped = false;
+        for ($offset = 0, $length = \strlen($text); $offset < $length; ++$offset) {
+            $character = $text[$offset];
+            if (null !== $quote) {
+                if ($escaped) {
+                    $escaped = false;
+                } elseif ('\\' === $character) {
+                    $escaped = true;
+                } elseif ($quote === $character) {
+                    $quote = null;
+                }
+                continue;
+            }
+            if (\in_array($character, ["'", '"'], true)) {
+                $quote = $character;
+            } elseif (\in_array($character, ['(', '[', '{'], true)) {
+                $stack[] = $character;
+            } elseif (\in_array($character, [')', ']', '}'], true) && [] !== $stack) {
+                array_pop($stack);
+            } elseif (',' === $character && [] === $stack) {
+                $arguments[] = substr($text, $start, $offset - $start);
+                $start = $offset + 1;
+            }
+        }
+        $arguments[] = substr($text, $start);
+
+        return $arguments;
     }
 
     /**

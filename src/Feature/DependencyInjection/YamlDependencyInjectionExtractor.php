@@ -12,7 +12,7 @@ final class YamlDependencyInjectionExtractor
     ) {
     }
 
-    public function extract(string $uri, string $text): DependencyInjectionSourceFacts
+    public function extract(string $uri, string $text, ?string $environment = null): DependencyInjectionSourceFacts
     {
         /** @var list<PendingServiceDeclaration> $services */
         $services = [];
@@ -25,7 +25,7 @@ final class YamlDependencyInjectionExtractor
         $entryIndent = null;
         $currentService = null;
         $tagsIndent = null;
-        $environmentSection = false;
+        $environmentSection = null;
         $scannedLines = [];
         $blockScalarLines = [];
         $blockScalarIndent = null;
@@ -50,12 +50,21 @@ final class YamlDependencyInjectionExtractor
                 $blockScalarIndent = $mapping['indent'];
             }
             if (null !== $mapping && 0 === $mapping['indent']) {
-                $environmentSection = str_starts_with($mapping['key'], 'when@');
+                $environmentSection = str_starts_with($mapping['key'], 'when@') ? substr($mapping['key'], \strlen('when@')) : null;
+                if (null !== $environment && null !== $environmentSection && $environmentSection !== $environment) {
+                    $section = null;
+                    $currentService = null;
+                    $tagsIndent = null;
+                }
+            }
+            if (null !== $environment && null !== $environmentSection && $environmentSection !== $environment) {
+                $scannedLines[$lineOffset] = true;
+                continue;
             }
             if (null !== $mapping
                 && \in_array($mapping['key'], ['parameters', 'services'], true)
                 && '' === trim($mapping['rest'])
-                && (0 === $mapping['indent'] || $environmentSection)
+                && (0 === $mapping['indent'] || null !== $environmentSection)
             ) {
                 $section = $mapping['key'];
                 $sectionIndent = $mapping['indent'];

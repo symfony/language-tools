@@ -27,7 +27,8 @@ and ``services`` sections in configuration files, such as
 a literal percent, and references in YAML comments are ignored.
 
 Symfony Language Tools also recognizes service and parameter references in PHP
-``#[Autowire]`` attributes. Dynamic references aren't recognized.
+``#[Autowire]`` attributes. YAML references under ``when@...`` are validated
+only for the selected environment. Dynamic references aren't recognized.
 
 Completion
 ----------

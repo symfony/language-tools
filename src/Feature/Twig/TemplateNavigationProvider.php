@@ -87,6 +87,9 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
         if (!$index->isComplete()) {
             return null;
         }
+        if ('twig' === $request->document->languageId() && !$index->isRuntimeTemplateUri($request->document->uri())) {
+            return [];
+        }
         $diagnostics = [];
         foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text()) as $reference) {
             if (null === $index->get($reference->name())) {

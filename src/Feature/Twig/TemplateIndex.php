@@ -141,6 +141,17 @@ final class TemplateIndex
         return $this->complete;
     }
 
+    public function isRuntimeTemplateUri(string $uri): bool
+    {
+        foreach ($this->runtime as $template) {
+            if ($template->uri() === $uri) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** @return list<string> */
     public function variables(string $template): array
     {

@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Route;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
+use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
@@ -16,6 +17,7 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly RouteReferenceExtractor $phpReferenceExtractor,
         private readonly TwigRouteReferenceExtractor $twigReferenceExtractor,
+        private readonly TemplateIndexRegistry $templateIndexes,
     ) {
     }
 
@@ -31,6 +33,11 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
             return null;
         }
 
+        if ('twig' === $request->document->languageId()
+            && !$this->templateIndexes->forProject($request->project)->isRuntimeTemplateUri($request->document->uri())
+        ) {
+            return [];
+        }
         $routeIndex = $this->routeIndexes->forProject($request->project);
         if (!$routeIndex->isComplete()) {
             return null;

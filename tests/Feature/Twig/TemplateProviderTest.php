@@ -597,6 +597,15 @@ final class TemplateProviderTest extends TestCase
         );
     }
 
+    public function testDoesNotDiagnoseTwigFilesOutsideRuntimeLoaderPaths(): void
+    {
+        $uri = 'file:///workspace/book/design/templates/base.html.twig';
+        $text = "{% extends 'missing.html.twig' %}";
+        [, $navigation] = $this->providers($uri, 'twig', $text);
+
+        self::assertSame([], $navigation->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
     /** @return array{TemplateCompletionHandler, TemplateNavigationProvider, PositionConverter} */
     private function providers(string $uri, string $languageId, string $text): array
     {
@@ -605,11 +614,19 @@ final class TemplateProviderTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $indexes = new TemplateIndexRegistry();
-        $indexes->forProject($project)->replaceRuntime(true, new TemplateDeclaration(
-            'article/show.html.twig',
-            'file:///workspace/templates/article/show.html.twig',
-            new Range(new Position(0, 0), new Position(0, 0)),
-        ));
+        $indexes->forProject($project)->replaceRuntime(
+            true,
+            new TemplateDeclaration(
+                'article/show.html.twig',
+                'file:///workspace/templates/article/show.html.twig',
+                new Range(new Position(0, 0), new Position(0, 0)),
+            ),
+            new TemplateDeclaration(
+                'page.html.twig',
+                'file:///workspace/templates/page.html.twig',
+                new Range(new Position(0, 0), new Position(0, 0)),
+            ),
+        );
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
         $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser), new QuotedArgumentMatcher($converter), new PhpCommentParser());

@@ -28,6 +28,7 @@ use Symfony\Lsp\Index\PersistentSourceIndexStore;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
@@ -205,6 +206,19 @@ final class ApplicationSourceScannerTest extends TestCase
         $range = new Range(new Position(0, 0), new Position(0, 0));
         $payload = base64_encode(serialize(new RouteSourceFacts('file:///source.php', [new RouteDeclaration('route', 'file:///source.php', $range)], [])));
         $this->expectException(\UnexpectedValueException::class);
+
+        $codec->decode($provider->name(), $payload);
+    }
+
+    public function testRejectsCachedPayloadsWithUninitializedProperties(): void
+    {
+        $provider = new RecordingSourceIndexProvider(payloadClasses: [UninitializedFacts::class]);
+        $codec = new SourceIndexPayloadCodec();
+        $codec->validate([$provider]);
+        $facts = (new \ReflectionClass(UninitializedFacts::class))->newInstanceWithoutConstructor();
+        $payload = base64_encode(serialize($facts));
+        $this->expectException(\UnexpectedValueException::class);
+        $this->expectExceptionMessage('uninitialized property');
 
         $codec->decode($provider->name(), $payload);
     }
@@ -999,5 +1013,25 @@ final class GenerationalSourceIndexProvider implements SourceIndexProviderInterf
     private function facts(string $uri, string $hash): RouteSourceFacts
     {
         return new RouteSourceFacts($uri, [new RouteDeclaration($hash, $uri, new Range(new Position(0, 0), new Position(0, 0)))], []);
+    }
+}
+
+final class UninitializedFacts implements SourceFactsInterface
+{
+    private string $uri;
+
+    public function __construct(string $uri)
+    {
+        $this->uri = $uri;
+    }
+
+    public function uri(): string
+    {
+        return $this->uri;
+    }
+
+    public function isEmpty(): bool
+    {
+        return false;
     }
 }

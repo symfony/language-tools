@@ -66,8 +66,8 @@ Diagnostics
 -----------
 
 A missing static template name is reported after the configured Twig loader
-paths are known. Dynamic template expressions, including concatenated names,
-are ignored.
+paths are known. Twig files outside those loader paths aren't diagnosed. Dynamic
+template expressions, including concatenated names, are ignored.
 Files owned by dependencies, such as bundle templates under ``vendor/``, are
 never diagnosed. A quick fix creates missing application templates under
 the ``templates/`` directory; namespaced ``@Bundle`` names are excluded.

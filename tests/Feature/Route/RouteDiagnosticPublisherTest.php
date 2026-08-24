@@ -8,7 +8,9 @@ use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
@@ -18,6 +20,8 @@ use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
+use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
+use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
@@ -196,7 +200,9 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $classIndexes = new DependencyInjectionSourceIndexRegistry();
             $phpExtractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter), new PhpCommentParser());
             $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()));
-            $diagnosticProvider = new RouteDiagnosticPublisher(new DocumentContextResolver($documents, $projects), new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor);
+            $templateIndexes = new TemplateIndexRegistry();
+            $templateIndexes->forProject($project)->replaceRuntime(true, new TemplateDeclaration('page.html.twig', $uri, new Range(new Position(0, 0), new Position(0, 0))));
+            $diagnosticProvider = new RouteDiagnosticPublisher(new DocumentContextResolver($documents, $projects), new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor, $templateIndexes);
             $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
             $provider = new RouteCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor, new ProjectPathResolver(new UriToPathConverter()));
@@ -257,6 +263,21 @@ final class RouteDiagnosticPublisherTest extends TestCase
         self::assertSame('route.not_found', $diagnostics[0]['code']);
     }
 
+    public function testDoesNotDiagnoseTwigFilesOutsideRuntimeLoaderPaths(): void
+    {
+        $uri = 'file:///workspace/book/design/templates/base.html.twig';
+        [$publisher, $client] = $this->publisher(
+            $uri,
+            "{{ path('missing_route') }}",
+            languageId: 'twig',
+            runtimeTemplate: false,
+        );
+
+        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+
+        self::assertSame([], $client->notifications[0]['params']['diagnostics']);
+    }
+
     public function testDoesNotDiagnoseBeforeCompleteRuntimeMetadataIsAvailable(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
@@ -286,6 +307,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 new DependencyInjectionSourceIndexRegistry(),
                 new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($positionConverter), new PhpCommentParser()),
                 new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
+                new TemplateIndexRegistry(),
             )],
         );
         $publisher = new DiagnosticProviderRegistry($client, $documents, $projects, $collector);
@@ -338,6 +360,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
         string $text,
         Route|array|null $route = null,
         string $languageId = 'php',
+        bool $runtimeTemplate = true,
     ): array {
         $client = new DiagnosticClient();
         $documents = new DocumentStore();
@@ -349,6 +372,11 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $route ?? new Route('article_show', '/article', ['GET'], [], null, null),
         ]));
         $positionConverter = new PositionConverter();
+        $templateIndexes = new TemplateIndexRegistry();
+        $templateIndexes->forProject($project)->replaceRuntime(
+            true,
+            ...('twig' === $languageId && $runtimeTemplate ? [new TemplateDeclaration(basename($uri), $uri, new Range(new Position(0, 0), new Position(0, 0)))] : []),
+        );
 
         $collector = new DiagnosticCollector(
             $documents,
@@ -361,6 +389,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 new DependencyInjectionSourceIndexRegistry(),
                 new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($positionConverter), new PhpCommentParser()),
                 new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
+                $templateIndexes,
             )],
         );
 

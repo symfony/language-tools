@@ -105,5 +105,7 @@ Parameters with route defaults are optional, while dynamic parameter maps aren't
 diagnosed. A quick fix adds the missing parameters to the literal parameter
 map.
 
-Only high-confidence Symfony contexts are diagnosed. Editor diagnostics update
-while typing, while ``symfony-lsp check`` analyzes saved files.
+Only high-confidence Symfony contexts are diagnosed. Twig route references are
+diagnosed only in files loaded by the selected environment's Twig loader. Editor
+diagnostics update while typing, while ``symfony-lsp check`` analyzes saved
+files.

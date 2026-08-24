@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Translation\TranslationDeclaration;
 use Symfony\Lsp\Feature\Translation\TranslationExtractor;
+use Symfony\Lsp\Feature\Translation\TranslationPlaceholders;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -44,9 +45,24 @@ final class TranslationExtractorTest extends TestCase
             TWIG);
 
         self::assertSame(
-            [['title.edit_post', ['name', 'id']]],
+            [['title.edit_post', ['id', 'name']]],
             array_map(static fn ($item): array => [$item->key(), $item->placeholders()], $references->references()),
         );
+    }
+
+    public function testExtractsNestedTwigParameterMapsAndIgnoresAbsentMaps(): void
+    {
+        $references = $this->extractor()->extract('file:///workspace/templates/schedule.html.twig', 'twig', <<<'TWIG'
+            {{ 'schedule.cfp_still_open'|trans({
+                '%cfp_url%': path('conference_cfp', { slug: conference.slug }),
+                '%cfp_end_date%': conference.cfpEndsAt|date,
+                '%num_days_left%': 3
+            }) }}
+            {{ 'registration.ticket_sales_countdown'|trans }}
+            TWIG)->references();
+
+        self::assertSame(['cfp_end_date', 'cfp_url', 'num_days_left'], $references[0]->placeholders());
+        self::assertNull($references[1]->placeholders());
     }
 
     public function testTreatsBracesAsPlaceholdersOnlyInIcuCatalogs(): void
@@ -67,6 +83,28 @@ final class TranslationExtractorTest extends TestCase
         self::assertSame(['id'], $icu->declarations()[0]->placeholders());
         self::assertFalse($plain->declarations()[0]->icu());
         self::assertSame([], $plain->declarations()[0]->placeholders());
+    }
+
+    public function testExtractsIcuArgumentsWithoutTreatingSelectMessagesAsPlaceholders(): void
+    {
+        self::assertSame(
+            ['conference_name', 'count', 'num_hours', 'num_rooms', 'person_name', 'trainer_name', 'type'],
+            TranslationPlaceholders::extract(<<<'ICU'
+                {num_rooms, select,
+                    1 {Room}
+                    other {Rooms for {conference_name}}
+                }
+                {num_hours, select,
+                    1 {{num_hours} hour}
+                    other {{num_hours} hours}
+                }
+                {type, select,
+                    online {We, Symfony, certify {trainer_name}.}
+                    other {Speaker {trainer_name}.}
+                }
+                You're {person_name}. It's {count, plural, one {# item} other {# items}}.
+                ICU, true),
+        );
     }
 
     public function testExtractsIniDeclarationsWithDirectoryLocales(): void
