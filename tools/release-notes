@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+    echo "Usage: release-notes VERSION [CHANGELOG]" >&2
+    exit 2
+fi
+
+version="${1#v}"
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+changelog="${2:-$root/CHANGELOG.md}"
+
+if [[ ! -f "$changelog" ]]; then
+    echo "Changelog not found: $changelog" >&2
+    exit 1
+fi
+
+awk -v version="$version" -v prefix="## $version (" '
+    !found && index($0, prefix) == 1 {
+        found = 1
+    }
+    found {
+        if (count > 0 && $0 ~ /^## /) {
+            exit
+        }
+        lines[++count] = $0
+    }
+    END {
+        if (!found) {
+            print "No changelog section found for " version "." > "/dev/stderr"
+            exit 1
+        }
+        while (count > 0 && lines[count] == "") {
+            --count
+        }
+        for (line = 1; line <= count; ++line) {
+            print lines[line]
+        }
+    }
+' "$changelog"

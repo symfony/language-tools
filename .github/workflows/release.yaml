@@ -299,6 +299,8 @@ jobs:
               run: |
                   find dist -type f -print0 | sort -z | xargs -0 sha256sum | awk '{ name = $2; sub(/^.*\//, "", name); print $1 "  " name }' > SHA256SUMS
                   mv SHA256SUMS dist/SHA256SUMS
+            - name: Generate release notes
+              run: ./tools/release-notes "$GITHUB_REF_NAME" > RELEASE_NOTES.md
             - uses: softprops/action-gh-release@v3
               with:
                   files: |
@@ -307,7 +309,7 @@ jobs:
                       dist/**/*.vsix
                       dist/SHA256SUMS
                   fail_on_unmatched_files: true
-                  body_path: CHANGELOG.md
+                  body_path: RELEASE_NOTES.md
                   prerelease: ${{ contains(github.ref_name, '-') }}
                   draft: true
             - name: Publish release

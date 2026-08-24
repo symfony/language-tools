@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Limit GitHub release notes to the current version
 - Retry partial terminal writes when printing check reports
 - Add a headless diagnostics check with CI reports and baselines
 - Recognize Twig functions and filters declared with PHP attributes

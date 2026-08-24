@@ -29,6 +29,15 @@ final class WorkflowTriggerTest extends TestCase
         self::assertStringContainsString('            - CHANGELOG.md', $push);
     }
 
+    public function testReleaseBodyUsesOnlyTheCurrentChangelogSection(): void
+    {
+        $contents = file_get_contents(self::ROOT.'/.github/workflows/release.yaml');
+        self::assertIsString($contents);
+        self::assertStringContainsString('run: ./tools/release-notes "$GITHUB_REF_NAME" > RELEASE_NOTES.md', $contents);
+        self::assertStringContainsString('body_path: RELEASE_NOTES.md', $contents);
+        self::assertStringNotContainsString('body_path: CHANGELOG.md', $contents);
+    }
+
     public function testOpenVsxStepsAreSkippedWithoutCredentials(): void
     {
         $contents = file_get_contents(self::ROOT.'/.github/workflows/publish-vscode.yaml');
