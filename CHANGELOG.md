@@ -3,6 +3,9 @@
 ## Unreleased
 
 - Keep configuration keys that mix dashes and underscores literal like Symfony
+- Treat dynamic translation keys, domains and parameter maps conservatively
+- Ignore Twig callable names containing escape sequences
+- Hide injected arguments of Twig callables with dynamic options
 - Complete all matching direct and aliased constraint imports
 - Keep nested route parameter arrays statically verifiable
 - Honor exact configuration keys inside sequence prototypes
@@ -13,7 +16,7 @@
 - Complete escaped Twig translation keys without changing their quoting
 - Preserve positional translation domains after class constant parameters
 - Recognize PHP named translation domains
-- Decode escaped quotes in Twig translation keys
+- Decode Twig translation strings with Twig's lexer rules
 - Resolve template names with a leading ./ prefix
 - Keep constraint metadata when optional validator dependencies are missing
 - Resolve validation attribute imports before applying constraint metadata
