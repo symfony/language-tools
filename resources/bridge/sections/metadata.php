@@ -54,26 +54,27 @@ function bridgeMetadataSection(SymfonyLspBridgeContext $context): ?array
 
     if (class_exists(Symfony\Component\Validator\Constraint::class)) {
         try {
-            $directory = Symfony\Component\Filesystem\Path::join($context->project(), 'vendor/symfony/validator/Constraints');
-            $finder = is_dir($directory)
-                ? (new Symfony\Component\Finder\Finder())->files()->in($directory)->depth('== 0')->name('*.php')
-                : [];
-            foreach ($finder as $file) {
-                $name = Symfony\Component\Filesystem\Path::getFilenameWithoutExtension($file->getFilename());
+            $directory = rtrim($context->project(), '/\\').'/vendor/symfony/validator/Constraints';
+            foreach (glob($directory.'/*.php') ?: [] as $path) {
+                $name = pathinfo($path, PATHINFO_FILENAME);
                 $class = 'Symfony\\Component\\Validator\\Constraints\\'.$name;
-                if (!class_exists($class)) {
+                try {
+                    if (!class_exists($class)) {
+                        continue;
+                    }
+                    $reflection = new ReflectionClass($class);
+                    if ($reflection->isAbstract() || !$reflection->isSubclassOf(Symfony\Component\Validator\Constraint::class)) {
+                        continue;
+                    }
+                    $options = [];
+                    foreach ($reflection->getConstructor()?->getParameters() ?? [] as $parameter) {
+                        $options[] = $parameter->getName();
+                    }
+                    sort($options);
+                    $constraints[$name] = ['name' => $name, 'class' => $class, 'options' => $options];
+                } catch (Throwable) {
                     continue;
                 }
-                $reflection = new ReflectionClass($class);
-                if ($reflection->isAbstract() || !$reflection->isSubclassOf(Symfony\Component\Validator\Constraint::class)) {
-                    continue;
-                }
-                $options = [];
-                foreach ($reflection->getConstructor()?->getParameters() ?? [] as $parameter) {
-                    $options[] = $parameter->getName();
-                }
-                sort($options);
-                $constraints[$name] = ['name' => $name, 'class' => $class, 'options' => $options];
             }
             $constraintsComplete = is_dir($directory) && [] !== $constraints;
         } catch (Throwable) {

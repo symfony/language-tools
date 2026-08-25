@@ -20,6 +20,12 @@ abstract class AbstractBridgeTestCase extends TestCase
         @rmdir($this->temporaryDirectory.'/bin');
         @unlink($this->temporaryDirectory.'/vendor/autoload_runtime.php');
         @unlink($this->temporaryDirectory.'/vendor/autoload.php');
+        @unlink($this->temporaryDirectory.'/vendor/symfony/validator/Constraints/Alpha.php');
+        @unlink($this->temporaryDirectory.'/vendor/symfony/validator/Constraints/ExpressionLanguageProvider.php');
+        @unlink($this->temporaryDirectory.'/vendor/symfony/validator/Constraints/Zulu.php');
+        @rmdir($this->temporaryDirectory.'/vendor/symfony/validator/Constraints');
+        @rmdir($this->temporaryDirectory.'/vendor/symfony/validator');
+        @rmdir($this->temporaryDirectory.'/vendor/symfony');
         @unlink($this->temporaryDirectory.'/composer.json');
         @unlink($this->temporaryDirectory.'/config/broken.php');
         @unlink($this->temporaryDirectory.'/config/framework.yaml');

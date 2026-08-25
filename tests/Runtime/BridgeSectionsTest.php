@@ -248,6 +248,32 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
         self::assertSame([], $result['sections']['metadata']['constraints'] ?? null);
     }
 
+    public function testKeepsConstraintMetadataWithoutOptionalDependencies(): void
+    {
+        $this->writeConstraintMetadataApplication();
+
+        exec(\sprintf(
+            '%s %s --project=%s --sections=metadata 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        $snapshot = implode("\n", $output);
+        self::assertSame(0, $exitCode, $snapshot);
+        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null, $snapshot);
+        self::assertIsArray($result['sections'] ?? null);
+        $metadata = $result['sections']['metadata'] ?? null;
+        self::assertIsArray($metadata);
+        self::assertTrue($metadata['constraintsComplete'] ?? null);
+        self::assertSame([
+            ['name' => 'Alpha', 'class' => 'Symfony\\Component\\Validator\\Constraints\\Alpha', 'options' => ['min']],
+            ['name' => 'Zulu', 'class' => 'Symfony\\Component\\Validator\\Constraints\\Zulu', 'options' => ['max']],
+        ], $metadata['constraints'] ?? null);
+    }
+
     public function testDerivesLoaderPathsWhenAThemeLoaderHidesThem(): void
     {
         $this->writeThemedTwigApplication();
@@ -343,5 +369,61 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
             'App\\Message\\Configured' => ['class' => 'App\\Message\\Configured', 'transports' => ['async']],
             'App\\Message\\HandlerOnly' => ['class' => 'App\\Message\\HandlerOnly', 'transports' => []],
         ], json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR));
+    }
+
+    private function writeConstraintMetadataApplication(): void
+    {
+        $directory = $this->temporaryDirectory.'/vendor/symfony/validator/Constraints';
+        mkdir($directory, 0777, true);
+        file_put_contents($directory.'/Alpha.php', <<<'PHP'
+            <?php
+            namespace Symfony\Component\Validator\Constraints;
+            final class Alpha extends \Symfony\Component\Validator\Constraint
+            {
+                public function __construct(public ?int $min = null) {}
+            }
+            PHP);
+        file_put_contents($directory.'/ExpressionLanguageProvider.php', <<<'PHP'
+            <?php
+            namespace Symfony\Component\Validator\Constraints;
+            final class ExpressionLanguageProvider implements \Missing\OptionalInterface
+            {
+            }
+            PHP);
+        file_put_contents($directory.'/Zulu.php', <<<'PHP'
+            <?php
+            namespace Symfony\Component\Validator\Constraints;
+            final class Zulu extends \Symfony\Component\Validator\Constraint
+            {
+                public function __construct(public ?int $max = null) {}
+            }
+            PHP);
+        file_put_contents($this->temporaryDirectory.'/vendor/autoload.php', <<<'PHP'
+            <?php
+            namespace Composer;
+            final class InstalledVersions
+            {
+                public static function getPrettyVersion(string $package): ?string { return '8.0.6'; }
+            }
+            namespace Symfony\Component\Filesystem;
+            final class Path
+            {
+                public static function join(string $root, string $path): string { return rtrim($root, '/\\').'/'.ltrim($path, '/\\'); }
+            }
+            namespace Symfony\Component\Validator;
+            abstract class Constraint
+            {
+            }
+            \spl_autoload_register(static function (string $class): void {
+                $prefix = 'Symfony\\Component\\Validator\\Constraints\\';
+                if (!str_starts_with($class, $prefix)) {
+                    return;
+                }
+                $path = __DIR__.'/symfony/validator/Constraints/'.substr($class, strlen($prefix)).'.php';
+                if (is_file($path)) {
+                    require $path;
+                }
+            });
+            PHP);
     }
 }

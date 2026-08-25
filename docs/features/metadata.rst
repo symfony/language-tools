@@ -20,8 +20,9 @@ Validation
 
 Constraint and constraint-option completion is available in PHP attributes and
 YAML validation mappings. Runtime indexing adds installed Symfony constraints
-and their constructor options. Project constraint classes extending
-``Constraint`` are recognized from project files.
+and their constructor options. Metadata for available constraints remains active
+when optional integrations aren't installed. Project constraint classes
+extending ``Constraint`` are recognized from project files.
 
 Definitely unknown options are diagnosed only when the constraint itself is
 known. In PHP, the attribute must resolve to an installed constraint; unrelated
