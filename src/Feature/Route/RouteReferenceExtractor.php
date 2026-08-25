@@ -144,14 +144,32 @@ final class RouteReferenceExtractor
         if (!preg_match('/^\s*,\s*\[([^\[\]]*)\]\s*[,)]/s', $afterRouteName, $parameters)) {
             return null;
         }
-        foreach (token_get_all('<?php ['.$parameters[1].'];') as $token) {
-            if (\is_array($token) && \T_ELLIPSIS === $token[0]) {
-                return null;
-            }
+        if ($this->containsTopLevelUnpack($parameters[1])) {
+            return null;
         }
 
         preg_match_all('/([\'"])([^\'"]+)\1\s*=>/', $parameters[1], $keys);
 
         return array_values(array_unique($keys[2]));
+    }
+
+    private function containsTopLevelUnpack(string $parameters): bool
+    {
+        $depth = 0;
+        foreach (token_get_all('<?php '.$parameters) as $token) {
+            if (\is_array($token)) {
+                if (\T_ELLIPSIS === $token[0] && 0 === $depth) {
+                    return true;
+                }
+                continue;
+            }
+            if (\in_array($token, ['(', '[', '{'], true)) {
+                ++$depth;
+            } elseif (\in_array($token, [')', ']', '}'], true)) {
+                --$depth;
+            }
+        }
+
+        return false;
     }
 }

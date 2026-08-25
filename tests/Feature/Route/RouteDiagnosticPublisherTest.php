@@ -256,6 +256,35 @@ final class RouteDiagnosticPublisherTest extends TestCase
         self::assertSame([], $client->notifications[0]['params']['diagnostics']);
     }
 
+    public function testDiagnosesMissingParametersWithNestedArgumentUnpacking(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = <<<'PHP'
+            <?php
+            class ArticleController extends AbstractController
+            {
+                public function show(array $parts): void
+                {
+                    $this->generateUrl('article_show', ['id' => sprintf(...$parts)]);
+                }
+            }
+            PHP;
+        [$publisher, $client] = $this->publisher($uri, $text, new Route(
+            'article_show',
+            '/{locale}/article/{id}',
+            ['GET'],
+            [],
+            null,
+            null,
+        ));
+
+        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+
+        $diagnostics = $client->notifications[0]['params']['diagnostics'];
+        self::assertIsArray($diagnostics);
+        self::assertSame(['Route "article_show" requires parameter "locale".'], array_column($diagnostics, 'message'));
+    }
+
     public function testDiagnosesUnknownRoutesInTwig(): void
     {
         $uri = 'file:///workspace/templates/navigation.html.twig';

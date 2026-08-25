@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Diagnose route parameters when unpacking occurs inside values
 - Complete template names with a leading ./ prefix
 - Complete directly imported validation constraints
 - Complete escaped Twig translation keys without changing their quoting
