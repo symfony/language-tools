@@ -41,12 +41,14 @@ selection:
     $ symfony-lsp check src/ templates/
     $ symfony-lsp check 'config/**/*.yaml'
 
-Paths and patterns are resolved from the workspace root. Files excluded by
-``.gitignore`` and files under ``.git/``, ``node_modules/``, ``var/`` or
-``vendor/`` are skipped. The default selection also skips project
+Paths and patterns are resolved from the workspace root. Files under ``.git/``,
+``node_modules/``, ``var/`` or ``vendor/`` are skipped. Files excluded by
+``.gitignore`` are also skipped, except project-root dotenv files (``.env*``),
+which Symfony reads even when ignored. This exception applies to default and
+explicit selections. The default selection also skips project
 ``excludePaths``. An explicit file, directory or pattern can select those
-configured exclusions, but it can't bypass dependency, cache or ``.gitignore``
-rules.
+configured exclusions, but it can't bypass the excluded directories or other
+``.gitignore`` rules.
 
 Runtime analysis is enabled by default and boots the application with the
 configured PHP command. Use source-only mode for code that you don't trust or
