@@ -237,10 +237,19 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 public function show(array $parameters): void
                 {
                     $this->generateUrl('article_show', $parameters);
+                    $this->generateUrl('article_show', [...$parameters]);
+                    $this->generateUrl('article_show', ['locale' => 'en', ...$parameters]);
                 }
             }
             PHP;
-        [$publisher, $client] = $this->publisher($uri, $text);
+        [$publisher, $client] = $this->publisher($uri, $text, new Route(
+            'article_show',
+            '/{locale}/article/{id}',
+            ['GET'],
+            [],
+            null,
+            null,
+        ));
 
         $publisher->publish(['textDocument' => ['uri' => $uri]]);
 

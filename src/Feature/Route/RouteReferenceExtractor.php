@@ -144,6 +144,11 @@ final class RouteReferenceExtractor
         if (!preg_match('/^\s*,\s*\[([^\[\]]*)\]\s*[,)]/s', $afterRouteName, $parameters)) {
             return null;
         }
+        foreach (token_get_all('<?php ['.$parameters[1].'];') as $token) {
+            if (\is_array($token) && \T_ELLIPSIS === $token[0]) {
+                return null;
+            }
+        }
 
         preg_match_all('/([\'"])([^\'"]+)\1\s*=>/', $parameters[1], $keys);
 
