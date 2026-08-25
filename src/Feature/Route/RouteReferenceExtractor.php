@@ -168,35 +168,57 @@ final class RouteReferenceExtractor
     /** @return list<string>|null */
     private function literalParameterKeys(string $parameters): ?array
     {
-        $tokens = token_get_all('<?php '.$parameters);
         $keys = [];
         $depth = 0;
-        foreach ($tokens as $index => $token) {
+        $literalKey = null;
+        $keyIsLiteral = true;
+        $keyParsed = false;
+        foreach (token_get_all('<?php '.$parameters) as $token) {
             if (\is_array($token)) {
                 if (\T_ELLIPSIS === $token[0] && 0 === $depth) {
                     return null;
                 }
-                if (\T_CONSTANT_ENCAPSED_STRING !== $token[0] || 0 !== $depth) {
+                if (\in_array($token[0], [\T_CURLY_OPEN, \T_DOLLAR_OPEN_CURLY_BRACES], true)) {
+                    if (0 === $depth && !$keyParsed) {
+                        $keyIsLiteral = false;
+                    }
+                    ++$depth;
+
                     continue;
                 }
-                for ($next = $index + 1; isset($tokens[$next]); ++$next) {
-                    $candidate = $tokens[$next];
-                    if (\is_array($candidate) && \in_array($candidate[0], [\T_WHITESPACE, \T_COMMENT, \T_DOC_COMMENT], true)) {
-                        continue;
+                if (0 !== $depth || \in_array($token[0], [\T_OPEN_TAG, \T_WHITESPACE, \T_COMMENT, \T_DOC_COMMENT], true)) {
+                    continue;
+                }
+                if (\T_DOUBLE_ARROW === $token[0] && !$keyParsed) {
+                    if (!$keyIsLiteral || null === $literalKey) {
+                        return null;
                     }
-                    if (\is_array($candidate) && \T_DOUBLE_ARROW === $candidate[0]) {
-                        $quote = $token[1][0];
-                        $value = substr($token[1], 1, -1);
-                        $keys[] = "'" === $quote ? strtr($value, ['\\\\' => '\\', "\\'" => "'"]) : stripcslashes($value);
+                    $quote = $literalKey[0];
+                    $value = substr($literalKey, 1, -1);
+                    $keys[] = "'" === $quote ? strtr($value, ['\\\\' => '\\', "\\'" => "'"]) : stripcslashes($value);
+                    $keyParsed = true;
+                } elseif (!$keyParsed) {
+                    if (\T_CONSTANT_ENCAPSED_STRING === $token[0] && null === $literalKey) {
+                        $literalKey = $token[1];
+                    } else {
+                        $keyIsLiteral = false;
                     }
-                    break;
                 }
                 continue;
             }
             if (\in_array($token, ['(', '[', '{'], true)) {
+                if (0 === $depth && !$keyParsed) {
+                    $keyIsLiteral = false;
+                }
                 ++$depth;
             } elseif (\in_array($token, [')', ']', '}'], true)) {
                 --$depth;
+            } elseif (0 === $depth && ',' === $token) {
+                $literalKey = null;
+                $keyIsLiteral = true;
+                $keyParsed = false;
+            } elseif (0 === $depth && !$keyParsed) {
+                $keyIsLiteral = false;
             }
         }
 

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ignore dynamic PHP route parameter keys when checking required parameters
 - Keep configuration keys literal when Symfony would not normalize them
 - Treat dynamic translation keys, domains and parameter maps conservatively
 - Ignore Twig callable names containing escape sequences

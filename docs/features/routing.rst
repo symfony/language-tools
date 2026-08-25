@@ -101,10 +101,10 @@ Diagnostics
 A statically known route name that doesn't exist is reported as an error. A
 route call with a complete literal parameter map also reports required path or
 host parameters that are missing. Parameters with route defaults are optional.
-Parameter maps that are variables or contain top-level array unpacking aren't
-diagnosed. Nested arrays and unpacking inside a parameter value don't make the
-parameter map dynamic. A quick fix adds the missing parameters to the literal
-parameter map.
+Parameter maps that are variables, contain a dynamic top-level key or contain
+top-level array unpacking aren't diagnosed. Nested arrays and unpacking inside
+a parameter value don't make the parameter map dynamic. A quick fix adds the
+missing parameters to the literal parameter map.
 
 Only high-confidence Symfony contexts are diagnosed. Twig route references are
 diagnosed only in files loaded by the selected environment's Twig loader. Editor

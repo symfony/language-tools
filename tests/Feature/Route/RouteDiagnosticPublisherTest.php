@@ -256,6 +256,41 @@ final class RouteDiagnosticPublisherTest extends TestCase
         self::assertSame([], $client->notifications[0]['params']['diagnostics']);
     }
 
+    public function testTreatsOnlyTopLevelRouteParameterKeysAsDynamic(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = <<<'PHP'
+            <?php
+            class ArticleController extends AbstractController
+            {
+                public function show(string $key, string $prefix): void
+                {
+                    $this->generateUrl('variable_key', [$key => 1]);
+                    $this->generateUrl('constant_key', [PARAMETER => 1]);
+                    $this->generateUrl('concatenated_key', ['i'.'d' => 1]);
+                    $this->generateUrl('interpolated_key', ["{$prefix}id" => 1]);
+                    $this->generateUrl('called_key', [parameter() => 1]);
+                    $this->generateUrl('nested_dynamic_key', ['query' => [$key => 1]]);
+                    $this->generateUrl('list_entry', [parameter()]);
+                }
+            }
+            PHP;
+        $routes = [];
+        foreach (['variable_key', 'constant_key', 'concatenated_key', 'interpolated_key', 'called_key', 'nested_dynamic_key', 'list_entry'] as $name) {
+            $routes[] = new Route($name, '/{id}', ['GET'], [], null, null);
+        }
+        [$publisher, $client] = $this->publisher($uri, $text, $routes);
+
+        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+
+        $diagnostics = $client->notifications[0]['params']['diagnostics'];
+        self::assertIsArray($diagnostics);
+        self::assertSame([
+            'Route "nested_dynamic_key" requires parameter "id".',
+            'Route "list_entry" requires parameter "id".',
+        ], array_column($diagnostics, 'message'));
+    }
+
     public function testDiagnosesMissingParametersWithNestedArgumentUnpacking(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
