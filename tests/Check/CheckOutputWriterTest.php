@@ -29,6 +29,22 @@ final class CheckOutputWriterTest extends TestCase
 
         self::assertSame($contents, IntermittentWriteStream::$contents);
     }
+
+    public function testWritesLargeReportsWithoutCopyingTheRemainingContents(): void
+    {
+        $stream = fopen('check-output://discard', 'w');
+        self::assertIsResource($stream);
+        $contents = str_repeat('x', 8 * 1024 * 1024);
+        memory_reset_peak_usage();
+        $memory = memory_get_usage();
+
+        $written = (new CheckOutputWriter())->write($stream, $contents);
+        $additionalMemory = memory_get_peak_usage() - $memory;
+        fclose($stream);
+
+        self::assertTrue($written);
+        self::assertLessThan(1024 * 1024, $additionalMemory);
+    }
 }
 
 final class IntermittentWriteStream
@@ -39,14 +55,20 @@ final class IntermittentWriteStream
     public $context;
 
     private bool $unavailable = true;
+    private bool $discard = false;
 
     public function stream_open(string $path, string $mode, int $options, ?string &$openedPath): bool
     {
+        $this->discard = 'discard' === parse_url($path, \PHP_URL_HOST);
+
         return true;
     }
 
     public function stream_write(string $data): int
     {
+        if ($this->discard) {
+            return \strlen($data);
+        }
         if ($this->unavailable) {
             $this->unavailable = false;
 

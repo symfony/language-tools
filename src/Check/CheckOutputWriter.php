@@ -12,8 +12,10 @@ final class CheckOutputWriter
     public function write($stream, string $contents): bool
     {
         $emptyWrites = 0;
-        while ('' !== $contents) {
-            $written = @fwrite($stream, substr($contents, 0, self::CHUNK_BYTES));
+        $length = \strlen($contents);
+        $offset = 0;
+        while ($offset < $length) {
+            $written = @fwrite($stream, substr($contents, $offset, self::CHUNK_BYTES));
             if (false === $written) {
                 return false;
             }
@@ -27,7 +29,7 @@ final class CheckOutputWriter
             }
 
             $emptyWrites = 0;
-            $contents = substr($contents, $written);
+            $offset += $written;
         }
 
         return true;
