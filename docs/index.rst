@@ -121,9 +121,10 @@ or CI:
 
     $ ./symfony-lsp check
 
-The command can produce human, JSON and GitHub Actions reports, select blocking
-diagnostic codes and maintain an occurrence-specific baseline. Runtime analysis
-executes application code; pass ``--source-only`` when it must remain disabled.
+The command can produce human, JSON, GitHub Actions and SARIF reports, select
+blocking diagnostic codes and maintain an occurrence-specific baseline. Runtime
+analysis executes application code; pass ``--source-only`` when it must remain
+disabled.
 See `Running Diagnostics Without an Editor`_ for configuration, output,
 baseline and exit-status details.
 
