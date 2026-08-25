@@ -45,7 +45,7 @@ final class ConfigurationHoverProvider implements HoverProviderInterface
             if (!$this->contains($request->document->text(), $occurrence->keyRange(), $offset)) {
                 continue;
             }
-            $node = $index->find($occurrence->path(), $occurrence->sequenceDepths());
+            $node = $index->find($occurrence->path(), $occurrence->sequenceDepths(), $occurrence->literalDepths());
 
             return null === $node ? null : $this->protocol->markdownHover($this->description($occurrence->path(), $node));
         }

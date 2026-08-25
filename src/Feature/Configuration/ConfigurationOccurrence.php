@@ -9,6 +9,7 @@ final class ConfigurationOccurrence
     /**
      * @param list<string> $path
      * @param list<int>    $sequenceDepths
+     * @param list<int>    $literalDepths
      */
     public function __construct(
         private readonly array $path,
@@ -17,6 +18,7 @@ final class ConfigurationOccurrence
         private readonly Range $valueRange,
         private readonly array $sequenceDepths,
         private readonly string $scope,
+        private readonly array $literalDepths = [],
     ) {
     }
 
@@ -50,6 +52,12 @@ final class ConfigurationOccurrence
     public function sequenceDepths(): array
     {
         return $this->sequenceDepths;
+    }
+
+    /** @return list<int> */
+    public function literalDepths(): array
+    {
+        return $this->literalDepths;
     }
 
     public function scope(): string

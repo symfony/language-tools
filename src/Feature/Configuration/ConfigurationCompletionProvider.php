@@ -51,7 +51,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
             if (!$this->contains($document->text(), $occurrence->valueRange(), $offset)) {
                 continue;
             }
-            $node = $index->find($occurrence->path(), $occurrence->sequenceDepths());
+            $node = $index->find($occurrence->path(), $occurrence->sequenceDepths(), $occurrence->literalDepths());
             if (null === $node || [] === $node->allowedValues()) {
                 continue;
             }

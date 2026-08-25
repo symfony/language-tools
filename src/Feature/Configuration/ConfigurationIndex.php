@@ -26,8 +26,9 @@ final class ConfigurationIndex
      *
      * @param list<string> $path
      * @param list<int>    $sequenceDepths
+     * @param list<int>    $literalDepths
      */
-    public function allowsUnknownKeys(array $path, array $sequenceDepths = []): bool
+    public function allowsUnknownKeys(array $path, array $sequenceDepths = [], array $literalDepths = []): bool
     {
         if ([] === $path) {
             return false;
@@ -35,7 +36,7 @@ final class ConfigurationIndex
         $node = $this->roots[array_shift($path)] ?? null;
         $depth = 1;
         while (null !== $node && [] !== $path) {
-            $child = $node->child(array_shift($path), \in_array($depth, $sequenceDepths, true));
+            $child = $node->child(array_shift($path), \in_array($depth, $sequenceDepths, true), !\in_array($depth, $literalDepths, true));
             if (null === $child) {
                 return $node->acceptsUnknownKeys();
             }
@@ -49,15 +50,19 @@ final class ConfigurationIndex
     /**
      * @param list<string> $path
      * @param list<int>    $sequenceDepths
+     * @param list<int>    $literalDepths
      *
      * @return list<string>
      */
-    public function normalizePath(array $path, array $sequenceDepths = []): array
+    public function normalizePath(array $path, array $sequenceDepths = [], array $literalDepths = []): array
     {
         if ([] === $path) {
             return [];
         }
-        $name = ConfigurationNode::normalizeKey(array_shift($path));
+        $name = array_shift($path);
+        if (!\in_array(0, $literalDepths, true)) {
+            $name = ConfigurationNode::normalizeKey($name);
+        }
         $normalized = [$name];
         $node = $this->roots[$name] ?? null;
         $normalizeKeys = true;
@@ -69,7 +74,7 @@ final class ConfigurationIndex
             if (null !== $normalizingNode) {
                 $normalizeKeys = $normalizingNode->normalizesKeys();
             }
-            $normalized[] = $normalizeKeys ? ConfigurationNode::normalizeKey($name) : $name;
+            $normalized[] = $normalizeKeys && !\in_array($depth, $literalDepths, true) ? ConfigurationNode::normalizeKey($name) : $name;
             $node = $node?->child($name, $sequenceChild);
             ++$depth;
         }
@@ -80,8 +85,9 @@ final class ConfigurationIndex
     /**
      * @param list<string> $path
      * @param list<int>    $sequenceDepths
+     * @param list<int>    $literalDepths
      */
-    public function find(array $path, array $sequenceDepths = []): ?ConfigurationNode
+    public function find(array $path, array $sequenceDepths = [], array $literalDepths = []): ?ConfigurationNode
     {
         if ([] === $path) {
             return null;
@@ -89,7 +95,7 @@ final class ConfigurationIndex
         $node = $this->roots[array_shift($path)] ?? null;
         $depth = 1;
         foreach ($path as $name) {
-            $node = $node?->child($name, \in_array($depth, $sequenceDepths, true));
+            $node = $node?->child($name, \in_array($depth, $sequenceDepths, true), !\in_array($depth, $literalDepths, true));
             if (null === $node) {
                 return null;
             }

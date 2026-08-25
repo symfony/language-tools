@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Keep configuration keys that mix dashes and underscores literal like Symfony
+- Keep configuration keys literal when Symfony would not normalize them
 - Treat dynamic translation keys, domains and parameter maps conservatively
 - Ignore Twig callable names containing escape sequences
 - Hide injected arguments of Twig callables with dynamic options

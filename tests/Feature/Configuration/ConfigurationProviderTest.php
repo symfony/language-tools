@@ -102,6 +102,8 @@ final class ConfigurationProviderTest extends TestCase
                 normalized-section:
                     nested-key: true
                     mixed-nested_key: true
+                    twin-key: true
+                    twin_key: true
                 exact_keys:
                     default-src: true
                     default_src: true
@@ -112,10 +114,11 @@ final class ConfigurationProviderTest extends TestCase
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
         $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
-        self::assertSame(['config.unknown_key', 'config.unknown_key', 'config.unknown_key'], array_column($diagnostics, 'code'));
+        self::assertSame(['config.unknown_key', 'config.unknown_key', 'config.unknown_key', 'config.unknown_key'], array_column($diagnostics, 'code'));
         self::assertSame(
             [
                 'Unknown configuration key "framework.normalized_section.mixed-nested_key".',
+                'Unknown configuration key "framework.normalized_section.twin-key".',
                 'Unknown configuration key "framework.exact_keys.default_src".',
                 'Unknown configuration key "framework.exact_items.default_src".',
             ],
@@ -504,6 +507,7 @@ final class ConfigurationProviderTest extends TestCase
                     $this->node('normalized_section', 'array', children: [
                         $this->node('nested_key', 'boolean'),
                         $this->node('mixed_nested_key', 'boolean'),
+                        $this->node('twin_key', 'boolean'),
                     ]),
                     $this->node('exact_keys', 'array', children: [
                         $this->node('default-src', 'boolean'),

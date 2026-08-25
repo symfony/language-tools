@@ -8,9 +8,9 @@ normalized values such as a cache pool's ``adapter``, Doctrine's default
 connection ``url``, ``~`` and ``true`` for array options. Dash-form keys are
 preserved when a bundle disables key normalization, including inside sequence
 entries, and converted to underscores elsewhere, matching Symfony's
-configuration processing; keys that mix dashes and underscores stay literal,
-as in Symfony. Extensible sections
-allow custom keys while validating their known children.
+configuration processing; keys that mix dashes and underscores, or whose
+underscore twin exists in the same mapping, stay literal, as in Symfony.
+Extensible sections allow custom keys while validating their known children.
 
 Completion
 ----------

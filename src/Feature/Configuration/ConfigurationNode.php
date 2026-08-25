@@ -143,13 +143,15 @@ final class ConfigurationNode
         return str_contains($name, '-') && !str_contains($name, '_') ? str_replace('-', '_', $name) : $name;
     }
 
-    public function child(string $name, bool $sequenceItem = false): ?self
+    public function child(string $name, bool $sequenceItem = false, bool $normalizeName = true): ?self
     {
         if ($sequenceItem && null !== $this->prototype) {
-            return $this->prototype->child($name)
+            return $this->prototype->child($name, false, $normalizeName)
                 ?? ([] === $this->prototype->children() || $this->prototype->acceptsUnknownKeys() ? $this->prototype : null);
         }
-        $name = $this->normalizeChildName($name);
+        if ($normalizeName) {
+            $name = $this->normalizeChildName($name);
+        }
         if ($name === $this->entryKeyNode?->name()) {
             return $this->entryKeyNode;
         }
