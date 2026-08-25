@@ -312,7 +312,7 @@ final class TranslationExtractor
         foreach ($arguments as $argument) {
             $name = null;
             $value = $argument;
-            if (preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$/s', $argument, $named)) {
+            if (preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)\s*(.*)$/s', $argument, $named)) {
                 $name = $named[1];
                 $value = $named[2];
             } else {

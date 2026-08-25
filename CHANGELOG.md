@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Preserve positional translation domains after class constant parameters
 - Recognize PHP named translation domains
 - Decode escaped quotes in Twig translation keys
 - Resolve template names with a leading ./ prefix

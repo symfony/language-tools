@@ -10,8 +10,9 @@ Completion
 Translation key completion is available in recognized PHP ``trans()`` calls,
 ``TranslatableMessage`` objects, the ``t()`` helper and Twig's ``trans`` filter.
 Suggestions are scoped to the selected domain. Literal PHP domains are
-recognized in positional and named arguments, and literal Twig keys can contain
-escaped quotes. Domain, locale and message placeholder completion are available
+recognized in positional and named arguments, including after dynamic parameter
+expressions. Literal Twig keys can contain escaped quotes. Domain, locale and
+message placeholder completion are available
 in statically recognized call arguments.
 
 Resources

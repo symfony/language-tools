@@ -218,6 +218,7 @@ final class TranslationProviderTest extends TestCase
             <?php
             $translator->trans('panel.title', domain: 'admin');
             $translator->trans('panel.title', [], 'admin');
+            $translator->trans('panel.title', self::PARAMETERS, 'admin');
             PHP;
         [$provider, , $configuration, $project] = $this->provider($uri, $text);
         $configuration->configure($project, true);
