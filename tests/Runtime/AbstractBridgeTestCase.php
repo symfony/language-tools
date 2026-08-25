@@ -222,6 +222,11 @@ abstract class AbstractBridgeTestCase extends TestCase
             final class DirectoryResource
             {
             }
+            final class ReflectionClassResource
+            {
+                public function __construct(private string $className) {}
+                public function __toString(): string { return 'reflection.'.$this->className; }
+            }
             namespace Symfony\Component\Routing;
             interface RouterInterface
             {
@@ -245,6 +250,8 @@ abstract class AbstractBridgeTestCase extends TestCase
                         new \Symfony\Component\Config\Resource\FileResource($root.'/vendor/autoload.php'),
                         new \Symfony\Component\Config\Resource\FileResource($root.'/var/cache/container.php'),
                         new \Symfony\Component\Config\Resource\DirectoryResource(),
+                        new \Symfony\Component\Config\Resource\ReflectionClassResource(\App\Endpoint\LegacyEndpoints::class),
+                        new \Symfony\Component\Config\Resource\ReflectionClassResource('App\\Endpoint\\MissingEndpoints'),
                     ]);
                 }
             }
@@ -319,6 +326,10 @@ abstract class AbstractBridgeTestCase extends TestCase
 
                     return 0;
                 }
+            }
+            namespace App\Endpoint;
+            if (is_file(\dirname(__DIR__).'/config/endpoints/LegacyEndpoints.php')) {
+                require \dirname(__DIR__).'/config/endpoints/LegacyEndpoints.php';
             }
             PHP));
     }

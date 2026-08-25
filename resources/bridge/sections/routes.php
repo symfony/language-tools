@@ -103,10 +103,11 @@ function bridgeRouteResourcePaths(SymfonyLspBridgeContext $context): array
     $projectRoot = Symfony\Component\Filesystem\Path::canonicalize($projectRoot);
     $resources = [];
     foreach ($collection->getResources() as $resource) {
-        if (!$resource instanceof Symfony\Component\Config\Resource\FileResource) {
+        $file = bridgeRouteResourceFile($resource);
+        if (null === $file) {
             continue;
         }
-        $path = realpath($resource->getResource());
+        $path = realpath($file);
         if (false === $path || !is_file($path)) {
             continue;
         }
@@ -123,4 +124,26 @@ function bridgeRouteResourcePaths(SymfonyLspBridgeContext $context): array
     ksort($resources);
 
     return array_keys($resources);
+}
+
+function bridgeRouteResourceFile(object $resource): ?string
+{
+    if ($resource instanceof Symfony\Component\Config\Resource\FileResource) {
+        return $resource->getResource();
+    }
+    if (!$resource instanceof Symfony\Component\Config\Resource\ReflectionClassResource) {
+        return null;
+    }
+    $class = substr((string) $resource, strlen('reflection.'));
+    if ('' === $class || !class_exists($class)) {
+        return null;
+    }
+
+    try {
+        $file = (new ReflectionClass($class))->getFileName();
+    } catch (Throwable) {
+        return null;
+    }
+
+    return is_string($file) ? $file : null;
 }
