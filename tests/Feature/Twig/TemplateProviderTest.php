@@ -627,6 +627,28 @@ final class TemplateProviderTest extends TestCase
         self::assertSame([$uri], array_column($navigation->references($params) ?? [], 'uri'));
     }
 
+    public function testKeepsLeadingDotSlashNamesInTheMainNamespace(): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        $completionText = "{{ source('./@Ad') }}";
+        [$completion, , $completionConverter] = $this->providers($uri, 'twig', $completionText);
+        $completionPosition = $completionConverter->toPosition($completionText, (int) strpos($completionText, "')"));
+        self::assertSame([], $completion->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $completionPosition->line(), 'character' => $completionPosition->character()],
+        ]) ?? []);
+
+        $text = "{{ source('./@Admin/foo.html.twig') }}";
+        [, $navigation, $converter] = $this->providers($uri, 'twig', $text);
+        $position = $converter->toPosition($text, strpos($text, '@Admin') + 1);
+        $params = ['textDocument' => ['uri' => $uri], 'position' => [
+            'line' => $position->line(), 'character' => $position->character(),
+        ]];
+
+        self::assertSame(['template.not_found'], array_column($navigation->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+        self::assertNull($navigation->definition($params));
+    }
+
     public function testDoesNotDiagnoseTwigFilesOutsideRuntimeLoaderPaths(): void
     {
         $uri = 'file:///workspace/book/design/templates/base.html.twig';
@@ -659,6 +681,11 @@ final class TemplateProviderTest extends TestCase
             new TemplateDeclaration(
                 'snippet.txt',
                 'file:///workspace/templates/snippet.txt',
+                new Range(new Position(0, 0), new Position(0, 0)),
+            ),
+            new TemplateDeclaration(
+                '@Admin/foo.html.twig',
+                'file:///workspace/vendor/admin/templates/foo.html.twig',
                 new Range(new Position(0, 0), new Position(0, 0)),
             ),
         );

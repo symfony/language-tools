@@ -20,7 +20,8 @@ and in these Twig contexts:
 
 Both regular names such as ``article/show.html.twig`` and namespaced names such
 as ``@Admin/dashboard.html.twig`` are supported. Completion and navigation
-resolve a leading ``./`` like the same loader-root name without that prefix.
+resolve a leading ``./`` on regular loader-root names. Before an ``@`` prefix,
+it keeps the name in Twig's main namespace.
 
 Navigation and Links
 --------------------

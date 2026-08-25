@@ -186,7 +186,7 @@ final class TemplateIndex
 
     private function normalize(string $name): string
     {
-        while (str_starts_with($name, './')) {
+        while (str_starts_with($name, './') && !str_starts_with($name, './@')) {
             $name = substr($name, 2);
         }
 
