@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\Translation;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -45,6 +46,18 @@ final class TranslationProviderTest extends TestCase
         self::assertIsArray($hover['contents']);
         self::assertIsString($hover['contents']['value']);
         self::assertStringContainsString('Article %name%', $hover['contents']['value']);
+    }
+
+    #[DataProvider('namedPhpTranslationCallProvider')]
+    public function testCompletesNamedPhpTranslationKeys(string $call): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = '<?php '.$call;
+        [$provider, $converter] = $this->provider($uri, $text);
+        $position = $converter->toPosition($text, strpos($text, 'article.ti') + \strlen('article.ti'));
+        $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+
+        self::assertSame(['article.title'], array_column($provider->complete($params) ?? [], 'label'));
     }
 
     public function testCompletesMessagePlaceholders(): void
@@ -311,6 +324,14 @@ final class TranslationProviderTest extends TestCase
         $position = $converter->toPosition($text, strpos($text, 'article.ti') + \strlen('article.ti'));
 
         self::assertNull($provider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]]));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function namedPhpTranslationCallProvider(): iterable
+    {
+        yield 'trans method' => ["\$translator->trans(id: 'article.ti"];
+        yield 't helper' => ["t(message: 'article.ti"];
+        yield 'translatable message' => ["new TranslatableMessage(message: 'article.ti"];
     }
 
     /** @return array{TranslationProvider, PositionConverter, TranslationConfigurationRegistry, Project} */

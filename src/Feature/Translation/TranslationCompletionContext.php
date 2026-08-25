@@ -53,7 +53,7 @@ final class TranslationCompletionContext
         $cursor = $converter->toByteOffset($text, $position);
         $before = substr($text, 0, $cursor);
         if ('php' === $languageId) {
-            if (preg_match('/(?:->trans|\bt|new\s+TranslatableMessage)\s*\(\s*([\'\"])([^\'\"]*)$/s', $before, $m, \PREG_OFFSET_CAPTURE)) {
+            if (preg_match('/(?:->trans\s*\(\s*(?:id\s*:\s*)?|(?:\bt|new\s+TranslatableMessage)\s*\(\s*(?:message\s*:\s*)?)([\'\"])([^\'\"]*)$/s', $before, $m, \PREG_OFFSET_CAPTURE)) {
                 return self::context('key', $m[2], $text, $position, $converter);
             }
             if (preg_match('/(?:->trans|\bt|new\s+TranslatableMessage)\s*\(\s*([\'\"])([^\'\"]+)\1\s*,\s*\[[^\]]*[\'\"](%?[^\'\"]*)$/s', $before, $m, \PREG_OFFSET_CAPTURE)) {

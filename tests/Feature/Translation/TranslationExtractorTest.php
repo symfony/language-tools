@@ -37,6 +37,23 @@ final class TranslationExtractorTest extends TestCase
         ], array_map(static fn ($item): array => [$item->key(), $item->domain(), $item->placeholders()], $references->references()));
     }
 
+    public function testExtractsNamedPhpTranslationKeys(): void
+    {
+        $references = $this->extractor()->extract('file:///workspace/src/Controller.php', 'php', <<<'PHP'
+            <?php
+            $translator->trans(id: 'panel.title', domain: 'admin');
+            t(message: 'article.title');
+            new TranslatableMessage(message: 'article.title');
+            $translator->trans(id: $key, domain: 'admin');
+            PHP)->references();
+
+        self::assertSame([
+            ['panel.title', 'admin'],
+            ['article.title', 'messages'],
+            ['article.title', 'messages'],
+        ], array_map(static fn ($item): array => [$item->key(), $item->domain()], $references));
+    }
+
     public function testExtractsBareTwigHashKeysAsPlaceholders(): void
     {
         $references = $this->extractor()->extract('file:///workspace/templates/edit.html.twig', 'twig', <<<'TWIG'

@@ -213,7 +213,7 @@ final class TranslationExtractor
             $defaultDomain = $this->twigString($domainMatch[2]);
         }
         $pattern = 'php' === $languageId
-            ? '/(?:->trans|\bt|new\s+TranslatableMessage)\s*\(\s*(?|(\')((?:\\\\.|[^\'\\\\])+)\'|(\")((?:\\\\[\\\\\"]|[^\"\\\\$])+)\")/s'
+            ? '/(?:->trans\s*\(\s*(?:id\s*:\s*)?|(?:\bt|new\s+TranslatableMessage)\s*\(\s*(?:message\s*:\s*)?)(?|(\')((?:\\\\.|[^\'\\\\])+)\'|(\")((?:\\\\[\\\\\"]|[^\"\\\\$])+)\")/s'
             : '/(?|(\')((?:\\\\.|[^\'\\\\])+)\'|(\")((?:\\\\.|[^\"#\\\\])+)\")\s*\|\s*trans\b/s';
         preg_match_all($pattern, $text, $matches, \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL);
         $result = [];
