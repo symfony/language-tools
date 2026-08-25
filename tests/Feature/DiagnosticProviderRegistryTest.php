@@ -226,8 +226,8 @@ final class MalformedDiagnosticProvider implements DiagnosticProviderInterface
 
     public function diagnostics(array $params): array
     {
+        /** @var list<array<array-key, mixed>> $diagnostics */
         $diagnostics = (array) json_decode('[42]', true, flags: \JSON_THROW_ON_ERROR);
-        /* @var list<array<array-key, mixed>> $diagnostics */
 
         return $diagnostics;
     }
