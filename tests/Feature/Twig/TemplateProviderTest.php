@@ -597,6 +597,28 @@ final class TemplateProviderTest extends TestCase
         );
     }
 
+    public function testResolvesTemplateNamesWithALeadingDotSlash(): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        $text = "{{ source('./snippet.txt') }}";
+        [, $navigation, $converter] = $this->providers($uri, 'twig', $text);
+        $position = $converter->toPosition($text, strpos($text, 'snippet') + 1);
+        $params = ['textDocument' => ['uri' => $uri], 'position' => [
+            'line' => $position->line(), 'character' => $position->character(),
+        ]];
+
+        self::assertSame([], $navigation->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame(
+            ['file:///workspace/templates/snippet.txt'],
+            array_column($navigation->definition($params) ?? [], 'uri'),
+        );
+        self::assertSame(
+            'file:///workspace/templates/snippet.txt',
+            $navigation->links(['textDocument' => ['uri' => $uri]])[0]['target'] ?? null,
+        );
+        self::assertSame([$uri], array_column($navigation->references($params) ?? [], 'uri'));
+    }
+
     public function testDoesNotDiagnoseTwigFilesOutsideRuntimeLoaderPaths(): void
     {
         $uri = 'file:///workspace/book/design/templates/base.html.twig';
@@ -626,10 +648,16 @@ final class TemplateProviderTest extends TestCase
                 'file:///workspace/templates/page.html.twig',
                 new Range(new Position(0, 0), new Position(0, 0)),
             ),
+            new TemplateDeclaration(
+                'snippet.txt',
+                'file:///workspace/templates/snippet.txt',
+                new Range(new Position(0, 0), new Position(0, 0)),
+            ),
         );
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
         $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+        $indexes->forProject($project)->replaceReferences(...$extractor->extract($uri, $languageId, $text));
         $resolver = new DocumentContextResolver($documents, $projects);
 
         return [

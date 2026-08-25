@@ -4,6 +4,7 @@
 
 - Recognize PHP named translation domains
 - Decode escaped quotes in Twig translation keys
+- Resolve template names with a leading ./ prefix
 - Add SARIF output for code-scanning integrations
 - Isolate diagnostic provider failures without discarding other findings
 - Add project path exclusions and actionable check failure details

@@ -77,6 +77,7 @@ final class TemplateIndex
 
     public function get(string $name): ?TemplateDeclaration
     {
+        $name = $this->normalize($name);
         foreach ($this->overlays as $overlay) {
             if ($overlay['declaration']?->name() === $name) {
                 return $overlay['declaration'];
@@ -114,20 +115,21 @@ final class TemplateIndex
     /** @return list<TemplateReference> */
     public function references(string $name): array
     {
+        $name = $this->normalize($name);
         $references = [];
         foreach ($this->references as $uri => $indexed) {
             if (isset($this->overlays[$uri])) {
                 continue;
             }
             foreach ($indexed as $reference) {
-                if ($reference->name() === $name) {
+                if ($this->normalize($reference->name()) === $name) {
                     $references[] = $reference;
                 }
             }
         }
         foreach ($this->overlays as $overlay) {
             foreach ($overlay['references'] as $reference) {
-                if ($reference->name() === $name) {
+                if ($this->normalize($reference->name()) === $name) {
                     $references[] = $reference;
                 }
             }
@@ -179,5 +181,14 @@ final class TemplateIndex
             $this->sources,
             fn (TemplateDeclaration $template): bool => !isset($this->overlays[$template->uri()]),
         ));
+    }
+
+    private function normalize(string $name): string
+    {
+        while (str_starts_with($name, './')) {
+            $name = substr($name, 2);
+        }
+
+        return $name;
     }
 }
