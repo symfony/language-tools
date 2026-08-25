@@ -8,6 +8,7 @@ use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpObjectCreation;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 
 final class TwigCallableDeclarationExtractor
 {
@@ -26,8 +27,8 @@ final class TwigCallableDeclarationExtractor
             if (null === $kind) {
                 continue;
             }
-            $name = ($creation->argument('name') ?? $creation->argument(0))?->stringLiteral();
-            if (null === $name || '' === $name->value()) {
+            $name = $this->literalName(($creation->argument('name') ?? $creation->argument(0))?->stringLiteral());
+            if (null === $name) {
                 continue;
             }
             $callable = ($creation->argument('callable') ?? $creation->argument(1))?->callable();
@@ -60,8 +61,8 @@ final class TwigCallableDeclarationExtractor
                 if (null === $kind) {
                     continue;
                 }
-                $name = ($attribute->argument('name') ?? $attribute->argument(0))?->stringLiteral();
-                if (null === $name || '' === $name->value()) {
+                $name = $this->literalName(($attribute->argument('name') ?? $attribute->argument(0))?->stringLiteral());
+                if (null === $name) {
                     continue;
                 }
                 $options = $this->attributeOptions($attribute, $method);
@@ -86,6 +87,11 @@ final class TwigCallableDeclarationExtractor
         }
 
         return new TwigCallableSourceFacts($uri, $declarations);
+    }
+
+    private function literalName(?PhpStringLiteral $name): ?PhpStringLiteral
+    {
+        return null === $name || '' === $name->value() || str_contains($name->value(), '\\') ? null : $name;
     }
 
     /** @return array{needsCharset: bool, needsEnvironment: bool, needsContext: bool, needsIsSandboxed: bool, variadic: bool, known: bool} */

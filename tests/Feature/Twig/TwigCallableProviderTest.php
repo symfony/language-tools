@@ -63,6 +63,7 @@ final class TwigCallableProviderTest extends TestCase
                     return [
                         new FunctionDefinition('function_name', [Runtime::class, 'doSomething'], ['needs_charset' => true, 'needs_environment' => true, 'needs_is_sandboxed' => true, 'is_variadic' => true]),
                         new FunctionDefinition('constant_options', [Runtime::class, 'doSomething'], self::OPTIONS),
+                        new FunctionDefinition("f\x6fo", [Runtime::class, 'doSomething']),
                         new FunctionDefinition('dynamic_name', $dynamicCallable),
                         new OtherDefinition('ignored_name', [Runtime::class, 'ignored']),
                     ];
@@ -85,6 +86,9 @@ final class TwigCallableProviderTest extends TestCase
 
                 #[AsTwigFunction('legacy_safe', null, null, null, ['html'])]
                 public function legacySafe(string $value): string { return $value; }
+
+                #[AsTwigFunction("f\x6fo")]
+                public function escapedAttribute(): string { return ''; }
 
                 #[AsTwigFunction(self::DYNAMIC_NAME)]
                 public function dynamicAttribute(): string { return ''; }

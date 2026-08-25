@@ -10,8 +10,9 @@ Supported Declarations
 
 Functions and filters returned by extension ``getFunctions()`` and
 ``getFilters()`` methods with ``TwigFunction`` and ``TwigFilter`` are recognized
-when their names are string literals. Statically resolvable class method
-callables declared as arrays or first-class callables are also resolved.
+when their names are plain string literals without escape sequences. Statically
+resolvable class method callables declared as arrays or first-class callables
+are also resolved.
 
 Public methods declared with Twig's ``#[AsTwigFunction]`` and
 ``#[AsTwigFilter]`` attributes are recognized too::
@@ -85,6 +86,6 @@ otherwise opens the function or filter registration.
 Limitations
 -----------
 
-Dynamic names, dynamic callables and non-public attributed methods are ignored.
-Functions and filters provided only by dependencies are left to a general Twig
-language server.
+Dynamic names, names with escape sequences, dynamic callables and non-public
+attributed methods are ignored. Functions and filters provided only by
+dependencies are left to a general Twig language server.
