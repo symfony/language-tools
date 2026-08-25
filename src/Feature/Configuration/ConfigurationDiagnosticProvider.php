@@ -35,6 +35,11 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
     ) {
     }
 
+    public function name(): string
+    {
+        return 'configuration';
+    }
+
     public function diagnostics(array $params): ?array
     {
         $request = $this->resolver->resolveDocument($params);

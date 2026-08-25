@@ -57,6 +57,48 @@ final class DiagnosticCollector
         return $matched ? $diagnostics : null;
     }
 
+    /**
+     * @param array<array-key, mixed> $params
+     */
+    public function collectDetailed(array $params, bool $includeExcluded = false): ?DetailedDiagnosticCollection
+    {
+        $textDocument = $params['textDocument'] ?? null;
+        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
+            return null;
+        }
+
+        $document = $this->documents->get($textDocument['uri']);
+        if (null === $document) {
+            return null;
+        }
+        if ($this->isExcluded($document->uri(), $includeExcluded)) {
+            return new DetailedDiagnosticCollection(true, [], []);
+        }
+
+        $diagnostics = [];
+        $failures = [];
+        $matched = false;
+        foreach ($this->providers as $provider) {
+            try {
+                $providedDiagnostics = $provider->diagnostics($params);
+            } catch (\Throwable $error) {
+                $failures[] = new DiagnosticProviderFailure($provider->name(), $error);
+
+                continue;
+            }
+            if (null === $providedDiagnostics) {
+                continue;
+            }
+
+            $matched = true;
+            foreach ($providedDiagnostics as $diagnostic) {
+                $diagnostics[] = new CollectedDiagnostic($provider->name(), $diagnostic);
+            }
+        }
+
+        return new DetailedDiagnosticCollection($matched, $diagnostics, $failures);
+    }
+
     private function isExcluded(string $uri, bool $includeExcluded): bool
     {
         $project = $this->projects->forDocumentUri($uri);

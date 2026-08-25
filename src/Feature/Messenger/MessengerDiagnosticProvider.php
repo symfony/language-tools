@@ -21,6 +21,11 @@ final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
     ) {
     }
 
+    public function name(): string
+    {
+        return 'messenger';
+    }
+
     public function diagnostics(array $params): ?array
     {
         $request = $this->documents->resolveDocument($params);

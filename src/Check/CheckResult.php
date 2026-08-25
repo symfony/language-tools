@@ -2,7 +2,7 @@
 
 namespace Symfony\Lsp\Check;
 
-/** @phpstan-type CheckError array{category: string, message: string, project?: string, environment?: string, workspacePath?: string, cause?: array{class: string, message: string}} */
+/** @phpstan-type CheckError array{category: string, message: string, project?: string, environment?: string, workspacePath?: string, provider?: string, cause?: array{class: string, message: string}} */
 final class CheckResult
 {
     /**

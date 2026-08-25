@@ -246,15 +246,32 @@ final class CheckRunner
                 }
                 try {
                     $params = ['textDocument' => ['uri' => $file->uri]];
-                    foreach ($this->diagnostics->collect($params, $file->excluded) ?? [] as $diagnostic) {
+                    $collection = $this->diagnostics->collectDetailed($params, $file->excluded);
+                    if (null === $collection) {
+                        continue;
+                    }
+                    foreach ($collection->failures as $failure) {
+                        $errors[] = [
+                            'category' => 'operational',
+                            'message' => \sprintf('Diagnostic provider "%s" failed for "%s".', $failure->provider, $file->workspacePath),
+                            'project' => $projectId,
+                            'environment' => $this->runtimeConfiguration->environment($file->project),
+                            'workspacePath' => $file->workspacePath,
+                            'provider' => $failure->provider,
+                            'cause' => $this->exceptionDetails($failure->error, $workspace),
+                        ];
+                        $incompleteProjects[$projectId] = true;
+                    }
+                    foreach ($collection->diagnostics as $diagnostic) {
                         $this->expireDeadline($deadline, $signal, $timedOut);
                         $cancellation->throwIfRequested();
                         $collected = CheckDiagnostic::fromProtocol(
                             $file,
                             $projectId,
                             $text,
-                            $diagnostic,
+                            $diagnostic->diagnostic,
                             $this->positions,
+                            $diagnostic->provider,
                         );
                         if (!$this->diagnosticCodes->contains($collected->code)) {
                             throw new \UnexpectedValueException(\sprintf('Diagnostic code "%s" is not registered.', $collected->code));
@@ -266,7 +283,7 @@ final class CheckRunner
                 } catch (\Throwable $error) {
                     $errors[] = [
                         'category' => 'operational',
-                        'message' => \sprintf('Diagnostic collection failed for "%s".', $file->workspacePath),
+                        'message' => \sprintf('Diagnostic result processing failed for "%s".', $file->workspacePath),
                         'project' => $projectId,
                         'environment' => $this->runtimeConfiguration->environment($file->project),
                         'workspacePath' => $file->workspacePath,

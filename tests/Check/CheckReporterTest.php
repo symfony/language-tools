@@ -29,6 +29,7 @@ final class CheckReporterTest extends TestCase
         self::assertSame('matched', $diagnostics[0]['baseline'] ?? null);
         self::assertSame([
             'feature' => 'service',
+            'provider' => 'dependency-injection',
             'environment' => 'test',
             'analysisMode' => 'source-only',
         ], $diagnostics[0]['provenance'] ?? null);
@@ -41,15 +42,17 @@ final class CheckReporterTest extends TestCase
             'category' => 'operational',
             'message' => 'Diagnostic collection failed.',
             'project' => 'apps/api',
+            'provider' => 'template',
             'cause' => ['class' => \UnexpectedValueException::class, 'message' => 'Invalid diagnostic.'],
         ]]);
 
-        /** @var array{errors: list<array{cause?: array{message: string}}>} $json */
+        /** @var array{errors: list<array{provider?: string, cause?: array{message: string}}>} $json */
         $json = json_decode((new CheckReporter())->render($result, 'json'), true, flags: \JSON_THROW_ON_ERROR);
         $human = (new CheckReporter())->render($result, 'human');
         $verbose = (new CheckReporter())->render($result, 'human', true);
         $github = (new CheckReporter())->render($result, 'github');
 
+        self::assertSame('template', $json['errors'][0]['provider'] ?? null);
         self::assertSame('Invalid diagnostic.', $json['errors'][0]['cause']['message'] ?? null);
         self::assertStringNotContainsString('Invalid diagnostic.', $human);
         self::assertStringContainsString('Cause: UnexpectedValueException: Invalid diagnostic.', $verbose);
@@ -65,7 +68,7 @@ final class CheckReporterTest extends TestCase
         self::assertStringContainsString('Missing 100%25%0Aservice', $output);
     }
 
-    /** @param list<array{category: string, message: string, project?: string, cause?: array{class: string, message: string}}> $errors */
+    /** @param list<array{category: string, message: string, project?: string, provider?: string, cause?: array{class: string, message: string}}> $errors */
     private function fixtureResult(array $errors = []): CheckResult
     {
         return new CheckResult(
@@ -94,6 +97,7 @@ final class CheckReporterTest extends TestCase
                 "Missing 100%\nservice",
                 hash('sha256', 'diagnostic'),
                 'matched',
+                'dependency-injection',
             )],
             [new BaselineEntry(
                 'apps/api',

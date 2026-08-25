@@ -158,6 +158,11 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         return $links;
     }
 
+    public function name(): string
+    {
+        return 'asset';
+    }
+
     public function diagnostics(array $params): ?array
     {
         $request = $this->resolver->resolveDocument($params);

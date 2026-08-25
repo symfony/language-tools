@@ -17,6 +17,11 @@ final class StimulusDiagnosticProvider implements DiagnosticProviderInterface
     ) {
     }
 
+    public function name(): string
+    {
+        return 'stimulus';
+    }
+
     public function diagnostics(array $params): ?array
     {
         $request = $this->documents->resolveDocument($params);

@@ -100,7 +100,7 @@ final class CheckCommand
         );
     }
 
-    /** @param array{category: string, message: string, project?: string, cause?: array{class: string, message: string}} $error */
+    /** @param array{category: string, message: string, project?: string, provider?: string, cause?: array{class: string, message: string}} $error */
     private function errorOutput(array $error, bool $verbose): string
     {
         $output = (isset($error['project']) ? '['.$error['project'].'] ' : '').$error['message']."\n";

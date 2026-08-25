@@ -21,6 +21,11 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
     ) {
     }
 
+    public function name(): string
+    {
+        return 'route';
+    }
+
     /**
      * @param array<array-key, mixed> $params
      *

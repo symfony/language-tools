@@ -76,6 +76,11 @@ final class FormMetadataProvider implements CompletionProviderInterface, Diagnos
         return null;
     }
 
+    public function name(): string
+    {
+        return 'form-metadata';
+    }
+
     public function diagnostics(array $params): ?array
     {
         $request = $this->resolver->resolveDocument($params);

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Isolate diagnostic provider failures without discarding other findings
 - Add project path exclusions and actionable check failure details
 - Verify cold and warm dogfood diagnostics match
 - Ignore runtime-backed diagnostics in Twig files outside configured loader paths

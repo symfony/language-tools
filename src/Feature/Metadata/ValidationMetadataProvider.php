@@ -75,6 +75,11 @@ final class ValidationMetadataProvider implements CompletionProviderInterface, D
         return null;
     }
 
+    public function name(): string
+    {
+        return 'validation-metadata';
+    }
+
     public function diagnostics(array $params): ?array
     {
         $request = $this->resolver->resolveDocument($params);

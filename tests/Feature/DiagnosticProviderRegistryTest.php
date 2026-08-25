@@ -58,6 +58,24 @@ final class DiagnosticProviderRegistryTest extends TestCase
         self::assertSame([], $client->notifications[0]['params']['diagnostics']);
     }
 
+    public function testDetailedCollectionKeepsSuccessfulProvidersAroundFailures(): void
+    {
+        [, , $collector] = $this->registryWithProviders(
+            'file:///workspace/templates/page.html.twig',
+            new StubDiagnosticProvider([$this->diagnostic('first')], 'first-provider'),
+            new ThrowingDiagnosticProvider(),
+            new StubDiagnosticProvider([$this->diagnostic('third')], 'third-provider'),
+        );
+
+        $collection = $collector->collectDetailed(['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']]);
+
+        self::assertNotNull($collection);
+        self::assertSame(['first-provider', 'third-provider'], array_map(static fn ($diagnostic): string => $diagnostic->provider, $collection->diagnostics));
+        self::assertSame(['first', 'third'], array_column(array_map(static fn ($diagnostic): array => $diagnostic->diagnostic, $collection->diagnostics), 'code'));
+        self::assertSame(['broken-provider'], array_map(static fn ($failure): string => $failure->provider, $collection->failures));
+        self::assertSame('Provider failed.', $collection->failures[0]->error->getMessage());
+    }
+
     public function testMergesProviderDiagnosticsInOrder(): void
     {
         [$registry, $client] = $this->registryWithProviders(
@@ -167,13 +185,33 @@ final class DiagnosticProviderRegistryTest extends TestCase
 final class StubDiagnosticProvider implements DiagnosticProviderInterface
 {
     /** @param list<array<array-key, mixed>>|null $diagnostics */
-    public function __construct(private readonly ?array $diagnostics)
+    public function __construct(
+        private readonly ?array $diagnostics,
+        private readonly string $name = 'stub',
+    ) {
+    }
+
+    public function name(): string
     {
+        return $this->name;
     }
 
     public function diagnostics(array $params): ?array
     {
         return $this->diagnostics;
+    }
+}
+
+final class ThrowingDiagnosticProvider implements DiagnosticProviderInterface
+{
+    public function name(): string
+    {
+        return 'broken-provider';
+    }
+
+    public function diagnostics(array $params): ?array
+    {
+        throw new \RuntimeException('Provider failed.');
     }
 }
 

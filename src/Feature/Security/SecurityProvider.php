@@ -106,6 +106,11 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
         return array_map(fn (SecuritySourceSymbol $candidate): array => $this->protocol->location($candidate->uri(), $candidate->range()), $this->sourceIndexes->forProject($project)->symbols($symbol->kind(), $symbol->name()));
     }
 
+    public function name(): string
+    {
+        return 'security';
+    }
+
     public function diagnostics(array $params): ?array
     {
         $request = $this->resolver->resolveDocument($params);

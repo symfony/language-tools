@@ -128,6 +128,11 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
         );
     }
 
+    public function name(): string
+    {
+        return 'twig-callable';
+    }
+
     public function diagnostics(array $params): ?array
     {
         $request = $this->documents->resolveDocument($params);

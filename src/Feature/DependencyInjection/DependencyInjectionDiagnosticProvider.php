@@ -20,6 +20,11 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
     ) {
     }
 
+    public function name(): string
+    {
+        return 'dependency-injection';
+    }
+
     public function diagnostics(array $params): ?array
     {
         $request = $this->documentContextResolver->resolveDocument($params);

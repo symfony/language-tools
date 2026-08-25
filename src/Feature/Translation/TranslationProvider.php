@@ -125,6 +125,11 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         return array_map(fn (TranslationReference $item): array => $this->protocol->location($item->uri(), $item->range()), $this->indexes->forProject($project)->references($reference->domain(), $reference->key()));
     }
 
+    public function name(): string
+    {
+        return 'translation';
+    }
+
     public function diagnostics(array $params): ?array
     {
         $request = $this->resolver->resolveDocument($params);

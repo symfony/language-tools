@@ -21,11 +21,12 @@ final class CheckDiagnostic
         public readonly string $message,
         public readonly string $fingerprint,
         public readonly string $baselineState = 'active',
+        public readonly ?string $provider = null,
     ) {
     }
 
     /** @param array<array-key, mixed> $diagnostic */
-    public static function fromProtocol(CheckFile $file, string $projectId, string $text, array $diagnostic, PositionConverter $positions): self
+    public static function fromProtocol(CheckFile $file, string $projectId, string $text, array $diagnostic, PositionConverter $positions, ?string $provider = null): self
     {
         $range = $diagnostic['range'] ?? null;
         $start = \is_array($range) ? ($range['start'] ?? null) : null;
@@ -81,6 +82,7 @@ final class CheckDiagnostic
             $source,
             $message,
             $fingerprint,
+            provider: $provider,
         );
     }
 
@@ -100,6 +102,7 @@ final class CheckDiagnostic
             $this->message,
             $this->fingerprint,
             $state,
+            $this->provider,
         );
     }
 

@@ -77,6 +77,11 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
         return $links;
     }
 
+    public function name(): string
+    {
+        return 'template';
+    }
+
     public function diagnostics(array $params): ?array
     {
         $request = $this->resolver->resolveDocument($params);

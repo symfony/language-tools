@@ -18,6 +18,11 @@ final class TwigComponentDiagnosticProvider implements DiagnosticProviderInterfa
     ) {
     }
 
+    public function name(): string
+    {
+        return 'twig-component';
+    }
+
     public function diagnostics(array $params): ?array
     {
         $request = $this->documents->resolveDocument($params);

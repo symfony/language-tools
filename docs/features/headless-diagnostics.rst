@@ -85,7 +85,8 @@ The JSON document uses ``schemaVersion`` 1. Diagnostic ranges are zero-based,
 end-exclusive and encoded as UTF-16 character offsets. It contains project
 identity, project-relative and workspace-relative paths, analysis mode, project
 status, baseline state, diagnostic provenance and summary counts. Operational
-errors include a sanitized cause when an exception is available.
+errors include the provider and a sanitized cause when an exception is
+available.
 
 Use GitHub Actions annotations for pull request feedback:
 
@@ -166,8 +167,10 @@ The exit statuses are stable automation contracts:
   or internal failure.
 
 Operational failure takes precedence over diagnostic findings. A partial report
-can contain diagnostics from completed projects, but ``complete`` remains
-``false`` and the exit status is ``12``.
+can contain diagnostics from completed projects and successful providers. If one
+provider fails for a file, the remaining providers continue and their
+findings stay in the report. ``complete`` remains ``false`` and the exit status
+is ``12``.
 
 Caching and Privacy
 -------------------

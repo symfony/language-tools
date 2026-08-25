@@ -116,6 +116,11 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         return array_map(fn (EnvironmentReference $item): array => $this->protocol->location($item->uri(), $item->range()), $this->indexes->forProject($project)->references($reference->name()));
     }
 
+    public function name(): string
+    {
+        return 'environment';
+    }
+
     public function diagnostics(array $params): ?array
     {
         $request = $this->resolver->resolveDocument($params);

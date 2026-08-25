@@ -175,6 +175,7 @@ HELP;
                 'baseline' => $diagnostic->baselineState,
                 'provenance' => [
                     'feature' => strstr($diagnostic->code, '.', true) ?: $diagnostic->code,
+                    'provider' => $diagnostic->provider,
                     'environment' => $projects[$diagnostic->project]->environment ?? null,
                     'analysisMode' => $projects[$diagnostic->project]->mode ?? null,
                 ],

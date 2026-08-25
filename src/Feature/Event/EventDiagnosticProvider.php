@@ -15,6 +15,11 @@ final class EventDiagnosticProvider implements DiagnosticProviderInterface
     ) {
     }
 
+    public function name(): string
+    {
+        return 'event';
+    }
+
     public function diagnostics(array $params): ?array
     {
         $request = $this->documents->resolveDocument($params);
