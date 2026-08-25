@@ -123,7 +123,7 @@ install_extensions="$state/install-extensions"
 demo_profile="$state/demo-profile"
 demo_extensions="$state/demo-extensions"
 mkdir -p "$raw" "$rendered" "$install_profile" "$install_extensions" "$demo_profile/User" "$demo_extensions"
-printf '%s\n' '{"extensions.ignoreRecommendations": true, "git.enabled": false}' >"$demo_profile/User/settings.json"
+printf '%s\n' '{"extensions.ignoreRecommendations":true,"git.enabled":false,"php.suggest.basic":false,"window.zoomLevel":2,"editor.fontSize":18,"editor.lineHeight":28,"editor.wordBasedSuggestions":"off","editor.suggest.showWords":false,"editor.minimap.enabled":false,"editor.stickyScroll.enabled":false,"editor.hover.delay":0,"workbench.startupEditor":"none","workbench.colorTheme":"Default Dark Modern"}' >"$demo_profile/User/settings.json"
 
 ports=()
 launchers=()
@@ -204,6 +204,16 @@ open_location() {
     local extensions="$2"
     local path="$3"
     "$code_command" --user-data-dir "$profile" --extensions-dir "$extensions" --reuse-window -g "$path"
+}
+
+resize_sidebar() {
+    local port="$1" from_x y width
+    width=$(node "$cdp" "$port" evaluate 'Math.round(document.querySelector(".part.sidebar").getBoundingClientRect().width)')
+    ((width > 260)) || return 0
+    from_x=$(node "$cdp" "$port" evaluate 'Math.round(document.querySelector(".part.sidebar").getBoundingClientRect().right)')
+    y=$(node "$cdp" "$port" evaluate 'Math.round(document.querySelector(".part.sidebar").getBoundingClientRect().top + document.querySelector(".part.sidebar").getBoundingClientRect().height / 2)')
+    node "$cdp" "$port" drag "$from_x" "$y" 250 "$y"
+    node "$cdp" "$port" wait 'document.querySelector(".part.sidebar").getBoundingClientRect().width <= 270' 10
 }
 
 clean_ui='(() => {
@@ -302,6 +312,7 @@ node "$cdp" "$demo_port" wait 'document.title.includes("symfony-demo")' 45
 node "$cdp" "$demo_port" evaluate "$clean_ui" >/dev/null
 sleep 2
 node "$cdp" "$demo_port" evaluate "$clean_ui" >/dev/null
+resize_sidebar "$demo_port"
 node "$cdp" "$demo_port" wait 'Array.from(document.querySelectorAll(".statusbar-item")).some((element) => element.getAttribute("aria-label")?.includes("source ready, runtime ready"))' 120
 node "$cdp" "$demo_port" evaluate "$clean_ui" >/dev/null
 if is_selected project-ready; then
@@ -689,7 +700,7 @@ lab="$state/runtime-application"
 lab_profile="$state/lab-profile"
 mkdir -p "$lab" "$lab_profile/User"
 git archive HEAD tests/Fixtures/RuntimeApplication | tar -x -C "$lab" --strip-components=3
-printf '%s\n' '{"extensions.ignoreRecommendations": true, "git.enabled": false, "symfonyLsp.translationDiagnostics": true}' >"$lab_profile/User/settings.json"
+printf '%s\n' '{"extensions.ignoreRecommendations":true,"git.enabled":false,"php.suggest.basic":false,"window.zoomLevel":2,"editor.fontSize":18,"editor.lineHeight":28,"editor.wordBasedSuggestions":"off","editor.suggest.showWords":false,"editor.minimap.enabled":false,"editor.stickyScroll.enabled":false,"editor.hover.delay":0,"workbench.startupEditor":"none","workbench.colorTheme":"Default Dark Modern","symfonyLsp.translationDiagnostics":true}' >"$lab_profile/User/settings.json"
 composer install --working-dir="$lab" --no-interaction --no-progress --prefer-dist
 php "$lab/bin/console" cache:clear --env=dev >/dev/null
 
@@ -712,6 +723,7 @@ node "$cdp" "$lab_port" wait 'document.title.includes("services.yaml")' 45
 node "$cdp" "$lab_port" evaluate "$clean_ui" >/dev/null
 sleep 2
 node "$cdp" "$lab_port" evaluate "$clean_ui" >/dev/null
+resize_sidebar "$lab_port"
 node "$cdp" "$lab_port" wait 'Array.from(document.querySelectorAll(".statusbar-item")).some((element) => element.getAttribute("aria-label")?.includes("source ready, runtime ready"))' 120
 
 lab_services="$lab/config/services.yaml"
@@ -774,7 +786,7 @@ if is_selected switch-environment; then
 fi
 
 if is_selected static-mode; then
-    printf '%s\n' '{"extensions.ignoreRecommendations": true, "git.enabled": false, "symfonyLsp.runtimeIndexing": false}' >"$lab_profile/User/settings.json"
+    printf '%s\n' '{"extensions.ignoreRecommendations":true,"git.enabled":false,"php.suggest.basic":false,"window.zoomLevel":2,"editor.fontSize":18,"editor.lineHeight":28,"editor.wordBasedSuggestions":"off","editor.suggest.showWords":false,"editor.minimap.enabled":false,"editor.stickyScroll.enabled":false,"editor.hover.delay":0,"workbench.startupEditor":"none","workbench.colorTheme":"Default Dark Modern","symfonyLsp.runtimeIndexing":false}' >"$lab_profile/User/settings.json"
     open_command_palette "$lab_port"
     node "$cdp" "$lab_port" text 'Developer: Reload Window'
     sleep 1
