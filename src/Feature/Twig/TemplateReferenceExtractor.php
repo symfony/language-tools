@@ -8,7 +8,6 @@ use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
-use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
@@ -55,7 +54,7 @@ final class TemplateReferenceExtractor
                 continue;
             }
             $references[] = new TemplateReference(
-                $this->decodedValue($text, $template),
+                $template->value(),
                 $uri,
                 new Range(
                     $this->positionConverter->toPosition($text, $template->startOffset()),
@@ -122,11 +121,6 @@ final class TemplateReferenceExtractor
         return null === $positional?->name() ? $positional : null;
     }
 
-    private function decodedValue(string $text, PhpStringLiteral $literal): string
-    {
-        return $this->decodedQuoted($text[$literal->startOffset() - 1].$literal->value());
-    }
-
     /** @return list<string> */
     private function attributeVariables(?string $expression): array
     {
@@ -147,7 +141,7 @@ final class TemplateReferenceExtractor
                 continue;
             }
             if ($token->is(\T_CONSTANT_ENCAPSED_STRING)) {
-                $variable = $this->decodedQuoted(substr($token->text, 0, -1));
+                $variable = PhpStringLiteralDecoder::decode($token->text[0], substr($token->text, 1, -1));
                 if ('' !== $variable) {
                     $variables[] = $variable;
                 }
@@ -159,15 +153,6 @@ final class TemplateReferenceExtractor
         }
 
         return array_values(array_unique($variables));
-    }
-
-    private function decodedQuoted(string $quotedWithoutClosingQuote): string
-    {
-        $value = substr($quotedWithoutClosingQuote, 1);
-
-        return "'" === $quotedWithoutClosingQuote[0]
-            ? strtr($value, ['\\\\' => '\\', "\\'" => "'"])
-            : PhpStringLiteralDecoder::decodeDoubleQuoted($value);
     }
 
     /**

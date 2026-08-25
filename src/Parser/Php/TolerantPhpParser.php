@@ -518,6 +518,6 @@ final class TolerantPhpParser implements PhpParserInterface
             return null;
         }
 
-        return new PhpStringLiteral(substr($text, 1, -1), $start + 1, $end - 1);
+        return new PhpStringLiteral(PhpStringLiteralDecoder::decode($text[0], substr($text, 1, -1)), $start + 1, $end - 1);
     }
 }

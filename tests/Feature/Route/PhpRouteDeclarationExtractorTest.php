@@ -68,6 +68,32 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
         self::assertSame('app_home', $declarations[0]->name());
     }
 
+    public function testDecodesEscapedRouteNames(): void
+    {
+        $text = <<<'PHP'
+            <?php
+            use Symfony\Component\Routing\Attribute\Route;
+
+            final class ArticleController
+            {
+                #[Route('/articles', name: 'blog\'s\\archive')]
+                public function archive(): void
+                {
+                }
+            }
+            PHP;
+
+        $declarations = (new PhpRouteDeclarationExtractor(new PositionConverter(), new TolerantPhpParser(new Parser())))->extract(
+            'file:///workspace/src/ArticleController.php',
+            $text,
+        );
+
+        self::assertSame(['blog\'s\\archive'], array_map(
+            static fn (RouteDeclaration $declaration): string => $declaration->name(),
+            $declarations,
+        ));
+    }
+
     public function testResolvesRouteImportsAndIgnoresUnrelatedAttributes(): void
     {
         $text = <<<'PHP'

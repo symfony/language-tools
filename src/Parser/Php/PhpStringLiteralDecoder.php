@@ -16,6 +16,16 @@ final class PhpStringLiteralDecoder
         'f' => "\f",
     ];
 
+    public static function decode(string $quote, string $value): string
+    {
+        return "'" === $quote ? self::decodeSingleQuoted($value) : self::decodeDoubleQuoted($value);
+    }
+
+    public static function decodeSingleQuoted(string $value): string
+    {
+        return strtr($value, ['\\\\' => '\\', "\\'" => "'"]);
+    }
+
     public static function decodeDoubleQuoted(string $value): string
     {
         $result = '';

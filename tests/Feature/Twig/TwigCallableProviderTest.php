@@ -113,11 +113,13 @@ final class TwigCallableProviderTest extends TestCase
             [TwigCallableKind::Filter, 'named_filter', 'App\Twig\AppExtension', 'localFilter', false, false, false, false, false, true],
             [TwigCallableKind::Function, 'function_name', 'App\Twig\AppExtensionRuntime', 'doSomething', true, true, false, true, true, true],
             [TwigCallableKind::Function, 'constant_options', 'App\Twig\AppExtensionRuntime', 'doSomething', false, false, false, false, false, false],
+            [TwigCallableKind::Function, 'foo', 'App\Twig\AppExtensionRuntime', 'doSomething', false, false, false, false, false, true],
             [TwigCallableKind::Function, 'dynamic_name', null, null, false, false, false, false, false, true],
             [TwigCallableKind::Filter, 'attribute_filter', 'App\Twig\AppExtension', 'attributeFilter', false, true, true, true, false, true],
             [TwigCallableKind::Function, 'attribute_function', 'App\Twig\AppExtension', 'attributeFunction', true, false, false, false, true, true],
             [TwigCallableKind::Function, 'auto_environment', 'App\Twig\AppExtension', 'autoEnvironment', false, true, false, false, false, true],
             [TwigCallableKind::Function, 'legacy_safe', 'App\Twig\AppExtension', 'legacySafe', false, false, false, false, false, true],
+            [TwigCallableKind::Function, 'foo', 'App\Twig\AppExtension', 'escapedAttribute', false, false, false, false, false, true],
             [TwigCallableKind::Function, 'trait_function', 'App\Twig\SharedExtension', 'traitFunction', false, false, false, false, false, true],
         ], array_map(static fn ($declaration): array => [
             $declaration->kind(),

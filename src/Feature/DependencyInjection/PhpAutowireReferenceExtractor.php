@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 
 final class PhpAutowireReferenceExtractor
 {
@@ -33,9 +34,10 @@ final class PhpAutowireReferenceExtractor
                     continue;
                 }
 
-                $rawName = $literal->value();
+                $rawName = $this->raw($text, $literal->startOffset(), $literal->endOffset());
                 $optional = DependencyInjectionSymbolKind::Service === $kind && str_starts_with($rawName, '?');
-                $name = trim($rawName, '%?');
+                $rawTrimmed = trim($rawName, '%?');
+                $name = PhpStringLiteralDecoder::decode($text[$literal->startOffset() - 1], $rawTrimmed);
                 if ('' === $name) {
                     continue;
                 }
@@ -45,7 +47,7 @@ final class PhpAutowireReferenceExtractor
                     $kind,
                     $name,
                     $uri,
-                    $this->range($text, $offset, \strlen($name)),
+                    $this->range($text, $offset, \strlen($rawTrimmed)),
                     $optional,
                 );
                 if (DependencyInjectionSymbolKind::Parameter === $kind) {
@@ -59,24 +61,29 @@ final class PhpAutowireReferenceExtractor
                     continue;
                 }
 
-                preg_match_all('/%([^%\s]+)%/', $literal->value(), $parameters, \PREG_OFFSET_CAPTURE);
-                foreach ($parameters[1] as [$name, $offset]) {
+                preg_match_all('/%([^%\s]+)%/', $this->raw($text, $literal->startOffset(), $literal->endOffset()), $parameters, \PREG_OFFSET_CAPTURE);
+                foreach ($parameters[1] as [$rawParameter, $offset]) {
                     $offset += $literal->startOffset();
-                    if (str_starts_with($name, 'env(') || \in_array($offset, $namedParameterOffsets, true)) {
+                    if (str_starts_with($rawParameter, 'env(') || \in_array($offset, $namedParameterOffsets, true)) {
                         continue;
                     }
 
                     $references[] = new DependencyInjectionReference(
                         DependencyInjectionSymbolKind::Parameter,
-                        $name,
+                        PhpStringLiteralDecoder::decode($text[$literal->startOffset() - 1], $rawParameter),
                         $uri,
-                        $this->range($text, $offset, \strlen($name)),
+                        $this->range($text, $offset, \strlen($rawParameter)),
                     );
                 }
             }
         }
 
         return $references;
+    }
+
+    private function raw(string $text, int $startOffset, int $endOffset): string
+    {
+        return substr($text, $startOffset, $endOffset - $startOffset);
     }
 
     private function range(string $text, int $offset, int $length): Range

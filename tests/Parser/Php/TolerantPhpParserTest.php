@@ -41,6 +41,28 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame([], $document->diagnostics());
     }
 
+    public function testDecodesEscapedStringLiteralsWithSourceOffsets(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            #[Foo('App\\Mailer', "tab\tbrace\x7dend")]
+            final class Service
+            {
+            }
+            PHP;
+
+        $attribute = (new TolerantPhpParser(new Parser()))->parse($source)->attributes()[0];
+        $service = $attribute->argument(0)?->stringLiteral();
+        $label = $attribute->argument(1)?->stringLiteral();
+
+        self::assertInstanceOf(PhpStringLiteral::class, $service);
+        self::assertSame('App\Mailer', $service->value());
+        self::assertSame('App\\\\Mailer', substr($source, $service->startOffset(), $service->endOffset() - $service->startOffset()));
+        self::assertInstanceOf(PhpStringLiteral::class, $label);
+        self::assertSame("tab\tbrace}end", $label->value());
+        self::assertSame('tab\\tbrace\\x7dend', substr($source, $label->startOffset(), $label->endOffset() - $label->startOffset()));
+    }
+
     public function testExposesNamespaceImportsAndNameResolution(): void
     {
         $source = <<<'PHP'
