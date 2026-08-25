@@ -117,18 +117,34 @@ final class MatrixCommand
         }
 
         $normalized = [];
-        foreach (array_filter($diagnostics, 'is_array') as $publication) {
+        foreach ($diagnostics as $publication) {
+            if (!\is_array($publication)) {
+                $normalized[] = $this->diagnosticEntry('malformed-publication', $publication);
+
+                continue;
+            }
             $items = $publication['items'] ?? null;
             if (\is_array($items)) {
-                $items = array_map($this->normalizeDiagnosticValue(...), array_filter($items, 'is_array'));
+                $items = array_map(
+                    fn (mixed $item): array => \is_array($item)
+                        ? $this->diagnosticEntry('item', $this->normalizeDiagnosticValue($item))
+                        : $this->diagnosticEntry('malformed-item', $item),
+                    $items,
+                );
                 usort($items, static fn (array $left, array $right): int => serialize($left) <=> serialize($right));
                 $publication['items'] = $items;
             }
-            $normalized[] = $this->normalizeDiagnosticValue($publication);
+            $normalized[] = $this->diagnosticEntry('publication', $this->normalizeDiagnosticValue($publication));
         }
         usort($normalized, static fn (array $left, array $right): int => serialize($left) <=> serialize($right));
 
         return $normalized;
+    }
+
+    /** @return array{type: string, value: mixed} */
+    private function diagnosticEntry(string $type, mixed $value): array
+    {
+        return ['type' => $type, 'value' => $value];
     }
 
     /**

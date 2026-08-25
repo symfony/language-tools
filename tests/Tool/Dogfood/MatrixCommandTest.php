@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Tool\Dogfood;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
@@ -112,6 +113,35 @@ final class MatrixCommandTest extends TestCase
         $report = $this->readReport();
         self::assertSame('cache-parity', $report['failure']['layer'] ?? null);
         self::assertStringContainsString('Cold and warm diagnostic publications differ.', $report['failure']['message']);
+    }
+
+    /**
+     * @param list<mixed> $coldDiagnostics
+     * @param list<mixed> $warmDiagnostics
+     */
+    #[DataProvider('malformedDiagnosticsProvider')]
+    public function testMalformedDiagnosticsRemainSignificantForCacheParity(array $coldDiagnostics, array $warmDiagnostics): void
+    {
+        $cold = $this->harnessRun(['diagnostics' => $coldDiagnostics]);
+        $warm = $this->harnessRun(['diagnostics' => $warmDiagnostics]);
+
+        $exitCode = $this->command(new FakeProvisioner($this->checkout), new FakeHarness($cold, $warm))->run([$this->configuration()], $this->output);
+
+        self::assertSame(1, $exitCode);
+        self::assertSame('cache-parity', $this->readReport()['failure']['layer'] ?? null);
+    }
+
+    /** @return iterable<string, array{list<mixed>, list<mixed>}> */
+    public static function malformedDiagnosticsProvider(): iterable
+    {
+        yield 'publication' => [[42], []];
+        yield 'item' => [[[
+            'uri' => 'file:///workspace/config/services.yaml',
+            'items' => [42],
+        ]], [[
+            'uri' => 'file:///workspace/config/services.yaml',
+            'items' => [],
+        ]]];
     }
 
     public function testUsesTheConfiguredApplicationDirectory(): void
