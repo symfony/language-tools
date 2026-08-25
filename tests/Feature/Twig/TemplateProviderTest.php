@@ -600,6 +600,14 @@ final class TemplateProviderTest extends TestCase
     public function testResolvesTemplateNamesWithALeadingDotSlash(): void
     {
         $uri = 'file:///workspace/templates/page.html.twig';
+        $completionText = "{{ source('./sn') }}";
+        [$completion, , $completionConverter] = $this->providers($uri, 'twig', $completionText);
+        $completionPosition = $completionConverter->toPosition($completionText, (int) strpos($completionText, "')"));
+        self::assertSame(['snippet.txt'], array_column($completion->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $completionPosition->line(), 'character' => $completionPosition->character()],
+        ]) ?? [], 'label'));
+
         $text = "{{ source('./snippet.txt') }}";
         [, $navigation, $converter] = $this->providers($uri, 'twig', $text);
         $position = $converter->toPosition($text, strpos($text, 'snippet') + 1);

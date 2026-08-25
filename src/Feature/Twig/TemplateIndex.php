@@ -95,6 +95,7 @@ final class TemplateIndex
     /** @return list<TemplateDeclaration> */
     public function matching(string $prefix): array
     {
+        $prefix = $this->normalize($prefix);
         $templates = $this->runtime;
         foreach ($this->sourceDeclarations() as $template) {
             $templates[$template->name()] = $template;

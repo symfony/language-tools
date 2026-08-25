@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Complete template names with a leading ./ prefix
 - Complete directly imported validation constraints
 - Complete escaped Twig translation keys without changing their quoting
 - Preserve positional translation domains after class constant parameters

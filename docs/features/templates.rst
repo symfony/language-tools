@@ -19,8 +19,8 @@ and in these Twig contexts:
 * the ``include()`` and ``source()`` functions.
 
 Both regular names such as ``article/show.html.twig`` and namespaced names such
-as ``@Admin/dashboard.html.twig`` are supported. A leading ``./`` is resolved
-like the same loader-root name without that prefix.
+as ``@Admin/dashboard.html.twig`` are supported. Completion and navigation
+resolve a leading ``./`` like the same loader-root name without that prefix.
 
 Navigation and Links
 --------------------
