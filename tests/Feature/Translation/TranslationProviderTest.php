@@ -193,6 +193,20 @@ final class TranslationProviderTest extends TestCase
         self::assertSame(['translation.not_found'], array_column($provider->diagnostics(['textDocument' => ['uri' => $uri]]), 'code'));
     }
 
+    public function testHonorsNamedAndPositionalPhpTranslationDomains(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = <<<'PHP'
+            <?php
+            $translator->trans('panel.title', domain: 'admin');
+            $translator->trans('panel.title', [], 'admin');
+            PHP;
+        [$provider, , $configuration, $project] = $this->provider($uri, $text);
+        $configuration->configure($project, true);
+
+        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
     public function testFlagsOnlyMissingPlaceholdersFromLiteralParameters(): void
     {
         $uri = 'file:///workspace/templates/article.html.twig';
@@ -233,7 +247,11 @@ final class TranslationProviderTest extends TestCase
         $commentParser = new TwigCommentParser();
         $extractor = new TranslationExtractor($converter, new UriToPathConverter(), $commentParser, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new QuotedArgumentMatcher($converter), new PhpCommentParser());
         $indexes = new TranslationIndexRegistry();
-        $indexes->forProject($project)->replaceRuntime(true, new TranslationMessage('article.title', 'messages', 'en', 'Article %name%'));
+        $indexes->forProject($project)->replaceRuntime(
+            true,
+            new TranslationMessage('article.title', 'messages', 'en', 'Article %name%'),
+            new TranslationMessage('panel.title', 'admin', 'en', 'Panel title'),
+        );
         $configuration = new TranslationConfigurationRegistry();
 
         return [new TranslationProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser, new PhpCommentParser()), $converter, $configuration, $project];

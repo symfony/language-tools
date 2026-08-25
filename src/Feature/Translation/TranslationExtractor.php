@@ -226,8 +226,7 @@ final class TranslationExtractor
             if ('twig' === $languageId) {
                 [$parameters, $domain] = $this->twigTransArguments($text, $matches[0][$i], $defaultDomain);
             } else {
-                $domain = \is_string($matches[5][$i][0] ?? null) ? $matches[5][$i][0] : $defaultDomain;
-                $parameters = \is_string($matches[3][$i][0] ?? null) ? $matches[3][$i][0] : null;
+                [$parameters, $domain] = $this->phpTransArguments($text, $matches[0][$i], $defaultDomain);
             }
             $placeholders = null === $parameters ? null : $this->parameterKeys($parameters);
             $result[] = new TranslationReference(
@@ -274,6 +273,50 @@ final class TranslationExtractor
         sort($keys);
 
         return $keys;
+    }
+
+    /**
+     * @param array{string|null, int} $match
+     *
+     * @return array{string|null, string}
+     */
+    private function phpTransArguments(string $text, array $match, string $defaultDomain): array
+    {
+        if (!\is_string($match[0])) {
+            return [null, $defaultDomain];
+        }
+        $open = strpos($text, '(', $match[1]);
+        if (false === $open) {
+            return [null, $defaultDomain];
+        }
+        $close = $this->matchingDelimiter($text, $open);
+        if (null === $close) {
+            return [null, $defaultDomain];
+        }
+        $arguments = $this->splitArguments(substr($text, $open + 1, $close - $open - 1));
+        array_shift($arguments);
+        $parameters = null;
+        $domain = $defaultDomain;
+        $position = 1;
+        foreach ($arguments as $argument) {
+            $name = null;
+            $value = $argument;
+            if (preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$/s', $argument, $named)) {
+                $name = $named[1];
+                $value = $named[2];
+            } else {
+                $name = 1 === $position ? 'parameters' : (2 === $position ? 'domain' : null);
+                ++$position;
+            }
+            $value = trim($value);
+            if ('parameters' === $name && str_starts_with($value, '[') && str_ends_with($value, ']')) {
+                $parameters = $value;
+            } elseif ('domain' === $name && \strlen($value) >= 2 && \in_array($value[0], ["'", '"'], true) && str_ends_with($value, $value[0])) {
+                $domain = substr($value, 1, -1);
+            }
+        }
+
+        return [$parameters, $domain];
     }
 
     /**

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recognize PHP named translation domains
 - Add SARIF output for code-scanning integrations
 - Isolate diagnostic provider failures without discarding other findings
 - Add project path exclusions and actionable check failure details
