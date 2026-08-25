@@ -67,8 +67,9 @@ final class MetadataExtractor
     /** @return list<array{constraint: string, option: string, range: Range}> */
     public function constraintOptions(string $text): array
     {
+        $php = $this->phpParser->parse($text);
         $options = [];
-        preg_match_all('/#\[\s*(?:Assert\\\\)?([A-Za-z_][A-Za-z0-9_]*)\s*\((.*?)\)\s*\]/s', $text, $attributes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        preg_match_all('/#\[\s*([\\\\A-Za-z_][A-Za-z0-9_\\\\]*)\s*\((.*?)\)\s*\]/s', $text, $attributes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($attributes as $attribute) {
             if (str_contains($attribute[2][0], 'new ')) {
                 continue;
@@ -79,7 +80,7 @@ final class MetadataExtractor
                 }
                 $name = $named[1][0];
                 $absolute = $argument['offset'] + $named[1][1];
-                $options[] = ['constraint' => $attribute[1][0], 'option' => $name, 'range' => $this->offsetRange($text, $absolute, \strlen($name))];
+                $options[] = ['constraint' => $php->resolveName($attribute[1][0]), 'option' => $name, 'range' => $this->offsetRange($text, $absolute, \strlen($name))];
             }
         }
 
@@ -159,11 +160,27 @@ final class MetadataExtractor
         foreach ($groupReferences as $group) {
             array_push($symbols, ...$this->quotedSymbols(MetadataSymbolKind::SerializerGroup, $uri, $text, $group[1][0], $group[1][1], false));
         }
-        preg_match_all('/#\[\s*Assert\\\\([A-Za-z_][A-Za-z0-9_]*)/', $text, $constraintReferences, \PREG_OFFSET_CAPTURE);
-        foreach ($constraintReferences[1] as [$name, $offset]) {
-            $symbols[] = new MetadataSourceSymbol(MetadataSymbolKind::Constraint, $name, $uri, $this->offsetRange($text, $offset, \strlen($name)), false);
+        $constraintNamespace = 'Symfony\\Component\\Validator\\Constraints\\';
+        preg_match_all('/#\[\s*([\\\\A-Za-z_][A-Za-z0-9_\\\\]*)/', $text, $constraintReferences, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        foreach ($constraintReferences as $reference) {
+            $className = $php->resolveName($reference[1][0]);
+            if (!str_starts_with($className, $constraintNamespace)) {
+                continue;
+            }
+            $name = substr($className, \strlen($constraintNamespace));
+            if (str_contains($name, '\\')) {
+                continue;
+            }
+            $separator = strrpos($reference[1][0], '\\');
+            $segmentOffset = false === $separator ? 0 : $separator + 1;
+            $offset = $reference[1][1] + $segmentOffset;
+            $length = \strlen($reference[1][0]) - $segmentOffset;
+            $symbols[] = new MetadataSourceSymbol(MetadataSymbolKind::Constraint, $name, $uri, $this->offsetRange($text, $offset, $length), false);
         }
         foreach ($php->imports() as $alias => $className) {
+            if ($className === rtrim($constraintNamespace, '\\') || str_starts_with($className, $constraintNamespace)) {
+                continue;
+            }
             if (!str_contains($className, '\\Validator\\') && !str_contains($className, '\\Constraints\\')) {
                 continue;
             }
@@ -233,17 +250,24 @@ final class MetadataExtractor
         }
         $attribute = strrpos($before, '#[');
         if (false !== $attribute && !str_contains(substr($before, $attribute), ']')) {
+            $php = $this->phpParser->parse($text);
             $expression = substr($before, $attribute + 2);
-            if (preg_match('/^\s*(?:Assert\\\\)?([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)$/s', $expression, $constraint) && preg_match('/(?:^|,)\s*([A-Za-z_][A-Za-z0-9_]*)$/', $constraint[2], $option, \PREG_OFFSET_CAPTURE)) {
+            if (preg_match('/^\s*([\\\\A-Za-z_][A-Za-z0-9_\\\\]*)\s*\((.*)$/s', $expression, $constraint) && preg_match('/(?:^|,)\s*([A-Za-z_][A-Za-z0-9_]*)$/', $constraint[2], $option, \PREG_OFFSET_CAPTURE)) {
                 $optionOffset = $attribute + 2 + strpos($expression, $constraint[2]) + $option[1][1];
 
-                return $this->context(MetadataCompletionKind::ConstraintOption, $option[1][0], $text, $optionOffset, $constraint[1]);
+                return $this->context(MetadataCompletionKind::ConstraintOption, $option[1][0], $text, $optionOffset, $php->resolveName($constraint[1]));
             }
-            if (preg_match('/^\s*(?:Assert\\\\)?([A-Za-z_][A-Za-z0-9_]*)$/', $expression, $constraint, \PREG_OFFSET_CAPTURE)) {
-                $name = $constraint[1][0];
-                $nameOffset = $attribute + 2 + $constraint[1][1];
+            if (preg_match('/^\s*([\\\\A-Za-z_][A-Za-z0-9_\\\\]*)$/', $expression, $constraint, \PREG_OFFSET_CAPTURE)) {
+                $separator = strrpos($constraint[1][0], '\\');
+                if (false !== $separator) {
+                    $name = substr($constraint[1][0], $separator + 1);
+                    $class = $php->resolveName(substr($constraint[1][0], 0, $separator + 1).'Constraint');
+                    if (str_starts_with($class, 'Symfony\\Component\\Validator\\Constraints\\')) {
+                        $nameOffset = $attribute + 2 + $constraint[1][1] + $separator + 1;
 
-                return $this->context(MetadataCompletionKind::Constraint, $name, $text, $nameOffset);
+                        return $this->context(MetadataCompletionKind::Constraint, $name, $text, $nameOffset);
+                    }
+                }
             }
         }
 

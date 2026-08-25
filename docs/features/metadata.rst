@@ -24,10 +24,11 @@ and their constructor options. Project constraint classes extending
 ``Constraint`` are recognized from project files.
 
 Definitely unknown options are diagnosed only when the constraint itself is
-known. In PHP attributes, validation applies to top-level named arguments;
-positional values and expressions nested inside argument values are ignored. Go
-to Definition and Find All References connect application constraint classes to
-static PHP and YAML usages.
+known. In PHP, the attribute must resolve to an installed constraint; unrelated
+attributes that share its short name are ignored. Validation applies to
+top-level named arguments; positional values and expressions nested inside
+argument values are ignored. Go to Definition and Find All References connect
+application constraint classes to static PHP and YAML usages.
 
 Serializer Groups and Mapped Properties
 ---------------------------------------

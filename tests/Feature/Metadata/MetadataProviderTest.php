@@ -47,6 +47,7 @@ final class MetadataProviderTest extends TestCase
                 new ValidationConstraint('Ip', 'Symfony\\Component\\Validator\\Constraints\\Ip', ['version']),
                 new ValidationConstraint('Length', 'Symfony\\Component\\Validator\\Constraints\\Length', ['groups', 'max', 'message', 'min']),
                 new ValidationConstraint('Type', 'Symfony\\Component\\Validator\\Constraints\\Type', ['groups', 'type']),
+                new ValidationConstraint('When', 'Symfony\\Component\\Validator\\Constraints\\When', ['constraints', 'expression']),
             ],
             true,
             true,
@@ -129,19 +130,33 @@ final class MetadataProviderTest extends TestCase
         $constraintUri = 'file:///workspace/src/Dto/Input.php';
         $constraintText = <<<'PHP'
             <?php
+            namespace App\Dto;
+            use Symfony\Component\DependencyInjection\Attribute as Assert;
+            use Symfony\Component\Validator\Constraints as Validation;
             final class Input
             {
-                #[Assert\Length(ma)]
-                #[Assert\Length(unknown: 1)]
-                #[Assert\Ip(version: Assert\Ip::ALL)]
-                #[Assert\Choice(choices: [MapMarkerType::Community->value, MapMarkerType::Ecosystem->value], groups: ['Submit'])]
-                #[Assert\Choice(MapMarkerType::cases())]
-                #[Assert\Type(\DateTimeInterface::class, groups: ['Submit'])]
+                #[Assert\When(env: 'dev', exp)]
+                #[Validation\When(exp)]
+                #[Validation\Length(ma)]
+                #[Validation\Length(unknown: 1)]
+                #[Validation\Ip(version: Validation\Ip::ALL)]
+                #[Validation\Choice(choices: [MapMarkerType::Community->value, MapMarkerType::Ecosystem->value], groups: ['Submit'])]
+                #[Validation\Choice(MapMarkerType::cases())]
+                #[Validation\Type(\DateTimeInterface::class, groups: ['Submit'])]
                 public string $value;
             }
             PHP;
         $documents->open(new Document($constraintUri, 'php', 1, $constraintText));
+        $dependencyInjectionWhen = strpos($constraintText, 'exp)]');
+        self::assertIsInt($dependencyInjectionWhen);
+        self::assertSame([], $this->completionLabels($completionProviders, $converter, $constraintUri, $constraintText, $dependencyInjectionWhen + 3));
+        $validatorWhen = strpos($constraintText, 'exp)]', $dependencyInjectionWhen + 1);
+        self::assertIsInt($validatorWhen);
+        self::assertSame(['expression'], $this->completionLabels($completionProviders, $converter, $constraintUri, $constraintText, $validatorWhen + 3));
         self::assertSame(['max'], $this->completionLabels($completionProviders, $converter, $constraintUri, $constraintText, strpos($constraintText, 'ma)') + 2));
+        self::assertNull($this->hover($hoverProviders, $converter, $constraintUri, $constraintText, strpos($constraintText, 'Assert\\When') + \strlen('Assert\\')));
+        self::assertNull($this->hover($hoverProviders, $converter, $constraintUri, $constraintText, strpos($constraintText, 'env:') + 1));
+        self::assertIsArray($this->hover($hoverProviders, $converter, $constraintUri, $constraintText, strpos($constraintText, 'unknown:') + 1));
         $diagnostics = $this->diagnostics($diagnosticProviders, $constraintUri);
         self::assertSame(['validation.unknown_constraint_option'], array_column($diagnostics, 'code'));
         self::assertSame('Unknown option "unknown" for constraint "Length".', $diagnostics[0]['message'] ?? null);

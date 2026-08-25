@@ -8,6 +8,8 @@ final class MetadataIndex
     private array $formTypes = [];
     /** @var array<string, ValidationConstraint> */
     private array $constraints = [];
+    /** @var array<string, ValidationConstraint> */
+    private array $constraintsByClass = [];
     private bool $formsComplete = false;
     private bool $constraintsComplete = false;
 
@@ -23,8 +25,10 @@ final class MetadataIndex
         }
         ksort($this->formTypes);
         $this->constraints = [];
+        $this->constraintsByClass = [];
         foreach ($constraints as $constraint) {
             $this->constraints[$constraint->name()] = $constraint;
+            $this->constraintsByClass[$constraint->className()] = $constraint;
         }
         ksort($this->constraints);
         $this->formsComplete = $formsComplete;
@@ -50,7 +54,7 @@ final class MetadataIndex
 
     public function constraint(string $name): ?ValidationConstraint
     {
-        return $this->constraints[$name] ?? null;
+        return $this->constraints[$name] ?? $this->constraintsByClass[ltrim($name, '\\')] ?? null;
     }
 
     public function formsComplete(): bool
