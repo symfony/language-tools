@@ -66,6 +66,33 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
+    public function testResolvesNestedSequencePrototypes(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = <<<'YAML'
+            framework:
+                items:
+                    first:
+                        handlers:
+                            - type: stream
+                              nested: true
+                        policies:
+                            - default-src: true
+            YAML;
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+
+        $text .= "\n                - typo: true";
+        $fixture->documents->update($uri, 2, $text);
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+        self::assertSame(
+            ['Unknown configuration key "framework.items.first.policies.typo".'],
+            array_column($diagnostics, 'message'),
+        );
+    }
+
     public function testHonorsConfigurationKeyNormalization(): void
     {
         $fixture = $this->providers();
@@ -502,6 +529,9 @@ final class ConfigurationProviderTest extends TestCase
                             $this->node('type', 'scalar'),
                             $this->node('nested', 'boolean'),
                         ]), keyAttribute: 'name'),
+                        $this->node('policies', 'array', prototype: $this->node('policy', 'array', children: [
+                            $this->node('default-src', 'boolean'),
+                        ], normalizeKeys: false)),
                     ]), keyAttribute: 'name'),
                     $this->node('assets', 'array', accepts: ['null' => true, 'true' => true, 'false' => true, 'scalar' => false, 'unknownKeys' => false], children: [
                         $this->node('enabled', 'boolean'),

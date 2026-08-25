@@ -6,6 +6,7 @@ final class YamlMapping
 {
     /**
      * @param list<string> $path
+     * @param list<int>    $sequenceDepths path indices entered through a sequence item
      */
     public function __construct(
         private readonly array $path,
@@ -14,7 +15,7 @@ final class YamlMapping
         private readonly int $keyEndByte,
         private readonly int $valueStartByte,
         private readonly int $valueEndByte,
-        private readonly bool $sequenceItem,
+        private readonly array $sequenceDepths,
         private readonly string $scope,
     ) {
     }
@@ -52,7 +53,13 @@ final class YamlMapping
 
     public function isSequenceItem(): bool
     {
-        return $this->sequenceItem;
+        return [] !== $this->sequenceDepths;
+    }
+
+    /** @return list<int> */
+    public function sequenceDepths(): array
+    {
+        return $this->sequenceDepths;
     }
 
     public function scope(): string

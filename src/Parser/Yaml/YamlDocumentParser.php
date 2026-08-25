@@ -17,7 +17,7 @@ final class YamlDocumentParser
     {
         $mappings = [];
         $tree = $this->parser->parse('yaml', $source);
-        $this->visit($tree, $tree->root(), $source, [], false, 'base', $mappings);
+        $this->visit($tree, $tree->root(), $source, [], [], false, 'base', $mappings);
         if ($tree->hasError()) {
             $indexedOffsets = [];
             foreach ($mappings as $mapping) {
@@ -48,12 +48,13 @@ final class YamlDocumentParser
 
     /**
      * @param list<string>      $path
+     * @param list<int>         $sequenceDepths
      * @param list<YamlMapping> $mappings
      */
-    private function visit(TreeSitterTree $tree, TreeSitterNode $node, string $source, array $path, bool $sequenceItem, string $scope, array &$mappings): void
+    private function visit(TreeSitterTree $tree, TreeSitterNode $node, string $source, array $path, array $sequenceDepths, bool $pendingSequence, string $scope, array &$mappings): void
     {
         if ('block_sequence_item' === $node->type()) {
-            $sequenceItem = true;
+            $pendingSequence = true;
         }
 
         if (\in_array($node->type(), ['block_mapping_pair', 'flow_pair'], true)) {
@@ -69,21 +70,22 @@ final class YamlDocumentParser
             $valueNode = $tree->childByField($node, 'value');
             $environmentSection = str_starts_with($key, 'when@');
             $mappingPath = $environmentSection ? $path : [...$path, $key];
+            $mappingDepths = $pendingSequence && !$environmentSection ? [...$sequenceDepths, \count($path)] : $sequenceDepths;
             $mappingScope = $environmentSection ? $key : $scope;
             if (!$environmentSection) {
                 [$value, $valueStart, $valueEnd] = $this->value($tree, $valueNode, $source, $node->endByte());
-                $mappings[] = new YamlMapping($mappingPath, $value, $keyStart, $keyEnd, $valueStart, $valueEnd, $sequenceItem, $mappingScope);
+                $mappings[] = new YamlMapping($mappingPath, $value, $keyStart, $keyEnd, $valueStart, $valueEnd, $mappingDepths, $mappingScope);
             }
 
             if (null !== $valueNode) {
-                $this->visit($tree, $valueNode, $source, $mappingPath, $sequenceItem, $mappingScope, $mappings);
+                $this->visit($tree, $valueNode, $source, $mappingPath, $mappingDepths, false, $mappingScope, $mappings);
             }
 
             return;
         }
 
         foreach ($tree->children($node) as $child) {
-            $this->visit($tree, $child, $source, $path, $sequenceItem, $scope, $mappings);
+            $this->visit($tree, $child, $source, $path, $sequenceDepths, $pendingSequence, $scope, $mappings);
         }
     }
 
@@ -120,7 +122,7 @@ final class YamlDocumentParser
     private function fallbackMappings(string $source): array
     {
         $mappings = [];
-        /** @var array<int, array{path: list<string>, sequence: bool, scope: string}> $stack */
+        /** @var array<int, array{path: list<string>, childDepths: list<int>, scope: string}> $stack */
         $stack = [];
         preg_match_all('/^.*(?:\R|$)/m', $source, $lines, \PREG_OFFSET_CAPTURE);
         foreach ($lines[0] as [$line, $lineOffset]) {
@@ -136,23 +138,23 @@ final class YamlDocumentParser
             }
             ksort($stack);
             $parent = [];
-            $insideSequence = false;
+            $childDepths = [];
             $scope = 'base';
             foreach ($stack as $entry) {
                 $parent = $entry['path'];
-                $insideSequence = $entry['sequence'];
+                $childDepths = $entry['childDepths'];
                 $scope = $entry['scope'];
             }
             $environmentSection = str_starts_with($parsed['key'], 'when@');
             if ($environmentSection) {
                 $scope = $parsed['key'];
             }
-            $sequenceItem = $insideSequence || $parsed['sequence'];
+            $depths = $parsed['sequence'] ? [...$childDepths, \count($parent)] : $childDepths;
             $path = $environmentSection ? $parent : [...$parent, $parsed['key']];
             if ($environmentSection || '' === $parsed['value']) {
-                $stack[$parsed['indent']] = ['path' => $path, 'sequence' => $sequenceItem, 'scope' => $scope];
+                $stack[$parsed['indent']] = ['path' => $path, 'childDepths' => $environmentSection ? $childDepths : $depths, 'scope' => $scope];
             } elseif ($parsed['sequence']) {
-                $stack[$parsed['indent']] = ['path' => $parent, 'sequence' => true, 'scope' => $scope];
+                $stack[$parsed['indent']] = ['path' => $parent, 'childDepths' => $depths, 'scope' => $scope];
             }
             if ($environmentSection) {
                 continue;
@@ -166,7 +168,7 @@ final class YamlDocumentParser
                 $keyStart + \strlen($parsed['key']),
                 $valueStart,
                 $valueStart + \strlen($parsed['value']),
-                $sequenceItem,
+                $depths,
                 $scope,
             );
         }

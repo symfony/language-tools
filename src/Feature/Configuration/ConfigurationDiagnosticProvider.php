@@ -87,9 +87,9 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
                 $diagnostics[] = $this->diagnostic($occurrence->keyRange(), 1, 'config.duplicate_key', \sprintf('Configuration key "%s" is duplicated.', $key));
             }
             $seen[$identity] = true;
-            $node = $index->find($path, $occurrence->sequenceItem());
+            $node = $index->find($path, $occurrence->sequenceDepths());
             if (null === $node) {
-                if (!$index->allowsUnknownKeys($path, $occurrence->sequenceItem())) {
+                if (!$index->allowsUnknownKeys($path, $occurrence->sequenceDepths())) {
                     $diagnostics[] = $this->diagnostic($occurrence->keyRange(), 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', $key));
                 }
                 continue;

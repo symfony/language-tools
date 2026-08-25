@@ -51,7 +51,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
             if (!$this->contains($document->text(), $occurrence->valueRange(), $offset)) {
                 continue;
             }
-            $node = $index->find($occurrence->path(), $occurrence->sequenceItem());
+            $node = $index->find($occurrence->path(), $occurrence->sequenceDepths());
             if (null === $node || [] === $node->allowedValues()) {
                 continue;
             }
@@ -70,16 +70,16 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         $indent = \strlen($match[1]);
         $prefix = $match[2] ?? '';
         $parent = [];
-        $parentSequenceItem = false;
+        $parentSequenceDepths = [];
         $previous = array_reverse($this->yaml->parse(substr($document->text(), 0, $lineStart), $index));
         foreach ($previous as $occurrence) {
             if ($occurrence->keyRange()->start()->character() < $indent) {
                 $parent = $occurrence->path();
-                $parentSequenceItem = $occurrence->sequenceItem();
+                $parentSequenceDepths = $occurrence->sequenceDepths();
                 break;
             }
         }
-        $nodes = [] === $parent ? array_values($index->roots()) : $this->completionChildren($index->find($parent, $parentSequenceItem));
+        $nodes = [] === $parent ? array_values($index->roots()) : $this->completionChildren($index->find($parent, $parentSequenceDepths));
         $items = [];
         foreach ($nodes as $node) {
             if (str_starts_with($node->name(), $prefix)) {

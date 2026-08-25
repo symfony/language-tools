@@ -19,13 +19,13 @@ final class YamlConfigurationParser
         foreach ($this->parser->parse($text) as $mapping) {
             $path = null === $index
                 ? $this->normalizePath($mapping->path())
-                : $index->normalizePath($mapping->path(), $mapping->isSequenceItem());
+                : $index->normalizePath($mapping->path(), $mapping->sequenceDepths());
             $occurrences[] = new ConfigurationOccurrence(
                 $path,
                 $mapping->value(),
                 new Range($this->converter->toPosition($text, $mapping->keyStartByte()), $this->converter->toPosition($text, $mapping->keyEndByte())),
                 new Range($this->converter->toPosition($text, $mapping->valueStartByte()), $this->converter->toPosition($text, $mapping->valueEndByte())),
-                $mapping->isSequenceItem(),
+                $mapping->sequenceDepths(),
                 $mapping->scope(),
             );
         }

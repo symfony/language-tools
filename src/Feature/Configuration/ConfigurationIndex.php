@@ -25,21 +25,22 @@ final class ConfigurationIndex
      * makes descendant keys unverifiable.
      *
      * @param list<string> $path
+     * @param list<int>    $sequenceDepths
      */
-    public function allowsUnknownKeys(array $path, bool $sequenceItem = false): bool
+    public function allowsUnknownKeys(array $path, array $sequenceDepths = []): bool
     {
         if ([] === $path) {
             return false;
         }
         $node = $this->roots[array_shift($path)] ?? null;
+        $depth = 1;
         while (null !== $node && [] !== $path) {
-            $sequenceChild = $sequenceItem && null !== $node->prototype();
-            $child = $node->child(array_shift($path), $sequenceChild);
+            $child = $node->child(array_shift($path), \in_array($depth, $sequenceDepths, true));
             if (null === $child) {
                 return $node->acceptsUnknownKeys();
             }
             $node = $child;
-            $sequenceItem = $sequenceItem && !$sequenceChild;
+            ++$depth;
         }
 
         return false;
@@ -47,10 +48,11 @@ final class ConfigurationIndex
 
     /**
      * @param list<string> $path
+     * @param list<int>    $sequenceDepths
      *
      * @return list<string>
      */
-    public function normalizePath(array $path, bool $sequenceItem = false): array
+    public function normalizePath(array $path, array $sequenceDepths = []): array
     {
         if ([] === $path) {
             return [];
@@ -59,35 +61,39 @@ final class ConfigurationIndex
         $normalized = [$name];
         $node = $this->roots[$name] ?? null;
         $normalizeKeys = true;
+        $depth = 1;
         foreach ($path as $name) {
             $prototype = $node?->prototype();
-            $sequenceChild = $sequenceItem && null !== $prototype;
+            $sequenceChild = \in_array($depth, $sequenceDepths, true) && null !== $prototype;
             $normalizingNode = $sequenceChild ? $prototype : $node;
             if (null !== $normalizingNode) {
                 $normalizeKeys = $normalizingNode->normalizesKeys();
             }
             $normalized[] = $normalizeKeys ? ConfigurationNode::normalizeKey($name) : $name;
             $node = $node?->child($name, $sequenceChild);
-            $sequenceItem = $sequenceItem && !$sequenceChild;
+            ++$depth;
         }
 
         return $normalized;
     }
 
-    /** @param list<string> $path */
-    public function find(array $path, bool $sequenceItem = false): ?ConfigurationNode
+    /**
+     * @param list<string> $path
+     * @param list<int>    $sequenceDepths
+     */
+    public function find(array $path, array $sequenceDepths = []): ?ConfigurationNode
     {
         if ([] === $path) {
             return null;
         }
         $node = $this->roots[array_shift($path)] ?? null;
+        $depth = 1;
         foreach ($path as $name) {
-            $sequenceChild = $sequenceItem && null !== $node?->prototype();
-            $node = $node?->child($name, $sequenceChild);
+            $node = $node?->child($name, \in_array($depth, $sequenceDepths, true));
             if (null === $node) {
                 return null;
             }
-            $sequenceItem = $sequenceItem && !$sequenceChild;
+            ++$depth;
         }
 
         return $node;
