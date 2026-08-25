@@ -47,7 +47,7 @@ final class YamlConfigurationParser
     private function normalizePath(array $path): array
     {
         foreach ($path as &$part) {
-            $part = str_replace('-', '_', $part);
+            $part = ConfigurationNode::normalizeKey($part);
         }
         unset($part);
 

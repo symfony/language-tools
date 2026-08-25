@@ -134,7 +134,13 @@ final class ConfigurationNode
 
     public function normalizeChildName(string $name): string
     {
-        return $this->normalizeKeys ? str_replace('-', '_', $name) : $name;
+        return $this->normalizeKeys ? self::normalizeKey($name) : $name;
+    }
+
+    // Symfony's ArrayNode::preNormalize keeps keys that mix dashes and underscores
+    public static function normalizeKey(string $name): string
+    {
+        return str_contains($name, '-') && !str_contains($name, '_') ? str_replace('-', '_', $name) : $name;
     }
 
     public function child(string $name, bool $sequenceItem = false): ?self

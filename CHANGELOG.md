@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep configuration keys that mix dashes and underscores literal like Symfony
 - Complete all matching direct and aliased constraint imports
 - Keep nested route parameter arrays statically verifiable
 - Honor exact configuration keys inside sequence prototypes

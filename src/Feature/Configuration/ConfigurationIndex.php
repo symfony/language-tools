@@ -55,7 +55,7 @@ final class ConfigurationIndex
         if ([] === $path) {
             return [];
         }
-        $name = str_replace('-', '_', array_shift($path));
+        $name = ConfigurationNode::normalizeKey(array_shift($path));
         $normalized = [$name];
         $node = $this->roots[$name] ?? null;
         $normalizeKeys = true;
@@ -66,7 +66,7 @@ final class ConfigurationIndex
             if (null !== $normalizingNode) {
                 $normalizeKeys = $normalizingNode->normalizesKeys();
             }
-            $normalized[] = $normalizeKeys ? str_replace('-', '_', $name) : $name;
+            $normalized[] = $normalizeKeys ? ConfigurationNode::normalizeKey($name) : $name;
             $node = $node?->child($name, $sequenceChild);
             $sequenceItem = $sequenceItem && !$sequenceChild;
         }
