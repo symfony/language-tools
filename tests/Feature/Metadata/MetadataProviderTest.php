@@ -166,11 +166,22 @@ final class MetadataProviderTest extends TestCase
         $directConstraintText = <<<'PHP'
             <?php
             namespace App\Dto;
+            use Symfony\Component\Validator\Constraints\Language;
             use Symfony\Component\Validator\Constraints\Length;
-            #[Len
+            #[L
             PHP;
         $documents->open(new Document($directConstraintUri, 'php', 1, $directConstraintText));
-        self::assertSame(['Length'], $this->completionLabels($completionProviders, $converter, $directConstraintUri, $directConstraintText, \strlen($directConstraintText)));
+        self::assertSame(['Language', 'Length'], $this->completionLabels($completionProviders, $converter, $directConstraintUri, $directConstraintText, \strlen($directConstraintText)));
+
+        $aliasedConstraintUri = 'file:///workspace/src/Dto/AliasedInput.php';
+        $aliasedConstraintText = <<<'PHP'
+            <?php
+            namespace App\Dto;
+            use Symfony\Component\Validator\Constraints\Length as AssertLength;
+            #[AssertL
+            PHP;
+        $documents->open(new Document($aliasedConstraintUri, 'php', 1, $aliasedConstraintText));
+        self::assertSame(['AssertLength'], $this->completionLabels($completionProviders, $converter, $aliasedConstraintUri, $aliasedConstraintText, \strlen($aliasedConstraintText)));
 
         $validationUri = 'file:///workspace/config/validator/User.yaml';
         $validationText = <<<'YAML'

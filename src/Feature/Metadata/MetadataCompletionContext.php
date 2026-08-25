@@ -6,11 +6,13 @@ use Symfony\Lsp\Document\Range;
 
 final class MetadataCompletionContext
 {
+    /** @param list<array{label: string, class: string}> $candidates */
     public function __construct(
         private readonly MetadataCompletionKind $kind,
         private readonly string $prefix,
         private readonly Range $range,
         private readonly ?string $owner = null,
+        private readonly array $candidates = [],
     ) {
     }
 
@@ -32,5 +34,11 @@ final class MetadataCompletionContext
     public function owner(): ?string
     {
         return $this->owner;
+    }
+
+    /** @return list<array{label: string, class: string}> */
+    public function candidates(): array
+    {
+        return $this->candidates;
     }
 }

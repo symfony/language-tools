@@ -269,13 +269,17 @@ final class MetadataExtractor
                         return $this->context(MetadataCompletionKind::Constraint, $name, $text, $nameOffset);
                     }
                 } else {
+                    $candidates = [];
                     foreach ($php->imports() as $alias => $class) {
-                        if ($alias === substr($class, strrpos($class, '\\') + 1)
-                            && str_starts_with($alias, $name)
+                        if (str_starts_with($alias, $name)
                             && str_starts_with($class, 'Symfony\\Component\\Validator\\Constraints\\')
+                            && !str_contains(substr($class, \strlen('Symfony\\Component\\Validator\\Constraints\\')), '\\')
                         ) {
-                            return $this->context(MetadataCompletionKind::Constraint, $name, $text, $attribute + 2 + $constraint[1][1], $class);
+                            $candidates[] = ['label' => $alias, 'class' => $class];
                         }
+                    }
+                    if ([] !== $candidates) {
+                        return $this->context(MetadataCompletionKind::Constraint, $name, $text, $attribute + 2 + $constraint[1][1], candidates: $candidates);
                     }
                 }
             }
@@ -522,9 +526,10 @@ final class MetadataExtractor
         return $symbols;
     }
 
-    private function context(MetadataCompletionKind $kind, string $prefix, string $text, int $offset, ?string $owner = null): MetadataCompletionContext
+    /** @param list<array{label: string, class: string}> $candidates */
+    private function context(MetadataCompletionKind $kind, string $prefix, string $text, int $offset, ?string $owner = null, array $candidates = []): MetadataCompletionContext
     {
-        return new MetadataCompletionContext($kind, $prefix, $this->offsetRange($text, $offset, \strlen($prefix)), $owner);
+        return new MetadataCompletionContext($kind, $prefix, $this->offsetRange($text, $offset, \strlen($prefix)), $owner, $candidates);
     }
 
     private function offsetRange(string $text, int $offset, int $length): Range

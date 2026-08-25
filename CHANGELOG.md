@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Complete all matching direct and aliased constraint imports
 - Keep nested route parameter arrays statically verifiable
 - Honor exact configuration keys inside sequence prototypes
 - Restrict direct constraint completion to the imported class

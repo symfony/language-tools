@@ -104,6 +104,17 @@ final class ValidationMetadataProvider implements CompletionProviderInterface, D
     /** @return list<array{label: string, detail: string}> */
     private function constraintItems(MetadataIndex $index, MetadataSourceIndex $sourceIndex, MetadataCompletionContext $context): array
     {
+        if ([] !== $context->candidates()) {
+            $items = [];
+            foreach ($context->candidates() as $candidate) {
+                if (null === $constraint = $index->constraint($candidate['class'])) {
+                    continue;
+                }
+                $items[] = ['label' => $candidate['label'], 'detail' => $constraint->className()];
+            }
+
+            return $items;
+        }
         if (null !== $context->owner()) {
             $constraint = $index->constraint($context->owner());
 
