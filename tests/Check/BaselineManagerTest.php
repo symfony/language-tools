@@ -79,6 +79,42 @@ final class BaselineManagerTest extends TestCase
         $this->manager->apply($this->directory, $this->options('refresh'), []);
     }
 
+    public function testOnlyOneConcurrentBaselineCreationSucceeds(): void
+    {
+        if (!\function_exists('pcntl_fork')) {
+            self::markTestSkipped('The pcntl extension is required.');
+        }
+
+        $barrier = $this->directory.'/barrier';
+        mkdir($barrier);
+        $pids = [];
+        foreach ([1, 2] as $worker) {
+            $pid = pcntl_fork();
+            self::assertNotSame(-1, $pid);
+            if (0 === $pid) {
+                $this->createBaselineInChild($worker, $barrier);
+            }
+            $pids[] = $pid;
+        }
+
+        foreach ($pids as $pid) {
+            self::assertSame($pid, pcntl_waitpid($pid, $status));
+            if (!\is_int($status)) {
+                throw new \RuntimeException('Unable to read the child process status.');
+            }
+            self::assertTrue(pcntl_wifexited($status));
+            self::assertSame(0, pcntl_wexitstatus($status));
+        }
+
+        $results = array_map(
+            static fn (int $worker): string => trim((string) file_get_contents($barrier.'/result-'.$worker)),
+            [1, 2],
+        );
+        sort($results);
+
+        self::assertSame(['created', 'exists'], $results);
+    }
+
     public function testFingerprintSurvivesUnrelatedLineMovementButNotChangedEvidence(): void
     {
         $project = new Project($this->directory, 'file://'.$this->directory, '^8.0');
@@ -109,6 +145,22 @@ final class BaselineManagerTest extends TestCase
 
         self::assertSame($original->fingerprint, $moved->fingerprint);
         self::assertNotSame($original->fingerprint, $changed->fingerprint);
+    }
+
+    private function createBaselineInChild(int $worker, string $barrier): never
+    {
+        $manager = new BaselineManager(new SynchronizingBaselineFilesystem($barrier), new DiagnosticCodeRegistry());
+        try {
+            $manager->apply($this->directory, $this->options('create'), []);
+            $result = 'created';
+        } catch (InvalidConfigurationException $error) {
+            $result = str_contains($error->getMessage(), 'already exists') ? 'exists' : $error->getMessage();
+        } catch (\Throwable $error) {
+            $result = $error::class.': '.$error->getMessage();
+        }
+        file_put_contents($barrier.'/result-'.$worker, $result);
+
+        exit(0);
     }
 
     private function diagnostic(string $fingerprint): CheckDiagnostic
@@ -147,5 +199,37 @@ final class BaselineManagerTest extends TestCase
             false,
             false,
         );
+    }
+}
+
+final class SynchronizingBaselineFilesystem extends Filesystem
+{
+    public function __construct(private readonly string $barrier)
+    {
+    }
+
+    /** @param string|iterable<string> $dirs */
+    public function mkdir(string|iterable $dirs, int $mode = 0o777): void
+    {
+        $this->synchronize();
+        parent::mkdir($dirs, $mode);
+    }
+
+    public function dumpFile(string $filename, $content): void
+    {
+        $this->synchronize();
+        parent::dumpFile($filename, $content);
+    }
+
+    private function synchronize(): void
+    {
+        file_put_contents($this->barrier.'/ready-'.getmypid(), '');
+        $deadline = microtime(true) + 5;
+        while (\count(glob($this->barrier.'/ready-*') ?: []) < 2) {
+            if (microtime(true) >= $deadline) {
+                throw new \RuntimeException('Timed out waiting for concurrent baseline creation.');
+            }
+            usleep(1000);
+        }
     }
 }

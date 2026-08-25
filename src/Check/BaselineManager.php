@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Check;
 
+use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Project\InvalidConfigurationException;
@@ -37,7 +38,11 @@ final class BaselineManager
             $entries = $this->load($path, $options->baselinePath);
         } else {
             $entries = $this->entries($diagnostics);
-            $this->write($path, $entries);
+            if ('create' === $options->baselineMode) {
+                $this->create($path, $options->baselinePath, $entries);
+            } else {
+                $this->write($path, $entries);
+            }
         }
 
         $remaining = [];
@@ -178,13 +183,57 @@ final class BaselineManager
     }
 
     /** @param list<BaselineEntry> $entries */
+    private function create(string $path, string $displayPath, array $entries): void
+    {
+        $contents = $this->contents($entries);
+        $this->filesystem->mkdir(\dirname($path));
+        $stream = @fopen($path, 'x');
+        if (false === $stream) {
+            if (is_file($path)) {
+                throw new InvalidConfigurationException(\sprintf('The baseline "%s" already exists; use --refresh-baseline to replace it.', $displayPath));
+            }
+
+            throw new IOException(\sprintf('Failed to create file "%s".', $path), 0, null, $path);
+        }
+
+        $created = false;
+        try {
+            $length = \strlen($contents);
+            $offset = 0;
+            while ($offset < $length) {
+                $written = @fwrite($stream, substr($contents, $offset, 8192));
+                if (false === $written || 0 === $written) {
+                    throw new IOException(\sprintf('Failed to write file "%s".', $path), 0, null, $path);
+                }
+                $offset += $written;
+            }
+            if (!@fclose($stream)) {
+                throw new IOException(\sprintf('Failed to close file "%s".', $path), 0, null, $path);
+            }
+            $created = true;
+        } finally {
+            if (\is_resource($stream)) {
+                @fclose($stream);
+            }
+            if (!$created) {
+                $this->filesystem->remove($path);
+            }
+        }
+    }
+
+    /** @param list<BaselineEntry> $entries */
     private function write(string $path, array $entries): void
     {
-        $json = json_encode([
+        $this->filesystem->dumpFile($path, $this->contents($entries));
+    }
+
+    /** @param list<BaselineEntry> $entries */
+    private function contents(array $entries): string
+    {
+        return json_encode([
             'version' => 1,
             'diagnostics' => array_map(static fn (BaselineEntry $entry): array => $entry->toArray(), $entries),
-        ], \JSON_THROW_ON_ERROR | \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_INVALID_UTF8_SUBSTITUTE);
-        $this->filesystem->dumpFile($path, $json."\n");
+        ], \JSON_THROW_ON_ERROR | \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_INVALID_UTF8_SUBSTITUTE)."\n";
     }
 
     private function relativePath(string $path, bool $project = false): bool
