@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Recognize PHP named translation domains
+- Decode escaped quotes in Twig translation keys
 - Add SARIF output for code-scanning integrations
 - Isolate diagnostic provider failures without discarding other findings
 - Add project path exclusions and actionable check failure details

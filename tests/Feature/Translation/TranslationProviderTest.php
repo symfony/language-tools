@@ -75,6 +75,24 @@ final class TranslationProviderTest extends TestCase
         self::assertNull($provider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]]));
     }
 
+    public function testDecodesEscapedQuotesInTwigTranslationKeys(): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        $text = <<<'TWIG'
+            <p>{{ 'don\'t panic'|trans }}</p>
+            TWIG;
+        [$provider, $converter, $configuration, $project] = $this->provider($uri, $text, 'twig');
+        $configuration->configure($project, true);
+        $position = $converter->toPosition($text, (int) strpos($text, "'|trans"));
+
+        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+        $hover = $provider->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]]);
+        self::assertIsArray($hover);
+        self::assertIsArray($hover['contents'] ?? null);
+        self::assertIsString($hover['contents']['value'] ?? null);
+        self::assertStringContainsString("Translation: `don't panic`", $hover['contents']['value']);
+    }
+
     public function testAddsMissingTranslationToTheOnlyDomainResource(): void
     {
         $root = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
@@ -250,6 +268,7 @@ final class TranslationProviderTest extends TestCase
         $indexes->forProject($project)->replaceRuntime(
             true,
             new TranslationMessage('article.title', 'messages', 'en', 'Article %name%'),
+            new TranslationMessage("don't panic", 'messages', 'en', "Don't panic"),
             new TranslationMessage('panel.title', 'admin', 'en', 'Panel title'),
         );
         $configuration = new TranslationConfigurationRegistry();
