@@ -250,33 +250,37 @@ final class CheckRunner
                     if (null === $collection) {
                         continue;
                     }
+                    $failedProviders = [];
                     foreach ($collection->failures as $failure) {
-                        $errors[] = [
-                            'category' => 'operational',
-                            'message' => \sprintf('Diagnostic provider "%s" failed for "%s".', $failure->provider, $file->workspacePath),
-                            'project' => $projectId,
-                            'environment' => $this->runtimeConfiguration->environment($file->project),
-                            'workspacePath' => $file->workspacePath,
-                            'provider' => $failure->provider,
-                            'cause' => $this->exceptionDetails($failure->error, $workspace),
-                        ];
+                        $errors[] = $this->diagnosticProviderError($failure->provider, $failure->error, $file, $projectId, $workspace);
+                        $failedProviders[$failure->provider] = true;
                         $incompleteProjects[$projectId] = true;
                     }
                     foreach ($collection->diagnostics as $diagnostic) {
                         $this->expireDeadline($deadline, $signal, $timedOut);
                         $cancellation->throwIfRequested();
-                        $collected = CheckDiagnostic::fromProtocol(
-                            $file,
-                            $projectId,
-                            $text,
-                            $diagnostic->diagnostic,
-                            $this->positions,
-                            $diagnostic->provider,
-                        );
-                        if (!$this->diagnosticCodes->contains($collected->code)) {
-                            throw new \UnexpectedValueException(\sprintf('Diagnostic code "%s" is not registered.', $collected->code));
+                        try {
+                            $collected = CheckDiagnostic::fromProtocol(
+                                $file,
+                                $projectId,
+                                $text,
+                                $diagnostic->diagnostic,
+                                $this->positions,
+                                $diagnostic->provider,
+                            );
+                            if (!$this->diagnosticCodes->contains($collected->code)) {
+                                throw new \UnexpectedValueException(\sprintf('Diagnostic code "%s" is not registered.', $collected->code));
+                            }
+                            $diagnostics[] = $collected;
+                        } catch (CancelledException $error) {
+                            throw $error;
+                        } catch (\Throwable $error) {
+                            if (!isset($failedProviders[$diagnostic->provider])) {
+                                $errors[] = $this->diagnosticProviderError($diagnostic->provider, $error, $file, $projectId, $workspace);
+                                $failedProviders[$diagnostic->provider] = true;
+                            }
+                            $incompleteProjects[$projectId] = true;
                         }
-                        $diagnostics[] = $collected;
                     }
                 } catch (CancelledException $error) {
                     throw $error;
@@ -393,6 +397,20 @@ final class CheckRunner
             $errors,
             $blockingCount,
         );
+    }
+
+    /** @return array{category: string, message: string, project: string, environment: string, workspacePath: string, provider: string, cause: array{class: class-string<\Throwable>, message: string}} */
+    private function diagnosticProviderError(string $provider, \Throwable $error, CheckFile $file, string $projectId, string $workspace): array
+    {
+        return [
+            'category' => 'operational',
+            'message' => \sprintf('Diagnostic provider "%s" failed for "%s".', $provider, $file->workspacePath),
+            'project' => $projectId,
+            'environment' => $this->runtimeConfiguration->environment($file->project),
+            'workspacePath' => $file->workspacePath,
+            'provider' => $provider,
+            'cause' => $this->exceptionDetails($error, $workspace),
+        ];
     }
 
     /** @return array{class: class-string<\Throwable>, message: string} */

@@ -90,13 +90,31 @@ final class DiagnosticCollector
                 continue;
             }
 
-            $matched = true;
-            foreach ($providedDiagnostics as $diagnostic) {
-                $diagnostics[] = new CollectedDiagnostic($provider->name(), $diagnostic);
+            $provided = [];
+            try {
+                foreach ($providedDiagnostics as $diagnostic) {
+                    $provided[] = $this->collectedDiagnostic($provider->name(), $diagnostic);
+                }
+            } catch (\Throwable $error) {
+                $failures[] = new DiagnosticProviderFailure($provider->name(), $error);
+
+                continue;
             }
+
+            $matched = true;
+            array_push($diagnostics, ...$provided);
         }
 
         return new DetailedDiagnosticCollection($matched, $diagnostics, $failures);
+    }
+
+    private function collectedDiagnostic(string $provider, mixed $diagnostic): CollectedDiagnostic
+    {
+        if (!\is_array($diagnostic)) {
+            throw new \UnexpectedValueException('A diagnostic provider returned a non-array diagnostic.');
+        }
+
+        return new CollectedDiagnostic($provider, $diagnostic);
     }
 
     private function isExcluded(string $uri, bool $includeExcluded): bool

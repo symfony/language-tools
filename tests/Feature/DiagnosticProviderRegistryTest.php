@@ -64,6 +64,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
             'file:///workspace/templates/page.html.twig',
             new StubDiagnosticProvider([$this->diagnostic('first')], 'first-provider'),
             new ThrowingDiagnosticProvider(),
+            new MalformedDiagnosticProvider(),
             new StubDiagnosticProvider([$this->diagnostic('third')], 'third-provider'),
         );
 
@@ -72,8 +73,9 @@ final class DiagnosticProviderRegistryTest extends TestCase
         self::assertNotNull($collection);
         self::assertSame(['first-provider', 'third-provider'], array_map(static fn ($diagnostic): string => $diagnostic->provider, $collection->diagnostics));
         self::assertSame(['first', 'third'], array_column(array_map(static fn ($diagnostic): array => $diagnostic->diagnostic, $collection->diagnostics), 'code'));
-        self::assertSame(['broken-provider'], array_map(static fn ($failure): string => $failure->provider, $collection->failures));
+        self::assertSame(['broken-provider', 'malformed-provider'], array_map(static fn ($failure): string => $failure->provider, $collection->failures));
         self::assertSame('Provider failed.', $collection->failures[0]->error->getMessage());
+        self::assertSame('A diagnostic provider returned a non-array diagnostic.', $collection->failures[1]->error->getMessage());
     }
 
     public function testMergesProviderDiagnosticsInOrder(): void
@@ -212,6 +214,22 @@ final class ThrowingDiagnosticProvider implements DiagnosticProviderInterface
     public function diagnostics(array $params): ?array
     {
         throw new \RuntimeException('Provider failed.');
+    }
+}
+
+final class MalformedDiagnosticProvider implements DiagnosticProviderInterface
+{
+    public function name(): string
+    {
+        return 'malformed-provider';
+    }
+
+    public function diagnostics(array $params): array
+    {
+        $diagnostics = (array) json_decode('[42]', true, flags: \JSON_THROW_ON_ERROR);
+        /* @var list<array<array-key, mixed>> $diagnostics */
+
+        return $diagnostics;
     }
 }
 
