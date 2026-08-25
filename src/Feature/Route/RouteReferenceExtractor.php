@@ -7,6 +7,7 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 
 final class RouteReferenceExtractor
@@ -195,7 +196,7 @@ final class RouteReferenceExtractor
                     }
                     $quote = $literalKey[0];
                     $value = substr($literalKey, 1, -1);
-                    $keys[] = "'" === $quote ? strtr($value, ['\\\\' => '\\', "\\'" => "'"]) : stripcslashes($value);
+                    $keys[] = "'" === $quote ? strtr($value, ['\\\\' => '\\', "\\'" => "'"]) : PhpStringLiteralDecoder::decodeDoubleQuoted($value);
                     $keyParsed = true;
                 } elseif (!$keyParsed) {
                     if (\T_CONSTANT_ENCAPSED_STRING === $token[0] && null === $literalKey) {

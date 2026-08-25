@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Feature\Route;
 
 use Microsoft\PhpParser\Parser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\Document;
@@ -291,6 +292,63 @@ final class RouteDiagnosticPublisherTest extends TestCase
         ], array_column($diagnostics, 'message'));
     }
 
+    #[DataProvider('doubleQuotedParameterKeyProvider')]
+    public function testDecodesDoubleQuotedRouteParameterKeysLikePhp(string $literal, string $expected): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = str_replace('PARAMETER_KEY', $literal, <<<'PHP'
+            <?php
+            class ArticleController extends AbstractController
+            {
+                public function show(): void
+                {
+                    $this->generateUrl('escaped_key', [PARAMETER_KEY => 1]);
+                }
+            }
+            PHP);
+        [$publisher, $client] = $this->publisher($uri, $text, new Route(
+            'escaped_key',
+            null,
+            ['GET'],
+            [],
+            null,
+            null,
+            requiredParameters: [$expected],
+        ));
+
+        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+
+        self::assertSame([], $client->notifications[0]['params']['diagnostics']);
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function doubleQuotedParameterKeyProvider(): iterable
+    {
+        foreach ([
+            'escaped backslash' => '"\\\\"',
+            'escaped quote' => '"\""',
+            'escaped dollar' => '"\$"',
+            'newline' => '"\n"',
+            'carriage return' => '"\r"',
+            'tab' => '"\t"',
+            'vertical tab' => '"\v"',
+            'escape' => '"\e"',
+            'form feed' => '"\f"',
+            'octal' => '"\101"',
+            'two-digit hexadecimal' => '"\x64"',
+            'one-digit hexadecimal' => '"\x4"',
+            'ASCII Unicode' => '"i\u{64}"',
+            'two-byte Unicode' => '"\u{80}"',
+            'three-byte Unicode' => '"\u{800}"',
+            'four-byte Unicode' => '"\u{1F600}"',
+            'maximum Unicode codepoint' => '"\u{10FFFF}"',
+            'unrecognized escape' => '"\d"',
+            'hexadecimal without digits' => '"\xG"',
+        ] as $name => $literal) {
+            yield $name => [$literal, self::evaluatePhpStringLiteral($literal)];
+        }
+    }
+
     public function testDiagnosesMissingParametersWithNestedArgumentUnpacking(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
@@ -429,6 +487,16 @@ final class RouteDiagnosticPublisherTest extends TestCase
             'uri' => $uri,
             'diagnostics' => [],
         ], $client->notifications[0]['params']);
+    }
+
+    private static function evaluatePhpStringLiteral(string $literal): string
+    {
+        $value = @eval('return '.$literal.';');
+        if (!\is_string($value)) {
+            throw new \LogicException(\sprintf('Expected PHP to evaluate %s as a string.', $literal));
+        }
+
+        return $value;
     }
 
     /**

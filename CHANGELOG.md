@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Decode double-quoted PHP route parameter keys with PHP semantics
 - Ignore dynamic PHP route parameter keys when checking required parameters
 - Keep configuration keys literal when Symfony would not normalize them
 - Treat dynamic translation keys, domains and parameter maps conservatively
