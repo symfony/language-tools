@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recognize template references in the PHP Template attribute
 - Recognize named first arguments for PHP translation keys
 - Decode double-quoted PHP route parameter keys with PHP semantics
 - Ignore dynamic PHP route parameter keys when checking required parameters

@@ -5,16 +5,20 @@ namespace Symfony\Lsp\Feature\Twig;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
 final class TemplateReferenceExtractor
 {
+    private const TEMPLATE_ATTRIBUTE = 'Symfony\Bridge\Twig\Attribute\Template';
+
     public function __construct(
         private readonly PositionConverter $positionConverter,
         private readonly TwigDocumentParser $twigParser,
         private readonly QuotedArgumentMatcher $matcher,
         private readonly PhpCommentParserInterface $phpComments,
+        private readonly PhpParserInterface $phpParser,
     ) {
     }
 
@@ -38,8 +42,26 @@ final class TemplateReferenceExtractor
             }
             $references[] = new TemplateReference($call->value, $uri, $call->range, $variables);
         }
+        foreach ($this->phpParser->parse($text)->attributes() as $attribute) {
+            if (self::TEMPLATE_ATTRIBUTE !== $attribute->name()) {
+                continue;
+            }
+            $template = ($attribute->argument('template') ?? $attribute->argument(0))?->stringLiteral();
+            if (null === $template || '' === $template->value()) {
+                continue;
+            }
+            $references[] = new TemplateReference(
+                $template->value(),
+                $uri,
+                new Range(
+                    $this->positionConverter->toPosition($text, $template->startOffset()),
+                    $this->positionConverter->toPosition($text, $template->endOffset()),
+                ),
+                $this->attributeVariables(($attribute->argument('vars') ?? $attribute->argument(1))?->expression()),
+            );
+        }
 
-        return $references;
+        return $this->sorted($references);
     }
 
     public function at(string $uri, string $languageId, string $text, int $offset): ?TemplateReference
@@ -82,6 +104,28 @@ final class TemplateReferenceExtractor
                 $references[] = $this->reference($literal[0], $uri, $text, $literal[1]);
             }
         }
+
+        return $this->sorted($references);
+    }
+
+    /** @return list<string> */
+    private function attributeVariables(?string $expression): array
+    {
+        if (null === $expression || !str_starts_with($expression, '[') || str_contains($expression, '=>')) {
+            return [];
+        }
+        preg_match_all('/([\'"])([^\'"]+)\1/', $expression, $matches);
+
+        return array_values(array_unique($matches[2]));
+    }
+
+    /**
+     * @param list<TemplateReference> $references
+     *
+     * @return list<TemplateReference>
+     */
+    private function sorted(array $references): array
+    {
         usort($references, static fn (TemplateReference $left, TemplateReference $right): int => $left->range()->start()->line() <=> $right->range()->start()->line() ?: $left->range()->start()->character() <=> $right->range()->start()->character());
 
         return $references;
