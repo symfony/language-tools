@@ -266,6 +266,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 public function show(array $parts): void
                 {
                     $this->generateUrl('article_show', ['id' => sprintf(...$parts)]);
+                    $this->generateUrl('article_show', ['id' => '1', 'query' => ['locale' => 'fr', ...$parts]]);
                 }
             }
             PHP;
@@ -282,7 +283,10 @@ final class RouteDiagnosticPublisherTest extends TestCase
 
         $diagnostics = $client->notifications[0]['params']['diagnostics'];
         self::assertIsArray($diagnostics);
-        self::assertSame(['Route "article_show" requires parameter "locale".'], array_column($diagnostics, 'message'));
+        self::assertSame([
+            'Route "article_show" requires parameter "locale".',
+            'Route "article_show" requires parameter "locale".',
+        ], array_column($diagnostics, 'message'));
     }
 
     public function testDiagnosesUnknownRoutesInTwig(): void

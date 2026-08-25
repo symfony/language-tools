@@ -141,25 +141,55 @@ final class RouteReferenceExtractor
             return [];
         }
 
-        if (!preg_match('/^\s*,\s*\[([^\[\]]*)\]\s*[,)]/s', $afterRouteName, $parameters)) {
-            return null;
-        }
-        if ($this->containsTopLevelUnpack($parameters[1])) {
+        if (null === $parameters = $this->parameterArray($afterRouteName)) {
             return null;
         }
 
-        preg_match_all('/([\'"])([^\'"]+)\1\s*=>/', $parameters[1], $keys);
-
-        return array_values(array_unique($keys[2]));
+        return $this->literalParameterKeys($parameters);
     }
 
-    private function containsTopLevelUnpack(string $parameters): bool
+    private function parameterArray(string $afterRouteName): ?string
     {
+        if (!preg_match('/^\s*,\s*\[/', $afterRouteName, $match)) {
+            return null;
+        }
+        $open = strpos($afterRouteName, '[', \strlen($match[0]) - 1);
+        if (false === $open || null === $close = $this->matchingBracket($afterRouteName, $open)) {
+            return null;
+        }
+        $tail = ltrim(substr($afterRouteName, $close + 1));
+        if ('' === $tail || !\in_array($tail[0], [',', ')'], true)) {
+            return null;
+        }
+
+        return substr($afterRouteName, $open + 1, $close - $open - 1);
+    }
+
+    /** @return list<string>|null */
+    private function literalParameterKeys(string $parameters): ?array
+    {
+        $tokens = token_get_all('<?php '.$parameters);
+        $keys = [];
         $depth = 0;
-        foreach (token_get_all('<?php '.$parameters) as $token) {
+        foreach ($tokens as $index => $token) {
             if (\is_array($token)) {
                 if (\T_ELLIPSIS === $token[0] && 0 === $depth) {
-                    return true;
+                    return null;
+                }
+                if (\T_CONSTANT_ENCAPSED_STRING !== $token[0] || 0 !== $depth) {
+                    continue;
+                }
+                for ($next = $index + 1; isset($tokens[$next]); ++$next) {
+                    $candidate = $tokens[$next];
+                    if (\is_array($candidate) && \in_array($candidate[0], [\T_WHITESPACE, \T_COMMENT, \T_DOC_COMMENT], true)) {
+                        continue;
+                    }
+                    if (\is_array($candidate) && \T_DOUBLE_ARROW === $candidate[0]) {
+                        $quote = $token[1][0];
+                        $value = substr($token[1], 1, -1);
+                        $keys[] = "'" === $quote ? strtr($value, ['\\\\' => '\\', "\\'" => "'"]) : stripcslashes($value);
+                    }
+                    break;
                 }
                 continue;
             }
@@ -170,6 +200,35 @@ final class RouteReferenceExtractor
             }
         }
 
-        return false;
+        return array_values(array_unique($keys));
+    }
+
+    private function matchingBracket(string $text, int $open): ?int
+    {
+        $depth = 1;
+        $quote = null;
+        $escaped = false;
+        for ($offset = $open + 1, $length = \strlen($text); $offset < $length; ++$offset) {
+            $character = $text[$offset];
+            if (null !== $quote) {
+                if ($escaped) {
+                    $escaped = false;
+                } elseif ('\\' === $character) {
+                    $escaped = true;
+                } elseif ($quote === $character) {
+                    $quote = null;
+                }
+                continue;
+            }
+            if (\in_array($character, ["'", '"'], true)) {
+                $quote = $character;
+            } elseif ('[' === $character) {
+                ++$depth;
+            } elseif (']' === $character && 0 === --$depth) {
+                return $offset;
+            }
+        }
+
+        return null;
     }
 }
