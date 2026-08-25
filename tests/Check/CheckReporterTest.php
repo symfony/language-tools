@@ -135,13 +135,35 @@ final class CheckReporterTest extends TestCase
         self::assertStringContainsString('Missing 100%25%0Aservice', $output);
     }
 
+    public function testKeepsGitHubAnnotationColumnsOrderedForEmptyRanges(): void
+    {
+        $diagnostic = new CheckDiagnostic(
+            'apps/api',
+            'config/services.yaml',
+            'apps/api/config/services.yaml',
+            1,
+            5,
+            1,
+            5,
+            1,
+            'service.not_found',
+            'symfony',
+            'Missing service.',
+            hash('sha256', 'empty-range'),
+        );
+
+        $output = $this->reporter()->render($this->fixtureResult(diagnostic: $diagnostic), 'github');
+
+        self::assertStringContainsString('line=2,col=6,endLine=2,endColumn=6', $output);
+    }
+
     private function reporter(): CheckReporter
     {
         return new CheckReporter(new SarifCheckReporter(new DiagnosticCodeRegistry(), '1.2.3'));
     }
 
     /** @param list<array{category: string, message: string, project?: string, provider?: string, cause?: array{class: string, message: string}}> $errors */
-    private function fixtureResult(array $errors = [], bool $complete = true): CheckResult
+    private function fixtureResult(array $errors = [], bool $complete = true, ?CheckDiagnostic $diagnostic = null): CheckResult
     {
         return new CheckResult(
             '1.2.3',
@@ -155,7 +177,7 @@ final class CheckReporterTest extends TestCase
                 ['state' => 'disabled', 'reason' => 'runtime-indexing-disabled'],
                 true,
             )],
-            [new CheckDiagnostic(
+            [$diagnostic ?? new CheckDiagnostic(
                 'apps/api',
                 'config/services.yaml',
                 'apps/api/config/services.yaml',

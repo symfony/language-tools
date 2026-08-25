@@ -228,7 +228,7 @@ HELP;
                     $diagnostic->startLine + 1,
                     $diagnostic->startCharacter + 1,
                     $diagnostic->endLine + 1,
-                    max(1, $diagnostic->endCharacter),
+                    max($diagnostic->startCharacter + 1, $diagnostic->endCharacter),
                 )
                 : \sprintf(
                     'file=%s,line=%d,endLine=%d',
