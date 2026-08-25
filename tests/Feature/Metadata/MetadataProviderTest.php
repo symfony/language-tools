@@ -160,6 +160,17 @@ final class MetadataProviderTest extends TestCase
         $diagnostics = $this->diagnostics($diagnosticProviders, $constraintUri);
         self::assertSame(['validation.unknown_constraint_option'], array_column($diagnostics, 'code'));
         self::assertSame('Unknown option "unknown" for constraint "Length".', $diagnostics[0]['message'] ?? null);
+
+        $directConstraintUri = 'file:///workspace/src/Dto/DirectInput.php';
+        $directConstraintText = <<<'PHP'
+            <?php
+            namespace App\Dto;
+            use Symfony\Component\Validator\Constraints\Length;
+            #[Len
+            PHP;
+        $documents->open(new Document($directConstraintUri, 'php', 1, $directConstraintText));
+        self::assertSame(['Length'], $this->completionLabels($completionProviders, $converter, $directConstraintUri, $directConstraintText, \strlen($directConstraintText)));
+
         $validationUri = 'file:///workspace/config/validator/User.yaml';
         $validationText = <<<'YAML'
             App\Entity\User:

@@ -258,14 +258,24 @@ final class MetadataExtractor
                 return $this->context(MetadataCompletionKind::ConstraintOption, $option[1][0], $text, $optionOffset, $php->resolveName($constraint[1]));
             }
             if (preg_match('/^\s*([\\\\A-Za-z_][A-Za-z0-9_\\\\]*)$/', $expression, $constraint, \PREG_OFFSET_CAPTURE)) {
-                $separator = strrpos($constraint[1][0], '\\');
+                $name = $constraint[1][0];
+                $separator = strrpos($name, '\\');
                 if (false !== $separator) {
-                    $name = substr($constraint[1][0], $separator + 1);
-                    $class = $php->resolveName(substr($constraint[1][0], 0, $separator + 1).'Constraint');
+                    $class = $php->resolveName(substr($name, 0, $separator + 1).'Constraint');
+                    $name = substr($name, $separator + 1);
                     if (str_starts_with($class, 'Symfony\\Component\\Validator\\Constraints\\')) {
                         $nameOffset = $attribute + 2 + $constraint[1][1] + $separator + 1;
 
                         return $this->context(MetadataCompletionKind::Constraint, $name, $text, $nameOffset);
+                    }
+                } else {
+                    foreach ($php->imports() as $alias => $class) {
+                        if ($alias === substr($class, strrpos($class, '\\') + 1)
+                            && str_starts_with($alias, $name)
+                            && str_starts_with($class, 'Symfony\\Component\\Validator\\Constraints\\')
+                        ) {
+                            return $this->context(MetadataCompletionKind::Constraint, $name, $text, $attribute + 2 + $constraint[1][1]);
+                        }
                     }
                 }
             }

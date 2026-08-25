@@ -19,8 +19,10 @@ Validation
 ----------
 
 Constraint and constraint-option completion is available in PHP attributes and
-YAML validation mappings. Runtime indexing adds installed Symfony constraints
-and their constructor options. Metadata for available constraints remains active
+YAML validation mappings. PHP completion supports constraints imported
+individually or through the ``Constraints`` namespace. Runtime indexing adds
+installed Symfony constraints and their constructor options. Metadata for
+available constraints remains active
 when optional integrations aren't installed. Project constraint classes
 extending ``Constraint`` are recognized from project files.
 
