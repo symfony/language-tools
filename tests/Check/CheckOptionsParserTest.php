@@ -61,9 +61,10 @@ final class CheckOptionsParserTest extends TestCase
         $this->parser->parse(['--fail-on=route.removed']);
     }
 
-    public function testRecognizesJsonBeforeAnotherInvocationError(): void
+    public function testRecognizesMachineFormatsBeforeAnotherInvocationError(): void
     {
         self::assertSame('json', $this->parser->selectedFormat(['--unknown=value', '--format=json']));
+        self::assertSame('sarif', $this->parser->selectedFormat(['--unknown=value', '--format=sarif']));
         self::assertSame('human', $this->parser->selectedFormat(['--', '--format=json']));
     }
 

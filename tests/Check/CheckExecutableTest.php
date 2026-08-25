@@ -13,6 +13,12 @@ use function Amp\ByteStream\buffer;
 use function Amp\Future\await;
 
 /**
+ * @phpstan-type SarifNotification array{descriptor: array{id: string}}
+ * @phpstan-type SarifInvocation array{executionSuccessful: bool, exitCode: int, toolConfigurationNotifications?: list<SarifNotification>}
+ * @phpstan-type SarifLocation array{physicalLocation: array{artifactLocation: array{uri: string}}}
+ * @phpstan-type SarifResult array{ruleId: string, locations: list<SarifLocation>}
+ * @phpstan-type SarifRun array{tool: array{driver: array{rules: list<array{id: string}>}}, invocations: list<SarifInvocation>, results: list<SarifResult>}
+ * @phpstan-type SarifReport array{version: string, runs: list<SarifRun>}
  * @phpstan-type CheckReport array{
  *     complete: bool,
  *     projects: list<array{environment: string, analysis: array{mode: string, reason: string|null}}>,
@@ -62,6 +68,25 @@ final class CheckExecutableTest extends TestCase
         self::assertSame('env.malformed_chain', $report['diagnostics'][0]['code']);
         self::assertSame('config/services.yaml', $report['diagnostics'][0]['path']);
         self::assertSame(1, $report['summary']['blocking']);
+    }
+
+    public function testRendersSarifForDiagnosticsAndCodeLists(): void
+    {
+        $result = $this->execute(['check', '--source-only', '--format=sarif', '--workspace='.$this->directory, 'config/services.yaml']);
+        /** @var SarifReport $sarif */
+        $sarif = json_decode($result['stdout'], true, flags: \JSON_THROW_ON_ERROR);
+        $codes = $this->execute(['check', '--format=sarif', '--list-codes']);
+        /** @var SarifReport $codeSarif */
+        $codeSarif = json_decode($codes['stdout'], true, flags: \JSON_THROW_ON_ERROR);
+        self::assertSame(CheckCommand::EXIT_DIAGNOSTICS, $result['exitCode'], $result['stderr']);
+        self::assertSame('2.1.0', $sarif['version']);
+        self::assertTrue($sarif['runs'][0]['invocations'][0]['executionSuccessful']);
+        self::assertSame(CheckCommand::EXIT_DIAGNOSTICS, $sarif['runs'][0]['invocations'][0]['exitCode']);
+        self::assertSame('env.malformed_chain', $sarif['runs'][0]['results'][0]['ruleId']);
+        self::assertSame('config/services.yaml', $sarif['runs'][0]['results'][0]['locations'][0]['physicalLocation']['artifactLocation']['uri']);
+        self::assertSame(CheckCommand::EXIT_SUCCESS, $codes['exitCode'], $codes['stderr']);
+        self::assertSame([], $codeSarif['runs'][0]['results']);
+        self::assertContains('env.malformed_chain', array_column($codeSarif['runs'][0]['tool']['driver']['rules'], 'id'));
     }
 
     public function testExcludesConfiguredPathsUnlessTheyAreExplicitlySelected(): void
@@ -358,6 +383,18 @@ final class CheckExecutableTest extends TestCase
         self::assertSame(CheckCommand::EXIT_INVOCATION, $result['exitCode']);
         self::assertFalse($report['complete']);
         self::assertStringContainsString('was not discovered', $result['stderr']);
+    }
+
+    public function testKeepsSarifValidForInvocationFailures(): void
+    {
+        $result = $this->execute(['check', '--format=sarif', '--workspace='.$this->directory, 'missing.php']);
+        /** @var SarifReport $sarif */
+        $sarif = json_decode($result['stdout'], true, flags: \JSON_THROW_ON_ERROR);
+        self::assertSame(CheckCommand::EXIT_INVOCATION, $result['exitCode']);
+        self::assertFalse($sarif['runs'][0]['invocations'][0]['executionSuccessful']);
+        self::assertSame(CheckCommand::EXIT_INVOCATION, $sarif['runs'][0]['invocations'][0]['exitCode']);
+        self::assertSame('symfony.check.invocation', $sarif['runs'][0]['invocations'][0]['toolConfigurationNotifications'][0]['descriptor']['id'] ?? null);
+        self::assertStringContainsString('does not exist', $result['stderr']);
     }
 
     public function testKeepsJsonValidForInvocationFailures(): void

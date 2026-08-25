@@ -4,11 +4,16 @@ namespace Symfony\Lsp\Check;
 
 final class CheckReporter
 {
-    public function render(CheckResult $result, string $format, bool $verbose = false): string
+    public function __construct(private readonly SarifCheckReporter $sarif)
+    {
+    }
+
+    public function render(CheckResult $result, string $format, bool $verbose = false, ?int $exitCode = null): string
     {
         return match ($format) {
             'json' => $this->json($result),
             'github' => $this->github($result),
+            'sarif' => $this->sarif->render($result, $exitCode ?? $this->exitCode($result)),
             default => $this->human($result, $verbose),
         };
     }
@@ -21,6 +26,7 @@ final class CheckReporter
                 'schemaVersion' => 1,
                 'diagnosticCodes' => $codes,
             ], \JSON_THROW_ON_ERROR | \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)."\n",
+            'sarif' => $this->sarif->codes($codes),
             'github' => implode('', array_map(
                 fn (string $code): string => \sprintf('::notice title=Symfony diagnostic code::%s%s', $this->escapeData($code), \PHP_EOL),
                 $codes,
@@ -35,7 +41,7 @@ final class CheckReporter
 Usage: symfony-lsp check [options] [files, directories or patterns]
 
 Options:
-  --format=human|json|github       Select the report format
+  --format=human|json|github|sarif Select the report format
   --workspace=PATH                 Set the workspace root
   --config=PATH                    Load a configuration file instead of .symfony-lsp.json
   --project-root=PATH              Select an explicit Symfony project root; repeatable
@@ -256,6 +262,11 @@ HELP;
         );
 
         return implode("\n", $lines)."\n";
+    }
+
+    private function exitCode(CheckResult $result): int
+    {
+        return !$result->complete ? CheckCommand::EXIT_OPERATIONAL : (0 === $result->blockingCount ? CheckCommand::EXIT_SUCCESS : CheckCommand::EXIT_DIAGNOSTICS);
     }
 
     private function reason(?string $reason): string

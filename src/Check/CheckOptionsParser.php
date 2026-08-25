@@ -158,8 +158,8 @@ final class CheckOptionsParser
             }
 
             $format = substr($argument, \strlen('--format='));
-            if (!\in_array($format, ['human', 'json', 'github'], true)) {
-                throw new InvalidConfigurationException('The --format option must be human, json or github.');
+            if (!\in_array($format, ['human', 'json', 'github', 'sarif'], true)) {
+                throw new InvalidConfigurationException('The --format option must be human, json, github or sarif.');
             }
             if (null !== $selected && $selected !== $format) {
                 throw new InvalidConfigurationException('The --format option cannot select more than one format.');

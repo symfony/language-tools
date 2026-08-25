@@ -46,13 +46,13 @@ final class CheckCommand
                 $result->errors,
             ));
 
-            return new CheckExecution($exitCode, $this->reporter->render($result, $format, $options->verbose), $stderr);
+            return new CheckExecution($exitCode, $this->reporter->render($result, $format, $options->verbose, $exitCode), $stderr);
         } catch (InvalidConfigurationException $error) {
             $result = $this->errorResult('invocation', $error->getMessage());
 
             return new CheckExecution(
                 self::EXIT_INVOCATION,
-                $this->reporter->render($result, $format, $verbose),
+                $this->reporter->render($result, $format, $verbose, self::EXIT_INVOCATION),
                 $error->getMessage()."\n",
             );
         } catch (CheckOperationalException $error) {
@@ -60,7 +60,7 @@ final class CheckCommand
 
             return new CheckExecution(
                 self::EXIT_OPERATIONAL,
-                $this->reporter->render($result, $format, $verbose),
+                $this->reporter->render($result, $format, $verbose, self::EXIT_OPERATIONAL),
                 $error->getMessage()."\n",
             );
         } catch (\Throwable $error) {
@@ -69,7 +69,7 @@ final class CheckCommand
 
             return new CheckExecution(
                 self::EXIT_OPERATIONAL,
-                $this->reporter->render($result, $format, $verbose),
+                $this->reporter->render($result, $format, $verbose, self::EXIT_OPERATIONAL),
                 $this->errorOutput($result->errors[0], $verbose),
             );
         }

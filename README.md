@@ -89,9 +89,10 @@ client:
 symfony-lsp check
 ```
 
-The checker supports deterministic human, JSON and GitHub Actions output,
-code-based failure policies, source-only analysis and occurrence-specific
-baselines. Running it with runtime indexing enabled executes application code.
+The checker supports deterministic human, JSON, GitHub Actions and SARIF
+output, code-based failure policies, source-only analysis and
+occurrence-specific baselines. Running it with runtime indexing enabled executes
+application code.
 See the [headless diagnostics guide](docs/features/headless-diagnostics.rst) for
 configuration, CI examples and stable exit statuses.
 

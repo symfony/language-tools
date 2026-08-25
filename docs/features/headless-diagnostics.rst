@@ -94,11 +94,23 @@ Use GitHub Actions annotations for pull request feedback:
 
     $ symfony-lsp check --format=github
 
+Generate a SARIF 2.1.0 report for code-scanning systems:
+
+.. code-block:: terminal
+
+    $ symfony-lsp check --format=sarif > symfony-lsp.sarif
+
+SARIF results use workspace-relative paths, UTF-16 coordinates and stable
+partial fingerprints. Baseline matches remain visible as accepted external
+suppressions. Incomplete runs still produce valid SARIF with operational
+notifications, but don't upload reports from exit status ``11`` or ``12``
+because their result set may be incomplete.
+
 Standard output contains only the selected report format. Operational details
 go to standard error. Add ``--verbose`` to human output to show sanitized
-exception classes and messages. GitHub annotations remain generic. Once JSON is
-selected successfully, later invocation, configuration, indexing and internal
-failures still produce a valid JSON report with ``complete`` set to ``false``.
+exception classes and messages. GitHub annotations remain generic. Once JSON or
+SARIF is selected successfully, later invocation, configuration, indexing and
+internal failures still produce a valid structured report.
 
 Selecting Blocking Diagnostics
 ------------------------------
@@ -191,7 +203,7 @@ Baselines contain no absolute checkout paths or source snippets.
 Limitations
 -----------
 
-The checker has no watch mode or SARIF output and doesn't apply fixes.
+The checker has no watch mode and doesn't apply fixes.
 
 .. _`standalone guide`: ../index.rst#installing-a-standalone-release
 .. _`source installation guide`: ../index.rst#installing-the-server-from-source
