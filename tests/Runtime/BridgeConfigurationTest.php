@@ -28,12 +28,18 @@ final class BridgeConfigurationTest extends AbstractBridgeTestCase
         self::assertIsArray($bundle['tree'] ?? null);
         self::assertSame(['alias' => 'secret'], $bundle['tree']['aliases'] ?? null);
         self::assertSame('name', $bundle['tree']['keyAttribute'] ?? null);
+        self::assertTrue($bundle['tree']['normalizeKeys'] ?? false);
         self::assertIsArray($bundle['tree']['children'] ?? null);
         $child = $bundle['tree']['children'][0] ?? null;
         self::assertIsArray($child);
         self::assertSame('framework', $bundle['alias'] ?? null);
         self::assertSame('scalar', $child['type'] ?? null);
         self::assertSame('string', $child['defaultSummary'] ?? null);
+        $csp = $bundle['tree']['children'][1] ?? null;
+        self::assertIsArray($csp);
+        self::assertFalse($csp['normalizeKeys'] ?? true);
+        self::assertIsArray($csp['children'] ?? null);
+        self::assertSame(['default-src'], array_column($csp['children'], 'name'));
     }
 
     public function testDoesNotExposeApplicationExceptionsInSectionWarnings(): void

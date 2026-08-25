@@ -47,7 +47,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         $lineStart = false === $lineStart ? 0 : $lineStart + 1;
         $line = substr($before, $lineStart);
         $index = $this->indexes->forProject($project);
-        foreach ($this->yaml->parse($document->text()) as $occurrence) {
+        foreach ($this->yaml->parse($document->text(), $index) as $occurrence) {
             if (!$this->contains($document->text(), $occurrence->valueRange(), $offset)) {
                 continue;
             }
@@ -71,7 +71,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         $prefix = $match[2] ?? '';
         $parent = [];
         $parentSequenceItem = false;
-        $previous = array_reverse($this->yaml->parse(substr($document->text(), 0, $lineStart)));
+        $previous = array_reverse($this->yaml->parse(substr($document->text(), 0, $lineStart), $index));
         foreach ($previous as $occurrence) {
             if ($occurrence->keyRange()->start()->character() < $indent) {
                 $parent = $occurrence->path();

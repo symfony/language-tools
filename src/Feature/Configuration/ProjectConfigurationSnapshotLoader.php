@@ -79,6 +79,7 @@ final class ProjectConfigurationSnapshotLoader implements RuntimeSnapshotLoaderI
             $aliases,
             $keyAttribute,
             $entryKeyAttribute,
+            false !== ($data['normalizeKeys'] ?? true),
         );
     }
 }

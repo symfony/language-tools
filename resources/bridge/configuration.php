@@ -83,6 +83,21 @@ function configNodeAcceptsKey(object $node, string $name, ?object $child = null)
     return false;
 }
 
+function configNodeNormalizesKeys(object $node): bool
+{
+    if (!property_exists($node, 'normalizeKeys')) {
+        return true;
+    }
+    try {
+        $property = (new ReflectionObject($node))->getProperty('normalizeKeys');
+        $normalizeKeys = $property->getValue($node);
+    } catch (ReflectionException) {
+        return true;
+    }
+
+    return !is_bool($normalizeKeys) || $normalizeKeys;
+}
+
 function normalizeConfigNode(object $node, int $depth = 0): array
 {
     $normalized = [
@@ -99,6 +114,7 @@ function normalizeConfigNode(object $node, int $depth = 0): array
         'prototype' => null,
         'aliases' => [],
         'keyAttribute' => method_exists($node, 'getKeyAttribute') && is_string($node->getKeyAttribute()) ? $node->getKeyAttribute() : null,
+        'normalizeKeys' => configNodeNormalizesKeys($node),
     ];
     $normalized['accepts'] = [
         'null' => configNodeNormalizes($node, null),

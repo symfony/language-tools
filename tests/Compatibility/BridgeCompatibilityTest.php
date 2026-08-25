@@ -102,6 +102,13 @@ final class BridgeCompatibilityTest extends TestCase
             ['null' => true, 'true' => true, 'false' => true, 'scalar' => false, 'unknownKeys' => false],
             $shorthandChildren['feature']['accepts'] ?? null,
         );
+        self::assertTrue($shorthandChildren['storage']['normalizeKeys'] ?? false);
+        self::assertFalse($shorthandChildren['exact_keys']['normalizeKeys'] ?? true);
+        self::assertIsArray($shorthandChildren['exact_keys']['children'] ?? null);
+        self::assertSame(
+            ['default-src', 'report-uri'],
+            array_column($shorthandChildren['exact_keys']['children'], 'name'),
+        );
         $configurationResources = $configuration['resources'] ?? null;
         self::assertIsArray($configurationResources);
         self::assertContains(realpath($project.'/config/services.yaml'), $configurationResources);

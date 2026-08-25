@@ -46,6 +46,13 @@ final class Configuration implements ConfigurationInterface
                     ->end()
                 ->end()
                 ->arrayNode('feature')->canBeEnabled()->end()
+                ->arrayNode('exact_keys')
+                    ->normalizeKeys(false)
+                    ->children()
+                        ->scalarNode('default-src')->end()
+                        ->scalarNode('report-uri')->end()
+                    ->end()
+                ->end()
             ->end();
 
         return $treeBuilder;

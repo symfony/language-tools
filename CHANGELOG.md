@@ -7,6 +7,7 @@
 - Resolve template names with a leading ./ prefix
 - Keep constraint metadata when optional validator dependencies are missing
 - Resolve validation attribute imports before applying constraint metadata
+- Honor bundle configuration trees that disable key normalization
 - Ignore unpacked PHP route parameter maps when checking required parameters
 - Add SARIF output for code-scanning integrations
 - Isolate diagnostic provider failures without discarding other findings

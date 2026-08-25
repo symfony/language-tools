@@ -585,9 +585,15 @@ abstract class AbstractBridgeTestCase extends TestCase
             }
             final class ArrayNode extends TestNode
             {
-                public function getChildren(): array { return [new ScalarNode('secret')]; }
-                public function getXmlRemappings(): array { return [['alias', 'secret']]; }
-                public function getKeyAttribute(): string { return 'name'; }
+                public function __construct(string $name, private bool $normalizeKeys = true) { parent::__construct($name); }
+                public function getChildren(): array
+                {
+                    return 'framework' === $this->getName()
+                        ? [new ScalarNode('secret'), new self('csp', false)]
+                        : [new ScalarNode('default-src')];
+                }
+                public function getXmlRemappings(): array { return 'framework' === $this->getName() ? [['alias', 'secret']] : []; }
+                public function getKeyAttribute(): ?string { return 'framework' === $this->getName() ? 'name' : null; }
             }
             namespace App;
             final class TreeBuilder

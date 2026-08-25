@@ -28,6 +28,7 @@ final class ConfigurationNode
         private readonly array $aliases = [],
         private readonly ?string $keyAttribute = null,
         ?string $entryKeyAttribute = null,
+        private readonly bool $normalizeKeys = true,
     ) {
         $this->entryKeyNode = null === $entryKeyAttribute ? null : new self(
             $entryKeyAttribute,
@@ -126,8 +127,19 @@ final class ConfigurationNode
         return $this->prototype;
     }
 
+    public function normalizesKeys(): bool
+    {
+        return $this->normalizeKeys;
+    }
+
+    public function normalizeChildName(string $name): string
+    {
+        return $this->normalizeKeys ? str_replace('-', '_', $name) : $name;
+    }
+
     public function child(string $name, bool $sequenceItem = false): ?self
     {
+        $name = $this->normalizeChildName($name);
         if ($name === $this->entryKeyNode?->name()) {
             return $this->entryKeyNode;
         }

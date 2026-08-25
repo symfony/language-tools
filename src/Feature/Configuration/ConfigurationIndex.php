@@ -45,6 +45,33 @@ final class ConfigurationIndex
         return false;
     }
 
+    /**
+     * @param list<string> $path
+     *
+     * @return list<string>
+     */
+    public function normalizePath(array $path, bool $sequenceItem = false): array
+    {
+        if ([] === $path) {
+            return [];
+        }
+        $name = str_replace('-', '_', array_shift($path));
+        $normalized = [$name];
+        $node = $this->roots[$name] ?? null;
+        $normalizeKeys = true;
+        foreach ($path as $name) {
+            if (null !== $node) {
+                $normalizeKeys = $node->normalizesKeys();
+            }
+            $normalized[] = $normalizeKeys ? str_replace('-', '_', $name) : $name;
+            $sequenceChild = $sequenceItem && null !== $node?->prototype();
+            $node = $node?->child($name, $sequenceChild);
+            $sequenceItem = $sequenceItem && !$sequenceChild;
+        }
+
+        return $normalized;
+    }
+
     /** @param list<string> $path */
     public function find(array $path, bool $sequenceItem = false): ?ConfigurationNode
     {

@@ -41,7 +41,7 @@ final class ConfigurationHoverProvider implements HoverProviderInterface
         if ('yaml' !== $request->document->languageId()) {
             return null;
         }
-        foreach ($this->yaml->parse($request->document->text()) as $occurrence) {
+        foreach ($this->yaml->parse($request->document->text(), $index) as $occurrence) {
             if (!$this->contains($request->document->text(), $occurrence->keyRange(), $offset)) {
                 continue;
             }

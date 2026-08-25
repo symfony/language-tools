@@ -66,6 +66,56 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
+    public function testHonorsConfigurationKeyNormalization(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = <<<'YAML'
+            framework:
+                normalized-section:
+                    nested-key: true
+                exact_keys:
+                    default-src: true
+                    default_src: true
+            YAML;
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.unknown_key'], array_column($diagnostics, 'code'));
+        self::assertSame(
+            ['Unknown configuration key "framework.exact_keys.default_src".'],
+            array_column($diagnostics, 'message'),
+        );
+
+        foreach ([
+            ['nested-key', 'framework.normalized_section.nested_key'],
+            ['default-src', 'framework.exact_keys.default-src'],
+        ] as [$key, $expectedPath]) {
+            $position = $fixture->converter->toPosition($text, strpos($text, $key) + 2);
+            $hover = $fixture->hover->hover([
+                'textDocument' => ['uri' => $uri],
+                'position' => ['line' => $position->line(), 'character' => $position->character()],
+            ]);
+            self::assertIsArray($hover);
+            self::assertIsArray($hover['contents'] ?? null);
+            self::assertIsString($hover['contents']['value'] ?? null);
+            self::assertStringContainsString($expectedPath, $hover['contents']['value']);
+        }
+
+        foreach ([
+            ['exact_keys', 'def', ['default-src']],
+            ['normalized_section', 'nes', ['nested_key']],
+        ] as [$parent, $prefix, $expected]) {
+            $text = "framework:\n    {$parent}:\n        {$prefix}";
+            $fixture->documents->update($uri, 2, $text);
+            $position = $fixture->converter->toPosition($text, \strlen($text));
+            self::assertSame($expected, array_column($fixture->completion->complete([
+                'textDocument' => ['uri' => $uri],
+                'position' => ['line' => $position->line(), 'character' => $position->character()],
+            ]) ?? [], 'label'));
+        }
+    }
+
     public function testValidatesKnownChildrenOfNodesThatAcceptUnknownKeys(): void
     {
         $fixture = $this->providers();
@@ -416,6 +466,12 @@ final class ConfigurationProviderTest extends TestCase
                         $this->node('strict', 'boolean'),
                         $this->node('mode', 'enum', deprecated: true, allowedValues: ['dev', 'prod']),
                     ]),
+                    $this->node('normalized_section', 'array', children: [
+                        $this->node('nested_key', 'boolean'),
+                    ]),
+                    $this->node('exact_keys', 'array', children: [
+                        $this->node('default-src', 'boolean'),
+                    ], normalizeKeys: false),
                     $this->node('required_parent', 'array', children: [
                         $this->node('known', 'boolean'),
                         $this->node('token', 'scalar', required: true),
@@ -499,9 +555,9 @@ final class ConfigurationProviderTest extends TestCase
      *
      * @return array<array-key, mixed>
      */
-    private function node(string $name, string $type, array $children = [], ?string $info = null, bool $deprecated = false, array $allowedValues = [], bool $required = false, ?array $prototype = null, array $accepts = [], array $aliases = [], ?string $keyAttribute = null): array
+    private function node(string $name, string $type, array $children = [], ?string $info = null, bool $deprecated = false, array $allowedValues = [], bool $required = false, ?array $prototype = null, array $accepts = [], array $aliases = [], ?string $keyAttribute = null, bool $normalizeKeys = true): array
     {
-        return ['name' => $name, 'type' => $type, 'required' => $required, 'hasDefault' => false, 'defaultSummary' => null, 'info' => $info, 'example' => null, 'deprecated' => $deprecated, 'allowedValues' => $allowedValues, 'children' => $children, 'prototype' => $prototype, 'accepts' => $accepts, 'aliases' => $aliases, 'keyAttribute' => $keyAttribute];
+        return ['name' => $name, 'type' => $type, 'required' => $required, 'hasDefault' => false, 'defaultSummary' => null, 'info' => $info, 'example' => null, 'deprecated' => $deprecated, 'allowedValues' => $allowedValues, 'children' => $children, 'prototype' => $prototype, 'accepts' => $accepts, 'aliases' => $aliases, 'keyAttribute' => $keyAttribute, 'normalizeKeys' => $normalizeKeys];
     }
 }
 

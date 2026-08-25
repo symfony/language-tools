@@ -13,12 +13,15 @@ final class YamlConfigurationParser
     }
 
     /** @return list<ConfigurationOccurrence> */
-    public function parse(string $text): array
+    public function parse(string $text, ?ConfigurationIndex $index = null): array
     {
         $occurrences = [];
         foreach ($this->parser->parse($text) as $mapping) {
+            $path = null === $index
+                ? $this->normalizePath($mapping->path())
+                : $index->normalizePath($mapping->path(), $mapping->isSequenceItem());
             $occurrences[] = new ConfigurationOccurrence(
-                $this->normalizePath($mapping->path()),
+                $path,
                 $mapping->value(),
                 new Range($this->converter->toPosition($text, $mapping->keyStartByte()), $this->converter->toPosition($text, $mapping->keyEndByte())),
                 new Range($this->converter->toPosition($text, $mapping->valueStartByte()), $this->converter->toPosition($text, $mapping->valueEndByte())),

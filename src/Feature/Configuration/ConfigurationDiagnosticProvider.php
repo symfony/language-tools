@@ -69,7 +69,7 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
     private function diagnoseYaml(Document $document, Project $project, ConfigurationIndex $index): array
     {
         $environmentScope = 'when@'.$this->runtimeConfiguration->environment($project);
-        $occurrences = $this->yaml->parse($document->text());
+        $occurrences = $this->yaml->parse($document->text(), $index);
         $diagnostics = [];
         $seen = [];
         foreach ($occurrences as $occurrence) {
