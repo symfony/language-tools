@@ -77,13 +77,19 @@ final class ConfigurationProviderTest extends TestCase
                 exact_keys:
                     default-src: true
                     default_src: true
+                exact_items:
+                    - default-src: true
+                      default_src: true
             YAML;
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
         $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
-        self::assertSame(['config.unknown_key'], array_column($diagnostics, 'code'));
+        self::assertSame(['config.unknown_key', 'config.unknown_key'], array_column($diagnostics, 'code'));
         self::assertSame(
-            ['Unknown configuration key "framework.exact_keys.default_src".'],
+            [
+                'Unknown configuration key "framework.exact_keys.default_src".',
+                'Unknown configuration key "framework.exact_items.default_src".',
+            ],
             array_column($diagnostics, 'message'),
         );
 
@@ -472,6 +478,9 @@ final class ConfigurationProviderTest extends TestCase
                     $this->node('exact_keys', 'array', children: [
                         $this->node('default-src', 'boolean'),
                     ], normalizeKeys: false),
+                    $this->node('exact_items', 'array', prototype: $this->node('exact_item', 'array', children: [
+                        $this->node('default-src', 'boolean'),
+                    ], normalizeKeys: false)),
                     $this->node('required_parent', 'array', children: [
                         $this->node('known', 'boolean'),
                         $this->node('token', 'scalar', required: true),

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Honor exact configuration keys inside sequence prototypes
 - Restrict direct constraint completion to the imported class
 - Diagnose route parameters when unpacking occurs inside values
 - Complete template names with a leading ./ prefix

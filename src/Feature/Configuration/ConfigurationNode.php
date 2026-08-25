@@ -139,6 +139,10 @@ final class ConfigurationNode
 
     public function child(string $name, bool $sequenceItem = false): ?self
     {
+        if ($sequenceItem && null !== $this->prototype) {
+            return $this->prototype->child($name)
+                ?? ([] === $this->prototype->children() || $this->prototype->acceptsUnknownKeys() ? $this->prototype : null);
+        }
         $name = $this->normalizeChildName($name);
         if ($name === $this->entryKeyNode?->name()) {
             return $this->entryKeyNode;
@@ -150,7 +154,7 @@ final class ConfigurationNode
         if (null === $this->prototype) {
             return null;
         }
-        if (null !== $this->keyAttribute && !$sequenceItem) {
+        if (null !== $this->keyAttribute) {
             return $this->prototype;
         }
 

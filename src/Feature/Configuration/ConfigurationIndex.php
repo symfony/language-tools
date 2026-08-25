@@ -60,11 +60,13 @@ final class ConfigurationIndex
         $node = $this->roots[$name] ?? null;
         $normalizeKeys = true;
         foreach ($path as $name) {
-            if (null !== $node) {
-                $normalizeKeys = $node->normalizesKeys();
+            $prototype = $node?->prototype();
+            $sequenceChild = $sequenceItem && null !== $prototype;
+            $normalizingNode = $sequenceChild ? $prototype : $node;
+            if (null !== $normalizingNode) {
+                $normalizeKeys = $normalizingNode->normalizesKeys();
             }
             $normalized[] = $normalizeKeys ? str_replace('-', '_', $name) : $name;
-            $sequenceChild = $sequenceItem && null !== $node?->prototype();
             $node = $node?->child($name, $sequenceChild);
             $sequenceItem = $sequenceItem && !$sequenceChild;
         }

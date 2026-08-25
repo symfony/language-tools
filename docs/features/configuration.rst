@@ -6,8 +6,9 @@ in the selected environment, including required options, default values, enum
 values, examples and deprecations. It supports common aliases, shorthand and
 normalized values such as a cache pool's ``adapter``, Doctrine's default
 connection ``url``, ``~`` and ``true`` for array options. Dash-form keys are
-preserved when a bundle disables key normalization and converted to underscores
-elsewhere, matching Symfony's configuration processing. Extensible sections
+preserved when a bundle disables key normalization, including inside sequence
+entries, and converted to underscores elsewhere, matching Symfony's
+configuration processing. Extensible sections
 allow custom keys while validating their known children.
 
 Completion
