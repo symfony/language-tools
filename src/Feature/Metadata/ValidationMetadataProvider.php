@@ -36,7 +36,7 @@ final class ValidationMetadataProvider implements CompletionProviderInterface, D
         }
         $index = $this->indexes->forProject($request->project);
         $items = MetadataCompletionKind::Constraint === $context->kind()
-            ? $this->constraintItems($index, $this->sourceIndexes->forProject($request->project))
+            ? $this->constraintItems($index, $this->sourceIndexes->forProject($request->project), $context)
             : $this->constraintOptionItems($index, $context);
         $completion = [];
         foreach ($items as $item) {
@@ -102,8 +102,16 @@ final class ValidationMetadataProvider implements CompletionProviderInterface, D
     }
 
     /** @return list<array{label: string, detail: string}> */
-    private function constraintItems(MetadataIndex $index, MetadataSourceIndex $sourceIndex): array
+    private function constraintItems(MetadataIndex $index, MetadataSourceIndex $sourceIndex, MetadataCompletionContext $context): array
     {
+        if (null !== $context->owner()) {
+            $constraint = $index->constraint($context->owner());
+
+            return null === $constraint ? [] : [[
+                'label' => $constraint->name(),
+                'detail' => $constraint->className(),
+            ]];
+        }
         $items = [];
         foreach ($index->constraints() as $constraint) {
             $items[$constraint->name()] = ['label' => $constraint->name(), 'detail' => $constraint->className()];

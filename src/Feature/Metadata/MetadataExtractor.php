@@ -274,7 +274,7 @@ final class MetadataExtractor
                             && str_starts_with($alias, $name)
                             && str_starts_with($class, 'Symfony\\Component\\Validator\\Constraints\\')
                         ) {
-                            return $this->context(MetadataCompletionKind::Constraint, $name, $text, $attribute + 2 + $constraint[1][1]);
+                            return $this->context(MetadataCompletionKind::Constraint, $name, $text, $attribute + 2 + $constraint[1][1], $class);
                         }
                     }
                 }

@@ -45,6 +45,7 @@ final class MetadataProviderTest extends TestCase
             [
                 new ValidationConstraint('Choice', 'Symfony\\Component\\Validator\\Constraints\\Choice', ['choices', 'groups']),
                 new ValidationConstraint('Ip', 'Symfony\\Component\\Validator\\Constraints\\Ip', ['version']),
+                new ValidationConstraint('Language', 'Symfony\\Component\\Validator\\Constraints\\Language', ['language']),
                 new ValidationConstraint('Length', 'Symfony\\Component\\Validator\\Constraints\\Length', ['groups', 'max', 'message', 'min']),
                 new ValidationConstraint('Type', 'Symfony\\Component\\Validator\\Constraints\\Type', ['groups', 'type']),
                 new ValidationConstraint('When', 'Symfony\\Component\\Validator\\Constraints\\When', ['constraints', 'expression']),
