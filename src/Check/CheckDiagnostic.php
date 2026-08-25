@@ -41,6 +41,12 @@ final class CheckDiagnostic
             || !\is_array($end)
             || !\is_int($end['line'] ?? null)
             || !\is_int($end['character'] ?? null)
+            || $start['line'] < 0
+            || $start['character'] < 0
+            || $end['line'] < 0
+            || $end['character'] < 0
+            || $end['line'] < $start['line']
+            || ($end['line'] === $start['line'] && $end['character'] < $start['character'])
             || !\is_int($severity)
             || !\in_array($severity, [1, 2, 3, 4], true)
             || !\is_string($code)
