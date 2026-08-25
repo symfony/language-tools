@@ -245,6 +245,23 @@ final class TranslationProviderTest extends TestCase
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
+    public function testTreatsDynamicPhpTranslationStringsConservatively(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = <<<'PHP'
+            <?php
+            $translator->trans('panel.title', [], "adm{$suffix}");
+            $translator->trans('panel.title', [], "ad\x6din");
+            $translator->trans("panel.{$suffix}", [], 'admin');
+            $translator->trans("panel.\x74itle", [], 'admin');
+            $translator->trans('article.title', ["%{$placeholder}%" => $name]);
+            PHP;
+        [$provider, , $configuration, $project] = $this->provider($uri, $text);
+        $configuration->configure($project, true);
+
+        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
     public function testFlagsOnlyMissingPlaceholdersFromLiteralParameters(): void
     {
         $uri = 'file:///workspace/templates/article.html.twig';

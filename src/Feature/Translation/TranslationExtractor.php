@@ -215,32 +215,33 @@ final class TranslationExtractor
             $defaultDomain = $domainMatch[2];
         }
         $pattern = 'php' === $languageId
-            ? '/(?:->trans|\bt|new\s+TranslatableMessage)\s*\(\s*([\'\"])([^\'\"]+)\1(?:\s*,\s*(\[[^\]]*\]))?(?:\s*,\s*([\'\"])([^\'\"]+)\4)?/s'
+            ? '/(?:->trans|\bt|new\s+TranslatableMessage)\s*\(\s*(?|(\')((?:\\\\.|[^\'\\\\])+)\'|(\")((?:\\\\[\\\\\"]|[^\"\\\\$])+)\")/s'
             : '/(?|(\')((?:\\\\.|[^\'\\\\])+)\'|(\")((?:\\\\.|[^\"\\\\])+)\")\s*\|\s*trans\b/s';
         preg_match_all($pattern, $text, $matches, \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL);
         $result = [];
         foreach ($matches[2] as $i => [$key, $offset]) {
-            if (!\is_string($key)) {
+            $quote = $matches[1][$i][0];
+            if (!\is_string($key) || !\is_string($quote)) {
                 continue;
             }
             $rangeLength = \strlen($key);
             if ('twig' === $languageId) {
-                $quote = $matches[1][$i][0];
-                if (!\is_string($quote)) {
-                    continue;
-                }
                 $key = $this->twigString($key, $quote);
                 [$parameters, $domain] = $this->twigTransArguments($text, $matches[0][$i], $defaultDomain);
             } else {
+                $key = $this->phpString($key, $quote);
                 [$parameters, $domain] = $this->phpTransArguments($text, $matches[0][$i], $defaultDomain);
             }
-            $placeholders = null === $parameters ? null : $this->parameterKeys($parameters);
+            if (null === $key || null === $domain) {
+                continue;
+            }
+            $placeholders = null === $parameters ? null : $this->parameterKeys($parameters, $languageId);
             $result[] = new TranslationReference(
                 $key,
                 $domain,
                 $uri,
                 $this->range($text, $offset, $rangeLength),
-                null === $parameters || $this->dynamicParameters($text, $matches[0][$i], $parameters) ? null : array_values(array_unique($placeholders ?? [])),
+                null === $parameters || null === $placeholders || $this->dynamicParameters($text, $matches[0][$i], $parameters) ? null : array_values(array_unique($placeholders)),
             );
         }
         if ('twig' === $languageId) {
@@ -264,8 +265,30 @@ final class TranslationExtractor
         return strtr($value, ['\\\\' => '\\', '\\'.$quote => $quote]);
     }
 
-    /** @return list<string> */
-    private function parameterKeys(string $parameters): array
+    private function phpString(string $value, string $quote): ?string
+    {
+        if ("'" === $quote) {
+            return 1 === preg_match('/^(?:\\\\.|[^\'\\\\])*$/s', $value)
+                ? strtr($value, ['\\\\' => '\\', "\\'" => "'"])
+                : null;
+        }
+
+        return 1 === preg_match('/^(?:\\\\[\\\\\"]|[^\"\\\\$])*$/s', $value)
+            ? strtr($value, ['\\\\' => '\\', '\\"' => '"'])
+            : null;
+    }
+
+    private function phpStringLiteral(string $value): ?string
+    {
+        if (\strlen($value) < 2 || !\in_array($value[0], ["'", '"'], true) || !str_ends_with($value, $value[0])) {
+            return null;
+        }
+
+        return $this->phpString(substr($value, 1, -1), $value[0]);
+    }
+
+    /** @return list<string>|null */
+    private function parameterKeys(string $parameters, string $languageId): ?array
     {
         $parameters = trim($parameters);
         if (\strlen($parameters) >= 2 && \in_array($parameters[0], ['[', '{'], true)) {
@@ -273,7 +296,13 @@ final class TranslationExtractor
         }
         $keys = [];
         foreach ($this->splitArguments($parameters) as $argument) {
-            if (preg_match('/^\s*([\'\"])(%?[^\'\"]+%?)\1\s*(?:=>|:)/', $argument, $match)) {
+            if ('php' === $languageId && preg_match('/^\s*(?<key>\'(?:\\\\.|[^\'\\\\])*\'|"(?:\\\\.|[^"\\\\])*")\s*(?:=>|:)/s', $argument, $match)) {
+                $key = $this->phpStringLiteral($match['key']);
+                if (null === $key) {
+                    return null;
+                }
+                $keys[] = trim($key, '%');
+            } elseif (preg_match('/^\s*([\'\"])(%?[^\'\"]+%?)\1\s*(?:=>|:)/', $argument, $match)) {
                 $keys[] = trim($match[2], '%');
             } elseif (preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)/', $argument, $match)) {
                 $keys[] = $match[1];
@@ -289,7 +318,7 @@ final class TranslationExtractor
     /**
      * @param array{string|null, int} $match
      *
-     * @return array{string|null, string}
+     * @return array{string|null, string|null}
      */
     private function phpTransArguments(string $text, array $match, string $defaultDomain): array
     {
@@ -322,8 +351,8 @@ final class TranslationExtractor
             $value = trim($value);
             if ('parameters' === $name && str_starts_with($value, '[') && str_ends_with($value, ']')) {
                 $parameters = $value;
-            } elseif ('domain' === $name && \strlen($value) >= 2 && \in_array($value[0], ["'", '"'], true) && str_ends_with($value, $value[0])) {
-                $domain = substr($value, 1, -1);
+            } elseif ('domain' === $name) {
+                $domain = $this->phpStringLiteral($value);
             }
         }
 
