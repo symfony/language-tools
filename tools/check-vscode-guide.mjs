@@ -100,6 +100,12 @@ const targetImages = captureTargets.map((target) => `${target}.webp`).sort();
 if (0 < duplicateTargets.length || targetImages.join(',') !== imageFiles.join(',')) {
     throw new Error(`Capture targets differ from visual guide images. Duplicates: ${duplicateTargets.join(', ') || 'none'}`);
 }
+if (!captureScript.includes('git -C "$lab" init --quiet')) {
+    throw new Error('The runtime capture must isolate its fixture from the parent repository ignore rules');
+}
+if (!captureScript.includes("document.querySelector('.markers-panel')?.innerText.includes($expected_json)")) {
+    throw new Error('The diagnostics capture must wait for the markers panel contents');
+}
 
 if (!manifest.scripts.package.includes('--readme-path MARKETPLACE.md')) {
     throw new Error('The package script must publish MARKETPLACE.md as the Marketplace overview');

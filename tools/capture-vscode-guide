@@ -528,7 +528,7 @@ capture_diagnostics() {
     move_pointer "$port"
     node "$cdp" "$port" wait 'Array.from(document.querySelectorAll("a[aria-label^=Errors]")).some((element) => !element.getAttribute("aria-label").includes("No Problems"))' 30
     node "$cdp" "$port" evaluate 'document.querySelector("a[aria-label^=Errors]")?.click(); true' >/dev/null
-    node "$cdp" "$port" wait "document.body.innerText.includes('PROBLEMS') && document.body.innerText.includes($expected_json)" 30
+    node "$cdp" "$port" wait "document.querySelector('.markers-panel')?.innerText.includes($expected_json)" 30
     dismiss_notifications "$port"
     node "$cdp" "$port" screenshot "$raw/$name.png"
     node "$cdp" "$port" evaluate 'document.querySelector("a[aria-label^=\"Hide Panel\"]")?.click(); true' >/dev/null
@@ -700,6 +700,7 @@ lab="$state/runtime-application"
 lab_profile="$state/lab-profile"
 mkdir -p "$lab" "$lab_profile/User"
 git archive HEAD tests/Fixtures/RuntimeApplication | tar -x -C "$lab" --strip-components=3
+git -C "$lab" init --quiet
 printf '%s\n' '{"extensions.ignoreRecommendations":true,"git.enabled":false,"php.suggest.basic":false,"window.zoomLevel":2,"editor.fontSize":18,"editor.lineHeight":28,"editor.wordBasedSuggestions":"off","editor.suggest.showWords":false,"editor.minimap.enabled":false,"editor.stickyScroll.enabled":false,"editor.hover.delay":0,"workbench.startupEditor":"none","workbench.colorTheme":"Default Dark Modern","symfonyLsp.translationDiagnostics":true}' >"$lab_profile/User/settings.json"
 composer install --working-dir="$lab" --no-interaction --no-progress --prefer-dist
 php "$lab/bin/console" cache:clear --env=dev >/dev/null
