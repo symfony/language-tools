@@ -14,6 +14,7 @@ final class TranslationCompletionContext
         private readonly Range $range,
         private readonly string $domain = 'messages',
         private readonly ?string $key = null,
+        private readonly ?string $quote = null,
     ) {
     }
 
@@ -42,6 +43,11 @@ final class TranslationCompletionContext
         return $this->key;
     }
 
+    public function quote(): ?string
+    {
+        return $this->quote;
+    }
+
     public static function create(string $languageId, string $text, Position $position, PositionConverter $converter): ?self
     {
         $cursor = $converter->toByteOffset($text, $position);
@@ -61,13 +67,13 @@ final class TranslationCompletionContext
             }
         }
         if ('twig' === $languageId) {
-            if (preg_match('/\b(?:trans|t)\s*\(\s*([\'\"])([^\'\"]*)$/s', $before, $m, \PREG_OFFSET_CAPTURE)) {
-                return self::context('key', $m[2], $text, $position, $converter);
+            if (preg_match('/\b(?:trans|t)\s*\(\s*(?|(\')((?:\\\\.|[^\'\\\\])*)$|(\")((?:\\\\.|[^\"\\\\])*)$)/s', $before, $m, \PREG_OFFSET_CAPTURE)) {
+                return self::context('key', $m[2], $text, $position, $converter, quote: $m[1][0]);
             }
-            if (preg_match('/([\'\"])([^\'\"]*)$/s', $before, $m, \PREG_OFFSET_CAPTURE)
+            if (preg_match('/(?|(\')((?:\\\\.|[^\'\\\\])*)$|(\")((?:\\\\.|[^\"\\\\])*)$)/s', $before, $m, \PREG_OFFSET_CAPTURE)
                 && preg_match('/^'.preg_quote($m[1][0], '/').'\s*\|\s*trans\b/', substr($text, $cursor))
             ) {
-                return self::context('key', $m[2], $text, $position, $converter);
+                return self::context('key', $m[2], $text, $position, $converter, quote: $m[1][0]);
             }
         }
 
@@ -75,11 +81,14 @@ final class TranslationCompletionContext
     }
 
     /** @param array{0: string, 1: int} $match */
-    private static function context(string $kind, array $match, string $text, Position $position, PositionConverter $converter, string $domain = 'messages', ?string $key = null): self
+    private static function context(string $kind, array $match, string $text, Position $position, PositionConverter $converter, string $domain = 'messages', ?string $key = null, ?string $quote = null): self
     {
         $prefix = ltrim($match[0], '%');
         $offset = $match[1] + (str_starts_with($match[0], '%') ? 1 : 0);
+        if (null !== $quote) {
+            $prefix = strtr($prefix, ['\\\\' => '\\', '\\'.$quote => $quote]);
+        }
 
-        return new self($kind, $prefix, new Range($converter->toPosition($text, $offset), $position), $domain, $key);
+        return new self($kind, $prefix, new Range($converter->toPosition($text, $offset), $position), $domain, $key, $quote);
     }
 }

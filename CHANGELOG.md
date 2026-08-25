@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Complete escaped Twig translation keys without changing their quoting
 - Preserve positional translation domains after class constant parameters
 - Recognize PHP named translation domains
 - Decode escaped quotes in Twig translation keys

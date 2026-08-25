@@ -66,8 +66,20 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
             'label' => $value,
             'kind' => 12,
             'detail' => 'Symfony translation '.$context->kind(),
-            'textEdit' => $this->protocol->textEdit($context->range(), 'placeholder' === $context->kind() ? $value.'%' : $value),
+            'textEdit' => $this->protocol->textEdit($context->range(), $this->completionValue($context, $value)),
         ], $values);
+    }
+
+    private function completionValue(TranslationCompletionContext $context, string $value): string
+    {
+        if ('placeholder' === $context->kind()) {
+            return $value.'%';
+        }
+        if (null === $quote = $context->quote()) {
+            return $value;
+        }
+
+        return strtr($value, ['\\' => '\\\\', $quote => '\\'.$quote]);
     }
 
     public function hover(array $params): ?array

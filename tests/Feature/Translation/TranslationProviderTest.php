@@ -93,6 +93,25 @@ final class TranslationProviderTest extends TestCase
         self::assertStringContainsString("Translation: `don't panic`", $hover['contents']['value']);
     }
 
+    public function testCompletesEscapedQuotesInTwigTranslationKeys(): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        $text = <<<'TWIG'
+            {{ 'don\'t pa'|trans }}
+            TWIG;
+        [$provider, $converter] = $this->provider($uri, $text, 'twig');
+        $position = $converter->toPosition($text, (int) strpos($text, "'|trans"));
+        $completion = $provider->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line(), 'character' => $position->character()],
+        ]);
+
+        self::assertIsArray($completion);
+        self::assertSame(["don't panic"], array_column($completion, 'label'));
+        self::assertIsArray($completion[0]['textEdit'] ?? null);
+        self::assertSame("don\\'t panic", $completion[0]['textEdit']['newText'] ?? null);
+    }
+
     public function testAddsMissingTranslationToTheOnlyDomainResource(): void
     {
         $root = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
