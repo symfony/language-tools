@@ -398,6 +398,7 @@ final class TwigCallableProviderTest extends TestCase
 
             final class MediaExtension
             {
+                private const DYNAMIC_FLAG = true;
                 private const DYNAMIC_OPTIONS = ['needs_environment' => true];
 
                 public function getFilters(): array
@@ -438,6 +439,18 @@ final class TwigCallableProviderTest extends TestCase
                 public function attributeImage(Environment $environment, array $context, string $name, int $width = 200): string
                 {
                     return $name;
+                }
+
+                #[AsTwigFunction('dynamic_attribute_charset', needsCharset: self::DYNAMIC_FLAG)]
+                public function dynamicAttributeCharset(string $charset, string $value): string
+                {
+                    return $value;
+                }
+
+                #[AsTwigFunction('dynamic_attribute_sandbox', needsIsSandboxed: self::DYNAMIC_FLAG)]
+                public function dynamicAttributeSandbox(bool $isSandboxed, string $value): string
+                {
+                    return $value;
                 }
 
                 #[AsTwigFilter('attribute_shorten')]
@@ -497,6 +510,8 @@ final class TwigCallableProviderTest extends TestCase
         self::assertSame(['name'], $completions('{{ dynamic_image('));
         self::assertSame(['length'], $completions('{{ text|shorten('));
         self::assertSame(['name', 'width'], $completions('{{ attribute_image('));
+        self::assertSame(['value'], $completions('{{ dynamic_attribute_charset('));
+        self::assertSame(['value'], $completions('{{ dynamic_attribute_sandbox('));
         self::assertSame(['length'], $completions('{{ text|attribute_shorten('));
         self::assertSame(['name'], $completions('{{ attribute_variadic('));
         self::assertSame(['name', 'width'], $completions('{{ legacy_safe('));

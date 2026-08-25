@@ -342,8 +342,14 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
                 + (int) $matchedDeclaration->needsContext()
                 + (int) $matchedDeclaration->needsIsSandboxed();
         } else {
-            $skip = str_contains($types[0] ?? '', 'Environment') ? 1 : 0;
+            $skip = 'charset' === ($all[0] ?? '') ? 1 : 0;
+            if (str_contains($types[$skip] ?? '', 'Environment')) {
+                ++$skip;
+            }
             if ('array' === ($types[$skip] ?? '') && 'context' === ($all[$skip] ?? '')) {
+                ++$skip;
+            }
+            if ('isSandboxed' === ($all[$skip] ?? '')) {
                 ++$skip;
             }
         }
