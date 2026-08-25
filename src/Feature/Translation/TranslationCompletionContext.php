@@ -67,10 +67,10 @@ final class TranslationCompletionContext
             }
         }
         if ('twig' === $languageId) {
-            if (preg_match('/\b(?:trans|t)\s*\(\s*(?|(\')((?:\\\\.|[^\'\\\\])*)$|(\")((?:\\\\.|[^\"\\\\])*)$)/s', $before, $m, \PREG_OFFSET_CAPTURE)) {
+            if (preg_match('/\b(?:trans|t)\s*\(\s*(?|(\')((?:\\\\.|[^\'\\\\])*)$|(\")((?:\\\\.|[^\"#\\\\])*)$)/s', $before, $m, \PREG_OFFSET_CAPTURE)) {
                 return self::context('key', $m[2], $text, $position, $converter, quote: $m[1][0]);
             }
-            if (preg_match('/(?|(\')((?:\\\\.|[^\'\\\\])*)$|(\")((?:\\\\.|[^\"\\\\])*)$)/s', $before, $m, \PREG_OFFSET_CAPTURE)
+            if (preg_match('/(?|(\')((?:\\\\.|[^\'\\\\])*)$|(\")((?:\\\\.|[^\"#\\\\])*)$)/s', $before, $m, \PREG_OFFSET_CAPTURE)
                 && preg_match('/^'.preg_quote($m[1][0], '/').'\s*\|\s*trans\b/', substr($text, $cursor))
             ) {
                 return self::context('key', $m[2], $text, $position, $converter, quote: $m[1][0]);
@@ -86,7 +86,7 @@ final class TranslationCompletionContext
         $prefix = ltrim($match[0], '%');
         $offset = $match[1] + (str_starts_with($match[0], '%') ? 1 : 0);
         if (null !== $quote) {
-            $prefix = strtr($prefix, ['\\\\' => '\\', '\\'.$quote => $quote]);
+            $prefix = TwigStringDecoder::decode($prefix);
         }
 
         return new self($kind, $prefix, new Range($converter->toPosition($text, $offset), $position), $domain, $key, $quote);

@@ -8,7 +8,6 @@ use Symfony\Lsp\Feature\Translation\TranslationDeclaration;
 use Symfony\Lsp\Feature\Translation\TranslationExtractor;
 use Symfony\Lsp\Feature\Translation\TranslationPlaceholders;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -215,11 +214,49 @@ final class TranslationExtractorTest extends TestCase
         self::assertSame('hello', $php->declarations()[0]->key());
     }
 
+    public function testDecodesTwigTranslationKeysLikeTheVendoredLexer(): void
+    {
+        $literals = ['"\\x66oo"', '"\\146oo"', '"line\\nkey"'];
+        $text = implode("\n", array_map(static fn (string $literal): string => '{{ '.$literal.'|trans }}', $literals));
+        $references = $this->extractor()->extract('file:///workspace/templates/page.html.twig', 'twig', $text)->references();
+
+        self::assertSame(
+            array_map($this->lexedTwigString(...), $literals),
+            array_map(static fn ($reference): string => $reference->key(), $references),
+        );
+    }
+
+    private function lexedTwigString(string $literal): string
+    {
+        $script = <<<'PHP'
+            require $argv[1];
+            $environment = new Twig\Environment(new Twig\Loader\ArrayLoader());
+            $stream = (new Twig\Lexer($environment))->tokenize(
+                new Twig\Source('{{ '.$argv[2].' }}', 'translation-key'),
+            );
+            $stream->next();
+            echo json_encode($stream->next()->getValue(), JSON_THROW_ON_ERROR);
+            PHP;
+        exec(\sprintf(
+            '%s -r %s %s %s 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg($script),
+            escapeshellarg(__DIR__.'/../../Fixtures/RuntimeApplication/vendor/autoload.php'),
+            escapeshellarg($literal),
+        ), $output, $exitCode);
+
+        self::assertSame(0, $exitCode, implode("\n", $output));
+        $value = json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsString($value);
+
+        return $value;
+    }
+
     private function extractor(): TranslationExtractor
     {
         $converter = new PositionConverter();
 
-        return new TranslationExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+        return new TranslationExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new PhpCommentParser());
     }
 
     public function testMeasuresTwigRangesCorrectlyAfterMultibyteComments(): void

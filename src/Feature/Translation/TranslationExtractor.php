@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Feature\Translation;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -17,7 +16,6 @@ final class TranslationExtractor
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly TwigCommentParser $commentParser,
         private readonly YamlDocumentParser $yamlParser,
-        private readonly QuotedArgumentMatcher $matcher,
         private readonly PhpCommentParserInterface $phpComments,
     ) {
     }
@@ -211,12 +209,12 @@ final class TranslationExtractor
     private function references(string $uri, string $languageId, string $text): array
     {
         $defaultDomain = 'messages';
-        if ('twig' === $languageId && preg_match('/{%\s*trans_default_domain\s+([\'\"])([^\'\"]+)\1/', $text, $domainMatch)) {
-            $defaultDomain = $domainMatch[2];
+        if ('twig' === $languageId && preg_match('/{%\s*trans_default_domain\s+(?|(\')((?:\\\\.|[^\'\\\\])+)\'|(\")((?:\\\\.|[^\"#\\\\])+)\")/', $text, $domainMatch)) {
+            $defaultDomain = $this->twigString($domainMatch[2]);
         }
         $pattern = 'php' === $languageId
             ? '/(?:->trans|\bt|new\s+TranslatableMessage)\s*\(\s*(?|(\')((?:\\\\.|[^\'\\\\])+)\'|(\")((?:\\\\[\\\\\"]|[^\"\\\\$])+)\")/s'
-            : '/(?|(\')((?:\\\\.|[^\'\\\\])+)\'|(\")((?:\\\\.|[^\"\\\\])+)\")\s*\|\s*trans\b/s';
+            : '/(?|(\')((?:\\\\.|[^\'\\\\])+)\'|(\")((?:\\\\.|[^\"#\\\\])+)\")\s*\|\s*trans\b/s';
         preg_match_all($pattern, $text, $matches, \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL);
         $result = [];
         foreach ($matches[2] as $i => [$key, $offset]) {
@@ -226,7 +224,7 @@ final class TranslationExtractor
             }
             $rangeLength = \strlen($key);
             if ('twig' === $languageId) {
-                $key = $this->twigString($key, $quote);
+                $key = $this->twigString($key);
                 [$parameters, $domain] = $this->twigTransArguments($text, $matches[0][$i], $defaultDomain);
             } else {
                 $key = $this->phpString($key, $quote);
@@ -245,12 +243,13 @@ final class TranslationExtractor
             );
         }
         if ('twig' === $languageId) {
-            foreach ($this->matcher->functionCalls($text, ['trans', 't']) as $call) {
-                $result[] = new TranslationReference($call->value, $defaultDomain, $uri, $call->range);
+            preg_match_all('/\b(?:trans|t)\s*\(\s*(?|(\')((?:\\\\.|[^\'\\\\])+)\'|(\")((?:\\\\.|[^\"#\\\\])+)\")(?=\s*[,\)])/s', $text, $calls, \PREG_OFFSET_CAPTURE);
+            foreach ($calls[2] as [$key, $offset]) {
+                $result[] = new TranslationReference($this->twigString($key), $defaultDomain, $uri, $this->range($text, $offset, \strlen($key)));
             }
-            preg_match_all('/{%\s*trans(?:\s+from\s+([\'\"])([^\'\"]+)\1)?\s*%}(.+?){%\s*endtrans\s*%}/s', $text, $tags, \PREG_OFFSET_CAPTURE);
+            preg_match_all('/{%\s*trans(?:\s+from\s+(?|(\')((?:\\\\.|[^\'\\\\])+)\'|(\")((?:\\\\.|[^\"#\\\\])+)\"))?\s*%}(.+?){%\s*endtrans\s*%}/s', $text, $tags, \PREG_OFFSET_CAPTURE);
             foreach ($tags[3] as $i => [$message, $offset]) {
-                $domain = \is_string($tags[2][$i][0] ?? null) ? $tags[2][$i][0] : $defaultDomain;
+                $domain = \is_string($tags[2][$i][0] ?? null) ? $this->twigString($tags[2][$i][0]) : $defaultDomain;
                 $key = trim($message);
                 $offset += \strlen($message) - \strlen(ltrim($message));
                 $result[] = new TranslationReference($key, $domain, $uri, $this->range($text, $offset, \strlen($key)));
@@ -260,9 +259,20 @@ final class TranslationExtractor
         return $result;
     }
 
-    private function twigString(string $value, string $quote): string
+    private function twigString(string $value): string
     {
-        return strtr($value, ['\\\\' => '\\', '\\'.$quote => $quote]);
+        return TwigStringDecoder::decode($value);
+    }
+
+    private function twigStringLiteral(string $value): ?string
+    {
+        if (\strlen($value) < 2 || !\in_array($value[0], ["'", '"'], true) || !str_ends_with($value, $value[0])) {
+            return null;
+        }
+        $contents = substr($value, 1, -1);
+        $pattern = "'" === $value[0] ? '/^(?:\\\\.|[^\'\\\\])*$/s' : '/^(?:\\\\.|[^\"#\\\\])*$/s';
+
+        return 1 === preg_match($pattern, $contents) ? $this->twigString($contents) : null;
     }
 
     private function phpString(string $value, string $quote): ?string
@@ -296,14 +306,12 @@ final class TranslationExtractor
         }
         $keys = [];
         foreach ($this->splitArguments($parameters) as $argument) {
-            if ('php' === $languageId && preg_match('/^\s*(?<key>\'(?:\\\\.|[^\'\\\\])*\'|"(?:\\\\.|[^"\\\\])*")\s*(?:=>|:)/s', $argument, $match)) {
-                $key = $this->phpStringLiteral($match['key']);
+            if (preg_match('/^\s*(?<key>\'(?:\\\\.|[^\'\\\\])*\'|"(?:\\\\.|[^"\\\\])*")\s*(?:=>|:)/s', $argument, $match)) {
+                $key = 'php' === $languageId ? $this->phpStringLiteral($match['key']) : $this->twigStringLiteral($match['key']);
                 if (null === $key) {
                     return null;
                 }
                 $keys[] = trim($key, '%');
-            } elseif (preg_match('/^\s*([\'\"])(%?[^\'\"]+%?)\1\s*(?:=>|:)/', $argument, $match)) {
-                $keys[] = trim($match[2], '%');
             } elseif (preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)/', $argument, $match)) {
                 $keys[] = $match[1];
             }
@@ -362,7 +370,7 @@ final class TranslationExtractor
     /**
      * @param array{string|null, int} $match
      *
-     * @return array{string|null, string}
+     * @return array{string|null, string|null}
      */
     private function twigTransArguments(string $text, array $match, string $defaultDomain): array
     {
@@ -386,10 +394,10 @@ final class TranslationExtractor
             $parameters = null;
         }
         $domain = trim($arguments[1] ?? '');
-        if (\strlen($domain) < 2 || !\in_array($domain[0], ["'", '"'], true) || !str_ends_with($domain, $domain[0])) {
+        if ('' === $domain) {
             $domain = $defaultDomain;
         } else {
-            $domain = substr($domain, 1, -1);
+            $domain = $this->twigStringLiteral($domain);
         }
 
         return [$parameters, $domain];

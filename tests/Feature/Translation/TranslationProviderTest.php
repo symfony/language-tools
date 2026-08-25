@@ -15,7 +15,6 @@ use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationMessage;
 use Symfony\Lsp\Feature\Translation\TranslationProvider;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -112,6 +111,29 @@ final class TranslationProviderTest extends TestCase
         self::assertSame("don\\'t panic", $completion[0]['textEdit']['newText'] ?? null);
     }
 
+    public function testDecodesTwigEscapeSequencesForLookupAndCompletion(): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        $text = <<<'TWIG'
+            {{ "\x66oo"|trans }}
+            {{ "\146oo"|trans }}
+            {{ "line\nkey"|trans }}
+            {{ t("\x66oo") }}
+            TWIG;
+        [$provider, , $configuration, $project] = $this->provider($uri, $text, 'twig');
+        $configuration->configure($project, true);
+
+        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+
+        $completionText = '{{ "\x66"|trans }}';
+        [$completionProvider, $converter] = $this->provider($uri, $completionText, 'twig');
+        $position = $converter->toPosition($completionText, (int) strpos($completionText, '"|trans'));
+        self::assertSame(['foo'], array_column($completionProvider->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line(), 'character' => $position->character()],
+        ]) ?? [], 'label'));
+    }
+
     public function testAddsMissingTranslationToTheOnlyDomainResource(): void
     {
         $root = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
@@ -126,7 +148,7 @@ final class TranslationProviderTest extends TestCase
         $projects->replace([$project = new Project($root, 'file://'.$root, '^8.0')]);
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TranslationExtractor($converter, new UriToPathConverter(), $commentParser, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+        $extractor = new TranslationExtractor($converter, new UriToPathConverter(), $commentParser, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new PhpCommentParser());
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true);
         $indexes->forProject($project)->replaceSources($extractor->extract('file://'.$translationPath, 'yaml', "existing: Existing\n"));
@@ -182,7 +204,7 @@ final class TranslationProviderTest extends TestCase
         $projects->replace([$project = new Project($root, 'file://'.$root, '^8.0')]);
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TranslationExtractor($converter, new UriToPathConverter(), $commentParser, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+        $extractor = new TranslationExtractor($converter, new UriToPathConverter(), $commentParser, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new PhpCommentParser());
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true);
         $indexes->forProject($project)->replaceSources($extractor->extract('file://'.$translationPath, 'yaml', "existing: Existing\n"));
@@ -300,12 +322,14 @@ final class TranslationProviderTest extends TestCase
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TranslationExtractor($converter, new UriToPathConverter(), $commentParser, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+        $extractor = new TranslationExtractor($converter, new UriToPathConverter(), $commentParser, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new PhpCommentParser());
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(
             true,
             new TranslationMessage('article.title', 'messages', 'en', 'Article %name%'),
             new TranslationMessage("don't panic", 'messages', 'en', "Don't panic"),
+            new TranslationMessage('foo', 'messages', 'en', 'Foo'),
+            new TranslationMessage("line\nkey", 'messages', 'en', 'Line key'),
             new TranslationMessage('panel.title', 'admin', 'en', 'Panel title'),
         );
         $configuration = new TranslationConfigurationRegistry();
