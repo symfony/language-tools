@@ -50,10 +50,25 @@ if (70 !== supported) {
     throw new Error(`Expected 70 supported combinations, found ${supported}`);
 }
 
-const tourSlides = [...tourScript.matchAll(/^    "([a-z-]+)\|/gm)].map((match) => `${match[1]}.webp`);
+const tourAnnotations = [...tourScript.matchAll(/^    "([a-z-]+)\|([^|]+)\|([^|]+)\|(\d+)\|(\d+)\|(\d+)\|(\d+)"$/gm)].map((match) => ({
+    image: `${match[1]}.webp`,
+    title: match[2],
+    label: match[3],
+    coordinates: match.slice(4).map(Number),
+}));
+const tourSlides = tourAnnotations.map((slide) => slide.image);
 const duplicateSlides = tourSlides.filter((slide, index) => tourSlides.indexOf(slide) !== index);
 if (0 < duplicateSlides.length) {
     throw new Error(`Duplicate tour slides: ${duplicateSlides.join(', ')}`);
+}
+for (const annotation of tourAnnotations) {
+    const [fromX, fromY, toX, toY] = annotation.coordinates;
+    if (!annotation.title || !annotation.label || fromX === toX && fromY === toY || [fromX, toX].some((value) => value < 0 || 960 < value) || [fromY, toY].some((value) => value < 0 || 600 < value)) {
+        throw new Error(`Invalid tour annotation for ${annotation.image}`);
+    }
+}
+if (!tourScript.includes('BAND=60') || !tourScript.includes('DELAY=420') || !tourScript.includes("-stroke '#ffd84d' -strokewidth 4")) {
+    throw new Error('The tour must use top titles, slow frames and yellow arrows');
 }
 if (!page.includes('](images/guide/tour.gif)')) {
     throw new Error('The Marketplace overview must embed the tour GIF');

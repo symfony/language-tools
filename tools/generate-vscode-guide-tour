@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Generates editor/vscode/images/guide/tour.gif, the capability tour embedded
-# in the Marketplace overview, from the guide screenshots. Requires ImageMagick.
+# in the Marketplace overview, from the guide screenshots. Requires ImageMagick and Python 3.
 set -euo pipefail
 
 cd "$(dirname "$0")/../editor/vscode/images/guide"
@@ -10,10 +10,10 @@ FONT_REGULAR="${FONT_REGULAR:-/System/Library/Fonts/Supplemental/Arial.ttf}"
 
 WIDTH=960
 HEIGHT=600
-BAND=72
+BAND=60
 BG="#1a1e26"
 ACCENT="#8ab4f8"
-DELAY=250 # per slide, in 1/100s
+DELAY=420 # per slide, in 1/100s
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -21,35 +21,35 @@ trap 'rm -rf "$WORK"' EXIT
 # Every capture used by the visual catalog, in page order: editor workflows,
 # then integrations, then the indexing lifecycle.
 SLIDES=(
-    "route-completion|Completion|Suggestions from effective runtime metadata and application source"
-    "route-hover|Hover|Inspect framework metadata without leaving the call site"
-    "definition|Definition and Document Links|Open declarations directly or peek at a target inline"
-    "references|Find All References|Declarations and static usages across PHP, Twig and configuration"
-    "rename|Rename|Update declarations and every statically recognized reference"
-    "diagnostics|Diagnostics|High-confidence errors inline and in the Problems panel"
-    "quick-fix|Quick Fixes|Safe edits for missing route parameters, templates and translations"
-    "code-lenses|Code Lenses|Messenger, events, Twig components, Stimulus and Doctrine relationships"
-    "dependency-injection|Dependency Injection|Effective services, aliases, autowiring types and parameters"
-    "twig-templates|Twig Templates|Template names, render variables and component metadata"
-    "twig-components|Twig Components|Component classes, public properties and Live Component metadata"
-    "translations|Translations|Keys, domains, locales and placeholders across PHP and Twig"
-    "environment|Environment Variables|Names and type-safe processor chains without revealing values"
-    "configuration|Bundle Configuration|Keys, types, enum values, defaults and deprecations per environment"
-    "messenger|Messenger|Buses, transports, routed messages, dispatch sites and effective handlers"
-    "events|Events and Listeners|Dispatch sites, event classes, subscribers and listener priorities"
-    "security|Security|Firewalls, providers, roles, hierarchy, authenticators and voters"
-    "form-options|Forms|Form options from runtime and source metadata"
-    "validation|Validation|Constraint options and mapped properties"
-    "serializer|Serializer|Serializer groups from application metadata"
-    "assets|AssetMapper and Importmaps|Logical asset paths resolved to application or vendor files"
-    "stimulus|Stimulus|Controllers, actions, targets, values and outlets"
-    "live-components|Live Components|Component properties, actions and events"
-    "doctrine|Doctrine Entities and Repositories|Mapped fields, associations and form metadata relationships"
-    "doctrine-code-lens|Doctrine Code Lenses|Navigate between entities and their repositories"
-    "project-ready|Runtime Ready|The status item identifies the environment when both indexes are ready"
-    "static-mode|Static-only Mode|Source-backed features without executing the application"
-    "command-palette|Index Commands|Refresh, inspect status or switch environments from the Command Palette"
-    "switch-environment|Environment Switching|Select another environment and rebuild its runtime metadata"
+    "route-completion|Completion|Suggest a route|500|397|580|353"
+    "route-hover|Hover|Inspect route metadata|390|275|315|228"
+    "definition|Definition and Document Links|Peek at definition|730|230|815|182"
+    "references|Find All References|Find every usage|730|270|815|228"
+    "rename|Rename|Rename across files|680|405|750|360"
+    "diagnostics|Diagnostics|Review the problem|650|485|570|436"
+    "quick-fix|Quick Fixes|Apply the safe fix|650|425|735|379"
+    "code-lenses|Code Lenses|Open the handler|500|245|420|204"
+    "dependency-injection|Dependency Injection|Complete a service|540|405|620|353"
+    "twig-templates|Twig Templates|Complete a template|560|405|650|353"
+    "twig-components|Twig Components|Inspect component|560|255|610|198"
+    "translations|Translations|Inspect translation|730|350|770|295"
+    "environment|Environment Variables|Inspect env metadata|500|335|410|280"
+    "configuration|Bundle Configuration|Complete config keys|470|205|520|154"
+    "messenger|Messenger|Trace message routing|650|255|720|198"
+    "events|Events and Listeners|Trace event listeners|600|335|650|268"
+    "security|Security|Complete a role|500|395|585|342"
+    "form-options|Forms|Complete form options|510|405|600|353"
+    "validation|Validation|Complete options|480|535|560|488"
+    "serializer|Serializer|Complete a group|480|430|560|380"
+    "assets|AssetMapper and Importmaps|Complete an asset|540|225|625|180"
+    "stimulus|Stimulus|Open Stimulus action|650|230|695|176"
+    "live-components|Live Components|Inspect Live action|760|260|840|202"
+    "doctrine|Doctrine Entities and Repositories|Complete association|500|405|575|353"
+    "doctrine-code-lens|Doctrine Code Lenses|Open repository|580|350|500|313"
+    "project-ready|Runtime Ready|Runtime ready|190|545|125|585"
+    "static-mode|Static-only Mode|Static mode active|205|545|130|585"
+    "command-palette|Index Commands|Refresh the index|480|110|430|54"
+    "switch-environment|Environment Switching|Switch environment|250|92|216|27"
 )
 
 card() {
@@ -62,19 +62,88 @@ card() {
         "$out"
 }
 
+render_slide() {
+    local image="$1" title="$2" text="$3" from_x="$4" from_y="$5" to_x="$6" to_y="$7" output="$8"
+    local base arrowed label_image labeled dimensions
+    base="$output.base.png"
+    arrowed="$output.arrow.png"
+    label_image="$output.label.png"
+    labeled="$output.labeled.png"
+
+    magick "$image.webp" -resize "${WIDTH}x${HEIGHT}" \
+        -background "$BG" -gravity center -extent "${WIDTH}x${HEIGHT}" "$base"
+
+    read -r start_x start_y wing1_x wing1_y wing2_x wing2_y < <(python3 - "$from_x" "$from_y" "$to_x" "$to_y" <<'PY'
+import math
+import sys
+x1, y1, x2, y2 = map(float, sys.argv[1:])
+start_x = x2 + (x1 - x2) * 0.55
+start_y = y2 + (y1 - y2) * 0.55
+angle = math.atan2(y2 - start_y, x2 - start_x)
+length = 18
+spread = 0.5
+points = [round(start_x), round(start_y)]
+for direction in (-spread, spread):
+    points.extend((round(x2 - length * math.cos(angle + direction)), round(y2 - length * math.sin(angle + direction))))
+print(*points)
+PY
+)
+
+    path="line $start_x,$start_y $to_x,$to_y line $to_x,$to_y $wing1_x,$wing1_y line $to_x,$to_y $wing2_x,$wing2_y"
+    magick "$base" \
+        -fill none -stroke '#111827' -strokewidth 8 -draw "$path" \
+        -stroke '#ffd84d' -strokewidth 4 -draw "$path" \
+        "$arrowed"
+
+    magick -background 'rgba(17,24,39,0.88)' \
+        -fill '#ffd84d' -stroke '#111827' -strokewidth 1 \
+        -font "$FONT_BOLD" -pointsize 20 \
+        label:"$text" -bordercolor 'rgba(17,24,39,0.88)' -border 8x5 \
+        "$label_image"
+    dimensions=$(magick identify -format '%w %h' "$label_image")
+    read -r label_width label_height <<<"$dimensions"
+
+    delta_x=$((to_x - start_x))
+    delta_y=$((to_y - start_y))
+    absolute_x=${delta_x#-}
+    absolute_y=${delta_y#-}
+    if ((absolute_x >= absolute_y)); then
+        if ((delta_x < 0)); then
+            label_x=$((start_x + 14))
+        else
+            label_x=$((start_x - label_width - 14))
+        fi
+        label_y=$((start_y - label_height / 2))
+    else
+        label_x=$((start_x - label_width / 2))
+        if ((delta_y < 0)); then
+            label_y=$((start_y + 14))
+        else
+            label_y=$((start_y - label_height - 14))
+        fi
+    fi
+    ((label_x >= 16)) || label_x=16
+    ((label_y >= 16)) || label_y=16
+    ((label_x + label_width <= WIDTH - 16)) || label_x=$((WIDTH - 16 - label_width))
+    ((label_y + label_height <= HEIGHT - 16)) || label_y=$((HEIGHT - 16 - label_height))
+
+    magick "$arrowed" "$label_image" -geometry +"$label_x"+"$label_y" -composite "$labeled"
+    magick \
+        \( -size "${WIDTH}x${BAND}" "xc:$BG" -gravity northwest \
+            -font "$FONT_BOLD" -pointsize 26 -fill white -annotate +24+13 "$title" \) \
+        "$labeled" -append "$output"
+
+    rm -f "$base" "$arrowed" "$label_image" "$labeled"
+}
+
 card "$WORK/frame-00.png" "Symfony Language Tools for VS Code" \
     "A tour of every capability" \
     "Captured in the Symfony Demo application"
 
 i=1
 for slide in "${SLIDES[@]}"; do
-    IFS='|' read -r image title text <<<"$slide"
-    magick "$image.webp" -resize "${WIDTH}x${HEIGHT}" \
-        -background "$BG" -gravity center -extent "${WIDTH}x${HEIGHT}" \
-        \( -size "${WIDTH}x${BAND}" "xc:$BG" -gravity northwest \
-            -font "$FONT_BOLD" -pointsize 21 -fill white -annotate +24+10 "$title" \
-            -font "$FONT_REGULAR" -pointsize 16 -fill "#9aa3b2" -annotate +24+42 "$text" \) \
-        -append "$(printf '%s/frame-%02d.png' "$WORK" "$i")"
+    IFS='|' read -r image title text from_x from_y to_x to_y <<<"$slide"
+    render_slide "$image" "$title" "$text" "$from_x" "$from_y" "$to_x" "$to_y" "$(printf '%s/frame-%02d.png' "$WORK" "$i")"
     i=$((i + 1))
 done
 
@@ -82,6 +151,6 @@ card "$(printf '%s/frame-%02d.png' "$WORK" "$i")" "Try it on your project" \
     "Select Install to get started" \
     "The language server is included"
 
-magick -delay "$DELAY" "$WORK"/frame-*.png -loop 0 -layers optimize tour.gif
+magick -delay "$DELAY" "$WORK"/frame-*.png -loop 0 -layers OptimizeTransparency tour.gif
 
 echo "Generated editor/vscode/images/guide/tour.gif"
