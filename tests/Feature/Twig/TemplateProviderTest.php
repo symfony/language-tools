@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Feature\Twig;
 
 use Microsoft\PhpParser\Parser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Document\Document;
@@ -13,6 +14,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Twig\ProjectTemplateSnapshotLoader;
 use Symfony\Lsp\Feature\Twig\TemplateCodeActionProvider;
+use Symfony\Lsp\Feature\Twig\TemplateCompletionContext;
 use Symfony\Lsp\Feature\Twig\TemplateCompletionHandler;
 use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
@@ -762,9 +764,21 @@ final class TemplateProviderTest extends TestCase
                 #[\Symfony\Bridge\Twig\Attribute\Template('product/edit.html.twig', ['product'])]
                 public function edit() {}
 
+                #[Template('product/it\'s.html.twig')]
+                public function escaped() {}
+
+                #[Template('product/delete.html.twig', vars: array(/* 'removed' */ 'product', 'category'))]
+                public function delete() {}
+
+                #[Template('product/export.html.twig', vars: ['pro'.'duct'])]
+                public function export() {}
+
                 // #[Template('commented.html.twig')]
                 #[Template]
                 public function guessed() {}
+
+                #[Template(block: 'content')]
+                public function misnamed() {}
 
                 #[Route('/products')]
                 public function unrelated() { return $this->render('product/list.html.twig'); }
@@ -776,10 +790,33 @@ final class TemplateProviderTest extends TestCase
                 ['product/index.html.twig', ['products', 'category']],
                 ['product/show.html.twig', []],
                 ['product/edit.html.twig', ['product']],
+                ["product/it's.html.twig", []],
+                ['product/delete.html.twig', ['product', 'category']],
+                ['product/export.html.twig', []],
                 ['product/list.html.twig', []],
             ],
             array_map(static fn (TemplateReference $reference): array => [$reference->name(), $reference->variables()], $references),
         );
+    }
+
+    #[DataProvider('providePhpCompletionContexts')]
+    public function testRecognizesPhpTemplateCompletionContexts(string $text, ?string $expectedPrefix): void
+    {
+        $converter = new PositionConverter();
+        $context = TemplateCompletionContext::create('php', $text, $converter->toPosition($text, \strlen($text)), $converter);
+
+        self::assertSame($expectedPrefix, $context?->prefix());
+    }
+
+    /** @return iterable<string, array{string, ?string}> */
+    public static function providePhpCompletionContexts(): iterable
+    {
+        yield 'attribute' => ["<?php #[Template('article/sh", 'article/sh'];
+        yield 'named template argument' => ["<?php #[Template(template: 'article/sh", 'article/sh'];
+        yield 'fully qualified attribute' => ["<?php #[\\Symfony\\Bridge\\Twig\\Attribute\\Template('article/sh", 'article/sh'];
+        yield 'grouped attributes' => ["<?php #[Route('/articles'), Template('article/sh", 'article/sh'];
+        yield 'unrelated qualified attribute' => ["<?php #[App\\Attribute\\Template('article/sh", null];
+        yield 'unrelated attribute' => ["<?php #[Route('/articles/sh", null];
     }
 
     public function testCompletesLinksAndNavigatesTemplateAttributeNames(): void

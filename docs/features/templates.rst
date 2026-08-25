@@ -78,6 +78,9 @@ the ``templates/`` directory; namespaced ``@Bundle`` names are excluded.
 Limitations
 -----------
 
+Completion inside the ``#[Template]`` attribute expects the template name as
+the attribute's first argument and doesn't recognize aliased attribute
+imports; navigation and diagnostics don't have these restrictions.
 Custom non-filesystem loaders can limit completion and navigation. Theme engines
 such as Sylius are supported through common application and bundle template
 conventions.

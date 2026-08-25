@@ -4,8 +4,12 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Php\PhpArgument;
+use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpStringLiteral;
+use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
@@ -46,18 +50,18 @@ final class TemplateReferenceExtractor
             if (self::TEMPLATE_ATTRIBUTE !== $attribute->name()) {
                 continue;
             }
-            $template = ($attribute->argument('template') ?? $attribute->argument(0))?->stringLiteral();
+            $template = $this->attributeArgument($attribute, 'template', 0)?->stringLiteral();
             if (null === $template || '' === $template->value()) {
                 continue;
             }
             $references[] = new TemplateReference(
-                $template->value(),
+                $this->decodedValue($text, $template),
                 $uri,
                 new Range(
                     $this->positionConverter->toPosition($text, $template->startOffset()),
                     $this->positionConverter->toPosition($text, $template->endOffset()),
                 ),
-                $this->attributeVariables(($attribute->argument('vars') ?? $attribute->argument(1))?->expression()),
+                $this->attributeVariables($this->attributeArgument($attribute, 'vars', 1)?->expression()),
             );
         }
 
@@ -108,15 +112,62 @@ final class TemplateReferenceExtractor
         return $this->sorted($references);
     }
 
+    private function attributeArgument(PhpAttribute $attribute, string $name, int $position): ?PhpArgument
+    {
+        if (null !== $argument = $attribute->argument($name)) {
+            return $argument;
+        }
+        $positional = $attribute->argument($position);
+
+        return null === $positional?->name() ? $positional : null;
+    }
+
+    private function decodedValue(string $text, PhpStringLiteral $literal): string
+    {
+        return $this->decodedQuoted($text[$literal->startOffset() - 1].$literal->value());
+    }
+
     /** @return list<string> */
     private function attributeVariables(?string $expression): array
     {
-        if (null === $expression || !str_starts_with($expression, '[') || str_contains($expression, '=>')) {
+        if (null === $expression) {
             return [];
         }
-        preg_match_all('/([\'"])([^\'"]+)\1/', $expression, $matches);
+        $variables = [];
+        $first = true;
+        foreach (\PhpToken::tokenize('<?php '.$expression) as $token) {
+            if ($token->is([\T_OPEN_TAG, \T_WHITESPACE, \T_COMMENT, \T_DOC_COMMENT])) {
+                continue;
+            }
+            if ($first) {
+                $first = false;
+                if (!$token->is(\T_ARRAY) && '[' !== $token->text) {
+                    return [];
+                }
+                continue;
+            }
+            if ($token->is(\T_CONSTANT_ENCAPSED_STRING)) {
+                $variable = $this->decodedQuoted(substr($token->text, 0, -1));
+                if ('' !== $variable) {
+                    $variables[] = $variable;
+                }
+                continue;
+            }
+            if (!\in_array($token->text, ['(', ')', '[', ']', ','], true)) {
+                return [];
+            }
+        }
 
-        return array_values(array_unique($matches[2]));
+        return array_values(array_unique($variables));
+    }
+
+    private function decodedQuoted(string $quotedWithoutClosingQuote): string
+    {
+        $value = substr($quotedWithoutClosingQuote, 1);
+
+        return "'" === $quotedWithoutClosingQuote[0]
+            ? strtr($value, ['\\\\' => '\\', "\\'" => "'"])
+            : PhpStringLiteralDecoder::decodeDoubleQuoted($value);
     }
 
     /**
