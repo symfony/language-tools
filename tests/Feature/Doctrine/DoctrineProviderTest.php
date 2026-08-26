@@ -19,6 +19,7 @@ use Symfony\Lsp\Feature\Doctrine\DoctrineFieldCompletionBuilder;
 use Symfony\Lsp\Feature\Doctrine\DoctrineIndexRegistry;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipCodeLensProvider;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipProvider;
+use Symfony\Lsp\Feature\Doctrine\DoctrineSymbolKind;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
@@ -179,6 +180,60 @@ final class DoctrineProviderTest extends TestCase
         self::assertIsArray($repositoryLenses);
         self::assertIsArray($repositoryLenses[0]['command'] ?? null);
         self::assertSame('Entity: App\\Entity\\Product', $repositoryLenses[0]['command']['title'] ?? null);
+    }
+
+    public function testIgnoresCommentedDoctrinePhpWhilePreservingActiveRanges(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $text = <<<'PHP'
+            <?php
+            namespace App\Form;
+
+            use App\Entity\Product;
+            use App\Repository\ProductRepository;
+            use Symfony\Bridge\Doctrine\Form\Type\EntityType;
+
+            /*
+            #[\Doctrine\ORM\Mapping\Entity]
+            final class Ghost
+            {
+                #[\Doctrine\ORM\Mapping\Column]
+                private string $ghost;
+            }
+            */
+
+            function configure(object $builder, ProductRepository $products): void
+            {
+                // $builder->add('ghost', EntityType::class, ['class' => Ghost::class, 'choice_label' => 'commented_entity_type']);
+                /* $products->findBy(['commented_criteria' => true]); */
+                $builder->add('product', EntityType::class, ['class' => Product::class, 'choice_label' => 'active_entity_type']);
+                $products->findBy(['active_criteria' => true]);
+            }
+            PHP;
+
+        $facts = $extractor->extract('file:///workspace/src/Form/ProductType.php', 'php', $text);
+        self::assertSame([], $facts->entities());
+
+        $references = array_values(array_filter($facts->symbols(), static fn ($symbol): bool => !$symbol->isDeclaration()));
+        foreach ($references as $reference) {
+            self::assertStringNotContainsString('commented_', $reference->name());
+            self::assertNotSame('App\\Entity\\Ghost', $reference->name());
+        }
+
+        $entityReferences = array_values(array_filter($references, static fn ($symbol): bool => DoctrineSymbolKind::Entity === $symbol->kind()));
+        self::assertCount(1, $entityReferences);
+        self::assertSame('App\\Entity\\Product', $entityReferences[0]->name());
+        self::assertSame(strpos($text, 'Product::class'), $converter->toByteOffset($text, $entityReferences[0]->range()->start()));
+
+        $fieldReferences = array_values(array_filter($references, static fn ($symbol): bool => DoctrineSymbolKind::Field === $symbol->kind()));
+        $fieldNames = [];
+        foreach ($fieldReferences as $fieldReference) {
+            $fieldNames[] = $fieldReference->name();
+        }
+        self::assertSame(['active_entity_type', 'active_criteria'], $fieldNames);
+        self::assertSame(strpos($text, 'active_entity_type'), $converter->toByteOffset($text, $fieldReferences[0]->range()->start()));
+        self::assertSame(strpos($text, 'active_criteria'), $converter->toByteOffset($text, $fieldReferences[1]->range()->start()));
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */

@@ -45,8 +45,9 @@ final class MetadataExtractor
     public function formOptions(string $text): array
     {
         $php = $this->phpParser->parse($text);
+        $source = $this->phpComments->mask($text);
         $options = [];
-        foreach ($this->calls($text, $php) as $call) {
+        foreach ($this->calls($source, $php) as $call) {
             $typeIndex = 'createNamed' === $call['name'] ? 1 : ('add' === $call['name'] ? 1 : 0);
             $optionsIndex = 'createNamed' === $call['name'] ? 3 : 2;
             if (!isset($call['arguments'][$typeIndex], $call['arguments'][$optionsIndex])) {
@@ -68,8 +69,9 @@ final class MetadataExtractor
     public function constraintOptions(string $text): array
     {
         $php = $this->phpParser->parse($text);
+        $source = $this->phpComments->mask($text);
         $options = [];
-        preg_match_all('/#\[\s*([\\\\A-Za-z_][A-Za-z0-9_\\\\]*)\s*\((.*?)\)\s*\]/s', $text, $attributes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        preg_match_all('/#\[\s*([\\\\A-Za-z_][A-Za-z0-9_\\\\]*)\s*\((.*?)\)\s*\]/s', $source, $attributes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($attributes as $attribute) {
             if (str_contains($attribute[2][0], 'new ')) {
                 continue;
@@ -111,12 +113,13 @@ final class MetadataExtractor
     private function phpSymbols(string $uri, string $text): array
     {
         $php = $this->phpParser->parse($text);
+        $source = $this->phpComments->mask($text);
         $symbols = [];
-        preg_match_all('/\b(?:final\s+|abstract\s+|readonly\s+)?class\s+([A-Za-z_][A-Za-z0-9_]*)[^\{]*\{/', $text, $classes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        preg_match_all('/\b(?:final\s+|abstract\s+|readonly\s+)?class\s+([A-Za-z_][A-Za-z0-9_]*)[^\{]*\{/', $source, $classes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($classes as $class) {
             $open = $class[0][1] + \strlen($class[0][0]) - 1;
-            $close = $this->matching($text, $open, '{', '}') ?? \strlen($text);
-            $body = substr($text, $open + 1, $close - $open - 1);
+            $close = $this->matching($source, $open, '{', '}') ?? \strlen($source);
+            $body = substr($source, $open + 1, $close - $open - 1);
             $className = $php->resolveName($class[1][0]);
             $symbols[] = new MetadataSourceSymbol(
                 MetadataSymbolKind::MappedClass,
@@ -149,19 +152,19 @@ final class MetadataExtractor
 
         $groupsImported = 'Symfony\\Component\\Serializer\\Attribute\\Groups' === ($php->imports()['Groups'] ?? null)
             || 'Symfony\\Component\\Serializer\\Annotation\\Groups' === ($php->imports()['Groups'] ?? null);
-        preg_match_all('/#\[\s*((?:[A-Za-z_\\\\][A-Za-z0-9_\\\\]*\\\\)?Groups)\s*\((.*?)\)\s*\]/s', $text, $groups, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        preg_match_all('/#\[\s*((?:[A-Za-z_\\\\][A-Za-z0-9_\\\\]*\\\\)?Groups)\s*\((.*?)\)\s*\]/s', $source, $groups, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($groups as $group) {
             if ('Groups' === $group[1][0] && !$groupsImported) {
                 continue;
             }
             array_push($symbols, ...$this->quotedSymbols(MetadataSymbolKind::SerializerGroup, $uri, $text, $group[2][0], $group[2][1], true));
         }
-        preg_match_all('/["\']groups["\']\s*=>\s*\[(.*?)\]/s', $text, $groupReferences, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        preg_match_all('/["\']groups["\']\s*=>\s*\[(.*?)\]/s', $source, $groupReferences, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($groupReferences as $group) {
             array_push($symbols, ...$this->quotedSymbols(MetadataSymbolKind::SerializerGroup, $uri, $text, $group[1][0], $group[1][1], false));
         }
         $constraintNamespace = 'Symfony\\Component\\Validator\\Constraints\\';
-        preg_match_all('/#\[\s*([\\\\A-Za-z_][A-Za-z0-9_\\\\]*)/', $text, $constraintReferences, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        preg_match_all('/#\[\s*([\\\\A-Za-z_][A-Za-z0-9_\\\\]*)/', $source, $constraintReferences, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($constraintReferences as $reference) {
             $className = $php->resolveName($reference[1][0]);
             if (!str_starts_with($className, $constraintNamespace)) {
@@ -184,7 +187,7 @@ final class MetadataExtractor
             if (!str_contains($className, '\\Validator\\') && !str_contains($className, '\\Constraints\\')) {
                 continue;
             }
-            preg_match_all('/#\[\s*'.preg_quote($alias, '/').'\b/', $text, $references, \PREG_OFFSET_CAPTURE);
+            preg_match_all('/#\[\s*'.preg_quote($alias, '/').'\b/', $source, $references, \PREG_OFFSET_CAPTURE);
             foreach ($references[0] as [$reference, $offset]) {
                 $nameOffset = $offset + strrpos($reference, $alias);
                 $symbols[] = new MetadataSourceSymbol(MetadataSymbolKind::Constraint, $alias, $uri, $this->offsetRange($text, $nameOffset, \strlen($alias)), false);

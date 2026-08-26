@@ -25,7 +25,8 @@ final class DoctrineExtractor
             return new DoctrineSourceFacts($uri, [], [], []);
         }
         $php = $this->phpParser->parse($text);
-        $classes = $this->classes($text, $php);
+        $source = $this->phpComments->mask($text);
+        $classes = $this->classes($source, $text, $php);
         $entities = [];
         $repositories = [];
         $symbols = [];
@@ -53,8 +54,8 @@ final class DoctrineExtractor
                 }
             }
         }
-        array_push($symbols, ...$this->formSymbols($uri, $text, $php));
-        array_push($symbols, ...$this->repositorySymbols($uri, $text, $php, $repositories));
+        array_push($symbols, ...$this->formSymbols($uri, $text, $source, $php));
+        array_push($symbols, ...$this->repositorySymbols($uri, $text, $source, $php, $repositories));
 
         return new DoctrineSourceFacts($uri, $entities, $repositories, $this->unique($symbols));
     }
@@ -65,7 +66,8 @@ final class DoctrineExtractor
             return null;
         }
         $php = $this->phpParser->parse($text);
-        $before = substr($this->phpComments->mask($text), 0, $offset);
+        $source = $this->phpComments->mask($text);
+        $before = substr($source, 0, $offset);
         if (preg_match('/[\'"](?:choice_label|choice_value|group_by)[\'"]\s*=>\s*[\'"]([A-Za-z_][A-Za-z0-9_]*)$/s', $before, $field, \PREG_OFFSET_CAPTURE)) {
             $statementStart = max((int) strrpos($before, ';'), (int) strrpos($before, '->add('), (int) strrpos($before, 'createForm('), (int) strrpos($before, 'createNamed('));
             $statement = substr($before, $statementStart);
@@ -81,7 +83,7 @@ final class DoctrineExtractor
             }
         }
 
-        return $this->repositoryCompletionContext($text, $offset, $php);
+        return $this->repositoryCompletionContext($text, $source, $offset, $php);
     }
 
     /**
@@ -176,20 +178,20 @@ final class DoctrineExtractor
     }
 
     /** @return list<DoctrineSourceSymbol> */
-    private function formSymbols(string $uri, string $text, PhpDocument $php): array
+    private function formSymbols(string $uri, string $text, string $source, PhpDocument $php): array
     {
-        preg_match_all('/([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*,\s*\[/', $text, $formTypes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        preg_match_all('/([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*,\s*\[/', $source, $formTypes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         $symbols = [];
         foreach ($formTypes as $formType) {
             if ('Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $php->resolveName($formType[1][0])) {
                 continue;
             }
             $open = $formType[0][1] + \strlen($formType[0][0]) - 1;
-            $close = $this->matching($text, $open, '[', ']');
+            $close = $this->matching($source, $open, '[', ']');
             if (null === $close) {
                 continue;
             }
-            $options = substr($text, $open + 1, $close - $open - 1);
+            $options = substr($source, $open + 1, $close - $open - 1);
             if (!preg_match('/[\'"]class[\'"]\s*=>\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class/', $options, $entity, \PREG_OFFSET_CAPTURE)) {
                 continue;
             }
@@ -210,16 +212,16 @@ final class DoctrineExtractor
      *
      * @return list<DoctrineSourceSymbol>
      */
-    private function repositorySymbols(string $uri, string $text, PhpDocument $php, array $localRepositories): array
+    private function repositorySymbols(string $uri, string $text, string $source, PhpDocument $php, array $localRepositories): array
     {
-        $repositoryVariables = $this->repositoryVariables($text, $php);
+        $repositoryVariables = $this->repositoryVariables($source, $php);
         $entityVariables = [];
-        preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*[^;]*?->\s*getRepository\s*\(\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*\)/', $text, $assignments, \PREG_SET_ORDER);
+        preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*[^;]*?->\s*getRepository\s*\(\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*\)/', $source, $assignments, \PREG_SET_ORDER);
         foreach ($assignments as $assignment) {
             $entityVariables[$assignment[1]] = $php->resolveName($assignment[2]);
         }
         $symbols = [];
-        preg_match_all('/(\$this(?:->([A-Za-z_][A-Za-z0-9_]*))?|\$([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:findBy|findOneBy|count)\s*\(\s*\[/', $text, $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        preg_match_all('/(\$this(?:->([A-Za-z_][A-Za-z0-9_]*))?|\$([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:findBy|findOneBy|count)\s*\(\s*\[/', $source, $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($calls as $call) {
             $owner = null;
             if ('$this' === $call[1][0] && isset($localRepositories[0])) {
@@ -232,26 +234,26 @@ final class DoctrineExtractor
                 continue;
             }
             $open = $call[0][1] + \strlen($call[0][0]) - 1;
-            array_push($symbols, ...$this->criteriaSymbols($uri, $text, $open, $owner));
+            array_push($symbols, ...$this->criteriaSymbols($uri, $text, $source, $open, $owner));
         }
-        preg_match_all('/getRepository\s*\(\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*\)\s*->\s*(?:findBy|findOneBy|count)\s*\(\s*\[/', $text, $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        preg_match_all('/getRepository\s*\(\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*\)\s*->\s*(?:findBy|findOneBy|count)\s*\(\s*\[/', $source, $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($calls as $call) {
             $owner = $php->resolveName($call[1][0]);
             $open = $call[0][1] + \strlen($call[0][0]) - 1;
-            array_push($symbols, ...$this->criteriaSymbols($uri, $text, $open, $owner));
+            array_push($symbols, ...$this->criteriaSymbols($uri, $text, $source, $open, $owner));
         }
 
         return $symbols;
     }
 
     /** @return list<DoctrineSourceSymbol> */
-    private function criteriaSymbols(string $uri, string $text, int $open, string $owner): array
+    private function criteriaSymbols(string $uri, string $text, string $source, int $open, string $owner): array
     {
-        $close = $this->matching($text, $open, '[', ']');
+        $close = $this->matching($source, $open, '[', ']');
         if (null === $close) {
             return [];
         }
-        $array = substr($text, $open + 1, $close - $open - 1);
+        $array = substr($source, $open + 1, $close - $open - 1);
         preg_match_all('/([\'"])([A-Za-z_][A-Za-z0-9_]*)\1\s*=>/', $array, $keys, \PREG_OFFSET_CAPTURE);
         $symbols = [];
         foreach ($keys[2] as [$field, $offset]) {
@@ -261,20 +263,20 @@ final class DoctrineExtractor
         return $symbols;
     }
 
-    private function repositoryCompletionContext(string $text, int $offset, PhpDocument $php): ?DoctrineCompletionContext
+    private function repositoryCompletionContext(string $text, string $source, int $offset, PhpDocument $php): ?DoctrineCompletionContext
     {
-        $before = substr($this->phpComments->mask($text), 0, $offset);
+        $before = substr($source, 0, $offset);
         if (!preg_match('/(?:\[|,)\s*[\'"]([A-Za-z_][A-Za-z0-9_]*)$/s', $before, $prefix, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
-        $repositoryVariables = $this->repositoryVariables($text, $php);
+        $repositoryVariables = $this->repositoryVariables($source, $php);
         $entityVariables = [];
-        preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*[^;]*?->\s*getRepository\s*\(\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*\)/', $text, $assignments, \PREG_SET_ORDER);
+        preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*[^;]*?->\s*getRepository\s*\(\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*\)/', $source, $assignments, \PREG_SET_ORDER);
         foreach ($assignments as $assignment) {
             $entityVariables[$assignment[1]] = $php->resolveName($assignment[2]);
         }
         $localRepositories = [];
-        foreach ($this->classes($text, $php) as $class) {
+        foreach ($this->classes($source, $text, $php) as $class) {
             $repository = $this->repository('', $text, $class, $php);
             if (null !== $repository) {
                 $localRepositories[] = $repository;
@@ -361,14 +363,15 @@ final class DoctrineExtractor
     }
 
     /** @return list<array{className: string, shortName: string, header: string, body: string, bodyOffset: int, attributes: string, attributesOffset: int, before: string, range: Range}> */
-    private function classes(string $text, PhpDocument $php): array
+    private function classes(string $source, string $text, PhpDocument $php): array
     {
-        preg_match_all('/(?:(?:final|abstract|readonly)\s+)*class\s+([A-Za-z_][A-Za-z0-9_]*)[^\{]*\{/', $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        preg_match_all('/(?:(?:final|abstract|readonly)\s+)*class\s+([A-Za-z_][A-Za-z0-9_]*)[^\{]*\{/', $source, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         $classes = [];
         foreach ($matches as $match) {
             $open = $match[0][1] + \strlen($match[0][0]) - 1;
-            $close = $this->matching($text, $open, '{', '}') ?? \strlen($text);
-            $before = substr($text, 0, $match[0][1]);
+            $close = $this->matching($source, $open, '{', '}') ?? \strlen($source);
+            $before = substr($source, 0, $match[0][1]);
+            $originalBefore = substr($text, 0, $match[0][1]);
             $boundary = max((int) strrpos($before, ';'), (int) strrpos($before, '}'));
             $attributeText = substr($before, $boundary + 1);
             $attributeOffset = $boundary + 1;
@@ -377,11 +380,11 @@ final class DoctrineExtractor
                 'className' => $php->resolveName($shortName),
                 'shortName' => $shortName,
                 'header' => $match[0][0],
-                'body' => substr($text, $open + 1, $close - $open - 1),
+                'body' => substr($source, $open + 1, $close - $open - 1),
                 'bodyOffset' => $open + 1,
                 'attributes' => $attributeText,
                 'attributesOffset' => $attributeOffset,
-                'before' => substr($before, max(0, \strlen($before) - 1000)),
+                'before' => substr($originalBefore, max(0, \strlen($originalBefore) - 1000)),
                 'range' => $this->offsetRange($text, $match[1][1], \strlen($shortName)),
             ];
         }

@@ -18,6 +18,7 @@ use Symfony\Lsp\Feature\Metadata\MetadataExtractor;
 use Symfony\Lsp\Feature\Metadata\MetadataIndexRegistry;
 use Symfony\Lsp\Feature\Metadata\MetadataRelationshipProvider;
 use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexRegistry;
+use Symfony\Lsp\Feature\Metadata\MetadataSymbolKind;
 use Symfony\Lsp\Feature\Metadata\SerializerMetadataProvider;
 use Symfony\Lsp\Feature\Metadata\ValidationConstraint;
 use Symfony\Lsp\Feature\Metadata\ValidationMetadataProvider;
@@ -223,6 +224,61 @@ final class MetadataProviderTest extends TestCase
         $references = $relationshipProvider->references($this->params($converter, $mappingUri, $mappingText, $admin));
         self::assertIsArray($references);
         self::assertCount(2, $references);
+    }
+
+    public function testIgnoresCommentedPhpMetadataWhilePreservingActiveRanges(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $text = <<<'PHP'
+            <?php
+            namespace App\Controller;
+
+            use App\Form\EventType;
+            use Symfony\Component\Form\FormBuilderInterface;
+            use Symfony\Component\Serializer\Attribute\Groups;
+            use Symfony\Component\Validator\Constraints as Assert;
+
+            final class EventController
+            {
+                public function build(FormBuilderInterface $builder): void
+                {
+                    // $this->createForm(EventType::class, null, ['commented_create_form' => true]);
+                    /* $this->createNamed('event', EventType::class, null, ['commented_create_named' => true]); */
+                    // $builder->add('event', EventType::class, ['commented_add' => true]);
+                    $this->createForm(EventType::class, null, ['active_form' => true]);
+                }
+            }
+
+            // #[Assert\Length(commented_constraint: 1)]
+            #[Assert\Length(active_constraint: 1)]
+            final class Input
+            {
+                // #[Groups(['commented_group'])]
+                #[Groups(['active_group'])]
+                public string $value;
+            }
+            PHP;
+
+        $formOptions = $extractor->formOptions($text);
+        self::assertSame(['active_form'], array_column($formOptions, 'option'));
+        self::assertSame(strpos($text, 'active_form'), $converter->toByteOffset($text, $formOptions[0]['range']->start()));
+
+        $constraintOptions = $extractor->constraintOptions($text);
+        self::assertSame(['active_constraint'], array_column($constraintOptions, 'option'));
+        self::assertSame(strpos($text, 'active_constraint'), $converter->toByteOffset($text, $constraintOptions[0]['range']->start()));
+
+        $symbols = $extractor->extract('file:///workspace/src/Controller/EventController.php', 'php', $text)->symbols();
+        $serializerGroups = [];
+        foreach ($symbols as $symbol) {
+            self::assertStringNotContainsString('commented_', $symbol->name());
+            if (MetadataSymbolKind::SerializerGroup === $symbol->kind()) {
+                $serializerGroups[] = $symbol;
+            }
+        }
+        self::assertCount(1, $serializerGroups);
+        self::assertSame('active_group', $serializerGroups[0]->name());
+        self::assertSame(strpos($text, 'active_group'), $converter->toByteOffset($text, $serializerGroups[0]->range()->start()));
     }
 
     /**
