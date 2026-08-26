@@ -57,16 +57,27 @@ final class DocumentSynchronizer
             return;
         }
 
-        $text = $document->text();
+        $parsedChanges = [];
         foreach ($changes as $change) {
             if (!\is_array($change) || !\is_string($change['text'] ?? null)) {
-                continue;
+                return;
             }
 
-            $range = $this->range($change['range'] ?? null);
+            $range = null;
+            if (\array_key_exists('range', $change)) {
+                $range = $this->range($change['range']);
+                if (null === $range) {
+                    return;
+                }
+            }
+            $parsedChanges[] = [$range, $change['text']];
+        }
+
+        $text = $document->text();
+        foreach ($parsedChanges as [$range, $replacement]) {
             $text = null === $range
-                ? $change['text']
-                : $this->positionConverter->applyChange($text, $range, $change['text']);
+                ? $replacement
+                : $this->positionConverter->applyChange($text, $range, $replacement);
         }
 
         $this->documentStore->update($textDocument['uri'], $textDocument['version'], $text);

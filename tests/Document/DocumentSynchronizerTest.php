@@ -41,6 +41,51 @@ final class DocumentSynchronizerTest extends TestCase
         self::assertNull($store->get($uri));
     }
 
+    public function testRejectsMalformedChangesWithoutUpdatingTheDocument(): void
+    {
+        $store = new DocumentStore();
+        $synchronizer = $this->synchronizer($store);
+        $uri = 'file:///workspace/src/Controller.php';
+        $synchronizer->open(['textDocument' => [
+            'uri' => $uri,
+            'languageId' => 'php',
+            'version' => 1,
+            'text' => 'original',
+        ]]);
+
+        $synchronizer->change([
+            'textDocument' => ['uri' => $uri, 'version' => 2],
+            'contentChanges' => [
+                ['text' => 'first'],
+                ['range' => ['start' => ['line' => 0]], 'text' => 'second'],
+            ],
+        ]);
+
+        self::assertSame(1, $store->get($uri)?->version());
+        self::assertSame('original', $store->get($uri)?->text());
+    }
+
+    public function testRejectsAnExplicitNullRange(): void
+    {
+        $store = new DocumentStore();
+        $synchronizer = $this->synchronizer($store);
+        $uri = 'file:///workspace/src/Controller.php';
+        $synchronizer->open(['textDocument' => [
+            'uri' => $uri,
+            'languageId' => 'php',
+            'version' => 1,
+            'text' => 'original',
+        ]]);
+
+        $synchronizer->change([
+            'textDocument' => ['uri' => $uri, 'version' => 2],
+            'contentChanges' => [['range' => null, 'text' => 'replacement']],
+        ]);
+
+        self::assertSame(1, $store->get($uri)?->version());
+        self::assertSame('original', $store->get($uri)?->text());
+    }
+
     public function testNormalizesTwigFilesReportedAsHtml(): void
     {
         $store = new DocumentStore();
