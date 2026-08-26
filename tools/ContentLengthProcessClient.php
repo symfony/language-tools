@@ -85,8 +85,9 @@ final class ContentLengthProcessClient
             }
             $input = $pipes[0];
             stream_set_blocking($input, false);
-            $output = fopen($outputPath, 'r');
-            $error = fopen($errorPath, 'r');
+            $readMode = 'r'.('Windows' === \PHP_OS_FAMILY ? 'b' : '');
+            $output = fopen($outputPath, $readMode);
+            $error = fopen($errorPath, $readMode);
             if (false === $output || false === $error) {
                 throw new \RuntimeException('Unable to open the process output files.');
             }
@@ -110,7 +111,6 @@ final class ContentLengthProcessClient
             \is_resource($socket) && fclose($socket);
             \is_resource($input) && fclose($input);
             \is_resource($output) && fclose($output);
-            \is_resource($error) && fclose($error);
             if (\is_resource($process)) {
                 proc_terminate($process);
                 $deadline = microtime(true) + self::TERMINATION_GRACE_SECONDS;
@@ -124,10 +124,12 @@ final class ContentLengthProcessClient
                 $status['running'] && proc_terminate($process, 9);
                 proc_close($process);
             }
+            $errorOutput = \is_resource($error) ? (string) stream_get_contents($error) : '';
+            \is_resource($error) && fclose($error);
             @unlink($outputPath);
             @unlink($errorPath);
 
-            throw $exception;
+            throw new \RuntimeException($exception->getMessage().('' === $errorOutput ? '' : "\nProcess error output:\n".$errorOutput), 0, $exception);
         } finally {
             \is_resource($listener) && fclose($listener);
         }
