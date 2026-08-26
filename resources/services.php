@@ -85,6 +85,8 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_iterator;
 
 return static function (ContainerConfigurator $container): void {
+    $container->parameters()->set('runtime.default_php_command', ['php']);
+
     $services = $container->services();
     $services->defaults()
         ->autowire()
@@ -92,6 +94,7 @@ return static function (ContainerConfigurator $container): void {
         ->bind('$serverVersion', param('server.version'))
         ->bind('$version', param('server.version'))
         ->bind('$bridgeSource', param('bridge.source'))
+        ->bind('$defaultPhpCommand', param('runtime.default_php_command'))
     ;
 
     $providerTags = [

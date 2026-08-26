@@ -23,6 +23,45 @@ its directory to ``PATH`` or invoke it by its full path:
 
 To build the executable yourself, follow the `source installation guide`_.
 
+Using Symfony CLI
+-----------------
+
+Symfony CLI can manage the standalone executable and run the checker for the
+current project:
+
+.. code-block:: terminal
+
+    $ symfony lsp:check
+
+This integration requires Symfony Language Tools 0.17.0 or newer. Symfony CLI
+selects the latest stable release for the current platform, verifies it against
+``SHA256SUMS`` and keeps the complete distribution in its own cache. It checks
+for a newer stable release at most once every 24 hours, with the same behavior
+in interactive shells and non-interactive automation. When the release service
+is unavailable or an update can't be verified and installed safely, it reuses a
+compatible cached executable. If no cached copy is available, the Symfony CLI
+wrapper fails before the checker starts.
+
+Display the managed cache location with:
+
+.. code-block:: terminal
+
+    $ symfony lsp:cache-dir
+
+When Symfony CLI starts the checker, its project-aware ``symfony php`` behavior
+becomes the default PHP command. This lets runtime analysis follow the PHP
+version and configuration selected for the project. An explicit ``phpCommand``
+in ``.symfony-lsp.json``, editor initialization settings or
+``symfony-lsp check --php-command`` remains authoritative and replaces this
+fallback.
+
+Source-only checks don't execute the project or invoke the configured PHP
+command:
+
+.. code-block:: terminal
+
+    $ symfony lsp:check --source-only
+
 Running a Check
 ---------------
 
@@ -109,10 +148,13 @@ notifications, but don't upload reports from exit status ``11`` or ``12``
 because their result set may be incomplete.
 
 Standard output contains only the selected report format. Operational details
-go to standard error. Add ``--verbose`` to human output to show sanitized
-exception classes and messages. GitHub annotations remain generic. Once JSON or
-SARIF is selected successfully, later invocation, configuration, indexing and
-internal failures still produce a valid structured report.
+go to standard error. The Symfony CLI wrapper also keeps release-management
+and cache messages on standard error, so JSON, GitHub Actions and SARIF output
+remain safe to pipe from standard output. Add ``--verbose`` to human output to
+show sanitized exception classes and messages. GitHub annotations remain
+generic.
+Once JSON or SARIF is selected successfully, later invocation, configuration,
+indexing and internal failures still produce a valid structured report.
 
 Selecting Blocking Diagnostics
 ------------------------------
@@ -182,9 +224,14 @@ The exit statuses are stable automation contracts:
 
 Operational failure takes precedence over diagnostic findings. A partial report
 can contain diagnostics from completed projects and successful providers. If one
-provider fails for a file, the remaining providers continue and their
-findings stay in the report. ``complete`` remains ``false`` and the exit status
-is ``12``.
+provider fails for a file, the remaining providers continue and their findings
+stay in the report. ``complete`` remains ``false`` and the exit status is
+``12``.
+
+When you run ``symfony lsp:check``, Symfony CLI forwards these checker statuses.
+A failure to select, download, verify or start the managed executable exits with
+status ``1`` instead: the checker didn't run, so no checker status or report was
+produced.
 
 Caching and Privacy
 -------------------
@@ -203,6 +250,11 @@ CI can cache ``var/symfony-lsp/`` by project revision, platform and Symfony
 Language Tools version. Don't publish it as a build artifact or share it between
 untrusted projects. Treat the application's Symfony cache according to the same
 policy you use when running its console and tests.
+
+When CI uses Symfony CLI, it can also cache the directory printed by
+``symfony lsp:cache-dir`` by operating system and architecture. A restored
+compatible installation can be used without network access; Symfony CLI still
+applies its normal latest-stable update policy when the cache is online.
 
 Reports and baselines can contain diagnostic messages and application names,
 but not parameter values, environment values, credentials or resolved secrets.

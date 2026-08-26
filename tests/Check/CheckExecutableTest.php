@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Check\CheckCommand;
+use Symfony\Lsp\Server\ServerVersion;
 
 use function Amp\async;
 use function Amp\ByteStream\buffer;
@@ -53,6 +54,47 @@ final class CheckExecutableTest extends TestCase
         self::assertSame(10, CheckCommand::EXIT_DIAGNOSTICS);
         self::assertSame(11, CheckCommand::EXIT_INVOCATION);
         self::assertSame(12, CheckCommand::EXIT_OPERATIONAL);
+    }
+
+    public function testReportsTheExactVersionContract(): void
+    {
+        $result = $this->execute(['--version']);
+
+        self::assertSame(0, $result['exitCode'], $result['stderr']);
+        self::assertSame('Symfony Language Tools '.(new ServerVersion())->value()."\n", $result['stdout']);
+        self::assertSame('', $result['stderr']);
+    }
+
+    public function testRejectsUnknownTopLevelCommands(): void
+    {
+        $result = $this->execute(['unknown-command']);
+
+        self::assertSame(CheckCommand::EXIT_INVOCATION, $result['exitCode']);
+        self::assertSame('', $result['stdout']);
+        self::assertSame("Unknown command \"unknown-command\".\n", $result['stderr']);
+    }
+
+    public function testUsesTheSymfonyCliAsTheDefaultPhpCommand(): void
+    {
+        if ('Windows' === \PHP_OS_FAMILY) {
+            self::markTestSkipped('The source executable integration requires Unix executable scripts.');
+        }
+
+        $marker = $this->directory.'/symfony-cli-command.json';
+        $symfonyCli = $this->directory.'/symfony';
+        file_put_contents($symfonyCli, "#!/usr/bin/env php\n<?php\nfile_put_contents(".var_export($marker, true).", json_encode(array_slice(\$argv, 1), JSON_THROW_ON_ERROR));\nexit(1);\n");
+        chmod($symfonyCli, 0700);
+
+        $result = $this->execute(
+            ['check', '--format=json', '--workspace='.$this->directory],
+            ['SYMFONY_LSP_SYMFONY_CLI' => $symfonyCli],
+        );
+        /** @var list<string> $command */
+        $command = json_decode((string) file_get_contents($marker), true, flags: \JSON_THROW_ON_ERROR);
+
+        self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode']);
+        self::assertSame('php', $command[0]);
+        self::assertStringEndsWith('/bridge.php', str_replace('\\', '/', $command[1]));
     }
 
     public function testReportsSavedFileDiagnosticsWithoutAnLspClient(): void
@@ -426,17 +468,19 @@ final class CheckExecutableTest extends TestCase
     }
 
     /**
-     * @param list<string> $arguments
+     * @param list<string>          $arguments
+     * @param array<string, string> $environment
      *
      * @return array{stdout: string, stderr: string, exitCode: int}
      */
-    private function execute(array $arguments): array
+    private function execute(array $arguments, array $environment = []): array
     {
         $root = \dirname(__DIR__, 2);
+        $inheritedEnvironment = getenv();
         $process = Process::start(
             [Path::join($root, 'bin/symfony-lsp'), ...$arguments],
             workingDirectory: $root,
-            environment: getenv(),
+            environment: [...$inheritedEnvironment, ...$environment],
             options: ['bypass_shell' => true],
         );
         $futures = [

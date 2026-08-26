@@ -25,9 +25,14 @@ final class LanguageServerFactory
 {
     private readonly ServerVersion $serverVersion;
 
-    public function __construct(?ServerVersion $serverVersion = null)
+    /** @var array<array-key, mixed> */
+    private readonly array $defaultPhpCommand;
+
+    /** @param array<array-key, mixed> $defaultPhpCommand */
+    public function __construct(?ServerVersion $serverVersion = null, array $defaultPhpCommand = ['php'])
     {
         $this->serverVersion = $serverVersion ?? new ServerVersion();
+        $this->defaultPhpCommand = $defaultPhpCommand;
     }
 
     public function create(ReadableStream $input, WritableStream $output, ?WritableStream $errorOutput = null): LanguageServer
@@ -79,6 +84,7 @@ final class LanguageServerFactory
         $container->setParameter('bridge.source', Path::join($resources, 'bridge.php'));
         $loader = new PhpFileLoader($container, new FileLocator($resources));
         $loader->load('services.php');
+        $container->setParameter('runtime.default_php_command', $this->defaultPhpCommand);
 
         return $container;
     }

@@ -1,6 +1,7 @@
 #!/usr/bin/env php
 <?php
 
+use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Check\CheckCommand;
 use Symfony\Lsp\Check\CheckOutputWriter;
 use Symfony\Lsp\Server\LanguageServerFactory;
@@ -41,6 +42,12 @@ if (in_array($argv[1] ?? null, ['--help', '-h'], true)) {
     exit(0);
 }
 
+$command = $argv[1] ?? null;
+if (null !== $command && 'check' !== $command && 1 !== preg_match('/^--socket=\d+$/D', $command)) {
+    fwrite(\STDERR, \sprintf('Unknown command "%s".%s', $command, \PHP_EOL));
+    exit(CheckCommand::EXIT_INVOCATION);
+}
+
 if (!function_exists('symfony_lsp_tree_sitter_parse')) {
     $extension = dirname(__DIR__).'/var/build/tree_sitter/modules/symfony_lsp_tree_sitter.so';
     if (is_file($extension) && function_exists('pcntl_exec')) {
@@ -49,8 +56,13 @@ if (!function_exists('symfony_lsp_tree_sitter_parse')) {
 }
 
 $errorOutput = getStderr();
-$factory = new LanguageServerFactory();
-if ('check' === ($argv[1] ?? null)) {
+$defaultPhpCommand = ['php'];
+$symfonyCli = getenv('SYMFONY_LSP_SYMFONY_CLI');
+if (false !== $symfonyCli && '' !== $symfonyCli && Path::isAbsolute($symfonyCli)) {
+    $defaultPhpCommand = [$symfonyCli, 'php'];
+}
+$factory = new LanguageServerFactory(defaultPhpCommand: $defaultPhpCommand);
+if ('check' === $command) {
     $execution = $factory->createCheck($errorOutput)->run(array_values(array_slice($argv, 2)));
     $writer = new CheckOutputWriter();
     if (!$writer->write(\STDOUT, $execution->stdout)) {

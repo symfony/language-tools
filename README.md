@@ -83,14 +83,15 @@ for supported platforms, checksum verification and source installation.
 ## Continuous Integration
 
 Run Symfony diagnostics against saved project files without an editor or LSP
-client:
+client. Symfony CLI manages and caches the latest stable compatible executable:
 
 ```console
-symfony-lsp check
+symfony lsp:check
 ```
 
-The checker supports deterministic human, JSON, GitHub Actions and SARIF
-output, code-based failure policies, source-only analysis and
+You can also invoke a standalone installation directly with
+`symfony-lsp check`. The checker supports deterministic human, JSON, GitHub
+Actions and SARIF output, code-based failure policies, source-only analysis and
 occurrence-specific baselines. Running it with runtime indexing enabled executes
 application code.
 See the [headless diagnostics guide](docs/features/headless-diagnostics.rst) for

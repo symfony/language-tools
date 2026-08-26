@@ -42,7 +42,9 @@ These settings can be configured globally or for one project:
 
 The defaults are automatic project discovery, ``["php"]``, no container
 project root, the ``dev`` environment, debug and runtime indexing enabled, a
-300-second timeout and missing-translation diagnostics disabled.
+300-second timeout and missing-translation diagnostics disabled. When a
+compatible Symfony CLI starts the server or checker, its project-aware
+``symfony php`` command becomes the lower-precedence PHP default.
 
 Configuring Multiple Projects
 -----------------------------

@@ -51,6 +51,47 @@ final class ProjectSettingsTest extends TestCase
         ], $client->params);
     }
 
+    public function testPhpCommandSettingsOverrideTheSymfonyCliDefault(): void
+    {
+        $directory = sys_get_temp_dir().'/symfony-lsp-project-settings-'.bin2hex(random_bytes(6));
+        mkdir($directory);
+        try {
+            file_put_contents($directory.'/.symfony-lsp.json', json_encode([
+                'version' => 1,
+                'phpCommand' => ['project-php'],
+            ], \JSON_THROW_ON_ERROR));
+            $projects = new ProjectRegistry();
+            $projects->replace([$project = new Project($directory, 'file://'.$directory, '^8.0')]);
+            $runtime = new RuntimeConfiguration(defaultPhpCommand: ['/usr/local/bin/symfony', 'php']);
+            $analysisSettings = new AnalysisSettings();
+            $projectConfiguration = new ProjectConfiguration(new UriToPathConverter(), $analysisSettings);
+            $projectConfiguration->load([['uri' => 'file://'.$directory]]);
+            $settings = new ProjectSettings(
+                new ProjectSettingsClient([]),
+                $projects,
+                new TranslationConfigurationRegistry(),
+                $runtime,
+                $projectConfiguration,
+                new ProjectFileScopeRegistry(),
+                $analysisSettings,
+            );
+
+            self::assertSame(['/usr/local/bin/symfony', 'php'], $runtime->phpCommand($project));
+
+            $settings->applyFileSettings();
+            self::assertSame(['project-php'], $runtime->phpCommand($project));
+
+            $runtime->configure(['phpCommand' => ['initialization-php']]);
+            $settings->applyFileSettings();
+            self::assertSame(['initialization-php'], $runtime->phpCommand($project));
+
+            $settings->applyFileSettings(['phpCommand' => ['command-line-php']]);
+            self::assertSame(['command-line-php'], $runtime->phpCommand($project));
+        } finally {
+            (new Filesystem())->remove($directory);
+        }
+    }
+
     public function testResourceSettingsOverrideInitializationAndCheckedInSettings(): void
     {
         $directory = sys_get_temp_dir().'/symfony-lsp-project-settings-'.bin2hex(random_bytes(6));

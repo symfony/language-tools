@@ -10,6 +10,7 @@ $deadlineSeconds = (float) (getenv('SYMFONY_LSP_SMOKE_DEADLINE') ?: 60);
 define('READ_DEADLINE_SECONDS', $deadlineSeconds);
 define('SMOKE_TEST_START', microtime(true));
 define('CHECK_DIAGNOSTICS_EXIT', 10);
+define('INVOCATION_EXIT', 11);
 
 function progress(string $message): void
 {
@@ -17,22 +18,22 @@ function progress(string $message): void
     fflush(\STDOUT);
 }
 
-function checkSavedDiagnostics(string $server, ?string $expectedVersion): void
+/**
+ * @param list<string> $command
+ *
+ * @return array{exitCode: int, stdout: string, stderr: string}
+ */
+function executeServerCommand(array $command): array
 {
-    $directory = sys_get_temp_dir().'/symfony-lsp-smoke-'.bin2hex(random_bytes(6));
-    $outputPath = tempnam(sys_get_temp_dir(), 'lsp-check-out-');
-    $errorPath = tempnam(sys_get_temp_dir(), 'lsp-check-err-');
+    $outputPath = tempnam(sys_get_temp_dir(), 'lsp-command-out-');
+    $errorPath = tempnam(sys_get_temp_dir(), 'lsp-command-err-');
     if (false === $outputPath || false === $errorPath) {
-        throw new RuntimeException('Unable to create the diagnostics smoke test output files.');
+        throw new RuntimeException('Unable to create the command smoke test output files.');
     }
-    mkdir($directory.'/config', 0777, true);
-    file_put_contents($directory.'/composer.json', '{"type":"project","require":{"symfony/framework-bundle":"^8.0"}}');
-    file_put_contents($directory.'/config/services.yaml', "parameters:\n    broken: '%env(APP_SECRET%'\n");
 
     try {
-        progress('Starting the headless diagnostics check');
         $process = proc_open(
-            [$server, 'check', '--source-only', '--format=json', '--workspace='.$directory],
+            $command,
             [
                 ['file', 'Windows' === \PHP_OS_FAMILY ? 'NUL' : '/dev/null', 'r'],
                 ['file', $outputPath, 'w'],
@@ -42,15 +43,57 @@ function checkSavedDiagnostics(string $server, ?string $expectedVersion): void
             options: ['bypass_shell' => true],
         );
         if (!is_resource($process)) {
-            throw new RuntimeException('Unable to start the headless diagnostics check.');
+            throw new RuntimeException('Unable to start the command smoke test.');
         }
-        $status = proc_close($process);
-        $stdout = (string) file_get_contents($outputPath);
-        $stderr = (string) file_get_contents($errorPath);
-        if (CHECK_DIAGNOSTICS_EXIT !== $status) {
-            throw new RuntimeException('The headless diagnostics check exited with status '.$status.":\n".$stderr);
+
+        return [
+            'exitCode' => proc_close($process),
+            'stdout' => (string) file_get_contents($outputPath),
+            'stderr' => (string) file_get_contents($errorPath),
+        ];
+    } finally {
+        @unlink($outputPath);
+        @unlink($errorPath);
+    }
+}
+
+function checkCommandDispatch(string $server, ?string $expectedVersion): void
+{
+    progress('Checking executable command dispatch');
+    $version = executeServerCommand([$server, '--version']);
+    $expectedOutput = null === $expectedVersion ? null : 'Symfony Language Tools '.$expectedVersion."\n";
+    if (0 !== $version['exitCode']
+        || '' !== $version['stderr']
+        || (null !== $expectedOutput && $expectedOutput !== $version['stdout'])
+        || (null === $expectedOutput && 1 !== preg_match('/^Symfony Language Tools (?:dev|\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\n$/D', $version['stdout']))
+    ) {
+        throw new RuntimeException('The executable returned an unexpected version contract.');
+    }
+
+    $unknown = executeServerCommand([$server, 'unknown-command']);
+    if (INVOCATION_EXIT !== $unknown['exitCode']
+        || '' !== $unknown['stdout']
+        || "Unknown command \"unknown-command\".\n" !== $unknown['stderr']
+    ) {
+        throw new RuntimeException('The executable accepted an unknown top-level command.');
+    }
+    progress('Executable command dispatch passed');
+}
+
+function checkSavedDiagnostics(string $server, ?string $expectedVersion): void
+{
+    $directory = sys_get_temp_dir().'/symfony-lsp-smoke-'.bin2hex(random_bytes(6));
+    mkdir($directory.'/config', 0777, true);
+    file_put_contents($directory.'/composer.json', '{"type":"project","require":{"symfony/framework-bundle":"^8.0"}}');
+    file_put_contents($directory.'/config/services.yaml', "parameters:\n    broken: '%env(APP_SECRET%'\n");
+
+    try {
+        progress('Starting the headless diagnostics check');
+        $execution = executeServerCommand([$server, 'check', '--source-only', '--format=json', '--workspace='.$directory]);
+        if (CHECK_DIAGNOSTICS_EXIT !== $execution['exitCode']) {
+            throw new RuntimeException('The headless diagnostics check exited with status '.$execution['exitCode'].":\n".$execution['stderr']);
         }
-        $report = json_decode($stdout, true, flags: \JSON_THROW_ON_ERROR);
+        $report = json_decode($execution['stdout'], true, flags: \JSON_THROW_ON_ERROR);
         if (!is_array($report)
             || true !== ($report['complete'] ?? null)
             || 'env.malformed_chain' !== ($report['diagnostics'][0]['code'] ?? null)
@@ -63,8 +106,6 @@ function checkSavedDiagnostics(string $server, ?string $expectedVersion): void
         progress('Headless diagnostics check passed');
     } finally {
         removeTree($directory);
-        @unlink($outputPath);
-        @unlink($errorPath);
     }
 }
 
@@ -92,6 +133,8 @@ if (!isset($arguments[0])) {
     fwrite(\STDERR, "Usage: smoke-test-server [--socket] <server> [expected-version]\n");
     exit(2);
 }
+
+checkCommandDispatch($arguments[0], $arguments[1] ?? null);
 
 progress('Starting Symfony Language Tools');
 $connection = new ContentLengthProcessClient([$arguments[0]], READ_DEADLINE_SECONDS, socketMode: $socketMode);

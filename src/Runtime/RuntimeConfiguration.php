@@ -19,9 +19,20 @@ final class RuntimeConfiguration implements ProjectStateInterface
 
     private readonly AnalysisSettings $analysisSettings;
 
-    public function __construct(?AnalysisSettings $analysisSettings = null)
+    /** @var non-empty-list<string> */
+    private readonly array $defaultPhpCommand;
+
+    /** @param array<array-key, mixed> $defaultPhpCommand */
+    public function __construct(?AnalysisSettings $analysisSettings = null, array $defaultPhpCommand = ['php'])
     {
         $this->analysisSettings = $analysisSettings ?? new AnalysisSettings();
+        $settings = $this->analysisSettings->normalizeProject(
+            ['phpCommand' => $defaultPhpCommand],
+            context: 'default runtime',
+        );
+        /** @var non-empty-list<string> $validatedDefaultPhpCommand */
+        $validatedDefaultPhpCommand = $settings['phpCommand'];
+        $this->defaultPhpCommand = $validatedDefaultPhpCommand;
     }
 
     /** @param array<array-key, mixed> $initializationOptions */
@@ -75,13 +86,13 @@ final class RuntimeConfiguration implements ProjectStateInterface
     /** @return non-empty-list<string> */
     public function phpCommand(?Project $project = null): array
     {
-        $command = $this->setting($project, 'phpCommand', ['php']);
+        $command = $this->setting($project, 'phpCommand', $this->defaultPhpCommand);
         if (!\is_array($command) || [] === $command || !array_is_list($command)) {
-            return ['php'];
+            return $this->defaultPhpCommand;
         }
         foreach ($command as $argument) {
             if (!\is_string($argument) || '' === $argument) {
-                return ['php'];
+                return $this->defaultPhpCommand;
             }
         }
 

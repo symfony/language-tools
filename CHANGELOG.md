@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Integrate headless diagnostics with Symfony CLI project-aware PHP defaults
 - Find Twig function and filter usages from PHP declarations
 - Validate and complete Console input argument and option names
 - Restore persisted runtime metadata when the application cannot boot
