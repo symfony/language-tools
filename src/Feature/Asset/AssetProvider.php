@@ -2,10 +2,8 @@
 
 namespace Symfony\Lsp\Feature\Asset;
 
-use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
@@ -218,7 +216,7 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         }
         $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
         foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->symbols() as $symbol) {
-            if ($this->contains($request->document, $symbol->range(), $offset)) {
+            if ($this->converter->containsByteOffset($request->document->text(), $symbol->range(), $offset, inclusiveEnd: true)) {
                 return [$symbol, $request->project];
             }
         }
@@ -241,11 +239,5 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         }
 
         return null;
-    }
-
-    private function contains(Document $document, Range $range, int $offset): bool
-    {
-        return $offset >= $this->converter->toByteOffset($document->text(), $range->start())
-            && $offset <= $this->converter->toByteOffset($document->text(), $range->end());
     }
 }

@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 
 final class DependencyInjectionSymbolResolver
 {
@@ -21,7 +20,7 @@ final class DependencyInjectionSymbolResolver
         if ('yaml' === $languageId) {
             $facts = $this->yamlExtractor->extract($uri, $text);
             foreach ($facts->services() as $declaration) {
-                if ($this->contains($text, $declaration->range(), $offset)) {
+                if ($this->positionConverter->containsByteOffset($text, $declaration->range(), $offset, inclusiveEnd: true)) {
                     return new DependencyInjectionSymbol(
                         DependencyInjectionSymbolKind::Service,
                         $declaration->id(),
@@ -30,7 +29,7 @@ final class DependencyInjectionSymbolResolver
                 }
             }
             foreach ($facts->parameters() as $declaration) {
-                if ($this->contains($text, $declaration->range(), $offset)) {
+                if ($this->positionConverter->containsByteOffset($text, $declaration->range(), $offset, inclusiveEnd: true)) {
                     return new DependencyInjectionSymbol(
                         DependencyInjectionSymbolKind::Parameter,
                         $declaration->name(),
@@ -46,7 +45,7 @@ final class DependencyInjectionSymbolResolver
         }
 
         foreach ($references as $reference) {
-            if ($this->contains($text, $reference->range(), $offset)) {
+            if ($this->positionConverter->containsByteOffset($text, $reference->range(), $offset, inclusiveEnd: true)) {
                 return new DependencyInjectionSymbol(
                     $reference->kind(),
                     $reference->name(),
@@ -56,11 +55,5 @@ final class DependencyInjectionSymbolResolver
         }
 
         return null;
-    }
-
-    private function contains(string $text, Range $range, int $offset): bool
-    {
-        return $offset >= $this->positionConverter->toByteOffset($text, $range->start())
-            && $offset <= $this->positionConverter->toByteOffset($text, $range->end());
     }
 }

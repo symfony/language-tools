@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
-use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
@@ -112,17 +111,11 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
         }
         $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
         foreach ($this->extractor->extract($request->project, $request->document->uri(), $request->document->languageId(), $request->document->text())->events() as $event) {
-            if ($this->contains($request->document, $event->range(), $offset)) {
+            if ($this->converter->containsByteOffset($request->document->text(), $event->range(), $offset, inclusiveEnd: true)) {
                 return [$event, $request->project];
             }
         }
 
         return null;
-    }
-
-    private function contains(Document $document, Range $range, int $offset): bool
-    {
-        return $offset >= $this->converter->toByteOffset($document->text(), $range->start())
-            && $offset <= $this->converter->toByteOffset($document->text(), $range->end());
     }
 }

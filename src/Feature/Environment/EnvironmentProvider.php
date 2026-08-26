@@ -176,22 +176,17 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
         $facts = $this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text());
         foreach ($facts->declarations() as $declaration) {
-            if ($this->contains($request->document->text(), $declaration->range(), $offset)) {
+            if ($this->converter->containsByteOffset($request->document->text(), $declaration->range(), $offset, inclusiveEnd: true)) {
                 return [new EnvironmentReference($declaration->name(), $request->document->uri(), $declaration->range(), []), $request->project];
             }
         }
         foreach ($facts->references() as $reference) {
-            if ($this->contains($request->document->text(), $reference->range(), $offset)) {
+            if ($this->converter->containsByteOffset($request->document->text(), $reference->range(), $offset, inclusiveEnd: true)) {
                 return [$reference, $request->project];
             }
         }
 
         return null;
-    }
-
-    private function contains(string $text, Range $range, int $offset): bool
-    {
-        return $offset >= $this->converter->toByteOffset($text, $range->start()) && $offset <= $this->converter->toByteOffset($text, $range->end());
     }
 
     /** @return array<array-key, mixed> */

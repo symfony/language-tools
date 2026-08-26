@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Feature\Metadata;
 
-use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
@@ -29,7 +28,7 @@ final class FormMetadataProvider implements DiagnosticProviderInterface, HoverPr
         }
         $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
         foreach ($this->extractor->formOptions($request->document->text()) as $option) {
-            if (!$this->contains($request->document, $option['range'], $offset)) {
+            if (!$this->converter->containsByteOffset($request->document->text(), $option['range'], $offset, inclusiveEnd: true)) {
                 continue;
             }
             $type = $this->indexes->forProject($request->project)->formType($option['class']);
@@ -65,12 +64,6 @@ final class FormMetadataProvider implements DiagnosticProviderInterface, HoverPr
         }
 
         return $diagnostics;
-    }
-
-    private function contains(Document $document, Range $range, int $offset): bool
-    {
-        return $offset >= $this->converter->toByteOffset($document->text(), $range->start())
-            && $offset <= $this->converter->toByteOffset($document->text(), $range->end());
     }
 
     /** @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, severity: int, source: string, code: string, message: string} */

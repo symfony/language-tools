@@ -48,7 +48,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         $line = substr($before, $lineStart);
         $index = $this->indexes->forProject($project);
         foreach ($this->yaml->parse($document->text(), $index) as $occurrence) {
-            if (!$this->contains($document->text(), $occurrence->valueRange(), $offset)) {
+            if (!$this->converter->containsByteOffset($document->text(), $occurrence->valueRange(), $offset, inclusiveEnd: true)) {
                 continue;
             }
             $node = $index->find($occurrence->path(), $occurrence->sequenceDepths(), $occurrence->literalDepths());
@@ -215,11 +215,6 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
     private function shortDescription(ConfigurationNode $node): string
     {
         return $node->type().(null !== $node->info() ? ' - '.$node->info() : '');
-    }
-
-    private function contains(string $text, Range $range, int $offset): bool
-    {
-        return $offset >= $this->converter->toByteOffset($text, $range->start()) && $offset <= $this->converter->toByteOffset($text, $range->end());
     }
 
     /** @return array<array-key, mixed> */

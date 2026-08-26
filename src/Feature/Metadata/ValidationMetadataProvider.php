@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Feature\Metadata;
 
-use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
@@ -32,7 +31,7 @@ final class ValidationMetadataProvider implements DiagnosticProviderInterface, H
             ? $this->extractor->yamlConstraintOptions($request->document->text())
             : $this->extractor->constraintOptions($request->document->text());
         foreach ($constraintOptions as $option) {
-            if (!$this->contains($request->document, $option['range'], $offset)) {
+            if (!$this->converter->containsByteOffset($request->document->text(), $option['range'], $offset, inclusiveEnd: true)) {
                 continue;
             }
             $constraint = $this->indexes->forProject($request->project)->constraint($option['constraint']);
@@ -67,12 +66,6 @@ final class ValidationMetadataProvider implements DiagnosticProviderInterface, H
         }
 
         return $diagnostics;
-    }
-
-    private function contains(Document $document, Range $range, int $offset): bool
-    {
-        return $offset >= $this->converter->toByteOffset($document->text(), $range->start())
-            && $offset <= $this->converter->toByteOffset($document->text(), $range->end());
     }
 
     /** @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, severity: int, source: string, code: string, message: string} */

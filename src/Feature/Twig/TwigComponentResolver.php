@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Project\Project;
 
 final class TwigComponentResolver
@@ -116,7 +115,7 @@ final class TwigComponentResolver
         $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
         $facts = $this->extractor->extract($request->project, $request->document->uri(), $request->document->languageId(), $request->document->text());
         foreach ($facts->actionReferences() as $reference) {
-            if (!$this->contains($request->document->text(), $reference->range(), $offset)) {
+            if (!$this->converter->containsByteOffset($request->document->text(), $reference->range(), $offset, inclusiveEnd: true)) {
                 continue;
             }
             $component = $this->indexes->forProject($request->project)->get($reference->component());
@@ -131,7 +130,7 @@ final class TwigComponentResolver
         }
         foreach ($facts->components() as $component) {
             foreach ($component->actions() as $action) {
-                if ($this->contains($request->document->text(), $action->range(), $offset)) {
+                if ($this->converter->containsByteOffset($request->document->text(), $action->range(), $offset, inclusiveEnd: true)) {
                     return [$this->indexes->forProject($request->project)->get($component->name()) ?? $component, $action, $request->project];
                 }
             }
@@ -154,14 +153,14 @@ final class TwigComponentResolver
         $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
         $facts = $this->extractor->extract($request->project, $request->document->uri(), $request->document->languageId(), $request->document->text());
         foreach ($facts->references() as $reference) {
-            if ($this->contains($request->document->text(), $reference->range(), $offset)) {
+            if ($this->converter->containsByteOffset($request->document->text(), $reference->range(), $offset, inclusiveEnd: true)) {
                 $component = $this->indexes->forProject($request->project)->get($reference->name());
 
                 return null === $component ? null : [$component, $request->project];
             }
         }
         foreach ($facts->components() as $component) {
-            if ($this->contains($request->document->text(), $component->range(), $offset)) {
+            if ($this->converter->containsByteOffset($request->document->text(), $component->range(), $offset, inclusiveEnd: true)) {
                 return [$this->indexes->forProject($request->project)->get($component->name()) ?? $component, $request->project];
             }
         }
@@ -180,10 +179,5 @@ final class TwigComponentResolver
         }
 
         return null;
-    }
-
-    private function contains(string $text, Range $range, int $offset): bool
-    {
-        return $offset >= $this->converter->toByteOffset($text, $range->start()) && $offset <= $this->converter->toByteOffset($text, $range->end());
     }
 }

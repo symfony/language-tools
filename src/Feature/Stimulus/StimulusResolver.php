@@ -2,10 +2,8 @@
 
 namespace Symfony\Lsp\Feature\Stimulus;
 
-use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -79,17 +77,17 @@ final class StimulusResolver
         $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
         $facts = $this->extractor->extract($request->project, $request->document->uri(), $request->document->languageId(), $request->document->text());
         foreach ($facts->references() as $reference) {
-            if ($this->contains($request->document, $reference->range(), $offset)) {
+            if ($this->converter->containsByteOffset($request->document->text(), $reference->range(), $offset, inclusiveEnd: true)) {
                 return [$reference, $request->project];
             }
         }
         foreach ($facts->declarations() as $declaration) {
             foreach ($declaration->members() as $member) {
-                if ($this->contains($request->document, $member->range(), $offset)) {
+                if ($this->converter->containsByteOffset($request->document->text(), $member->range(), $offset, inclusiveEnd: true)) {
                     return [new StimulusReference($declaration->name(), $member->kind(), $member->name(), $declaration->uri(), $member->range()), $request->project];
                 }
             }
-            if ($this->contains($request->document, $declaration->range(), $offset)) {
+            if ($this->converter->containsByteOffset($request->document->text(), $declaration->range(), $offset, inclusiveEnd: true)) {
                 return [new StimulusReference($declaration->name(), null, null, $declaration->uri(), $declaration->range()), $request->project];
             }
         }
@@ -114,11 +112,5 @@ final class StimulusResolver
         }
 
         return $locations;
-    }
-
-    private function contains(Document $document, Range $range, int $offset): bool
-    {
-        return $offset >= $this->converter->toByteOffset($document->text(), $range->start())
-            && $offset <= $this->converter->toByteOffset($document->text(), $range->end());
     }
 }

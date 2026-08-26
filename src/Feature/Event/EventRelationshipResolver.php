@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Feature\Event;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
@@ -37,13 +36,13 @@ final class EventRelationshipResolver
         }
         $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
         foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->symbols() as $symbol) {
-            if ($this->contains($request->document->text(), $symbol->range(), $offset)) {
+            if ($this->converter->containsByteOffset($request->document->text(), $symbol->range(), $offset, inclusiveEnd: true)) {
                 return [$symbol, null, $request->project];
             }
         }
         if ('php' === $request->document->languageId()) {
             foreach ($this->classExtractor->extract($request->document->uri(), $request->document->text()) as $class) {
-                if ($this->contains($request->document->text(), $class->range(), $offset)) {
+                if ($this->converter->containsByteOffset($request->document->text(), $class->range(), $offset, inclusiveEnd: true)) {
                     return [null, $class, $request->project];
                 }
             }
@@ -134,10 +133,5 @@ final class EventRelationshipResolver
         }
 
         return array_values($unique);
-    }
-
-    private function contains(string $text, Range $range, int $offset): bool
-    {
-        return $offset >= $this->converter->toByteOffset($text, $range->start()) && $offset <= $this->converter->toByteOffset($text, $range->end());
     }
 }

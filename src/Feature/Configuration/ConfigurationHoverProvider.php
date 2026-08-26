@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Feature\Configuration;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -42,7 +41,7 @@ final class ConfigurationHoverProvider implements HoverProviderInterface
             return null;
         }
         foreach ($this->yaml->parse($request->document->text(), $index) as $occurrence) {
-            if (!$this->contains($request->document->text(), $occurrence->keyRange(), $offset)) {
+            if (!$this->converter->containsByteOffset($request->document->text(), $occurrence->keyRange(), $offset, inclusiveEnd: true)) {
                 continue;
             }
             $node = $index->find($occurrence->path(), $occurrence->sequenceDepths(), $occurrence->literalDepths());
@@ -92,10 +91,5 @@ final class ConfigurationHoverProvider implements HoverProviderInterface
         }
 
         return implode("\n", $lines);
-    }
-
-    private function contains(string $text, Range $range, int $offset): bool
-    {
-        return $offset >= $this->converter->toByteOffset($text, $range->start()) && $offset <= $this->converter->toByteOffset($text, $range->end());
     }
 }

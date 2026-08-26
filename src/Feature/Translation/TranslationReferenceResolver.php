@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 
 final readonly class TranslationReferenceResolver
 {
@@ -27,7 +26,7 @@ final readonly class TranslationReferenceResolver
         $offset = $this->positions->toByteOffset($text, $request->position);
         $facts = $this->extractor->extract($request->document->uri(), $request->document->languageId(), $text);
         foreach ($facts->declarations() as $declaration) {
-            if ($this->contains($text, $declaration->range(), $offset)) {
+            if ($this->positions->containsByteOffset($text, $declaration->range(), $offset, inclusiveEnd: true)) {
                 return new ResolvedTranslationReference(
                     new TranslationReference(
                         $declaration->key(),
@@ -40,19 +39,11 @@ final readonly class TranslationReferenceResolver
             }
         }
         foreach ($facts->references() as $reference) {
-            if ($this->contains($text, $reference->range(), $offset)) {
+            if ($this->positions->containsByteOffset($text, $reference->range(), $offset, inclusiveEnd: true)) {
                 return new ResolvedTranslationReference($reference, $request->project);
             }
         }
 
         return null;
-    }
-
-    private function contains(string $text, Range $range, int $offset): bool
-    {
-        $start = $this->positions->toByteOffset($text, $range->start());
-        $end = $this->positions->toByteOffset($text, $range->end());
-
-        return $offset >= $start && $offset <= $end;
     }
 }
