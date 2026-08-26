@@ -116,6 +116,7 @@ return static function (ContainerConfigurator $container): void {
     $featureGroups = [
         'Route' => [],
         'DependencyInjection' => [],
+        'Console' => [],
         'Twig' => [
             TemplateCompletionHandler::class,
             TemplateNavigationProvider::class,

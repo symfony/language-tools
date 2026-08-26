@@ -41,6 +41,13 @@ Supported Integrations
       - Yes
       - Yes
       - Yes
+    * - `Console commands`_
+      - Yes
+      - No
+      - No
+      - No
+      - No
+      - Yes
     * - `Twig template names`_
       - Yes
       - Yes
@@ -211,6 +218,7 @@ If a runtime-backed feature returns no results, verify that:
 .. _`Docker support`: ../docker.rst
 .. _`Routing`: routing.rst
 .. _`Dependency injection`: dependency-injection.rst
+.. _`Console commands`: console.rst
 .. _`Twig template names`: templates.rst
 .. _`Twig functions and filters`: twig-callables.rst
 .. _`Translations`: translations.rst

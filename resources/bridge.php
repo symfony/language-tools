@@ -42,6 +42,7 @@ require __DIR__.'/bridge/sections/stimulus.php';
 require __DIR__.'/bridge/sections/configuration.php';
 require __DIR__.'/bridge/sections/doctrine.php';
 require __DIR__.'/bridge/sections/environment.php';
+require __DIR__.'/bridge/sections/console.php';
 
 $options = getopt('', ['project:', 'environment::', 'debug::', 'sections::', 'targeted-refresh::', 'rebuild-container::', 'configuration-generation::']);
 $project = $options['project'] ?? null;
@@ -128,6 +129,7 @@ foreach ($requestedSections as $sectionName) {
             'configuration' => symfonyLspBridgeConfigurationSection($context),
             'doctrine' => symfonyLspBridgeDoctrineSection($context),
             'environment' => symfonyLspBridgeEnvironmentSection($context),
+            'console' => symfonyLspBridgeConsoleSection($context),
             default => null,
         };
         if (is_array($section)) {

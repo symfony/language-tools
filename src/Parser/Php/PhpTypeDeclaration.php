@@ -35,6 +35,21 @@ final class PhpTypeDeclaration
         return $this->nameEndOffset;
     }
 
+    public function startOffset(): int
+    {
+        return $this->startOffset;
+    }
+
+    public function endOffset(): int
+    {
+        return $this->endOffset;
+    }
+
+    public function isClass(): bool
+    {
+        return $this->class;
+    }
+
     public function contains(int $offset): bool
     {
         return $this->class && $offset >= $this->startOffset && $offset <= $this->endOffset;

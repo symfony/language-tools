@@ -10,6 +10,8 @@ final class DiagnosticCodeRegistry
         'config.invalid_type',
         'config.malformed_structure',
         'config.unknown_key',
+        'console.unknown_argument',
+        'console.unknown_option',
         'env.incompatible_type',
         'env.malformed_chain',
         'env.unknown_processor',

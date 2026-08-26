@@ -86,7 +86,10 @@ final class CheckExecutableTest extends TestCase
         self::assertSame('config/services.yaml', $sarif['runs'][0]['results'][0]['locations'][0]['physicalLocation']['artifactLocation']['uri']);
         self::assertSame(CheckCommand::EXIT_SUCCESS, $codes['exitCode'], $codes['stderr']);
         self::assertSame([], $codeSarif['runs'][0]['results']);
-        self::assertContains('env.malformed_chain', array_column($codeSarif['runs'][0]['tool']['driver']['rules'], 'id'));
+        $listedCodes = array_column($codeSarif['runs'][0]['tool']['driver']['rules'], 'id');
+        self::assertContains('env.malformed_chain', $listedCodes);
+        self::assertContains('console.unknown_argument', $listedCodes);
+        self::assertContains('console.unknown_option', $listedCodes);
     }
 
     public function testExcludesConfiguredPathsUnlessTheyAreExplicitlySelected(): void

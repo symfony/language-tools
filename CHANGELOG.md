@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Validate and complete Console input argument and option names
 - Restore persisted runtime metadata when the application cannot boot
 - Recover interrupted source caches and verify content before restoring facts
 - Ignore commented PHP when extracting Metadata and Doctrine symbols

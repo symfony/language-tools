@@ -8,6 +8,7 @@ final class RuntimeRefreshPlanner
 {
     private const DOMAIN_SECTIONS = [
         'assets' => ['assets'],
+        'console' => ['console'],
         'dependencyInjection' => ['container'],
         'environment' => ['environment'],
         'events' => ['events', 'container'],

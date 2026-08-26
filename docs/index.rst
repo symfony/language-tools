@@ -38,9 +38,10 @@ Features
 --------
 
 Symfony Language Tools understands routing, dependency injection, Twig
-templates, translations, environment variables, bundle configuration, Messenger,
-events, security, form and validation metadata, AssetMapper, Stimulus and
-Doctrine. Each integration page documents its supported declarations,
+templates, translations, environment variables, bundle configuration, Console
+commands, Messenger, events, security, form and validation metadata,
+AssetMapper, Stimulus and Doctrine. Each integration page documents its
+supported declarations,
 references and editor features. See the `supported integrations`_
 for the complete feature matrix.
 

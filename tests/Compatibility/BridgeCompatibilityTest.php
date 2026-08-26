@@ -20,7 +20,7 @@ final class BridgeCompatibilityTest extends TestCase
             '--project='.$project,
             '--environment=test',
             '--debug=1',
-            '--sections=routes,container,twig,twig_components,translations,configuration,environment,messenger,events,security,assets,stimulus',
+            '--sections=routes,container,twig,twig_components,translations,configuration,environment,messenger,events,security,assets,stimulus,console',
             '--rebuild-container=1',
         ], $project);
 
@@ -48,6 +48,7 @@ final class BridgeCompatibilityTest extends TestCase
         $security = $this->section($result['sections'], 'security');
         $assets = $this->section($result['sections'], 'assets');
         $stimulus = $this->section($result['sections'], 'stimulus');
+        $console = $this->section($result['sections'], 'console');
 
         $routeItems = \is_array($routes['items'] ?? null) ? $routes['items'] : [];
         self::assertContains('fixture_home', array_column($routeItems, 'name'));
@@ -147,6 +148,18 @@ final class BridgeCompatibilityTest extends TestCase
         self::assertIsArray($stimulusTargets);
         self::assertContains('open', $stimulusActions);
         self::assertContains('results', $stimulusTargets);
+        $consoleCommands = \is_array($console['commands'] ?? null) ? $console['commands'] : [];
+        $fixtureCommands = array_values(array_filter($consoleCommands, static fn (mixed $command): bool => \is_array($command) && 'App\\Command\\FixtureCommand' === ($command['class'] ?? null)));
+        self::assertCount(1, $fixtureCommands);
+        $fixtureArguments = $fixtureCommands[0]['arguments'] ?? null;
+        $fixtureOptions = $fixtureCommands[0]['options'] ?? null;
+        self::assertIsArray($fixtureArguments);
+        self::assertIsArray($fixtureOptions);
+        self::assertContains('message', $fixtureArguments);
+        foreach (['env', 'format', 'help', 'no-debug', 'verbose'] as $option) {
+            self::assertContains($option, $fixtureOptions);
+        }
+        self::assertTrue($fixtureCommands[0]['complete'] ?? false);
     }
 
     public function testRealInvalidBundleConfiguration(): void
