@@ -31,6 +31,7 @@ use Symfony\Lsp\Project\WorkspaceTrustManager;
 use Symfony\Lsp\Runtime\DebouncedRuntimeRefreshScheduler;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
+use Symfony\Lsp\Runtime\RuntimeSnapshotState;
 
 final class ServiceConfigurationTest extends TestCase
 {
@@ -93,6 +94,7 @@ final class ServiceConfigurationTest extends TestCase
             ProjectIndexStatusRegistry::class,
             PublicAssetResolver::class,
             RuntimeConfiguration::class,
+            RuntimeSnapshotState::class,
             TranslationConfigurationRegistry::class,
             WorkspaceTrust::class,
             WorkspaceTrustManager::class,

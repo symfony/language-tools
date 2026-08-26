@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Restore persisted runtime metadata when the application cannot boot
 - Recover interrupted source caches and verify content before restoring facts
 - Ignore commented PHP when extracting Metadata and Doctrine symbols
 - Reject malformed incremental edits without replacing open documents

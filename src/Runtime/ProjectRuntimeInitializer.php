@@ -18,6 +18,8 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         private readonly ContainerPathMapper $pathMapper,
         private readonly ProjectRegistry $projects,
         private readonly ProjectConfigurationValidationSnapshotLoader $configurationValidation,
+        private readonly ?RuntimeSnapshotStore $snapshotStore = null,
+        private readonly ?RuntimeSnapshotState $snapshotState = null,
     ) {
     }
 
@@ -29,61 +31,108 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         $plan ??= new RuntimeRefreshPlan();
         $mode = $plan->mode();
         $cancellation?->throwIfRequested();
-        $sections = $plan->sections() ?? $this->snapshotLoaders->sections();
+        $requestedSections = $plan->sections();
+        $sections = $requestedSections ?? $this->snapshotLoaders->sections();
         $bridge = $this->bridgeInstaller->install($project);
-        $result = $this->processRunner->run([
-            ...$this->configuration->phpCommand($project),
-            $this->pathMapper->toContainer($project, $bridge),
-            '--project='.$this->pathMapper->toContainer($project, $project->rootPath()),
-            '--environment='.$this->configuration->environment($project),
-            '--debug=1',
-            '--sections='.implode(',', $sections),
-            '--configuration-generation='.$this->configurationValidation->generation($project),
-            ...($plan->preservesContainer() ? ['--targeted-refresh=1'] : []),
-            ...(RuntimeRefreshMode::Clear === $mode ? ['--rebuild-container=1'] : []),
-        ], $project->rootPath(), $cancellation, $this->configuration->bridgeTimeout($project));
+        $loadedSections = [];
 
-        $cancellation?->throwIfRequested();
-        if (!$this->projects->contains($project)) {
-            // never load metadata for a project removed while the bridge ran
-            throw new CancelledException();
-        }
+        try {
+            $result = $this->processRunner->run([
+                ...$this->configuration->phpCommand($project),
+                $this->pathMapper->toContainer($project, $bridge),
+                '--project='.$this->pathMapper->toContainer($project, $project->rootPath()),
+                '--environment='.$this->configuration->environment($project),
+                '--debug=1',
+                '--sections='.implode(',', $sections),
+                '--configuration-generation='.$this->configurationValidation->generation($project),
+                ...($plan->preservesContainer() ? ['--targeted-refresh=1'] : []),
+                ...(RuntimeRefreshMode::Clear === $mode ? ['--rebuild-container=1'] : []),
+            ], $project->rootPath(), $cancellation, $this->configuration->bridgeTimeout($project));
 
-        if (0 !== $result->exitCode()) {
-            throw new BridgeExecutionException(\sprintf('The project bridge failed with status %d.', $result->exitCode()));
-        }
-
-        $snapshot = $this->decodeSnapshot($result);
-        if (1 !== ($snapshot['schemaVersion'] ?? null)) {
-            throw new \RuntimeException('The project bridge returned an unsupported snapshot.');
-        }
-        $this->configurationValidation->load($project, $snapshot);
-
-        $errors = $snapshot['errors'] ?? null;
-        $loadableSnapshot = $snapshot;
-        $failedSections = [];
-        foreach (\is_array($errors) ? $errors : [] as $error) {
-            if (!\is_array($error)) {
-                continue;
+            $cancellation?->throwIfRequested();
+            if (!$this->projects->contains($project)) {
+                // never load metadata for a project removed while the bridge ran
+                throw new CancelledException();
             }
-            $section = $error['section'] ?? null;
-            if (!\is_string($section)) {
-                continue;
-            }
-            if (\is_array($loadableSnapshot['sections'] ?? null)) {
-                unset($loadableSnapshot['sections'][$section]);
-            }
-            if ('runtime' === $section || \in_array($section, $sections, true)) {
-                $failedSections[$section] = true;
-            }
-        }
-        $this->snapshotLoaders->load($project, $loadableSnapshot);
 
-        if (\is_array($errors) && [] !== $errors) {
-            $detail = [] === $failedSections ? '' : ': '.implode(', ', array_keys($failedSections));
+            if (0 !== $result->exitCode()) {
+                throw new BridgeExecutionException(\sprintf('The project bridge failed with status %d.', $result->exitCode()));
+            }
 
-            throw new \RuntimeException('The project bridge could not load runtime metadata'.$detail.'.');
+            $snapshot = $this->decodeSnapshot($result);
+            if (1 !== ($snapshot['schemaVersion'] ?? null)) {
+                throw new \RuntimeException('The project bridge returned an unsupported snapshot.');
+            }
+            $this->configurationValidation->load($project, $snapshot);
+
+            $errors = $snapshot['errors'] ?? null;
+            $loadableSnapshot = $snapshot;
+            $failedSections = [];
+            foreach (\is_array($errors) ? $errors : [] as $error) {
+                if (!\is_array($error)) {
+                    continue;
+                }
+                $section = $error['section'] ?? null;
+                if (!\is_string($section)) {
+                    continue;
+                }
+                if (\is_array($loadableSnapshot['sections'] ?? null)) {
+                    unset($loadableSnapshot['sections'][$section]);
+                }
+                if ('runtime' === $section || \in_array($section, $sections, true)) {
+                    $failedSections[$section] = true;
+                }
+            }
+            $this->snapshotLoaders->load($project, $loadableSnapshot);
+            $snapshotSections = \is_array($loadableSnapshot['sections'] ?? null) ? $loadableSnapshot['sections'] : [];
+            $loadedSections = array_values(array_intersect($sections, array_keys($snapshotSections)));
+
+            if (\is_array($errors) && [] !== $errors) {
+                $detail = [] === $failedSections ? '' : ': '.implode(', ', array_keys($failedSections));
+
+                throw new \RuntimeException('The project bridge could not load runtime metadata'.$detail.'.');
+            }
+
+            $this->snapshotStore?->save($project, $bridge, $snapshot, $sections, null === $requestedSections);
+        } catch (CancelledException $error) {
+            throw $error;
+        } catch (\Throwable $error) {
+            $this->restoreSnapshot($project, $bridge, $loadedSections);
+
+            throw $error;
         }
+    }
+
+    /** @param list<string> $loadedSections */
+    private function restoreSnapshot(Project $project, string $bridge, array $loadedSections): void
+    {
+        if (!$this->projects->contains($project)
+            || null === $this->snapshotStore
+            || null === $this->snapshotState
+            || $this->snapshotState->has($project)
+        ) {
+            return;
+        }
+        $snapshot = $this->snapshotStore->load($project, $bridge);
+        if (null === $snapshot) {
+            return;
+        }
+
+        $restoredSnapshot = $snapshot->snapshot;
+        $sections = \is_array($restoredSnapshot['sections'] ?? null) ? $restoredSnapshot['sections'] : [];
+        foreach ($loadedSections as $section) {
+            unset($sections[$section]);
+        }
+        if ([] === $sections) {
+            return;
+        }
+        $restoredSnapshot['sections'] = $sections;
+        try {
+            $this->snapshotLoaders->load($project, $restoredSnapshot);
+        } catch (\Throwable) {
+            return;
+        }
+        $this->snapshotState->restore($project, $snapshot->lastSuccessfulAt);
     }
 
     /**

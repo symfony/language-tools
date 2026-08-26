@@ -150,6 +150,11 @@ unsaved changes. Information from the running application is refreshed after
 relevant files are saved. If a refresh fails, the editor reports the project as
 stale and keeps the last successful information.
 
+Compatible runtime information from the last successful refresh is retained
+across editor restarts. If the application cannot boot during the next refresh,
+Symfony Language Tools restores that information, reports when it was last
+updated and keeps the project stale until a refresh succeeds.
+
 Use the editor's commands to refresh project data, inspect the current status
 or switch the selected Symfony environment. Custom Language Server Protocol
 clients can invoke these command identifiers directly:
@@ -161,9 +166,10 @@ clients can invoke these command identifiers directly:
 Privacy
 -------
 
-Parameter values, environment values, credentials and application objects are
-never displayed or written to logs. Protocol tracing is disabled by default and
-redacts values when enabled.
+Retained runtime information is stored under ``var/symfony-lsp/`` in the
+application. Parameter values, environment values, credentials and application
+objects are never stored, displayed or written to logs. Protocol tracing is
+disabled by default and redacts values when enabled.
 
 General Limitations
 -------------------

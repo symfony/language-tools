@@ -50,7 +50,7 @@ final class RuntimeSnapshotStoreTest extends TestCase
                 'container' => ['complete' => true, 'items' => []],
             ],
             'errors' => [['section' => 'routes', 'message' => 'discarded']],
-        ], ['routes', 'container']);
+        ], ['routes', 'container'], true);
 
         $loaded = (new RuntimeSnapshotStore($configuration, new Filesystem()))->load($this->project, $this->bridge);
 
@@ -60,9 +60,6 @@ final class RuntimeSnapshotStoreTest extends TestCase
                 'root' => $this->project->rootPath(),
                 'environment' => 'dev',
                 'debug' => true,
-                'symfonyVersion' => '8.1.0',
-                'symfonyBranch' => '8.1',
-                'phpVersion' => '8.4.1',
             ],
             'sections' => [
                 'routes' => ['complete' => true, 'items' => [['name' => 'homepage', 'path' => '/']]],
@@ -88,17 +85,17 @@ final class RuntimeSnapshotStoreTest extends TestCase
             'sections' => [
                 'routes' => ['items' => [['name' => 'old']]],
                 'container' => ['items' => [['id' => 'mailer']]],
-                'twigComponents' => ['items' => [['name' => 'Alert']]],
+                'twig_components' => ['items' => [['name' => 'Alert']]],
             ],
-        ], ['routes', 'container', 'twigComponents']);
+        ], ['routes', 'container', 'twig_components'], true);
 
         (new RuntimeSnapshotStore($configuration, new Filesystem()))->save($this->project, $this->bridge, [
             'schemaVersion' => 1,
             'sections' => [
                 'routes' => ['items' => [['name' => 'new']]],
-                'twigComponents' => ['items' => [['name' => 'Ignored']]],
+                'twig_components' => ['items' => [['name' => 'Ignored']]],
             ],
-        ], ['routes', 'container']);
+        ], ['routes', 'container'], false);
 
         $loaded = (new RuntimeSnapshotStore($configuration, new Filesystem()))->load($this->project, $this->bridge);
         self::assertSame([
@@ -107,13 +104,35 @@ final class RuntimeSnapshotStoreTest extends TestCase
                 'root' => $this->project->rootPath(),
                 'environment' => 'dev',
                 'debug' => true,
-                'symfonyVersion' => '8.1.0',
             ],
             'sections' => [
                 'routes' => ['items' => [['name' => 'new']]],
-                'twigComponents' => ['items' => [['name' => 'Alert']]],
+                'twig_components' => ['items' => [['name' => 'Alert']]],
             ],
         ], $loaded?->snapshot);
+    }
+
+    public function testCreatesSnapshotsOnlyFromCompleteRefreshes(): void
+    {
+        $store = new RuntimeSnapshotStore(new RuntimeConfiguration(), new Filesystem());
+        $store->save(
+            $this->project,
+            $this->bridge,
+            ['schemaVersion' => 1, 'sections' => ['routes' => ['items' => []]]],
+            ['routes'],
+            false,
+        );
+        self::assertNull($store->load($this->project, $this->bridge));
+
+        $store = $this->storeWithSnapshot();
+        $store->save(
+            $this->project,
+            $this->bridge,
+            ['schemaVersion' => 1, 'sections' => []],
+            ['routes'],
+            true,
+        );
+        self::assertNull($store->load($this->project, $this->bridge));
     }
 
     public function testSeparatesEveryRuntimeConfigurationDimension(): void
@@ -124,6 +143,7 @@ final class RuntimeSnapshotStoreTest extends TestCase
             $this->bridge,
             ['schemaVersion' => 1, 'sections' => ['routes' => ['items' => []]]],
             ['routes'],
+            true,
         );
 
         $otherProject = new Project($this->project->rootPath().'-other', 'file://'.$this->project->rootPath().'-other', '^8.0');
@@ -209,6 +229,7 @@ final class RuntimeSnapshotStoreTest extends TestCase
                 'sections' => ['routes' => ['items' => [['name' => 'replacement']]]],
             ],
             ['routes'],
+            false,
         );
 
         self::assertSame(
@@ -228,6 +249,7 @@ final class RuntimeSnapshotStoreTest extends TestCase
                 'sections' => ['routes' => ['items' => [['name' => 'homepage']]]],
             ],
             ['routes'],
+            true,
         );
 
         return $store;

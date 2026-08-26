@@ -9,6 +9,8 @@ const switchEnvironmentCommand = 'symfony.switchEnvironment';
 interface IndexSection {
     state: string;
     error?: string;
+    stage?: string;
+    lastSuccessfulAt?: string;
 }
 
 export function indexStatusPollingEnabled(state: State): boolean {
@@ -222,9 +224,12 @@ export class IndexStatusController implements vscode.Disposable {
         const runtime = !status.runtimeEnabled
             ? 'disabled'
             : status.trusted ? status.runtime.state : 'static only';
-        const errors = [status.source.error, status.runtime.error].filter((error): error is string => undefined !== error);
+        const details = [status.source.error, status.runtime.error].filter((detail): detail is string => undefined !== detail);
+        if ('stale' === status.runtime.state && status.runtime.lastSuccessfulAt) {
+            details.unshift(`Last successful runtime index: ${status.runtime.lastSuccessfulAt}.`);
+        }
         const summary = `${status.root}: source ${status.source.state}, runtime ${runtime}, environment ${status.environment}`;
 
-        return 0 === errors.length ? summary : `${summary}. ${errors.join(' ')}`;
+        return 0 === details.length ? summary : `${summary}. ${details.join(' ')}`;
     }
 }

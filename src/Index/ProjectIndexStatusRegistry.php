@@ -4,14 +4,19 @@ namespace Symfony\Lsp\Index;
 
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectStateInterface;
+use Symfony\Lsp\Runtime\RuntimeSnapshotState;
 
 final class ProjectIndexStatusRegistry implements ProjectStateInterface
 {
-    /** @var array<string, array{source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string}}> */
+    /** @var array<string, array{source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string}}> */
     private array $statuses = [];
 
-    /** @var array<string, true> */
-    private array $hasRuntimeSnapshot = [];
+    private readonly RuntimeSnapshotState $runtimeSnapshots;
+
+    public function __construct(?RuntimeSnapshotState $runtimeSnapshots = null)
+    {
+        $this->runtimeSnapshots = $runtimeSnapshots ?? new RuntimeSnapshotState();
+    }
 
     public function sourceIndexing(Project $project): void
     {
@@ -35,7 +40,7 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
 
     public function runtimeReady(Project $project): void
     {
-        $this->hasRuntimeSnapshot[$project->rootPath()] = true;
+        $this->runtimeSnapshots->markReady($project);
         $this->section($project, 'runtime', 'ready');
     }
 
@@ -49,7 +54,7 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
      */
     public function runtimeFailed(Project $project, ?string $stage = null): void
     {
-        $state = isset($this->hasRuntimeSnapshot[$project->rootPath()]) ? 'stale' : 'failed';
+        $state = $this->runtimeSnapshots->has($project) ? 'stale' : 'failed';
         $error = match ($stage) {
             'bootstrap' => 'The application failed to boot.',
             'configuration' => 'The application configuration is invalid.',
@@ -60,11 +65,12 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
 
     public function removeProject(Project $project): void
     {
-        unset($this->statuses[$project->rootPath()], $this->hasRuntimeSnapshot[$project->rootPath()]);
+        unset($this->statuses[$project->rootPath()]);
+        $this->runtimeSnapshots->removeProject($project);
     }
 
     /**
-     * @return array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string}}
+     * @return array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string}}
      */
     public function status(Project $project): array
     {
@@ -84,6 +90,9 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
         $status = $this->status($project);
         unset($status['root']);
         $status[$section] = ['state' => $state];
+        if ('runtime' === $section && 'stale' === $state && null !== ($lastSuccessfulAt = $this->runtimeSnapshots->lastSuccessfulAt($project))) {
+            $status[$section]['lastSuccessfulAt'] = $lastSuccessfulAt;
+        }
         if (null !== $error && '' !== $error) {
             $status[$section]['error'] = $error;
         }

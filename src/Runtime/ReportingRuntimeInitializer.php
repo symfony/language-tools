@@ -30,7 +30,12 @@ final class ReportingRuntimeInitializer implements RuntimeInitializerInterface
             $runtimeStatus = $this->statuses->status($project)['runtime'];
             $stale = 'stale' === $runtimeStatus['state'];
             $message = 'configuration' === ($runtimeStatus['stage'] ?? null)
-                ? \sprintf('Symfony Language Tools found invalid application configuration for "%s".', $project->rootPath())
+                ? \sprintf(
+                    $stale
+                        ? 'Symfony Language Tools found invalid application configuration for "%s". The last valid runtime metadata remains active.'
+                        : 'Symfony Language Tools found invalid application configuration for "%s".',
+                    $project->rootPath(),
+                )
                 : \sprintf(
                     $stale
                         ? 'Symfony Language Tools could not refresh runtime metadata for "%s". The last valid metadata remains active.'

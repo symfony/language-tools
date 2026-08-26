@@ -65,7 +65,8 @@ Index Status and Commands
 The status bar shows the source and runtime index state for the application
 owning the active document. It identifies indexing, static-only, stale and
 failed states and displays the selected environment when both indexes are
-ready. Select the status bar item to show details.
+ready. Select the status bar item to show details, including when stale runtime
+information was last updated.
 
 The command palette provides these commands:
 

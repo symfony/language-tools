@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Index;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Runtime\RuntimeSnapshotState;
 
 final class ProjectIndexStatusRegistryTest extends TestCase
 {
@@ -34,5 +35,22 @@ final class ProjectIndexStatusRegistryTest extends TestCase
             ['state' => 'failed', 'error' => 'The application failed to boot.', 'stage' => 'bootstrap'],
             $statuses->status($project)['runtime'],
         );
+    }
+
+    public function testReportsRestoredRuntimeMetadataAsStale(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $snapshots = new RuntimeSnapshotState();
+        $statuses = new ProjectIndexStatusRegistry($snapshots);
+        $snapshots->restore($project, '2026-08-25T20:15:00+00:00');
+
+        $statuses->runtimeFailed($project, 'bootstrap');
+
+        self::assertSame([
+            'state' => 'stale',
+            'lastSuccessfulAt' => '2026-08-25T20:15:00+00:00',
+            'error' => 'The application failed to boot.',
+            'stage' => 'bootstrap',
+        ], $statuses->status($project)['runtime']);
     }
 }

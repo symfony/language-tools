@@ -68,6 +68,23 @@ final class ReportingRuntimeInitializerTest extends TestCase
         );
     }
 
+    public function testReportsConfigurationFailuresWithRestoredMetadata(): void
+    {
+        $client = new ReportingClient();
+        $statuses = new ProjectIndexStatusRegistry();
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $statuses->runtimeReady($project);
+        $statuses->runtimeFailed($project, 'configuration');
+        $initializer = new ReportingRuntimeInitializer($this->failingInitializer(), $client, $statuses, new ServerLogger(null, new SensitiveDataRedactor()));
+
+        $initializer->initialize($project);
+
+        self::assertSame(
+            'Symfony Language Tools found invalid application configuration for "/workspace". The last valid runtime metadata remains active.',
+            $client->notifications[0]['params']['message'],
+        );
+    }
+
     public function testLogsTheUnderlyingErrorWithRedaction(): void
     {
         $client = new ReportingClient();

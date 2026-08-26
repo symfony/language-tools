@@ -16,8 +16,10 @@ use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Feature\Route\ProjectRouteSnapshotLoader;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
+use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Runtime\BridgeExecutionException;
 use Symfony\Lsp\Runtime\BridgeInstaller;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\ProcessResult;
@@ -27,6 +29,9 @@ use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeRefreshMode;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
+use Symfony\Lsp\Runtime\RuntimeSnapshotState;
+use Symfony\Lsp\Runtime\RuntimeSnapshotStore;
+use Symfony\Lsp\Runtime\StatusRuntimeInitializer;
 
 final class ProjectRuntimeInitializerTest extends TestCase
 {
@@ -306,11 +311,83 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertNull($routeIndexes->forProject($project)->get('replacement'));
     }
 
+    public function testRestoresOnlyFailedSectionsAfterAPartialBridgeError(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $projects = self::projects($project);
+        $configuration = new RuntimeConfiguration();
+        $bridgeInstaller = new BridgeInstaller($source, 'test', new Filesystem());
+        $store = new RuntimeSnapshotStore($configuration, new Filesystem());
+        $store->save($project, $bridgeInstaller->install($project), [
+            'schemaVersion' => 1,
+            'sections' => [
+                'routes' => ['complete' => true, 'items' => [['name' => 'old_route', 'path' => '/old']]],
+                'container' => [
+                    'complete' => true,
+                    'items' => [['id' => 'old.service', 'class' => 'App\\OldService']],
+                    'parameters' => [],
+                ],
+            ],
+        ], ['routes', 'container'], true);
+        $routeIndexes = new RouteIndexRegistry();
+        $serviceIndexes = new ServiceIndexRegistry();
+        $state = new RuntimeSnapshotState();
+        $initializer = new ProjectRuntimeInitializer(
+            $bridgeInstaller,
+            new CapturingProcessRunner(new ProcessResult(0, json_encode([
+                'schemaVersion' => 1,
+                'errors' => [['section' => 'container', 'message' => 'CANARY_RUNTIME_SECTION_ERROR']],
+                'sections' => [
+                    'routes' => ['complete' => true, 'items' => [['name' => 'new_route', 'path' => '/new']]],
+                    'container' => [
+                        'complete' => true,
+                        'items' => [['id' => 'new.service', 'class' => 'App\\NewService']],
+                        'parameters' => [],
+                    ],
+                ],
+            ], \JSON_THROW_ON_ERROR), '')),
+            new RuntimeSnapshotLoaderRegistry([
+                new ProjectRouteSnapshotLoader($routeIndexes),
+                new ProjectServiceSnapshotLoader($serviceIndexes, new ParameterIndexRegistry()),
+            ]),
+            $configuration,
+            new ContainerPathMapper($configuration),
+            $projects,
+            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
+            $store,
+            $state,
+        );
+
+        try {
+            $initializer->initialize($project);
+            self::fail('The section error was not reported.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('The project bridge could not load runtime metadata: container.', $error->getMessage());
+        }
+
+        self::assertSame('new_route', $routeIndexes->forProject($project)->get('new_route')?->name());
+        self::assertNull($routeIndexes->forProject($project)->get('old_route'));
+        self::assertSame('old.service', $serviceIndexes->forProject($project)->get('old.service')?->id());
+        self::assertNull($serviceIndexes->forProject($project)->get('new.service'));
+        self::assertTrue($state->has($project));
+    }
+
     public function testRejectsStaleConfigurationValidationResults(): void
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $projects = self::projects($project);
+        $configuration = new RuntimeConfiguration();
+        $bridgeInstaller = new BridgeInstaller($source, 'test', new Filesystem());
+        $store = new RuntimeSnapshotStore($configuration, new Filesystem());
+        $store->save($project, $bridgeInstaller->install($project), [
+            'schemaVersion' => 1,
+            'sections' => ['routes' => ['complete' => true, 'items' => [['name' => 'persisted', 'path' => '/persisted']]]],
+        ], ['routes'], true);
+        $state = new RuntimeSnapshotState();
         $validations = new ConfigurationValidationRegistry();
         $validations->pending($project);
         $routeIndexes = new RouteIndexRegistry();
@@ -322,13 +399,15 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'sections' => ['routes' => ['complete' => true, 'items' => [['name' => 'stale', 'path' => '/stale']]]],
         ], \JSON_THROW_ON_ERROR), ''));
         $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test', new Filesystem()),
+            $bridgeInstaller,
             $processRunner,
             new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($routeIndexes)]),
-            new RuntimeConfiguration(),
-            new ContainerPathMapper(new RuntimeConfiguration()),
-            self::projects($project),
+            $configuration,
+            new ContainerPathMapper($configuration),
+            $projects,
             new ProjectConfigurationValidationSnapshotLoader($validations),
+            $store,
+            $state,
         );
 
         try {
@@ -340,6 +419,8 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertContains('--configuration-generation=1', $processRunner->command);
         self::assertSame(ConfigurationValidationResult::PENDING, $validations->result($project)->state);
         self::assertNull($routeIndexes->forProject($project)->get('stale'));
+        self::assertNull($routeIndexes->forProject($project)->get('persisted'));
+        self::assertFalse($state->has($project));
     }
 
     public function testLoadsConfigurationValidationBeforeReportingRuntimeFailure(): void
@@ -375,6 +456,171 @@ final class ProjectRuntimeInitializerTest extends TestCase
             self::assertSame('framework.router', $error->validation->path);
         }
         self::assertSame(ConfigurationValidationResult::INVALID, $validations->result($project)->state);
+    }
+
+    public function testRestoresPersistedMetadataWhenTheInitialBridgeExecutionFails(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $projects = self::projects($project);
+        $configuration = new RuntimeConfiguration();
+        $firstIndexes = new RouteIndexRegistry();
+        $firstState = new RuntimeSnapshotState();
+        $firstStatuses = new ProjectIndexStatusRegistry($firstState);
+        $first = new StatusRuntimeInitializer(
+            new ProjectRuntimeInitializer(
+                new BridgeInstaller($source, 'test', new Filesystem()),
+                new CapturingProcessRunner(new ProcessResult(0, json_encode([
+                    'schemaVersion' => 1,
+                    'sections' => [
+                        'routes' => ['complete' => true, 'items' => [['name' => 'homepage', 'path' => '/']]],
+                    ],
+                ], \JSON_THROW_ON_ERROR), '')),
+                new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($firstIndexes)]),
+                $configuration,
+                new ContainerPathMapper($configuration),
+                $projects,
+                new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
+                new RuntimeSnapshotStore($configuration, new Filesystem()),
+                $firstState,
+            ),
+            $firstStatuses,
+            $projects,
+        );
+        $first->initialize($project);
+        self::assertSame('ready', $firstStatuses->status($project)['runtime']['state']);
+
+        $restoredIndexes = new RouteIndexRegistry();
+        $restoredState = new RuntimeSnapshotState();
+        $restoredStatuses = new ProjectIndexStatusRegistry($restoredState);
+        $restored = new StatusRuntimeInitializer(
+            new ProjectRuntimeInitializer(
+                new BridgeInstaller($source, 'test', new Filesystem()),
+                new CapturingProcessRunner(new ProcessResult(1, '', '')),
+                new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($restoredIndexes)]),
+                $configuration,
+                new ContainerPathMapper($configuration),
+                $projects,
+                new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
+                new RuntimeSnapshotStore($configuration, new Filesystem()),
+                $restoredState,
+            ),
+            $restoredStatuses,
+            $projects,
+        );
+
+        try {
+            $restored->initialize($project);
+            self::fail('The failed bridge execution was accepted.');
+        } catch (BridgeExecutionException) {
+        }
+
+        self::assertSame('homepage', $restoredIndexes->forProject($project)->get('homepage')?->name());
+        $status = $restoredStatuses->status($project)['runtime'];
+        self::assertSame('stale', $status['state']);
+        self::assertMatchesRegularExpression('/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+00:00$/D', $status['lastSuccessfulAt'] ?? '');
+        self::assertSame('The application failed to boot.', $status['error'] ?? null);
+        self::assertSame('bootstrap', $status['stage'] ?? null);
+    }
+
+    public function testKeepsTheActiveSnapshotWhenARefreshFails(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $projects = self::projects($project);
+        $configuration = new RuntimeConfiguration();
+        $bridgeInstaller = new BridgeInstaller($source, 'test', new Filesystem());
+        $store = new RuntimeSnapshotStore($configuration, new Filesystem());
+        $store->save($project, $bridgeInstaller->install($project), [
+            'schemaVersion' => 1,
+            'sections' => [
+                'routes' => ['complete' => true, 'items' => [['name' => 'persisted', 'path' => '/persisted']]],
+            ],
+        ], ['routes'], true);
+        $indexes = new RouteIndexRegistry();
+        $indexes->forProject($project)->replace(new Route('current', '/current', [], [], null, null));
+        $state = new RuntimeSnapshotState();
+        $state->markReady($project);
+        $initializer = new ProjectRuntimeInitializer(
+            $bridgeInstaller,
+            new CapturingProcessRunner(new ProcessResult(1, '', '')),
+            new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($indexes)]),
+            $configuration,
+            new ContainerPathMapper($configuration),
+            $projects,
+            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
+            $store,
+            $state,
+        );
+
+        try {
+            $initializer->initialize($project);
+            self::fail('The failed bridge execution was accepted.');
+        } catch (BridgeExecutionException) {
+        }
+
+        self::assertSame('current', $indexes->forProject($project)->get('current')?->name());
+        self::assertNull($indexes->forProject($project)->get('persisted'));
+    }
+
+    public function testKeepsCurrentConfigurationFailureWithRestoredMetadata(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $projects = self::projects($project);
+        $configuration = new RuntimeConfiguration();
+        $bridgeInstaller = new BridgeInstaller($source, 'test', new Filesystem());
+        $store = new RuntimeSnapshotStore($configuration, new Filesystem());
+        $store->save($project, $bridgeInstaller->install($project), [
+            'schemaVersion' => 1,
+            'sections' => [
+                'routes' => ['complete' => true, 'items' => [['name' => 'homepage', 'path' => '/']]],
+            ],
+        ], ['routes'], true);
+        $indexes = new RouteIndexRegistry();
+        $validations = new ConfigurationValidationRegistry();
+        $state = new RuntimeSnapshotState();
+        $statuses = new ProjectIndexStatusRegistry($state);
+        $initializer = new StatusRuntimeInitializer(
+            new ProjectRuntimeInitializer(
+                $bridgeInstaller,
+                new CapturingProcessRunner(new ProcessResult(0, json_encode([
+                    'schemaVersion' => 1,
+                    'project' => ['environment' => 'dev'],
+                    'configurationValidation' => [
+                        'status' => 'invalid',
+                        'kind' => 'configuration',
+                        'path' => 'framework.router',
+                    ],
+                    'sections' => [],
+                    'errors' => [['section' => 'runtime', 'message' => 'CANARY_RUNTIME_SECTION_ERROR']],
+                ], \JSON_THROW_ON_ERROR), '')),
+                new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($indexes)]),
+                $configuration,
+                new ContainerPathMapper($configuration),
+                $projects,
+                new ProjectConfigurationValidationSnapshotLoader($validations),
+                $store,
+                $state,
+            ),
+            $statuses,
+            $projects,
+        );
+
+        try {
+            $initializer->initialize($project);
+            self::fail('The configuration validation failure was not reported.');
+        } catch (ConfigurationValidationException $error) {
+            self::assertSame('framework.router', $error->validation->path);
+        }
+
+        self::assertSame(ConfigurationValidationResult::INVALID, $validations->result($project)->state);
+        self::assertSame('homepage', $indexes->forProject($project)->get('homepage')?->name());
+        self::assertSame('stale', $statuses->status($project)['runtime']['state']);
+        self::assertSame('configuration', $statuses->status($project)['runtime']['stage'] ?? null);
     }
 
     public function testRejectsFailedBridgeExecutionWithoutExposingErrorOutput(): void

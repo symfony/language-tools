@@ -12,11 +12,6 @@ final class RuntimeSnapshotStore
     private const FORMAT_VERSION = 1;
     private const SNAPSHOT_SCHEMA_VERSION = 1;
     private const JSON_FLAGS = \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES;
-    private const OPTIONAL_PROJECT_METADATA = [
-        'symfonyVersion',
-        'symfonyBranch',
-        'phpVersion',
-    ];
 
     public function __construct(
         private readonly RuntimeConfiguration $configuration,
@@ -71,14 +66,24 @@ final class RuntimeSnapshotStore
      * @param array<array-key, mixed> $snapshot
      * @param list<string>            $requestedSections
      */
-    public function save(Project $project, string $bridge, array $snapshot, array $requestedSections): void
+    public function save(Project $project, string $bridge, array $snapshot, array $requestedSections, bool $complete): void
     {
         if (self::SNAPSHOT_SCHEMA_VERSION !== ($snapshot['schemaVersion'] ?? null)) {
             return;
         }
 
-        $previous = $this->load($project, $bridge)?->snapshot;
-        $sections = \is_array($previous['sections'] ?? null) ? $previous['sections'] : [];
+        if ($complete) {
+            $previous = null;
+            $previousSnapshot = [];
+        } else {
+            $previous = $this->load($project, $bridge);
+            if (null === $previous) {
+                return;
+            }
+            $previousSnapshot = $previous->snapshot;
+        }
+        $previousSections = $previousSnapshot['sections'] ?? null;
+        $sections = \is_array($previousSections) ? $previousSections : [];
         $incomingSections = \is_array($snapshot['sections'] ?? null) ? $snapshot['sections'] : [];
         foreach ($requestedSections as $section) {
             if (\is_array($incomingSections[$section] ?? null)) {
@@ -88,11 +93,24 @@ final class RuntimeSnapshotStore
             }
         }
 
+        if ([] === $sections) {
+            $this->remove($project, $bridge);
+
+            return;
+        }
+
         $payload = [
             'schemaVersion' => self::SNAPSHOT_SCHEMA_VERSION,
-            'project' => $this->projectMetadata($project, $snapshot, $previous),
+            'project' => [
+                'root' => $project->rootPath(),
+                'environment' => $this->configuration->environment($project),
+                'debug' => $this->configuration->debug($project),
+            ],
             'sections' => $sections,
         ];
+        if (null !== $previous && $payload === $previousSnapshot) {
+            return;
+        }
 
         try {
             $payloadJson = json_encode($payload, self::JSON_FLAGS);
@@ -109,31 +127,6 @@ final class RuntimeSnapshotStore
         }
     }
 
-    /**
-     * @param array<array-key, mixed>  $snapshot
-     * @param ?array<array-key, mixed> $previous
-     *
-     * @return array<string, mixed>
-     */
-    private function projectMetadata(Project $project, array $snapshot, ?array $previous): array
-    {
-        $metadata = [
-            'root' => $project->rootPath(),
-            'environment' => $this->configuration->environment($project),
-            'debug' => $this->configuration->debug($project),
-        ];
-        $incomingProject = \is_array($snapshot['project'] ?? null) ? $snapshot['project'] : [];
-        $previousProject = \is_array($previous['project'] ?? null) ? $previous['project'] : [];
-        foreach (self::OPTIONAL_PROJECT_METADATA as $name) {
-            $value = $incomingProject[$name] ?? $previousProject[$name] ?? null;
-            if (\is_string($value)) {
-                $metadata[$name] = $value;
-            }
-        }
-
-        return $metadata;
-    }
-
     /** @param array<array-key, mixed> $payload */
     private function validPayload(Project $project, array $payload): bool
     {
@@ -147,20 +140,12 @@ final class RuntimeSnapshotStore
         }
 
         $metadata = $payload['project'];
-        if ($project->rootPath() !== ($metadata['root'] ?? null)
+        if (3 !== \count($metadata)
+            || $project->rootPath() !== ($metadata['root'] ?? null)
             || $this->configuration->environment($project) !== ($metadata['environment'] ?? null)
             || $this->configuration->debug($project) !== ($metadata['debug'] ?? null)
-            || \count($metadata) > 6
         ) {
             return false;
-        }
-        foreach ($metadata as $name => $value) {
-            if (!\is_string($name)
-                || (!\in_array($name, self::OPTIONAL_PROJECT_METADATA, true) && !\in_array($name, ['root', 'environment', 'debug'], true))
-                || (\in_array($name, self::OPTIONAL_PROJECT_METADATA, true) && !\is_string($value))
-            ) {
-                return false;
-            }
         }
 
         foreach ($payload['sections'] as $name => $section) {
@@ -170,6 +155,14 @@ final class RuntimeSnapshotStore
         }
 
         return true;
+    }
+
+    private function remove(Project $project, string $bridge): void
+    {
+        try {
+            $this->filesystem->remove($this->path($project, $bridge));
+        } catch (IOExceptionInterface) {
+        }
     }
 
     private function validTimestamp(mixed $timestamp): bool
@@ -186,13 +179,13 @@ final class RuntimeSnapshotStore
 
     private function path(Project $project, string $bridge): string
     {
-        $configuration = json_encode([
+        $configuration = serialize([
             'projectRoot' => $project->rootPath(),
             'phpCommand' => $this->configuration->phpCommand($project),
             'containerProjectRoot' => $this->configuration->containerProjectRoot($project),
             'environment' => $this->configuration->environment($project),
             'debug' => $this->configuration->debug($project),
-        ], self::JSON_FLAGS);
+        ]);
 
         return Path::join(\dirname($bridge), 'runtime', hash('sha256', $configuration).'.json');
     }

@@ -189,9 +189,15 @@ is ``12``.
 Caching and Privacy
 -------------------
 
-The checker stores its cache under ``var/symfony-lsp/<server-version>/`` in
-each application. Runtime analysis can also update the application's Symfony
-cache. These directories must be writable.
+The checker stores its source index and last successful runtime information
+under ``var/symfony-lsp/<server-version>/`` in each application. Runtime
+analysis can also update the application's Symfony cache. These directories
+must be writable.
+
+A runtime failure still makes the analysis incomplete. When the current
+application configuration can be diagnosed, those diagnostics can use
+compatible runtime information from the cache. Remove the cache when reproducing
+a strictly cold analysis.
 
 CI can cache ``var/symfony-lsp/`` by project revision, platform and Symfony
 Language Tools version. Don't publish it as a build artifact or share it between
