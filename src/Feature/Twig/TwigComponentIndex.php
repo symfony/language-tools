@@ -11,123 +11,95 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     private bool $runtimeComplete = false;
     /** @var array<string, TwigComponent> */
     private array $runtimeComponents = [];
+    /** @var array<string, TwigComponent> */
+    private array $caseInsensitiveRuntimeComponents = [];
     /** @var array<string, true> */
     private array $runtimeNames = [];
     /** @var array<string, true> */
     private array $caseInsensitiveRuntimeNames = [];
     private string $anonymousTemplateDirectory = 'components';
+    private bool $indexed = false;
+
+    /** @var list<TwigComponent> */
+    private array $components = [];
+
+    /** @var array<string, TwigComponent> */
+    private array $componentsByName = [];
+
+    /** @var array<string, list<TwigComponent>> */
+    private array $declarations = [];
+
+    /** @var array<string, list<TwigComponentReference>> */
+    private array $references = [];
+
+    /** @var array<string, list<TwigComponentReference>> */
+    private array $caseInsensitiveReferences = [];
+
+    /** @var array<string, array<string, list<TwigComponentActionReference>>> */
+    private array $actionReferences = [];
+
+    /** @var array<string, list<LiveComponentEvent>> */
+    private array $events = [];
+
+    /** @var list<string> */
+    private array $eventNames = [];
 
     /** @return list<TwigComponent> */
     public function components(): array
     {
-        $components = [];
-        foreach ($this->facts() as $facts) {
-            foreach ($facts->components() as $component) {
-                $components[$component->name()] = $this->merge($components[$component->name()] ?? null, $component);
-            }
-        }
-        ksort($components);
+        $this->index();
 
-        return array_values($components);
+        return $this->components;
     }
 
     /** @return list<TwigComponent> */
     public function declarations(string $name): array
     {
-        $components = [];
-        foreach ($this->facts() as $facts) {
-            foreach ($facts->components() as $component) {
-                if ($component->name() === $name) {
-                    $components[] = $component;
-                }
-            }
-        }
+        $this->index();
 
-        return $components;
+        return $this->declarations[$name] ?? [];
     }
 
     public function get(string $name): ?TwigComponent
     {
-        foreach ($this->components() as $component) {
-            if ($component->name() === $name) {
-                return $component;
-            }
-        }
+        $this->index();
 
         // vendor components, such as ux:icon, only exist in runtime metadata
-        $component = $this->runtimeComponents[$name] ?? null;
-        if (null === $component && isset($this->caseInsensitiveRuntimeNames[strtolower($name)])) {
-            foreach ($this->runtimeComponents as $candidate) {
-                if (0 === strcasecmp($candidate->name(), $name)) {
-                    return $candidate;
-                }
-            }
-        }
-
-        return $component;
+        return $this->componentsByName[$name]
+            ?? $this->runtimeComponents[$name]
+            ?? (isset($this->caseInsensitiveRuntimeNames[strtolower($name)]) ? $this->caseInsensitiveRuntimeComponents[strtolower($name)] ?? null : null);
     }
 
     /** @return list<TwigComponentReference> */
     public function references(string $name): array
     {
-        $caseInsensitive = isset($this->caseInsensitiveRuntimeNames[strtolower($name)]);
-        $references = [];
-        foreach ($this->facts() as $facts) {
-            foreach ($facts->references() as $reference) {
-                if ($reference->name() === $name || ($caseInsensitive && 0 === strcasecmp($reference->name(), $name))) {
-                    $references[] = $reference;
-                }
-            }
-        }
+        $this->index();
 
-        return $references;
+        return isset($this->caseInsensitiveRuntimeNames[strtolower($name)]) ? $this->caseInsensitiveReferences[strtolower($name)] ?? [] : $this->references[$name] ?? [];
     }
 
     /** @return list<TwigComponentActionReference> */
     public function actionReferences(string $component, string $action): array
     {
-        $references = [];
-        foreach ($this->facts() as $facts) {
-            foreach ($facts->actionReferences() as $reference) {
-                if ($component === $reference->component() && $action === $reference->action()) {
-                    $references[] = $reference;
-                }
-            }
-        }
+        $this->index();
 
-        return $references;
+        return $this->actionReferences[$component][$action] ?? [];
     }
 
     /** @return list<LiveComponentEvent> */
     public function events(string $name): array
     {
-        $events = [];
-        foreach ($this->facts() as $facts) {
-            foreach ($facts->events() as $event) {
-                if ($name === $event->name()) {
-                    $events[] = $event;
-                }
-            }
-        }
+        $this->index();
 
-        return $events;
+        return $this->events[$name] ?? [];
     }
 
     /** @return list<string> */
     public function eventNames(): array
     {
-        $names = [];
-        foreach ($this->facts() as $facts) {
-            foreach ($facts->events() as $event) {
-                if ($event->isDeclaration()) {
-                    $names[] = $event->name();
-                }
-            }
-        }
-        $names = array_values(array_unique($names));
-        sort($names);
+        $this->index();
 
-        return $names;
+        return $this->eventNames;
     }
 
     public function isComplete(): bool
@@ -149,6 +121,10 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
         $this->runtimeComponents = [];
         foreach ($components as $component) {
             $this->runtimeComponents[$component->name()] = $component;
+        }
+        $this->caseInsensitiveRuntimeComponents = [];
+        foreach ($this->runtimeComponents as $component) {
+            $this->caseInsensitiveRuntimeComponents[strtolower($component->name())] ??= $component;
         }
     }
 
@@ -176,6 +152,53 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     protected function factsReplaced(): void
     {
         $this->complete = true;
+        $this->factsChanged();
+    }
+
+    protected function factsChanged(): void
+    {
+        $this->indexed = false;
+    }
+
+    private function index(): void
+    {
+        if ($this->indexed) {
+            return;
+        }
+
+        $this->componentsByName = [];
+        $this->declarations = [];
+        $this->references = [];
+        $this->caseInsensitiveReferences = [];
+        $this->actionReferences = [];
+        $this->events = [];
+        $eventNames = [];
+        foreach ($this->facts() as $facts) {
+            foreach ($facts->components() as $component) {
+                $name = $component->name();
+                $this->declarations[$name][] = $component;
+                $this->componentsByName[$name] = $this->merge($this->componentsByName[$name] ?? null, $component);
+            }
+            foreach ($facts->references() as $reference) {
+                $this->references[$reference->name()][] = $reference;
+                $this->caseInsensitiveReferences[strtolower($reference->name())][] = $reference;
+            }
+            foreach ($facts->actionReferences() as $reference) {
+                $this->actionReferences[$reference->component()][$reference->action()][] = $reference;
+            }
+            foreach ($facts->events() as $event) {
+                $this->events[$event->name()][] = $event;
+                if ($event->isDeclaration()) {
+                    $eventNames['s'.$event->name()] = $event->name();
+                }
+            }
+        }
+
+        ksort($this->componentsByName);
+        $this->components = array_values($this->componentsByName);
+        $this->eventNames = array_values($eventNames);
+        sort($this->eventNames);
+        $this->indexed = true;
     }
 
     private function merge(?TwigComponent $current, TwigComponent $component): TwigComponent
