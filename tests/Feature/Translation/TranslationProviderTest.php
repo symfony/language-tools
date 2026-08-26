@@ -15,6 +15,7 @@ use Symfony\Lsp\Feature\Translation\TranslationExtractor;
 use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationMessage;
 use Symfony\Lsp\Feature\Translation\TranslationProvider;
+use Symfony\Lsp\Feature\Translation\TranslationReferenceResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -167,7 +168,8 @@ final class TranslationProviderTest extends TestCase
         $indexes->forProject($project)->replaceSources($extractor->extract('file://'.$translationPath, 'yaml', "existing: Existing\n"));
         $configuration = new TranslationConfigurationRegistry();
         $configuration->configure($project, true);
-        $provider = new TranslationProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser, new PhpCommentParser());
+        $documentResolver = new DocumentContextResolver($documents, $projects);
+        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser, new PhpCommentParser(), new TranslationReferenceResolver($documentResolver, $converter, $extractor));
 
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -223,7 +225,8 @@ final class TranslationProviderTest extends TestCase
         $indexes->forProject($project)->replaceSources($extractor->extract('file://'.$translationPath, 'yaml', "existing: Existing\n"));
         $configuration = new TranslationConfigurationRegistry();
         $configuration->configure($project, true);
-        $provider = new TranslationProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser, new PhpCommentParser());
+        $documentResolver = new DocumentContextResolver($documents, $projects);
+        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser, new PhpCommentParser(), new TranslationReferenceResolver($documentResolver, $converter, $extractor));
 
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -354,7 +357,8 @@ final class TranslationProviderTest extends TestCase
             new TranslationMessage('panel.title', 'admin', 'en', 'Panel title'),
         );
         $configuration = new TranslationConfigurationRegistry();
+        $documentResolver = new DocumentContextResolver($documents, $projects);
 
-        return [new TranslationProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser, new PhpCommentParser()), $converter, $configuration, $project];
+        return [new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser, new PhpCommentParser(), new TranslationReferenceResolver($documentResolver, $converter, $extractor)), $converter, $configuration, $project];
     }
 }

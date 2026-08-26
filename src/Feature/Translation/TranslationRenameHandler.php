@@ -2,21 +2,16 @@
 
 namespace Symfony\Lsp\Feature\Translation;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\RenameProviderInterface;
-use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TranslationRenameHandler implements RenameProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
-        private readonly PositionConverter $converter,
+        private readonly TranslationReferenceResolver $referenceResolver,
         private readonly LspProtocolMapper $protocol,
-        private readonly TranslationExtractor $extractor,
         private readonly TranslationIndexRegistry $indexes,
         private readonly ProjectPathResolver $pathResolver,
     ) {
@@ -28,7 +23,8 @@ final class TranslationRenameHandler implements RenameProviderInterface
         if (null === $resolved) {
             return null;
         }
-        [$reference, $project] = $resolved;
+        $reference = $resolved->reference;
+        $project = $resolved->project;
         $declarations = $this->indexes->forProject($project)->declarations($reference->domain(), $reference->key());
         if ([] === array_filter(
             $declarations,
@@ -48,7 +44,8 @@ final class TranslationRenameHandler implements RenameProviderInterface
             return null;
         }
 
-        [$reference, $project] = $resolved;
+        $reference = $resolved->reference;
+        $project = $resolved->project;
         $index = $this->indexes->forProject($project);
         $declarations = $index->declarations($reference->domain(), $reference->key());
         if ([] === array_filter(
@@ -93,40 +90,15 @@ final class TranslationRenameHandler implements RenameProviderInterface
         ];
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{TranslationReference, Project}|null
-     */
-    private function resolve(array $params): ?array
+    /** @param array<array-key, mixed> $params */
+    private function resolve(array $params): ?ResolvedTranslationReference
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri())) {
+        $resolved = $this->referenceResolver->resolve($params);
+        if (null === $resolved || !$this->pathResolver->isApplicationOwned($resolved->project, $resolved->reference->uri())) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $facts = $this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text());
-        foreach ($facts->declarations() as $declaration) {
-            $start = $this->converter->toByteOffset($request->document->text(), $declaration->range()->start());
-            $end = $this->converter->toByteOffset($request->document->text(), $declaration->range()->end());
-            if ($offset >= $start && $offset <= $end) {
-                return [new TranslationReference(
-                    $declaration->key(),
-                    $declaration->domain(),
-                    $request->document->uri(),
-                    $declaration->range(),
-                ), $request->project];
-            }
-        }
-        foreach ($facts->references() as $reference) {
-            $start = $this->converter->toByteOffset($request->document->text(), $reference->range()->start());
-            $end = $this->converter->toByteOffset($request->document->text(), $reference->range()->end());
-            if ($offset >= $start && $offset <= $end) {
-                return [$reference, $request->project];
-            }
-        }
 
-        return null;
+        return $resolved;
     }
 
     private function declarationText(string $oldName, string $newName): ?string

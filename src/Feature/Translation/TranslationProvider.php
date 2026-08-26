@@ -11,7 +11,6 @@ use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TranslationProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface, ReferencesProviderInterface
@@ -25,6 +24,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         private readonly TranslationConfigurationRegistry $configuration,
         private readonly TwigCommentParser $commentParser,
         private readonly PhpCommentParserInterface $phpComments,
+        private readonly TranslationReferenceResolver $referenceResolver,
     ) {
     }
 
@@ -89,8 +89,8 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
             return null;
         }
 
-        [$reference, $project] = $resolved;
-        $index = $this->indexes->forProject($project);
+        $reference = $resolved->reference;
+        $index = $this->indexes->forProject($resolved->project);
         $messages = $index->messages($reference->domain(), $reference->key());
         $declarations = $index->declarations($reference->domain(), $reference->key());
         $item = $messages[0] ?? $declarations[0] ?? null;
@@ -120,9 +120,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
             return null;
         }
 
-        [$reference, $project] = $resolved;
-
-        return array_map(fn (TranslationDeclaration $declaration): array => $this->protocol->location($declaration->uri(), $declaration->range()), $this->indexes->forProject($project)->declarations($reference->domain(), $reference->key()));
+        return array_map(fn (TranslationDeclaration $declaration): array => $this->protocol->location($declaration->uri(), $declaration->range()), $this->indexes->forProject($resolved->project)->declarations($resolved->reference->domain(), $resolved->reference->key()));
     }
 
     public function references(array $params): ?array
@@ -132,9 +130,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
             return null;
         }
 
-        [$reference, $project] = $resolved;
-
-        return array_map(fn (TranslationReference $item): array => $this->protocol->location($item->uri(), $item->range()), $this->indexes->forProject($project)->references($reference->domain(), $reference->key()));
+        return array_map(fn (TranslationReference $item): array => $this->protocol->location($item->uri(), $item->range()), $this->indexes->forProject($resolved->project)->references($resolved->reference->domain(), $resolved->reference->key()));
     }
 
     public function name(): string
@@ -195,41 +191,10 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         return $diagnostics;
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{TranslationReference, Project}|null
-     */
-    private function resolve(array $params): ?array
+    /** @param array<array-key, mixed> $params */
+    private function resolve(array $params): ?ResolvedTranslationReference
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $facts = $this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text());
-        foreach ($facts->declarations() as $declaration) {
-            $start = $this->converter->toByteOffset($request->document->text(), $declaration->range()->start());
-            $end = $this->converter->toByteOffset($request->document->text(), $declaration->range()->end());
-            if ($offset >= $start && $offset <= $end) {
-                return [new TranslationReference(
-                    $declaration->key(),
-                    $declaration->domain(),
-                    $request->document->uri(),
-                    $declaration->range(),
-                ), $request->project];
-            }
-        }
-        foreach ($facts->references() as $reference) {
-            $start = $this->converter->toByteOffset($request->document->text(), $reference->range()->start());
-            $end = $this->converter->toByteOffset($request->document->text(), $reference->range()->end());
-            if ($offset >= $start && $offset <= $end) {
-                return [$reference, $request->project];
-            }
-        }
-
-        return null;
+        return $this->referenceResolver->resolve($params);
     }
 
     /** @return list<string> */

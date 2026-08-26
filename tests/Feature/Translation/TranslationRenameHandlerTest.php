@@ -9,6 +9,7 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Translation\TranslationExtractor;
 use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
+use Symfony\Lsp\Feature\Translation\TranslationReferenceResolver;
 use Symfony\Lsp\Feature\Translation\TranslationRenameHandler;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -41,10 +42,8 @@ final class TranslationRenameHandlerTest extends TestCase
             $extractor->extract($referenceUri, 'php', $reference),
         );
         $handler = new TranslationRenameHandler(
-            new DocumentContextResolver($documents, $projects),
-            $converter,
+            new TranslationReferenceResolver(new DocumentContextResolver($documents, $projects), $converter, $extractor),
             new LspProtocolMapper(),
-            $extractor,
             $indexes,
             new ProjectPathResolver(new UriToPathConverter()),
         );
