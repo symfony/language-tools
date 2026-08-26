@@ -71,6 +71,28 @@ final class PositionConverterTest extends TestCase
         self::assertSame(5, $converter->toByteOffset('a😀b', new Position(0, 2)));
     }
 
+    public function testCreatesRangesFromByteOffsetsAndLengths(): void
+    {
+        $range = (new PositionConverter())->toRange("a😀b\néx", 1, 8);
+
+        self::assertSame([0, 1], [$range->start()->line(), $range->start()->character()]);
+        self::assertSame([1, 1], [$range->end()->line(), $range->end()->character()]);
+    }
+
+    public function testChecksWhetherByteOffsetsAreWithinRanges(): void
+    {
+        $converter = new PositionConverter();
+        $text = "a😀b\néx";
+        $range = new Range(new Position(0, 1), new Position(1, 1));
+
+        self::assertFalse($converter->containsByteOffset($text, $range, 0));
+        self::assertTrue($converter->containsByteOffset($text, $range, 1));
+        self::assertTrue($converter->containsByteOffset($text, $range, 8));
+        self::assertFalse($converter->containsByteOffset($text, $range, 9));
+        self::assertTrue($converter->containsByteOffset($text, $range, 9, inclusiveEnd: true));
+        self::assertFalse($converter->containsByteOffset($text, $range, 10, inclusiveEnd: true));
+    }
+
     public function testAppliesIncrementalChangesWithUtf16Ranges(): void
     {
         $converter = new PositionConverter();

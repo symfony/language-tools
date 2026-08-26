@@ -35,6 +35,22 @@ final class PositionConverter
         return $this->map($text)->toPosition($byteOffset);
     }
 
+    public function toRange(string $text, int $byteOffset, int $byteLength): Range
+    {
+        $map = $this->map($text);
+
+        return new Range($map->toPosition($byteOffset), $map->toPosition($byteOffset + $byteLength));
+    }
+
+    public function containsByteOffset(string $text, Range $range, int $byteOffset, bool $inclusiveEnd = false): bool
+    {
+        $map = $this->map($text);
+        $start = $map->toByteOffset($range->start());
+        $end = $map->toByteOffset($range->end());
+
+        return $byteOffset >= $start && ($inclusiveEnd ? $byteOffset <= $end : $byteOffset < $end);
+    }
+
     public function applyChange(string $text, Range $range, string $replacement): string
     {
         $start = $this->toByteOffset($text, $range->start());
