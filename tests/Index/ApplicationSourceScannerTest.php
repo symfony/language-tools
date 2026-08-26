@@ -158,6 +158,27 @@ final class ApplicationSourceScannerTest extends TestCase
         self::assertSame(0, $fourthProvider->restores);
     }
 
+    public function testReindexesSameSizeContentSavedWithTheCachedModificationTime(): void
+    {
+        $path = $this->temporaryDirectory.'/.env';
+        $modifiedAt = 1_700_000_000;
+        file_put_contents($path, "FIRST=1\n");
+        touch($path, $modifiedAt);
+        $firstProvider = new RecordingSourceIndexProvider();
+        $this->scanner($firstProvider)->indexAll();
+
+        file_put_contents($path, "OTHER=1\n");
+        touch($path, $modifiedAt);
+        clearstatcache(true, $path);
+        $secondProvider = new RecordingSourceIndexProvider();
+        $this->scanner($secondProvider)->indexAll();
+
+        $uri = 'file://'.$path;
+        self::assertSame(1, $secondProvider->extractions);
+        self::assertSame(0, $secondProvider->restores);
+        self::assertSame(hash('sha256', "OTHER=1\n"), $secondProvider->sources[$uri]);
+    }
+
     public function testStoresEmptyFactsAsMarkersAndSkipsTheirRestores(): void
     {
         file_put_contents($this->temporaryDirectory.'/src/Empty.php', '<?php final class Empty1 {}');

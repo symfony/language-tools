@@ -398,8 +398,13 @@ final class ApplicationSourceScanner implements ProjectStateInterface
                 continue;
             }
 
+            $text = file_get_contents($path);
+            if (false === $text) {
+                continue;
+            }
+            $hash = hash('sha256', $text);
             $cachedEntry = $cached[$relativePath] ?? null;
-            if (null !== $cachedEntry && $this->isFresh($path, $languageId, $cachedEntry)) {
+            if (null !== $cachedEntry && $this->isFresh($path, $languageId, $hash, $cachedEntry)) {
                 try {
                     $payloads = $this->store->loadPayloads($project, $relativePath);
                     foreach ($this->providers as $provider) {
@@ -420,17 +425,13 @@ final class ApplicationSourceScanner implements ProjectStateInterface
                 continue;
             }
 
-            $text = file_get_contents($path);
-            if (false === $text) {
-                continue;
-            }
             $document = new SourceDocument($uri, $languageId, $text);
             $payloads = [];
             foreach ($this->providers as $provider) {
                 $payloads[$provider->name()] = $this->encodePayload($provider, $provider->index($project, $document));
             }
             $runtimeStructure = $this->runtimeStructureHasher->hash($relativePath, $text);
-            $entries[$relativePath] = $this->entry($path, $languageId, hash('sha256', $text), $runtimeStructure);
+            $entries[$relativePath] = $this->entry($path, $languageId, $hash, $runtimeStructure);
             $writer->add($relativePath, $entries[$relativePath], $payloads);
             // Only parsing produces cyclic garbage; restores must not pay for
             // full walks of the live facts graph.
@@ -445,11 +446,12 @@ final class ApplicationSourceScanner implements ProjectStateInterface
     /**
      * @param SourceIndexMetadata $entry
      */
-    private function isFresh(string $path, string $languageId, array $entry): bool
+    private function isFresh(string $path, string $languageId, string $hash, array $entry): bool
     {
         return $languageId === $entry['languageId']
             && filesize($path) === $entry['size']
-            && filemtime($path) === $entry['modifiedAt'];
+            && filemtime($path) === $entry['modifiedAt']
+            && $hash === $entry['hash'];
     }
 
     /**
