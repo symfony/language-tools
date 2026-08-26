@@ -22,6 +22,42 @@ final class DogfoodServerTest extends TestCase
         (new Filesystem())->remove($this->directory);
     }
 
+    public function testTerminatesTheServerWhenProtocolParsingFails(): void
+    {
+        $lockPath = Path::join($this->directory, 'server.lock');
+        $server = Path::join($this->directory, 'malformed-server');
+        file_put_contents($server, <<<'PHP'
+            #!/usr/bin/env php
+            <?php
+
+            $lock = fopen(__DIR__.'/server.lock', 'c+');
+            flock($lock, LOCK_EX);
+            fwrite(STDOUT, "Content-Length: 1\r\n\r\n{");
+            fflush(STDOUT);
+            sleep(10);
+            PHP);
+        chmod($server, 0755);
+
+        $result = (new NativeProcessRunner())->run([
+            \PHP_BINARY,
+            Path::join(\dirname(__DIR__, 3), 'tools/dogfood-server'),
+            '--index-timeout=1',
+            '--request-timeout=1',
+            $server,
+            $this->directory,
+        ], timeout: 5.0);
+
+        self::assertNotSame(0, $result->exitCode);
+        self::assertFalse($result->timedOut, $result->errorOutput);
+        $lock = fopen($lockPath, 'c+');
+        self::assertIsResource($lock);
+        try {
+            self::assertTrue(flock($lock, \LOCK_EX | \LOCK_NB));
+        } finally {
+            fclose($lock);
+        }
+    }
+
     public function testCapturesLargeServerErrorOutputWithoutBlockingProtocolResponses(): void
     {
         $server = Path::join($this->directory, 'server');

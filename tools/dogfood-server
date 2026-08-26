@@ -2,73 +2,12 @@
 <?php
 
 require __DIR__.'/../vendor/autoload.php';
+require_once __DIR__.'/ContentLengthProcessClient.php';
 
+use Symfony\Lsp\Tools\ContentLengthProcessClient;
 use Symfony\Lsp\Tools\Dogfood\ProbeFinder;
 use Symfony\Lsp\Tools\Dogfood\ProtocolValidator;
-
-function writeMessage($stream, array $message): void
-{
-    $json = json_encode($message, \JSON_THROW_ON_ERROR);
-    fwrite($stream, 'Content-Length: '.strlen($json)."\r\n\r\n".$json);
-    fflush($stream);
-}
-
-function readMessage($stream, float $timeout): ?array
-{
-    $read = [$stream];
-    $write = null;
-    $except = null;
-    $seconds = max(0, (int) $timeout);
-    $microseconds = max(0, (int) (($timeout - $seconds) * 1_000_000));
-    if (0 === stream_select($read, $write, $except, $seconds, $microseconds)) {
-        return null;
-    }
-    $length = null;
-    while (false !== $line = fgets($stream)) {
-        if ("\r\n" === $line) {
-            break;
-        }
-        if (preg_match('/^Content-Length: (\d+)\r\n$/i', $line, $matches)) {
-            $length = (int) $matches[1];
-        }
-    }
-    if (null === $length) {
-        throw new RuntimeException('Invalid response header.');
-    }
-    $json = '';
-    while (strlen($json) < $length) {
-        $chunk = fread($stream, $length - strlen($json));
-        if (false === $chunk || '' === $chunk) {
-            throw new RuntimeException('Incomplete response body.');
-        }
-        $json .= $chunk;
-    }
-
-    return json_decode($json, true, flags: \JSON_THROW_ON_ERROR);
-}
-
-function awaitResponse($input, $output, int $id, float $timeout, array &$notifications): array
-{
-    $deadline = microtime(true) + $timeout;
-    while (microtime(true) < $deadline) {
-        $message = readMessage($output, max(0.0, min(1.0, $deadline - microtime(true))));
-        if (null === $message) {
-            continue;
-        }
-        if (isset($message['method'], $message['id'])) {
-            writeMessage($input, ['jsonrpc' => '2.0', 'id' => $message['id'], 'result' => null]);
-            continue;
-        }
-        if (isset($message['method'])) {
-            $notifications[] = $message;
-            continue;
-        }
-        if (($message['id'] ?? null) === $id) {
-            return $message;
-        }
-    }
-    throw new RuntimeException(sprintf('Timed out waiting for response %d.', $id));
-}
+use Symfony\Lsp\Tools\Dogfood\ServerHarness;
 
 function uri(string $path): string
 {
@@ -124,133 +63,117 @@ $project = realpath($project);
 if (false === $project) {
     throw new RuntimeException('Project does not exist.');
 }
-$errorStream = tmpfile();
-if (false === $errorStream) {
-    throw new RuntimeException('Unable to create the Symfony Language Tools error stream.');
-}
-$process = proc_open([$server], [['pipe', 'r'], ['pipe', 'w'], $errorStream], $pipes, env_vars: getenv(), options: ['bypass_shell' => true]);
-if (!is_resource($process)) {
-    fclose($errorStream);
-    throw new RuntimeException('Unable to start Symfony Language Tools.');
-}
-$notifications = [];
-$id = 1;
-writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $id, 'method' => 'initialize', 'params' => [
-    'processId' => null,
-    'rootUri' => uri($project),
-    'workspaceFolders' => [['uri' => uri($project), 'name' => basename($project)]],
-    'capabilities' => new stdClass(),
-    'initializationOptions' => ['workspaceTrust' => true, 'runtimeIndexing' => true, 'environment' => $environment],
-]]);
-$initialize = awaitResponse($pipes[0], $pipes[1], $id, 10.0, $notifications);
-writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []]);
 
-$status = null;
-$terminal = false;
-$deadline = microtime(true) + $indexTimeout;
-while (microtime(true) < $deadline) {
-    ++$id;
-    writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $id, 'method' => 'workspace/executeCommand', 'params' => ['command' => 'symfony.indexStatus']]);
-    $response = awaitResponse($pipes[0], $pipes[1], $id, $requestTimeout, $notifications);
-    $status = $response['result'][0] ?? null;
-    if (is_array($status)
-        && in_array($status['source']['state'] ?? null, ['ready', 'failed'], true)
-        && in_array($status['runtime']['state'] ?? null, ['ready', 'failed', 'stale'], true)
-    ) {
-        $terminal = true;
-        break;
+$client = new ContentLengthProcessClient([$server], max(10.0, $requestTimeout), getenv());
+try {
+    $id = 1;
+    $initialize = $client->request($id, 'initialize', [
+        'processId' => null,
+        'rootUri' => uri($project),
+        'workspaceFolders' => [['uri' => uri($project), 'name' => basename($project)]],
+        'capabilities' => new stdClass(),
+        'initializationOptions' => ['workspaceTrust' => true, 'runtimeIndexing' => true, 'environment' => $environment],
+    ], 10.0);
+    $client->notify('initialized');
+
+    $status = null;
+    $terminal = false;
+    $deadline = microtime(true) + $indexTimeout;
+    while (microtime(true) < $deadline) {
+        $response = $client->request(++$id, 'workspace/executeCommand', ['command' => 'symfony.indexStatus'], $requestTimeout);
+        $status = $response['result'][0] ?? null;
+        if (is_array($status)
+            && in_array($status['source']['state'] ?? null, ['ready', 'failed'], true)
+            && in_array($status['runtime']['state'] ?? null, ['ready', 'failed', 'stale'], true)
+        ) {
+            $terminal = true;
+            break;
+        }
+        usleep(250_000);
     }
-    usleep(250_000);
-}
 
-$probes = (new ProbeFinder($probeRoots, $probesPerCategory))->find($project);
-$validator = new ProtocolValidator();
-
-$opened = [];
-$results = [];
-$violations = [];
-foreach ($probes as $probe) {
-    $documentUri = uri($probe->path);
-    if (!isset($opened[$documentUri])) {
-        writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'textDocument/didOpen', 'params' => ['textDocument' => [
-            'uri' => $documentUri,
-            'languageId' => languageId($probe->path),
-            'version' => 1,
-            'text' => $probe->contents,
-        ]]]);
-        $opened[$documentUri] = true;
-    }
-    $position = ['line' => $probe->line, 'character' => $probe->character];
-    $entry = [
-        'category' => $probe->category,
-        'file' => substr($probe->path, strlen($project) + 1),
-        'value' => $probe->value,
-        'requests' => [],
-    ];
-    foreach (['textDocument/completion', 'textDocument/hover', 'textDocument/definition', 'textDocument/references', 'textDocument/documentLink', 'textDocument/codeLens', 'textDocument/codeAction', 'textDocument/prepareRename', 'textDocument/rename'] as $method) {
-        ++$id;
-        $params = ['textDocument' => ['uri' => $documentUri]];
-        if (!in_array($method, ['textDocument/documentLink', 'textDocument/codeLens', 'textDocument/codeAction'], true)) {
-            $params['position'] = $position;
+    $probes = (new ProbeFinder($probeRoots, $probesPerCategory))->find($project);
+    $validator = new ProtocolValidator();
+    $opened = [];
+    $results = [];
+    $violations = [];
+    foreach ($probes as $probe) {
+        $documentUri = uri($probe->path);
+        if (!isset($opened[$documentUri])) {
+            $client->notify('textDocument/didOpen', ['textDocument' => [
+                'uri' => $documentUri,
+                'languageId' => languageId($probe->path),
+                'version' => 1,
+                'text' => $probe->contents,
+            ]]);
+            $opened[$documentUri] = true;
         }
-        if ('textDocument/codeAction' === $method) {
-            $params['range'] = ['start' => $position, 'end' => $position];
-            $params['context'] = ['diagnostics' => []];
-        }
-        if ('textDocument/references' === $method) {
-            $params['context'] = ['includeDeclaration' => true];
-        } elseif ('textDocument/rename' === $method) {
-            $params['newName'] = 'dogfood_'.str_replace(['.', '\\', '/'], '_', $probe->value);
-        }
-        $startedAt = microtime(true);
-        writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $id, 'method' => $method, 'params' => $params]);
-        $response = awaitResponse($pipes[0], $pipes[1], $id, $requestTimeout, $notifications);
-        $result = $response['result'] ?? null;
-        foreach ($validator->validate($method, $result, $project) as $violation) {
-            $violations[] = ['category' => $probe->category, 'method' => substr($method, strlen('textDocument/')), 'message' => $violation];
-        }
-        $entry['requests'][substr($method, strlen('textDocument/'))] = [
-            'milliseconds' => round((microtime(true) - $startedAt) * 1000, 1),
-            'resultCount' => is_array($result) && array_is_list($result) ? count($result) : (null === $result ? 0 : 1),
-            'error' => $response['error']['message'] ?? null,
+        $position = ['line' => $probe->line, 'character' => $probe->character];
+        $entry = [
+            'category' => $probe->category,
+            'file' => substr($probe->path, strlen($project) + 1),
+            'value' => $probe->value,
+            'requests' => [],
         ];
+        foreach (ServerHarness::PROBE_METHODS as $method) {
+            $params = ['textDocument' => ['uri' => $documentUri]];
+            if (!in_array($method, ['textDocument/documentLink', 'textDocument/codeLens', 'textDocument/codeAction'], true)) {
+                $params['position'] = $position;
+            }
+            if ('textDocument/codeAction' === $method) {
+                $params['range'] = ['start' => $position, 'end' => $position];
+                $params['context'] = ['diagnostics' => []];
+            }
+            if ('textDocument/references' === $method) {
+                $params['context'] = ['includeDeclaration' => true];
+            } elseif ('textDocument/rename' === $method) {
+                $params['newName'] = 'dogfood_'.str_replace(['.', '\\', '/'], '_', $probe->value);
+            }
+            $startedAt = microtime(true);
+            $response = $client->request(++$id, $method, $params, $requestTimeout);
+            $result = $response['result'] ?? null;
+            foreach ($validator->validate($method, $result, $project) as $violation) {
+                $violations[] = ['category' => $probe->category, 'method' => substr($method, strlen('textDocument/')), 'message' => $violation];
+            }
+            $entry['requests'][substr($method, strlen('textDocument/'))] = [
+                'milliseconds' => round((microtime(true) - $startedAt) * 1000, 1),
+                'resultCount' => is_array($result) && array_is_list($result) ? count($result) : (null === $result ? 0 : 1),
+                'error' => $response['error']['message'] ?? null,
+            ];
+        }
+        $results[] = $entry;
     }
-    $results[] = $entry;
-}
 
-foreach (array_keys($opened) as $documentUri) {
-    writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'textDocument/didClose', 'params' => ['textDocument' => ['uri' => $documentUri]]]);
-}
-++$id;
-writeMessage($pipes[0], ['jsonrpc' => '2.0', 'id' => $id, 'method' => 'shutdown', 'params' => []]);
-awaitResponse($pipes[0], $pipes[1], $id, $requestTimeout, $notifications);
-writeMessage($pipes[0], ['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []]);
-fclose($pipes[0]);
-fclose($pipes[1]);
-$exitCode = proc_close($process);
-rewind($errorStream);
-$stderr = stream_get_contents($errorStream);
-fclose($errorStream);
-$diagnostics = [];
-foreach ($notifications as $notification) {
-    if ('textDocument/publishDiagnostics' === ($notification['method'] ?? null)) {
-        $diagnostics[] = [
-            'uri' => $notification['params']['uri'] ?? null,
-            'items' => $notification['params']['diagnostics'] ?? [],
-        ];
+    foreach (array_keys($opened) as $documentUri) {
+        $client->notify('textDocument/didClose', ['textDocument' => ['uri' => $documentUri]]);
     }
-}
+    $client->request(++$id, 'shutdown', timeout: $requestTimeout);
+    $client->notify('exit');
+    $exitCode = $client->close();
+    $stderr = $client->errorOutput();
+    $diagnostics = [];
+    foreach ($client->notifications() as $notification) {
+        if ('textDocument/publishDiagnostics' === ($notification['method'] ?? null)) {
+            $diagnostics[] = [
+                'uri' => $notification['params']['uri'] ?? null,
+                'items' => $notification['params']['diagnostics'] ?? [],
+            ];
+        }
+    }
 
-echo json_encode([
-    'project' => $project,
-    'environment' => $environment,
-    'serverVersion' => $initialize['result']['serverInfo']['version'] ?? null,
-    'status' => $status,
-    'terminal' => $terminal,
-    'probeCount' => count($results),
-    'probes' => $results,
-    'violations' => $violations,
-    'diagnostics' => $diagnostics,
-    'serverError' => '' === trim($stderr) ? null : trim($stderr),
-    'exitCode' => $exitCode,
-], \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR)."\n";
+    echo json_encode([
+        'project' => $project,
+        'environment' => $environment,
+        'serverVersion' => $initialize['result']['serverInfo']['version'] ?? null,
+        'status' => $status,
+        'terminal' => $terminal,
+        'probeCount' => count($results),
+        'probes' => $results,
+        'violations' => $violations,
+        'diagnostics' => $diagnostics,
+        'serverError' => '' === trim($stderr) ? null : trim($stderr),
+        'exitCode' => $exitCode,
+    ], \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR)."\n";
+} finally {
+    $client->terminate();
+}

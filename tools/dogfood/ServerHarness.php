@@ -4,7 +4,21 @@ namespace Symfony\Lsp\Tools\Dogfood;
 
 final class ServerHarness implements HarnessInterface
 {
-    private const REQUEST_BUDGET = 180.0;
+    public const PROBE_METHODS = [
+        'textDocument/completion',
+        'textDocument/hover',
+        'textDocument/definition',
+        'textDocument/references',
+        'textDocument/documentLink',
+        'textDocument/codeLens',
+        'textDocument/codeAction',
+        'textDocument/prepareRename',
+        'textDocument/rename',
+    ];
+
+    private const INITIALIZE_TIMEOUT = 10.0;
+    private const NON_PROBE_REQUESTS = 2;
+    private const PROCESS_OVERHEAD = 5.0;
 
     public function __construct(
         private ProcessRunnerInterface $processes,
@@ -15,6 +29,9 @@ final class ServerHarness implements HarnessInterface
 
     public function run(ProjectConfiguration $configuration, string $applicationRoot): HarnessResult
     {
+        $probeCount = \count((new ProbeFinder($configuration->probeRoots, $configuration->probesPerCategory))->find($applicationRoot));
+        $requestCount = self::NON_PROBE_REQUESTS + $probeCount * \count(self::PROBE_METHODS);
+        $timeout = self::INITIALIZE_TIMEOUT + $configuration->indexTimeout + $requestCount * $configuration->requestTimeout + self::PROCESS_OVERHEAD;
         $result = $this->processes->run([
             \PHP_BINARY,
             $this->harnessPath,
@@ -25,7 +42,7 @@ final class ServerHarness implements HarnessInterface
             '--probes-per-category='.$configuration->probesPerCategory,
             $this->serverPath,
             $applicationRoot,
-        ], null, $configuration->indexTimeout + self::REQUEST_BUDGET * $configuration->probesPerCategory);
+        ], null, $timeout);
         $decoded = null;
         if ('' !== $result->standardOutput) {
             try {
