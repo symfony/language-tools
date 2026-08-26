@@ -14,6 +14,8 @@ interface SourceIndexStoreInterface
      */
     public function loadMetadata(Project $project): array;
 
+    public function beginRead(Project $project): SourceIndexReaderInterface;
+
     /**
      * The provider payloads of a single indexed file, read on demand so the
      * whole index never has to be materialized in memory.

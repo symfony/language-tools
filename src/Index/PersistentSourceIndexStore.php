@@ -31,56 +31,23 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface, Pro
 
     public function loadMetadata(Project $project): array
     {
-        $root = $project->rootPath();
-        $this->offsets[$root] = [];
-        $this->needsReset[$root] = true;
-        $path = $this->path($project);
-        if (!is_file($path)) {
-            return [];
-        }
-        $writable = false;
-        $handle = @fopen($path, 'r+');
-        if (false === $handle) {
-            $handle = @fopen($path, 'r');
-        } else {
-            $writable = true;
-        }
-        if (false === $handle) {
-            return [];
-        }
-
-        try {
-            $header = fgets($handle);
-            if (false === $header || !$this->validHeader($header)) {
-                return [];
-            }
-            $this->needsReset[$root] = false;
-
-            $metadata = [];
-            $offset = \strlen($header);
-            while (false !== ($line = fgets($handle))) {
-                $length = \strlen($line);
-                $record = $this->decodeRecord($line);
-                if (null === $record) {
-                    if (!$writable || !ftruncate($handle, $offset)) {
-                        $this->needsReset[$root] = true;
-                    }
-                    break;
-                }
-                [$relativePath, $entry] = $record;
-                if (null === $entry) {
-                    unset($metadata[$relativePath], $this->offsets[$root][$relativePath]);
-                } else {
-                    $metadata[$relativePath] = $entry;
-                    $this->offsets[$root][$relativePath] = [$offset, $length];
-                }
-                $offset += $length;
-            }
-
-            return $metadata;
-        } finally {
+        [$metadata, $handle] = $this->readMetadata($project);
+        if (null !== $handle) {
             fclose($handle);
         }
+
+        return $metadata;
+    }
+
+    public function beginRead(Project $project): SourceIndexReaderInterface
+    {
+        [$metadata, $handle] = $this->readMetadata($project);
+
+        return new PersistentSourceIndexReader(
+            $handle,
+            $metadata,
+            $this->offsets[$project->rootPath()] ?? [],
+        );
     }
 
     public function loadPayloads(Project $project, string $relativePath): array
@@ -183,6 +150,61 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface, Pro
         unset($this->offsets[$project->rootPath()], $this->needsReset[$project->rootPath()]);
     }
 
+    /**
+     * @return array{array<string, SourceIndexMetadata>, ?resource}
+     */
+    private function readMetadata(Project $project): array
+    {
+        $root = $project->rootPath();
+        $this->offsets[$root] = [];
+        $this->needsReset[$root] = true;
+        $path = $this->path($project);
+        if (!is_file($path)) {
+            return [[], null];
+        }
+        $writable = false;
+        $handle = @fopen($path, 'r+');
+        if (false === $handle) {
+            $handle = @fopen($path, 'r');
+        } else {
+            $writable = true;
+        }
+        if (false === $handle) {
+            return [[], null];
+        }
+
+        $header = fgets($handle);
+        if (false === $header || !$this->validHeader($header)) {
+            fclose($handle);
+
+            return [[], null];
+        }
+        $this->needsReset[$root] = false;
+
+        $metadata = [];
+        $offset = \strlen($header);
+        while (false !== ($line = fgets($handle))) {
+            $length = \strlen($line);
+            $record = $this->decodeRecord($line);
+            if (null === $record) {
+                if (!$writable || !ftruncate($handle, $offset)) {
+                    $this->needsReset[$root] = true;
+                }
+                break;
+            }
+            [$relativePath, $entry] = $record;
+            if (null === $entry) {
+                unset($metadata[$relativePath], $this->offsets[$root][$relativePath]);
+            } else {
+                $metadata[$relativePath] = $entry;
+                $this->offsets[$root][$relativePath] = [$offset, $length];
+            }
+            $offset += $length;
+        }
+
+        return [$metadata, $handle];
+    }
+
     private function appendLine(Project $project, string $relativePath, string $line): void
     {
         $root = $project->rootPath();
@@ -280,6 +302,77 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface, Pro
         }
 
         return $payloads;
+    }
+}
+
+/**
+ * @phpstan-import-type SourceIndexMetadata from SourceIndexStoreInterface
+ */
+final class PersistentSourceIndexReader implements SourceIndexReaderInterface
+{
+    /**
+     * @param ?resource                          $handle
+     * @param array<string, SourceIndexMetadata> $metadata
+     * @param array<string, array{int, int}>     $offsets
+     */
+    public function __construct(
+        private $handle,
+        private readonly array $metadata,
+        private readonly array $offsets,
+    ) {
+    }
+
+    public function hasRecords(): bool
+    {
+        return [] !== $this->metadata;
+    }
+
+    public function records(): iterable
+    {
+        if (null === $this->handle) {
+            return;
+        }
+        if (!rewind($this->handle) || false === $header = fgets($this->handle)) {
+            throw new \UnexpectedValueException('The source index is unreadable.');
+        }
+
+        $offset = \strlen($header);
+        while (false !== ($line = fgets($this->handle))) {
+            $length = \strlen($line);
+            $record = json_decode($line, true);
+            $relativePath = \is_array($record) ? ($record['path'] ?? null) : null;
+            if (!\is_string($relativePath)) {
+                throw new \UnexpectedValueException('The source index record is corrupted.');
+            }
+            if (($this->offsets[$relativePath] ?? null) !== [$offset, $length]) {
+                $offset += $length;
+                continue;
+            }
+            $metadata = $this->metadata[$relativePath] ?? null;
+            $providers = $record['providers'] ?? null;
+            if (null === $metadata || !\is_array($providers)) {
+                throw new \UnexpectedValueException('The source index record is corrupted.');
+            }
+            $payloads = [];
+            foreach ($providers as $name => $payload) {
+                if (!\is_string($name) || !\is_string($payload)) {
+                    throw new \UnexpectedValueException('A source index provider payload is invalid.');
+                }
+                $payloads[$name] = $payload;
+            }
+
+            yield $relativePath => ['metadata' => $metadata, 'payloads' => $payloads];
+            $offset += $length;
+        }
+    }
+
+    public function close(): void
+    {
+        if (null === $this->handle) {
+            return;
+        }
+        fclose($this->handle);
+        $this->handle = null;
     }
 }
 

@@ -366,12 +366,14 @@ foreach ([SMALL_PROJECT_FILES, LARGE_PROJECT_FILES] as $target) {
 $perFile = static fn (int|float $value, array $measurement): float => $value / max(1, $measurement['cold']['indexedFiles']);
 $coldSmallMsPerFile = $perFile($small['cold']['milliseconds'], $small);
 $coldLargeMsPerFile = $perFile($large['cold']['milliseconds'], $large);
+$warmLargeMsPerFile = $perFile($large['warm']['milliseconds'], $large);
 $scalingRatio = $coldLargeMsPerFile / max(0.001, $coldSmallMsPerFile);
 $kib = 1024;
 
 $result = [
     'measurements' => $measurements,
     'coldMillisecondsPerFile' => round($coldLargeMsPerFile, 3),
+    'warmMillisecondsPerFile' => round($warmLargeMsPerFile, 3),
     'coldScalingRatio' => round($scalingRatio, 2),
     'coldPeakKibPerFile' => round($perFile($large['cold']['peakBytes'], $large) / $kib, 1),
     'coldRetainedKibPerFile' => round($perFile($large['cold']['retainedBytes'], $large) / $kib, 1),
@@ -384,6 +386,7 @@ $result = [
         // at these sizes; healthy scans measure ~1.1.
         'coldScalesLinearly' => $scalingRatio < 1.5,
         'coldUnder25MillisecondsPerFile' => $coldLargeMsPerFile < 25,
+        'warmUnder1MillisecondPerFile' => $warmLargeMsPerFile < 1,
         'coldPeakUnder26KibPerFile' => $perFile($large['cold']['peakBytes'], $large) < 26 * $kib,
         'coldRetainedUnder16KibPerFile' => $perFile($large['cold']['retainedBytes'], $large) < 16 * $kib,
         'warmPeakUnder56KibPerFile' => $perFile($large['warm']['peakBytes'], $large) < 56 * $kib,

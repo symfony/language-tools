@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Support;
 
+use Symfony\Lsp\Index\SourceIndexReaderInterface;
 use Symfony\Lsp\Index\SourceIndexStoreInterface;
 use Symfony\Lsp\Index\SourceIndexWriterInterface;
 use Symfony\Lsp\Project\Project;
@@ -20,6 +21,14 @@ final class InMemorySourceIndexStore implements SourceIndexStoreInterface
     public function loadMetadata(Project $project): array
     {
         return $this->metadata[$project->rootPath()] ?? [];
+    }
+
+    public function beginRead(Project $project): SourceIndexReaderInterface
+    {
+        return new InMemorySourceIndexReader(
+            $this->metadata[$project->rootPath()] ?? [],
+            $this->payloads[$project->rootPath()] ?? [],
+        );
     }
 
     public function loadPayloads(Project $project, string $relativePath): array
@@ -54,6 +63,39 @@ final class InMemorySourceIndexStore implements SourceIndexStoreInterface
     {
         $this->metadata[$rootPath] = $metadata;
         $this->payloads[$rootPath] = $payloads;
+    }
+}
+
+/**
+ * @phpstan-import-type SourceIndexMetadata from SourceIndexStoreInterface
+ */
+final class InMemorySourceIndexReader implements SourceIndexReaderInterface
+{
+    /**
+     * @param array<string, SourceIndexMetadata>   $metadata
+     * @param array<string, array<string, string>> $payloads
+     */
+    public function __construct(private readonly array $metadata, private readonly array $payloads)
+    {
+    }
+
+    public function hasRecords(): bool
+    {
+        return [] !== $this->metadata;
+    }
+
+    public function records(): iterable
+    {
+        foreach ($this->metadata as $relativePath => $metadata) {
+            yield $relativePath => [
+                'metadata' => $metadata,
+                'payloads' => $this->payloads[$relativePath] ?? [],
+            ];
+        }
+    }
+
+    public function close(): void
+    {
     }
 }
 

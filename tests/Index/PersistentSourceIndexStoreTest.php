@@ -43,6 +43,26 @@ final class PersistentSourceIndexStoreTest extends TestCase
         self::assertSame([], $fresh->loadPayloads($this->project, 'src/Missing.php'));
     }
 
+    public function testSequentialReaderReturnsOnlyLatestRecords(): void
+    {
+        $store = $this->store();
+        $writer = $store->beginRewrite($this->project);
+        $writer->add('src/A.php', $this->metadata(1), ['routes' => 'stale']);
+        $writer->add('src/B.php', $this->metadata(2), ['routes' => 'deleted']);
+        $writer->commit();
+        $store->append($this->project, 'src/A.php', $this->metadata(3), ['routes' => 'current']);
+        $store->appendDeletion($this->project, 'src/B.php');
+
+        $reader = $store->beginRead($this->project);
+        $records = iterator_to_array($reader->records());
+        $reader->close();
+
+        self::assertSame(['src/A.php'], array_keys($records));
+        self::assertSame(3, $records['src/A.php']['metadata']['size']);
+        self::assertSame(['routes' => 'current'], $records['src/A.php']['payloads']);
+        self::assertSame(['routes' => 'current'], $store->loadPayloads($this->project, 'src/A.php'));
+    }
+
     public function testLastAppendedRecordWins(): void
     {
         $store = $this->store();

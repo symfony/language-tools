@@ -32,6 +32,9 @@ use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
+use Symfony\Lsp\Index\SourceIndexReaderInterface;
+use Symfony\Lsp\Index\SourceIndexStoreInterface;
+use Symfony\Lsp\Index\SourceIndexWriterInterface;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -43,6 +46,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
 use Symfony\Lsp\Tests\Support\NullProgressReporter;
 
 use function Amp\async;
@@ -156,6 +160,20 @@ final class ApplicationSourceScannerTest extends TestCase
 
         self::assertSame(1, $fourthProvider->extractions);
         self::assertSame(0, $fourthProvider->restores);
+    }
+
+    public function testWarmFullScanUsesTheScanScopedReader(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $store = new RandomAccessTrackingSourceIndexStore();
+        $this->scannerWithStore($store, [new RecordingSourceIndexProvider()])->indexAll();
+        $provider = new RecordingSourceIndexProvider();
+
+        $this->scannerWithStore($store, [$provider])->indexAll();
+
+        self::assertSame(0, $store->randomAccessReads);
+        self::assertSame(0, $provider->extractions);
+        self::assertSame(1, $provider->restores);
     }
 
     public function testReindexesSameSizeContentSavedWithTheCachedModificationTime(): void
@@ -767,19 +785,69 @@ PHP;
 
     private function scannerWithMutex(LocalKeyedMutex $mutex, DocumentStore $documents, SourceIndexProviderInterface ...$providers): ApplicationSourceScanner
     {
+        return $this->scannerWithStore(new PersistentSourceIndexStore('test', new Filesystem()), array_values($providers), $mutex, $documents);
+    }
+
+    /** @param list<SourceIndexProviderInterface> $providers */
+    private function scannerWithStore(SourceIndexStoreInterface $store, array $providers, ?LocalKeyedMutex $mutex = null, ?DocumentStore $documents = null): ApplicationSourceScanner
+    {
         return new ApplicationSourceScanner(
             $this->projects,
-            $documents,
+            $documents ?? new DocumentStore(),
             new ProjectIndexStatusRegistry(),
             new NullProgressReporter(),
-            new PersistentSourceIndexStore('test', new Filesystem()),
+            $store,
             new SourceIndexPayloadCodec(),
             new PhpRuntimeStructureHasher(),
             new UriToPathConverter(),
             new SourceFileEnumerator(new GitignoreMatcher(), $this->fileScope),
-            $mutex,
+            $mutex ?? new LocalKeyedMutex(),
             $providers,
         );
+    }
+}
+
+final class RandomAccessTrackingSourceIndexStore implements SourceIndexStoreInterface
+{
+    public int $randomAccessReads = 0;
+
+    private InMemorySourceIndexStore $store;
+
+    public function __construct()
+    {
+        $this->store = new InMemorySourceIndexStore();
+    }
+
+    public function loadMetadata(Project $project): array
+    {
+        return $this->store->loadMetadata($project);
+    }
+
+    public function beginRead(Project $project): SourceIndexReaderInterface
+    {
+        return $this->store->beginRead($project);
+    }
+
+    public function loadPayloads(Project $project, string $relativePath): array
+    {
+        ++$this->randomAccessReads;
+
+        return $this->store->loadPayloads($project, $relativePath);
+    }
+
+    public function beginRewrite(Project $project): SourceIndexWriterInterface
+    {
+        return $this->store->beginRewrite($project);
+    }
+
+    public function append(Project $project, string $relativePath, array $metadata, array $payloads): void
+    {
+        $this->store->append($project, $relativePath, $metadata, $payloads);
+    }
+
+    public function appendDeletion(Project $project, string $relativePath): void
+    {
+        $this->store->appendDeletion($project, $relativePath);
     }
 }
 
