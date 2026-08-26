@@ -7,8 +7,28 @@ use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 /** @extends AbstractSourceFactsIndex<DependencyInjectionSourceFacts> */
 final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
 {
-    /** @var array<string, list<PhpClassDeclaration>>|null */
-    private ?array $classDeclarations = null;
+    private bool $indexed = false;
+
+    /** @var array<string, list<ServiceDeclaration>> */
+    private array $serviceDeclarations = [];
+
+    /** @var array<string, list<ParameterDeclaration>> */
+    private array $parameterDeclarations = [];
+
+    /** @var array<string, array<string, list<DependencyInjectionReference>>> */
+    private array $references = [];
+
+    /** @var array<string, list<PhpClassDeclaration>> */
+    private array $classDeclarations = [];
+
+    /** @var array<string, list<ServiceDeclaration>> */
+    private array $decorators = [];
+
+    /** @var list<string> */
+    private array $serviceIds = [];
+
+    /** @var list<string> */
+    private array $parameterNames = [];
 
     /** @var array<string, bool> */
     private array $subclasses = [];
@@ -16,59 +36,31 @@ final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
     /** @return list<ServiceDeclaration> */
     public function serviceDeclarations(string $id): array
     {
-        $declarations = [];
-        foreach ($this->facts() as $source) {
-            foreach ($source->services() as $declaration) {
-                if ($declaration->id() === $id) {
-                    $declarations[] = $declaration;
-                }
-            }
-        }
+        $this->index();
 
-        return $declarations;
+        return $this->serviceDeclarations[$id] ?? [];
     }
 
     /** @return list<ParameterDeclaration> */
     public function parameterDeclarations(string $name): array
     {
-        $declarations = [];
-        foreach ($this->facts() as $source) {
-            foreach ($source->parameters() as $declaration) {
-                if ($declaration->name() === $name) {
-                    $declarations[] = $declaration;
-                }
-            }
-        }
+        $this->index();
 
-        return $declarations;
+        return $this->parameterDeclarations[$name] ?? [];
     }
 
     /** @return list<DependencyInjectionReference> */
     public function references(DependencyInjectionSymbolKind $kind, string $name): array
     {
-        $references = [];
-        foreach ($this->facts() as $source) {
-            foreach ($source->references() as $reference) {
-                if ($reference->kind() === $kind && $reference->name() === $name) {
-                    $references[] = $reference;
-                }
-            }
-        }
+        $this->index();
 
-        return $references;
+        return $this->references[$kind->value][$name] ?? [];
     }
 
     /** @return list<PhpClassDeclaration> */
     public function classDeclarations(string $className): array
     {
-        if (null === $this->classDeclarations) {
-            $this->classDeclarations = [];
-            foreach ($this->facts() as $source) {
-                foreach ($source->classes() as $declaration) {
-                    $this->classDeclarations[strtolower(ltrim($declaration->className(), '\\'))][] = $declaration;
-                }
-            }
-        }
+        $this->index();
 
         return $this->classDeclarations[strtolower(ltrim($className, '\\'))] ?? [];
     }
@@ -114,51 +106,66 @@ final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function serviceIds(): array
     {
-        $ids = [];
-        foreach ($this->facts() as $source) {
-            foreach ($source->services() as $declaration) {
-                $ids[$declaration->id()] = true;
-            }
-        }
-        $ids = array_keys($ids);
-        sort($ids);
+        $this->index();
 
-        return $ids;
+        return $this->serviceIds;
     }
 
     /** @return list<string> */
     public function parameterNames(): array
     {
-        $names = [];
-        foreach ($this->facts() as $source) {
-            foreach ($source->parameters() as $declaration) {
-                $names[$declaration->name()] = true;
-            }
-        }
-        $names = array_keys($names);
-        sort($names);
+        $this->index();
 
-        return $names;
+        return $this->parameterNames;
     }
 
     /** @return list<ServiceDeclaration> */
     public function decoratorsOf(string $id): array
     {
-        $declarations = [];
-        foreach ($this->facts() as $source) {
-            foreach ($source->services() as $declaration) {
-                if ($declaration->decorates() === $id) {
-                    $declarations[] = $declaration;
-                }
-            }
-        }
+        $this->index();
 
-        return $declarations;
+        return $this->decorators[$id] ?? [];
     }
 
     protected function factsChanged(): void
     {
-        $this->classDeclarations = null;
+        $this->indexed = false;
         $this->subclasses = [];
+    }
+
+    private function index(): void
+    {
+        if ($this->indexed) {
+            return;
+        }
+
+        $this->serviceDeclarations = [];
+        $this->parameterDeclarations = [];
+        $this->references = [];
+        $this->classDeclarations = [];
+        $this->decorators = [];
+        foreach ($this->facts() as $source) {
+            foreach ($source->services() as $declaration) {
+                $this->serviceDeclarations[$declaration->id()][] = $declaration;
+                if (null !== $decorated = $declaration->decorates()) {
+                    $this->decorators[$decorated][] = $declaration;
+                }
+            }
+            foreach ($source->parameters() as $declaration) {
+                $this->parameterDeclarations[$declaration->name()][] = $declaration;
+            }
+            foreach ($source->references() as $reference) {
+                $this->references[$reference->kind()->value][$reference->name()][] = $reference;
+            }
+            foreach ($source->classes() as $declaration) {
+                $this->classDeclarations[strtolower(ltrim($declaration->className(), '\\'))][] = $declaration;
+            }
+        }
+
+        $this->serviceIds = array_keys($this->serviceDeclarations);
+        sort($this->serviceIds);
+        $this->parameterNames = array_keys($this->parameterDeclarations);
+        sort($this->parameterNames);
+        $this->indexed = true;
     }
 }
