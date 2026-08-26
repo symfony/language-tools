@@ -35,7 +35,17 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface, Pro
         $this->offsets[$root] = [];
         $this->needsReset[$root] = true;
         $path = $this->path($project);
-        if (!is_file($path) || false === $handle = @fopen($path, 'r')) {
+        if (!is_file($path)) {
+            return [];
+        }
+        $writable = false;
+        $handle = @fopen($path, 'r+');
+        if (false === $handle) {
+            $handle = @fopen($path, 'r');
+        } else {
+            $writable = true;
+        }
+        if (false === $handle) {
             return [];
         }
 
@@ -52,7 +62,9 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface, Pro
                 $length = \strlen($line);
                 $record = $this->decodeRecord($line);
                 if (null === $record) {
-                    // A torn tail from a crashed append invalidates the rest.
+                    if (!$writable || !ftruncate($handle, $offset)) {
+                        $this->needsReset[$root] = true;
+                    }
                     break;
                 }
                 [$relativePath, $entry] = $record;

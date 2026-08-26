@@ -88,6 +88,23 @@ final class PersistentSourceIndexStoreTest extends TestCase
         self::assertSame(['routes' => 'payload'], $fresh->loadPayloads($this->project, 'src/A.php'));
     }
 
+    public function testAppendsAfterATornTailRemainReadableAfterRestart(): void
+    {
+        $store = $this->store();
+        $writer = $store->beginRewrite($this->project);
+        $writer->add('src/A.php', $this->metadata(1), ['routes' => 'payload-a']);
+        $writer->commit();
+        file_put_contents($store->path($this->project), '{"path":"src/Torn.php"', \FILE_APPEND);
+
+        $fresh = $this->store();
+        $fresh->append($this->project, 'src/B.php', $this->metadata(2), ['routes' => 'payload-b']);
+
+        $restarted = $this->store();
+        self::assertSame(['src/A.php', 'src/B.php'], array_keys($restarted->loadMetadata($this->project)));
+        self::assertSame(['routes' => 'payload-a'], $restarted->loadPayloads($this->project, 'src/A.php'));
+        self::assertSame(['routes' => 'payload-b'], $restarted->loadPayloads($this->project, 'src/B.php'));
+    }
+
     public function testDiscardsCachesFromOtherServerVersions(): void
     {
         $store = $this->store();
