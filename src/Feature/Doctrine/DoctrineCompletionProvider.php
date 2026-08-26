@@ -6,7 +6,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 
-final class DoctrineEntityTypeProvider implements CompletionProviderInterface
+final class DoctrineCompletionProvider implements CompletionProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
@@ -25,10 +25,14 @@ final class DoctrineEntityTypeProvider implements CompletionProviderInterface
         }
         $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
         $context = $this->extractor->completionContext($request->document->languageId(), $request->document->text(), $offset);
-        if (null === $context || DoctrineCompletionKind::EntityTypeField !== $context->kind()) {
+        if (null === $context) {
             return null;
         }
+        $index = $this->indexes->forProject($request->project);
 
-        return $this->completionBuilder->build($context, $this->indexes->forProject($request->project));
+        return match ($context->kind()) {
+            DoctrineCompletionKind::EntityTypeField => $this->completionBuilder->build($context, $index),
+            DoctrineCompletionKind::RepositoryCriteria => $this->completionBuilder->build($context, $index),
+        };
     }
 }

@@ -10,9 +10,8 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Feature\Doctrine\DoctrineCriteriaProvider;
+use Symfony\Lsp\Feature\Doctrine\DoctrineCompletionProvider;
 use Symfony\Lsp\Feature\Doctrine\DoctrineEntity;
-use Symfony\Lsp\Feature\Doctrine\DoctrineEntityTypeProvider;
 use Symfony\Lsp\Feature\Doctrine\DoctrineExtractor;
 use Symfony\Lsp\Feature\Doctrine\DoctrineField;
 use Symfony\Lsp\Feature\Doctrine\DoctrineFieldCompletionBuilder;
@@ -149,14 +148,13 @@ final class DoctrineProviderTest extends TestCase
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $completionBuilder = new DoctrineFieldCompletionBuilder($protocol);
-        $entityTypeProvider = new DoctrineEntityTypeProvider($resolver, $converter, $indexes, $extractor, $completionBuilder);
-        $criteriaProvider = new DoctrineCriteriaProvider($resolver, $converter, $indexes, $extractor, $completionBuilder);
+        $completionProvider = new DoctrineCompletionProvider($resolver, $converter, $indexes, $extractor, $completionBuilder);
         $relationshipProvider = new DoctrineRelationshipProvider($resolver, $converter, $protocol, $indexes, $extractor);
         $codeLensProvider = new DoctrineRelationshipCodeLensProvider($resolver, $protocol, $indexes, $extractor);
 
-        self::assertSame(['name'], array_column($entityTypeProvider->complete($this->params($converter, $formCompletionUri, $formCompletionText, \strlen($formCompletionText))) ?? [], 'label'));
-        self::assertSame(['name'], array_column($criteriaProvider->complete($this->params($converter, $repositoryCompletionUri, $repositoryCompletionText, \strlen($repositoryCompletionText))) ?? [], 'label'));
-        self::assertSame(['category'], array_column($criteriaProvider->complete($this->params($converter, $managerCompletionUri, $managerCompletionText, \strlen($managerCompletionText))) ?? [], 'label'));
+        self::assertSame(['name'], array_column($completionProvider->complete($this->params($converter, $formCompletionUri, $formCompletionText, \strlen($formCompletionText))) ?? [], 'label'));
+        self::assertSame(['name'], array_column($completionProvider->complete($this->params($converter, $repositoryCompletionUri, $repositoryCompletionText, \strlen($repositoryCompletionText))) ?? [], 'label'));
+        self::assertSame(['category'], array_column($completionProvider->complete($this->params($converter, $managerCompletionUri, $managerCompletionText, \strlen($managerCompletionText))) ?? [], 'label'));
 
         $fieldParams = $this->params($converter, $usageUri, $usageText, strpos($usageText, "['name'") + 3);
         self::assertSame([$entityUri], array_column($relationshipProvider->definition($fieldParams) ?? [], 'uri'));

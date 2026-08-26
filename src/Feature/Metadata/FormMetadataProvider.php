@@ -6,12 +6,11 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
-final class FormMetadataProvider implements CompletionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface
+final class FormMetadataProvider implements DiagnosticProviderInterface, HoverProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
@@ -20,37 +19,6 @@ final class FormMetadataProvider implements CompletionProviderInterface, Diagnos
         private readonly MetadataIndexRegistry $indexes,
         private readonly MetadataExtractor $extractor,
     ) {
-    }
-
-    public function complete(array $params): ?array
-    {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $context = $this->extractor->completionContext($request->document->languageId(), $request->document->text(), $offset);
-        if (null === $context || MetadataCompletionKind::FormOption !== $context->kind()) {
-            return null;
-        }
-        $type = null === $context->owner() ? null : $this->indexes->forProject($request->project)->formType($context->owner());
-        if (null === $type) {
-            return [];
-        }
-        $items = [];
-        foreach ($type->options() as $option) {
-            if (!str_starts_with($option, $context->prefix())) {
-                continue;
-            }
-            $items[] = [
-                'label' => $option,
-                'detail' => \in_array($option, $type->requiredOptions(), true) ? 'Required form option' : 'Form option',
-                'kind' => 14,
-                'textEdit' => $this->protocol->textEdit($context->range(), $option),
-            ];
-        }
-
-        return $items;
     }
 
     public function hover(array $params): ?array

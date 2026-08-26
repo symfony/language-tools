@@ -14,8 +14,10 @@ use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
+use Symfony\Lsp\Feature\Doctrine\DoctrineCompletionProvider;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
+use Symfony\Lsp\Feature\Metadata\MetadataCompletionProvider;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
@@ -63,6 +65,16 @@ final class ServiceConfigurationTest extends TestCase
                 }
             }
         }
+    }
+
+    public function testRegistersOneCompletionProviderPerMetadataDomain(): void
+    {
+        $providers = array_keys($this->container()->findTaggedServiceIds('lsp.provider.completion'));
+        $metadataProviders = array_values(array_filter($providers, static fn (string $provider): bool => str_starts_with($provider, 'Symfony\\Lsp\\Feature\\Metadata\\')));
+        $doctrineProviders = array_values(array_filter($providers, static fn (string $provider): bool => str_starts_with($provider, 'Symfony\\Lsp\\Feature\\Doctrine\\')));
+
+        self::assertSame([MetadataCompletionProvider::class], $metadataProviders);
+        self::assertSame([DoctrineCompletionProvider::class], $doctrineProviders);
     }
 
     public function testEveryProjectStateServiceIsReleasedOnProjectRemoval(): void

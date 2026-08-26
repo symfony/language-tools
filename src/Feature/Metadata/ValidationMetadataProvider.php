@@ -6,51 +6,19 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
-final class ValidationMetadataProvider implements CompletionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface
+final class ValidationMetadataProvider implements DiagnosticProviderInterface, HoverProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly MetadataIndexRegistry $indexes,
-        private readonly MetadataSourceIndexRegistry $sourceIndexes,
         private readonly MetadataExtractor $extractor,
     ) {
-    }
-
-    public function complete(array $params): ?array
-    {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $context = $this->extractor->completionContext($request->document->languageId(), $request->document->text(), $offset);
-        if (null === $context || !\in_array($context->kind(), [MetadataCompletionKind::Constraint, MetadataCompletionKind::ConstraintOption], true)) {
-            return null;
-        }
-        $index = $this->indexes->forProject($request->project);
-        $items = MetadataCompletionKind::Constraint === $context->kind()
-            ? $this->constraintItems($index, $this->sourceIndexes->forProject($request->project), $context)
-            : $this->constraintOptionItems($index, $context);
-        $completion = [];
-        foreach ($items as $item) {
-            if (!str_starts_with($item['label'], $context->prefix())) {
-                continue;
-            }
-            $completion[] = [
-                ...$item,
-                'kind' => 14,
-                'textEdit' => $this->protocol->textEdit($context->range(), $item['label']),
-            ];
-        }
-
-        return $completion;
     }
 
     public function hover(array $params): ?array
@@ -99,55 +67,6 @@ final class ValidationMetadataProvider implements CompletionProviderInterface, D
         }
 
         return $diagnostics;
-    }
-
-    /** @return list<array{label: string, detail: string}> */
-    private function constraintItems(MetadataIndex $index, MetadataSourceIndex $sourceIndex, MetadataCompletionContext $context): array
-    {
-        if ([] !== $context->candidates()) {
-            $items = [];
-            foreach ($context->candidates() as $candidate) {
-                if (null === $constraint = $index->constraint($candidate['class'])) {
-                    continue;
-                }
-                $items[] = ['label' => $candidate['label'], 'detail' => $constraint->className()];
-            }
-
-            return $items;
-        }
-        if (null !== $context->owner()) {
-            $constraint = $index->constraint($context->owner());
-
-            return null === $constraint ? [] : [[
-                'label' => $constraint->name(),
-                'detail' => $constraint->className(),
-            ]];
-        }
-        $items = [];
-        foreach ($index->constraints() as $constraint) {
-            $items[$constraint->name()] = ['label' => $constraint->name(), 'detail' => $constraint->className()];
-        }
-        foreach ($sourceIndex->names(MetadataSymbolKind::Constraint) as $name) {
-            $items[$name] ??= ['label' => $name, 'detail' => 'Validation constraint'];
-        }
-        ksort($items);
-
-        return array_values($items);
-    }
-
-    /** @return list<array{label: string, detail: string}> */
-    private function constraintOptionItems(MetadataIndex $index, MetadataCompletionContext $context): array
-    {
-        $constraint = null === $context->owner() ? null : $index->constraint($context->owner());
-        if (null === $constraint) {
-            return [];
-        }
-        $items = [];
-        foreach ($constraint->options() as $option) {
-            $items[] = ['label' => $option, 'detail' => 'Constraint option'];
-        }
-
-        return $items;
     }
 
     private function contains(Document $document, Range $range, int $offset): bool

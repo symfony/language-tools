@@ -6,14 +6,13 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
-final class MetadataRelationshipProvider implements CompletionProviderInterface, DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
+final class MetadataRelationshipProvider implements DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
@@ -22,41 +21,6 @@ final class MetadataRelationshipProvider implements CompletionProviderInterface,
         private readonly MetadataSourceIndexRegistry $sourceIndexes,
         private readonly MetadataExtractor $extractor,
     ) {
-    }
-
-    public function complete(array $params): ?array
-    {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $context = $this->extractor->completionContext($request->document->languageId(), $request->document->text(), $offset);
-        if (null === $context || MetadataCompletionKind::Property !== $context->kind()) {
-            return null;
-        }
-        $prefix = $context->owner().'::$';
-        $names = [];
-        foreach ($this->sourceIndexes->forProject($request->project)->symbols(MetadataSymbolKind::Property) as $symbol) {
-            if ($symbol->isDeclaration() && str_starts_with($symbol->name(), $prefix)) {
-                $names[substr($symbol->name(), \strlen($prefix))] = true;
-            }
-        }
-        ksort($names);
-        $items = [];
-        foreach (array_keys($names) as $name) {
-            if (!str_starts_with($name, $context->prefix())) {
-                continue;
-            }
-            $items[] = [
-                'label' => $name,
-                'detail' => 'Mapped property',
-                'kind' => 10,
-                'textEdit' => $this->protocol->textEdit($context->range(), $name),
-            ];
-        }
-
-        return $items;
     }
 
     public function hover(array $params): ?array

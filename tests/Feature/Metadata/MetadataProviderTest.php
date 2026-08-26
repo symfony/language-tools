@@ -14,12 +14,12 @@ use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\Metadata\FormMetadataProvider;
 use Symfony\Lsp\Feature\Metadata\FormType;
+use Symfony\Lsp\Feature\Metadata\MetadataCompletionProvider;
 use Symfony\Lsp\Feature\Metadata\MetadataExtractor;
 use Symfony\Lsp\Feature\Metadata\MetadataIndexRegistry;
 use Symfony\Lsp\Feature\Metadata\MetadataRelationshipProvider;
 use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexRegistry;
 use Symfony\Lsp\Feature\Metadata\MetadataSymbolKind;
-use Symfony\Lsp\Feature\Metadata\SerializerMetadataProvider;
 use Symfony\Lsp\Feature\Metadata\ValidationConstraint;
 use Symfony\Lsp\Feature\Metadata\ValidationMetadataProvider;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
@@ -93,11 +93,10 @@ final class MetadataProviderTest extends TestCase
         $documents->open(new Document($mappingUri, 'yaml', 1, $mappingText));
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
+        $completionProvider = new MetadataCompletionProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
         $formProvider = new FormMetadataProvider($resolver, $converter, $protocol, $indexes, $extractor);
-        $validationProvider = new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
-        $serializerProvider = new SerializerMetadataProvider($resolver, $converter, $protocol, $sourceIndexes, $extractor);
+        $validationProvider = new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $extractor);
         $relationshipProvider = new MetadataRelationshipProvider($resolver, $converter, $protocol, $sourceIndexes, $extractor);
-        $completionProviders = [$formProvider, $validationProvider, $serializerProvider, $relationshipProvider];
         $hoverProviders = [$relationshipProvider, $formProvider, $validationProvider];
         $diagnosticProviders = [$formProvider, $validationProvider];
 
@@ -123,9 +122,9 @@ final class MetadataProviderTest extends TestCase
             PHP;
         $documents->open(new Document($formUri, 'php', 1, $formText));
         $firstRequired = strpos($formText, 'required');
-        self::assertSame(['required'], $this->completionLabels($completionProviders, $converter, $formUri, $formText, $firstRequired + 4));
+        self::assertSame(['required'], $this->completionLabels($completionProvider, $converter, $formUri, $formText, $firstRequired + 4));
         $builderRequired = strpos($formText, 'required', $firstRequired + 1);
-        self::assertSame(['required'], $this->completionLabels($completionProviders, $converter, $formUri, $formText, $builderRequired + 4));
+        self::assertSame(['required'], $this->completionLabels($completionProvider, $converter, $formUri, $formText, $builderRequired + 4));
         self::assertSame(['form.unknown_option'], array_column($this->diagnostics($diagnosticProviders, $formUri), 'code'));
         $required = strpos($formText, 'required') + 1;
         self::assertIsArray($this->hover($hoverProviders, $converter, $formUri, $formText, $required));
@@ -152,11 +151,11 @@ final class MetadataProviderTest extends TestCase
         $documents->open(new Document($constraintUri, 'php', 1, $constraintText));
         $dependencyInjectionWhen = strpos($constraintText, 'exp)]');
         self::assertIsInt($dependencyInjectionWhen);
-        self::assertSame([], $this->completionLabels($completionProviders, $converter, $constraintUri, $constraintText, $dependencyInjectionWhen + 3));
+        self::assertSame([], $this->completionLabels($completionProvider, $converter, $constraintUri, $constraintText, $dependencyInjectionWhen + 3));
         $validatorWhen = strpos($constraintText, 'exp)]', $dependencyInjectionWhen + 1);
         self::assertIsInt($validatorWhen);
-        self::assertSame(['expression'], $this->completionLabels($completionProviders, $converter, $constraintUri, $constraintText, $validatorWhen + 3));
-        self::assertSame(['max'], $this->completionLabels($completionProviders, $converter, $constraintUri, $constraintText, strpos($constraintText, 'ma)') + 2));
+        self::assertSame(['expression'], $this->completionLabels($completionProvider, $converter, $constraintUri, $constraintText, $validatorWhen + 3));
+        self::assertSame(['max'], $this->completionLabels($completionProvider, $converter, $constraintUri, $constraintText, strpos($constraintText, 'ma)') + 2));
         self::assertNull($this->hover($hoverProviders, $converter, $constraintUri, $constraintText, strpos($constraintText, 'Assert\\When') + \strlen('Assert\\')));
         self::assertNull($this->hover($hoverProviders, $converter, $constraintUri, $constraintText, strpos($constraintText, 'env:') + 1));
         self::assertIsArray($this->hover($hoverProviders, $converter, $constraintUri, $constraintText, strpos($constraintText, 'unknown:') + 1));
@@ -173,7 +172,7 @@ final class MetadataProviderTest extends TestCase
             #[L
             PHP;
         $documents->open(new Document($directConstraintUri, 'php', 1, $directConstraintText));
-        self::assertSame(['Language', 'Length'], $this->completionLabels($completionProviders, $converter, $directConstraintUri, $directConstraintText, \strlen($directConstraintText)));
+        self::assertSame(['Language', 'Length'], $this->completionLabels($completionProvider, $converter, $directConstraintUri, $directConstraintText, \strlen($directConstraintText)));
 
         $aliasedConstraintUri = 'file:///workspace/src/Dto/AliasedInput.php';
         $aliasedConstraintText = <<<'PHP'
@@ -183,7 +182,7 @@ final class MetadataProviderTest extends TestCase
             #[AssertL
             PHP;
         $documents->open(new Document($aliasedConstraintUri, 'php', 1, $aliasedConstraintText));
-        self::assertSame(['AssertLength'], $this->completionLabels($completionProviders, $converter, $aliasedConstraintUri, $aliasedConstraintText, \strlen($aliasedConstraintText)));
+        self::assertSame(['AssertLength'], $this->completionLabels($completionProvider, $converter, $aliasedConstraintUri, $aliasedConstraintText, \strlen($aliasedConstraintText)));
 
         $validationUri = 'file:///workspace/config/validator/User.yaml';
         $validationText = <<<'YAML'
@@ -195,22 +194,22 @@ final class MetadataProviderTest extends TestCase
                             maximum: 200
             YAML;
         $documents->open(new Document($validationUri, 'yaml', 1, $validationText));
-        self::assertSame(['max'], $this->completionLabels($completionProviders, $converter, $validationUri, $validationText, strpos($validationText, 'max:') + 3));
+        self::assertSame(['max'], $this->completionLabels($completionProvider, $converter, $validationUri, $validationText, strpos($validationText, 'max:') + 3));
         self::assertSame(['validation.unknown_constraint_option'], array_column($this->diagnostics($diagnosticProviders, $validationUri), 'code'));
         $constraintNameUri = 'file:///workspace/config/validator/Custom.yaml';
         $constraintNameText = "App\\Entity\\User:\n    properties:\n        email:\n            - Sl";
         $documents->open(new Document($constraintNameUri, 'yaml', 1, $constraintNameText));
-        self::assertSame(['Slug'], $this->completionLabels($completionProviders, $converter, $constraintNameUri, $constraintNameText, \strlen($constraintNameText)));
+        self::assertSame(['Slug'], $this->completionLabels($completionProvider, $converter, $constraintNameUri, $constraintNameText, \strlen($constraintNameText)));
 
         $groupUri = 'file:///workspace/src/Serializer.php';
         $groupText = "<?php\n\$context = ['groups' => ['ad";
         $documents->open(new Document($groupUri, 'php', 1, $groupText));
-        self::assertSame(['admin'], $this->completionLabels($completionProviders, $converter, $groupUri, $groupText, \strlen($groupText)));
+        self::assertSame(['admin'], $this->completionLabels($completionProvider, $converter, $groupUri, $groupText, \strlen($groupText)));
 
         $propertyUri = 'file:///workspace/config/serializer/Completion.yaml';
         $propertyText = "App\\Entity\\User:\n    attributes:\n        em";
         $documents->open(new Document($propertyUri, 'yaml', 1, $propertyText));
-        self::assertSame(['email'], $this->completionLabels($completionProviders, $converter, $propertyUri, $propertyText, \strlen($propertyText)));
+        self::assertSame(['email'], $this->completionLabels($completionProvider, $converter, $propertyUri, $propertyText, \strlen($propertyText)));
 
         $mappedClass = strpos($mappingText, 'App\\Entity\\User') + 1;
         $classDefinition = $relationshipProvider->definition($this->params($converter, $mappingUri, $mappingText, $mappedClass));
@@ -268,7 +267,25 @@ final class MetadataProviderTest extends TestCase
         self::assertSame(['active_constraint'], array_column($constraintOptions, 'option'));
         self::assertSame(strpos($text, 'active_constraint'), $converter->toByteOffset($text, $constraintOptions[0]['range']->start()));
 
-        $symbols = $extractor->extract('file:///workspace/src/Controller/EventController.php', 'php', $text)->symbols();
+        $uri = 'file:///workspace/src/Controller/EventController.php';
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $projects = new ProjectRegistry();
+        $projects->replace([$project]);
+        $indexes = new MetadataIndexRegistry();
+        $indexes->forProject($project)->replace(
+            [new FormType('App\\Form\\EventType', 'event', ['active_form'], [])],
+            [new ValidationConstraint('Length', 'Symfony\\Component\\Validator\\Constraints\\Length', ['active_constraint'])],
+            true,
+            true,
+        );
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $resolver = new DocumentContextResolver($documents, $projects);
+        $protocol = new LspProtocolMapper();
+        self::assertSame([], (new FormMetadataProvider($resolver, $converter, $protocol, $indexes, $extractor))->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], (new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $extractor))->diagnostics(['textDocument' => ['uri' => $uri]]));
+
+        $symbols = $extractor->extract($uri, 'php', $text)->symbols();
         $serializerGroups = [];
         foreach ($symbols as $symbol) {
             self::assertStringNotContainsString('commented_', $symbol->name());
@@ -281,22 +298,11 @@ final class MetadataProviderTest extends TestCase
         self::assertSame(strpos($text, 'active_group'), $converter->toByteOffset($text, $serializerGroups[0]->range()->start()));
     }
 
-    /**
-     * @param list<CompletionProviderInterface> $providers
-     *
-     * @return list<string>
-     */
-    private function completionLabels(array $providers, PositionConverter $converter, string $uri, string $text, int $offset): array
+    /** @return list<string> */
+    private function completionLabels(CompletionProviderInterface $provider, PositionConverter $converter, string $uri, string $text, int $offset): array
     {
-        $items = [];
-        foreach ($providers as $provider) {
-            $completion = $provider->complete($this->params($converter, $uri, $text, $offset));
-            if (null !== $completion) {
-                array_push($items, ...$completion);
-            }
-        }
         /** @var list<string> $labels */
-        $labels = array_column($items, 'label');
+        $labels = array_column($provider->complete($this->params($converter, $uri, $text, $offset)) ?? [], 'label');
 
         return $labels;
     }
