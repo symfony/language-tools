@@ -20,6 +20,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly RouteReferenceExtractor $phpReferenceExtractor,
         private readonly PhpCommentParserInterface $phpComments,
+        private readonly RouteCompletionBuilder $completionBuilder,
     ) {
     }
 
@@ -68,7 +69,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
             }
 
             return $this->withTextEdits(
-                (new RouteCompletionProvider($routeIndex))->complete($routeContext->prefix()),
+                $this->completionBuilder->complete($routeIndex, $routeContext->prefix()),
                 $routeContext->replacementRange(),
             );
         }
@@ -108,7 +109,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         }
 
         return $this->withTextEdits(
-            (new RouteCompletionProvider($routeIndex))->complete($routeContext->prefix()),
+            $this->completionBuilder->complete($routeIndex, $routeContext->prefix()),
             $routeContext->replacementRange(),
         );
     }

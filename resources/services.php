@@ -31,7 +31,6 @@ use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderRegistry;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Feature\RenameProviderRegistry;
-use Symfony\Lsp\Feature\Route\RouteCompletionProvider;
 use Symfony\Lsp\Feature\Route\RouteSnapshotLoader;
 use Symfony\Lsp\Feature\Security\SecurityUserProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusCodeLensProvider;
@@ -148,7 +147,7 @@ return static function (ContainerConfigurator $container): void {
             '../src/Feature/'.$feature.'/*{Provider,Handler,Extractor,Indexer,Registry,Resolver,Loader,Publisher,Parser,Validator,Builder}.php',
         );
     }
-    foreach ([MessengerHandler::class, RouteCompletionProvider::class, RouteSnapshotLoader::class, SecurityUserProvider::class] as $class) {
+    foreach ([MessengerHandler::class, RouteSnapshotLoader::class, SecurityUserProvider::class] as $class) {
         $services->remove($class);
     }
 

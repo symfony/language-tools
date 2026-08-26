@@ -3,11 +3,11 @@
 namespace Symfony\Lsp\Tests\Feature\Route;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Feature\Route\RouteCompletionProvider;
+use Symfony\Lsp\Feature\Route\RouteCompletionBuilder;
 use Symfony\Lsp\Feature\Route\RouteIndex;
 use Symfony\Lsp\Feature\Route\RouteSnapshotLoader;
 
-final class RouteCompletionProviderTest extends TestCase
+final class RouteCompletionBuilderTest extends TestCase
 {
     public function testCompletesRoutesLoadedFromRuntimeSnapshot(): void
     {
@@ -29,7 +29,7 @@ final class RouteCompletionProviderTest extends TestCase
         self::assertSame([
             ['label' => 'article_edit', 'kind' => 12, 'detail' => '/article/{id}/edit'],
             ['label' => 'article_show', 'kind' => 12, 'detail' => '/article/{id}'],
-        ], (new RouteCompletionProvider($index))->complete('article_'));
+        ], (new RouteCompletionBuilder())->complete($index, 'article_'));
         self::assertTrue($index->isResource('config/routes.yaml'));
         self::assertTrue($index->isResource('config/http_endpoints.yaml'));
     }
@@ -51,7 +51,7 @@ final class RouteCompletionProviderTest extends TestCase
 
         self::assertSame([
             ['label' => 'app_home', 'kind' => 12, 'detail' => 'Symfony route'],
-        ], (new RouteCompletionProvider($index))->complete('app_'));
+        ], (new RouteCompletionBuilder())->complete($index, 'app_'));
     }
 
     public function testIgnoresMalformedSnapshotEntries(): void
@@ -65,7 +65,7 @@ final class RouteCompletionProviderTest extends TestCase
             ]],
         ]);
 
-        self::assertSame([], (new RouteCompletionProvider($index))->complete(''));
+        self::assertSame([], (new RouteCompletionBuilder())->complete($index, ''));
         self::assertTrue($index->isResource('config/routes.yaml'));
     }
 

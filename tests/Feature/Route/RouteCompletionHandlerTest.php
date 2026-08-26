@@ -12,6 +12,7 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\Route;
+use Symfony\Lsp\Feature\Route\RouteCompletionBuilder;
 use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
@@ -275,6 +276,7 @@ final class RouteCompletionHandlerTest extends TestCase
             $classIndexes ?? new DependencyInjectionSourceIndexRegistry(),
             new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter), new PhpCommentParser()),
             new PhpCommentParser(),
+            new RouteCompletionBuilder(),
         );
     }
 }

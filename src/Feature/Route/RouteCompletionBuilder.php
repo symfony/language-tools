@@ -2,17 +2,12 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
-final class RouteCompletionProvider
+final class RouteCompletionBuilder
 {
-    public function __construct(
-        private readonly RouteIndex $routeIndex,
-    ) {
-    }
-
     /**
      * @return list<array{label: string, kind: int, detail: string}>
      */
-    public function complete(string $prefix): array
+    public function complete(RouteIndex $routeIndex, string $prefix): array
     {
         return array_map(
             static fn (Route $route): array => [
@@ -20,7 +15,7 @@ final class RouteCompletionProvider
                 'kind' => 12,
                 'detail' => $route->path() ?? 'Symfony route',
             ],
-            $this->routeIndex->matching($prefix),
+            $routeIndex->matching($prefix),
         );
     }
 }
