@@ -69,7 +69,9 @@ final class ServiceConfigurationTest extends TestCase
 
     public function testRegistersOneCompletionProviderPerMetadataDomain(): void
     {
-        $providers = array_keys($this->container()->findTaggedServiceIds('lsp.provider.completion'));
+        $container = $this->container();
+        $container->compile();
+        $providers = array_keys($container->findTaggedServiceIds('lsp.provider.completion'));
         $metadataProviders = array_values(array_filter($providers, static fn (string $provider): bool => str_starts_with($provider, 'Symfony\\Lsp\\Feature\\Metadata\\')));
         $doctrineProviders = array_values(array_filter($providers, static fn (string $provider): bool => str_starts_with($provider, 'Symfony\\Lsp\\Feature\\Doctrine\\')));
 
