@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
@@ -238,21 +237,21 @@ final class TranslationExtractor
                 $key,
                 $domain,
                 $uri,
-                $this->range($text, $offset, $rangeLength),
+                $this->converter->toRange($text, $offset, $rangeLength),
                 null === $parameters || null === $placeholders || $this->dynamicParameters($text, $matches[0][$i], $parameters) ? null : array_values(array_unique($placeholders)),
             );
         }
         if ('twig' === $languageId) {
             preg_match_all('/\b(?:trans|t)\s*\(\s*(?|(\')((?:\\\\.|[^\'\\\\])+)\'|(\")((?:\\\\.|[^\"#\\\\])+)\")(?=\s*[,\)])/s', $text, $calls, \PREG_OFFSET_CAPTURE);
             foreach ($calls[2] as [$key, $offset]) {
-                $result[] = new TranslationReference($this->twigString($key), $defaultDomain, $uri, $this->range($text, $offset, \strlen($key)));
+                $result[] = new TranslationReference($this->twigString($key), $defaultDomain, $uri, $this->converter->toRange($text, $offset, \strlen($key)));
             }
             preg_match_all('/{%\s*trans(?:\s+from\s+(?|(\')((?:\\\\.|[^\'\\\\])+)\'|(\")((?:\\\\.|[^\"#\\\\])+)\"))?\s*%}(.+?){%\s*endtrans\s*%}/s', $text, $tags, \PREG_OFFSET_CAPTURE);
             foreach ($tags[3] as $i => [$message, $offset]) {
                 $domain = \is_string($tags[2][$i][0] ?? null) ? $this->twigString($tags[2][$i][0]) : $defaultDomain;
                 $key = trim($message);
                 $offset += \strlen($message) - \strlen(ltrim($message));
-                $result[] = new TranslationReference($key, $domain, $uri, $this->range($text, $offset, \strlen($key)));
+                $result[] = new TranslationReference($key, $domain, $uri, $this->converter->toRange($text, $offset, \strlen($key)));
             }
         }
 
@@ -530,11 +529,6 @@ final class TranslationExtractor
     {
         $icu = str_ends_with($domain, '+intl-icu');
 
-        return new TranslationDeclaration($key, $icu ? substr($domain, 0, -\strlen('+intl-icu')) : $domain, $locale, $message, $uri, $this->range($text, $offset, $rangeLength ?? \strlen($key)), $icu);
-    }
-
-    private function range(string $text, int $offset, int $length): Range
-    {
-        return new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + $length));
+        return new TranslationDeclaration($key, $icu ? substr($domain, 0, -\strlen('+intl-icu')) : $domain, $locale, $message, $uri, $this->converter->toRange($text, $offset, $rangeLength ?? \strlen($key)), $icu);
     }
 }

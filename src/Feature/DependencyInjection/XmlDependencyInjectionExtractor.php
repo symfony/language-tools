@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 
 final class XmlDependencyInjectionExtractor
 {
@@ -46,7 +45,7 @@ final class XmlDependencyInjectionExtractor
             $services[] = new ServiceDeclaration(
                 $name,
                 $uri,
-                $this->range($text, $attributesOffset + $offset, \strlen($name)),
+                $this->positionConverter->toRange($text, $attributesOffset + $offset, \strlen($name)),
                 null !== $className ? $className[0] : (str_contains($name, '\\') ? ltrim($name, '\\') : null),
                 $this->attribute($attributes, 'alias')[0] ?? null,
                 $this->attribute($attributes, 'decorates')[0] ?? null,
@@ -59,7 +58,7 @@ final class XmlDependencyInjectionExtractor
                         DependencyInjectionSymbolKind::Service,
                         $target[0],
                         $uri,
-                        $this->range($text, $attributesOffset + $target[1], \strlen($target[0])),
+                        $this->positionConverter->toRange($text, $attributesOffset + $target[1], \strlen($target[0])),
                     );
                 }
             }
@@ -70,7 +69,7 @@ final class XmlDependencyInjectionExtractor
         foreach ($matches[1] as [$attributes, $attributesOffset]) {
             $key = $this->attribute($attributes, 'key');
             if (null !== $key) {
-                $parameters[] = new ParameterDeclaration($key[0], $uri, $this->range($text, $attributesOffset + $key[1], \strlen($key[0])));
+                $parameters[] = new ParameterDeclaration($key[0], $uri, $this->positionConverter->toRange($text, $attributesOffset + $key[1], \strlen($key[0])));
             }
         }
 
@@ -85,7 +84,7 @@ final class XmlDependencyInjectionExtractor
                 DependencyInjectionSymbolKind::Service,
                 $id[0],
                 $uri,
-                $this->range($text, $attributesOffset + $id[1], \strlen($id[0])),
+                $this->positionConverter->toRange($text, $attributesOffset + $id[1], \strlen($id[0])),
                 null !== ($onInvalid = $this->attribute($attributes, 'on-invalid')) && 'exception' !== $onInvalid[0],
             );
         }
@@ -99,7 +98,7 @@ final class XmlDependencyInjectionExtractor
                 DependencyInjectionSymbolKind::Parameter,
                 $name,
                 $uri,
-                $this->range($text, $offset, \strlen($name)),
+                $this->positionConverter->toRange($text, $offset, \strlen($name)),
             );
         }
 
@@ -121,13 +120,5 @@ final class XmlDependencyInjectionExtractor
         return preg_replace_callback('/<!--.*?(?:-->|$)/s', static function (array $match): string {
             return preg_replace('/[^\r\n]/', ' ', $match[0]) ?? $match[0];
         }, $text) ?? $text;
-    }
-
-    private function range(string $text, int $offset, int $length): Range
-    {
-        return new Range(
-            $this->positionConverter->toPosition($text, $offset),
-            $this->positionConverter->toPosition($text, $offset + $length),
-        );
     }
 }

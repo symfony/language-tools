@@ -106,7 +106,7 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
         }
         preg_match_all('/^\t+\S.*$/m', $document->text(), $tabbedLines, \PREG_OFFSET_CAPTURE);
         foreach ($tabbedLines[0] as [$line, $offset]) {
-            $diagnostics[] = $this->diagnostic($this->offsetRange($document->text(), $offset, \strlen($line)), 1, 'config.malformed_structure', 'YAML indentation cannot contain tabs.');
+            $diagnostics[] = $this->diagnostic($this->converter->toRange($document->text(), $offset, \strlen($line)), 1, 'config.malformed_structure', 'YAML indentation cannot contain tabs.');
         }
 
         return $diagnostics;
@@ -206,7 +206,7 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
                 $path[] = $this->paths->phpMethodName($method[1][0]);
                 $node = $index->find($path);
                 $offset = $chain[2][1] + $method[1][1];
-                $range = $this->offsetRange($document->text(), $offset, \strlen($method[1][0]));
+                $range = $this->converter->toRange($document->text(), $offset, \strlen($method[1][0]));
                 if (null === $node) {
                     if (!$index->allowsUnknownKeys($path)) {
                         $diagnostics[] = $this->diagnostic($range, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', implode('.', $path)));
@@ -237,7 +237,7 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
             if ('' !== $tag[1][0]) {
                 $open = array_pop($elements);
                 if ($open !== $tag[2][0]) {
-                    $diagnostics[] = $this->diagnostic($this->offsetRange($document->text(), $tag[2][1], \strlen($tag[2][0])), 1, 'config.malformed_structure', \sprintf('Closing element "%s" does not match "%s".', $tag[2][0], $open ?? 'none'));
+                    $diagnostics[] = $this->diagnostic($this->converter->toRange($document->text(), $tag[2][1], \strlen($tag[2][0])), 1, 'config.malformed_structure', \sprintf('Closing element "%s" does not match "%s".', $tag[2][0], $open ?? 'none'));
                 }
                 if ([] !== $stack) {
                     array_pop($stack);
@@ -253,7 +253,7 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
                 continue;
             }
             $node = $index->find($path);
-            $nameRange = $this->offsetRange($document->text(), $tag[2][1], \strlen($name));
+            $nameRange = $this->converter->toRange($document->text(), $tag[2][1], \strlen($name));
             if (null === $node) {
                 if (!$index->allowsUnknownKeys($path)) {
                     $diagnostics[] = $this->diagnostic($nameRange, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', implode('.', $path)));
@@ -267,7 +267,7 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
                     $attributeName = str_replace('-', '_', $attribute[1][0]);
                     $child = $node->child($attributeName);
                     $attributePath = [...$path, $attributeName];
-                    $range = $this->offsetRange($document->text(), $tag[3][1] + $attribute[1][1], \strlen($attribute[1][0]));
+                    $range = $this->converter->toRange($document->text(), $tag[3][1] + $attribute[1][1], \strlen($attribute[1][0]));
                     if (null === $child) {
                         if (!$index->allowsUnknownKeys($attributePath)) {
                             $diagnostics[] = $this->diagnostic($range, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', implode('.', $attributePath)));
@@ -282,15 +282,10 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
             }
         }
         if ([] !== $elements) {
-            $diagnostics[] = $this->diagnostic($this->offsetRange($document->text(), \strlen($document->text()), 0), 1, 'config.malformed_structure', \sprintf('Element "%s" is not closed.', array_pop($elements)));
+            $diagnostics[] = $this->diagnostic($this->converter->toRange($document->text(), \strlen($document->text()), 0), 1, 'config.malformed_structure', \sprintf('Element "%s" is not closed.', array_pop($elements)));
         }
 
         return $diagnostics;
-    }
-
-    private function offsetRange(string $text, int $offset, int $length): Range
-    {
-        return new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + $length));
     }
 
     /** @return array{range: array<string, array<string, int>>, severity: int, source: string, code: string, message: string} */

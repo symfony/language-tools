@@ -101,7 +101,7 @@ final class YamlDependencyInjectionExtractor
                     $parameters[] = new ParameterDeclaration(
                         $mapping['key'],
                         $uri,
-                        $this->range($text, $lineOffset + $mapping['keyOffset'], \strlen($mapping['key'])),
+                        $this->positionConverter->toRange($text, $lineOffset + $mapping['keyOffset'], \strlen($mapping['key'])),
                     );
                     $currentService = null;
 
@@ -116,7 +116,7 @@ final class YamlDependencyInjectionExtractor
 
                 $currentService = new PendingServiceDeclaration(
                     $mapping['key'],
-                    $this->range($text, $lineOffset + $mapping['keyOffset'], \strlen($mapping['key'])),
+                    $this->positionConverter->toRange($text, $lineOffset + $mapping['keyOffset'], \strlen($mapping['key'])),
                 );
                 $services[] = $currentService;
                 $target = $this->scalar($mapping['rest']);
@@ -150,7 +150,7 @@ final class YamlDependencyInjectionExtractor
                                 DependencyInjectionSymbolKind::Service,
                                 $normalizedTarget,
                                 $uri,
-                                $this->range($text, $lineOffset + $valueOffset, \strlen($normalizedTarget)),
+                                $this->positionConverter->toRange($text, $lineOffset + $valueOffset, \strlen($normalizedTarget)),
                             );
                         }
                     }
@@ -249,7 +249,7 @@ final class YamlDependencyInjectionExtractor
                 DependencyInjectionSymbolKind::Service,
                 $name,
                 $uri,
-                $this->range($text, $lineOffset + $offset, \strlen($name)),
+                $this->positionConverter->toRange($text, $lineOffset + $offset, \strlen($name)),
                 '' !== $serviceMatches[1][$index][0],
             );
         }
@@ -275,7 +275,7 @@ final class YamlDependencyInjectionExtractor
                 DependencyInjectionSymbolKind::Parameter,
                 $name,
                 $uri,
-                $this->range($text, $lineOffset + $offset, \strlen($name)),
+                $this->positionConverter->toRange($text, $lineOffset + $offset, \strlen($name)),
             );
         }
 
@@ -351,14 +351,6 @@ final class YamlDependencyInjectionExtractor
         }
 
         return array_values($unique);
-    }
-
-    private function range(string $text, int $offset, int $length): Range
-    {
-        return new Range(
-            $this->positionConverter->toPosition($text, $offset),
-            $this->positionConverter->toPosition($text, $offset + $length),
-        );
     }
 }
 

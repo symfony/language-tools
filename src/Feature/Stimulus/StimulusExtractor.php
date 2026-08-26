@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -43,11 +42,11 @@ final class StimulusExtractor
                 str_contains($match[0], 'stimulus_action') ? StimulusMemberKind::Action : StimulusMemberKind::Target,
                 $match[2],
                 $match[4],
-                $this->range($text, $offset - \strlen($match[4]), \strlen($match[4])),
+                $this->converter->toRange($text, $offset - \strlen($match[4]), \strlen($match[4])),
             );
         }
         if (preg_match('/\bstimulus_(?:controller|action|target)\s*\(\s*([\'"])([^\'"]*)$/s', $before, $match)) {
-            return new StimulusCompletionContext(null, null, $match[2], $this->range($text, $offset - \strlen($match[2]), \strlen($match[2])));
+            return new StimulusCompletionContext(null, null, $match[2], $this->converter->toRange($text, $offset - \strlen($match[2]), \strlen($match[2])));
         }
         if (preg_match('/\bdata-action\s*=\s*([\'"])([^\'"]*)$/s', $before, $match)) {
             $token = preg_replace('/^.*\s/s', '', $match[2]);
@@ -63,21 +62,21 @@ final class StimulusExtractor
                     return null;
                 }
 
-                return new StimulusCompletionContext(StimulusMemberKind::Action, $controller, $prefix, $this->range($text, $offset - \strlen($prefix), \strlen($prefix)));
+                return new StimulusCompletionContext(StimulusMemberKind::Action, $controller, $prefix, $this->converter->toRange($text, $offset - \strlen($prefix), \strlen($prefix)));
             }
 
-            return new StimulusCompletionContext(null, null, $descriptor, $this->range($text, $offset - \strlen($descriptor), \strlen($descriptor)));
+            return new StimulusCompletionContext(null, null, $descriptor, $this->converter->toRange($text, $offset - \strlen($descriptor), \strlen($descriptor)));
         }
         if (preg_match('/\bdata-controller\s*=\s*([\'"])([^\'"]*)$/s', $before, $match)) {
             $prefix = preg_replace('/^.*\s/s', '', $match[2]);
             if (\is_string($prefix)) {
-                return new StimulusCompletionContext(null, null, $prefix, $this->range($text, $offset - \strlen($prefix), \strlen($prefix)));
+                return new StimulusCompletionContext(null, null, $prefix, $this->converter->toRange($text, $offset - \strlen($prefix), \strlen($prefix)));
             }
         }
         if (preg_match('/\bdata-([A-Za-z0-9_@.-]+)-target\s*=\s*([\'"])([^\'"]*)$/s', $before, $match)) {
             $prefix = preg_replace('/^.*\s/s', '', $match[3]);
             if (\is_string($prefix)) {
-                return new StimulusCompletionContext(StimulusMemberKind::Target, $match[1], $prefix, $this->range($text, $offset - \strlen($prefix), \strlen($prefix)));
+                return new StimulusCompletionContext(StimulusMemberKind::Target, $match[1], $prefix, $this->converter->toRange($text, $offset - \strlen($prefix), \strlen($prefix)));
             }
         }
 
@@ -106,7 +105,7 @@ final class StimulusExtractor
         return [new StimulusControllerDeclaration(
             $name,
             $uri,
-            $this->range($text, $offset, \strlen('export default class')),
+            $this->converter->toRange($text, $offset, \strlen('export default class')),
             $members,
             1 === preg_match(self::LAZY_COMMENT_PATTERN, $text),
         )];
@@ -119,7 +118,7 @@ final class StimulusExtractor
         $members = [];
         foreach ($matches[1] as [$name, $offset]) {
             if (!\in_array($name, self::LIFECYCLE_METHODS, true)) {
-                $members[] = new StimulusMember($name, StimulusMemberKind::Action, $this->range($text, $offset, \strlen($name)));
+                $members[] = new StimulusMember($name, StimulusMemberKind::Action, $this->converter->toRange($text, $offset, \strlen($name)));
             }
         }
 
@@ -137,7 +136,7 @@ final class StimulusExtractor
         preg_match_all('/([\'"])([^\'"]+)\1/', $body, $values, \PREG_OFFSET_CAPTURE);
         $members = [];
         foreach ($values[2] as [$name, $offset]) {
-            $members[] = new StimulusMember($name, $kind, $this->range($text, $bodyOffset + $offset, \strlen($name)));
+            $members[] = new StimulusMember($name, $kind, $this->converter->toRange($text, $bodyOffset + $offset, \strlen($name)));
         }
 
         return $members;
@@ -154,7 +153,7 @@ final class StimulusExtractor
         preg_match_all('/(?:^|,)\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*:/m', $body, $values, \PREG_OFFSET_CAPTURE);
         $members = [];
         foreach ($values[1] as [$name, $offset]) {
-            $members[] = new StimulusMember($name, StimulusMemberKind::Value, $this->range($text, $bodyOffset + $offset, \strlen($name)));
+            $members[] = new StimulusMember($name, StimulusMemberKind::Value, $this->converter->toRange($text, $bodyOffset + $offset, \strlen($name)));
         }
 
         return $members;
@@ -170,7 +169,7 @@ final class StimulusExtractor
         ] as $pattern) {
             preg_match_all($pattern, $text, $matches, \PREG_OFFSET_CAPTURE);
             foreach ($matches[2] as [$name, $offset]) {
-                $references[] = new StimulusReference($name, null, null, $uri, $this->range($text, $offset, \strlen($name)));
+                $references[] = new StimulusReference($name, null, null, $uri, $this->converter->toRange($text, $offset, \strlen($name)));
             }
         }
 
@@ -197,8 +196,8 @@ final class StimulusExtractor
             foreach ($actions as $action) {
                 $controller = $action[1][0];
                 $name = $action[2][0];
-                $references[] = new StimulusReference($controller, null, null, $uri, $this->range($text, $valueOffset + $action[1][1], \strlen($controller)));
-                $references[] = new StimulusReference($controller, StimulusMemberKind::Action, $name, $uri, $this->range($text, $valueOffset + $action[2][1], \strlen($name)));
+                $references[] = new StimulusReference($controller, null, null, $uri, $this->converter->toRange($text, $valueOffset + $action[1][1], \strlen($controller)));
+                $references[] = new StimulusReference($controller, StimulusMemberKind::Action, $name, $uri, $this->converter->toRange($text, $valueOffset + $action[2][1], \strlen($name)));
             }
         }
         preg_match_all('/\bdata-([A-Za-z0-9_@.-]+)-target\s*=\s*([\'"])(.*?)\2/s', $text, $attributes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
@@ -208,20 +207,20 @@ final class StimulusExtractor
             $valueOffset = $attribute[3][1];
             preg_match_all('/[A-Za-z_$][A-Za-z0-9_$]*/', $value, $targets, \PREG_OFFSET_CAPTURE);
             foreach ($targets[0] as [$name, $offset]) {
-                $references[] = new StimulusReference($controller, StimulusMemberKind::Target, $name, $uri, $this->range($text, $valueOffset + $offset, \strlen($name)));
+                $references[] = new StimulusReference($controller, StimulusMemberKind::Target, $name, $uri, $this->converter->toRange($text, $valueOffset + $offset, \strlen($name)));
             }
         }
         preg_match_all('/\bstimulus_controller\s*\(\s*([\'"])([^\'"]+)\1/', $text, $controllers, \PREG_OFFSET_CAPTURE);
         foreach ($controllers[2] as [$name, $offset]) {
-            $references[] = new StimulusReference($name, null, null, $uri, $this->range($text, $offset, \strlen($name)));
+            $references[] = new StimulusReference($name, null, null, $uri, $this->converter->toRange($text, $offset, \strlen($name)));
         }
         foreach (['action' => StimulusMemberKind::Action, 'target' => StimulusMemberKind::Target] as $function => $kind) {
             preg_match_all('/\bstimulus_'.$function.'\s*\(\s*([\'"])([^\'"]+)\1\s*,\s*([\'"])([^\'"]+)\3/', $text, $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
             foreach ($calls as $call) {
                 $controller = $call[2][0];
                 $member = $call[4][0];
-                $references[] = new StimulusReference($controller, null, null, $uri, $this->range($text, $call[2][1], \strlen($controller)));
-                $references[] = new StimulusReference($controller, $kind, $member, $uri, $this->range($text, $call[4][1], \strlen($member)));
+                $references[] = new StimulusReference($controller, null, null, $uri, $this->converter->toRange($text, $call[2][1], \strlen($controller)));
+                $references[] = new StimulusReference($controller, $kind, $member, $uri, $this->converter->toRange($text, $call[4][1], \strlen($member)));
             }
         }
 
@@ -233,7 +232,7 @@ final class StimulusExtractor
     {
         preg_match_all('/[A-Za-z0-9_@.\/-]+/', $value, $controllers, \PREG_OFFSET_CAPTURE);
         foreach ($controllers[0] as [$name, $offset]) {
-            $references[] = new StimulusReference($name, null, null, $uri, $this->range($text, $valueOffset + $offset, \strlen($name)));
+            $references[] = new StimulusReference($name, null, null, $uri, $this->converter->toRange($text, $valueOffset + $offset, \strlen($name)));
         }
     }
 
@@ -249,10 +248,5 @@ final class StimulusExtractor
         }
 
         return str_replace(['_', '/'], ['-', '--'], $match[1]);
-    }
-
-    private function range(string $text, int $offset, int $length): Range
-    {
-        return new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + $length));
     }
 }

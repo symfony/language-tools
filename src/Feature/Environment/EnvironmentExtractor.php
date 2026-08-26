@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Environment;
 
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -29,14 +28,14 @@ final class EnvironmentExtractor
                 $declarations[] = new EnvironmentDeclaration(
                     $name,
                     $uri,
-                    $this->range($text, $offset, \strlen($name)),
+                    $this->converter->toRange($text, $offset, \strlen($name)),
                     true,
                 );
             }
             preg_match_all('/(?<!\\\\)\$(?:\{)?([A-Za-z_][A-Za-z0-9_]*)/', $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
             foreach ($matches as $match) {
                 [$name, $offset] = $match[1];
-                $references[] = new EnvironmentReference($name, $uri, $this->range($text, $offset, \strlen($name)), []);
+                $references[] = new EnvironmentReference($name, $uri, $this->converter->toRange($text, $offset, \strlen($name)), []);
             }
         }
         if (\in_array($languageId, ['php', 'twig', 'yaml', 'xml'], true)) {
@@ -56,17 +55,12 @@ final class EnvironmentExtractor
                 $references[] = new EnvironmentReference(
                     $name,
                     $uri,
-                    $this->range($text, $nameOffset, \strlen($name)),
+                    $this->converter->toRange($text, $nameOffset, \strlen($name)),
                     $parts,
                 );
             }
         }
 
         return new EnvironmentSourceFacts($uri, $declarations, $references);
-    }
-
-    private function range(string $text, int $offset, int $length): Range
-    {
-        return new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + $length));
     }
 }

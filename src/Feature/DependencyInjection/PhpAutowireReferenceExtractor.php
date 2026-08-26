@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 
@@ -47,7 +46,7 @@ final class PhpAutowireReferenceExtractor
                     $kind,
                     $name,
                     $uri,
-                    $this->range($text, $offset, \strlen($rawTrimmed)),
+                    $this->positionConverter->toRange($text, $offset, \strlen($rawTrimmed)),
                     $optional,
                 );
                 if (DependencyInjectionSymbolKind::Parameter === $kind) {
@@ -72,7 +71,7 @@ final class PhpAutowireReferenceExtractor
                         DependencyInjectionSymbolKind::Parameter,
                         PhpStringLiteralDecoder::decode($text[$literal->startOffset() - 1], $rawParameter),
                         $uri,
-                        $this->range($text, $offset, \strlen($rawParameter)),
+                        $this->positionConverter->toRange($text, $offset, \strlen($rawParameter)),
                     );
                 }
             }
@@ -84,13 +83,5 @@ final class PhpAutowireReferenceExtractor
     private function raw(string $text, int $startOffset, int $endOffset): string
     {
         return substr($text, $startOffset, $endOffset - $startOffset);
-    }
-
-    private function range(string $text, int $offset, int $length): Range
-    {
-        return new Range(
-            $this->positionConverter->toPosition($text, $offset),
-            $this->positionConverter->toPosition($text, $offset + $length),
-        );
     }
 }

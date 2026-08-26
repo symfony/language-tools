@@ -84,7 +84,7 @@ final class MetadataExtractor
                 }
                 $name = $named[1][0];
                 $absolute = $argument['offset'] + $named[1][1];
-                $options[] = ['constraint' => $php->resolveName($attribute[1][0]), 'option' => $name, 'range' => $this->offsetRange($text, $absolute, \strlen($name))];
+                $options[] = ['constraint' => $php->resolveName($attribute[1][0]), 'option' => $name, 'range' => $this->converter->toRange($text, $absolute, \strlen($name))];
             }
         }
 
@@ -127,7 +127,7 @@ final class MetadataExtractor
                 MetadataSymbolKind::MappedClass,
                 $className,
                 $uri,
-                $this->offsetRange($text, $class[1][1], \strlen($class[1][0])),
+                $this->converter->toRange($text, $class[1][1], \strlen($class[1][0])),
                 true,
             );
             if (preg_match('/\bextends\s+([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)/', $class[0][0], $parent)
@@ -136,7 +136,7 @@ final class MetadataExtractor
                     MetadataSymbolKind::Constraint,
                     $class[1][0],
                     $uri,
-                    $this->offsetRange($text, $class[1][1], \strlen($class[1][0])),
+                    $this->converter->toRange($text, $class[1][1], \strlen($class[1][0])),
                     true,
                 );
             }
@@ -146,7 +146,7 @@ final class MetadataExtractor
                     MetadataSymbolKind::Property,
                     $className.'::$'.$property,
                     $uri,
-                    $this->offsetRange($text, $open + 1 + $offset, \strlen($property)),
+                    $this->converter->toRange($text, $open + 1 + $offset, \strlen($property)),
                     true,
                 );
             }
@@ -180,7 +180,7 @@ final class MetadataExtractor
             $segmentOffset = false === $separator ? 0 : $separator + 1;
             $offset = $reference[1][1] + $segmentOffset;
             $length = \strlen($reference[1][0]) - $segmentOffset;
-            $symbols[] = new MetadataSourceSymbol(MetadataSymbolKind::Constraint, $name, $uri, $this->offsetRange($text, $offset, $length), false);
+            $symbols[] = new MetadataSourceSymbol(MetadataSymbolKind::Constraint, $name, $uri, $this->converter->toRange($text, $offset, $length), false);
         }
         foreach ($php->imports() as $alias => $className) {
             if ($className === rtrim($constraintNamespace, '\\') || str_starts_with($className, $constraintNamespace)) {
@@ -192,7 +192,7 @@ final class MetadataExtractor
             preg_match_all('/#\[\s*'.preg_quote($alias, '/').'\b/', $source, $references, \PREG_OFFSET_CAPTURE);
             foreach ($references[0] as [$reference, $offset]) {
                 $nameOffset = $offset + strrpos($reference, $alias);
-                $symbols[] = new MetadataSourceSymbol(MetadataSymbolKind::Constraint, $alias, $uri, $this->offsetRange($text, $nameOffset, \strlen($alias)), false);
+                $symbols[] = new MetadataSourceSymbol(MetadataSymbolKind::Constraint, $alias, $uri, $this->converter->toRange($text, $nameOffset, \strlen($alias)), false);
             }
         }
 
@@ -240,7 +240,7 @@ final class MetadataExtractor
             $value = substr($text, $start, $end - $start);
             preg_match_all('/[A-Za-z_][A-Za-z0-9_.:-]*/', $value, $names, \PREG_OFFSET_CAPTURE);
             foreach ($names[0] as [$name, $offset]) {
-                $symbols[] = new MetadataSourceSymbol(MetadataSymbolKind::SerializerGroup, $name, $uri, $this->offsetRange($text, $start + $offset, \strlen($name)), true);
+                $symbols[] = new MetadataSourceSymbol(MetadataSymbolKind::SerializerGroup, $name, $uri, $this->converter->toRange($text, $start + $offset, \strlen($name)), true);
             }
         }
 
@@ -482,7 +482,7 @@ final class MetadataExtractor
             }
             $name = substr($text, $index + 1, $end - $index - 1);
             $absolute = $argument['offset'] + $index + 1;
-            $keys[] = ['name' => $name, 'range' => $this->offsetRange($document, $absolute, \strlen($name))];
+            $keys[] = ['name' => $name, 'range' => $this->converter->toRange($document, $absolute, \strlen($name))];
             $index = $end;
         }
 
@@ -495,7 +495,7 @@ final class MetadataExtractor
         preg_match_all('/["\']([A-Za-z_][A-Za-z0-9_.:-]*)["\']/', $fragment, $matches, \PREG_OFFSET_CAPTURE);
         $symbols = [];
         foreach ($matches[1] as [$name, $offset]) {
-            $symbols[] = new MetadataSourceSymbol($kind, $name, $uri, $this->offsetRange($text, $base + $offset, \strlen($name)), $declaration);
+            $symbols[] = new MetadataSourceSymbol($kind, $name, $uri, $this->converter->toRange($text, $base + $offset, \strlen($name)), $declaration);
         }
 
         return $symbols;
@@ -504,12 +504,7 @@ final class MetadataExtractor
     /** @param list<array{label: string, class: string}> $candidates */
     private function context(MetadataCompletionKind $kind, string $prefix, string $text, int $offset, ?string $owner = null, array $candidates = []): MetadataCompletionContext
     {
-        return new MetadataCompletionContext($kind, $prefix, $this->offsetRange($text, $offset, \strlen($prefix)), $owner, $candidates);
-    }
-
-    private function offsetRange(string $text, int $offset, int $length): Range
-    {
-        return new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + $length));
+        return new MetadataCompletionContext($kind, $prefix, $this->converter->toRange($text, $offset, \strlen($prefix)), $owner, $candidates);
     }
 
     /**

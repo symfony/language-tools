@@ -43,7 +43,7 @@ final class DoctrineExtractor
                     $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, $field->name(), $entity->className(), $uri, $field->range(), true);
                 }
                 if (null !== $repositoryClass && null !== $repositoryOffset) {
-                    $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Repository, $repositoryClass, null, $uri, $this->offsetRange($text, $repositoryOffset, $this->shortNameLengthAt($text, $repositoryOffset)), false);
+                    $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Repository, $repositoryClass, null, $uri, $this->converter->toRange($text, $repositoryOffset, $this->shortNameLengthAt($text, $repositoryOffset)), false);
                 }
             }
             $repository = $this->repository($uri, $text, $class, $php);
@@ -52,7 +52,7 @@ final class DoctrineExtractor
                 $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Repository, $repository->className(), null, $uri, $repository->range(), true);
                 $entityOffset = $this->repositoryEntityOffset($class);
                 if (null !== $entityOffset) {
-                    $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Entity, $repository->entityClass(), null, $uri, $this->offsetRange($text, $entityOffset, $this->shortNameLengthAt($text, $entityOffset)), false);
+                    $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Entity, $repository->entityClass(), null, $uri, $this->converter->toRange($text, $entityOffset, $this->shortNameLengthAt($text, $entityOffset)), false);
                 }
             }
         }
@@ -80,7 +80,7 @@ final class DoctrineExtractor
                     $php->resolveName($classes[2]),
                     null,
                     $field[1][0],
-                    $this->offsetRange($text, $field[1][1], \strlen($field[1][0])),
+                    $this->converter->toRange($text, $field[1][1], \strlen($field[1][0])),
                 );
             }
         }
@@ -116,7 +116,7 @@ final class DoctrineExtractor
             $fields[] = new DoctrineField(
                 $property[2][0],
                 $uri,
-                $this->offsetRange($text, $offset, \strlen($property[2][0])),
+                $this->converter->toRange($text, $offset, \strlen($property[2][0])),
                 $association,
                 $type,
                 $targetEntity,
@@ -199,10 +199,10 @@ final class DoctrineExtractor
             }
             $entityClass = $php->resolveName($entity[1][0]);
             $entityOffset = $open + 1 + $entity[1][1];
-            $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Entity, $entityClass, null, $uri, $this->offsetRange($text, $entityOffset, \strlen($entity[1][0])), false);
+            $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Entity, $entityClass, null, $uri, $this->converter->toRange($text, $entityOffset, \strlen($entity[1][0])), false);
             preg_match_all('/[\'"](?:choice_label|choice_value|group_by)[\'"]\s*=>\s*([\'"])([A-Za-z_][A-Za-z0-9_]*)\1/', $options, $fields, \PREG_OFFSET_CAPTURE);
             foreach ($fields[2] as [$field, $fieldOffset]) {
-                $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, $field, $entityClass, $uri, $this->offsetRange($text, $open + 1 + $fieldOffset, \strlen($field)), false);
+                $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, $field, $entityClass, $uri, $this->converter->toRange($text, $open + 1 + $fieldOffset, \strlen($field)), false);
             }
         }
 
@@ -259,7 +259,7 @@ final class DoctrineExtractor
         preg_match_all('/([\'"])([A-Za-z_][A-Za-z0-9_]*)\1\s*=>/', $array, $keys, \PREG_OFFSET_CAPTURE);
         $symbols = [];
         foreach ($keys[2] as [$field, $offset]) {
-            $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, $field, $owner, $uri, $this->offsetRange($text, $open + 1 + $offset, \strlen($field)), false);
+            $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, $field, $owner, $uri, $this->converter->toRange($text, $open + 1 + $offset, \strlen($field)), false);
         }
 
         return $symbols;
@@ -296,17 +296,17 @@ final class DoctrineExtractor
                 $owner = $repositoryVariables[$variable] ?? null;
             }
             if (null !== $owner) {
-                return new DoctrineCompletionContext(DoctrineCompletionKind::RepositoryCriteria, null, $owner, $prefix[1][0], $this->offsetRange($text, $prefix[1][1], \strlen($prefix[1][0])));
+                return new DoctrineCompletionContext(DoctrineCompletionKind::RepositoryCriteria, null, $owner, $prefix[1][0], $this->converter->toRange($text, $prefix[1][1], \strlen($prefix[1][0])));
             }
             if (isset($entityVariables[$variable])) {
-                return new DoctrineCompletionContext(DoctrineCompletionKind::RepositoryCriteria, $entityVariables[$variable], null, $prefix[1][0], $this->offsetRange($text, $prefix[1][1], \strlen($prefix[1][0])));
+                return new DoctrineCompletionContext(DoctrineCompletionKind::RepositoryCriteria, $entityVariables[$variable], null, $prefix[1][0], $this->converter->toRange($text, $prefix[1][1], \strlen($prefix[1][0])));
             }
         }
         preg_match_all('/getRepository\s*\(\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*\)\s*->\s*(?:findBy|findOneBy|count)\s*\(\s*\[/', $before, $calls, \PREG_SET_ORDER);
         if ([] !== $calls) {
             $call = $calls[array_key_last($calls)];
 
-            return new DoctrineCompletionContext(DoctrineCompletionKind::RepositoryCriteria, $php->resolveName($call[1]), null, $prefix[1][0], $this->offsetRange($text, $prefix[1][1], \strlen($prefix[1][0])));
+            return new DoctrineCompletionContext(DoctrineCompletionKind::RepositoryCriteria, $php->resolveName($call[1]), null, $prefix[1][0], $this->converter->toRange($text, $prefix[1][1], \strlen($prefix[1][0])));
         }
 
         return null;
@@ -387,7 +387,7 @@ final class DoctrineExtractor
                 'attributes' => $attributeText,
                 'attributesOffset' => $attributeOffset,
                 'before' => substr($originalBefore, max(0, \strlen($originalBefore) - 1000)),
-                'range' => $this->offsetRange($text, $match[1][1], \strlen($shortName)),
+                'range' => $this->converter->toRange($text, $match[1][1], \strlen($shortName)),
             ];
         }
 
@@ -412,10 +412,5 @@ final class DoctrineExtractor
     private function shortNameLengthAt(string $text, int $offset): int
     {
         return preg_match('/[A-Za-z_\\\\][A-Za-z0-9_\\\\]*/A', substr($text, $offset), $name) ? \strlen($name[0]) : 0;
-    }
-
-    private function offsetRange(string $text, int $offset, int $length): Range
-    {
-        return new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + $length));
     }
 }

@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -165,17 +164,12 @@ final class AssetExtractor
 
     private function context(AssetSymbolKind $kind, string $prefix, string $text, int $offset): AssetCompletionContext
     {
-        return new AssetCompletionContext($kind, $prefix, $this->offsetRange($text, $offset, \strlen($prefix)));
+        return new AssetCompletionContext($kind, $prefix, $this->converter->toRange($text, $offset, \strlen($prefix)));
     }
 
     private function symbol(AssetSymbolKind $kind, string $name, string $uri, string $text, int $offset, bool $declaration): AssetSourceSymbol
     {
-        return new AssetSourceSymbol($kind, $name, $uri, $this->offsetRange($text, $offset, \strlen($name)), $declaration);
-    }
-
-    private function offsetRange(string $text, int $offset, int $length): Range
-    {
-        return new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + $length));
+        return new AssetSourceSymbol($kind, $name, $uri, $this->converter->toRange($text, $offset, \strlen($name)), $declaration);
     }
 
     /**
