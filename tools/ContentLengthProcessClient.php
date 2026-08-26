@@ -351,14 +351,15 @@ final class ContentLengthProcessClient
         if (!\is_array($message)) {
             throw new \RuntimeException('The Content-Length response body must contain a JSON object.');
         }
-        foreach (array_keys($message) as $key) {
+        $object = [];
+        foreach ($message as $key => $value) {
             if (!\is_string($key)) {
                 throw new \RuntimeException('The Content-Length response body must contain a JSON object with string keys.');
             }
+            $object[$key] = $value;
         }
 
-        /* @var array<string, mixed> $message */
-        return $message;
+        return $object;
     }
 
     private function writeBefore(string $frame, float $deadline): void
