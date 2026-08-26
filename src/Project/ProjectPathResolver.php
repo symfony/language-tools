@@ -6,8 +6,6 @@ use Symfony\Component\Filesystem\Path;
 
 final class ProjectPathResolver
 {
-    private const READ_ONLY_DIRECTORIES = ['.git', 'node_modules', 'var', 'vendor'];
-
     public function __construct(
         private readonly UriToPathConverter $uriToPathConverter,
     ) {
@@ -31,7 +29,7 @@ final class ProjectPathResolver
             return false;
         }
         foreach (explode('/', $relativePath) as $segment) {
-            if (\in_array($segment, self::READ_ONLY_DIRECTORIES, true)) {
+            if (\in_array($segment, ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)) {
                 return false;
             }
         }

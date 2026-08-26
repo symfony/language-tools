@@ -3,8 +3,8 @@
 namespace Symfony\Lsp\Feature;
 
 use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
+use Symfony\Lsp\Project\ProjectPathPolicy;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -133,7 +133,7 @@ final class DiagnosticCollector
         }
 
         foreach (explode('/', $relativePath) as $segment) {
-            if (\in_array($segment, SourceFileEnumerator::EXCLUDED_DIRECTORIES, true)) {
+            if (\in_array($segment, ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)) {
                 return true;
             }
         }

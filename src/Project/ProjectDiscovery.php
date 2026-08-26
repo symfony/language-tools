@@ -7,13 +7,6 @@ use Symfony\Component\Finder\Finder;
 
 final class ProjectDiscovery
 {
-    private const EXCLUDED_DIRECTORIES = [
-        '.git',
-        'node_modules',
-        'var',
-        'vendor',
-    ];
-
     public function __construct(
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly GitignoreMatcher $gitignore,
@@ -100,7 +93,7 @@ final class ProjectDiscovery
             ->files()
             ->name('composer.json')
             ->in($directory)
-            ->exclude(self::EXCLUDED_DIRECTORIES)
+            ->exclude(ProjectPathPolicy::EXCLUDED_DIRECTORIES)
             ->ignoreDotFiles(false)
             ->ignoreVCS(false)
             ->ignoreUnreadableDirs();

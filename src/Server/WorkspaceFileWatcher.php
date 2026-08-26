@@ -6,13 +6,13 @@ use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectConfiguration;
+use Symfony\Lsp\Project\ProjectPathPolicy;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 
 final class WorkspaceFileWatcher
 {
     private const DIRECTORY_CHANGE_KIND = 1 | 4;
-    private const EXCLUDED_DIRECTORIES = ['.git', 'node_modules', 'var', 'vendor'];
     private const SOURCE_PATTERN = '*.{php,twig,yaml,yml,ini,json,xml,xlf,xliff,css,js,mjs,ts,svg,png,jpg,jpeg,gif,webp,woff,woff2,ttf,otf,wasm}';
 
     private bool $supported = false;
@@ -122,7 +122,7 @@ final class WorkspaceFileWatcher
         $path = Path::canonicalize($path);
         foreach ($this->projects->all() as $project) {
             if (Path::canonicalize($project->rootPath()) === \dirname($path)
-                && !\in_array(basename($path), self::EXCLUDED_DIRECTORIES, true)
+                && !\in_array(basename($path), ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)
                 && preg_match('/^[A-Za-z0-9_.-]+$/D', basename($path))
             ) {
                 return true;
@@ -148,7 +148,7 @@ final class WorkspaceFileWatcher
     {
         $directories = [];
         foreach (scandir($project->rootPath()) ?: [] as $entry) {
-            if ('.' === $entry || '..' === $entry || \in_array($entry, self::EXCLUDED_DIRECTORIES, true)) {
+            if ('.' === $entry || '..' === $entry || \in_array($entry, ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)) {
                 continue;
             }
             if (preg_match('/^[A-Za-z0-9_.-]+$/D', $entry) && is_dir($project->rootPath().'/'.$entry)) {

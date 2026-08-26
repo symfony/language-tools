@@ -7,16 +7,10 @@ use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
+use Symfony\Lsp\Project\ProjectPathPolicy;
 
 final class SourceFileEnumerator
 {
-    public const EXCLUDED_DIRECTORIES = [
-        '.git',
-        'node_modules',
-        'var',
-        'vendor',
-    ];
-
     private const LANGUAGE_IDS = [
         'ini' => 'ini',
         'js' => 'javascript',
@@ -56,7 +50,7 @@ final class SourceFileEnumerator
         $files = (new Finder())
             ->files()
             ->in($directory)
-            ->exclude(self::EXCLUDED_DIRECTORIES)
+            ->exclude(ProjectPathPolicy::EXCLUDED_DIRECTORIES)
             ->ignoreDotFiles(false)
             ->ignoreVCS(false)
             ->ignoreUnreadableDirs()
@@ -124,7 +118,7 @@ final class SourceFileEnumerator
         }
 
         foreach (explode('/', $relativePath) as $part) {
-            if (\in_array($part, self::EXCLUDED_DIRECTORIES, true)) {
+            if (\in_array($part, ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)) {
                 return false;
             }
         }

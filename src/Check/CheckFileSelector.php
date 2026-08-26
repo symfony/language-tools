@@ -7,6 +7,7 @@ use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectConfiguration;
+use Symfony\Lsp\Project\ProjectPathPolicy;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 
@@ -202,7 +203,7 @@ final class CheckFileSelector
                 throw new InvalidConfigurationException(\sprintf('The application directory "%s" is unreadable.', $project->rootPath() === $directory ? '.' : $this->files->relativePath($project, $directory)));
             }
             foreach ($entries as $entry) {
-                if ('.' === $entry || '..' === $entry || \in_array($entry, SourceFileEnumerator::EXCLUDED_DIRECTORIES, true)) {
+                if ('.' === $entry || '..' === $entry || \in_array($entry, ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)) {
                     continue;
                 }
                 $path = Path::join($directory, $entry);
