@@ -7,6 +7,9 @@ final class ProjectRegistry
     /** @var list<Project> */
     private array $projects = [];
 
+    /** @var list<Project> */
+    private array $projectsBySpecificity = [];
+
     /**
      * @param list<Project> $projects
      */
@@ -21,6 +24,11 @@ final class ProjectRegistry
             $current[$project->rootPath()] = $project;
         }
         $this->projects = $projects;
+        $this->projectsBySpecificity = $projects;
+        usort(
+            $this->projectsBySpecificity,
+            static fn (Project $left, Project $right): int => \strlen($right->rootUri()) <=> \strlen($left->rootUri()),
+        );
 
         return new ProjectCollectionChange(
             array_values(array_diff_key($current, $previous)),
@@ -49,17 +57,13 @@ final class ProjectRegistry
 
     public function forDocumentUri(string $uri): ?Project
     {
-        $matches = array_filter(
-            $this->projects,
-            static fn (Project $project): bool => str_starts_with($uri, rtrim($project->rootUri(), '/').'/')
-                || $uri === rtrim($project->rootUri(), '/'),
-        );
+        foreach ($this->projectsBySpecificity as $project) {
+            $rootUri = rtrim($project->rootUri(), '/');
+            if ($uri === $rootUri || str_starts_with($uri, $rootUri.'/')) {
+                return $project;
+            }
+        }
 
-        usort(
-            $matches,
-            static fn (Project $left, Project $right): int => \strlen($right->rootUri()) <=> \strlen($left->rootUri()),
-        );
-
-        return $matches[0] ?? null;
+        return null;
     }
 }
