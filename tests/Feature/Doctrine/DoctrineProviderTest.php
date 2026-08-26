@@ -19,6 +19,7 @@ use Symfony\Lsp\Feature\Doctrine\DoctrineIndexRegistry;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipCodeLensProvider;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipProvider;
 use Symfony\Lsp\Feature\Doctrine\DoctrineSymbolKind;
+use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
@@ -116,7 +117,7 @@ final class DoctrineProviderTest extends TestCase
             PHP;
 
         $converter = new PositionConverter();
-        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser(), new BalancedDelimiterMatcher());
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -183,7 +184,7 @@ final class DoctrineProviderTest extends TestCase
     public function testIgnoresCommentedDoctrinePhpWhilePreservingActiveRanges(): void
     {
         $converter = new PositionConverter();
-        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser(), new BalancedDelimiterMatcher());
         $text = <<<'PHP'
             <?php
             namespace App\Form;
@@ -248,7 +249,7 @@ final class DoctrineProviderTest extends TestCase
     public function testNavigatesToRuntimeOnlyEntities(): void
     {
         $converter = new PositionConverter();
-        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser(), new BalancedDelimiterMatcher());
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -284,7 +285,7 @@ final class DoctrineProviderTest extends TestCase
 
     public function testOffersNoDoctrineCompletionsInsidePhpComments(): void
     {
-        $extractor = new DoctrineExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = new DoctrineExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new BalancedDelimiterMatcher());
         $text = <<<'PHP'
             <?php
             use App\Repository\ProductRepository;

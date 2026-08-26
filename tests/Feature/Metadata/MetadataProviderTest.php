@@ -22,6 +22,7 @@ use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexRegistry;
 use Symfony\Lsp\Feature\Metadata\MetadataSymbolKind;
 use Symfony\Lsp\Feature\Metadata\ValidationConstraint;
 use Symfony\Lsp\Feature\Metadata\ValidationMetadataProvider;
+use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -36,7 +37,7 @@ final class MetadataProviderTest extends TestCase
     public function testProvidesFormConstraintSerializerAndMappingMetadata(): void
     {
         $converter = new PositionConverter();
-        $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new BalancedDelimiterMatcher());
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -228,7 +229,7 @@ final class MetadataProviderTest extends TestCase
     public function testIgnoresCommentedPhpMetadataWhilePreservingActiveRanges(): void
     {
         $converter = new PositionConverter();
-        $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new BalancedDelimiterMatcher());
         $text = <<<'PHP'
             <?php
             namespace App\Controller;
@@ -352,7 +353,7 @@ final class MetadataProviderTest extends TestCase
     public function testOffersNoMetadataCompletionsInsidePhpComments(): void
     {
         $converter = new PositionConverter();
-        $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new BalancedDelimiterMatcher());
         $text = "<?php // #[Groups(['adm";
 
         self::assertNull($extractor->completionContext('php', $text, \strlen($text)));

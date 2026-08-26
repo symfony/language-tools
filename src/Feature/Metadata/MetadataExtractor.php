@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Metadata;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
+use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -16,6 +17,7 @@ final class MetadataExtractor
         private readonly YamlConfigurationParser $yaml,
         private readonly PhpParserInterface $phpParser,
         private readonly PhpCommentParserInterface $phpComments,
+        private readonly BalancedDelimiterMatcher $delimiters,
     ) {
     }
 
@@ -118,7 +120,7 @@ final class MetadataExtractor
         preg_match_all('/\b(?:final\s+|abstract\s+|readonly\s+)?class\s+([A-Za-z_][A-Za-z0-9_]*)[^\{]*\{/', $source, $classes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($classes as $class) {
             $open = $class[0][1] + \strlen($class[0][0]) - 1;
-            $close = $this->matching($source, $open, '{', '}') ?? \strlen($source);
+            $close = $this->delimiters->matching($source, $open, '{', '}') ?? \strlen($source);
             $body = substr($source, $open + 1, $close - $open - 1);
             $className = $php->resolveName($class[1][0]);
             $symbols[] = new MetadataSourceSymbol(
@@ -302,7 +304,7 @@ final class MetadataExtractor
                 continue;
             }
             $open = $call[0][1] + \strlen($call[0][0]) - 1;
-            $close = $this->matching($masked, $open, '(', ')');
+            $close = $this->delimiters->matching($masked, $open, '(', ')');
             if (null !== $close && $close < $offset) {
                 continue;
             }
@@ -366,7 +368,7 @@ final class MetadataExtractor
                 continue;
             }
             $open = $match[0][1] + \strlen($match[0][0]) - 1;
-            $close = $this->matching($text, $open, '(', ')');
+            $close = $this->delimiters->matching($text, $open, '(', ')');
             if (null === $close) {
                 continue;
             }
@@ -485,36 +487,6 @@ final class MetadataExtractor
         }
 
         return $keys;
-    }
-
-    private function matching(string $text, int $open, string $opening, string $closing): ?int
-    {
-        $depth = 0;
-        $quote = null;
-        $escaped = false;
-        $length = \strlen($text);
-        for ($index = $open; $index < $length; ++$index) {
-            $character = $text[$index];
-            if (null !== $quote) {
-                if ($escaped) {
-                    $escaped = false;
-                } elseif ('\\' === $character) {
-                    $escaped = true;
-                } elseif ($character === $quote) {
-                    $quote = null;
-                }
-                continue;
-            }
-            if ('"' === $character || "'" === $character) {
-                $quote = $character;
-            } elseif ($opening === $character) {
-                ++$depth;
-            } elseif ($closing === $character && 0 === --$depth) {
-                return $index;
-            }
-        }
-
-        return null;
     }
 
     /** @return list<MetadataSourceSymbol> */

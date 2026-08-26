@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Doctrine;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -16,6 +17,7 @@ final class DoctrineExtractor
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $phpParser,
         private readonly PhpCommentParserInterface $phpComments,
+        private readonly BalancedDelimiterMatcher $delimiters,
     ) {
     }
 
@@ -187,7 +189,7 @@ final class DoctrineExtractor
                 continue;
             }
             $open = $formType[0][1] + \strlen($formType[0][0]) - 1;
-            $close = $this->matching($source, $open, '[', ']');
+            $close = $this->delimiters->matching($source, $open, '[', ']');
             if (null === $close) {
                 continue;
             }
@@ -249,7 +251,7 @@ final class DoctrineExtractor
     /** @return list<DoctrineSourceSymbol> */
     private function criteriaSymbols(string $uri, string $text, string $source, int $open, string $owner): array
     {
-        $close = $this->matching($source, $open, '[', ']');
+        $close = $this->delimiters->matching($source, $open, '[', ']');
         if (null === $close) {
             return [];
         }
@@ -369,7 +371,7 @@ final class DoctrineExtractor
         $classes = [];
         foreach ($matches as $match) {
             $open = $match[0][1] + \strlen($match[0][0]) - 1;
-            $close = $this->matching($source, $open, '{', '}') ?? \strlen($source);
+            $close = $this->delimiters->matching($source, $open, '{', '}') ?? \strlen($source);
             $before = substr($source, 0, $match[0][1]);
             $originalBefore = substr($text, 0, $match[0][1]);
             $boundary = max((int) strrpos($before, ';'), (int) strrpos($before, '}'));
@@ -390,35 +392,6 @@ final class DoctrineExtractor
         }
 
         return $classes;
-    }
-
-    private function matching(string $text, int $open, string $opening, string $closing): ?int
-    {
-        $depth = 0;
-        $quote = null;
-        $escaped = false;
-        for ($index = $open, $length = \strlen($text); $index < $length; ++$index) {
-            $character = $text[$index];
-            if (null !== $quote) {
-                if ($escaped) {
-                    $escaped = false;
-                } elseif ('\\' === $character) {
-                    $escaped = true;
-                } elseif ($quote === $character) {
-                    $quote = null;
-                }
-                continue;
-            }
-            if ('\'' === $character || '"' === $character) {
-                $quote = $character;
-            } elseif ($opening === $character) {
-                ++$depth;
-            } elseif ($closing === $character && 0 === --$depth) {
-                return $index;
-            }
-        }
-
-        return null;
     }
 
     /** @param list<DoctrineSourceSymbol> $symbols
