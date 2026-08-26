@@ -39,6 +39,25 @@ final class PositionConverterTest extends TestCase
         self::assertSame(3, $position->character());
     }
 
+    public function testConvertsPositionsAtLineBoundaries(): void
+    {
+        $converter = new PositionConverter();
+        $text = "first\nsecond\n";
+
+        self::assertSame(6, $converter->toByteOffset($text, new Position(1, 0)));
+        self::assertSame(13, $converter->toByteOffset($text, new Position(2, 0)));
+        self::assertSame([1, 0], [$converter->toPosition($text, 6)->line(), $converter->toPosition($text, 6)->character()]);
+        self::assertSame([2, 0], [$converter->toPosition($text, 13)->line(), $converter->toPosition($text, 13)->character()]);
+    }
+
+    public function testInvalidatesThePositionMapWhenTheTextChanges(): void
+    {
+        $converter = new PositionConverter();
+
+        self::assertSame(6, $converter->toByteOffset("first\nsecond", new Position(1, 0)));
+        self::assertSame(4, $converter->toByteOffset("one\ntwo", new Position(1, 0)));
+    }
+
     public function testNegotiatesUtf8AndUtf32Positions(): void
     {
         $converter = new PositionConverter();
