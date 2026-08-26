@@ -1,0 +1,51 @@
+#!/usr/bin/env php
+<?php
+
+use Symfony\Lsp\Document\Position;
+use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\Metadata\MetadataSourceFacts;
+use Symfony\Lsp\Feature\Metadata\MetadataSourceIndex;
+use Symfony\Lsp\Feature\Metadata\MetadataSourceSymbol;
+use Symfony\Lsp\Feature\Metadata\MetadataSymbolKind;
+
+require dirname(__DIR__).'/vendor/autoload.php';
+
+const FACT_COUNT = 10_000;
+const LOOKUP_COUNT = 5_000;
+const RUN_COUNT = 5;
+
+$range = new Range(new Position(0, 0), new Position(0, 1));
+$facts = [];
+for ($i = 0; $i < FACT_COUNT; ++$i) {
+    $name = sprintf('group.%05d', $i);
+    $uri = sprintf('file:///src/Entity%05d.php', $i);
+    $facts[] = new MetadataSourceFacts($uri, [new MetadataSourceSymbol(MetadataSymbolKind::SerializerGroup, $name, $uri, $range, true)]);
+}
+
+$index = new MetadataSourceIndex();
+$index->replace(...$facts);
+$target = sprintf('group.%05d', FACT_COUNT - 1);
+$index->symbols(MetadataSymbolKind::SerializerGroup, $target);
+
+$measurements = [];
+for ($run = 0; $run < RUN_COUNT; ++$run) {
+    $matches = 0;
+    $start = hrtime(true);
+    for ($lookup = 0; $lookup < LOOKUP_COUNT; ++$lookup) {
+        $matches += \count($index->symbols(MetadataSymbolKind::SerializerGroup, $target));
+    }
+    $measurements[] = (hrtime(true) - $start) / 1_000_000;
+    if (LOOKUP_COUNT !== $matches) {
+        throw new RuntimeException('The benchmark lookup returned an unexpected result.');
+    }
+}
+sort($measurements);
+
+$result = [
+    'facts' => FACT_COUNT,
+    'lookups' => LOOKUP_COUNT,
+    'milliseconds' => array_map(static fn (float $milliseconds): float => round($milliseconds, 3), $measurements),
+    'medianMilliseconds' => round($measurements[intdiv(RUN_COUNT, 2)], 3),
+];
+
+echo json_encode($result, \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR)."\n";
