@@ -1,6 +1,11 @@
 #!/usr/bin/env php
 <?php
 
+require __DIR__.'/../vendor/autoload.php';
+require_once __DIR__.'/ContentLengthProcessClient.php';
+
+use Symfony\Lsp\Tools\ContentLengthProcessClient;
+
 $deadlineSeconds = (float) (getenv('SYMFONY_LSP_SMOKE_DEADLINE') ?: 60);
 define('READ_DEADLINE_SECONDS', $deadlineSeconds);
 define('SMOKE_TEST_START', microtime(true));
@@ -78,193 +83,6 @@ function removeTree(string $path): void
     @rmdir($path);
 }
 
-final class ServerConnection
-{
-    /** @var resource */
-    private $process;
-    /** @var resource */
-    private $stdin;
-    /** @var resource */
-    private $stdout;
-    /** @var resource */
-    private $stderr;
-    /** @var ?resource */
-    private $socket = null;
-    private string $buffer = '';
-    private int $stdoutOffset = 0;
-    private int $stderrOffset = 0;
-    private string $errorOutput = '';
-    private int $silentDeadIterations = 0;
-
-    public function __construct(string $server, bool $socketMode)
-    {
-        $outputPath = tempnam(sys_get_temp_dir(), 'lsp-smoke-out-');
-        $errorPath = tempnam(sys_get_temp_dir(), 'lsp-smoke-err-');
-        if (false === $outputPath || false === $errorPath) {
-            throw new RuntimeException('Unable to create the smoke test output files.');
-        }
-        $command = [$server];
-        $listener = null;
-        if ($socketMode) {
-            $listener = stream_socket_server('tcp://127.0.0.1:0', $errorCode, $errorMessage);
-            if (false === $listener) {
-                throw new RuntimeException('Unable to listen for the server: '.$errorMessage);
-            }
-            $address = (string) stream_socket_get_name($listener, false);
-            $port = (int) substr($address, (int) strrpos($address, ':') + 1);
-            $command[] = '--socket='.$port;
-            progress('Listening on '.$address);
-        }
-        progress(sprintf('Starting %s (stdout: %s, stderr: %s)', implode(' ', $command), $outputPath, $errorPath));
-        $process = proc_open(
-            $command,
-            [
-                ['pipe', 'r'],
-                ['file', $outputPath, 'w'],
-                ['file', $errorPath, 'w'],
-            ],
-            $pipes,
-            options: ['bypass_shell' => true],
-        );
-        if (!is_resource($process)) {
-            throw new RuntimeException('Unable to start Symfony Language Tools.');
-        }
-        $stdout = fopen($outputPath, 'rb');
-        $stderr = fopen($errorPath, 'rb');
-        if (false === $stdout || false === $stderr) {
-            throw new RuntimeException('Unable to open the smoke test output files.');
-        }
-        progress('Server started');
-        $this->process = $process;
-        $this->stdin = $pipes[0];
-        $this->stdout = $stdout;
-        $this->stderr = $stderr;
-        if (null !== $listener) {
-            $connection = stream_socket_accept($listener, READ_DEADLINE_SECONDS);
-            fclose($listener);
-            if (false === $connection) {
-                $this->fail('Symfony Language Tools did not connect to the socket within '.READ_DEADLINE_SECONDS.' seconds.');
-            }
-            stream_set_blocking($connection, false);
-            progress('Server connected');
-            $this->socket = $connection;
-        }
-    }
-
-    public function write(array $message): void
-    {
-        progress('Writing '.($message['method'] ?? 'response'));
-        $json = json_encode($message, \JSON_THROW_ON_ERROR);
-        $channel = $this->socket ?? $this->stdin;
-        @fwrite($channel, 'Content-Length: '.strlen($json)."\r\n\r\n".$json);
-        @fflush($channel);
-        progress('Wrote '.($message['method'] ?? 'response'));
-    }
-
-    public function read(): array
-    {
-        progress('Reading a response');
-        $deadline = microtime(true) + READ_DEADLINE_SECONDS;
-        $nextReport = microtime(true) + 5;
-        while (null === ($message = $this->extractMessage())) {
-            if (!$this->fill() && microtime(true) > $deadline) {
-                $this->fail('Symfony Language Tools sent no response within '.READ_DEADLINE_SECONDS.' seconds.');
-            }
-            if (microtime(true) > $nextReport) {
-                progress(sprintf('Still waiting (%d raw bytes so far)', $this->stdoutOffset));
-                $nextReport = microtime(true) + 5;
-            }
-        }
-        progress('Read a response');
-
-        return $message;
-    }
-
-    public function close(): void
-    {
-        progress('Closing');
-        if (null !== $this->socket) {
-            fclose($this->socket);
-            $this->socket = null;
-        }
-        fclose($this->stdin);
-        $deadline = microtime(true) + READ_DEADLINE_SECONDS;
-        while (proc_get_status($this->process)['running']) {
-            $this->fill();
-            if (microtime(true) > $deadline) {
-                $this->fail('Symfony Language Tools did not exit within '.READ_DEADLINE_SECONDS.' seconds.');
-            }
-        }
-        $this->drain();
-        fclose($this->stdout);
-        fclose($this->stderr);
-        $status = proc_close($this->process);
-        if (0 !== $status) {
-            throw new RuntimeException('Symfony Language Tools exited with status '.$status.":\n".$this->errorOutput);
-        }
-        progress('Closed');
-    }
-
-    private function extractMessage(): ?array
-    {
-        if (!preg_match('/^(?:[^\r\n:]+: [^\r\n]*\r\n)*?Content-Length: (\d+)\r\n(?:[^\r\n:]+: [^\r\n]*\r\n)*\r\n/i', $this->buffer, $match)) {
-            return null;
-        }
-        $header = strlen($match[0]);
-        $length = (int) $match[1];
-        if (strlen($this->buffer) < $header + $length) {
-            return null;
-        }
-        $json = substr($this->buffer, $header, $length);
-        $this->buffer = substr($this->buffer, $header + $length);
-
-        return json_decode($json, true, flags: \JSON_THROW_ON_ERROR);
-    }
-
-    private function fill(): bool
-    {
-        if (null !== $this->socket) {
-            $chunk = fread($this->socket, 8192);
-            $chunk = is_string($chunk) ? $chunk : '';
-        } else {
-            fseek($this->stdout, $this->stdoutOffset);
-            $chunk = (string) stream_get_contents($this->stdout);
-            $this->stdoutOffset += strlen($chunk);
-        }
-        $filled = '' !== $chunk;
-        $this->buffer .= $chunk;
-        $filled = $this->drain() || $filled;
-        if (!$filled) {
-            if (!proc_get_status($this->process)['running'] && ++$this->silentDeadIterations > 3) {
-                $this->fail('Symfony Language Tools exited before responding.');
-            }
-            usleep(20000);
-        }
-
-        return $filled;
-    }
-
-    private function drain(): bool
-    {
-        fseek($this->stderr, $this->stderrOffset);
-        $chunk = (string) stream_get_contents($this->stderr);
-        if ('' === $chunk) {
-            return false;
-        }
-        $this->errorOutput .= $chunk;
-        $this->stderrOffset += strlen($chunk);
-
-        return true;
-    }
-
-    private function fail(string $reason): never
-    {
-        proc_terminate($this->process);
-        $error = '' === $this->errorOutput ? '(no error output)' : $this->errorOutput;
-        throw new RuntimeException($reason."\nServer error output:\n".$error);
-    }
-}
-
 $arguments = array_slice($argv, 1);
 $socketMode = '--socket' === ($arguments[0] ?? null);
 if ($socketMode) {
@@ -275,19 +93,29 @@ if (!isset($arguments[0])) {
     exit(2);
 }
 
-$connection = new ServerConnection($arguments[0], $socketMode);
-$connection->write(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => [
-    'processId' => null,
-    'rootUri' => null,
-    'capabilities' => new stdClass(),
-    'initializationOptions' => ['workspaceTrust' => false],
-]]);
-$initialize = $connection->read();
-$connection->write(['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []]);
-$connection->write(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'shutdown', 'params' => []]);
-$shutdown = $connection->read();
-$connection->write(['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []]);
-$connection->close();
+progress('Starting Symfony Language Tools');
+$connection = new ContentLengthProcessClient([$arguments[0]], READ_DEADLINE_SECONDS, socketMode: $socketMode);
+try {
+    progress('Initializing');
+    $initialize = $connection->request(1, 'initialize', [
+        'processId' => null,
+        'rootUri' => null,
+        'capabilities' => new stdClass(),
+        'initializationOptions' => ['workspaceTrust' => false],
+    ]);
+    $connection->notify('initialized');
+    progress('Shutting down');
+    $shutdown = $connection->request(2, 'shutdown');
+    $connection->notify('exit');
+    progress('Closing');
+    $exitCode = $connection->close();
+    if (0 !== $exitCode) {
+        throw new RuntimeException('Symfony Language Tools exited with status '.$exitCode.":\n".$connection->errorOutput());
+    }
+    progress('Closed');
+} finally {
+    $connection->terminate();
+}
 if (1 !== ($initialize['id'] ?? null) || !isset($initialize['result']['capabilities'])) {
     throw new RuntimeException('Symfony Language Tools did not initialize successfully.');
 }
