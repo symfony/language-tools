@@ -351,7 +351,13 @@ final class ContentLengthProcessClient
         if (!\is_array($message)) {
             throw new \RuntimeException('The Content-Length response body must contain a JSON object.');
         }
+        foreach (array_keys($message) as $key) {
+            if (!\is_string($key)) {
+                throw new \RuntimeException('The Content-Length response body must contain a JSON object with string keys.');
+            }
+        }
 
+        /* @var array<string, mixed> $message */
         return $message;
     }
 

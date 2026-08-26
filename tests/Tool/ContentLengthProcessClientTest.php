@@ -78,6 +78,26 @@ final class ContentLengthProcessClientTest extends TestCase
         yield 'partial body' => ["Content-Length: 30\r\n\r\n{\"jsonrpc\":\"2.0\""];
     }
 
+    public function testRejectsJsonArrays(): void
+    {
+        $json = json_encode(['value'], \JSON_THROW_ON_ERROR);
+        $server = $this->server(<<<'PHP'
+            $json = base64_decode($argv[1]);
+            fwrite(STDOUT, 'Content-Length: '.strlen($json)."\r\n\r\n".$json);
+            fflush(STDOUT);
+            PHP);
+        $client = new ContentLengthProcessClient([$server, base64_encode($json)], 1.0);
+
+        try {
+            $client->read();
+            self::fail('A JSON array is not a protocol message.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('The Content-Length response body must contain a JSON object with string keys.', $exception->getMessage());
+        } finally {
+            $client->terminate();
+        }
+    }
+
     public function testParsingFailuresAllowFinallyCleanupToTerminateTheChild(): void
     {
         $lockPath = Path::join($this->directory, 'server.lock');
