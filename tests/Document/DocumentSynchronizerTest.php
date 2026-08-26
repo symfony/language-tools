@@ -62,7 +62,7 @@ final class DocumentSynchronizerTest extends TestCase
         ]);
 
         self::assertSame(1, $store->get($uri)?->version());
-        self::assertSame('original', $store->get($uri)?->text());
+        self::assertSame('original', $store->get($uri)->text());
     }
 
     public function testRejectsAnExplicitNullRange(): void
@@ -83,7 +83,7 @@ final class DocumentSynchronizerTest extends TestCase
         ]);
 
         self::assertSame(1, $store->get($uri)?->version());
-        self::assertSame('original', $store->get($uri)?->text());
+        self::assertSame('original', $store->get($uri)->text());
     }
 
     public function testNormalizesTwigFilesReportedAsHtml(): void
