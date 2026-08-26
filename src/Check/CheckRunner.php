@@ -156,7 +156,9 @@ final class CheckRunner
                         break;
                     }
                     $preparedHashes[$file->path] = $hash;
-                    $preparedTexts[$file->path] = $text;
+                    if ($file->excluded) {
+                        $preparedTexts[$file->path] = $text;
+                    }
                 }
                 if (!$prepared) {
                     $projectResults[] = $this->projectResult($project, $status, false);
