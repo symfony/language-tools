@@ -64,7 +64,7 @@ final class DocumentSynchronizer
             }
 
             $range = null;
-            if (\array_key_exists('range', $change)) {
+            if (null !== ($change['range'] ?? null)) {
                 $range = $this->range($change['range']);
                 if (null === $range) {
                     return;

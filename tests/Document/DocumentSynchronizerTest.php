@@ -65,7 +65,7 @@ final class DocumentSynchronizerTest extends TestCase
         self::assertSame('original', $store->get($uri)->text());
     }
 
-    public function testRejectsAnExplicitNullRange(): void
+    public function testTreatsAnExplicitNullRangeAsAFullDocumentChange(): void
     {
         $store = new DocumentStore();
         $synchronizer = $this->synchronizer($store);
@@ -82,8 +82,8 @@ final class DocumentSynchronizerTest extends TestCase
             'contentChanges' => [['range' => null, 'text' => 'replacement']],
         ]);
 
-        self::assertSame(1, $store->get($uri)?->version());
-        self::assertSame('original', $store->get($uri)->text());
+        self::assertSame(2, $store->get($uri)?->version());
+        self::assertSame('replacement', $store->get($uri)->text());
     }
 
     public function testNormalizesTwigFilesReportedAsHtml(): void
