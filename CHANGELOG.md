@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Recover interrupted source caches and verify content before restoring facts
+- Ignore commented PHP when extracting Metadata and Doctrine symbols
+- Reject malformed incremental edits without replacing open documents
+- Speed up large-document position conversion and source fact lookups
+- Isolate project bridge helpers from application global symbols
 - Recognize template references in the PHP Template attribute
 - Decode escaped PHP string literals in extracted declarations and references
 - Recognize named first arguments for PHP translation keys
