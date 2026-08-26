@@ -60,7 +60,10 @@ References
 ----------
 
 Find All References lists recognized function and filter usages across
-application templates.
+application templates. You can request references from the name in a Twig
+template, from the static name in a ``TwigFunction``, ``TwigFilter``,
+``AsTwigFunction`` or ``AsTwigFilter`` declaration, or from the registered PHP
+method when the callable is statically resolved.
 
 Diagnostics
 -----------
@@ -85,6 +88,8 @@ otherwise opens the function or filter registration.
 Limitations
 -----------
 
-Dynamic names, dynamic callables and non-public attributed methods are
-ignored. Functions and filters provided only by dependencies are left to a
+Dynamic names and non-public attributed methods are ignored. A static name
+with a dynamic callable supports completion, references and navigation to its
+registration, but method navigation and signature-based features are
+unavailable. Functions and filters provided only by dependencies are left to a
 general Twig language server.

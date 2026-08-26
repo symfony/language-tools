@@ -53,6 +53,36 @@ final class SupportScorerTest extends TestCase
         self::assertSame(12, \strlen($score['fingerprint']));
     }
 
+    public function testPhpTwigCallableProbesOnlyExpectReferences(): void
+    {
+        $score = (new SupportScorer())->score(['probes' => [
+            [
+                'category' => 'twig.function.php',
+                'file' => 'src/Twig/AppExtension.php',
+                'value' => 'app_widget',
+                'requests' => [
+                    'completion' => ['resultCount' => 0, 'error' => null],
+                    'hover' => ['resultCount' => 0, 'error' => null],
+                    'definition' => ['resultCount' => 0, 'error' => null],
+                    'references' => ['resultCount' => 2, 'error' => null],
+                ],
+            ],
+            [
+                'category' => 'twig.filter.php',
+                'file' => 'src/Twig/AppExtension.php',
+                'value' => 'app_short',
+                'requests' => [
+                    'completion' => ['resultCount' => 0, 'error' => null],
+                    'hover' => ['resultCount' => 0, 'error' => null],
+                    'definition' => ['resultCount' => 0, 'error' => null],
+                    'references' => ['resultCount' => 1, 'error' => null],
+                ],
+            ],
+        ]]);
+
+        self::assertSame(1.0, (float) ($score['score'] ?? -1));
+    }
+
     public function testFingerprintTracksTheProbeSetNotTheResults(): void
     {
         $scorer = new SupportScorer();

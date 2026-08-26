@@ -117,14 +117,60 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
     public function references(array $params): ?array
     {
         $resolved = $this->resolve($params);
-        if (null === $resolved) {
+        if (null !== $resolved) {
+            [, $declarations, $project] = $resolved;
+
+            return $this->referenceLocations($project, $declarations);
+        }
+
+        $request = $this->documents->resolvePositioned($params);
+        if (null === $request || 'php' !== $request->document->languageId()) {
             return null;
         }
-        [$reference, , $project] = $resolved;
+        $index = $this->indexes->forProject($request->project);
+        $declaration = $index->declarationAt($request->document->uri(), $request->position);
+        if (null !== $declaration) {
+            return $this->referenceLocations($request->project, [$declaration]);
+        }
+        if (!$index->hasCallableDeclarations()) {
+            return null;
+        }
+        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        foreach ($this->phpParser->parse($request->document->text())->methodDeclarations() as $method) {
+            if ($offset < $method->nameStartOffset() || $offset > $method->nameEndOffset()) {
+                continue;
+            }
+            $declarations = $index->declarationsForCallable($method->className(), $method->name());
+
+            return [] === $declarations ? null : $this->referenceLocations($request->project, $declarations);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<TwigCallableDeclaration> $declarations
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function referenceLocations(Project $project, array $declarations): array
+    {
+        $pairs = [];
+        foreach ($declarations as $declaration) {
+            $pairs[$declaration->kind()->value."\0".$declaration->name()] = [$declaration->kind(), $declaration->name()];
+        }
+        $usages = [];
+        $index = $this->indexes->forProject($project);
+        foreach ($pairs as [$kind, $name]) {
+            array_push($usages, ...$index->usages($kind, $name));
+        }
+        if (1 < \count($pairs)) {
+            usort($usages, static fn (TwigCallableUsage $left, TwigCallableUsage $right): int => [$left->uri(), $left->range()->start()->line(), $left->range()->start()->character()] <=> [$right->uri(), $right->range()->start()->line(), $right->range()->start()->character()]);
+        }
 
         return array_map(
             fn (TwigCallableUsage $usage): array => $this->protocol->location($usage->uri(), $usage->range()),
-            $this->indexes->forProject($project)->usages($reference->kind(), $reference->name()),
+            $usages,
         );
     }
 

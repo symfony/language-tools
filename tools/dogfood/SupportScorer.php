@@ -12,12 +12,15 @@ final class SupportScorer
     private const DEFAULT_EXPECTED = ['completion', 'hover', 'definition', 'references'];
 
     /**
-     * Form and constraint options are resolver metadata without a navigable
-     * declaration, so definition and references are not expected.
+     * Some probe locations intentionally expose only a subset of request kinds.
+     * PHP Twig declarations expose template references, while form and constraint
+     * options expose completion and hover metadata.
      */
     private const EXPECTED_OVERRIDES = [
         'form.option.php' => ['completion', 'hover'],
         'constraint.option.php' => ['completion', 'hover'],
+        'twig.function.php' => ['references'],
+        'twig.filter.php' => ['references'],
     ];
 
     /**

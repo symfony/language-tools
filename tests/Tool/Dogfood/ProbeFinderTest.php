@@ -71,24 +71,36 @@ final class ProbeFinderTest extends TestCase
 
     public function testFindsCustomTwigCallables(): void
     {
-        $this->write('src/AppExtension.php', "<?php\nnew TwigFunction('app_widget', fn () => '');\nnew TwigFilter('app_short', fn () => '');\n");
+        $this->write('src/AppExtension.php', "<?php\nuse Twig\\TwigFilter;\nuse Twig\\TwigFunction;\nfinal class AppExtension\n{\n    public function getFunctions(): array\n    {\n        return [\n            new TwigFunction('unused_widget', fn () => ''),\n            new TwigFunction('app_widget', fn () => ''),\n        ];\n    }\n    public function getFilters(): array\n    {\n        return [new TwigFilter('app_short', fn () => '')];\n    }\n}\n");
         $this->write('templates/home.html.twig', "{{ app_widget() }}\n{{ 'text'|app_short }}\n");
 
         $finder = new ProbeFinder();
 
         self::assertSame('app_widget', $this->probes($finder, 'twig.function')[0]->value);
         self::assertSame('app_short', $this->probes($finder, 'twig.filter')[0]->value);
+        $functionDeclaration = $this->probes($finder, 'twig.function.php')[0];
+        $filterDeclaration = $this->probes($finder, 'twig.filter.php')[0];
+        self::assertSame('app_widget', $functionDeclaration->value);
+        self::assertSame('app_short', $filterDeclaration->value);
+        $this->assertPositionInsideValue($functionDeclaration);
+        $this->assertPositionInsideValue($filterDeclaration);
     }
 
     public function testFindsAttributedTwigCallables(): void
     {
-        $this->write('src/AppExtension.php', "<?php\n#[AsTwigFunction('app_widget')]\nfunction widget() {}\n#[\\Twig\\Attribute\\AsTwigFilter(name: 'app_short')]\nfunction shorten() {}\n");
+        $this->write('src/AppExtension.php', "<?php\nuse Twig\\Attribute\\AsTwigFunction;\nfinal class AppExtension\n{\n    #[AsTwigFunction('app_widget')]\n    public function widget() {}\n    #[\\Twig\\Attribute\\AsTwigFilter(name: 'app_short')]\n    public function shorten() {}\n}\n");
         $this->write('templates/home.html.twig', "{{ app_widget() }}\n{{ 'text'|app_short }}\n");
 
         $finder = new ProbeFinder();
 
         self::assertSame('app_widget', $this->probes($finder, 'twig.function')[0]->value);
         self::assertSame('app_short', $this->probes($finder, 'twig.filter')[0]->value);
+        $functionDeclaration = $this->probes($finder, 'twig.function.php')[0];
+        $filterDeclaration = $this->probes($finder, 'twig.filter.php')[0];
+        self::assertSame('app_widget', $functionDeclaration->value);
+        self::assertSame('app_short', $filterDeclaration->value);
+        $this->assertPositionInsideValue($functionDeclaration);
+        $this->assertPositionInsideValue($filterDeclaration);
     }
 
     public function testReportsThePositionInsideTheMatchedValue(): void
@@ -111,6 +123,13 @@ final class ProbeFinderTest extends TestCase
             $finder->find($this->project),
             static fn (Probe $probe): bool => $probe->category === $category,
         ));
+    }
+
+    private function assertPositionInsideValue(Probe $probe): void
+    {
+        $line = explode("\n", $probe->contents)[$probe->line];
+
+        self::assertSame($probe->value, substr($line, $probe->character - intdiv(\strlen($probe->value), 2), \strlen($probe->value)));
     }
 
     private function write(string $relativePath, string $contents): void

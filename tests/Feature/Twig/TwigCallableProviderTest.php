@@ -188,8 +188,10 @@ final class TwigCallableProviderTest extends TestCase
                 {
                     return [
                         new TwigFunction('function_name', [AppExtensionRuntime::class, 'doSomething']),
+                        new TwigFunction('function_name', [AppExtensionRuntime::class, 'doSomething']),
                         new TwigFunction('dynamic_name', $dynamicCallable),
                         new TwigFunction('outside_name', [OutsideRuntime::class, 'outside']),
+                        new TwigFunction('unused_name', [AppExtensionRuntime::class, 'doSomething']),
                     ];
                 }
 
@@ -299,12 +301,13 @@ final class TwigCallableProviderTest extends TestCase
         ], $provider->hover($this->params($twigUri, $twigText, 'attribute_function', $converter)));
         $methodOffset = strpos($runtimeText, 'doSomething');
         self::assertIsInt($methodOffset);
+        $methodLength = \strlen('doSomething');
         self::assertSame([
             $protocol->location(
                 $runtimeUri,
                 new Range(
                     $converter->toPosition($runtimeText, $methodOffset),
-                    $converter->toPosition($runtimeText, $methodOffset + \strlen('doSomething')),
+                    $converter->toPosition($runtimeText, $methodOffset + $methodLength),
                 ),
             ),
         ], $provider->definition($this->params($twigUri, $twigText, 'function_name', $converter)));
@@ -354,6 +357,18 @@ final class TwigCallableProviderTest extends TestCase
         self::assertCount(2, $functionReferences ?? []);
         self::assertSame([$twigUri, $twigUri], array_column($functionReferences ?? [], 'uri'));
         self::assertCount(2, $provider->references($this->params($twigUri, $twigText, 'filter_name', $converter)) ?? []);
+        self::assertCount(2, $provider->references($this->params($extensionUri, $extensionText, 'function_name', $converter)) ?? []);
+        self::assertCount(2, $provider->references($this->params($extensionUri, $extensionText, 'filter_name', $converter)) ?? []);
+        self::assertCount(1, $provider->references($this->params($extensionUri, $extensionText, 'attribute_function', $converter)) ?? []);
+        self::assertCount(1, $provider->references($this->params($extensionUri, $extensionText, 'dynamic_name', $converter)) ?? []);
+        self::assertSame([], $provider->references($this->params($extensionUri, $extensionText, 'unused_name', $converter)));
+        /** @var list<array{range: array{start: array{line: int}}}> $methodReferences */
+        $methodReferences = $provider->references($this->params($runtimeUri, $runtimeText, 'doSomething', $converter)) ?? [];
+        self::assertSame([0, 1, 3, 4], array_map(static fn (array $location): int => $location['range']['start']['line'], $methodReferences));
+        self::assertCount(4, $provider->references($this->params($runtimeUri, $runtimeText, 'doSomething', $converter, $methodOffset - intdiv($methodLength, 2))) ?? []);
+        self::assertCount(4, $provider->references($this->params($runtimeUri, $runtimeText, 'doSomething', $converter, $methodOffset + $methodLength - intdiv($methodLength, 2))) ?? []);
+        self::assertCount(1, $provider->references($this->params($extensionUri, $extensionText, 'attributeFunction', $converter)) ?? []);
+        self::assertNull($provider->references($this->params($extensionUri, $extensionText, 'getFunctions', $converter)));
 
         self::assertNull($provider->hover($this->params($twigUri, $twigText, 'path', $converter)));
         self::assertNull($provider->hover($this->params($twigUri, $twigText, 'function_name', $converter, strrpos($twigText, 'function_name'))));

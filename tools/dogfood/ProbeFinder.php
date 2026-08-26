@@ -78,17 +78,21 @@ final class ProbeFinder
     private function findTwigCallables(array $files, string $kind): array
     {
         $names = [];
+        $declarations = [];
+        $category = 'twig.'.strtolower($kind);
         foreach ($files as $path => $contents) {
             if (1 !== preg_match('{\.php$}', $path)) {
                 continue;
             }
-            preg_match_all('/\bnew\s+(?:\\\\?Twig\\\\)?Twig'.preg_quote($kind, '/').'\s*\(\s*([\'\"])([A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*)\1/', $contents, $matches);
-            foreach ($matches[2] as $name) {
+            preg_match_all('/\bnew\s+(?:\\\\?Twig\\\\)?Twig'.preg_quote($kind, '/').'\s*\(\s*([\'\"])([A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*)\1/', $contents, $matches, \PREG_OFFSET_CAPTURE);
+            foreach ($matches[2] as [$name, $offset]) {
                 $names[$name] = true;
+                $declarations[$name] ??= $this->probe($category.'.php', $path, $contents, $name, $offset);
             }
-            preg_match_all('/#\[\s*(?:\\\\?Twig\\\\Attribute\\\\)?AsTwig'.preg_quote($kind, '/').'\s*\(\s*(?:name\s*:\s*)?([\'"])([A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*)\1/', $contents, $matches);
-            foreach ($matches[2] as $name) {
+            preg_match_all('/#\[\s*(?:\\\\?Twig\\\\Attribute\\\\)?AsTwig'.preg_quote($kind, '/').'\s*\(\s*(?:name\s*:\s*)?([\'"])([A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*)\1/', $contents, $matches, \PREG_OFFSET_CAPTURE);
+            foreach ($matches[2] as [$name, $offset]) {
                 $names[$name] = true;
+                $declarations[$name] ??= $this->probe($category.'.php', $path, $contents, $name, $offset);
             }
         }
         if ([] === $names) {
@@ -99,16 +103,25 @@ final class ProbeFinder
             ? '/\b('.$alternatives.')\s*\(/'
             : '/\|\s*('.$alternatives.')\b/';
         $probes = [];
+        $declarationPaths = [];
+        $found = 0;
         foreach ($files as $path => $contents) {
-            if (\count($probes) >= $this->probesPerCategory) {
+            if ($found >= $this->probesPerCategory) {
                 break;
             }
             if (1 !== preg_match('{\.twig$}', $path)) {
                 continue;
             }
-            $probe = $this->match('twig.'.strtolower($kind), $pattern, $path, $contents);
-            if (null !== $probe) {
-                $probes[] = $probe;
+            $probe = $this->match($category, $pattern, $path, $contents);
+            if (null === $probe) {
+                continue;
+            }
+            $probes[] = $probe;
+            ++$found;
+            $declaration = $declarations[$probe->value] ?? null;
+            if (null !== $declaration && !isset($declarationPaths[$declaration->path])) {
+                $probes[] = $declaration;
+                $declarationPaths[$declaration->path] = true;
             }
         }
 
@@ -124,7 +137,13 @@ final class ProbeFinder
         if ('' === $value) {
             return null;
         }
-        [$line, $character] = $this->position($contents, $matches[1][1] + intdiv(\strlen($value), 2));
+
+        return $this->probe($category, $path, $contents, $value, $matches[1][1]);
+    }
+
+    private function probe(string $category, string $path, string $contents, string $value, int $offset): Probe
+    {
+        [$line, $character] = $this->position($contents, $offset + intdiv(\strlen($value), 2));
 
         return new Probe($category, $path, $contents, $value, $line, $character);
     }

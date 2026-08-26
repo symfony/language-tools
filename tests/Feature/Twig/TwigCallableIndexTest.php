@@ -21,6 +21,12 @@ final class TwigCallableIndexTest extends TestCase
 
         self::assertSame(['first'], $index->names(TwigCallableKind::Function));
         self::assertSame([$firstDeclaration], $index->declarations(TwigCallableKind::Function, 'first'));
+        self::assertSame([$firstDeclaration], $index->declarationsForCallable('app\\extension', 'FIRST'));
+        self::assertTrue($index->hasCallableDeclarations());
+        self::assertSame($firstDeclaration, $index->declarationAt($firstDeclaration->uri(), new Position(0, 0)));
+        self::assertSame($firstDeclaration, $index->declarationAt($firstDeclaration->uri(), new Position(0, 1)));
+        self::assertNull($index->declarationAt($firstDeclaration->uri(), new Position(0, 2)));
+        self::assertNull($index->declarationAt('file:///src/Other.php', new Position(0, 0)));
         self::assertSame([$firstUsage], $index->usages(TwigCallableKind::Function, 'first'));
 
         [$secondFacts, $secondDeclaration, $secondUsage] = $this->facts('second');
@@ -28,7 +34,10 @@ final class TwigCallableIndexTest extends TestCase
 
         self::assertSame(['second'], $index->names(TwigCallableKind::Function));
         self::assertSame([], $index->declarations(TwigCallableKind::Function, 'first'));
+        self::assertSame([], $index->declarationsForCallable('App\\Extension', 'first'));
         self::assertSame([$secondDeclaration], $index->declarations(TwigCallableKind::Function, 'second'));
+        self::assertSame([$secondDeclaration], $index->declarationsForCallable('App\\Extension', 'second'));
+        self::assertSame($secondDeclaration, $index->declarationAt($secondDeclaration->uri(), new Position(0, 0)));
         self::assertSame([], $index->usages(TwigCallableKind::Function, 'first'));
         self::assertSame([$secondUsage], $index->usages(TwigCallableKind::Function, 'second'));
     }
@@ -50,7 +59,7 @@ final class TwigCallableIndexTest extends TestCase
     private function facts(string $name): array
     {
         $uri = 'file:///src/TwigExtension.php';
-        $declaration = new TwigCallableDeclaration(TwigCallableKind::Function, $name, $uri, $this->range(0, 0));
+        $declaration = new TwigCallableDeclaration(TwigCallableKind::Function, $name, $uri, $this->range(0, 0), 'App\\Extension', $name);
         $usage = new TwigCallableUsage(TwigCallableKind::Function, $name, 'file:///templates/page.html.twig', $this->range(0, 0));
 
         return [new TwigCallableSourceFacts($uri, [$declaration], [$usage]), $declaration, $usage];

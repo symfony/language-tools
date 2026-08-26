@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Find Twig function and filter usages from PHP declarations
 - Validate and complete Console input argument and option names
 - Restore persisted runtime metadata when the application cannot boot
 - Recover interrupted source caches and verify content before restoring facts
