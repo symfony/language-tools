@@ -60,6 +60,7 @@ final class BridgeTest extends AbstractBridgeTestCase
         $result = json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR);
         self::assertIsArray($result);
         self::assertSame(1, $result['schemaVersion'] ?? null);
+        self::assertIsArray($result['project'] ?? null);
         self::assertSame('42.7.3', $result['project']['symfonyVersion'] ?? null);
         self::assertSame([], $result['sections'] ?? null);
         self::assertSame([], $result['errors'] ?? null);
