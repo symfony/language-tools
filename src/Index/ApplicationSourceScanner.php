@@ -13,6 +13,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\ProjectStateInterface;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Server\ServerLogger;
 
 use function Amp\delay;
 
@@ -45,6 +46,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly SourceFileEnumerator $files,
         private readonly KeyedMutex $mutex,
+        private readonly ServerLogger $logger,
         iterable $providers,
     ) {
         $providers = \is_array($providers) ? array_values($providers) : iterator_to_array($providers, false);
@@ -127,8 +129,9 @@ final class ApplicationSourceScanner implements ProjectStateInterface
             $progressMessage = 'Source indexing canceled';
 
             throw $error;
-        } catch (\Throwable) {
+        } catch (\Throwable $error) {
             $progressMessage = 'Source indexing failed';
+            $this->logger->error($error);
             $this->statuses->sourceFailed($project);
         } finally {
             $this->progress->end($progress, $progressMessage);

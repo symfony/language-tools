@@ -39,6 +39,8 @@ use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Server\SensitiveDataRedactor;
+use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
 use Symfony\Lsp\Tests\Support\NullProgressReporter;
 
@@ -116,6 +118,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new UriToPathConverter(),
             new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry()),
             new LocalKeyedMutex(),
+            new ServerLogger(null, new SensitiveDataRedactor()),
             [
                 new ProjectRouteSourceIndexer(
                     new RouteDeclarationIndexRegistry(),
@@ -196,6 +199,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new UriToPathConverter(),
             new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry()),
             new LocalKeyedMutex(),
+            new ServerLogger(null, new SensitiveDataRedactor()),
             [$indexer],
         );
 

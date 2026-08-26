@@ -24,6 +24,8 @@ use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 use Symfony\Lsp\Runtime\RuntimeRefreshMode;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 use Symfony\Lsp\Runtime\StatusRuntimeInitializer;
+use Symfony\Lsp\Server\SensitiveDataRedactor;
+use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
 use Symfony\Lsp\Tests\Support\NullProgressReporter;
 
@@ -62,6 +64,7 @@ final class IndexCommandHandlerTest extends TestCase
             new UriToPathConverter(),
             new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry()),
             new LocalKeyedMutex(),
+            new ServerLogger(null, new SensitiveDataRedactor()),
             [],
         );
         $runtime = new RecordingRuntimeInitializer();

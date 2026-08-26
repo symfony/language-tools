@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Index;
 
+use Amp\ByteStream\WritableBuffer;
 use Amp\CancelledException;
 use Amp\DeferredCancellation;
 use Amp\Sync\LocalKeyedMutex;
@@ -46,6 +47,8 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Server\SensitiveDataRedactor;
+use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
 use Symfony\Lsp\Tests\Support\NullProgressReporter;
 
@@ -160,6 +163,28 @@ final class ApplicationSourceScannerTest extends TestCase
 
         self::assertSame(1, $fourthProvider->extractions);
         self::assertSame(0, $fourthProvider->restores);
+    }
+
+    public function testLogsSourceIndexFailuresWithoutExposingDetailsInStatus(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $statuses = new ProjectIndexStatusRegistry();
+        $log = new WritableBuffer();
+        $logger = new ServerLogger($log, new SensitiveDataRedactor());
+
+        $this->scannerWithStore(
+            new InMemorySourceIndexStore(),
+            [new FailingSourceIndexProvider()],
+            statuses: $statuses,
+            logger: $logger,
+        )->indexAll();
+
+        $log->close();
+        self::assertSame("[error] secret=[redacted]\n", $log->buffer());
+        self::assertSame(
+            ['state' => 'failed', 'error' => 'Source indexing failed.'],
+            $statuses->status($this->project)['source'],
+        );
     }
 
     public function testWarmFullScanUsesTheScanScopedReader(): void
@@ -789,12 +814,18 @@ PHP;
     }
 
     /** @param list<SourceIndexProviderInterface> $providers */
-    private function scannerWithStore(SourceIndexStoreInterface $store, array $providers, ?LocalKeyedMutex $mutex = null, ?DocumentStore $documents = null): ApplicationSourceScanner
-    {
+    private function scannerWithStore(
+        SourceIndexStoreInterface $store,
+        array $providers,
+        ?LocalKeyedMutex $mutex = null,
+        ?DocumentStore $documents = null,
+        ?ProjectIndexStatusRegistry $statuses = null,
+        ?ServerLogger $logger = null,
+    ): ApplicationSourceScanner {
         return new ApplicationSourceScanner(
             $this->projects,
             $documents ?? new DocumentStore(),
-            new ProjectIndexStatusRegistry(),
+            $statuses ?? new ProjectIndexStatusRegistry(),
             new NullProgressReporter(),
             $store,
             new SourceIndexPayloadCodec(),
@@ -802,6 +833,7 @@ PHP;
             new UriToPathConverter(),
             new SourceFileEnumerator(new GitignoreMatcher(), $this->fileScope),
             $mutex ?? new LocalKeyedMutex(),
+            $logger ?? new ServerLogger(null, new SensitiveDataRedactor()),
             $providers,
         );
     }
@@ -939,6 +971,58 @@ final class ObjectFactsSourceIndexProvider implements SourceIndexProviderInterfa
         }
 
         return new RouteSourceFacts($document->uri(), [], []);
+    }
+}
+
+final class FailingSourceIndexProvider implements SourceIndexProviderInterface
+{
+    public function name(): string
+    {
+        return 'failing';
+    }
+
+    public function payloadClasses(): array
+    {
+        return [RouteDeclaration::class, RouteSourceFacts::class];
+    }
+
+    public function begin(Project $project): void
+    {
+    }
+
+    public function index(Project $project, SourceDocument $document): SourceFactsInterface
+    {
+        throw new \RuntimeException('secret=value');
+    }
+
+    public function restore(Project $project, mixed $data): void
+    {
+    }
+
+    public function finish(Project $project): void
+    {
+    }
+
+    public function replace(Project $project, SourceDocument $document): SourceFactsInterface
+    {
+        throw new \RuntimeException('secret=value');
+    }
+
+    public function runtimeDeclarations(mixed $data): array
+    {
+        return [];
+    }
+
+    public function remove(Project $project, string $uri): void
+    {
+    }
+
+    public function overlay(Project $project, Document $document): void
+    {
+    }
+
+    public function removeOverlay(Project $project, string $uri): void
+    {
     }
 }
 
