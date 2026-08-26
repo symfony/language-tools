@@ -68,9 +68,8 @@ jobs:
                     - project: sulu-demo
                     - project: symfony-demo
                     - project: sylius
-                      mysql: true
                       environment: |
-                          DATABASE_URL=mysql://root:root@127.0.0.1:3306/dogfood
+                          DATABASE_URL=mysql://root:root@127.0.0.1:9/dogfood?serverVersion=8.0.32&charset=utf8mb4
                     - project: shopware
                       environment: |
                           DATABASE_URL=mysql://shopware:shopware@127.0.0.1:9/shopware
@@ -100,17 +99,6 @@ jobs:
             - name: Build the Tree-sitter extension
               if: env.DOGFOOD_SELECTED == 'true'
               run: composer tree-sitter:build
-            - name: Start MySQL
-              if: env.DOGFOOD_SELECTED == 'true' && matrix.mysql
-              run: |
-                  docker run -d --name dogfood-mysql \
-                      -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=dogfood \
-                      -p 127.0.0.1:3306:3306 mysql:8.0
-                  for attempt in $(seq 1 60); do
-                      docker exec dogfood-mysql mysqladmin -uroot -proot ping >/dev/null 2>&1 && exit 0
-                      sleep 2
-                  done
-                  exit 1
             - name: Configure the project environment
               if: env.DOGFOOD_SELECTED == 'true' && matrix.environment
               run: echo "${{ matrix.environment }}" >> "$GITHUB_ENV"

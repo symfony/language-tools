@@ -29,6 +29,16 @@ final class WorkflowTriggerTest extends TestCase
         self::assertStringContainsString('            - CHANGELOG.md', $push);
     }
 
+    public function testSyliusDogfoodDoesNotRequireALiveDatabase(): void
+    {
+        $contents = file_get_contents(self::ROOT.'/.github/workflows/dogfood.yaml');
+        self::assertIsString($contents);
+        self::assertStringContainsString('DATABASE_URL=mysql://root:root@127.0.0.1:9/dogfood?serverVersion=8.0.32&charset=utf8mb4', $contents);
+        self::assertStringNotContainsString('mysql: true', $contents);
+        self::assertStringNotContainsString('Start MySQL', $contents);
+        self::assertStringNotContainsString('dogfood-mysql', $contents);
+    }
+
     public function testReleaseBodyUsesOnlyTheCurrentChangelogSection(): void
     {
         $contents = file_get_contents(self::ROOT.'/.github/workflows/release.yaml');
