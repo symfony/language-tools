@@ -56,10 +56,10 @@ final class ServerHarnessTest extends TestCase
     /** @return iterable<string, array{array<string, string>, float}> */
     public static function probeBudgetProvider(): iterable
     {
-        yield 'no probes' => [[], 41.0];
+        yield 'no probes' => [[], 44.0];
         yield 'two probes with nine requests each' => [[
             'src/Controller.php' => "<?php\n\$router->generate('home');\n",
             'templates/home.html.twig' => "{{ path('home') }}\n",
-        ], 95.0];
+        ], 98.0];
     }
 }

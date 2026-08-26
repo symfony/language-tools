@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tools\Dogfood;
 
 final class ServerHarness implements HarnessInterface
 {
+    public const PROCESS_EXIT_TIMEOUT = 5.0;
     public const PROBE_METHODS = [
         'textDocument/completion',
         'textDocument/hover',
@@ -18,7 +19,7 @@ final class ServerHarness implements HarnessInterface
 
     private const INITIALIZE_TIMEOUT = 10.0;
     private const NON_PROBE_REQUESTS = 2;
-    private const PROCESS_OVERHEAD = 5.0;
+    private const PROCESS_OVERHEAD = self::PROCESS_EXIT_TIMEOUT + 3.0;
 
     public function __construct(
         private ProcessRunnerInterface $processes,

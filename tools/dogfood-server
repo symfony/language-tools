@@ -149,7 +149,7 @@ try {
     }
     $client->request(++$id, 'shutdown', timeout: $requestTimeout);
     $client->notify('exit');
-    $exitCode = $client->close();
+    $exitCode = $client->close(ServerHarness::PROCESS_EXIT_TIMEOUT);
     $stderr = $client->errorOutput();
     $diagnostics = [];
     foreach ($client->notifications() as $notification) {
