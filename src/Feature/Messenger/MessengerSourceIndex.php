@@ -7,41 +7,61 @@ use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 /** @extends AbstractSourceFactsIndex<MessengerSourceFacts> */
 final class MessengerSourceIndex extends AbstractSourceFactsIndex
 {
+    private bool $indexed = false;
+
+    /** @var array<string, array<string, list<MessengerSourceSymbol>>> */
+    private array $symbols = [];
+
+    /** @var array<string, list<string>> */
+    private array $parents = [];
+
     /** @return list<MessengerSourceSymbol> */
     public function symbols(MessengerSymbolKind $kind, string $name): array
     {
-        $result = [];
-        foreach ($this->facts() as $source) {
-            foreach ($source->symbols() as $symbol) {
-                if ($symbol->kind() === $kind && $symbol->name() === $name) {
-                    $result[] = $symbol;
-                }
-            }
-        }
+        $this->index();
 
-        return $result;
+        return $this->symbols[$kind->name][$name] ?? [];
     }
 
     /** @return list<string> */
     public function ancestors(string $className): array
     {
-        $parents = [];
-        foreach ($this->facts() as $source) {
-            foreach ($source->parents() as $class => $classParents) {
-                $parents[$class] = $classParents;
-            }
-        }
+        $this->index();
         $ancestors = [];
-        $pending = $parents[ltrim($className, '\\')] ?? [];
+        $pending = $this->parents[ltrim($className, '\\')] ?? [];
         while ([] !== $pending) {
             $parent = array_shift($pending);
             if (isset($ancestors[$parent])) {
                 continue;
             }
             $ancestors[$parent] = true;
-            array_push($pending, ...($parents[$parent] ?? []));
+            array_push($pending, ...($this->parents[$parent] ?? []));
         }
 
         return array_keys($ancestors);
+    }
+
+    protected function factsChanged(): void
+    {
+        $this->indexed = false;
+    }
+
+    private function index(): void
+    {
+        if ($this->indexed) {
+            return;
+        }
+
+        $this->symbols = [];
+        $this->parents = [];
+        foreach ($this->facts() as $source) {
+            foreach ($source->symbols() as $symbol) {
+                $this->symbols[$symbol->kind()->name][$symbol->name()][] = $symbol;
+            }
+            foreach ($source->parents() as $class => $parents) {
+                $this->parents[$class] = $parents;
+            }
+        }
+        $this->indexed = true;
     }
 }

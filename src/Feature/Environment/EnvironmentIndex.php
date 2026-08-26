@@ -10,6 +10,16 @@ final class EnvironmentIndex extends AbstractSourceFactsIndex
     /** @var array<string, string> */
     private array $processors = [];
     private bool $processorsComplete = false;
+    private bool $indexed = false;
+
+    /** @var list<string> */
+    private array $names = [];
+
+    /** @var array<string, list<EnvironmentDeclaration>> */
+    private array $declarations = [];
+
+    /** @var array<string, list<EnvironmentReference>> */
+    private array $references = [];
 
     /** @param array<string, string> $processors */
     public function replaceProcessors(array $processors, bool $complete = true): void
@@ -38,45 +48,51 @@ final class EnvironmentIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function names(): array
     {
-        $names = [];
-        foreach ($this->facts() as $facts) {
-            foreach ($facts->declarations() as $declaration) {
-                $names[$declaration->name()] = true;
-            }
-        }
-        $names = array_keys($names);
-        sort($names);
+        $this->index();
 
-        return $names;
+        return $this->names;
     }
 
     /** @return list<EnvironmentDeclaration> */
     public function declarations(string $name): array
     {
-        $result = [];
-        foreach ($this->facts() as $facts) {
-            foreach ($facts->declarations() as $declaration) {
-                if ($declaration->name() === $name) {
-                    $result[] = $declaration;
-                }
-            }
-        }
+        $this->index();
 
-        return $result;
+        return $this->declarations[$name] ?? [];
     }
 
     /** @return list<EnvironmentReference> */
     public function references(string $name): array
     {
-        $result = [];
+        $this->index();
+
+        return $this->references[$name] ?? [];
+    }
+
+    protected function factsChanged(): void
+    {
+        $this->indexed = false;
+    }
+
+    private function index(): void
+    {
+        if ($this->indexed) {
+            return;
+        }
+
+        $this->declarations = [];
+        $this->references = [];
         foreach ($this->facts() as $facts) {
+            foreach ($facts->declarations() as $declaration) {
+                $this->declarations[$declaration->name()][] = $declaration;
+            }
             foreach ($facts->references() as $reference) {
-                if ($reference->name() === $name) {
-                    $result[] = $reference;
-                }
+                $this->references[$reference->name()][] = $reference;
             }
         }
 
-        return $result;
+        $this->names = array_keys($this->declarations);
+        sort($this->names);
+        $this->indexed = true;
     }
 }
