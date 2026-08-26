@@ -1,6 +1,6 @@
 <?php
 
-function bridgeTranslationsSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeTranslationsSection(SymfonyLspBridgeContext $context): ?array
 {
     $items = [];
     if (interface_exists(Symfony\Component\Translation\TranslatorBagInterface::class)) {

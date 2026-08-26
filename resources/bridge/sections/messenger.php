@@ -1,6 +1,6 @@
 <?php
 
-function bridgeMessengerSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeMessengerSection(SymfonyLspBridgeContext $context): ?array
 {
     $buses = [];
     $transports = [];
@@ -12,25 +12,25 @@ function bridgeMessengerSection(SymfonyLspBridgeContext $context): ?array
         try {
             $application = $context->application();
             $commandOptions = $context->commandOptions();
-            $definitions = bridgeMessengerDefinitions($application, $commandOptions);
-            [$buses, $transports] = bridgeMessengerTaggedTopology($definitions);
+            $definitions = symfonyLspBridgeMessengerDefinitions($application, $commandOptions);
+            [$buses, $transports] = symfonyLspBridgeMessengerTaggedTopology($definitions);
             try {
-                [$configuredBuses, $configuredTransports, $configuredMessages] = bridgeMessengerConfiguration($application, $commandOptions);
+                [$configuredBuses, $configuredTransports, $configuredMessages] = symfonyLspBridgeMessengerConfiguration($application, $commandOptions);
                 $buses = array_replace($buses, $configuredBuses);
                 $transports = array_replace($transports, $configuredTransports);
                 $messages = array_replace($messages, $configuredMessages);
             } catch (Throwable) {
                 $warnings[] = 'The messenger configuration is unavailable.';
             }
-            [$handlers, $locatorMessages, $locatorWarnings] = bridgeMessengerLocatorHandlers($application, $commandOptions, $definitions, array_keys($buses));
-            $messages = bridgeMessengerMergeMessages($messages, $locatorMessages);
+            [$handlers, $locatorMessages, $locatorWarnings] = symfonyLspBridgeMessengerLocatorHandlers($application, $commandOptions, $definitions, array_keys($buses));
+            $messages = symfonyLspBridgeMessengerMergeMessages($messages, $locatorMessages);
             array_push($warnings, ...$locatorWarnings);
             if ([] === $handlers) {
-                [$handlers, $taggedMessages] = bridgeMessengerTaggedHandlers($definitions, array_keys($buses));
-                $messages = bridgeMessengerMergeMessages($messages, $taggedMessages);
+                [$handlers, $taggedMessages] = symfonyLspBridgeMessengerTaggedHandlers($definitions, array_keys($buses));
+                $messages = symfonyLspBridgeMessengerMergeMessages($messages, $taggedMessages);
             }
             try {
-                $messages = bridgeMessengerSenderRouting($application, $commandOptions, $messages);
+                $messages = symfonyLspBridgeMessengerSenderRouting($application, $commandOptions, $messages);
             } catch (Throwable) {
                 $warnings[] = 'The messenger routing is unavailable.';
             }
@@ -44,20 +44,20 @@ function bridgeMessengerSection(SymfonyLspBridgeContext $context): ?array
     ksort($messages);
     sort($warnings);
 
-    return finalizeBridgeSection([
+    return symfonyLspBridgeFinalizeSection([
         'complete' => $complete,
         'buses' => array_values($buses),
         'transports' => array_values($transports),
         'messages' => array_values($messages),
-        'handlers' => bridgeMessengerSortHandlers($handlers),
+        'handlers' => symfonyLspBridgeMessengerSortHandlers($handlers),
         'resources' => [],
         'warnings' => $warnings,
     ]);
 }
 
-function bridgeMessengerDefinitions(object $application, array $commandOptions): array
+function symfonyLspBridgeMessengerDefinitions(object $application, array $commandOptions): array
 {
-    $container = runJsonCommand($application, [
+    $container = symfonyLspBridgeRunJsonCommand($application, [
         'command' => 'debug:container',
         '--format' => 'json',
         '--show-hidden' => true,
@@ -65,7 +65,7 @@ function bridgeMessengerDefinitions(object $application, array $commandOptions):
     ]);
     $definitions = is_array($container['definitions'] ?? null) ? $container['definitions'] : [];
     foreach (['messenger.bus', 'messenger.receiver', 'messenger.message_handler'] as $tagName) {
-        $tagged = runJsonCommand($application, [
+        $tagged = symfonyLspBridgeRunJsonCommand($application, [
             'command' => 'debug:container',
             '--tag' => $tagName,
             '--format' => 'json',
@@ -81,7 +81,7 @@ function bridgeMessengerDefinitions(object $application, array $commandOptions):
     return $definitions;
 }
 
-function bridgeMessengerTaggedTopology(array $definitions): array
+function symfonyLspBridgeMessengerTaggedTopology(array $definitions): array
 {
     $buses = [];
     $transports = [];
@@ -89,13 +89,13 @@ function bridgeMessengerTaggedTopology(array $definitions): array
         if (!is_string($id) || !is_array($definition)) {
             continue;
         }
-        foreach (definitionTagParameters($definition, 'messenger.bus') as $parameters) {
+        foreach (symfonyLspBridgeDefinitionTagParameters($definition, 'messenger.bus') as $parameters) {
             $buses[$id] = [
                 'name' => $id,
                 'default' => in_array('messenger.default_bus', is_array($definition['usages'] ?? null) ? $definition['usages'] : [], true),
             ];
         }
-        foreach (definitionTagParameters($definition, 'messenger.receiver') as $parameters) {
+        foreach (symfonyLspBridgeDefinitionTagParameters($definition, 'messenger.receiver') as $parameters) {
             $name = is_string($parameters['alias'] ?? null) ? $parameters['alias'] : preg_replace('/^messenger\.transport\./', '', $id);
             if (is_string($name)) {
                 $transports[$name] = [
@@ -109,9 +109,9 @@ function bridgeMessengerTaggedTopology(array $definitions): array
     return [$buses, $transports];
 }
 
-function bridgeMessengerConfiguration(object $application, array $commandOptions): array
+function symfonyLspBridgeMessengerConfiguration(object $application, array $commandOptions): array
 {
-    $configuration = runJsonCommand($application, [
+    $configuration = symfonyLspBridgeRunJsonCommand($application, [
         'command' => 'debug:config',
         'name' => 'framework',
         'path' => 'messenger',
@@ -138,20 +138,20 @@ function bridgeMessengerConfiguration(object $application, array $commandOptions
             continue;
         }
         $senders = is_array($routing) && is_array($routing['senders'] ?? null) ? $routing['senders'] : $routing;
-        $messages[$message] = ['class' => $message, 'transports' => bridgeMessengerStringList($senders)];
+        $messages[$message] = ['class' => $message, 'transports' => symfonyLspBridgeMessengerStringList($senders)];
     }
 
     return [$buses, $transports, $messages];
 }
 
-function bridgeMessengerLocatorHandlers(object $application, array $commandOptions, array $definitions, array $buses): array
+function symfonyLspBridgeMessengerLocatorHandlers(object $application, array $commandOptions, array $definitions, array $buses): array
 {
     $handlers = [];
     $messages = [];
     $warnings = [];
     foreach ($buses as $bus) {
         try {
-            $locator = runJsonCommand($application, [
+            $locator = symfonyLspBridgeRunJsonCommand($application, [
                 'command' => 'debug:container',
                 'name' => $bus.'.messenger.handlers_locator',
                 '--format' => 'json',
@@ -176,7 +176,7 @@ function bridgeMessengerLocatorHandlers(object $application, array $commandOptio
                     }
                     $handlerDefinition = is_array($definitions[$service] ?? null) ? $definitions[$service] : [];
                     $options = is_array($descriptor['arguments'][1] ?? null) ? $descriptor['arguments'][1] : [];
-                    $handlers[] = bridgeMessengerHandler(
+                    $handlers[] = symfonyLspBridgeMessengerHandler(
                         $message,
                         $bus,
                         $service,
@@ -195,7 +195,7 @@ function bridgeMessengerLocatorHandlers(object $application, array $commandOptio
     return [$handlers, $messages, $warnings];
 }
 
-function bridgeMessengerTaggedHandlers(array $definitions, array $buses): array
+function symfonyLspBridgeMessengerTaggedHandlers(array $definitions, array $buses): array
 {
     $handlers = [];
     $messages = [];
@@ -203,15 +203,15 @@ function bridgeMessengerTaggedHandlers(array $definitions, array $buses): array
         if (!is_string($service) || !is_array($definition)) {
             continue;
         }
-        foreach (definitionTagParameters($definition, 'messenger.message_handler') as $options) {
+        foreach (symfonyLspBridgeDefinitionTagParameters($definition, 'messenger.message_handler') as $options) {
             $class = is_string($definition['class'] ?? null) ? $definition['class'] : $service;
             $method = is_string($options['method'] ?? null) && '' !== $options['method'] ? $options['method'] : '__invoke';
-            $handledMessages = is_string($options['handles'] ?? null) && '' !== $options['handles'] ? [$options['handles']] : inferHandlerMessages($class, $method);
+            $handledMessages = is_string($options['handles'] ?? null) && '' !== $options['handles'] ? [$options['handles']] : symfonyLspBridgeInferHandlerMessages($class, $method);
             $handlerBuses = is_string($options['bus'] ?? null) && '' !== $options['bus'] ? [$options['bus']] : $buses;
             foreach ($handledMessages as $message) {
                 $messages[$message] ??= ['class' => $message, 'transports' => []];
                 foreach ($handlerBuses as $bus) {
-                    $handlers[] = bridgeMessengerHandler(
+                    $handlers[] = symfonyLspBridgeMessengerHandler(
                         $message,
                         $bus,
                         $service,
@@ -228,9 +228,9 @@ function bridgeMessengerTaggedHandlers(array $definitions, array $buses): array
     return [$handlers, $messages];
 }
 
-function bridgeMessengerSenderRouting(object $application, array $commandOptions, array $messages): array
+function symfonyLspBridgeMessengerSenderRouting(object $application, array $commandOptions, array $messages): array
 {
-    $senders = runJsonCommand($application, [
+    $senders = symfonyLspBridgeRunJsonCommand($application, [
         'command' => 'debug:container',
         'name' => 'messenger.senders_locator',
         '--format' => 'json',
@@ -242,13 +242,13 @@ function bridgeMessengerSenderRouting(object $application, array $commandOptions
             continue;
         }
         $messages[$message] ??= ['class' => $message, 'transports' => []];
-        $messages[$message]['transports'] = bridgeMessengerStringList($senderNames);
+        $messages[$message]['transports'] = symfonyLspBridgeMessengerStringList($senderNames);
     }
 
     return $messages;
 }
 
-function bridgeMessengerHandler(string $message, string $bus, string $service, string $class, string $method, int $priority, ?string $fromTransport): array
+function symfonyLspBridgeMessengerHandler(string $message, string $bus, string $service, string $class, string $method, int $priority, ?string $fromTransport): array
 {
     return [
         'message' => $message,
@@ -261,7 +261,7 @@ function bridgeMessengerHandler(string $message, string $bus, string $service, s
     ];
 }
 
-function bridgeMessengerMergeMessages(array $messages, array $additional): array
+function symfonyLspBridgeMessengerMergeMessages(array $messages, array $additional): array
 {
     foreach ($additional as $class => $message) {
         $messages[$class] ??= $message;
@@ -270,7 +270,7 @@ function bridgeMessengerMergeMessages(array $messages, array $additional): array
     return $messages;
 }
 
-function bridgeMessengerStringList(mixed $values): array
+function symfonyLspBridgeMessengerStringList(mixed $values): array
 {
     $values = is_string($values) ? [$values] : $values;
     $strings = [];
@@ -283,7 +283,7 @@ function bridgeMessengerStringList(mixed $values): array
     return $strings;
 }
 
-function bridgeMessengerSortHandlers(array $handlers): array
+function symfonyLspBridgeMessengerSortHandlers(array $handlers): array
 {
     $sorted = [];
     foreach ($handlers as $offset => $handler) {

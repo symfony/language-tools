@@ -28,7 +28,7 @@ final class StimulusBridgeTest extends TestCase
         file_put_contents($sourcePath, $text);
 
         $script = \sprintf(
-            'require %s; require %s; echo bridgeStimulusController(%s, %s, %s, null)[%s] ? "1" : "0";',
+            'require %s; require %s; echo symfonyLspBridgeStimulusController(%s, %s, %s, null)[%s] ? "1" : "0";',
             var_export(\dirname(__DIR__, 2).'/vendor/autoload.php', true),
             var_export(\dirname(__DIR__, 2).'/resources/bridge/sections/stimulus.php', true),
             var_export($this->temporaryDirectory, true),

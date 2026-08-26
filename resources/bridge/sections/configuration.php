@@ -1,6 +1,6 @@
 <?php
 
-function bridgeConfigurationSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeConfigurationSection(SymfonyLspBridgeContext $context): ?array
 {
     $project = $context->project();
     $bundles = [];
@@ -42,7 +42,7 @@ function bridgeConfigurationSection(SymfonyLspBridgeContext $context): ?array
                 $bundles[] = [
                     'alias' => (string) $alias,
                     'class' => $bundle::class,
-                    'tree' => normalizeConfigNode($tree),
+                    'tree' => symfonyLspBridgeNormalizeConfigNode($tree),
                 ];
             } catch (Throwable) {
                 $warnings[] = sprintf('The %s configuration tree is unavailable.', $bundle::class);

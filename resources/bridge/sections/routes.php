@@ -1,6 +1,6 @@
 <?php
 
-function bridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
 {
     if (!class_exists(Symfony\Component\Console\Input\ArrayInput::class)
         || !class_exists(Symfony\Component\Console\Output\BufferedOutput::class)
@@ -9,7 +9,7 @@ function bridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
     } else {
         try {
             $application = $context->application();
-            $routes = runJsonCommand($application, [
+            $routes = symfonyLspBridgeRunJsonCommand($application, [
                 'command' => 'debug:router',
                 '--format' => 'json',
                 '--show-aliases' => true,
@@ -24,10 +24,10 @@ function bridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
 
                 $methods = is_array($route['methods'] ?? null)
                     ? array_values($route['methods'])
-                    : splitDebugValues($route['method'] ?? null);
+                    : symfonyLspBridgeSplitDebugValues($route['method'] ?? null);
                 $schemes = is_array($route['schemes'] ?? null)
                     ? array_values($route['schemes'])
-                    : splitDebugValues($route['scheme'] ?? null);
+                    : symfonyLspBridgeSplitDebugValues($route['scheme'] ?? null);
                 $host = is_string($route['host'] ?? null) && !in_array($route['host'], ['', 'ANY'], true)
                     ? $route['host']
                     : null;
@@ -67,7 +67,7 @@ function bridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
             }
 
             usort($items, static fn (array $a, array $b): int => $a['name'] <=> $b['name']);
-            $resources = bridgeRouteResourcePaths($context);
+            $resources = symfonyLspBridgeRouteResourcePaths($context);
             $section = [
                 'complete' => true,
                 'generation' => hash('sha256', json_encode([$items, $resources], JSON_THROW_ON_ERROR)),
@@ -84,7 +84,7 @@ function bridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
 }
 
 /** @return list<string> */
-function bridgeRouteResourcePaths(SymfonyLspBridgeContext $context): array
+function symfonyLspBridgeRouteResourcePaths(SymfonyLspBridgeContext $context): array
 {
     try {
         $router = $context->kernel()->getContainer()->get('router');
@@ -103,7 +103,7 @@ function bridgeRouteResourcePaths(SymfonyLspBridgeContext $context): array
     $projectRoot = Symfony\Component\Filesystem\Path::canonicalize($projectRoot);
     $resources = [];
     foreach ($collection->getResources() as $resource) {
-        $file = bridgeRouteResourceFile($resource);
+        $file = symfonyLspBridgeRouteResourceFile($resource);
         if (null === $file) {
             continue;
         }
@@ -116,7 +116,7 @@ function bridgeRouteResourcePaths(SymfonyLspBridgeContext $context): array
             continue;
         }
         $relativePath = Symfony\Component\Filesystem\Path::makeRelative($path, $projectRoot);
-        if ([] !== array_intersect(explode('/', $relativePath), ['.git', 'node_modules', 'var', 'vendor'])) {
+        if ([] !== array_intersect(explode('/', $relativePath), symfonyLspBridgeExcludedDirectories())) {
             continue;
         }
         $resources[$relativePath] = true;
@@ -126,7 +126,7 @@ function bridgeRouteResourcePaths(SymfonyLspBridgeContext $context): array
     return array_keys($resources);
 }
 
-function bridgeRouteResourceFile(object $resource): ?string
+function symfonyLspBridgeRouteResourceFile(object $resource): ?string
 {
     if ($resource instanceof Symfony\Component\Config\Resource\FileResource) {
         return $resource->getResource();

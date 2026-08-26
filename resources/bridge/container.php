@@ -1,6 +1,6 @@
 <?php
 
-function inferHandlerMessages(string $class, string $method): array
+function symfonyLspBridgeInferHandlerMessages(string $class, string $method): array
 {
     if (!class_exists($class) || !method_exists($class, $method)) {
         return [];
@@ -22,7 +22,7 @@ function inferHandlerMessages(string $class, string $method): array
     }
 }
 
-function definitionTagParameters(array $definition, string $tagName): array
+function symfonyLspBridgeDefinitionTagParameters(array $definition, string $tagName): array
 {
     $parameters = [];
     foreach (is_array($definition['tags'] ?? null) ? $definition['tags'] : [] as $key => $tag) {
@@ -38,7 +38,7 @@ function definitionTagParameters(array $definition, string $tagName): array
     return $parameters;
 }
 
-function normalizeServices(array $container, array $types): array
+function symfonyLspBridgeNormalizeServices(array $container, array $types): array
 {
     $services = [];
     $definitions = $container['definitions'] ?? $container['services'] ?? $container;
@@ -59,12 +59,12 @@ function normalizeServices(array $container, array $types): array
         $alias = is_string($definition['alias'] ?? null)
             ? $definition['alias']
             : null;
-        $services[$id] = normalizeService($id, $definition, $alias);
+        $services[$id] = symfonyLspBridgeNormalizeService($id, $definition, $alias);
     }
 
     foreach (is_array($container['services'] ?? null) ? $container['services'] : [] as $id => $className) {
         if (is_string($id) && is_string($className)) {
-            $services[$id] = normalizeService($id, ['class' => $className], null);
+            $services[$id] = symfonyLspBridgeNormalizeService($id, ['class' => $className], null);
         }
     }
 
@@ -81,11 +81,11 @@ function normalizeServices(array $container, array $types): array
                 ? $metadata['service']
                 : (is_string($metadata['target'] ?? null) ? $metadata['target'] : null));
         if (null !== $id) {
-            $services[$id] = normalizeService($id, $metadata, $target);
+            $services[$id] = symfonyLspBridgeNormalizeService($id, $metadata, $target);
         }
     }
 
-    $typesByService = normalizeAutowiringTypes($types);
+    $typesByService = symfonyLspBridgeNormalizeAutowiringTypes($types);
     foreach ($services as $id => $service) {
         $service['autowiringTypes'] = $typesByService[$id] ?? [];
         $services[$id] = $service;
@@ -96,7 +96,7 @@ function normalizeServices(array $container, array $types): array
     return array_values($services);
 }
 
-function normalizeService(string $id, array $metadata, ?string $alias): array
+function symfonyLspBridgeNormalizeService(string $id, array $metadata, ?string $alias): array
 {
     $tags = [];
     foreach (is_array($metadata['tags'] ?? null) ? $metadata['tags'] : [] as $key => $tag) {
@@ -130,7 +130,7 @@ function normalizeService(string $id, array $metadata, ?string $alias): array
         'lazy' => is_bool($metadata['lazy'] ?? null)
             ? $metadata['lazy']
             : (is_string($metadata['lazy'] ?? null) && '' !== $metadata['lazy'] ? true : null),
-        'deprecation' => normalizeDeprecation($metadata['deprecation_message'] ?? $metadata['deprecated'] ?? $metadata['deprecation'] ?? null),
+        'deprecation' => symfonyLspBridgeNormalizeDeprecation($metadata['deprecation_message'] ?? $metadata['deprecated'] ?? $metadata['deprecation'] ?? null),
         'tags' => $tags,
         'decorates' => $decorates,
         'decorationStack' => array_values(array_unique($decorationStack)),
@@ -138,7 +138,7 @@ function normalizeService(string $id, array $metadata, ?string $alias): array
     ];
 }
 
-function normalizeAutowiringTypes(array $output): array
+function symfonyLspBridgeNormalizeAutowiringTypes(array $output): array
 {
     $typesByService = [];
     if (array_key_exists('definitions', $output) || array_key_exists('aliases', $output)) {
@@ -170,7 +170,7 @@ function normalizeAutowiringTypes(array $output): array
             $serviceIds = is_array($services) && array_key_exists('services', $services)
                 ? $services['services']
                 : $services;
-            foreach (serviceIds($serviceIds) as $serviceId) {
+            foreach (symfonyLspBridgeServiceIds($serviceIds) as $serviceId) {
                 $typesByService[$serviceId][] = $type;
             }
         }
@@ -185,7 +185,7 @@ function normalizeAutowiringTypes(array $output): array
     return $typesByService;
 }
 
-function serviceIds(mixed $services): array
+function symfonyLspBridgeServiceIds(mixed $services): array
 {
     if (is_string($services)) {
         return [$services];
@@ -202,13 +202,13 @@ function serviceIds(mixed $services): array
 
     $ids = [];
     foreach ($services as $service) {
-        array_push($ids, ...serviceIds($service));
+        array_push($ids, ...symfonyLspBridgeServiceIds($service));
     }
 
     return array_values(array_unique($ids));
 }
 
-function normalizeParameters(array $output): array
+function symfonyLspBridgeNormalizeParameters(array $output): array
 {
     $parameters = $output['parameters'] ?? $output;
     $deprecations = [];
@@ -236,7 +236,7 @@ function normalizeParameters(array $output): array
     return array_values($items);
 }
 
-function normalizeDeprecation(mixed $deprecation): ?string
+function symfonyLspBridgeNormalizeDeprecation(mixed $deprecation): ?string
 {
     if (is_string($deprecation)) {
         return '' !== $deprecation ? $deprecation : null;

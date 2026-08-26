@@ -1,6 +1,6 @@
 <?php
 
-function bridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
 {
     $assets = [];
     $importMap = [];
@@ -12,7 +12,7 @@ function bridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
         try {
             $application = $context->application();
             $commandOptions = ['--format' => 'json', ...$context->commandOptions()];
-            $configuration = runJsonCommand($application, [
+            $configuration = symfonyLspBridgeRunJsonCommand($application, [
                 'command' => 'debug:config',
                 'name' => 'framework',
                 'path' => 'asset_mapper',
@@ -29,7 +29,7 @@ function bridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
             $importMapPath = is_string($configuration['importmap_path'] ?? null) ? $configuration['importmap_path'] : null;
             if ($application->find('debug:container')->getDefinition()->hasOption('show-arguments')) {
                 $containerOptions = ['--show-hidden' => true, '--show-arguments' => true, ...$commandOptions];
-                $repository = runJsonCommand($application, [
+                $repository = symfonyLspBridgeRunJsonCommand($application, [
                     'command' => 'debug:container',
                     'name' => 'asset_mapper.repository',
                     ...$containerOptions,
@@ -42,7 +42,7 @@ function bridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
                     $excludedPatterns = array_values(array_filter($repository['arguments'][2], 'is_string'));
                 }
                 $excludeDotFiles = true === ($repository['arguments'][3] ?? $excludeDotFiles);
-                $configReader = runJsonCommand($application, [
+                $configReader = symfonyLspBridgeRunJsonCommand($application, [
                     'command' => 'debug:container',
                     'name' => 'asset_mapper.importmap.config_reader',
                     ...$containerOptions,
@@ -54,7 +54,7 @@ function bridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
                 if (!is_string($path) || !is_string($namespace)) {
                     continue;
                 }
-                $absolutePath = bridgeAssetAbsolutePath($projectRoot, $path);
+                $absolutePath = symfonyLspBridgeAssetAbsolutePath($projectRoot, $path);
                 if (null === $absolutePath) {
                     $warnings[] = sprintf('Asset path not found: %s', $path);
                     continue;
@@ -67,7 +67,7 @@ function bridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
                     ->notName('/\.php$/i');
                 foreach ($finder as $file) {
                     $sourcePath = Symfony\Component\Filesystem\Path::canonicalize($file->getPathname());
-                    if (bridgeAssetExcluded($sourcePath, $excludedPatterns, $excludeDotFiles)) {
+                    if (symfonyLspBridgeAssetExcluded($sourcePath, $excludedPatterns, $excludeDotFiles)) {
                         continue;
                     }
                     $relativePath = Symfony\Component\Filesystem\Path::makeRelative($sourcePath, $absolutePath);
@@ -124,10 +124,10 @@ function bridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
         'resources' => [],
         'warnings' => $warnings,
     ];
-    return finalizeBridgeSection($section);
+    return symfonyLspBridgeFinalizeSection($section);
 }
 
-function bridgeAssetAbsolutePath(string $projectRoot, string $path): ?string
+function symfonyLspBridgeAssetAbsolutePath(string $projectRoot, string $path): ?string
 {
     $absolute = Symfony\Component\Filesystem\Path::isAbsolute($path)
         ? Symfony\Component\Filesystem\Path::canonicalize($path)
@@ -137,7 +137,7 @@ function bridgeAssetAbsolutePath(string $projectRoot, string $path): ?string
     return false !== $realPath && is_dir($realPath) ? $realPath : null;
 }
 
-function bridgeAssetExcluded(string $path, array $patterns, bool $excludeDotFiles): bool
+function symfonyLspBridgeAssetExcluded(string $path, array $patterns, bool $excludeDotFiles): bool
 {
     foreach ($patterns as $pattern) {
         if (1 === preg_match($pattern, $path)) {

@@ -1,6 +1,6 @@
 <?php
 
-function bridgeEnvironmentSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeEnvironmentSection(SymfonyLspBridgeContext $context): ?array
 {
     $processors = [];
     $complete = true;
@@ -10,7 +10,7 @@ function bridgeEnvironmentSection(SymfonyLspBridgeContext $context): ?array
             : [];
         try {
             $application = $context->application();
-            $tagged = runJsonCommand($application, [
+            $tagged = symfonyLspBridgeRunJsonCommand($application, [
                 'command' => 'debug:container',
                 '--tag' => 'container.env_var_processor',
                 '--format' => 'json',

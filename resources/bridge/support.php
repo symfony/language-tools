@@ -1,13 +1,19 @@
 <?php
 
-function finalizeBridgeSection(array $section): array
+/** @return list<string> */
+function symfonyLspBridgeExcludedDirectories(): array
+{
+    return ['.git', 'node_modules', 'var', 'vendor'];
+}
+
+function symfonyLspBridgeFinalizeSection(array $section): array
 {
     $section['generation'] = hash('sha256', json_encode($section, JSON_THROW_ON_ERROR));
 
     return $section;
 }
 
-function runJsonCommand(object $application, array $arguments): array
+function symfonyLspBridgeRunJsonCommand(object $application, array $arguments): array
 {
     static $cache = [];
 
@@ -21,7 +27,7 @@ function runJsonCommand(object $application, array $arguments): array
         throw new RuntimeException(sprintf('%s exited with status %d.', $arguments['command'], $exitCode));
     }
 
-    $result = json_decode(commandJsonDocument($output->fetch()), true, 512, JSON_THROW_ON_ERROR);
+    $result = json_decode(symfonyLspBridgeCommandJsonDocument($output->fetch()), true, 512, JSON_THROW_ON_ERROR);
     if (!is_array($result)) {
         throw new RuntimeException(sprintf('%s did not return a JSON object or array.', $arguments['command']));
     }
@@ -34,7 +40,7 @@ function runJsonCommand(object $application, array $arguments): array
  * begins a line can be the command document; JSON embedded in a log line is
  * context data.
  */
-function commandJsonDocument(string $output): string
+function symfonyLspBridgeCommandJsonDocument(string $output): string
 {
     $best = null;
     for ($start = 0, $length = strlen($output); $start < $length; ++$start) {
@@ -87,7 +93,7 @@ function commandJsonDocument(string $output): string
     return $best ?? $output;
 }
 
-function splitDebugValues(mixed $value): array
+function symfonyLspBridgeSplitDebugValues(mixed $value): array
 {
     if (!is_string($value) || '' === $value || 'ANY' === $value) {
         return [];

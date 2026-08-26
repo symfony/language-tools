@@ -7,34 +7,34 @@
  * database connection) in listener constructors.
  */
 
-function bridgeEventsSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeEventsSection(SymfonyLspBridgeContext $context): ?array
 {
     $eventItems = [];
     $listeners = [];
     $complete = true;
     if (interface_exists(Symfony\Contracts\EventDispatcher\EventDispatcherInterface::class)) {
         try {
-            $aliases = bridgeEventAliases($context);
+            $aliases = symfonyLspBridgeEventAliases($context);
             $application = $context->application();
-            $listenerDefinitions = runJsonCommand($application, [
+            $listenerDefinitions = symfonyLspBridgeRunJsonCommand($application, [
                 'command' => 'debug:container',
                 '--tag' => 'kernel.event_listener',
                 '--format' => 'json',
                 ...$context->commandOptions(),
             ]);
-            foreach (bridgeContainerTagDefinitions($listenerDefinitions) as $definition) {
-                foreach (bridgeListenerTagEntries($definition, $aliases) as $listener) {
+            foreach (symfonyLspBridgeContainerTagDefinitions($listenerDefinitions) as $definition) {
+                foreach (symfonyLspBridgeListenerTagEntries($definition, $aliases) as $listener) {
                     $listeners[] = $listener;
                 }
             }
-            $subscriberDefinitions = runJsonCommand($application, [
+            $subscriberDefinitions = symfonyLspBridgeRunJsonCommand($application, [
                 'command' => 'debug:container',
                 '--tag' => 'kernel.event_subscriber',
                 '--format' => 'json',
                 ...$context->commandOptions(),
             ]);
-            foreach (bridgeContainerTagDefinitions($subscriberDefinitions) as $definition) {
-                foreach (bridgeSubscriberEntries($definition, $aliases) as $listener) {
+            foreach (symfonyLspBridgeContainerTagDefinitions($subscriberDefinitions) as $definition) {
+                foreach (symfonyLspBridgeSubscriberEntries($definition, $aliases) as $listener) {
                     $listeners[] = $listener;
                 }
             }
@@ -67,10 +67,10 @@ function bridgeEventsSection(SymfonyLspBridgeContext $context): ?array
         'resources' => [],
         'warnings' => [],
     ];
-    return finalizeBridgeSection($section);
+    return symfonyLspBridgeFinalizeSection($section);
 }
 
-function bridgeEventAliases(SymfonyLspBridgeContext $context): array
+function symfonyLspBridgeEventAliases(SymfonyLspBridgeContext $context): array
 {
     try {
         $kernel = $context->kernel();
@@ -92,7 +92,7 @@ function bridgeEventAliases(SymfonyLspBridgeContext $context): array
     return is_array($aliases) ? $aliases : [];
 }
 
-function bridgeContainerTagDefinitions(array $payload): array
+function symfonyLspBridgeContainerTagDefinitions(array $payload): array
 {
     $definitions = [];
     foreach (is_array($payload['definitions'] ?? null) ? $payload['definitions'] : [] as $definition) {
@@ -108,7 +108,7 @@ function bridgeContainerTagDefinitions(array $payload): array
     return $definitions;
 }
 
-function bridgeListenerTagEntries(array $definition, array $aliases): array
+function symfonyLspBridgeListenerTagEntries(array $definition, array $aliases): array
 {
     $class = $definition['class'];
     $entries = [];
@@ -133,7 +133,7 @@ function bridgeListenerTagEntries(array $definition, array $aliases): array
                     continue;
                 }
                 $method ??= '__invoke';
-                $eventNames = bridgeListenerParameterEvents($class, $method);
+                $eventNames = symfonyLspBridgeListenerParameterEvents($class, $method);
             } else {
                 $eventNames = [$event];
             }
@@ -142,7 +142,7 @@ function bridgeListenerTagEntries(array $definition, array $aliases): array
                 $entries[] = [
                     'event' => $eventName,
                     'class' => $class,
-                    'method' => $method ?? bridgeListenerDefaultMethod($class, $eventName),
+                    'method' => $method ?? symfonyLspBridgeListenerDefaultMethod($class, $eventName),
                     'priority' => $priority,
                 ];
             }
@@ -154,7 +154,7 @@ function bridgeListenerTagEntries(array $definition, array $aliases): array
     return $entries;
 }
 
-function bridgeListenerParameterEvents(string $class, string $method): array
+function symfonyLspBridgeListenerParameterEvents(string $class, string $method): array
 {
     if (!class_exists($class) || !method_exists($class, $method)) {
         return [];
@@ -180,7 +180,7 @@ function bridgeListenerParameterEvents(string $class, string $method): array
     return $names;
 }
 
-function bridgeListenerDefaultMethod(string $class, string $event): string
+function symfonyLspBridgeListenerDefaultMethod(string $class, string $event): string
 {
     $method = 'on'.preg_replace_callback([
         '/(?<=\b|_)[a-z]/i',
@@ -194,7 +194,7 @@ function bridgeListenerDefaultMethod(string $class, string $event): string
     return $method;
 }
 
-function bridgeSubscriberEntries(array $definition, array $aliases): array
+function symfonyLspBridgeSubscriberEntries(array $definition, array $aliases): array
 {
     $class = $definition['class'];
     $entries = [];

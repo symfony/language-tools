@@ -1,6 +1,6 @@
 <?php
 
-function bridgeContainerSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeContainerSection(SymfonyLspBridgeContext $context): ?array
 {
     if (!class_exists(Symfony\Component\Console\Input\ArrayInput::class)
         || !class_exists(Symfony\Component\Console\Output\BufferedOutput::class)
@@ -10,26 +10,26 @@ function bridgeContainerSection(SymfonyLspBridgeContext $context): ?array
         try {
             $application = $context->application();
             $commandOptions = $context->commandOptions();
-            $container = runJsonCommand($application, [
+            $container = symfonyLspBridgeRunJsonCommand($application, [
                 'command' => 'debug:container',
                 '--format' => 'json',
                 '--show-hidden' => true,
                 ...$commandOptions,
             ]);
-            $types = runJsonCommand($application, [
+            $types = symfonyLspBridgeRunJsonCommand($application, [
                 'command' => 'debug:container',
                 '--types' => true,
                 '--format' => 'json',
                 ...$commandOptions,
             ]);
-            $parameterItems = normalizeParameters(runJsonCommand($application, [
+            $parameterItems = symfonyLspBridgeNormalizeParameters(symfonyLspBridgeRunJsonCommand($application, [
                 'command' => 'debug:container',
                 '--parameters' => true,
                 '--format' => 'json',
                 ...$commandOptions,
             ]));
 
-            $items = normalizeServices($container, $types);
+            $items = symfonyLspBridgeNormalizeServices($container, $types);
             $section = [
                 'complete' => true,
                 'servicesComplete' => false,
@@ -39,7 +39,7 @@ function bridgeContainerSection(SymfonyLspBridgeContext $context): ?array
                 'resources' => [],
                 'warnings' => [],
             ];
-            $section = finalizeBridgeSection($section);
+            $section = symfonyLspBridgeFinalizeSection($section);
         } catch (Throwable) {
             $context->addError('container');
         }

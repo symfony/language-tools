@@ -1,6 +1,6 @@
 <?php
 
-function bridgeTwigSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeTwigSection(SymfonyLspBridgeContext $context): ?array
 {
     $paths = [];
     $globals = [];
@@ -13,7 +13,7 @@ function bridgeTwigSection(SymfonyLspBridgeContext $context): ?array
                 $complete = false;
                 $warnings[] = 'The debug:twig command is unavailable.';
             } else {
-                $twig = runJsonCommand($application, [
+                $twig = symfonyLspBridgeRunJsonCommand($application, [
                     'command' => 'debug:twig',
                     '--format' => 'json',
                     ...$context->commandOptions(),
@@ -34,7 +34,7 @@ function bridgeTwigSection(SymfonyLspBridgeContext $context): ?array
             if ([] === $paths) {
                 // theme loaders, such as the Sylius theme bundle, decorate the
                 // filesystem loader and hide every path from debug:twig
-                $paths = bridgeTwigConventionPaths($context, $application);
+                $paths = symfonyLspBridgeTwigConventionPaths($context, $application);
             }
         } catch (Throwable) {
             $context->addError('twig');
@@ -60,13 +60,13 @@ function bridgeTwigSection(SymfonyLspBridgeContext $context): ?array
  * the configured paths and default path plus the bundle template directories
  * and their application-level overrides.
  */
-function bridgeTwigConventionPaths(SymfonyLspBridgeContext $context, object $application): array
+function symfonyLspBridgeTwigConventionPaths(SymfonyLspBridgeContext $context, object $application): array
 {
     $paths = [];
     $project = rtrim($context->project(), '/\\');
     $defaultPath = $project.'/templates';
     try {
-        $configuration = runJsonCommand($application, [
+        $configuration = symfonyLspBridgeRunJsonCommand($application, [
             'command' => 'debug:config',
             'name' => 'twig',
             '--format' => 'json',

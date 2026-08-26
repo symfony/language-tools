@@ -28,6 +28,43 @@ final class BridgeTest extends AbstractBridgeTestCase
         self::assertFalse($result['project']['debug']);
     }
 
+    public function testApplicationGlobalFunctionsDoNotCollideWithBridgeSymbols(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/vendor/autoload.php', <<<'PHP'
+            <?php
+            namespace {
+                function runJsonCommand(): string { return 'application'; }
+                function serviceIds(): string { return 'application'; }
+                function normalizeParameters(): string { return 'application'; }
+                function configNodeType(): string { return 'application'; }
+            }
+            namespace Composer {
+                final class InstalledVersions
+                {
+                    public static function getPrettyVersion(string $package): ?string
+                    {
+                        return '42.7.3';
+                    }
+                }
+            }
+            PHP);
+
+        exec(\sprintf(
+            '%s %s --project=%s --environment=test --debug=0 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
+            escapeshellarg($this->temporaryDirectory),
+        ), $output, $exitCode);
+
+        self::assertSame(0, $exitCode, implode("\n", $output));
+        $result = json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($result);
+        self::assertSame(1, $result['schemaVersion'] ?? null);
+        self::assertSame('42.7.3', $result['project']['symfonyVersion'] ?? null);
+        self::assertSame([], $result['sections'] ?? null);
+        self::assertSame([], $result['errors'] ?? null);
+    }
+
     /** @return iterable<string, array{string}> */
     public static function versionProvider(): iterable
     {

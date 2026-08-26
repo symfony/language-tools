@@ -1,6 +1,6 @@
 <?php
 
-function configNodeType(object $node): string
+function symfonyLspBridgeConfigNodeType(object $node): string
 {
     $class = basename(str_replace('\\', '/', $node::class));
 
@@ -16,7 +16,7 @@ function configNodeType(object $node): string
     };
 }
 
-function configDefaultSummary(object $node): ?string
+function symfonyLspBridgeConfigDefaultSummary(object $node): ?string
 {
     if (!method_exists($node, 'hasDefaultValue') || !$node->hasDefaultValue()) {
         return null;
@@ -34,7 +34,7 @@ function configDefaultSummary(object $node): ?string
     };
 }
 
-function normalizeConfigExample(mixed $example): mixed
+function symfonyLspBridgeNormalizeConfigExample(mixed $example): mixed
 {
     if (null === $example || is_bool($example) || is_float($example) || is_int($example) || is_string($example)) {
         return $example;
@@ -42,7 +42,7 @@ function normalizeConfigExample(mixed $example): mixed
     if (is_array($example)) {
         $normalized = [];
         foreach (array_slice($example, 0, 20, true) as $key => $value) {
-            $normalized[$key] = normalizeConfigExample($value);
+            $normalized[$key] = symfonyLspBridgeNormalizeConfigExample($value);
         }
 
         return $normalized;
@@ -51,7 +51,7 @@ function normalizeConfigExample(mixed $example): mixed
     return null;
 }
 
-function configNodeNormalizes(object $node, mixed $value): bool
+function symfonyLspBridgeConfigNodeNormalizes(object $node, mixed $value): bool
 {
     if (!method_exists($node, 'normalize')) {
         return false;
@@ -65,7 +65,7 @@ function configNodeNormalizes(object $node, mixed $value): bool
     return true;
 }
 
-function configNodeAcceptsKey(object $node, string $name, ?object $child = null): bool
+function symfonyLspBridgeConfigNodeAcceptsKey(object $node, string $name, ?object $child = null): bool
 {
     $values = [null, [], 'symfony-lsp-probe', true, 1];
     if (null !== $child && method_exists($child, 'getValues')) {
@@ -75,7 +75,7 @@ function configNodeAcceptsKey(object $node, string $name, ?object $child = null)
         }
     }
     foreach ($values as $value) {
-        if (configNodeNormalizes($node, [$name => $value])) {
+        if (symfonyLspBridgeConfigNodeNormalizes($node, [$name => $value])) {
             return true;
         }
     }
@@ -83,7 +83,7 @@ function configNodeAcceptsKey(object $node, string $name, ?object $child = null)
     return false;
 }
 
-function configNodeNormalizesKeys(object $node): bool
+function symfonyLspBridgeConfigNodeNormalizesKeys(object $node): bool
 {
     if (!property_exists($node, 'normalizeKeys')) {
         return true;
@@ -98,30 +98,30 @@ function configNodeNormalizesKeys(object $node): bool
     return !is_bool($normalizeKeys) || $normalizeKeys;
 }
 
-function normalizeConfigNode(object $node, int $depth = 0): array
+function symfonyLspBridgeNormalizeConfigNode(object $node, int $depth = 0): array
 {
     $normalized = [
         'name' => method_exists($node, 'getName') ? (string) $node->getName() : '',
-        'type' => configNodeType($node),
+        'type' => symfonyLspBridgeConfigNodeType($node),
         'required' => method_exists($node, 'isRequired') && $node->isRequired(),
         'hasDefault' => method_exists($node, 'hasDefaultValue') && $node->hasDefaultValue(),
-        'defaultSummary' => configDefaultSummary($node),
+        'defaultSummary' => symfonyLspBridgeConfigDefaultSummary($node),
         'info' => method_exists($node, 'getInfo') && is_string($node->getInfo()) ? $node->getInfo() : null,
-        'example' => method_exists($node, 'getExample') ? normalizeConfigExample($node->getExample()) : null,
+        'example' => method_exists($node, 'getExample') ? symfonyLspBridgeNormalizeConfigExample($node->getExample()) : null,
         'deprecated' => method_exists($node, 'isDeprecated') && $node->isDeprecated(),
-        'allowedValues' => method_exists($node, 'getValues') ? normalizeConfigExample($node->getValues()) : null,
+        'allowedValues' => method_exists($node, 'getValues') ? symfonyLspBridgeNormalizeConfigExample($node->getValues()) : null,
         'children' => [],
         'prototype' => null,
         'aliases' => [],
         'keyAttribute' => method_exists($node, 'getKeyAttribute') && is_string($node->getKeyAttribute()) ? $node->getKeyAttribute() : null,
-        'normalizeKeys' => configNodeNormalizesKeys($node),
+        'normalizeKeys' => symfonyLspBridgeConfigNodeNormalizesKeys($node),
     ];
     $normalized['accepts'] = [
-        'null' => configNodeNormalizes($node, null),
-        'true' => configNodeNormalizes($node, true),
-        'false' => configNodeNormalizes($node, false),
-        'scalar' => configNodeNormalizes($node, 'symfony-lsp-probe'),
-        'unknownKeys' => configNodeNormalizes($node, ['symfony_lsp_unknown_probe' => null]),
+        'null' => symfonyLspBridgeConfigNodeNormalizes($node, null),
+        'true' => symfonyLspBridgeConfigNodeNormalizes($node, true),
+        'false' => symfonyLspBridgeConfigNodeNormalizes($node, false),
+        'scalar' => symfonyLspBridgeConfigNodeNormalizes($node, 'symfony-lsp-probe'),
+        'unknownKeys' => symfonyLspBridgeConfigNodeNormalizes($node, ['symfony_lsp_unknown_probe' => null]),
     ];
     if (method_exists($node, 'getXmlRemappings')) {
         foreach ($node->getXmlRemappings() as $remapping) {
@@ -138,7 +138,7 @@ function normalizeConfigNode(object $node, int $depth = 0): array
     if (method_exists($node, 'getChildren')) {
         foreach ($node->getChildren() as $child) {
             if (is_object($child)) {
-                $normalized['children'][] = normalizeConfigNode($child, $depth + 1);
+                $normalized['children'][] = symfonyLspBridgeNormalizeConfigNode($child, $depth + 1);
                 if (method_exists($child, 'getName')) {
                     $ownNames[(string) $child->getName()] = true;
                 }
@@ -148,18 +148,18 @@ function normalizeConfigNode(object $node, int $depth = 0): array
     if (method_exists($node, 'getPrototype')) {
         $prototype = $node->getPrototype();
         if (is_object($prototype)) {
-            $normalized['prototype'] = normalizeConfigNode($prototype, $depth + 1);
+            $normalized['prototype'] = symfonyLspBridgeNormalizeConfigNode($prototype, $depth + 1);
             // some branches normalize prototype entry values on the prototyped
             // node itself, such as the messenger routing string shorthand
             foreach ([['null', null], ['true', true], ['false', false], ['scalar', 'symfony-lsp-probe']] as [$kind, $value]) {
-                if (!$normalized['prototype']['accepts'][$kind] && configNodeNormalizes($node, ['symfony_lsp_probe_key' => $value])) {
+                if (!$normalized['prototype']['accepts'][$kind] && symfonyLspBridgeConfigNodeNormalizes($node, ['symfony_lsp_probe_key' => $value])) {
                     $normalized['prototype']['accepts'][$kind] = true;
                 }
             }
         }
     }
     if ('array' === $normalized['type'] && [] !== $normalized['children'] && !$normalized['accepts']['unknownKeys']) {
-        mergeShorthandChildren($node, $normalized, $ownNames, $depth);
+        symfonyLspBridgeMergeShorthandChildren($node, $normalized, $ownNames, $depth);
     }
 
     return $normalized;
@@ -172,7 +172,7 @@ function normalizeConfigNode(object $node, int $depth = 0): array
  * accepted keys become regular children so validation, completion and hover
  * understand the shorthand.
  */
-function mergeShorthandChildren(object $node, array &$normalized, array $ownNames, int $depth): void
+function symfonyLspBridgeMergeShorthandChildren(object $node, array &$normalized, array $ownNames, int $depth): void
 {
     if (!method_exists($node, 'getChildren')) {
         return;
@@ -191,7 +191,7 @@ function mergeShorthandChildren(object $node, array &$normalized, array $ownName
             if (isset($ownNames[$name]) || !is_object($prototypeChild)) {
                 continue;
             }
-            if (configNodeAcceptsKey($node, (string) $name, $prototypeChild)) {
+            if (symfonyLspBridgeConfigNodeAcceptsKey($node, (string) $name, $prototypeChild)) {
                 $delegates = true;
                 break;
             }
@@ -203,10 +203,10 @@ function mergeShorthandChildren(object $node, array &$normalized, array $ownName
             continue;
         }
         foreach ($prototype->getChildren() as $name => $prototypeChild) {
-            if (isset($ownNames[$name]) || !is_object($prototypeChild) || !configNodeAcceptsKey($node, (string) $name, $prototypeChild)) {
+            if (isset($ownNames[$name]) || !is_object($prototypeChild) || !symfonyLspBridgeConfigNodeAcceptsKey($node, (string) $name, $prototypeChild)) {
                 continue;
             }
-            $normalized['children'][] = normalizeConfigNode($prototypeChild, $depth + 1);
+            $normalized['children'][] = symfonyLspBridgeNormalizeConfigNode($prototypeChild, $depth + 1);
             $ownNames[$name] = true;
         }
     }

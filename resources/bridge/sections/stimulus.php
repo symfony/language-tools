@@ -1,6 +1,6 @@
 <?php
 
-function bridgeStimulusSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeStimulusSection(SymfonyLspBridgeContext $context): ?array
 {
     $controllers = [];
     $resources = [];
@@ -19,7 +19,7 @@ function bridgeStimulusSection(SymfonyLspBridgeContext $context): ?array
             }
             if ($enabled) {
                 $application = $context->application();
-                $configuration = runJsonCommand($application, [
+                $configuration = symfonyLspBridgeRunJsonCommand($application, [
                     'command' => 'debug:config',
                     'name' => 'stimulus',
                     '--format' => 'json',
@@ -30,7 +30,7 @@ function bridgeStimulusSection(SymfonyLspBridgeContext $context): ?array
                 $controllersJson = is_string($configuration['controllers_json'] ?? null) ? $configuration['controllers_json'] : null;
                 if (null !== $controllersJson && is_file($controllersJson)) {
                     $resources[] = realpath($controllersJson) ?: $controllersJson;
-                    foreach (bridgeStimulusUxControllers($context->project(), $controllersJson, $warnings) as $name => $controller) {
+                    foreach (symfonyLspBridgeStimulusUxControllers($context->project(), $controllersJson, $warnings) as $name => $controller) {
                         $controllers[$name] = $controller;
                     }
                 } elseif (null !== $controllersJson) {
@@ -38,14 +38,14 @@ function bridgeStimulusSection(SymfonyLspBridgeContext $context): ?array
                     // registry cannot be treated as the complete controller set
                     $warnings[] = 'The configured controllers.json was not found.';
                 }
-                foreach (bridgeStimulusBundleRegistries($context, $kernel, $warnings) as $bundleControllersJson) {
+                foreach (symfonyLspBridgeStimulusBundleRegistries($context, $kernel, $warnings) as $bundleControllersJson) {
                     $resources[] = realpath($bundleControllersJson) ?: $bundleControllersJson;
-                    foreach (bridgeStimulusUxControllers($context->project(), $bundleControllersJson, $warnings) as $name => $controller) {
+                    foreach (symfonyLspBridgeStimulusUxControllers($context->project(), $bundleControllersJson, $warnings) as $name => $controller) {
                         $controllers[$name] ??= $controller;
                     }
                 }
                 foreach ($controllerPaths as $controllerPath) {
-                    foreach (bridgeStimulusLocalControllers($context->project(), $controllerPath) as $name => $controller) {
+                    foreach (symfonyLspBridgeStimulusLocalControllers($context->project(), $controllerPath) as $name => $controller) {
                         $controllers[$name] = $controller;
                     }
                 }
@@ -65,10 +65,10 @@ function bridgeStimulusSection(SymfonyLspBridgeContext $context): ?array
         'resources' => $resources,
         'warnings' => $warnings,
     ];
-    return finalizeBridgeSection($section);
+    return symfonyLspBridgeFinalizeSection($section);
 }
 
-function bridgeStimulusBundleRegistries(SymfonyLspBridgeContext $context, object $kernel, array &$warnings): array
+function symfonyLspBridgeStimulusBundleRegistries(SymfonyLspBridgeContext $context, object $kernel, array &$warnings): array
 {
     $registries = [];
     try {
@@ -93,7 +93,7 @@ function bridgeStimulusBundleRegistries(SymfonyLspBridgeContext $context, object
     return $registries;
 }
 
-function bridgeStimulusLocalControllers(string $projectRoot, string $controllerPath): array
+function symfonyLspBridgeStimulusLocalControllers(string $projectRoot, string $controllerPath): array
 {
     $controllers = [];
     $realPath = realpath($controllerPath);
@@ -120,13 +120,13 @@ function bridgeStimulusLocalControllers(string $projectRoot, string $controllerP
         if (false === $sourcePath) {
             continue;
         }
-        $controllers[$name] = bridgeStimulusController($projectRoot, $name, $sourcePath, null);
+        $controllers[$name] = symfonyLspBridgeStimulusController($projectRoot, $name, $sourcePath, null);
     }
 
     return $controllers;
 }
 
-function bridgeStimulusUxControllers(string $projectRoot, string $controllersJson, array &$warnings): array
+function symfonyLspBridgeStimulusUxControllers(string $projectRoot, string $controllersJson, array &$warnings): array
 {
     try {
         $configuration = json_decode((string) file_get_contents($controllersJson), true, 512, JSON_THROW_ON_ERROR);
@@ -185,18 +185,18 @@ function bridgeStimulusUxControllers(string $projectRoot, string $controllersJso
                 continue;
             }
             $lazy = 'lazy' === ($localConfiguration['fetch'] ?? 'eager');
-            $controllers[$name] = bridgeStimulusController($projectRoot, $name, $sourcePath, $lazy);
+            $controllers[$name] = symfonyLspBridgeStimulusController($projectRoot, $name, $sourcePath, $lazy);
         }
     }
 
     return $controllers;
 }
 
-function bridgeStimulusController(string $projectRoot, string $name, string $sourcePath, ?bool $lazy): array
+function symfonyLspBridgeStimulusController(string $projectRoot, string $name, string $sourcePath, ?bool $lazy): array
 {
     $contents = file_get_contents($sourcePath);
     $contents = false === $contents ? '' : $contents;
-    $metadata = bridgeStimulusJavascriptMetadata($contents);
+    $metadata = symfonyLspBridgeStimulusJavascriptMetadata($contents);
     $root = Symfony\Component\Filesystem\Path::canonicalize(realpath($projectRoot) ?: $projectRoot);
     $sourcePath = Symfony\Component\Filesystem\Path::canonicalize($sourcePath);
 
@@ -209,7 +209,7 @@ function bridgeStimulusController(string $projectRoot, string $name, string $sou
     ];
 }
 
-function bridgeStimulusJavascriptMetadata(string $contents): array
+function symfonyLspBridgeStimulusJavascriptMetadata(string $contents): array
 {
     preg_match_all('/^[ \t]*(?:async\s+)?([A-Za-z_$][A-Za-z0-9_$]*)\s*\([^)]*\)\s*(?::\s*[^\{\r\n]+)?\s*\{/m', $contents, $methodMatches);
     $actions = array_values(array_diff(array_unique($methodMatches[1]), ['connect', 'constructor', 'disconnect', 'initialize']));

@@ -1,6 +1,6 @@
 <?php
 
-function bridgeSecuritySection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeSecuritySection(SymfonyLspBridgeContext $context): ?array
 {
     $firewalls = [];
     $providers = [];
@@ -27,7 +27,7 @@ function bridgeSecuritySection(SymfonyLspBridgeContext $context): ?array
         try {
             $application = $context->application();
             $commandOptions = $context->commandOptions();
-            $configuration = runJsonCommand($application, [
+            $configuration = symfonyLspBridgeRunJsonCommand($application, [
                 'command' => 'debug:config',
                 'name' => 'security',
                 '--format' => 'json',
@@ -83,7 +83,7 @@ function bridgeSecuritySection(SymfonyLspBridgeContext $context): ?array
                 }
             }
             try {
-                $taggedVoters = runJsonCommand($application, [
+                $taggedVoters = symfonyLspBridgeRunJsonCommand($application, [
                     'command' => 'debug:container',
                     '--tag' => 'security.voter',
                     '--format' => 'json',
@@ -120,5 +120,5 @@ function bridgeSecuritySection(SymfonyLspBridgeContext $context): ?array
         'resources' => [],
         'warnings' => $warnings,
     ];
-    return finalizeBridgeSection($section);
+    return symfonyLspBridgeFinalizeSection($section);
 }

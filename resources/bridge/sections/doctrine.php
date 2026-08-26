@@ -1,6 +1,6 @@
 <?php
 
-function bridgeDoctrineSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeDoctrineSection(SymfonyLspBridgeContext $context): ?array
 {
     if (!interface_exists(Doctrine\Persistence\ManagerRegistry::class)) {
         return null;

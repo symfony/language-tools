@@ -354,7 +354,7 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
     {
         $script = <<<'PHP'
             require $argv[1].'/resources/bridge/sections/messenger.php';
-            echo json_encode(bridgeMessengerMergeMessages(
+            echo json_encode(symfonyLspBridgeMessengerMergeMessages(
                 ['App\\Message\\Configured' => ['class' => 'App\\Message\\Configured', 'transports' => ['async']]],
                 [
                     'App\\Message\\Configured' => ['class' => 'App\\Message\\Configured', 'transports' => []],

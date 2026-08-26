@@ -1,6 +1,6 @@
 <?php
 
-function bridgeMetadataSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeMetadataSection(SymfonyLspBridgeContext $context): ?array
 {
     $forms = [];
     $constraints = [];
@@ -15,7 +15,7 @@ function bridgeMetadataSection(SymfonyLspBridgeContext $context): ?array
                 $warnings[] = 'The debug:form command is unavailable.';
             } else {
                 $commandOptions = ['--format' => 'json', ...$context->commandOptions()];
-                $formList = runJsonCommand($application, ['command' => 'debug:form', ...$commandOptions]);
+                $formList = symfonyLspBridgeRunJsonCommand($application, ['command' => 'debug:form', ...$commandOptions]);
                 $types = [];
                 foreach (['builtin_form_types', 'service_form_types'] as $key) {
                     foreach (is_array($formList[$key] ?? null) ? $formList[$key] : [] as $type) {
@@ -26,9 +26,9 @@ function bridgeMetadataSection(SymfonyLspBridgeContext $context): ?array
                 }
                 foreach (array_keys($types) as $type) {
                     try {
-                        $metadata = runJsonCommand($application, ['command' => 'debug:form', 'class' => $type, ...$commandOptions]);
+                        $metadata = symfonyLspBridgeRunJsonCommand($application, ['command' => 'debug:form', 'class' => $type, ...$commandOptions]);
                         $options = [];
-                        foreach (bridgeMetadataStringLeaves(is_array($metadata['options'] ?? null) ? $metadata['options'] : []) as $name) {
+                        foreach (symfonyLspBridgeMetadataStringLeaves(is_array($metadata['options'] ?? null) ? $metadata['options'] : []) as $name) {
                             $options[$name] = true;
                         }
                         $required = array_values(array_filter(is_array($metadata['options']['required'] ?? null) ? $metadata['options']['required'] : [], 'is_string'));
@@ -93,17 +93,17 @@ function bridgeMetadataSection(SymfonyLspBridgeContext $context): ?array
         'resources' => [],
         'warnings' => $warnings,
     ];
-    return finalizeBridgeSection($section);
+    return symfonyLspBridgeFinalizeSection($section);
 }
 
-function bridgeMetadataStringLeaves(array $values): array
+function symfonyLspBridgeMetadataStringLeaves(array $values): array
 {
     $strings = [];
     foreach ($values as $value) {
         if (is_string($value)) {
             $strings[] = $value;
         } elseif (is_array($value)) {
-            array_push($strings, ...bridgeMetadataStringLeaves($value));
+            array_push($strings, ...symfonyLspBridgeMetadataStringLeaves($value));
         }
     }
 

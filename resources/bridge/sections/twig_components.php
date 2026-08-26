@@ -1,6 +1,6 @@
 <?php
 
-function bridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
 {
     if (!class_exists(Symfony\UX\TwigComponent\ComponentFactory::class)) {
         $section = [
@@ -22,7 +22,7 @@ function bridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
         try {
             $application = $context->application();
             $commandOptions = $context->commandOptions();
-            $configuration = runJsonCommand($application, [
+            $configuration = symfonyLspBridgeRunJsonCommand($application, [
                 'command' => 'debug:config',
                 'name' => 'twig_component',
                 '--format' => 'json',
@@ -48,7 +48,7 @@ function bridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
             foreach (['twig.component', 'ux.twig_component.twig_renderer'] as $tag) {
                 $definitionsByTag[$tag] = [];
                 foreach ([[], ['--show-hidden' => true]] as $visibilityOptions) {
-                    $tagged = runJsonCommand($application, [
+                    $tagged = symfonyLspBridgeRunJsonCommand($application, [
                         'command' => 'debug:container',
                         '--tag' => $tag,
                         '--format' => 'json',
@@ -68,10 +68,10 @@ function bridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
             $components = [];
             foreach ($definitionsByTag['twig.component'] as $definition) {
                 $class = is_string($definition['class'] ?? null) ? $definition['class'] : null;
-                foreach (definitionTagParameters($definition, 'twig.component') as $parameters) {
+                foreach (symfonyLspBridgeDefinitionTagParameters($definition, 'twig.component') as $parameters) {
                     $name = is_string($parameters['key'] ?? null) && '' !== $parameters['key']
                         ? $parameters['key']
-                        : (null === $class ? null : autoTwigComponentName($class, $defaults));
+                        : (null === $class ? null : symfonyLspBridgeAutoTwigComponentName($class, $defaults));
                     if (null === $name) {
                         $complete = false;
                         $warnings[] = sprintf('Unable to derive the component name of "%s".', $class ?? 'an unnamed component service');
@@ -96,7 +96,7 @@ function bridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
             }
             $caseInsensitiveNames = [];
             foreach ($definitionsByTag['ux.twig_component.twig_renderer'] as $definition) {
-                foreach (definitionTagParameters($definition, 'ux.twig_component.twig_renderer') as $parameters) {
+                foreach (symfonyLspBridgeDefinitionTagParameters($definition, 'ux.twig_component.twig_renderer') as $parameters) {
                     $name = is_string($parameters['key'] ?? null) ? $parameters['key'] : null;
                     if (null !== $name && '' !== $name && strtolower($name) === $name) {
                         $caseInsensitiveNames[$name] = true;
@@ -135,7 +135,7 @@ function bridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
 }
 
 // Mirrors the automatic naming rule of TwigComponentPass for tags without an explicit key.
-function autoTwigComponentName(string $class, array $defaults): ?string
+function symfonyLspBridgeAutoTwigComponentName(string $class, array $defaults): ?string
 {
     foreach ($defaults as $namespace => $namePrefix) {
         if (!str_starts_with($class, $namespace)) {

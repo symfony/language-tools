@@ -392,7 +392,7 @@ final class SymfonyLspBridgeContext
             return null;
         }
         $relative = substr($file, strlen($prefix));
-        if ([] !== array_intersect(explode('/', $relative), ['.git', 'node_modules', 'var', 'vendor'])) {
+        if ([] !== array_intersect(explode('/', $relative), symfonyLspBridgeExcludedDirectories())) {
             return null;
         }
 
