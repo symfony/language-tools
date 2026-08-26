@@ -5,7 +5,7 @@ namespace Symfony\Lsp\Tools;
 final class ContentLengthProcessClient
 {
     private const MAX_HEADER_BYTES = 65536;
-    private const POLL_INTERVAL_MICROSECONDS = 10000;
+    private const POLL_INTERVAL_MICROSECONDS = 1000;
     private const TERMINATION_GRACE_SECONDS = 1.0;
 
     /** @var resource|null */
