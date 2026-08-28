@@ -2,12 +2,12 @@
 
 namespace Symfony\Lsp\Tests\Feature\Configuration;
 
-use Amp\CancelledException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\Configuration\ConfigurationValidationException;
 use Symfony\Lsp\Feature\Configuration\ConfigurationValidationRegistry;
 use Symfony\Lsp\Feature\Configuration\ConfigurationValidationResult;
 use Symfony\Lsp\Feature\Configuration\ProjectConfigurationValidationSnapshotLoader;
+use Symfony\Lsp\Feature\Configuration\StaleConfigurationValidationSnapshotException;
 use Symfony\Lsp\Project\Project;
 
 final class ConfigurationValidationRegistryTest extends TestCase
@@ -69,7 +69,7 @@ final class ConfigurationValidationRegistryTest extends TestCase
                 'configurationValidation' => ['status' => 'valid'],
             ]);
             self::fail('The stale configuration validation was accepted.');
-        } catch (CancelledException) {
+        } catch (StaleConfigurationValidationSnapshotException) {
         }
 
         self::assertSame(ConfigurationValidationResult::PENDING, $registry->result($project)->state);

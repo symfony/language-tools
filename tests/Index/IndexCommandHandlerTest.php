@@ -6,6 +6,7 @@ use Amp\Cancellation;
 use Amp\Sync\LocalKeyedMutex;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Feature\Configuration\StaleConfigurationValidationSnapshotException;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\IndexCommandHandler;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
@@ -113,6 +114,50 @@ final class IndexCommandHandlerTest extends TestCase
         ]);
         self::assertFalse($untrusted[0]['trusted'] ?? null);
     }
+
+    public function testRetriesManualRuntimeRefreshAfterAConfigurationChangeInvalidatesTheSnapshot(): void
+    {
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project(
+            $this->temporaryDirectory,
+            'file://'.$this->temporaryDirectory,
+            '^8.0',
+        )]);
+        $statuses = new ProjectIndexStatusRegistry();
+        $sourceScanner = new ApplicationSourceScanner(
+            $projects,
+            new DocumentStore(),
+            $statuses,
+            new NullProgressReporter(),
+            new InMemorySourceIndexStore(),
+            new SourceIndexPayloadCodec(),
+            new PhpRuntimeStructureHasher(),
+            new UriToPathConverter(),
+            new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry()),
+            new LocalKeyedMutex(),
+            new ServerLogger(null, new SensitiveDataRedactor()),
+            [],
+        );
+        $runtime = new RecordingRuntimeInitializer(1);
+        $workspaceTrust = new WorkspaceTrust();
+        $workspaceTrust->set($project, TrustStatus::Trusted);
+        $handler = new IndexCommandHandler(
+            $projects,
+            $workspaceTrust,
+            $sourceScanner,
+            new StatusRuntimeInitializer($runtime, $statuses, $projects),
+            $statuses,
+            new RuntimeConfiguration(),
+        );
+
+        $result = $handler->execute([
+            'command' => IndexCommandHandler::REFRESH_COMMAND,
+            'arguments' => [$project->rootUri()],
+        ]);
+
+        self::assertSame([$this->temporaryDirectory, $this->temporaryDirectory], $runtime->projects);
+        self::assertSame('ready', $result[0]['runtime']['state'] ?? null);
+    }
 }
 
 final class RecordingRuntimeInitializer implements RuntimeInitializerInterface
@@ -123,9 +168,18 @@ final class RecordingRuntimeInitializer implements RuntimeInitializerInterface
     /** @var list<RuntimeRefreshPlan> */
     public array $plans = [];
 
+    public function __construct(private int $staleSnapshots = 0)
+    {
+    }
+
     public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
     {
         $this->projects[] = $project->rootPath();
         $this->plans[] = $plan ?? new RuntimeRefreshPlan();
+        if (0 < $this->staleSnapshots) {
+            --$this->staleSnapshots;
+
+            throw new StaleConfigurationValidationSnapshotException();
+        }
     }
 }

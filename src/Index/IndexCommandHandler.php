@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Index;
 
 use Amp\Cancellation;
+use Symfony\Lsp\Feature\Configuration\StaleConfigurationValidationSnapshotException;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\TrustStatus;
@@ -50,7 +51,7 @@ final class IndexCommandHandler
                 $cancellation?->throwIfRequested();
                 $this->configuration->setEnvironment($project, $environment);
                 if ($this->configuration->runtimeIndexing($project) && TrustStatus::Trusted === $this->workspaceTrust->status($project)) {
-                    $this->runtimeInitializer->initialize($project, new RuntimeRefreshPlan(RuntimeRefreshMode::Clear), $cancellation);
+                    $this->initializeRuntime($project, new RuntimeRefreshPlan(RuntimeRefreshMode::Clear), $cancellation);
                 }
             }
         } elseif (self::REFRESH_COMMAND === $command) {
@@ -58,7 +59,7 @@ final class IndexCommandHandler
                 $cancellation?->throwIfRequested();
                 $this->sourceScanner->refreshProject($project, $cancellation);
                 if ($this->configuration->runtimeIndexing($project) && TrustStatus::Trusted === $this->workspaceTrust->status($project)) {
-                    $this->runtimeInitializer->initialize($project, cancellation: $cancellation);
+                    $this->initializeRuntime($project, cancellation: $cancellation);
                 }
             }
         }
@@ -69,6 +70,22 @@ final class IndexCommandHandler
             'runtimeEnabled' => $this->configuration->runtimeIndexing($project),
             'trusted' => TrustStatus::Trusted === $this->workspaceTrust->status($project),
         ], $projects);
+    }
+
+    private function initializeRuntime(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+    {
+        while (true) {
+            try {
+                $this->runtimeInitializer->initialize($project, $plan, $cancellation);
+
+                return;
+            } catch (StaleConfigurationValidationSnapshotException $error) {
+                $cancellation?->throwIfRequested();
+                if (!$this->projects->contains($project)) {
+                    throw $error;
+                }
+            }
+        }
     }
 
     /** @param array<array-key, mixed> $params */

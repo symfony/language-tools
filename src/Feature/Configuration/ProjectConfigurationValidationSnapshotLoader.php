@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Feature\Configuration;
 
-use Amp\CancelledException;
 use Symfony\Lsp\Project\Project;
 
 final class ProjectConfigurationValidationSnapshotLoader
@@ -21,7 +20,7 @@ final class ProjectConfigurationValidationSnapshotLoader
     {
         $generation = $snapshot['configurationGeneration'] ?? 0;
         if (!\is_int($generation) || $generation !== $this->validations->generation($project)) {
-            throw new CancelledException();
+            throw new StaleConfigurationValidationSnapshotException();
         }
         $validation = $snapshot['configurationValidation'] ?? null;
         $projectMetadata = $snapshot['project'] ?? null;
