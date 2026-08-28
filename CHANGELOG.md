@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Accept native Windows line endings in packaged command smoke tests
+
 ## 0.17.0 (2026-08-28)
 
 - Retry manual runtime refreshes invalidated by concurrent file changes

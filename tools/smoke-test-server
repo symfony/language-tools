@@ -73,7 +73,7 @@ function checkCommandDispatch(string $server, ?string $expectedVersion): void
     $unknown = executeServerCommand([$server, 'unknown-command']);
     if (INVOCATION_EXIT !== $unknown['exitCode']
         || '' !== $unknown['stdout']
-        || "Unknown command \"unknown-command\".\n" !== $unknown['stderr']
+        || 'Unknown command "unknown-command".'.\PHP_EOL !== $unknown['stderr']
     ) {
         throw new RuntimeException('The executable accepted an unknown top-level command.');
     }

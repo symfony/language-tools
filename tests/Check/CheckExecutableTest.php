@@ -71,7 +71,7 @@ final class CheckExecutableTest extends TestCase
 
         self::assertSame(CheckCommand::EXIT_INVOCATION, $result['exitCode']);
         self::assertSame('', $result['stdout']);
-        self::assertSame("Unknown command \"unknown-command\".\n", $result['stderr']);
+        self::assertSame('Unknown command "unknown-command".'.\PHP_EOL, $result['stderr']);
     }
 
     public function testUsesTheSymfonyCliAsTheDefaultPhpCommand(): void
