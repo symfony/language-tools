@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.17.1 (2026-08-28)
 
 - Accept native Windows line endings in packaged command smoke tests
