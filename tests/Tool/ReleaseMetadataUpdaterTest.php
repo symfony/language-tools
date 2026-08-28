@@ -26,30 +26,13 @@ final class ReleaseMetadataUpdaterTest extends TestCase
     {
         $this->writeFixture("- Add release automation\n");
 
-        (new ReleaseMetadataUpdater())->prepare($this->directory, '0.3.0', '0.3.1', '2026-08-05');
+        (new ReleaseMetadataUpdater())->prepare($this->directory, '0.3.1', '2026-08-05');
 
         self::assertSame(
             "# Changelog\n\n## 0.3.1 (2026-08-05)\n\n- Add release automation\n\n## 0.3.0 (2026-08-04)\n",
             file_get_contents($this->directory.'/CHANGELOG.md'),
         );
-        self::assertSame("Install 0.3.1\n", file_get_contents($this->directory.'/docs/index.rst'));
-    }
-
-    public function testDoesNotPartiallyUpdateInvalidMetadata(): void
-    {
-        $this->writeFixture("- Add release automation\n");
-        file_put_contents($this->directory.'/docs/index.rst', "Install dev\n");
-        $changelog = file_get_contents($this->directory.'/CHANGELOG.md');
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('contains no 0.3.0 installation example');
-
-        try {
-            (new ReleaseMetadataUpdater())->prepare($this->directory, '0.3.0', '0.3.1', '2026-08-05');
-        } finally {
-            self::assertSame($changelog, file_get_contents($this->directory.'/CHANGELOG.md'));
-            self::assertSame("Install dev\n", file_get_contents($this->directory.'/docs/index.rst'));
-        }
+        self::assertSame("Install vX.Y.Z\n", file_get_contents($this->directory.'/docs/index.rst'));
     }
 
     public function testStartsNextDevelopmentCycleOnce(): void
@@ -73,7 +56,7 @@ final class ReleaseMetadataUpdaterTest extends TestCase
             $this->directory.'/CHANGELOG.md',
             "# Changelog\n\n## Unreleased\n\n{$entries}\n## 0.3.0 (2026-08-04)\n",
         );
-        file_put_contents($this->directory.'/docs/index.rst', "Install 0.3.0\n");
+        file_put_contents($this->directory.'/docs/index.rst', "Install vX.Y.Z\n");
     }
 
     private function removeDirectory(string $directory): void

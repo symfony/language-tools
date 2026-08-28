@@ -4,9 +4,8 @@ namespace Symfony\Lsp\Tools;
 
 final class ReleaseMetadataUpdater
 {
-    public function prepare(string $root, string $currentVersion, string $version, string $date): void
+    public function prepare(string $root, string $version, string $date): void
     {
-        $updates = [];
         $changelogPath = $root.'/CHANGELOG.md';
         $changelog = $this->read($changelogPath);
         if (1 !== substr_count($changelog, '## Unreleased')) {
@@ -23,18 +22,7 @@ final class ReleaseMetadataUpdater
         if (null === $changelog || 1 !== $count) {
             throw new \RuntimeException('Unable to update CHANGELOG.md.');
         }
-        $updates[$changelogPath] = $changelog;
-
-        $documentationPath = $root.'/docs/index.rst';
-        $documentation = $this->read($documentationPath);
-        if (!str_contains($documentation, $currentVersion)) {
-            throw new \RuntimeException(\sprintf('docs/index.rst contains no %s installation example.', $currentVersion));
-        }
-        $updates[$documentationPath] = str_replace($currentVersion, $version, $documentation);
-
-        foreach ($updates as $path => $contents) {
-            $this->write($path, $contents);
-        }
+        $this->write($changelogPath, $changelog);
     }
 
     public function startNextDevelopment(string $root): bool

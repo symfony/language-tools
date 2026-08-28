@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep generic installation examples unchanged during releases
 - Integrate headless diagnostics with Symfony CLI project-aware PHP defaults
 - Find Twig function and filter usages from PHP declarations
 - Validate and complete Console input argument and option names

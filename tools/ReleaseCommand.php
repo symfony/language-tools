@@ -6,7 +6,6 @@ final class ReleaseCommand
 {
     private const EXPECTED_RELEASE_FILES = [
         'CHANGELOG.md',
-        'docs/index.rst',
         'editor/vscode/package-lock.json',
         'editor/vscode/package.json',
     ];
@@ -71,7 +70,7 @@ final class ReleaseCommand
             }
 
             $this->validateLocally();
-            $this->metadataUpdater->prepare($this->root, $currentVersion, $version, gmdate('Y-m-d'));
+            $this->metadataUpdater->prepare($this->root, $version, gmdate('Y-m-d'));
             $this->processes->run(['npm', 'version', $version, '--no-git-tag-version'], $this->root.'/editor/vscode');
             $this->assertPreparedMetadata($version);
             $this->assertExpectedReleaseDiff();
@@ -136,9 +135,6 @@ final class ReleaseCommand
         $changelog = $this->read($this->root.'/CHANGELOG.md');
         if (!str_contains($changelog, \sprintf('## %s (', $version)) || str_contains($changelog, '## Unreleased')) {
             throw new \RuntimeException('The changelog is not prepared for the release.');
-        }
-        if (!str_contains($this->read($this->root.'/docs/index.rst'), $version)) {
-            throw new \RuntimeException(\sprintf('docs/index.rst does not reference version %s.', $version));
         }
     }
 
