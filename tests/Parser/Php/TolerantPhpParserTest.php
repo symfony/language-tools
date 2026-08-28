@@ -129,6 +129,122 @@ final class TolerantPhpParserTest extends TestCase
         ], array_map(static fn ($variable): array => $variable->types(), $variables));
     }
 
+    public function testExposesPropertyDeclarationsWithoutInitializerValues(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Model;
+
+            use Vendor\Identity\Identifier;
+            use Vendor\Profile as UserProfile;
+
+            final class Customer
+            {
+                /**
+                 * Stores customer identities.
+                 *
+                 * @var Identifier
+                 */
+                private ?Identifier $primary = null, $secondary = null;
+                protected UserProfile|null $profile;
+                public string $token = 'secret';
+                private $untyped;
+            }
+            PHP;
+
+        $properties = (new TolerantPhpParser(new Parser()))->parse($source)->propertyDeclarations();
+
+        self::assertSame(['primary', 'secondary', 'profile', 'token', 'untyped'], array_map(static fn ($property): string => $property->name(), $properties));
+        self::assertSame(array_fill(0, 5, 'App\Model\Customer'), array_map(static fn ($property): string => $property->className(), $properties));
+        self::assertSame([
+            'private ?Identifier $primary',
+            'private ?Identifier $secondary',
+            'protected UserProfile|null $profile',
+            'public string $token',
+            'private $untyped',
+        ], array_map(static fn ($property): string => $property->signature(), $properties));
+        self::assertSame([
+            ['Vendor\Identity\Identifier'],
+            ['Vendor\Identity\Identifier'],
+            ['Vendor\Profile'],
+            [],
+            [],
+        ], array_map(static fn ($property): array => $property->types(), $properties));
+        self::assertSame(['private', 'private', 'protected', 'public', 'private'], array_map(static fn ($property): string => $property->visibility(), $properties));
+        self::assertSame([false, false, false, true, false], array_map(static fn ($property): bool => $property->isPublic(), $properties));
+        self::assertSame(['Stores customer identities.', 'Stores customer identities.', null, null, null], array_map(static fn ($property): ?string => $property->description(), $properties));
+        self::assertSame(array_fill(0, 5, false), array_map(static fn ($property): bool => $property->isPromoted(), $properties));
+        foreach ($properties as $property) {
+            self::assertSame($property->name(), substr($source, $property->nameStartOffset(), $property->nameEndOffset() - $property->nameStartOffset()));
+        }
+    }
+
+    public function testExposesPromotedPropertyDeclarations(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Model;
+
+            use Vendor\Identity\Identifier;
+            use Vendor\Service;
+
+            final class Customer
+            {
+                public function __construct(
+                    public Service $service = new Service(),
+                    protected readonly ?Identifier $identifier = null,
+                    private $token = 'secret',
+                    string $ordinary = '',
+                ) {
+                }
+            }
+            PHP;
+
+        $properties = (new TolerantPhpParser(new Parser()))->parse($source)->propertyDeclarations();
+
+        self::assertSame(['service', 'identifier', 'token'], array_map(static fn ($property): string => $property->name(), $properties));
+        self::assertSame([
+            'public Service $service',
+            'protected readonly ?Identifier $identifier',
+            'private $token',
+        ], array_map(static fn ($property): string => $property->signature(), $properties));
+        self::assertSame([
+            ['Vendor\Service'],
+            ['Vendor\Identity\Identifier'],
+            [],
+        ], array_map(static fn ($property): array => $property->types(), $properties));
+        self::assertSame(['public', 'protected', 'private'], array_map(static fn ($property): string => $property->visibility(), $properties));
+        self::assertSame([true, false, false], array_map(static fn ($property): bool => $property->isPublic(), $properties));
+        self::assertSame(array_fill(0, 3, true), array_map(static fn ($property): bool => $property->isPromoted(), $properties));
+        foreach ($properties as $property) {
+            self::assertSame('App\Model\Customer', $property->className());
+            self::assertSame($property->name(), substr($source, $property->nameStartOffset(), $property->nameEndOffset() - $property->nameStartOffset()));
+        }
+    }
+
+    public function testKeepsPropertyDeclarationsFromIncompleteSource(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+
+            use Vendor\Identity\Identifier;
+
+            final class Draft
+            {
+                public function __construct(private Identifier $identifier =
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $property = $document->propertyDeclarations()[0];
+
+        self::assertSame('identifier', $property->name());
+        self::assertSame('private Identifier $identifier', $property->signature());
+        self::assertSame(['Vendor\Identity\Identifier'], $property->types());
+        self::assertTrue($property->isPromoted());
+        self::assertSame('identifier', substr($source, $property->nameStartOffset(), $property->nameEndOffset() - $property->nameStartOffset()));
+    }
+
     public function testExposesObjectCreationCallablesAndMethodDeclarations(): void
     {
         $source = <<<'PHP'

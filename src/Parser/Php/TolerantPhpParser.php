@@ -120,8 +120,9 @@ final class TolerantPhpParser implements PhpParserInterface
                 $methodDeclarations[] = $declaration;
             }
         }
+        $propertyDeclarations = $this->propertyDeclarations($typedVariableNodes, $source, $names);
 
-        return new PhpDocument($attributes, $methodCalls, $typeDeclarations, $diagnostics, $typedVariables, $names, $objectCreations, $methodDeclarations, $constantDeclarations);
+        return new PhpDocument($attributes, $methodCalls, $typeDeclarations, $diagnostics, $typedVariables, $names, $objectCreations, $methodDeclarations, $constantDeclarations, $propertyDeclarations);
     }
 
     /**
@@ -159,6 +160,109 @@ final class TolerantPhpParser implements PhpParserInterface
         }
 
         return $variables;
+    }
+
+    /**
+     * @param list<Parameter|PropertyDeclaration> $declarations
+     *
+     * @return list<PhpPropertyDeclaration>
+     */
+    private function propertyDeclarations(array $declarations, string $source, PhpNameContext $names): array
+    {
+        $properties = [];
+        foreach ($declarations as $declaration) {
+            if ($declaration instanceof Parameter) {
+                $method = $declaration->getFirstAncestor(MethodDeclaration::class);
+                $methodName = $method instanceof MethodDeclaration && $method->name instanceof Token ? $method->name->getText($source) : null;
+                if (!\is_string($methodName) || '__construct' !== strtolower($methodName) || !$declaration->visibilityToken instanceof Token) {
+                    continue;
+                }
+                $owner = $declaration->getFirstAncestor(ObjectCreationExpression::class, ClassDeclaration::class, TraitDeclaration::class);
+                if ($owner instanceof ObjectCreationExpression || (!$owner instanceof ClassDeclaration && !$owner instanceof TraitDeclaration)) {
+                    continue;
+                }
+                $name = $this->variableName($declaration->variableName, $source);
+                if (null === $name) {
+                    continue;
+                }
+                $signatureStart = $declaration->variableName->getStartPosition();
+                foreach ([$declaration->visibilityToken, $declaration->setVisibilityToken, ...($declaration->modifiers ?? []), $declaration->questionToken, $declaration->typeDeclarationList, $declaration->byRefToken, $declaration->dotDotDotToken] as $part) {
+                    if ($part instanceof Node || $part instanceof Token) {
+                        $signatureStart = min($signatureStart, $part->getStartPosition());
+                    }
+                }
+                $properties[] = new PhpPropertyDeclaration(
+                    (string) $owner->getNamespacedName(),
+                    $name,
+                    $declaration->variableName->getStartPosition() + 1,
+                    $declaration->variableName->getEndPosition(),
+                    trim(substr($source, $signatureStart, $declaration->variableName->getEndPosition() - $signatureStart)),
+                    $this->description($declaration),
+                    $this->resolvedTypes($declaration->typeDeclarationList, $source, $names),
+                    $this->propertyVisibility($declaration),
+                    true,
+                );
+
+                continue;
+            }
+
+            $owner = $declaration->getFirstAncestor(ObjectCreationExpression::class, ClassDeclaration::class, TraitDeclaration::class);
+            if ($owner instanceof ObjectCreationExpression || (!$owner instanceof ClassDeclaration && !$owner instanceof TraitDeclaration)) {
+                continue;
+            }
+            $elements = $declaration->propertyElements;
+            if (!$elements instanceof ExpressionList) {
+                continue;
+            }
+            $signatureStart = $elements->getStartPosition();
+            foreach ([...$declaration->modifiers, $declaration->questionToken, $declaration->typeDeclarationList] as $part) {
+                if ($part instanceof Node || $part instanceof Token) {
+                    $signatureStart = min($signatureStart, $part->getStartPosition());
+                }
+            }
+            $signaturePrefix = substr($source, $signatureStart, $elements->getStartPosition() - $signatureStart);
+            $types = $this->resolvedTypes($declaration->typeDeclarationList, $source, $names);
+            $description = $this->description($declaration);
+            $visibility = $this->propertyVisibility($declaration);
+            foreach ($elements->children as $element) {
+                $variable = $element instanceof Variable
+                    ? $element
+                    : ($element instanceof AssignmentExpression && $element->leftOperand instanceof Variable ? $element->leftOperand : null);
+                if (null === $variable || null === $name = $this->variableName($variable, $source)) {
+                    continue;
+                }
+                $properties[] = new PhpPropertyDeclaration(
+                    (string) $owner->getNamespacedName(),
+                    $name,
+                    $variable->getStartPosition() + 1,
+                    $variable->getEndPosition(),
+                    trim($signaturePrefix.$variable->getText($source)),
+                    $description,
+                    $types,
+                    $visibility,
+                    false,
+                );
+            }
+        }
+
+        return $properties;
+    }
+
+    private function propertyVisibility(Parameter|PropertyDeclaration $declaration): string
+    {
+        if ($declaration instanceof Parameter) {
+            return match ($declaration->visibilityToken?->kind) {
+                TokenKind::PrivateKeyword => 'private',
+                TokenKind::ProtectedKeyword => 'protected',
+                default => 'public',
+            };
+        }
+
+        return match (true) {
+            $declaration->hasModifier(TokenKind::PrivateKeyword) => 'private',
+            $declaration->hasModifier(TokenKind::ProtectedKeyword) => 'protected',
+            default => 'public',
+        };
     }
 
     /** @return list<string> */

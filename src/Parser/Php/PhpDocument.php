@@ -15,6 +15,7 @@ final class PhpDocument
      * @param list<PhpObjectCreation>      $objectCreations
      * @param list<PhpMethodDeclaration>   $methodDeclarations
      * @param list<PhpConstantDeclaration> $constantDeclarations
+     * @param list<PhpPropertyDeclaration> $propertyDeclarations
      */
     public function __construct(
         private readonly array $attributes,
@@ -26,6 +27,7 @@ final class PhpDocument
         private readonly array $objectCreations = [],
         private readonly array $methodDeclarations = [],
         private readonly array $constantDeclarations = [],
+        private readonly array $propertyDeclarations = [],
     ) {
         $this->names = $names ?? new PhpNameContext();
     }
@@ -64,6 +66,12 @@ final class PhpDocument
     public function constantDeclarations(): array
     {
         return $this->constantDeclarations;
+    }
+
+    /** @return list<PhpPropertyDeclaration> */
+    public function propertyDeclarations(): array
+    {
+        return $this->propertyDeclarations;
     }
 
     /** @return list<PhpDiagnostic> */
