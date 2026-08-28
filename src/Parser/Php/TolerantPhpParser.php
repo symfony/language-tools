@@ -7,10 +7,13 @@ use Microsoft\PhpParser\Node;
 use Microsoft\PhpParser\Node\ArrayElement;
 use Microsoft\PhpParser\Node\Attribute;
 use Microsoft\PhpParser\Node\ClassBaseClause;
+use Microsoft\PhpParser\Node\ClassConstDeclaration;
+use Microsoft\PhpParser\Node\ConstElement;
 use Microsoft\PhpParser\Node\DelimitedList\ArrayElementList;
 use Microsoft\PhpParser\Node\DelimitedList\ExpressionList;
 use Microsoft\PhpParser\Node\DelimitedList\ParameterDeclarationList;
 use Microsoft\PhpParser\Node\DelimitedList\QualifiedNameList;
+use Microsoft\PhpParser\Node\EnumCaseDeclaration;
 use Microsoft\PhpParser\Node\Expression\ArgumentExpression;
 use Microsoft\PhpParser\Node\Expression\ArrayCreationExpression;
 use Microsoft\PhpParser\Node\Expression\AssignmentExpression;
@@ -52,6 +55,7 @@ final class TolerantPhpParser implements PhpParserInterface
         $typedVariableNodes = [];
         $objectCreationNodes = [];
         $methodDeclarationNodes = [];
+        $constantDeclarations = [];
         $typeDeclarations = [];
         $namespaceDefinition = null;
         $namespaceFound = false;
@@ -72,6 +76,13 @@ final class TolerantPhpParser implements PhpParserInterface
                 $objectCreationNodes[] = $node;
             } elseif ($node instanceof MethodDeclaration) {
                 $methodDeclarationNodes[] = $node;
+            } elseif ($node instanceof ClassConstDeclaration) {
+                array_push($constantDeclarations, ...$this->classConstants($node, $source));
+            } elseif ($node instanceof EnumCaseDeclaration) {
+                $constant = $this->enumCase($node, $source);
+                if (null !== $constant) {
+                    $constantDeclarations[] = $constant;
+                }
             } elseif ($node instanceof ClassDeclaration || $node instanceof InterfaceDeclaration || $node instanceof TraitDeclaration || $node instanceof EnumDeclaration) {
                 $typeDeclarations[] = $this->typeDeclaration($node, $source);
             }
@@ -110,7 +121,7 @@ final class TolerantPhpParser implements PhpParserInterface
             }
         }
 
-        return new PhpDocument($attributes, $methodCalls, $typeDeclarations, $diagnostics, $typedVariables, $names, $objectCreations, $methodDeclarations);
+        return new PhpDocument($attributes, $methodCalls, $typeDeclarations, $diagnostics, $typedVariables, $names, $objectCreations, $methodDeclarations, $constantDeclarations);
     }
 
     /**
@@ -236,6 +247,35 @@ final class TolerantPhpParser implements PhpParserInterface
                 $parentClassName = $classBaseClause->baseClass->getResolvedName();
             }
         }
+        $kind = match (true) {
+            $declaration instanceof ClassDeclaration => PhpTypeKind::Class_,
+            $declaration instanceof InterfaceDeclaration => PhpTypeKind::Interface_,
+            $declaration instanceof TraitDeclaration => PhpTypeKind::Trait_,
+            default => PhpTypeKind::Enum,
+        };
+        $keyword = match ($kind) {
+            PhpTypeKind::Class_ => $declaration->classKeyword,
+            PhpTypeKind::Interface_ => $declaration->interfaceKeyword,
+            PhpTypeKind::Trait_ => $declaration->traitKeyword,
+            PhpTypeKind::Enum => $declaration->enumKeyword,
+        };
+        $start = $keyword->getStartPosition();
+        $modifiers = get_object_vars($declaration)['modifiers'] ?? [];
+        foreach (\is_array($modifiers) ? $modifiers : [] as $modifier) {
+            if ($modifier instanceof Token) {
+                $start = min($start, $modifier->getStartPosition());
+            }
+        }
+        $primaryModifier = get_object_vars($declaration)['abstractOrFinalModifier'] ?? null;
+        if ($primaryModifier instanceof Token) {
+            $start = min($start, $primaryModifier->getStartPosition());
+        }
+        $members = match ($kind) {
+            PhpTypeKind::Class_ => $declaration->classMembers,
+            PhpTypeKind::Interface_ => $declaration->interfaceMembers,
+            PhpTypeKind::Trait_ => $declaration->traitMembers,
+            PhpTypeKind::Enum => $declaration->enumMembers,
+        };
 
         return new PhpTypeDeclaration(
             (string) $declaration->getNamespacedName(),
@@ -244,8 +284,89 @@ final class TolerantPhpParser implements PhpParserInterface
             $declaration->name->getEndPosition(),
             $declaration->getStartPosition(),
             $declaration->getEndPosition(),
-            $declaration instanceof ClassDeclaration,
+            $kind,
+            trim(substr($source, $start, $members->getStartPosition() - $start)),
+            $this->description($declaration),
         );
+    }
+
+    /** @return list<PhpConstantDeclaration> */
+    private function classConstants(ClassConstDeclaration $declaration, string $source): array
+    {
+        $owner = $declaration->getFirstAncestor(ObjectCreationExpression::class, ClassDeclaration::class, InterfaceDeclaration::class, TraitDeclaration::class, EnumDeclaration::class);
+        if ($owner instanceof ObjectCreationExpression || (!$owner instanceof ClassDeclaration && !$owner instanceof InterfaceDeclaration && !$owner instanceof TraitDeclaration && !$owner instanceof EnumDeclaration)) {
+            return [];
+        }
+        $start = $declaration->constKeyword->getStartPosition();
+        foreach ($declaration->modifiers as $modifier) {
+            $start = min($start, $modifier->getStartPosition());
+        }
+        $prefix = substr($source, $start, $declaration->constElements->getStartPosition() - $start);
+        $public = !$declaration->hasModifier(TokenKind::ProtectedKeyword) && !$declaration->hasModifier(TokenKind::PrivateKeyword);
+        $constants = [];
+        foreach ($declaration->constElements->children as $element) {
+            if (!$element instanceof ConstElement) {
+                continue;
+            }
+            $name = $element->name->getText($source);
+            if (!\is_string($name) || '' === $name) {
+                continue;
+            }
+            $constants[] = new PhpConstantDeclaration(
+                PhpConstantKind::ClassConstant,
+                (string) $owner->getNamespacedName(),
+                $name,
+                $element->name->getStartPosition(),
+                $element->name->getEndPosition(),
+                trim($prefix.$name).';',
+                $this->description($declaration),
+                $public,
+            );
+        }
+
+        return $constants;
+    }
+
+    private function enumCase(EnumCaseDeclaration $declaration, string $source): ?PhpConstantDeclaration
+    {
+        $owner = $declaration->getFirstAncestor(EnumDeclaration::class);
+        $name = $declaration->name->getText($source);
+        if (!$owner instanceof EnumDeclaration || !\is_string($name) || '' === $name) {
+            return null;
+        }
+
+        return new PhpConstantDeclaration(
+            PhpConstantKind::EnumCase,
+            (string) $owner->getNamespacedName(),
+            $name,
+            $declaration->name->getStartPosition(),
+            $declaration->name->getEndPosition(),
+            'case '.$name.';',
+            $this->description($declaration),
+            true,
+        );
+    }
+
+    private function description(Node $node): ?string
+    {
+        $comment = $node->getDocCommentText();
+        if (null === $comment) {
+            return null;
+        }
+        $description = [];
+        foreach (explode("\n", trim($comment, "\r\n")) as $part) {
+            $part = trim($part, "*\r\t /");
+            if ('' === $part) {
+                continue;
+            }
+            if ('@' === $part[0]) {
+                break;
+            }
+            $description[] = $part;
+        }
+        $description = implode(' ', $description);
+
+        return '' === $description ? null : $description;
     }
 
     private function objectCreation(ObjectCreationExpression $creation, string $source, PhpNameContext $names): ?PhpObjectCreation

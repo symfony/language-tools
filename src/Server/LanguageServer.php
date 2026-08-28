@@ -116,7 +116,7 @@ final class LanguageServer
                 'positionEncoding' => $this->workspaceConfiguration->positionEncoding(),
                 'textDocumentSync' => 2,
                 'completionProvider' => [
-                    'triggerCharacters' => ["'", '"', '@', '%'],
+                    'triggerCharacters' => ["'", '"', '@', '%', ':', '.'],
                 ],
                 'codeActionProvider' => true,
                 'codeLensProvider' => [

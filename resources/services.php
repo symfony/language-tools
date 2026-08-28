@@ -43,6 +43,7 @@ use Symfony\Lsp\Feature\Twig\TwigComponentCodeLensProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentCompletionProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentDiagnosticProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentRelationshipProvider;
+use Symfony\Lsp\Feature\Twig\TwigPhpSymbolProvider;
 use Symfony\Lsp\Feature\Twig\TwigVariableProvider;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
@@ -125,6 +126,7 @@ return static function (ContainerConfigurator $container): void {
             TemplateNavigationProvider::class,
             TemplateCodeActionProvider::class,
             TwigCallableProvider::class,
+            TwigPhpSymbolProvider::class,
             TwigVariableProvider::class,
             TwigComponentCompletionProvider::class,
             TwigComponentRelationshipProvider::class,

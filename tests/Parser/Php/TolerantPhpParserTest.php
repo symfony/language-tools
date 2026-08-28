@@ -4,7 +4,9 @@ namespace Symfony\Lsp\Tests\Parser\Php;
 
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Parser\Php\PhpConstantKind;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
+use Symfony\Lsp\Parser\Php\PhpTypeKind;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 
 final class TolerantPhpParserTest extends TestCase
@@ -221,6 +223,67 @@ final class TolerantPhpParserTest extends TestCase
         self::assertNull($methods[1]->firstParameterType());
         self::assertFalse($methods[2]->isPublic());
         self::assertSame([], $methods[3]->attributes());
+    }
+
+    public function testExposesClassConstantsAndEnumCases(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Model;
+
+            /** Describes the status. */
+            enum Status: string
+            {
+                /** The published state. */
+                case Published = 'published';
+
+                public const LABEL = 'Status';
+                private const SECRET = 'secret';
+            }
+
+            // This isn't documentation.
+            interface Options
+            {
+                public const FORMAT = 'json', EXTENSION = '.json';
+            }
+
+            final class Factory
+            {
+                public function create(): object
+                {
+                    return new class {
+                        public const HIDDEN = 'hidden';
+                    };
+                }
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $status = $document->typeDeclarations()[0];
+        $constants = $document->constantDeclarations();
+
+        self::assertSame(PhpTypeKind::Enum, $status->kind());
+        self::assertTrue($status->isEnum());
+        self::assertSame('enum Status: string', $status->signature());
+        self::assertSame('Describes the status.', $status->description());
+        self::assertNull($document->typeDeclarations()[1]->description());
+        self::assertSame([
+            [PhpConstantKind::EnumCase, 'App\Model\Status', 'Published', 'case Published;', 'The published state.', true],
+            [PhpConstantKind::ClassConstant, 'App\Model\Status', 'LABEL', 'public const LABEL;', null, true],
+            [PhpConstantKind::ClassConstant, 'App\Model\Status', 'SECRET', 'private const SECRET;', null, false],
+            [PhpConstantKind::ClassConstant, 'App\Model\Options', 'FORMAT', 'public const FORMAT;', null, true],
+            [PhpConstantKind::ClassConstant, 'App\Model\Options', 'EXTENSION', 'public const EXTENSION;', null, true],
+        ], array_map(static fn ($constant): array => [
+            $constant->kind(),
+            $constant->className(),
+            $constant->name(),
+            $constant->signature(),
+            $constant->description(),
+            $constant->isPublic(),
+        ], $constants));
+        foreach ($constants as $constant) {
+            self::assertSame($constant->name(), substr($source, $constant->nameStartOffset(), $constant->nameEndOffset() - $constant->nameStartOffset()));
+        }
     }
 
     public function testKeepsImportsFromIncompleteGroupedSyntax(): void

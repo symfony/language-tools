@@ -11,7 +11,9 @@ final class PhpTypeDeclaration
         private readonly int $nameEndOffset,
         private readonly int $startOffset,
         private readonly int $endOffset,
-        private readonly bool $class,
+        private readonly PhpTypeKind $kind,
+        private readonly string $signature,
+        private readonly ?string $description,
     ) {
     }
 
@@ -45,13 +47,33 @@ final class PhpTypeDeclaration
         return $this->endOffset;
     }
 
+    public function kind(): PhpTypeKind
+    {
+        return $this->kind;
+    }
+
     public function isClass(): bool
     {
-        return $this->class;
+        return PhpTypeKind::Class_ === $this->kind;
+    }
+
+    public function isEnum(): bool
+    {
+        return PhpTypeKind::Enum === $this->kind;
+    }
+
+    public function signature(): string
+    {
+        return $this->signature;
+    }
+
+    public function description(): ?string
+    {
+        return $this->description;
     }
 
     public function contains(int $offset): bool
     {
-        return $this->class && $offset >= $this->startOffset && $offset <= $this->endOffset;
+        return $this->isClass() && $offset >= $this->startOffset && $offset <= $this->endOffset;
     }
 }

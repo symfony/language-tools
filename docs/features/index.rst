@@ -62,6 +62,13 @@ Supported Integrations
       - Yes
       - No
       - Yes
+    * - `PHP constants and enums in Twig`_
+      - Yes
+      - Yes
+      - Yes
+      - Yes
+      - No
+      - No
     * - `Translations`_
       - Yes
       - Yes
@@ -221,6 +228,7 @@ If a runtime-backed feature returns no results, verify that:
 .. _`Console commands`: console.rst
 .. _`Twig template names`: templates.rst
 .. _`Twig functions and filters`: twig-callables.rst
+.. _`PHP constants and enums in Twig`: twig-constants-enums.rst
 .. _`Translations`: translations.rst
 .. _`Environment variables`: environment.rst
 .. _`Bundle configuration`: configuration.rst

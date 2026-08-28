@@ -13,6 +13,8 @@ final class ProbeFinder
         ['category' => 'route.twig', 'files' => '{\.twig$}', 'pattern' => '{(?<![.\w|])(?:path|url)\(\s*[\'\"]([^\'\"]+)}'],
         ['category' => 'template.php', 'files' => '{\.php$}', 'pattern' => '{(?:render|renderView)\(\s*[\'\"]([^\'\"]+\.twig)}'],
         ['category' => 'template.twig', 'files' => '{\.twig$}', 'pattern' => '{\b(?:extends|include|embed|import|from|use)\s+[\'\"]([^\'\"]+\.twig)}'],
+        ['category' => 'twig.constant', 'files' => '{\.twig$}', 'pattern' => '{\bconstant\(\s*[\'\"]App\\\\[A-Za-z0-9_\\\\]+::([A-Za-z_][A-Za-z0-9_]*)}'],
+        ['category' => 'twig.enum', 'files' => '{\.twig$}', 'pattern' => '{\benum\(\s*[\'\"]App\\\\[A-Za-z0-9_\\\\]+[\'\"]\s*\)\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)}'],
         ['category' => 'component.twig', 'files' => '{\.twig$}', 'pattern' => '{<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\b}'],
         ['category' => 'stimulus.controller.twig', 'files' => '{\.twig$}', 'pattern' => '{\bdata-controller\s*=\s*[\'"][^\'"]*?([A-Za-z0-9_@./-]+)}'],
         ['category' => 'stimulus.action.twig', 'files' => '{\.twig$}', 'pattern' => '{\bdata-action\s*=\s*[\'"][^\'"]*?(?:[^\s\'"]+->)?[A-Za-z0-9_@./-]+#([A-Za-z_$][A-Za-z0-9_$]*)}'],

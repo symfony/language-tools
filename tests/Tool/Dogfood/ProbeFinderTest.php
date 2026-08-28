@@ -86,6 +86,21 @@ final class ProbeFinderTest extends TestCase
         $this->assertPositionInsideValue($filterDeclaration);
     }
 
+    public function testFindsTwigConstantsAndEnums(): void
+    {
+        $this->write('src/Status.php', "<?php\nnamespace App;\nenum Status { case Published; }\nfinal class Options { public const FORMAT = 'html'; }\n");
+        $this->write('templates/home.html.twig', "{{ constant('App\\\\Options::FORMAT') }}\n{{ enum('App\\\\Status').Published }}\n");
+
+        $finder = new ProbeFinder();
+        $constant = $this->probes($finder, 'twig.constant')[0];
+        $enum = $this->probes($finder, 'twig.enum')[0];
+
+        self::assertSame('FORMAT', $constant->value);
+        self::assertSame('Published', $enum->value);
+        $this->assertPositionInsideValue($constant);
+        $this->assertPositionInsideValue($enum);
+    }
+
     public function testFindsAttributedTwigCallables(): void
     {
         $this->write('src/AppExtension.php', "<?php\nuse Twig\\Attribute\\AsTwigFunction;\nfinal class AppExtension\n{\n    #[AsTwigFunction('app_widget')]\n    public function widget() {}\n    #[\\Twig\\Attribute\\AsTwigFilter(name: 'app_short')]\n    public function shorten() {}\n}\n");

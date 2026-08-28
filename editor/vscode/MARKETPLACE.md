@@ -54,6 +54,7 @@ It complements your PHP language server; keep it enabled.
 | Console commands | ✓ | · | · | · | · | ✓ |
 | Twig template names | ✓ | ✓ | ✓ | ✓ | · | ✓ |
 | Twig functions and filters | ✓ | ✓ | ✓ | ✓ | · | ✓ |
+| PHP constants and enums in Twig | ✓ | ✓ | ✓ | ✓ | · | · |
 | Translations | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Environment variables | ✓ | ✓ | ✓ | ✓ | · | ✓ |
 | Bundle configuration | ✓ | ✓ | · | · | · | ✓ |
