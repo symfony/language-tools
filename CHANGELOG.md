@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.17.0 (2026-08-28)
 
 - Keep generic installation examples unchanged during releases
 - Integrate headless diagnostics with Symfony CLI project-aware PHP defaults
