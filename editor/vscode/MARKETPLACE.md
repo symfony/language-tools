@@ -52,9 +52,6 @@ It complements your PHP language server; keep it enabled.
 | Routing | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Dependency injection | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Console commands | ✓ | · | · | · | · | ✓ |
-| Twig template names | ✓ | ✓ | ✓ | ✓ | · | ✓ |
-| Twig functions and filters | ✓ | ✓ | ✓ | ✓ | · | ✓ |
-| PHP constants and enums in Twig | ✓ | ✓ | ✓ | ✓ | · | · |
 | Translations | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Environment variables | ✓ | ✓ | ✓ | ✓ | · | ✓ |
 | Bundle configuration | ✓ | ✓ | · | · | · | ✓ |
@@ -65,6 +62,14 @@ It complements your PHP language server; keep it enabled.
 | AssetMapper and public assets | ✓ | ✓ | ✓ | ✓ | · | ✓ |
 | Stimulus and Live Components | ✓ | ✓ | ✓ | ✓ | · | ✓ |
 | Doctrine entities and repositories | ✓ | ✓ | ✓ | ✓ | · | · |
+
+### Twig
+
+| Integration | Completion | Hover | Definition | References | Rename | Diagnostics |
+| --- | :-: | :-: | :-: | :-: | :-: | :-: |
+| Twig template names | ✓ | ✓ | ✓ | ✓ | · | ✓ |
+| Twig functions and filters | ✓ | ✓ | ✓ | ✓ | · | ✓ |
+| PHP constants and enums in Twig | ✓ | ✓ | ✓ | ✓ | · | · |
 
 A dot marks an intentionally unsupported combination. Document links, quick
 fixes and code lenses are covered in the

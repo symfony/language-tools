@@ -32,26 +32,27 @@ final class DocumentationTest extends TestCase
         $index = (string) file_get_contents(self::ROOT.'/docs/features/index.rst');
         preg_match_all('/^    \* - `(.+)`_\R((?:      - (?:Yes|No)\R){6})/m', $index, $matches, \PREG_SET_ORDER);
 
-        $documentationRows = array_map(static function (array $match): array {
+        $documentationRows = array_column(array_map(static function (array $match): array {
             preg_match_all('/^      - (Yes|No)$/m', $match[2], $support);
 
             return [
                 'name' => $match[1],
                 'support' => array_map(static fn (string $cell): bool => 'Yes' === $cell, $support[1]),
             ];
-        }, $matches);
+        }, $matches), null, 'name');
         self::assertNotSame([], $documentationRows);
 
         $marketplace = (string) file_get_contents(self::ROOT.'/editor/vscode/MARKETPLACE.md');
-        $table = explode('| Integration | Completion | Hover | Definition | References | Rename | Diagnostics |', $marketplace, 2)[1] ?? null;
-        self::assertNotNull($table);
-        $table = explode("\n\n", $table, 2)[0];
-        preg_match_all('/^\| ([^|:-][^|]*) \|(.+)\|$/m', $table, $matches, \PREG_SET_ORDER);
-
-        $marketplaceRows = array_map(static fn (array $match): array => [
-            'name' => trim($match[1]),
-            'support' => array_map(static fn (string $cell): bool => '✓' === trim($cell), explode('|', $match[2])),
-        ], $matches);
+        preg_match_all('/^\| ([^|:-][^|]*) \| ([✓·]) \| ([✓·]) \| ([✓·]) \| ([✓·]) \| ([✓·]) \| ([✓·]) \|$/mu', $marketplace, $matches, \PREG_SET_ORDER);
+        $marketplaceRows = [];
+        foreach ($matches as $match) {
+            $marketplaceRows[$match[1]] = [
+                'name' => $match[1],
+                'support' => array_map(static fn (string $cell): bool => '✓' === $cell, \array_slice($match, 2)),
+            ];
+        }
+        ksort($documentationRows);
+        ksort($marketplaceRows);
 
         self::assertSame($documentationRows, $marketplaceRows);
     }
