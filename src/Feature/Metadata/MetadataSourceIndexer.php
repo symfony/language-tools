@@ -20,7 +20,7 @@ final class MetadataSourceIndexer extends AbstractSourceIndexer
 
     public function payloadClasses(): array
     {
-        return [MetadataSourceFacts::class, MetadataSourceSymbol::class, MetadataSymbolKind::class];
+        return [FormDataClass::class, MetadataSourceFacts::class, MetadataSourceSymbol::class, MetadataSymbolKind::class];
     }
 
     public function runtimeDeclarations(mixed $data): array
@@ -29,7 +29,10 @@ final class MetadataSourceIndexer extends AbstractSourceIndexer
             throw new \UnexpectedValueException('The metadata source facts are invalid.');
         }
 
-        return array_values(array_filter($data->symbols(), static fn (MetadataSourceSymbol $symbol): bool => $symbol->isDeclaration()));
+        return [
+            ...array_values(array_filter($data->symbols(), static fn (MetadataSourceSymbol $symbol): bool => $symbol->isDeclaration())),
+            ...$data->formDataClasses(),
+        ];
     }
 
     protected function factsClass(): string

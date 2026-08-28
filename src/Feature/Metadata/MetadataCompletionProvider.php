@@ -33,6 +33,7 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
 
         return match ($context->kind()) {
             MetadataCompletionKind::FormOption => $this->formOptions($context, $this->indexes->forProject($request->project)),
+            MetadataCompletionKind::FormProperty => $this->formProperties($context, $this->sourceIndexes->forProject($request->project)),
             MetadataCompletionKind::Constraint => $this->constraints($context, $this->indexes->forProject($request->project), $this->sourceIndexes->forProject($request->project)),
             MetadataCompletionKind::ConstraintOption => $this->constraintOptions($context, $this->indexes->forProject($request->project)),
             MetadataCompletionKind::SerializerGroup => $this->serializerGroups($context, $this->sourceIndexes->forProject($request->project)),
@@ -125,24 +126,41 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
     }
 
     /** @return list<array<array-key, mixed>> */
+    private function formProperties(MetadataCompletionContext $context, MetadataSourceIndex $sourceIndex): array
+    {
+        $dataClass = null === $context->owner() ? null : $sourceIndex->formDataClass($context->owner());
+        if (null === $dataClass) {
+            return [];
+        }
+
+        return $this->propertyItems($context, $sourceIndex, $dataClass);
+    }
+
+    /** @return list<array<array-key, mixed>> */
     private function properties(MetadataCompletionContext $context, MetadataSourceIndex $sourceIndex): array
     {
-        $prefix = $context->owner().'::$';
-        $names = [];
+        return null === $context->owner() ? [] : $this->propertyItems($context, $sourceIndex, $context->owner());
+    }
+
+    /** @return list<array<array-key, mixed>> */
+    private function propertyItems(MetadataCompletionContext $context, MetadataSourceIndex $sourceIndex, string $className): array
+    {
+        $prefix = $className.'::$';
+        $declarations = [];
         foreach ($sourceIndex->symbols(MetadataSymbolKind::Property) as $symbol) {
             if ($symbol->isDeclaration() && str_starts_with($symbol->name(), $prefix)) {
-                $names[substr($symbol->name(), \strlen($prefix))] = true;
+                $declarations[substr($symbol->name(), \strlen($prefix))] = $symbol;
             }
         }
-        ksort($names);
+        ksort($declarations);
         $items = [];
-        foreach (array_keys($names) as $name) {
+        foreach ($declarations as $name => $declaration) {
             if (!str_starts_with($name, $context->prefix())) {
                 continue;
             }
             $items[] = [
                 'label' => $name,
-                'detail' => 'Mapped property',
+                'detail' => $declaration->signature() ?? 'Mapped property',
                 'kind' => 10,
                 'textEdit' => $this->protocol->textEdit($context->range(), $name),
             ];

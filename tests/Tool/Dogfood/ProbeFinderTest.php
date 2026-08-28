@@ -101,6 +101,41 @@ final class ProbeFinderTest extends TestCase
         $this->assertPositionInsideValue($enum);
     }
 
+    public function testFindsFormPropertiesOnlyWithAStaticDataClass(): void
+    {
+        $this->write('src/Form/ArticleType.php', <<<'PHP'
+            <?php
+            final class ArticleType
+            {
+                public function buildForm(FormBuilderInterface $builder): void
+                {
+                    // $builder->add('commented', TextType::class);
+                    $builder
+                        ->add('ignored', TextType::class, ['mapped' => false])
+                        ->add('title', TextType::class)
+                    ;
+                }
+
+                public function configureOptions(OptionsResolver $resolver): void
+                {
+                    $resolver->setDefaults(['data_class' => Article::class]);
+                }
+            }
+            PHP);
+        $this->write('src/Form/DynamicType.php', <<<'PHP'
+            <?php
+            $builder->add('dynamic', TextType::class);
+            $resolver->setDefaults(['data_class' => $class]);
+            PHP);
+        $this->write('src/Form/UnmappedType.php', "<?php\n\$builder->add('unmapped', TextType::class);\n");
+
+        $probes = $this->probes(new ProbeFinder(probesPerCategory: 10), 'form.property.php');
+
+        self::assertCount(1, $probes);
+        self::assertSame('title', $probes[0]->value);
+        $this->assertPositionInsideValue($probes[0]);
+    }
+
     public function testFindsAttributedTwigCallables(): void
     {
         $this->write('src/AppExtension.php', "<?php\nuse Twig\\Attribute\\AsTwigFunction;\nfinal class AppExtension\n{\n    #[AsTwigFunction('app_widget')]\n    public function widget() {}\n    #[\\Twig\\Attribute\\AsTwigFilter(name: 'app_short')]\n    public function shorten() {}\n}\n");

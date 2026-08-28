@@ -19,6 +19,9 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
     /** @var array<string, list<string>> */
     private array $names = [];
 
+    /** @var array<string, string> */
+    private array $formDataClasses = [];
+
     public function __construct()
     {
         parent::__construct(SourceFactsOverlayOrder::PreserveSavedPosition);
@@ -40,6 +43,13 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
         return $this->names[$kind->value] ?? [];
     }
 
+    public function formDataClass(string $formClass): ?string
+    {
+        $this->index();
+
+        return $this->formDataClasses[strtolower(ltrim($formClass, '\\'))] ?? null;
+    }
+
     protected function factsChanged(): void
     {
         $this->indexed = false;
@@ -53,8 +63,12 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
 
         $this->symbols = [];
         $this->symbolsByName = [];
+        $this->formDataClasses = [];
         $names = [];
         foreach ($this->facts() as $facts) {
+            foreach ($facts->formDataClasses() as $formDataClass) {
+                $this->formDataClasses[strtolower(ltrim($formDataClass->formClass(), '\\'))] = $formDataClass->dataClass();
+            }
             foreach ($facts->symbols() as $symbol) {
                 $kind = $symbol->kind()->value;
                 $name = $symbol->name();

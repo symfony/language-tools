@@ -12,6 +12,8 @@ final class MetadataSourceSymbol
         private readonly string $uri,
         private readonly Range $range,
         private readonly bool $declaration,
+        private readonly ?string $signature = null,
+        private readonly ?string $description = null,
     ) {
     }
 
@@ -38,5 +40,15 @@ final class MetadataSourceSymbol
     public function isDeclaration(): bool
     {
         return $this->declaration;
+    }
+
+    public function signature(): ?string
+    {
+        return $this->signature;
+    }
+
+    public function description(): ?string
+    {
+        return $this->description;
     }
 }

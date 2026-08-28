@@ -8,6 +8,7 @@ use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
 final class MetadataExtractor
@@ -23,13 +24,19 @@ final class MetadataExtractor
 
     public function extract(string $uri, string $languageId, string $text): MetadataSourceFacts
     {
-        $symbols = match ($languageId) {
-            'php' => $this->phpSymbols($uri, $text),
-            'yaml' => $this->yamlSymbols($uri, $text),
-            default => [],
-        };
+        if ('php' === $languageId) {
+            $php = $this->phpParser->parse($text);
+            $source = $this->phpComments->mask($text);
+            $formDataClasses = $this->formDataClasses($source, $php);
 
-        return new MetadataSourceFacts($uri, $this->unique($symbols));
+            return new MetadataSourceFacts(
+                $uri,
+                $this->unique($this->phpSymbols($uri, $text, $source, $php, $formDataClasses)),
+                $formDataClasses,
+            );
+        }
+
+        return new MetadataSourceFacts($uri, 'yaml' === $languageId ? $this->unique($this->yamlSymbols($uri, $text)) : []);
     }
 
     public function completionContext(string $languageId, string $text, int $offset): ?MetadataCompletionContext
@@ -111,17 +118,62 @@ final class MetadataExtractor
         return $options;
     }
 
-    /** @return list<MetadataSourceSymbol> */
-    private function phpSymbols(string $uri, string $text): array
+    /** @return list<FormDataClass> */
+    private function formDataClasses(string $source, PhpDocument $php): array
     {
-        $php = $this->phpParser->parse($text);
-        $source = $this->phpComments->mask($text);
+        $classes = [];
+        foreach ($php->methodDeclarations() as $method) {
+            if ('configureOptions' !== $method->name()
+                || 'Symfony\\Component\\OptionsResolver\\OptionsResolver' !== $method->firstParameterType()
+                || null === ($body = $this->methodBody($source, $method))
+                || null === ($resolver = $this->firstParameterVariable($method->signature()))
+            ) {
+                continue;
+            }
+            $dataClass = null;
+            preg_match_all('/\\$'.preg_quote($resolver, '/').'\\s*->\\s*(setDefaults|setDefault)\\s*\\(/', $body['text'], $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+            foreach ($calls as $call) {
+                $open = $call[0][1] + \strlen($call[0][0]) - 1;
+                $close = $this->delimiters->matching($body['text'], $open, '(', ')');
+                if (null === $close) {
+                    continue;
+                }
+                $arguments = $this->arguments(substr($body['text'], $open + 1, $close - $open - 1), $body['start'] + $open + 1);
+                if ('setDefaults' === $call[1][0]) {
+                    if (!isset($arguments[0]) || null === $entries = $this->arrayEntries($arguments[0]['text'])) {
+                        $dataClass = null;
+                        continue;
+                    }
+                    if (!\array_key_exists('data_class', $entries)) {
+                        continue;
+                    }
+                    $expression = $entries['data_class'];
+                } else {
+                    if ('data_class' !== $this->quotedIdentifier($arguments[0]['text'] ?? '')) {
+                        continue;
+                    }
+                    $expression = $arguments[1]['text'] ?? '';
+                }
+                $dataClass = $this->staticClassName($expression, $php);
+            }
+            if (null !== $dataClass) {
+                $classes[strtolower(ltrim($method->className(), '\\'))] = new FormDataClass($method->className(), $dataClass);
+            }
+        }
+
+        return array_values($classes);
+    }
+
+    /**
+     * @param list<FormDataClass> $formDataClasses
+     *
+     * @return list<MetadataSourceSymbol>
+     */
+    private function phpSymbols(string $uri, string $text, string $source, PhpDocument $php, array $formDataClasses): array
+    {
         $symbols = [];
         preg_match_all('/\b(?:final\s+|abstract\s+|readonly\s+)?class\s+([A-Za-z_][A-Za-z0-9_]*)[^\{]*\{/', $source, $classes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($classes as $class) {
-            $open = $class[0][1] + \strlen($class[0][0]) - 1;
-            $close = $this->delimiters->matching($source, $open, '{', '}') ?? \strlen($source);
-            $body = substr($source, $open + 1, $close - $open - 1);
             $className = $php->resolveName($class[1][0]);
             $symbols[] = new MetadataSourceSymbol(
                 MetadataSymbolKind::MappedClass,
@@ -140,14 +192,56 @@ final class MetadataExtractor
                     true,
                 );
             }
-            preg_match_all('/\b(?:public|protected|private|var)\s+(?:(?:readonly|static)\s+)*(?:[^$;=()]+\s+)?\$([A-Za-z_][A-Za-z0-9_]*)/', $body, $properties, \PREG_OFFSET_CAPTURE);
-            foreach ($properties[1] as [$property, $offset]) {
+        }
+        foreach ($php->propertyDeclarations() as $property) {
+            $symbols[] = new MetadataSourceSymbol(
+                MetadataSymbolKind::Property,
+                $property->className().'::$'.$property->name(),
+                $uri,
+                $this->converter->toRange($text, $property->nameStartOffset(), $property->nameEndOffset() - $property->nameStartOffset()),
+                true,
+                $property->signature(),
+                $property->description(),
+            );
+        }
+
+        $dataClasses = [];
+        foreach ($formDataClasses as $formDataClass) {
+            $dataClasses[strtolower(ltrim($formDataClass->formClass(), '\\'))] = $formDataClass->dataClass();
+        }
+        foreach ($php->methodDeclarations() as $method) {
+            $dataClass = $dataClasses[strtolower(ltrim($method->className(), '\\'))] ?? null;
+            if (null === $dataClass
+                || 'buildForm' !== $method->name()
+                || 'Symfony\\Component\\Form\\FormBuilderInterface' !== $method->firstParameterType()
+                || null === ($body = $this->methodBody($source, $method))
+                || null === ($builder = $this->firstParameterVariable($method->signature()))
+            ) {
+                continue;
+            }
+            preg_match_all('/->\\s*add\\s*\\(/', $body['text'], $calls, \PREG_OFFSET_CAPTURE);
+            foreach ($calls[0] as [$matched, $relativeOffset]) {
+                $callOffset = $body['start'] + $relativeOffset;
+                if (!$this->isDirectFormBuilderCall($source, $callOffset, $builder)) {
+                    continue;
+                }
+                $open = $callOffset + \strlen($matched) - 1;
+                $close = $this->delimiters->matching($source, $open, '(', ')');
+                if (null === $close) {
+                    continue;
+                }
+                $arguments = $this->arguments(substr($source, $open + 1, $close - $open - 1), $open + 1);
+                $field = isset($arguments[0]) ? $this->quotedIdentifierArgument($text, $arguments[0]) : null;
+                $property = null === $field ? null : $this->formPropertyName($arguments, $field['name']);
+                if (null === $field || null === $property) {
+                    continue;
+                }
                 $symbols[] = new MetadataSourceSymbol(
                     MetadataSymbolKind::Property,
-                    $className.'::$'.$property,
+                    $dataClass.'::$'.$property,
                     $uri,
-                    $this->converter->toRange($text, $open + 1 + $offset, \strlen($property)),
-                    true,
+                    $field['range'],
+                    false,
                 );
             }
         }
@@ -300,7 +394,7 @@ final class MetadataExtractor
         $masked = $this->phpComments->mask($text);
         preg_match_all('/(?:(->)\s*)?\b(createForm|createNamed|add)\s*\(/', substr($masked, 0, $offset), $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach (array_reverse($calls) as $call) {
-            if ('add' === $call[2][0] && !$this->isFormBuilderCall($masked, $call[0][1], $formBuilders)) {
+            if ('add' === $call[2][0] && null === $this->directFormBuilderVariable($masked, $call[0][1], $formBuilders)) {
                 continue;
             }
             $open = $call[0][1] + \strlen($call[0][0]) - 1;
@@ -310,6 +404,14 @@ final class MetadataExtractor
             }
             $arguments = $this->arguments(substr($masked, $open + 1, $offset - $open - 1), $open + 1);
             $name = $call[2][0];
+            if ('add' === $name && 0 === \count($arguments) - 1
+                && preg_match('/^\\s*["\']([A-Za-z_][A-Za-z0-9_]*)?$/', $arguments[0]['text'], $prefix, \PREG_OFFSET_CAPTURE)
+                && null !== $class = $this->enclosingClass($php, $call[0][1])
+            ) {
+                $value = isset($prefix[1]) ? $prefix[1][0] : '';
+
+                return $this->context(MetadataCompletionKind::FormProperty, $value, $text, $offset - \strlen($value), $class);
+            }
             $typeIndex = 'createNamed' === $name ? 1 : ('add' === $name ? 1 : 0);
             $optionsIndex = 'createNamed' === $name ? 3 : 2;
             if (\count($arguments) - 1 !== $optionsIndex || !isset($arguments[$typeIndex])) {
@@ -395,6 +497,43 @@ final class MetadataExtractor
         return false;
     }
 
+    /** @param array<string, true> $variables */
+    private function directFormBuilderVariable(string $text, int $offset, array $variables): ?string
+    {
+        foreach (array_keys($variables) as $variable) {
+            if ($this->isDirectFormBuilderCall($text, $offset, $variable)) {
+                return $variable;
+            }
+        }
+
+        return null;
+    }
+
+    private function isDirectFormBuilderCall(string $text, int $offset, string $variable): bool
+    {
+        $before = substr($text, 0, $offset);
+        $statementStart = max((int) strrpos($before, ';'), (int) strrpos($before, '{'));
+        $statement = ltrim(substr($before, $statementStart), " \t\r\n;{");
+        $builder = '$'.$variable;
+        if (!str_starts_with($statement, $builder)) {
+            return false;
+        }
+        $chain = substr($statement, \strlen($builder));
+        while ('' !== ($chain = ltrim($chain))) {
+            if (!preg_match('/^->\\s*add\\s*\\(/', $chain, $add)) {
+                return false;
+            }
+            $open = \strlen($add[0]) - 1;
+            $close = $this->delimiters->matching($chain, $open, '(', ')');
+            if (null === $close) {
+                return false;
+            }
+            $chain = substr($chain, $close + 1);
+        }
+
+        return true;
+    }
+
     /** @return array<string, true> */
     private function formBuilderVariables(PhpDocument $php): array
     {
@@ -406,6 +545,145 @@ final class MetadataExtractor
         }
 
         return $variables;
+    }
+
+    /** @return array{text: string, start: int, end: int}|null */
+    private function methodBody(string $source, PhpMethodDeclaration $method): ?array
+    {
+        $parametersOpen = strpos($source, '(', $method->nameEndOffset());
+        if (false === $parametersOpen || null === $parametersClose = $this->delimiters->matching($source, $parametersOpen, '(', ')')) {
+            return null;
+        }
+        $bodyOpen = strpos($source, '{', $parametersClose + 1);
+        $semicolon = strpos($source, ';', $parametersClose + 1);
+        if (false === $bodyOpen || (false !== $semicolon && $semicolon < $bodyOpen)) {
+            return null;
+        }
+        $bodyClose = $this->delimiters->matching($source, $bodyOpen, '{', '}');
+        if (null === $bodyClose) {
+            return null;
+        }
+
+        return ['text' => substr($source, $bodyOpen + 1, $bodyClose - $bodyOpen - 1), 'start' => $bodyOpen + 1, 'end' => $bodyClose];
+    }
+
+    private function firstParameterVariable(string $signature): ?string
+    {
+        $open = strpos($signature, '(');
+        if (false === $open || !preg_match('/\\$([A-Za-z_][A-Za-z0-9_]*)/', substr($signature, $open + 1), $variable)) {
+            return null;
+        }
+
+        return $variable[1];
+    }
+
+    private function staticClassName(string $expression, PhpDocument $php): ?string
+    {
+        if (!preg_match('/^\\s*([\\\\A-Za-z_][A-Za-z0-9_\\\\]*)\\s*::\\s*class\\s*$/', $expression, $class)
+            || \in_array(strtolower(ltrim($class[1], '\\')), ['self', 'static', 'parent'], true)
+        ) {
+            return null;
+        }
+
+        return $php->resolveName($class[1]);
+    }
+
+    /** @return array<string, string>|null */
+    private function arrayEntries(string $text): ?array
+    {
+        if (!preg_match('/^\\s*\\[(.*)\\]\\s*$/s', $text, $array)) {
+            return null;
+        }
+        $entries = [];
+        foreach ($this->arguments($array[1], 0) as $entry) {
+            if ('' === trim($entry['text'])) {
+                continue;
+            }
+            if (!preg_match('/^\\s*((?:"[^"]*")|(?:\'[^\']*\'))\\s*=>\\s*(.*?)\\s*$/s', $entry['text'], $match)
+                || null === ($key = $this->quotedIdentifier($match[1]))
+            ) {
+                return null;
+            }
+            $entries[$key] = $match[2];
+        }
+
+        return $entries;
+    }
+
+    private function quotedIdentifier(string $text): ?string
+    {
+        if (!preg_match('/^\\s*(["\'])([A-Za-z_][A-Za-z0-9_]*)\\1\\s*$/', $text, $match)) {
+            return null;
+        }
+
+        return $match[2];
+    }
+
+    /**
+     * @param array{text: string, offset: int} $argument
+     *
+     * @return array{name: string, range: Range}|null
+     */
+    private function quotedIdentifierArgument(string $document, array $argument): ?array
+    {
+        if (!preg_match('/^\\s*(["\'])([A-Za-z_][A-Za-z0-9_]*)\\1\\s*$/', $argument['text'], $match, \PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+        $name = $match[2][0];
+
+        return [
+            'name' => $name,
+            'range' => $this->converter->toRange($document, $argument['offset'] + $match[2][1], \strlen($name)),
+        ];
+    }
+
+    /** @param list<array{text: string, offset: int}> $arguments */
+    private function formPropertyName(array $arguments, string $field): ?string
+    {
+        foreach (\array_slice($arguments, 1) as $argument) {
+            if (preg_match('/^\\s*[A-Za-z_][A-Za-z0-9_]*\\s*:(?!:)/', $argument['text'])) {
+                return null;
+            }
+        }
+        if (!isset($arguments[2])) {
+            return $field;
+        }
+        $options = $this->arrayEntries($arguments[2]['text']);
+        if (null === $options) {
+            return null;
+        }
+        if (isset($options['mapped'])) {
+            $mapped = trim($options['mapped']);
+            if ('false' === $mapped) {
+                return null;
+            }
+            if ('true' !== $mapped) {
+                return null;
+            }
+        }
+        if (!isset($options['property_path'])) {
+            return $field;
+        }
+        $propertyPath = trim($options['property_path']);
+        if ('null' === $propertyPath) {
+            return $field;
+        }
+        if ('false' === $propertyPath) {
+            return null;
+        }
+
+        return $this->quotedIdentifier($propertyPath);
+    }
+
+    private function enclosingClass(PhpDocument $php, int $offset): ?string
+    {
+        foreach ($php->typeDeclarations() as $type) {
+            if ($type->contains($offset)) {
+                return $type->name();
+            }
+        }
+
+        return null;
     }
 
     /** @return list<array{text: string, offset: int}> */

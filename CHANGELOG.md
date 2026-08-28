@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Navigate and complete form fields mapped to data class properties
 - Complete and navigate PHP constants and enums in Twig
 
 ## 0.17.1 (2026-08-28)

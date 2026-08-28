@@ -15,6 +15,20 @@ in completion and hover details.
 After runtime indexing, definitely unknown literal options are diagnosed for
 known form types. Dynamic option arrays and unresolved form types are ignored.
 
+For form types that configure a static ``data_class`` with ``setDefaults()``
+or ``setDefault()``, literal field names passed to
+``FormBuilderInterface::add()`` are linked to the corresponding class property.
+Property completion is available while entering the field name. Hover shows the
+PHP property signature and description. Go to Definition opens the declaration.
+Find All References includes the form field and mapped validation or serializer
+metadata.
+
+Literal ``property_path`` options are followed when they contain one property
+name. Unmapped fields, dynamic option arrays, inherited or dynamic
+``data_class`` values and nested property paths are ignored. Completion and
+navigation require the property to be declared directly on the data class;
+inherited and trait properties aren't resolved.
+
 Validation
 ----------
 
@@ -42,8 +56,9 @@ Known serializer groups are completed in PHP ``Groups`` attributes, literal
 show their statically recognized occurrences.
 
 Go to Definition connects YAML validation and serializer class and property
-mappings to application PHP declarations. Property completion is available
-under YAML ``properties`` and ``attributes`` mappings.
+mappings to application PHP declarations. Hover shows the PHP property signature
+and description. Property completion is available under YAML ``properties`` and
+``attributes`` mappings.
 
 Unknown serializer groups, dynamic arrays and options that cannot be resolved
 exactly aren't diagnosed.

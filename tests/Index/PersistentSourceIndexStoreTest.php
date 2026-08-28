@@ -125,6 +125,25 @@ final class PersistentSourceIndexStoreTest extends TestCase
         self::assertSame(['routes' => 'payload-b'], $restarted->loadPayloads($this->project, 'src/B.php'));
     }
 
+    public function testDiscardsCachesFromOlderSchemaVersions(): void
+    {
+        $store = $this->store();
+        $writer = $store->beginRewrite($this->project);
+        $writer->add('src/A.php', $this->metadata(1), ['routes' => 'payload']);
+        $writer->commit();
+        $path = $store->path($this->project);
+        $contents = (string) file_get_contents($path);
+        /** @var array{schemaVersion: int, serverVersion: string} $header */
+        $header = json_decode($store->header(), true, 512, \JSON_THROW_ON_ERROR);
+        --$header['schemaVersion'];
+        file_put_contents(
+            $path,
+            json_encode($header, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)."\n".substr($contents, (int) strpos($contents, "\n") + 1),
+        );
+
+        self::assertSame([], $this->store()->loadMetadata($this->project));
+    }
+
     public function testDiscardsCachesFromOtherServerVersions(): void
     {
         $store = $this->store();

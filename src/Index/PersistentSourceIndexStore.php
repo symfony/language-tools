@@ -17,7 +17,7 @@ use Symfony\Lsp\Project\ProjectStateInterface;
  */
 final class PersistentSourceIndexStore implements SourceIndexStoreInterface, ProjectStateInterface
 {
-    private const SCHEMA_VERSION = 6;
+    private const SCHEMA_VERSION = 7;
 
     /** @var array<string, array<string, array{int, int}>> project root => path => [offset, length] */
     private array $offsets = [];

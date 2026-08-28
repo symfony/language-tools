@@ -226,6 +226,136 @@ final class MetadataProviderTest extends TestCase
         self::assertCount(2, $references);
     }
 
+    public function testLinksFormFieldsToDataClassProperties(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new BalancedDelimiterMatcher());
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $projects = new ProjectRegistry();
+        $projects->replace([$project]);
+        $dtoUri = 'file:///workspace/src/Dto/Article.php';
+        $dtoText = <<<'PHP'
+            <?php
+            namespace App\Dto;
+
+            final class Article
+            {
+                /** The article title. */
+                private ?string $title = null;
+
+                public string $summary;
+            }
+            PHP;
+        $formUri = 'file:///workspace/src/Form/ArticleType.php';
+        $formText = <<<'PHP'
+            <?php
+            namespace App\Form;
+
+            use App\Dto\Article;
+            use Symfony\Component\Form\AbstractType;
+            use Symfony\Component\Form\Extension\Core\Type\TextType;
+            use Symfony\Component\Form\FormBuilderInterface;
+            use Symfony\Component\OptionsResolver\OptionsResolver;
+
+            final class ArticleType extends AbstractType
+            {
+                public function buildForm(FormBuilderInterface $builder, array $options, object $menu): void
+                {
+                    $builder
+                        ->add('title', TextType::class)
+                        ->add('headline', TextType::class, ['property_path' => 'summary'])
+                        ->add('ignored', TextType::class, ['mapped' => false])
+                        ->add('dynamic', TextType::class, $options)
+                    ;
+                    $builder->get('author')->add('street', TextType::class);
+                    $builder->add('named', options: ['mapped' => false]);
+                    $builder->addEventListener('event', fn ($event) => $event->getForm()->add('leaked', TextType::class));
+                    $menu->add('unrelated', TextType::class);
+                }
+
+                public function configureOptions(OptionsResolver $resolver): void
+                {
+                    $resolver->setDefaults([
+                        'data_class' => Article::class,
+                    ]);
+                }
+            }
+
+            final class AlternateArticleType extends AbstractType
+            {
+                public function configureOptions(OptionsResolver $resolver): void
+                {
+                    $resolver->setDefault('data_class', Article::class);
+                }
+            }
+
+            final class DynamicArticleType extends AbstractType
+            {
+                public function configureOptions(OptionsResolver $resolver, string $class): void
+                {
+                    $resolver->setDefaults(['data_class' => $class]);
+                }
+            }
+            PHP;
+        $formFacts = $extractor->extract($formUri, 'php', $formText);
+        $dataClasses = [];
+        foreach ($formFacts->formDataClasses() as $formDataClass) {
+            $dataClasses[$formDataClass->formClass()] = $formDataClass->dataClass();
+        }
+        self::assertSame([
+            'App\\Form\\ArticleType' => 'App\\Dto\\Article',
+            'App\\Form\\AlternateArticleType' => 'App\\Dto\\Article',
+        ], $dataClasses);
+
+        $sourceIndexes = new MetadataSourceIndexRegistry();
+        $sourceIndexes->forProject($project)->replace(
+            $extractor->extract($dtoUri, 'php', $dtoText),
+            $formFacts,
+        );
+        $documents = new DocumentStore();
+        $documents->open(new Document($dtoUri, 'php', 1, $dtoText));
+        $documents->open(new Document($formUri, 'php', 1, $formText));
+        $resolver = new DocumentContextResolver($documents, $projects);
+        $protocol = new LspProtocolMapper();
+        $relationshipProvider = new MetadataRelationshipProvider($resolver, $converter, $protocol, $sourceIndexes, $extractor);
+        $completionProvider = new MetadataCompletionProvider($resolver, $converter, $protocol, new MetadataIndexRegistry(), $sourceIndexes, $extractor);
+
+        $titleOffset = strpos($formText, "'title'") + 2;
+        $hover = $relationshipProvider->hover($this->params($converter, $formUri, $formText, $titleOffset));
+        self::assertIsArray($hover);
+        $hoverValue = \is_array($hover['contents'] ?? null) ? ($hover['contents']['value'] ?? null) : null;
+        self::assertIsString($hoverValue);
+        self::assertStringContainsString('PHP property: `App\\Dto\\Article::$title`', $hoverValue);
+        self::assertStringContainsString('private ?string $title', $hoverValue);
+        self::assertStringContainsString('The article title.', $hoverValue);
+
+        $definition = $relationshipProvider->definition($this->params($converter, $formUri, $formText, $titleOffset));
+        self::assertIsArray($definition);
+        self::assertSame([$dtoUri], array_column($definition, 'uri'));
+
+        $propertyOffset = strpos($dtoText, '$title') + 2;
+        $references = $relationshipProvider->references($this->params($converter, $dtoUri, $dtoText, $propertyOffset));
+        self::assertIsArray($references);
+        $referenceUris = [];
+        foreach ($references as $reference) {
+            self::assertIsString($reference['uri'] ?? null);
+            $referenceUris[$reference['uri']] = true;
+        }
+        self::assertSame([$dtoUri, $formUri], array_keys($referenceUris));
+
+        self::assertSame(['title'], $this->completionLabels($completionProvider, $converter, $formUri, $formText, strpos($formText, "'title'") + \strlen("'ti")));
+        $headlineDefinition = $relationshipProvider->definition($this->params($converter, $formUri, $formText, strpos($formText, "'headline'") + 2));
+        self::assertIsArray($headlineDefinition);
+        self::assertSame([$dtoUri], array_column($headlineDefinition, 'uri'));
+        self::assertNull($relationshipProvider->definition($this->params($converter, $formUri, $formText, strpos($formText, "'ignored'") + 2)));
+        self::assertNull($relationshipProvider->definition($this->params($converter, $formUri, $formText, strpos($formText, "'dynamic'") + 2)));
+        self::assertNull($relationshipProvider->definition($this->params($converter, $formUri, $formText, strpos($formText, "'street'") + 2)));
+        self::assertNull($relationshipProvider->definition($this->params($converter, $formUri, $formText, strpos($formText, "'named'") + 2)));
+        self::assertNull($relationshipProvider->definition($this->params($converter, $formUri, $formText, strpos($formText, "'leaked'") + 2)));
+        self::assertNull($relationshipProvider->definition($this->params($converter, $formUri, $formText, strpos($formText, "'unrelated'") + 2)));
+        self::assertSame([], $this->completionLabels($completionProvider, $converter, $formUri, $formText, strpos($formText, "'street'") + \strlen("'str")));
+    }
+
     public function testIgnoresCommentedPhpMetadataWhilePreservingActiveRanges(): void
     {
         $converter = new PositionConverter();

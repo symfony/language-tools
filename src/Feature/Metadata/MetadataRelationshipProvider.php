@@ -28,11 +28,12 @@ final class MetadataRelationshipProvider implements DefinitionProviderInterface,
             return null;
         }
         [$symbol, $project] = $resolved;
-        $count = \count($this->sourceIndexes->forProject($project)->symbols($symbol->kind(), $symbol->name()));
+        $symbols = $this->sourceIndexes->forProject($project)->symbols($symbol->kind(), $symbol->name());
+        $count = \count($symbols);
         $value = match ($symbol->kind()) {
             MetadataSymbolKind::Constraint => 'Validation constraint: `'.$symbol->name().'`',
             MetadataSymbolKind::MappedClass => 'Mapped class: `'.$symbol->name().'`',
-            MetadataSymbolKind::Property => 'Mapped property: `'.$symbol->name().'`',
+            MetadataSymbolKind::Property => $this->propertyHover($symbol, $symbols),
             MetadataSymbolKind::SerializerGroup => \sprintf("Serializer group: `%s`\n\n%d known occurrence%s", $symbol->name(), $count, 1 === $count ? '' : 's'),
         };
 
@@ -69,6 +70,28 @@ final class MetadataRelationshipProvider implements DefinitionProviderInterface,
         }
 
         return $locations;
+    }
+
+    /** @param list<MetadataSourceSymbol> $symbols */
+    private function propertyHover(MetadataSourceSymbol $symbol, array $symbols): string
+    {
+        $declaration = $symbol->isDeclaration() ? $symbol : null;
+        foreach ($symbols as $candidate) {
+            if ($candidate->isDeclaration()) {
+                $declaration = $candidate;
+                break;
+            }
+        }
+
+        $value = 'PHP property: `'.$symbol->name().'`';
+        if (null !== $declaration?->signature()) {
+            $value .= "\n\n```php\n".$declaration->signature()."\n```";
+        }
+        if (null !== $declaration?->description()) {
+            $value .= "\n\n".$declaration->description();
+        }
+
+        return $value;
     }
 
     /**
