@@ -67,9 +67,9 @@ It complements your PHP language server; keep it enabled.
 
 | Integration | Completion | Hover | Definition | References | Rename | Diagnostics |
 | --- | :-: | :-: | :-: | :-: | :-: | :-: |
-| Twig template names | ✓ | ✓ | ✓ | ✓ | · | ✓ |
-| Twig functions and filters | ✓ | ✓ | ✓ | ✓ | · | ✓ |
-| PHP constants and enums in Twig | ✓ | ✓ | ✓ | ✓ | · | · |
+| Template names | ✓ | ✓ | ✓ | ✓ | · | ✓ |
+| Functions and filters | ✓ | ✓ | ✓ | ✓ | · | ✓ |
+| PHP constants and enums | ✓ | ✓ | ✓ | ✓ | · | · |
 
 A dot marks an intentionally unsupported combination. Document links, quick
 fixes and code lenses are covered in the

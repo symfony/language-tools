@@ -48,27 +48,6 @@ Supported Integrations
       - No
       - No
       - Yes
-    * - `Twig template names`_
-      - Yes
-      - Yes
-      - Yes
-      - Yes
-      - No
-      - Yes
-    * - `Twig functions and filters`_
-      - Yes
-      - Yes
-      - Yes
-      - Yes
-      - No
-      - Yes
-    * - `PHP constants and enums in Twig`_
-      - Yes
-      - Yes
-      - Yes
-      - Yes
-      - No
-      - No
     * - `Translations`_
       - Yes
       - Yes
@@ -143,6 +122,41 @@ Supported Integrations
 Messenger message and handler classes, event and listener classes, Stimulus
 controllers and Doctrine entity and repository classes also provide code lenses
 for navigating between related declarations.
+
+Twig
+~~~~
+
+.. list-table::
+    :header-rows: 1
+
+    * - Integration
+      - Completion
+      - Hover
+      - Definition
+      - References
+      - Rename
+      - Diagnostics
+    * - `Template names`_
+      - Yes
+      - Yes
+      - Yes
+      - Yes
+      - No
+      - Yes
+    * - `Functions and filters`_
+      - Yes
+      - Yes
+      - Yes
+      - Yes
+      - No
+      - Yes
+    * - `PHP constants and enums`_
+      - Yes
+      - Yes
+      - Yes
+      - Yes
+      - No
+      - No
 
 Workspace Trust
 ---------------
@@ -226,9 +240,9 @@ If a runtime-backed feature returns no results, verify that:
 .. _`Routing`: routing.rst
 .. _`Dependency injection`: dependency-injection.rst
 .. _`Console commands`: console.rst
-.. _`Twig template names`: templates.rst
-.. _`Twig functions and filters`: twig-callables.rst
-.. _`PHP constants and enums in Twig`: twig-constants-enums.rst
+.. _`Template names`: templates.rst
+.. _`Functions and filters`: twig-callables.rst
+.. _`PHP constants and enums`: twig-constants-enums.rst
 .. _`Translations`: translations.rst
 .. _`Environment variables`: environment.rst
 .. _`Bundle configuration`: configuration.rst
