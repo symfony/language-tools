@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Match Messenger handler signatures to their declaring classes
 - Scope typed Doctrine repository receivers to their declaring methods
 - Recognize attributed multi-property Doctrine declarations
 - Scope typed Event and Messenger receivers to their declaring methods

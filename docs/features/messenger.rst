@@ -71,8 +71,10 @@ Diagnostics
 
 After runtime indexing completes, unknown bus and transport references are
 reported as errors. PHP handlers with a scalar first parameter are reported when
-Messenger assigns an object message to that method. These diagnostics are
-suppressed when runtime indexing is unavailable or incomplete.
+Messenger assigns an object message to that method. The signature check is
+matched to the handler's declaring class and method, so same-named methods on
+other classes are ignored. These diagnostics are suppressed when runtime
+indexing is unavailable or incomplete.
 
 Limitations
 -----------

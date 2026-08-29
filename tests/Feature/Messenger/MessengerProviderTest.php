@@ -156,7 +156,7 @@ YAML;
         $messageUri = 'file:///workspace/src/Message/Ping.php';
         $message = "<?php\nnamespace App\\Message;\ninterface DomainEvent {}\nfinal class Ping implements DomainEvent {}\n";
         $handlerUri = 'file:///workspace/src/MessageHandler/PingHandler.php';
-        $handler = "<?php\nnamespace App\\MessageHandler;\nfinal class PingHandler { public function __invoke(string \$message): void {} }\n";
+        $handler = "<?php\nnamespace App\\MessageHandler;\nuse App\\Message\\Ping;\nfinal class UnrelatedHandler { public function __invoke(string \$message): void {} }\nfinal class PingHandler { public function __invoke(Ping \$message): void {} }\nfinal class StringHandler { public function handle(string \$message): void {} }\n";
         $controllerUri = 'file:///workspace/src/Controller/PingController.php';
         $controller = "<?php\nnamespace App\\Controller;\nuse App\\Message\\{Ping};\nuse Symfony\\Component\\Messenger\\{MessageBusInterface};\nfinal class PingController { public function __construct(private MessageBusInterface \$bus) {} public function send(): void { \$this->bus->dispatch(new Ping()); } }\n";
         $documents = new DocumentStore();
@@ -174,7 +174,10 @@ YAML;
             [new MessengerBus('command.bus', true)],
             [new MessengerTransport('async', false)],
             [new MessengerMessage('App\\Message\\Ping', ['async'])],
-            [new MessengerHandler('App\\Message\\DomainEvent', 'command.bus', 'handler', 'App\\MessageHandler\\PingHandler', '__invoke', 0, 'async')],
+            [
+                new MessengerHandler('App\\Message\\DomainEvent', 'command.bus', 'handler', 'App\\MessageHandler\\PingHandler', '__invoke', 0, 'async'),
+                new MessengerHandler('App\\Message\\Other', 'command.bus', 'string_handler', 'App\\MessageHandler\\StringHandler', 'handle', 0, 'async'),
+            ],
             true,
         );
         $sourceIndexes = new MessengerSourceIndexRegistry();
@@ -190,7 +193,7 @@ YAML;
         $relationshipResolver = new MessengerRelationshipResolver($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
         $completionProvider = new MessengerCompletionProvider($documentResolver, $converter, $protocol, $indexes, $yamlParser, new PhpCommentParser());
         $relationshipProvider = new MessengerRelationshipProvider($protocol, $indexes, $relationshipResolver);
-        $diagnosticProvider = new MessengerDiagnosticProvider($documentResolver, $converter, $protocol, $indexes, $extractor, $classExtractor);
+        $diagnosticProvider = new MessengerDiagnosticProvider($documentResolver, $converter, $protocol, $indexes, $extractor, new TolerantPhpParser(new Parser()));
         $codeLensProvider = new MessengerCodeLensProvider($documentResolver, $protocol, $indexes, $classExtractor, $relationshipResolver);
 
         $completionParams = $this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'command.bus }') + 4));

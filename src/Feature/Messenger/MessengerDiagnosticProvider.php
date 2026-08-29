@@ -5,8 +5,10 @@ namespace Symfony\Lsp\Feature\Messenger;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpTypedVariable;
+use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
@@ -17,7 +19,7 @@ final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
         private readonly LspProtocolMapper $protocol,
         private readonly MessengerIndexRegistry $indexes,
         private readonly MessengerExtractor $extractor,
-        private readonly PhpClassDeclarationExtractor $classExtractor,
+        private readonly PhpParserInterface $phpParser,
     ) {
     }
 
@@ -50,14 +52,31 @@ final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
             return $diagnostics;
         }
         $scalarTypes = ['array', 'bool', 'callable', 'float', 'int', 'never', 'resource', 'string', 'void'];
-        foreach ($this->classExtractor->extract($request->document->uri(), $request->document->text()) as $class) {
-            foreach ($index->handlersByClass($class->className()) as $handler) {
-                $pattern = '/\bfunction\s+'.preg_quote($handler->method(), '/').'\s*\(\s*(?:[A-Za-z_][A-Za-z0-9_]*\s+)*(\\??[A-Za-z_][A-Za-z0-9_]*)\s+\$/';
-                if (preg_match($pattern, $request->document->text(), $match, \PREG_OFFSET_CAPTURE) && \in_array(strtolower(ltrim($match[1][0], '?')), $scalarTypes, true)) {
-                    $start = $match[1][1];
-                    $range = new Range($this->converter->toPosition($request->document->text(), $start), $this->converter->toPosition($request->document->text(), $start + \strlen($match[1][0])));
-                    $diagnostics[] = $this->protocol->diagnostic($range, 1, 'messenger.invalid_handler_signature', \sprintf('Messenger handler "%s::%s" cannot accept message "%s".', $handler->className(), $handler->method(), $handler->message()));
+        $php = $this->phpParser->parse($request->document->text());
+        foreach ($php->methodDeclarations() as $method) {
+            if (!\in_array(strtolower((string) $method->firstParameterType()), $scalarTypes, true)) {
+                continue;
+            }
+            $parameters = array_values(array_filter(
+                $php->typedVariables(),
+                static fn (PhpTypedVariable $variable): bool => PhpTypedVariableKind::Parameter === $variable->kind()
+                    && $method->className() === $variable->className()
+                    && $method->name() === $variable->methodName(),
+            ));
+            usort($parameters, static fn (PhpTypedVariable $left, PhpTypedVariable $right): int => $left->nameStartOffset() <=> $right->nameStartOffset());
+            $parameter = $parameters[0] ?? null;
+            if (null === $parameter) {
+                continue;
+            }
+            foreach ($index->handlersByClass($method->className()) as $handler) {
+                if ($method->name() !== $handler->method()) {
+                    continue;
                 }
+                $range = new Range(
+                    $this->converter->toPosition($request->document->text(), $parameter->nameStartOffset()),
+                    $this->converter->toPosition($request->document->text(), $parameter->nameEndOffset()),
+                );
+                $diagnostics[] = $this->protocol->diagnostic($range, 1, 'messenger.invalid_handler_signature', \sprintf('Messenger handler "%s::%s" cannot accept message "%s".', $handler->className(), $handler->method(), $handler->message()));
             }
         }
 
