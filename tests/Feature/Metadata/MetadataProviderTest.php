@@ -356,6 +356,59 @@ final class MetadataProviderTest extends TestCase
         self::assertSame([], $this->completionLabels($completionProvider, $converter, $formUri, $formText, strpos($formText, "'street'") + \strlen("'str")));
     }
 
+    public function testScopesCompleteMetadataCallsToTheirTypedParameters(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new BalancedDelimiterMatcher());
+        $text = <<<'PHP'
+            <?php
+            namespace App\Form;
+
+            use App\Dto\Article;
+            use App\Form\ArticleType as NestedArticleType;
+            use Symfony\Component\Form\FormBuilderInterface;
+            use Symfony\Component\OptionsResolver\OptionsResolver;
+
+            final class ArticleType
+            {
+                public function configureOptions(OptionsResolver $resolver): void
+                {
+                    $resolver->setDefault('data_class', Article::class);
+                }
+
+                public function unrelated(object $resolver): void
+                {
+                    $resolver->setDefault('data_class', Ignored::class);
+                }
+
+                public function buildForm(FormBuilderInterface $builder): void
+                {
+                    $builder->add('title', NestedArticleType::class, ['active_option' => true]);
+                }
+
+                public function unrelatedBuilder(object $builder): void
+                {
+                    $builder->add('ignored', NestedArticleType::class, ['ignored_option' => true]);
+                }
+            }
+            PHP;
+
+        $facts = $extractor->extract('file:///workspace/src/Form/ArticleType.php', 'php', $text);
+        $dataClasses = [];
+        foreach ($facts->formDataClasses() as $dataClass) {
+            $dataClasses[$dataClass->formClass()] = $dataClass->dataClass();
+        }
+        self::assertSame(['App\Form\ArticleType' => 'App\Dto\Article'], $dataClasses);
+        self::assertSame(['active_option'], array_column($extractor->formOptions($text), 'option'));
+
+        $references = array_values(array_filter(
+            $facts->symbols(),
+            static fn ($symbol): bool => MetadataSymbolKind::Property === $symbol->kind() && !$symbol->isDeclaration(),
+        ));
+        self::assertSame(['App\Dto\Article::$title'], array_map(static fn ($symbol): string => $symbol->name(), $references));
+        self::assertSame(strpos($text, "'title'") + 1, $converter->toByteOffset($text, $references[0]->range()->start()));
+    }
+
     public function testIgnoresCommentedPhpMetadataWhilePreservingActiveRanges(): void
     {
         $converter = new PositionConverter();

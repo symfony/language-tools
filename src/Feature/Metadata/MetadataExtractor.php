@@ -6,10 +6,15 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
+use Symfony\Lsp\Parser\Php\PhpArgument;
+use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
-use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
+use Symfony\Lsp\Parser\Php\PhpMethodCall;
+use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpTypedVariable;
+use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
 final class MetadataExtractor
 {
@@ -54,20 +59,17 @@ final class MetadataExtractor
     public function formOptions(string $text): array
     {
         $php = $this->phpParser->parse($text);
-        $source = $this->phpComments->mask($text);
         $options = [];
-        foreach ($this->calls($source, $php) as $call) {
-            $typeIndex = 'createNamed' === $call['name'] ? 1 : ('add' === $call['name'] ? 1 : 0);
-            $optionsIndex = 'createNamed' === $call['name'] ? 3 : 2;
-            if (!isset($call['arguments'][$typeIndex], $call['arguments'][$optionsIndex])) {
+        foreach ($this->formCalls($php) as $call) {
+            $typeIndex = 'createNamed' === $call->method() ? 1 : ('add' === $call->method() ? 1 : 0);
+            $optionsIndex = 'createNamed' === $call->method() ? 3 : 2;
+            $type = $this->classReferenceArgument($php, $call->argument($typeIndex));
+            $argument = $call->argument($optionsIndex);
+            if (null === $type || null === $argument) {
                 continue;
             }
-            if (!preg_match('/^\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\b/', $call['arguments'][$typeIndex]['text'], $type)) {
-                continue;
-            }
-            $class = $php->resolveName($type[1]);
-            foreach ($this->arrayKeys($text, $call['arguments'][$optionsIndex]) as $key) {
-                $options[] = ['class' => $class, 'option' => $key['name'], 'range' => $key['range']];
+            foreach ($this->arrayKeys($text, $argument) as $key) {
+                $options[] = ['class' => $type->className(), 'option' => $key['name'], 'range' => $key['range']];
             }
         }
 
@@ -78,20 +80,24 @@ final class MetadataExtractor
     public function constraintOptions(string $text): array
     {
         $php = $this->phpParser->parse($text);
-        $source = $this->phpComments->mask($text);
         $options = [];
-        preg_match_all('/#\[\s*([\\\\A-Za-z_][A-Za-z0-9_\\\\]*)\s*\((.*?)\)\s*\]/s', $source, $attributes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-        foreach ($attributes as $attribute) {
-            if (str_contains($attribute[2][0], 'new ')) {
+        foreach ($php->attributes() as $attribute) {
+            if (array_any($attribute->arguments(), static fn (PhpArgument $argument): bool => str_contains((string) $argument->expression(), 'new '))) {
                 continue;
             }
-            foreach ($this->arguments($attribute[2][0], $attribute[2][1]) as $argument) {
-                if (!preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)/', $argument['text'], $named, \PREG_OFFSET_CAPTURE)) {
+            foreach ($attribute->arguments() as $argument) {
+                $name = $argument->name();
+                if (null === $name) {
                     continue;
                 }
-                $name = $named[1][0];
-                $absolute = $argument['offset'] + $named[1][1];
-                $options[] = ['constraint' => $php->resolveName($attribute[1][0]), 'option' => $name, 'range' => $this->converter->toRange($text, $absolute, \strlen($name))];
+                $prefixEnd = $argument->expressionStartOffset() ?? $argument->endOffset();
+                $prefix = substr($text, $argument->startOffset(), $prefixEnd - $argument->startOffset());
+                $relativeOffset = strpos($prefix, $name);
+                if (false === $relativeOffset) {
+                    continue;
+                }
+                $absolute = $argument->startOffset() + $relativeOffset;
+                $options[] = ['constraint' => $attribute->name(), 'option' => $name, 'range' => $this->converter->toRange($text, $absolute, \strlen($name))];
             }
         }
 
@@ -125,36 +131,47 @@ final class MetadataExtractor
         foreach ($php->methodDeclarations() as $method) {
             if ('configureOptions' !== $method->name()
                 || 'Symfony\\Component\\OptionsResolver\\OptionsResolver' !== $method->firstParameterType()
-                || null === ($body = $this->methodBody($source, $method))
-                || null === ($resolver = $this->firstParameterVariable($method->signature()))
+                || null === ($resolver = $this->typedMethodParameter($php, $method->className(), $method->name(), 'Symfony\\Component\\OptionsResolver\\OptionsResolver'))
             ) {
                 continue;
             }
             $dataClass = null;
-            preg_match_all('/\\$'.preg_quote($resolver, '/').'\\s*->\\s*(setDefaults|setDefault)\\s*\\(/', $body['text'], $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-            foreach ($calls as $call) {
-                $open = $call[0][1] + \strlen($call[0][0]) - 1;
-                $close = $this->delimiters->matching($body['text'], $open, '(', ')');
-                if (null === $close) {
+            foreach ($php->methodCalls() as $call) {
+                if (!\in_array($call->method(), ['setDefaults', 'setDefault'], true)
+                    || $method->className() !== $call->className()
+                    || $method->name() !== $call->enclosingMethod()
+                    || $resolver->scopeStartOffset() !== $call->scopeStartOffset()
+                    || PhpMethodReceiverKind::Variable !== $call->receiverContext()->kind()
+                    || $resolver->name() !== $call->receiverContext()->name()
+                ) {
                     continue;
                 }
-                $arguments = $this->arguments(substr($body['text'], $open + 1, $close - $open - 1), $body['start'] + $open + 1);
-                if ('setDefaults' === $call[1][0]) {
-                    if (!isset($arguments[0]) || null === $entries = $this->arrayEntries($arguments[0]['text'])) {
+                if ('setDefaults' === $call->method()) {
+                    $argument = $call->argument(0);
+                    $expression = $argument?->expression();
+                    $offset = $argument?->expressionStartOffset();
+                    if (!\is_string($expression) || !\is_int($offset) || null === $entries = $this->arrayEntries($expression, $offset)) {
                         $dataClass = null;
                         continue;
                     }
                     if (!\array_key_exists('data_class', $entries)) {
                         continue;
                     }
-                    $expression = $entries['data_class'];
+                    $dataClassExpression = $entries['data_class'];
                 } else {
-                    if ('data_class' !== $this->quotedIdentifier($arguments[0]['text'] ?? '')) {
+                    if ('data_class' !== $this->quotedIdentifier($call->argument(0)?->expression() ?? '')) {
                         continue;
                     }
-                    $expression = $arguments[1]['text'] ?? '';
+                    $argument = $call->argument(1);
+                    $expression = $argument?->expression();
+                    $offset = $argument?->expressionStartOffset();
+                    if (!\is_string($expression) || !\is_int($offset)) {
+                        $dataClass = null;
+                        continue;
+                    }
+                    $dataClassExpression = ['text' => $expression, 'offset' => $offset];
                 }
-                $dataClass = $this->staticClassName($expression, $php);
+                $dataClass = $this->staticClassName($source, $dataClassExpression, $php);
             }
             if (null !== $dataClass) {
                 $classes[strtolower(ltrim($method->className(), '\\'))] = new FormDataClass($method->className(), $dataClass);
@@ -172,23 +189,25 @@ final class MetadataExtractor
     private function phpSymbols(string $uri, string $text, string $source, PhpDocument $php, array $formDataClasses): array
     {
         $symbols = [];
-        preg_match_all('/\b(?:final\s+|abstract\s+|readonly\s+)?class\s+([A-Za-z_][A-Za-z0-9_]*)[^\{]*\{/', $source, $classes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-        foreach ($classes as $class) {
-            $className = $php->resolveName($class[1][0]);
+        foreach ($php->typeDeclarations() as $type) {
+            if (!$type->isClass()) {
+                continue;
+            }
+            $range = $this->converter->toRange($text, $type->nameStartOffset(), $type->nameEndOffset() - $type->nameStartOffset());
             $symbols[] = new MetadataSourceSymbol(
                 MetadataSymbolKind::MappedClass,
-                $className,
+                $type->name(),
                 $uri,
-                $this->converter->toRange($text, $class[1][1], \strlen($class[1][0])),
+                $range,
                 true,
             );
-            if (preg_match('/\bextends\s+([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)/', $class[0][0], $parent)
-                && 'Symfony\\Component\\Validator\\Constraint' === $php->resolveName($parent[1])) {
+            if ('Symfony\\Component\\Validator\\Constraint' === $type->parentClassName()) {
+                $separator = strrpos($type->name(), '\\');
                 $symbols[] = new MetadataSourceSymbol(
                     MetadataSymbolKind::Constraint,
-                    $class[1][0],
+                    false === $separator ? $type->name() : substr($type->name(), $separator + 1),
                     $uri,
-                    $this->converter->toRange($text, $class[1][1], \strlen($class[1][0])),
+                    $range,
                     true,
                 );
             }
@@ -214,25 +233,21 @@ final class MetadataExtractor
             if (null === $dataClass
                 || 'buildForm' !== $method->name()
                 || 'Symfony\\Component\\Form\\FormBuilderInterface' !== $method->firstParameterType()
-                || null === ($body = $this->methodBody($source, $method))
-                || null === ($builder = $this->firstParameterVariable($method->signature()))
+                || null === ($builder = $this->typedMethodParameter($php, $method->className(), $method->name(), 'Symfony\\Component\\Form\\FormBuilderInterface'))
             ) {
                 continue;
             }
-            preg_match_all('/->\\s*add\\s*\\(/', $body['text'], $calls, \PREG_OFFSET_CAPTURE);
-            foreach ($calls[0] as [$matched, $relativeOffset]) {
-                $callOffset = $body['start'] + $relativeOffset;
-                if (!$this->isDirectFormBuilderCall($source, $callOffset, $builder)) {
+            foreach ($php->methodCalls() as $call) {
+                if ('add' !== $call->method()
+                    || $method->className() !== $call->className()
+                    || $method->name() !== $call->enclosingMethod()
+                    || $builder->scopeStartOffset() !== $call->scopeStartOffset()
+                    || !$this->isDirectFormBuilderReceiver($call->receiver(), $builder->name())
+                ) {
                     continue;
                 }
-                $open = $callOffset + \strlen($matched) - 1;
-                $close = $this->delimiters->matching($source, $open, '(', ')');
-                if (null === $close) {
-                    continue;
-                }
-                $arguments = $this->arguments(substr($source, $open + 1, $close - $open - 1), $open + 1);
-                $field = isset($arguments[0]) ? $this->quotedIdentifierArgument($text, $arguments[0]) : null;
-                $property = null === $field ? null : $this->formPropertyName($arguments, $field['name']);
+                $field = null === $call->argument(0) ? null : $this->quotedIdentifierArgument($text, $call->argument(0));
+                $property = null === $field ? null : $this->formPropertyName($call->arguments(), $field['name']);
                 if (null === $field || null === $property) {
                     continue;
                 }
@@ -246,48 +261,60 @@ final class MetadataExtractor
             }
         }
 
-        $groupsImported = 'Symfony\\Component\\Serializer\\Attribute\\Groups' === ($php->imports()['Groups'] ?? null)
-            || 'Symfony\\Component\\Serializer\\Annotation\\Groups' === ($php->imports()['Groups'] ?? null);
-        preg_match_all('/#\[\s*((?:[A-Za-z_\\\\][A-Za-z0-9_\\\\]*\\\\)?Groups)\s*\((.*?)\)\s*\]/s', $source, $groups, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-        foreach ($groups as $group) {
-            if ('Groups' === $group[1][0] && !$groupsImported) {
-                continue;
+        foreach ($php->attributes() as $attribute) {
+            if (\in_array($attribute->name(), [
+                'Symfony\\Component\\Serializer\\Attribute\\Groups',
+                'Symfony\\Component\\Serializer\\Annotation\\Groups',
+            ], true)) {
+                foreach ($attribute->arguments() as $argument) {
+                    $expression = $argument->expression();
+                    $offset = $argument->expressionStartOffset();
+                    if (\is_string($expression) && \is_int($offset)) {
+                        array_push($symbols, ...$this->quotedSymbols(MetadataSymbolKind::SerializerGroup, $uri, $text, $expression, $offset, true));
+                    }
+                }
             }
-            array_push($symbols, ...$this->quotedSymbols(MetadataSymbolKind::SerializerGroup, $uri, $text, $group[2][0], $group[2][1], true));
         }
         preg_match_all('/["\']groups["\']\s*=>\s*\[(.*?)\]/s', $source, $groupReferences, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($groupReferences as $group) {
             array_push($symbols, ...$this->quotedSymbols(MetadataSymbolKind::SerializerGroup, $uri, $text, $group[1][0], $group[1][1], false));
         }
         $constraintNamespace = 'Symfony\\Component\\Validator\\Constraints\\';
-        preg_match_all('/#\[\s*([\\\\A-Za-z_][A-Za-z0-9_\\\\]*)/', $source, $constraintReferences, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-        foreach ($constraintReferences as $reference) {
-            $className = $php->resolveName($reference[1][0]);
-            if (!str_starts_with($className, $constraintNamespace)) {
+        foreach ($php->attributes() as $attribute) {
+            $className = $attribute->name();
+            $rawName = substr($text, $attribute->nameStartOffset(), $attribute->nameEndOffset() - $attribute->nameStartOffset());
+            if (str_starts_with($className, $constraintNamespace)) {
+                $name = substr($className, \strlen($constraintNamespace));
+                if (str_contains($name, '\\')) {
+                    continue;
+                }
+                $segmentOffset = (int) strrpos('\\'.$rawName, '\\');
+                $symbols[] = new MetadataSourceSymbol(
+                    MetadataSymbolKind::Constraint,
+                    $name,
+                    $uri,
+                    $this->converter->toRange($text, $attribute->nameStartOffset() + $segmentOffset, \strlen($rawName) - $segmentOffset),
+                    false,
+                );
+
                 continue;
             }
-            $name = substr($className, \strlen($constraintNamespace));
-            if (str_contains($name, '\\')) {
+            $aliasOffset = '\\' === ($rawName[0] ?? '') ? 1 : 0;
+            $separator = strpos($rawName, '\\', $aliasOffset);
+            $alias = substr($rawName, $aliasOffset, false === $separator ? null : $separator - $aliasOffset);
+            $imported = $php->imports()[$alias] ?? null;
+            if (!\is_string($imported)
+                || (!str_contains($imported, '\\Validator\\') && !str_contains($imported, '\\Constraints\\'))
+            ) {
                 continue;
             }
-            $separator = strrpos($reference[1][0], '\\');
-            $segmentOffset = false === $separator ? 0 : $separator + 1;
-            $offset = $reference[1][1] + $segmentOffset;
-            $length = \strlen($reference[1][0]) - $segmentOffset;
-            $symbols[] = new MetadataSourceSymbol(MetadataSymbolKind::Constraint, $name, $uri, $this->converter->toRange($text, $offset, $length), false);
-        }
-        foreach ($php->imports() as $alias => $className) {
-            if ($className === rtrim($constraintNamespace, '\\') || str_starts_with($className, $constraintNamespace)) {
-                continue;
-            }
-            if (!str_contains($className, '\\Validator\\') && !str_contains($className, '\\Constraints\\')) {
-                continue;
-            }
-            preg_match_all('/#\[\s*'.preg_quote($alias, '/').'\b/', $source, $references, \PREG_OFFSET_CAPTURE);
-            foreach ($references[0] as [$reference, $offset]) {
-                $nameOffset = $offset + strrpos($reference, $alias);
-                $symbols[] = new MetadataSourceSymbol(MetadataSymbolKind::Constraint, $alias, $uri, $this->converter->toRange($text, $nameOffset, \strlen($alias)), false);
-            }
+            $symbols[] = new MetadataSourceSymbol(
+                MetadataSymbolKind::Constraint,
+                $alias,
+                $uri,
+                $this->converter->toRange($text, $attribute->nameStartOffset() + $aliasOffset, \strlen($alias)),
+                false,
+            );
         }
 
         return $symbols;
@@ -459,42 +486,40 @@ final class MetadataExtractor
         return null;
     }
 
-    /** @return list<array{name: string, arguments: list<array{text: string, offset: int}>}> */
-    private function calls(string $text, PhpDocument $php): array
+    /** @return list<PhpMethodCall> */
+    private function formCalls(PhpDocument $php): array
     {
-        $formBuilders = $this->formBuilderVariables($php);
-        preg_match_all('/(?:(->)\s*)?\b(createForm|createNamed|add)\s*\(/', $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         $calls = [];
-        foreach ($matches as $match) {
-            if ('add' === $match[2][0] && ('' === $match[1][0] || !$this->isFormBuilderCall($text, $match[0][1], $formBuilders))) {
+        foreach ($php->methodCalls() as $call) {
+            if (!\in_array($call->method(), ['createForm', 'createNamed', 'add'], true)) {
                 continue;
             }
-            $open = $match[0][1] + \strlen($match[0][0]) - 1;
-            $close = $this->delimiters->matching($text, $open, '(', ')');
-            if (null === $close) {
+            if ('add' === $call->method() && null === $this->formBuilderVariableForCall($php, $call)) {
                 continue;
             }
-            $calls[] = ['name' => $match[2][0], 'arguments' => $this->arguments(substr($text, $open + 1, $close - $open - 1), $open + 1)];
+            $calls[] = $call;
         }
 
         return $calls;
     }
 
-    /**
-     * @param array<string, true> $variables
-     */
-    private function isFormBuilderCall(string $text, int $offset, array $variables): bool
+    private function formBuilderVariableForCall(PhpDocument $php, PhpMethodCall $call): ?PhpTypedVariable
     {
-        $before = substr($text, 0, $offset);
-        $statementStart = max((int) strrpos($before, ';'), (int) strrpos($before, '{'));
-        $statement = substr($before, $statementStart);
-        foreach (array_keys($variables) as $variable) {
-            if (preg_match('/\\$'.preg_quote($variable, '/').'\b/', $statement)) {
-                return true;
+        foreach ($php->typedVariables() as $variable) {
+            if (PhpTypedVariableKind::Parameter !== $variable->kind()
+                || !\in_array('Symfony\\Component\\Form\\FormBuilderInterface', $variable->types(), true)
+                || $call->className() !== $variable->className()
+                || $call->enclosingMethod() !== $variable->methodName()
+                || $call->scopeStartOffset() !== $variable->scopeStartOffset()
+                || 1 !== preg_match('/^\s*\\$'.preg_quote($variable->name(), '/').'\b/', $call->receiver())
+            ) {
+                continue;
             }
+
+            return $variable;
         }
 
-        return false;
+        return null;
     }
 
     /** @param array<string, true> $variables */
@@ -513,12 +538,17 @@ final class MetadataExtractor
     {
         $before = substr($text, 0, $offset);
         $statementStart = max((int) strrpos($before, ';'), (int) strrpos($before, '{'));
-        $statement = ltrim(substr($before, $statementStart), " \t\r\n;{");
+
+        return $this->isDirectFormBuilderReceiver(ltrim(substr($before, $statementStart), " \t\r\n;{"), $variable);
+    }
+
+    private function isDirectFormBuilderReceiver(string $receiver, string $variable): bool
+    {
         $builder = '$'.$variable;
-        if (!str_starts_with($statement, $builder)) {
+        if (!str_starts_with($receiver, $builder)) {
             return false;
         }
-        $chain = substr($statement, \strlen($builder));
+        $chain = substr($receiver, \strlen($builder));
         while ('' !== ($chain = ltrim($chain))) {
             if (!preg_match('/^->\\s*add\\s*\\(/', $chain, $add)) {
                 return false;
@@ -547,64 +577,81 @@ final class MetadataExtractor
         return $variables;
     }
 
-    /** @return array{text: string, start: int, end: int}|null */
-    private function methodBody(string $source, PhpMethodDeclaration $method): ?array
+    private function typedMethodParameter(PhpDocument $php, string $className, string $methodName, string $type): ?PhpTypedVariable
     {
-        $parametersOpen = strpos($source, '(', $method->nameEndOffset());
-        if (false === $parametersOpen || null === $parametersClose = $this->delimiters->matching($source, $parametersOpen, '(', ')')) {
-            return null;
+        $parameters = [];
+        foreach ($php->typedVariables() as $variable) {
+            if (PhpTypedVariableKind::Parameter === $variable->kind()
+                && $className === $variable->className()
+                && $methodName === $variable->methodName()
+                && \in_array($type, $variable->types(), true)
+            ) {
+                $parameters[] = $variable;
+            }
         }
-        $bodyOpen = strpos($source, '{', $parametersClose + 1);
-        $semicolon = strpos($source, ';', $parametersClose + 1);
-        if (false === $bodyOpen || (false !== $semicolon && $semicolon < $bodyOpen)) {
-            return null;
-        }
-        $bodyClose = $this->delimiters->matching($source, $bodyOpen, '{', '}');
-        if (null === $bodyClose) {
-            return null;
-        }
+        usort($parameters, static fn (PhpTypedVariable $left, PhpTypedVariable $right): int => $left->nameStartOffset() <=> $right->nameStartOffset());
 
-        return ['text' => substr($source, $bodyOpen + 1, $bodyClose - $bodyOpen - 1), 'start' => $bodyOpen + 1, 'end' => $bodyClose];
+        return $parameters[0] ?? null;
     }
 
-    private function firstParameterVariable(string $signature): ?string
+    /** @param array{text: string, offset: int} $expression */
+    private function staticClassName(string $source, array $expression, PhpDocument $php): ?string
     {
-        $open = strpos($signature, '(');
-        if (false === $open || !preg_match('/\\$([A-Za-z_][A-Za-z0-9_]*)/', substr($signature, $open + 1), $variable)) {
+        $references = [];
+        $end = $expression['offset'] + \strlen($expression['text']);
+        foreach ($php->classReferences() as $reference) {
+            if ($reference->startOffset() >= $expression['offset'] && $reference->endOffset() <= $end) {
+                $references[] = $reference;
+            }
+        }
+        if (1 !== \count($references)) {
             return null;
         }
-
-        return $variable[1];
-    }
-
-    private function staticClassName(string $expression, PhpDocument $php): ?string
-    {
-        if (!preg_match('/^\\s*([\\\\A-Za-z_][A-Za-z0-9_\\\\]*)\\s*::\\s*class\\s*$/', $expression, $class)
-            || \in_array(strtolower(ltrim($class[1], '\\')), ['self', 'static', 'parent'], true)
-        ) {
+        $reference = $references[0];
+        $rawName = substr($source, $reference->startOffset(), $reference->endOffset() - $reference->startOffset());
+        if (\in_array(strtolower(ltrim($rawName, '\\')), ['self', 'static', 'parent'], true)) {
             return null;
         }
+        $before = trim(substr($source, $expression['offset'], $reference->startOffset() - $expression['offset']));
+        $after = preg_replace('/\\s+/', '', substr($source, $reference->endOffset(), $end - $reference->endOffset()));
 
-        return $php->resolveName($class[1]);
+        return '' === $before && '::class' === $after ? $reference->className() : null;
     }
 
-    /** @return array<string, string>|null */
-    private function arrayEntries(string $text): ?array
+    private function classReferenceArgument(PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
     {
-        if (!preg_match('/^\\s*\\[(.*)\\]\\s*$/s', $text, $array)) {
+        $start = $argument?->expressionStartOffset();
+        $end = $argument?->expressionEndOffset();
+        if (!\is_int($start) || !\is_int($end)) {
+            return null;
+        }
+        $references = [];
+        foreach ($php->classReferences() as $reference) {
+            if ($reference->startOffset() >= $start && $reference->endOffset() <= $end) {
+                $references[] = $reference;
+            }
+        }
+
+        return 1 === \count($references) ? $references[0] : null;
+    }
+
+    /** @return array<string, array{text: string, offset: int}>|null */
+    private function arrayEntries(string $text, int $base = 0): ?array
+    {
+        if (!preg_match('/^\\s*\\[(.*)\\]\\s*$/s', $text, $array, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
         $entries = [];
-        foreach ($this->arguments($array[1], 0) as $entry) {
+        foreach ($this->arguments($array[1][0], $base + $array[1][1]) as $entry) {
             if ('' === trim($entry['text'])) {
                 continue;
             }
-            if (!preg_match('/^\\s*((?:"[^"]*")|(?:\'[^\']*\'))\\s*=>\\s*(.*?)\\s*$/s', $entry['text'], $match)
-                || null === ($key = $this->quotedIdentifier($match[1]))
+            if (!preg_match('/^\\s*((?:"[^"]*")|(?:\'[^\']*\'))\\s*=>\\s*(.*?)\\s*$/s', $entry['text'], $match, \PREG_OFFSET_CAPTURE)
+                || null === ($key = $this->quotedIdentifier($match[1][0]))
             ) {
                 return null;
             }
-            $entries[$key] = $match[2];
+            $entries[$key] = ['text' => $match[2][0], 'offset' => $entry['offset'] + $match[2][1]];
         }
 
         return $entries;
@@ -619,41 +666,40 @@ final class MetadataExtractor
         return $match[2];
     }
 
-    /**
-     * @param array{text: string, offset: int} $argument
-     *
-     * @return array{name: string, range: Range}|null
-     */
-    private function quotedIdentifierArgument(string $document, array $argument): ?array
+    /** @return array{name: string, range: Range}|null */
+    private function quotedIdentifierArgument(string $document, PhpArgument $argument): ?array
     {
-        if (!preg_match('/^\\s*(["\'])([A-Za-z_][A-Za-z0-9_]*)\\1\\s*$/', $argument['text'], $match, \PREG_OFFSET_CAPTURE)) {
+        $expression = $argument->expression();
+        $offset = $argument->expressionStartOffset();
+        if (!\is_string($expression) || !\is_int($offset) || !preg_match('/^\\s*(["\'])([A-Za-z_][A-Za-z0-9_]*)\\1\\s*$/', $expression, $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
         $name = $match[2][0];
 
         return [
             'name' => $name,
-            'range' => $this->converter->toRange($document, $argument['offset'] + $match[2][1], \strlen($name)),
+            'range' => $this->converter->toRange($document, $offset + $match[2][1], \strlen($name)),
         ];
     }
 
-    /** @param list<array{text: string, offset: int}> $arguments */
+    /** @param list<PhpArgument> $arguments */
     private function formPropertyName(array $arguments, string $field): ?string
     {
         foreach (\array_slice($arguments, 1) as $argument) {
-            if (preg_match('/^\\s*[A-Za-z_][A-Za-z0-9_]*\\s*:(?!:)/', $argument['text'])) {
+            if (null !== $argument->name()) {
                 return null;
             }
         }
         if (!isset($arguments[2])) {
             return $field;
         }
-        $options = $this->arrayEntries($arguments[2]['text']);
-        if (null === $options) {
+        $expression = $arguments[2]->expression();
+        $offset = $arguments[2]->expressionStartOffset();
+        if (!\is_string($expression) || !\is_int($offset) || null === $options = $this->arrayEntries($expression, $offset)) {
             return null;
         }
         if (isset($options['mapped'])) {
-            $mapped = trim($options['mapped']);
+            $mapped = trim($options['mapped']['text']);
             if ('false' === $mapped) {
                 return null;
             }
@@ -664,7 +710,7 @@ final class MetadataExtractor
         if (!isset($options['property_path'])) {
             return $field;
         }
-        $propertyPath = trim($options['property_path']);
+        $propertyPath = trim($options['property_path']['text']);
         if ('null' === $propertyPath) {
             return $field;
         }
@@ -723,14 +769,14 @@ final class MetadataExtractor
         return $arguments;
     }
 
-    /**
-     * @param array{text: string, offset: int} $argument
-     *
-     * @return list<array{name: string, range: Range}>
-     */
-    private function arrayKeys(string $document, array $argument): array
+    /** @return list<array{name: string, range: Range}> */
+    private function arrayKeys(string $document, PhpArgument $argument): array
     {
-        $text = $argument['text'];
+        $text = $argument->expression();
+        $offset = $argument->expressionStartOffset();
+        if (!\is_string($text) || !\is_int($offset)) {
+            return [];
+        }
         if (!preg_match('/^\s*\[/', $text, $open, \PREG_OFFSET_CAPTURE)) {
             return [];
         }
@@ -759,7 +805,7 @@ final class MetadataExtractor
                 continue;
             }
             $name = substr($text, $index + 1, $end - $index - 1);
-            $absolute = $argument['offset'] + $index + 1;
+            $absolute = $offset + $index + 1;
             $keys[] = ['name' => $name, 'range' => $this->converter->toRange($document, $absolute, \strlen($name))];
             $index = $end;
         }
