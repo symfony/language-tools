@@ -46,11 +46,13 @@ final class ServerHarnessTest extends TestCase
             20,
             requestTimeout: 3,
             probeRoots: ['src', 'templates'],
+            environmentVariables: ['DATABASE_URL' => 'mysql://root@127.0.0.1:9/app'],
         );
 
         (new ServerHarness($processes, '/tools/dogfood-server', '/bin/symfony-lsp'))->run($configuration, $this->directory);
 
         self::assertSame($expectedTimeout, $processes->calls[0]['timeout']);
+        self::assertSame(['DATABASE_URL' => 'mysql://root@127.0.0.1:9/app'], $processes->calls[0]['environment']);
     }
 
     /** @return iterable<string, array{array<string, string>, float}> */

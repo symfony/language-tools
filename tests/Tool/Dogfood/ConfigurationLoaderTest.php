@@ -45,6 +45,7 @@ final class ConfigurationLoaderTest extends TestCase
         self::assertSame(self::REVISION, $configuration->revision);
         self::assertNull($configuration->directory);
         self::assertSame('dev', $configuration->environment);
+        self::assertSame([], $configuration->environmentVariables);
         self::assertSame('composer', $configuration->setup);
         self::assertTrue($configuration->ci);
         self::assertSame(120, $configuration->indexTimeout);
@@ -61,6 +62,10 @@ final class ConfigurationLoaderTest extends TestCase
             'revision' => self::REVISION,
             'directory' => 'twig.symfony.com',
             'environment' => 'test',
+            'environmentVariables' => [
+                'DATABASE_URL' => 'mysql://root@127.0.0.1:9/app',
+                'APP_SECRET' => 'dogfood-not-a-secret',
+            ],
             'setup' => 'composer',
             'ci' => false,
             'indexTimeout' => 300,
@@ -75,6 +80,10 @@ final class ConfigurationLoaderTest extends TestCase
         self::assertSame('twig.symfony.com', $configuration->name);
         self::assertSame('twig.symfony.com', $configuration->directory);
         self::assertSame('test', $configuration->environment);
+        self::assertSame([
+            'APP_SECRET' => 'dogfood-not-a-secret',
+            'DATABASE_URL' => 'mysql://root@127.0.0.1:9/app',
+        ], $configuration->environmentVariables);
         self::assertFalse($configuration->ci);
         self::assertSame(300, $configuration->indexTimeout);
         self::assertSame(20, $configuration->requestTimeout);
@@ -176,6 +185,10 @@ final class ConfigurationLoaderTest extends TestCase
         yield 'absolute directory' => [['directory' => '/srv'], 'relative path inside the repository'];
         yield 'parent directory' => [['directory' => '../other'], 'relative path inside the repository'];
         yield 'invalid environment' => [['environment' => 'dev; rm'], 'simple environment name'];
+        yield 'environment variable list' => [['environmentVariables' => ['DATABASE_URL']], 'map of environment variable names to string values'];
+        yield 'invalid environment variable name' => [['environmentVariables' => ['database-url' => 'value']], 'map of environment variable names to string values'];
+        yield 'non-string environment variable' => [['environmentVariables' => ['DATABASE_URL' => 42]], 'map of environment variable names to string values'];
+        yield 'null byte environment variable' => [['environmentVariables' => ['DATABASE_URL' => "value\0suffix"]], 'map of environment variable names to string values'];
         yield 'unknown setup' => [['setup' => 'shell'], 'The "setup" in'];
         yield 'missing ci' => [['ci' => null], 'boolean "ci"'];
         yield 'string ci' => [['ci' => 'yes'], 'boolean "ci"'];

@@ -35,6 +35,17 @@ final class ComposerSetupTest extends TestCase
         self::assertCount(1, $processes->calls);
         self::assertSame(['composer', 'install', '--no-interaction', '--no-progress'], $processes->calls[0]['command']);
         self::assertSame($this->directory, $processes->calls[0]['directory']);
+        self::assertSame([], $processes->calls[0]['environment']);
+    }
+
+    public function testPassesConfiguredEnvironmentVariablesToComposer(): void
+    {
+        file_put_contents(Path::join($this->directory, 'composer.lock'), '{}');
+        $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '', '', false));
+
+        (new ComposerSetup($processes))->setUp($this->configuration(environmentVariables: ['DATABASE_URL' => 'mysql://root@127.0.0.1:9/app']), $this->directory);
+
+        self::assertSame(['DATABASE_URL' => 'mysql://root@127.0.0.1:9/app'], $processes->calls[0]['environment']);
     }
 
     public function testSkipsScriptsWhenDisabled(): void
@@ -109,10 +120,11 @@ final class ComposerSetupTest extends TestCase
     }
 
     /**
-     * @param list<string> $allowPlugins
+     * @param list<string>          $allowPlugins
+     * @param array<string, string> $environmentVariables
      */
-    private function configuration(?string $lockFile = null, array $allowPlugins = []): ProjectConfiguration
+    private function configuration(?string $lockFile = null, array $allowPlugins = [], array $environmentVariables = []): ProjectConfiguration
     {
-        return new ProjectConfiguration('acme', 'https://github.com/acme/app.git', str_repeat('a', 40), null, 'dev', 'composer', false, 120, lockFile: $lockFile, allowPlugins: $allowPlugins);
+        return new ProjectConfiguration('acme', 'https://github.com/acme/app.git', str_repeat('a', 40), null, 'dev', 'composer', false, 120, lockFile: $lockFile, allowPlugins: $allowPlugins, environmentVariables: $environmentVariables);
     }
 }

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Apply configured environment variables to dogfood processes
 - Navigate and complete form fields mapped to data class properties
 - Complete and navigate PHP constants and enums in Twig
 

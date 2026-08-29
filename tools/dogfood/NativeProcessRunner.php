@@ -11,13 +11,13 @@ use function Amp\ByteStream\buffer;
 
 final class NativeProcessRunner implements ProcessRunnerInterface
 {
-    public function run(array $command, ?string $directory = null, float $timeout = 600.0): ProcessResult
+    public function run(array $command, ?string $directory = null, float $timeout = 600.0, array $environment = []): ProcessResult
     {
-        $environment = [];
+        $inheritedEnvironment = [];
         foreach (getenv() as $key => $value) {
-            $environment[(string) $key] = $value;
+            $inheritedEnvironment[(string) $key] = $value;
         }
-        $process = Process::start($command, $directory, $environment);
+        $process = Process::start($command, $directory, array_replace($inheritedEnvironment, $environment));
         $process->getStdin()->close();
         /** @var \Amp\Future<string> $stdout */
         $stdout = async(static fn (): string => buffer($process->getStdout()));

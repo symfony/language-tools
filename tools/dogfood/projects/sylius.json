@@ -4,5 +4,8 @@
     "revision": "c4c61a0d66666e7dec5487cdd1b059bec418892c",
     "setup": "composer",
     "ci": true,
+    "environmentVariables": {
+        "DATABASE_URL": "mysql://root:root@127.0.0.1:9/dogfood?serverVersion=8.0.32&charset=utf8mb4"
+    },
     "indexTimeout": 300
 }

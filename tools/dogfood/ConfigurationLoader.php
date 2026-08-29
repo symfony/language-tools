@@ -5,7 +5,7 @@ namespace Symfony\Lsp\Tools\Dogfood;
 final class ConfigurationLoader
 {
     private const VERSION = 1;
-    private const KEYS = ['version', 'repository', 'revision', 'directory', 'environment', 'setup', 'ci', 'indexTimeout', 'requestTimeout', 'probeRoots', 'probesPerCategory', 'allowPlugins', 'ignorePlatformRequirements', 'setupChanges'];
+    private const KEYS = ['version', 'repository', 'revision', 'directory', 'environment', 'environmentVariables', 'setup', 'ci', 'indexTimeout', 'requestTimeout', 'probeRoots', 'probesPerCategory', 'allowPlugins', 'ignorePlatformRequirements', 'setupChanges'];
     private const DEFAULT_INDEX_TIMEOUT = 120;
     private const MAX_INDEX_TIMEOUT = 900;
     private const DEFAULT_REQUEST_TIMEOUT = 10;
@@ -85,6 +85,7 @@ final class ConfigurationLoader
             $this->allowPlugins($data, $file),
             $this->ignorePlatformRequirements($data, $file),
             $this->setupChanges($data, $file),
+            $this->environmentVariables($data, $file),
         );
     }
 
@@ -147,6 +148,27 @@ final class ConfigurationLoader
         }
 
         return $environment;
+    }
+
+    /**
+     * @param array<array-key, mixed> $data
+     *
+     * @return array<string, string>
+     */
+    private function environmentVariables(array $data, string $file): array
+    {
+        $variables = $data['environmentVariables'] ?? [];
+        if (!\is_array($variables) || ([] !== $variables && array_is_list($variables))) {
+            throw new ConfigurationException(\sprintf('The "environmentVariables" in "%s" must be a map of environment variable names to string values.', $file));
+        }
+        foreach ($variables as $name => $value) {
+            if (!\is_string($name) || 1 !== preg_match('/^[A-Z_][A-Z0-9_]*$/', $name) || !\is_string($value) || str_contains($value, "\0")) {
+                throw new ConfigurationException(\sprintf('The "environmentVariables" in "%s" must be a map of environment variable names to string values.', $file));
+            }
+        }
+        ksort($variables);
+
+        return $variables;
     }
 
     /**

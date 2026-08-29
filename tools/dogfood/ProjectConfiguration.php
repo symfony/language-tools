@@ -5,10 +5,11 @@ namespace Symfony\Lsp\Tools\Dogfood;
 final class ProjectConfiguration
 {
     /**
-     * @param list<string> $probeRoots
-     * @param list<string> $allowPlugins
-     * @param list<string> $ignorePlatformRequirements
-     * @param list<string> $setupChanges               tracked files the project's own setup scripts are expected to change
+     * @param list<string>          $probeRoots
+     * @param list<string>          $allowPlugins
+     * @param list<string>          $ignorePlatformRequirements
+     * @param list<string>          $setupChanges               tracked files the project's own setup scripts are expected to change
+     * @param array<string, string> $environmentVariables
      */
     public function __construct(
         public readonly string $name,
@@ -26,6 +27,7 @@ final class ProjectConfiguration
         public readonly array $allowPlugins = [],
         public readonly array $ignorePlatformRequirements = [],
         public readonly array $setupChanges = [],
+        public readonly array $environmentVariables = [],
     ) {
     }
 }

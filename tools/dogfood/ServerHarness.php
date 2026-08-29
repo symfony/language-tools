@@ -43,7 +43,7 @@ final class ServerHarness implements HarnessInterface
             '--probes-per-category='.$configuration->probesPerCategory,
             $this->serverPath,
             $applicationRoot,
-        ], null, $timeout);
+        ], null, $timeout, $configuration->environmentVariables);
         $decoded = null;
         if ('' !== $result->standardOutput) {
             try {
