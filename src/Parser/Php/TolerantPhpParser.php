@@ -122,7 +122,7 @@ final class TolerantPhpParser implements PhpParserInterface
         }
         $methodDeclarations = [];
         foreach ($methodDeclarationNodes as $node) {
-            $declaration = $this->methodDeclaration($node, $source, $names);
+            $declaration = $this->methodDeclaration($node, $source, $names, $attributes);
             if (null !== $declaration) {
                 $methodDeclarations[] = $declaration;
             }
@@ -574,7 +574,8 @@ final class TolerantPhpParser implements PhpParserInterface
         );
     }
 
-    private function methodDeclaration(MethodDeclaration $declaration, string $source, PhpNameContext $names): ?PhpMethodDeclaration
+    /** @param list<PhpAttribute> $attributes */
+    private function methodDeclaration(MethodDeclaration $declaration, string $source, PhpNameContext $names, array $attributes): ?PhpMethodDeclaration
     {
         $owner = $declaration->getFirstAncestor(ClassDeclaration::class, TraitDeclaration::class);
         $nameToken = $declaration->name;
@@ -593,11 +594,13 @@ final class TolerantPhpParser implements PhpParserInterface
         }
         $signature = trim(substr($source, $signatureStart, $signatureEnd - $signatureStart));
         $description = trim($declaration->getDescriptionFormatted());
-        $attributes = [];
-        foreach ($declaration->attributes ?? [] as $group) {
-            foreach ($group->attributes->children as $attribute) {
-                if ($attribute instanceof Attribute) {
-                    $attributes[] = $this->attribute($attribute, $source);
+        $className = (string) $owner->getNamespacedName();
+        $methodAttributes = [];
+        foreach ($attributes as $attribute) {
+            foreach ($attribute->targets() as $target) {
+                if (PhpAttributeTargetKind::Method === $target->kind() && $className === $target->className() && $name === $target->memberName()) {
+                    $methodAttributes[] = $attribute;
+                    break;
                 }
             }
         }
@@ -618,13 +621,13 @@ final class TolerantPhpParser implements PhpParserInterface
         }
 
         return new PhpMethodDeclaration(
-            (string) $owner->getNamespacedName(),
+            $className,
             $name,
             $nameToken->getStartPosition(),
             $nameToken->getEndPosition(),
             $signature,
             '' === $description ? null : $description,
-            $attributes,
+            $methodAttributes,
             $firstParameterType,
             isset($parameters[0]) && $parameters[0]->dotDotDotToken instanceof Token,
             array_any($parameters, static fn (Parameter $parameter): bool => $parameter->dotDotDotToken instanceof Token),
@@ -743,8 +746,6 @@ final class TolerantPhpParser implements PhpParserInterface
             $method,
             $call->getStartPosition(),
             $call->getEndPosition(),
-            $methodNode->getStartPosition(),
-            $methodNode->getEndPosition(),
             $this->arguments($call->argumentExpressionList->children ?? [], $source),
             null === $owner ? null : (string) $owner->getNamespacedName(),
             \is_string($methodName) && '' !== $methodName ? $methodName : null,

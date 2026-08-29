@@ -39,8 +39,6 @@ final class MessengerExtractor
         $handlers = [];
         if ('yaml' === $languageId) {
             array_push($symbols, ...$this->yamlSymbols($uri, $text));
-        }
-        if ('yaml' === $languageId) {
             foreach ([
                 [MessengerSymbolKind::Bus, '/(?:\bbus|default_bus)\s*:\s*["\']?([A-Za-z_][A-Za-z0-9_.-]*)/'],
                 [MessengerSymbolKind::Transport, '/(?:fromTransport|from_transport|failure_transport)\s*:\s*["\']?([A-Za-z_][A-Za-z0-9_.-]*)/'],

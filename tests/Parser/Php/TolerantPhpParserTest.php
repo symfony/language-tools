@@ -240,7 +240,6 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame('bus', $propertyCall->receiverContext()->name());
         self::assertSame($secondParameter->scopeStartOffset(), $secondCall->scopeStartOffset());
         self::assertSame(PhpMethodReceiverKind::Variable, $otherCall->receiverContext()->kind());
-        self::assertSame('dispatch', substr($source, $firstCall->methodStartOffset(), $firstCall->methodEndOffset() - $firstCall->methodStartOffset()));
         self::assertSame("'first'", substr($source, $firstArgumentStart, $firstArgumentEnd - $firstArgumentStart));
         self::assertSame('$local->dispatch(\'first\')', substr($source, $firstCall->startOffset(), $firstCall->endOffset() - $firstCall->startOffset()));
     }
@@ -443,8 +442,10 @@ final class TolerantPhpParserTest extends TestCase
             }
             PHP;
 
-        $methods = (new TolerantPhpParser(new Parser()))->parse($source)->methodDeclarations();
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $methods = $document->methodDeclarations();
 
+        self::assertSame($document->attributes()[0], $methods[0]->attributes()[0]);
         self::assertSame('Twig\Attribute\AsTwigFunction', $methods[0]->attributes()[0]->name());
         self::assertSame('format', $methods[0]->attributes()[0]->argument(0)?->stringLiteral()?->value());
         self::assertSame('Twig\Environment', $methods[0]->firstParameterType());

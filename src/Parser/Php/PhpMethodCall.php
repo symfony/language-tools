@@ -13,8 +13,6 @@ final class PhpMethodCall
         private readonly string $method,
         private readonly int $startOffset,
         private readonly int $endOffset,
-        private readonly int $methodStartOffset,
-        private readonly int $methodEndOffset,
         private readonly array $arguments,
         private readonly ?string $className,
         private readonly ?string $enclosingMethod,
@@ -45,16 +43,6 @@ final class PhpMethodCall
     public function endOffset(): int
     {
         return $this->endOffset;
-    }
-
-    public function methodStartOffset(): int
-    {
-        return $this->methodStartOffset;
-    }
-
-    public function methodEndOffset(): int
-    {
-        return $this->methodEndOffset;
     }
 
     /** @return list<PhpArgument> */
