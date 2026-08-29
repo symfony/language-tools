@@ -6,6 +6,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpExpressionParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
@@ -22,6 +23,7 @@ final class ConsoleExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $parser,
+        private readonly PhpExpressionParser $expressionParser,
         private readonly QuotedArgumentMatcher $matcher,
         private readonly PhpCommentParserInterface $phpComments,
     ) {
@@ -174,7 +176,7 @@ final class ConsoleExtractor
     /** @return array{list<string>, list<string>, bool} */
     private function setDefinition(string $expression): array
     {
-        $document = $this->parser->parse('<?php '.$expression.';');
+        $document = $this->expressionParser->parse($expression);
         $arguments = [];
         $options = [];
         $complete = 1 !== preg_match('/\$|\.\.\./', $expression);

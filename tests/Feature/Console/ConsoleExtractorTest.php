@@ -7,7 +7,11 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Console\ConsoleExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleInputKind;
+use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpExpressionParser;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 
@@ -155,6 +159,38 @@ final class ConsoleExtractorTest extends TestCase
         self::assertNull($this->extractor()->completionContext('php', $unrelated, $cursor));
     }
 
+    public function testKeepsDocumentParseCachedWhileParsingDefinitionExpressions(): void
+    {
+        $text = <<<'PHP'
+            <?php
+            use Symfony\Component\Console\Input\InputArgument;
+
+            final class ReportCommand
+            {
+                protected function configure(): void
+                {
+                    $this->setDefinition([new InputArgument('report')]);
+                }
+            }
+            PHP;
+        $inner = new CountingConsolePhpParser(new TolerantPhpParser(new Parser()));
+        $parser = new LastResultPhpParser($inner);
+        $converter = new PositionConverter();
+        $extractor = new ConsoleExtractor(
+            $converter,
+            $parser,
+            new PhpExpressionParser(new TolerantPhpParser(new Parser())),
+            new QuotedArgumentMatcher($converter),
+            new PhpCommentParser(),
+        );
+
+        $facts = $extractor->extract('file:///workspace/src/Command/ReportCommand.php', 'php', $text);
+        $parser->parse($text);
+
+        self::assertSame(['report'], $facts->declarations()[0]->arguments());
+        self::assertSame([$text], $inner->sources);
+    }
+
     private function extractor(): ConsoleExtractor
     {
         $converter = new PositionConverter();
@@ -162,8 +198,26 @@ final class ConsoleExtractorTest extends TestCase
         return new ConsoleExtractor(
             $converter,
             new TolerantPhpParser(new Parser()),
+            new PhpExpressionParser(new TolerantPhpParser(new Parser())),
             new QuotedArgumentMatcher($converter),
             new PhpCommentParser(),
         );
+    }
+}
+
+final class CountingConsolePhpParser implements PhpParserInterface
+{
+    /** @var list<string> */
+    public array $sources = [];
+
+    public function __construct(private readonly PhpParserInterface $parser)
+    {
+    }
+
+    public function parse(string $source): PhpDocument
+    {
+        $this->sources[] = $source;
+
+        return $this->parser->parse($source);
     }
 }

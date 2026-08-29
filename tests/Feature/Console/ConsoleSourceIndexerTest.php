@@ -12,6 +12,7 @@ use Symfony\Lsp\Feature\Console\ConsoleSourceIndexRegistry;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Php\PhpExpressionParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Project\Project;
@@ -68,6 +69,7 @@ final class ConsoleSourceIndexerTest extends TestCase
         return new ConsoleSourceIndexer($indexes, new ConsoleExtractor(
             $converter,
             new TolerantPhpParser(new Parser()),
+            new PhpExpressionParser(new TolerantPhpParser(new Parser())),
             new QuotedArgumentMatcher($converter),
             new PhpCommentParser(),
         ));
