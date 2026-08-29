@@ -52,7 +52,8 @@ From a dispatch site, definition results include the message class and its
 registered handlers. From a message class, definition navigates to handlers and
 references include recognized dispatch sites. Handler classes navigate back to
 the message classes they handle. Handler relationships inherited through
-application-owned parent classes and interfaces are included.
+application-owned parent classes and interfaces are included. Commented-out PHP
+attributes and calls are ignored.
 
 Code Lenses
 -----------

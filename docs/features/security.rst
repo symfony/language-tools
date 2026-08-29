@@ -34,7 +34,8 @@ Definition and References
 Definition requests on firewall and provider names navigate to their YAML
 declarations. Role definitions navigate to role-hierarchy declarations when
 available. References include recognized PHP and Twig authorization checks and
-SecurityBundle YAML configuration.
+SecurityBundle YAML configuration. Commented-out PHP attributes and calls are
+ignored.
 
 Diagnostics
 -----------

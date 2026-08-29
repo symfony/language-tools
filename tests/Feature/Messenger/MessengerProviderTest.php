@@ -53,7 +53,7 @@ framework:
 YAML;
         $converter = new PositionConverter();
         $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
-        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser);
+        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser, new PhpCommentParser());
         $facts = $extractor->extract('file:///workspace/config/packages/messenger.yaml', 'yaml', $text);
 
         $names = [];
@@ -109,7 +109,7 @@ YAML;
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
         $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
-        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser);
+        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser, new PhpCommentParser());
         $indexes = new MessengerIndexRegistry();
         $indexes->forProject($project)->replace(
             [new MessengerBus('command.bus', true)],
@@ -153,6 +153,41 @@ YAML;
         self::assertIsArray($codeLens);
         self::assertIsArray($codeLens['command'] ?? null);
         self::assertSame('1 Messenger handler', $codeLens['command']['title'] ?? null);
+    }
+
+    public function testIgnoresCommentedPhpMessengerConstructs(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new MessengerExtractor(
+            $converter,
+            new TolerantPhpParser(new Parser()),
+            new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
+            new PhpCommentParser(),
+        );
+        $text = <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Component\Messenger\MessageBusInterface;
+
+            final class Handler
+            {
+                public function __construct(private MessageBusInterface $bus) {}
+
+                public function handle(): void
+                {
+                    // #[AsMessageHandler(bus: 'commented.bus', handles: CommentedMessage::class)]
+                    // $this->bus->dispatch(new CommentedMessage());
+                    // new Envelope(new CommentedMessage());
+                    // new BusNameStamp('commented.bus');
+                }
+            }
+            PHP;
+
+        $facts = $extractor->extract('file:///workspace/src/Handler.php', 'php', $text);
+
+        self::assertSame([], $facts->symbols());
+        self::assertSame([], $facts->handlers());
     }
 
     public function testOffersNoMessengerCompletionsInsidePhpComments(): void

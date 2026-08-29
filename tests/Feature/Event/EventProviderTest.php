@@ -169,6 +169,34 @@ PHP;
         self::assertSame('Listens to 1 event', $listenerLens['command']['title'] ?? null);
     }
 
+    public function testIgnoresCommentedPhpEventConstructs(): void
+    {
+        $extractor = new EventExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $text = <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+
+            final class Listener
+            {
+                public function __construct(private EventDispatcherInterface $dispatcher) {}
+
+                public function listen(): void
+                {
+                    // #[AsEventListener(event: 'commented.attribute')]
+                    // $this->dispatcher->dispatch(new CommentedEvent());
+                    // $this->dispatcher->dispatch(new CommentedEvent(), 'commented.name');
+                }
+            }
+            PHP;
+
+        $facts = $extractor->extract('file:///workspace/src/Listener.php', 'php', $text);
+
+        self::assertSame([], $facts->symbols());
+        self::assertSame([], $facts->listeners());
+    }
+
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
     private function params(string $uri, Position $position): array
     {

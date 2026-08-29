@@ -38,6 +38,8 @@ The server recognizes event references in these contexts:
 * ``EventSubscriberInterface::getSubscribedEvents()`` return values;
 * ``kernel.event_listener`` service tags.
 
+Commented-out PHP attributes and calls are ignored.
+
 Code Lenses
 -----------
 

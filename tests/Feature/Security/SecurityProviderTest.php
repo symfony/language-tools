@@ -74,6 +74,34 @@ YAML;
         );
     }
 
+    public function testIgnoresCommentedPhpSecurityConstructs(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TwigCommentParser(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $text = <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+            use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+
+            final class AdminController extends AbstractController
+            {
+                public function __construct(private AuthorizationCheckerInterface $security) {}
+
+                public function index(): void
+                {
+                    // #[IsGranted('ROLE_ATTRIBUTE')]
+                    // $this->denyAccessUnlessGranted('ROLE_CONTROLLER');
+                    // $this->security->isGranted('ROLE_CHECKER');
+                }
+            }
+            PHP;
+
+        self::assertSame([], $extractor->extract('file:///workspace/src/AdminController.php', 'php', $text)->symbols());
+    }
+
     public function testOffersNoSecurityCompletionsInsidePhpComments(): void
     {
         $converter = new PositionConverter();

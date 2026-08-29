@@ -70,10 +70,11 @@ final class EventExtractor
         $symbols = [];
         $invalidListenerMethods = [];
         $php = $this->parser->parse($text);
-        preg_match_all('/#\[\s*(?:[\\\\A-Za-z_][\\\\A-Za-z0-9_]*\\\\)*AsEventListener\b(?:\([^)]*\))?\s*\]/s', $text, $listenerAttributes);
+        $source = $this->phpComments->mask($text);
+        preg_match_all('/#\[\s*(?:[\\\\A-Za-z_][\\\\A-Za-z0-9_]*\\\\)*AsEventListener\b(?:\([^)]*\))?\s*\]/s', $source, $listenerAttributes);
         $listeners = $listenerAttributes[0];
 
-        preg_match_all('/AsEventListener\s*\(([^)]*)\)/s', $text, $attributes, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/AsEventListener\s*\(([^)]*)\)/s', $source, $attributes, \PREG_OFFSET_CAPTURE);
         foreach ($attributes[1] as [$arguments, $argumentsOffset]) {
             if (preg_match('/\bevent\s*:\s*["\']([^"\']+)/', $arguments, $match, \PREG_OFFSET_CAPTURE)) {
                 $symbols[] = $this->symbol($match[1][0], $uri, $text, $argumentsOffset + $match[1][1], true);
@@ -82,15 +83,15 @@ final class EventExtractor
             }
         }
 
-        $dispatchers = $this->eventDispatcherVariables($text, $php);
-        preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*dispatch\s*\(\s*new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)/', $text, $dispatches, \PREG_OFFSET_CAPTURE);
+        $dispatchers = $this->eventDispatcherVariables($source, $php);
+        preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*dispatch\s*\(\s*new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)/', $source, $dispatches, \PREG_OFFSET_CAPTURE);
         foreach ($dispatches[3] as $index => [$name, $offset]) {
             $variable = '' !== $dispatches[2][$index][0] ? $dispatches[2][$index][0] : $dispatches[1][$index][0];
             if (isset($dispatchers[$variable])) {
                 $symbols[] = $this->symbol($php->resolveName($name), $uri, $text, $offset, false, \strlen($name));
             }
         }
-        preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:addListener\s*\(\s*|dispatch\s*\([^,\r\n]+,\s*)["\']([^"\']+)/', $text, $namedEvents, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:addListener\s*\(\s*|dispatch\s*\([^,\r\n]+,\s*)["\']([^"\']+)/', $source, $namedEvents, \PREG_OFFSET_CAPTURE);
         foreach ($namedEvents[3] as $index => [$name, $offset]) {
             $variable = '' !== $namedEvents[2][$index][0] ? $namedEvents[2][$index][0] : $namedEvents[1][$index][0];
             if (isset($dispatchers[$variable])) {
@@ -98,11 +99,11 @@ final class EventExtractor
             }
         }
 
-        preg_match_all('/function\s+getSubscribedEvents\s*\([^)]*\)[^{]*\{/', $text, $subscriberMethods, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/function\s+getSubscribedEvents\s*\([^)]*\)[^{]*\{/', $source, $subscriberMethods, \PREG_OFFSET_CAPTURE);
         foreach ($subscriberMethods[0] as [$declaration, $declarationOffset]) {
             $open = $declarationOffset + \strlen($declaration) - 1;
-            $close = $this->matchingBrace($text, $open);
-            $body = substr($text, $open + 1, $close - $open - 1);
+            $close = $this->matchingBrace($source, $open);
+            $body = substr($source, $open + 1, $close - $open - 1);
             preg_match_all('/["\']([^"\']+)["\']\s*=>/', $body, $stringEvents, \PREG_OFFSET_CAPTURE);
             foreach ($stringEvents[1] as [$name, $offset]) {
                 $symbols[] = $this->symbol($name, $uri, $text, $open + 1 + $offset, true);
@@ -113,14 +114,14 @@ final class EventExtractor
             }
         }
 
-        preg_match_all('/#\[\s*(?:[\\\\A-Za-z_][\\\\A-Za-z0-9_]*\\\\)*AsEventListener\s*\((.*?)\)\s*\]\s*(?:(?:final|abstract|readonly)\s+)*class\s+([A-Za-z_][A-Za-z0-9_]*)([^\{]*)\{/s', $text, $classListeners, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        preg_match_all('/#\[\s*(?:[\\\\A-Za-z_][\\\\A-Za-z0-9_]*\\\\)*AsEventListener\s*\((.*?)\)\s*\]\s*(?:(?:final|abstract|readonly)\s+)*class\s+([A-Za-z_][A-Za-z0-9_]*)([^\{]*)\{/s', $source, $classListeners, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($classListeners as $listener) {
             if (!preg_match('/\bmethod\s*:\s*["\']([^"\']+)["\']/', $listener[1][0], $method, \PREG_OFFSET_CAPTURE)) {
                 continue;
             }
             $open = $listener[0][1] + \strlen($listener[0][0]) - 1;
-            $close = $this->matchingBrace($text, $open);
-            $body = substr($text, $open + 1, $close - $open - 1);
+            $close = $this->matchingBrace($source, $open);
+            $body = substr($source, $open + 1, $close - $open - 1);
             if (!str_contains($listener[3][0], 'extends') && !preg_match('/\buse\s+[^;]+;/', $body) && !preg_match('/\bfunction\s+'.preg_quote($method[1][0], '/').'\s*\(/', $body)) {
                 $className = $php->resolveName($listener[2][0]);
                 $methodOffset = $listener[1][1] + $method[1][1];

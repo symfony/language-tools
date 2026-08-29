@@ -118,14 +118,15 @@ final class SecurityExtractor
     {
         $symbols = [];
         $php = $this->phpParser->parse($text);
+        $source = $this->phpComments->mask($text);
         if ($this->hasIsGrantedAttribute($php)) {
-            preg_match_all('/\bIsGranted\s*\(\s*(?:attribute\s*:\s*)?["\'](ROLE_[A-Z0-9_]+)["\']/', $text, $attributes, \PREG_OFFSET_CAPTURE);
+            preg_match_all('/\bIsGranted\s*\(\s*(?:attribute\s*:\s*)?["\'](ROLE_[A-Z0-9_]+)["\']/', $source, $attributes, \PREG_OFFSET_CAPTURE);
             foreach ($attributes[1] as [$role, $offset]) {
                 $symbols[] = $this->symbol(SecuritySymbolKind::Role, $role, $uri, $text, $offset);
             }
         }
         if ($this->extendsAbstractController($php)) {
-            preg_match_all('/\$this\s*->\s*denyAccessUnlessGranted\s*\(\s*["\'](ROLE_[A-Z0-9_]+)["\']/', $text, $controllerRoles, \PREG_OFFSET_CAPTURE);
+            preg_match_all('/\$this\s*->\s*denyAccessUnlessGranted\s*\(\s*["\'](ROLE_[A-Z0-9_]+)["\']/', $source, $controllerRoles, \PREG_OFFSET_CAPTURE);
             foreach ($controllerRoles[1] as [$role, $offset]) {
                 $symbols[] = $this->symbol(SecuritySymbolKind::Role, $role, $uri, $text, $offset);
             }
@@ -134,7 +135,7 @@ final class SecurityExtractor
             'Symfony\\Bundle\\SecurityBundle\\Security',
             'Symfony\\Component\\Security\\Core\\Authorization\\AuthorizationCheckerInterface',
         ]);
-        preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*isGranted\s*\(\s*["\'](ROLE_[A-Z0-9_]+)["\']/', $text, $roles, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*isGranted\s*\(\s*["\'](ROLE_[A-Z0-9_]+)["\']/', $source, $roles, \PREG_OFFSET_CAPTURE);
         foreach ($roles[3] as $index => [$role, $offset]) {
             $variable = '' !== $roles[2][$index][0] ? $roles[2][$index][0] : $roles[1][$index][0];
             if (isset($authorizationVariables[$variable])) {
@@ -142,7 +143,7 @@ final class SecurityExtractor
             }
         }
         $logoutVariables = $this->typedVariables($php, ['Symfony\\Component\\Security\\Http\\Logout\\LogoutUrlGenerator']);
-        preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*getLogout(?:Path|Url)\s*\(\s*["\']([A-Za-z0-9_.-]+)["\']/', $text, $firewalls, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*getLogout(?:Path|Url)\s*\(\s*["\']([A-Za-z0-9_.-]+)["\']/', $source, $firewalls, \PREG_OFFSET_CAPTURE);
         foreach ($firewalls[3] as $index => [$firewall, $offset]) {
             $variable = '' !== $firewalls[2][$index][0] ? $firewalls[2][$index][0] : $firewalls[1][$index][0];
             if (isset($logoutVariables[$variable])) {
