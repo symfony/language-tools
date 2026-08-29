@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpConstantKind;
+use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
@@ -22,7 +23,7 @@ final class TolerantPhpParserTest extends TestCase
             use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
             use Symfony\Component\Routing\Attribute\Route as RoutingRoute;
 
-            #[RoutingRoute(path: '/article', name: "article_list")]
+            #[RoutingRoute(/* path marker */ path: '/article', name: "article_list")]
             final class ArticleController extends AbstractController
             {
             }
@@ -32,9 +33,11 @@ final class TolerantPhpParserTest extends TestCase
 
         $document = (new TolerantPhpParser(new Parser()))->parse($source);
         $attribute = $document->attributes()[0];
+        $path = $attribute->argument('path');
         $name = $attribute->argument('name')?->stringLiteral();
 
         self::assertSame('Symfony\Component\Routing\Attribute\Route', $attribute->name());
+        self::assertSame('path', substr($source, (int) $path?->nameStartOffset(), (int) $path?->nameEndOffset() - (int) $path?->nameStartOffset()));
         self::assertInstanceOf(PhpStringLiteral::class, $name);
         self::assertSame('article_list', $name->value());
         self::assertSame('article_list', substr($source, $name->startOffset(), $name->endOffset() - $name->startOffset()));
@@ -439,12 +442,24 @@ final class TolerantPhpParserTest extends TestCase
                 private function hidden(): void {}
 
                 public function parameter(#[FunctionAttribute('invalid')] string $value): void {}
+
+                public function anonymous(): object
+                {
+                    return new class {
+                        #[FunctionAttribute('anonymous')]
+                        public function format(string $value): string
+                        {
+                            return $value;
+                        }
+                    };
+                }
             }
             PHP;
 
         $document = (new TolerantPhpParser(new Parser()))->parse($source);
         $methods = $document->methodDeclarations();
 
+        self::assertSame(['format', 'union', 'hidden', 'parameter', 'anonymous'], array_map(static fn (PhpMethodDeclaration $method): string => $method->name(), $methods));
         self::assertSame($document->attributes()[0], $methods[0]->attributes()[0]);
         self::assertSame('Twig\Attribute\AsTwigFunction', $methods[0]->attributes()[0]->name());
         self::assertSame('format', $methods[0]->attributes()[0]->argument(0)?->stringLiteral()?->value());

@@ -577,9 +577,9 @@ final class TolerantPhpParser implements PhpParserInterface
     /** @param list<PhpAttribute> $attributes */
     private function methodDeclaration(MethodDeclaration $declaration, string $source, PhpNameContext $names, array $attributes): ?PhpMethodDeclaration
     {
-        $owner = $declaration->getFirstAncestor(ClassDeclaration::class, TraitDeclaration::class);
+        $owner = $declaration->getFirstAncestor(ObjectCreationExpression::class, ClassDeclaration::class, TraitDeclaration::class);
         $nameToken = $declaration->name;
-        if ((!$owner instanceof ClassDeclaration && !$owner instanceof TraitDeclaration) || !$nameToken instanceof Token) {
+        if ($owner instanceof ObjectCreationExpression || (!$owner instanceof ClassDeclaration && !$owner instanceof TraitDeclaration) || !$nameToken instanceof Token) {
             return null;
         }
         $name = $nameToken->getText($source);
@@ -792,6 +792,8 @@ final class TolerantPhpParser implements PhpParserInterface
             $expression = $child->expression?->getText($source);
             $arguments[] = new PhpArgument(
                 \is_string($name) ? $name : null,
+                $child->name?->getStartPosition(),
+                $child->name?->getEndPosition(),
                 $child->expression instanceof StringLiteral ? $this->stringLiteral($child->expression, $source) : null,
                 null === $names ? null : $this->phpCallable($child->expression, $source, $names, $owner),
                 \is_string($expression) ? $expression : null,

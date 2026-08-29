@@ -6,6 +6,8 @@ final class PhpArgument
 {
     public function __construct(
         private readonly ?string $name,
+        private readonly ?int $nameStartOffset,
+        private readonly ?int $nameEndOffset,
         private readonly ?PhpStringLiteral $stringLiteral,
         private readonly ?PhpCallable $callable,
         private readonly ?string $expression,
@@ -19,6 +21,16 @@ final class PhpArgument
     public function name(): ?string
     {
         return $this->name;
+    }
+
+    public function nameStartOffset(): ?int
+    {
+        return $this->nameStartOffset;
+    }
+
+    public function nameEndOffset(): ?int
+    {
+        return $this->nameEndOffset;
     }
 
     public function stringLiteral(): ?PhpStringLiteral
