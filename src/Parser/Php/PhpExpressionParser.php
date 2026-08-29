@@ -4,7 +4,7 @@ namespace Symfony\Lsp\Parser\Php;
 
 final class PhpExpressionParser
 {
-    public function __construct(private readonly TolerantPhpParser $parser)
+    public function __construct(private readonly PhpParserInterface $parser)
     {
     }
 

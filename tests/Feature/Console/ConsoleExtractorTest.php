@@ -175,11 +175,12 @@ final class ConsoleExtractorTest extends TestCase
             PHP;
         $inner = new CountingConsolePhpParser(new TolerantPhpParser(new Parser()));
         $parser = new LastResultPhpParser($inner);
+        $expressionParser = new CountingConsolePhpParser(new TolerantPhpParser(new Parser()));
         $converter = new PositionConverter();
         $extractor = new ConsoleExtractor(
             $converter,
             $parser,
-            new PhpExpressionParser(new TolerantPhpParser(new Parser())),
+            new PhpExpressionParser($expressionParser),
             new QuotedArgumentMatcher($converter),
             new PhpCommentParser(),
         );
@@ -189,6 +190,7 @@ final class ConsoleExtractorTest extends TestCase
 
         self::assertSame(['report'], $facts->declarations()[0]->arguments());
         self::assertSame([$text], $inner->sources);
+        self::assertSame(["<?php [new InputArgument('report')];"], $expressionParser->sources);
     }
 
     private function extractor(): ConsoleExtractor

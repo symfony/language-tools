@@ -54,6 +54,7 @@ use Symfony\Lsp\Parser\Php\LastResultPhpCommentParser;
 use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpExpressionParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
@@ -182,6 +183,8 @@ return static function (ContainerConfigurator $container): void {
     $services->get(LastResultPhpParser::class)
         ->decorate(PhpParserInterface::class)
         ->arg('$parser', service(LastResultPhpParser::class.'.inner'));
+    $services->get(PhpExpressionParser::class)
+        ->arg('$parser', service(TolerantPhpParser::class));
     $services->alias(PhpCommentParserInterface::class, PhpCommentParser::class);
     $services->get(LastResultPhpCommentParser::class)
         ->decorate(PhpCommentParserInterface::class)
