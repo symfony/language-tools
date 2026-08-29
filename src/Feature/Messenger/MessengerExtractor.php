@@ -5,14 +5,22 @@ namespace Symfony\Lsp\Feature\Messenger;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
+use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpMethodCall;
+use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
 final class MessengerExtractor
 {
     private const AS_MESSAGE_HANDLER = 'Symfony\\Component\\Messenger\\Attribute\\AsMessageHandler';
+    private const BUS_TYPES = [
+        'Symfony\\Component\\Messenger\\MessageBus',
+        'Symfony\\Component\\Messenger\\MessageBusInterface',
+    ];
 
     public function __construct(
         private readonly PositionConverter $converter,
@@ -75,12 +83,13 @@ final class MessengerExtractor
                 $symbols[] = $this->symbol(MessengerSymbolKind::Bus, $name, $uri, $text, $offset, false);
             }
             $parents = $this->phpParents($source, $php);
-            $busVariables = $this->messengerBusVariables($source, $php);
-            preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*dispatch\s*\(\s*new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)/', $source, $dispatches, \PREG_OFFSET_CAPTURE);
-            foreach ($dispatches[3] as $index => [$name, $offset]) {
-                $variable = '' !== $dispatches[2][$index][0] ? $dispatches[2][$index][0] : $dispatches[1][$index][0];
-                if (isset($busVariables[$variable])) {
-                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $php->resolveName($name), $uri, $text, $offset, false, \strlen($name));
+            foreach ($php->methodCalls() as $call) {
+                if ('dispatch' !== $call->method() || !$this->hasBusReceiver($call, $php)) {
+                    continue;
+                }
+                $message = $this->newClassArgument($call->argument(0));
+                if (null !== $message) {
+                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $php->resolveName($message['name']), $uri, $text, $message['offset'], false, \strlen($message['name']));
                 }
             }
             preg_match_all('/new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s*\(\s*new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)/', $source, $envelopes, \PREG_OFFSET_CAPTURE);
@@ -161,19 +170,43 @@ final class MessengerExtractor
         return $parents;
     }
 
-    /** @return array<string, true> */
-    private function messengerBusVariables(string $text, PhpDocument $php): array
+    private function hasBusReceiver(PhpMethodCall $call, PhpDocument $php): bool
     {
-        $variables = [];
-        preg_match_all('/(\\??[\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s+\$([A-Za-z_][A-Za-z0-9_]*)/', $text, $matches, \PREG_SET_ORDER);
-        foreach ($matches as $match) {
-            $type = $php->resolveName(ltrim($match[1], '?'));
-            if (\in_array($type, ['Symfony\\Component\\Messenger\\MessageBus', 'Symfony\\Component\\Messenger\\MessageBusInterface'], true)) {
-                $variables[$match[2]] = true;
+        $receiver = $call->receiverContext();
+        if (null === $receiver->name()) {
+            return false;
+        }
+        foreach ($php->typedVariables() as $variable) {
+            if ($receiver->name() !== $variable->name() || [] === array_intersect(self::BUS_TYPES, $variable->types())) {
+                continue;
+            }
+            if (PhpMethodReceiverKind::Variable === $receiver->kind()
+                && \in_array($variable->kind(), [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                && $call->scopeStartOffset() === $variable->scopeStartOffset()
+            ) {
+                return true;
+            }
+            if (PhpMethodReceiverKind::ThisProperty === $receiver->kind()
+                && \in_array($variable->kind(), [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
+                && $call->className() === $variable->className()
+            ) {
+                return true;
             }
         }
 
-        return $variables;
+        return false;
+    }
+
+    /** @return array{name: string, offset: int}|null */
+    private function newClassArgument(?PhpArgument $argument): ?array
+    {
+        $expression = $argument?->expression();
+        $offset = $argument?->expressionStartOffset();
+        if (!\is_string($expression) || !\is_int($offset) || 1 !== preg_match('/^\s*new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)/', $expression, $match, \PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+
+        return ['name' => $match[1][0], 'offset' => $offset + $match[1][1]];
     }
 
     /**

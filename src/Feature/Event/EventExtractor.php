@@ -4,12 +4,22 @@ namespace Symfony\Lsp\Feature\Event;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpMethodCall;
+use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
 final class EventExtractor
 {
+    private const DISPATCHER_TYPES = [
+        'Symfony\\Component\\EventDispatcher\\EventDispatcher',
+        'Symfony\\Component\\EventDispatcher\\EventDispatcherInterface',
+        'Symfony\\Contracts\\EventDispatcher\\EventDispatcherInterface',
+    ];
+
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $parser,
@@ -50,7 +60,7 @@ final class EventExtractor
                     return $match[1];
                 }
             }
-            $dispatchers = $this->eventDispatcherVariables($masked, $php);
+            $dispatchers = $this->eventDispatcherVariables($php);
             if (preg_match('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:addListener\s*\(\s*|dispatch\s*\([^,\r\n]+,\s*)["\']([^"\']*)$/', $before, $match)) {
                 $variable = '' !== $match[2] ? $match[2] : $match[1];
                 if (isset($dispatchers[$variable])) {
@@ -83,19 +93,24 @@ final class EventExtractor
             }
         }
 
-        $dispatchers = $this->eventDispatcherVariables($source, $php);
-        preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*dispatch\s*\(\s*new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)/', $source, $dispatches, \PREG_OFFSET_CAPTURE);
-        foreach ($dispatches[3] as $index => [$name, $offset]) {
-            $variable = '' !== $dispatches[2][$index][0] ? $dispatches[2][$index][0] : $dispatches[1][$index][0];
-            if (isset($dispatchers[$variable])) {
-                $symbols[] = $this->symbol($php->resolveName($name), $uri, $text, $offset, false, \strlen($name));
+        foreach ($php->methodCalls() as $call) {
+            if (!$this->hasDispatcherReceiver($call, $php)) {
+                continue;
             }
-        }
-        preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:addListener\s*\(\s*|dispatch\s*\([^,\r\n]+,\s*)["\']([^"\']+)/', $source, $namedEvents, \PREG_OFFSET_CAPTURE);
-        foreach ($namedEvents[3] as $index => [$name, $offset]) {
-            $variable = '' !== $namedEvents[2][$index][0] ? $namedEvents[2][$index][0] : $namedEvents[1][$index][0];
-            if (isset($dispatchers[$variable])) {
-                $symbols[] = $this->symbol($name, $uri, $text, $offset, false);
+            if ('dispatch' === $call->method()) {
+                $event = $this->newClassArgument($call->argument(0));
+                if (null !== $event) {
+                    $symbols[] = $this->symbol($php->resolveName($event['name']), $uri, $text, $event['offset'], false, \strlen($event['name']));
+                }
+                $name = $call->argument(1)?->stringLiteral();
+                if (null !== $name && '' !== $name->value()) {
+                    $symbols[] = $this->symbol($name->value(), $uri, $text, $name->startOffset(), false, $name->endOffset() - $name->startOffset());
+                }
+            } elseif ('addListener' === $call->method()) {
+                $name = $call->argument(0)?->stringLiteral();
+                if (null !== $name && '' !== $name->value()) {
+                    $symbols[] = $this->symbol($name->value(), $uri, $text, $name->startOffset(), false, $name->endOffset() - $name->startOffset());
+                }
             }
         }
 
@@ -202,18 +217,55 @@ final class EventExtractor
     }
 
     /** @return array<string, true> */
-    private function eventDispatcherVariables(string $text, PhpDocument $php): array
+    private function eventDispatcherVariables(PhpDocument $php): array
     {
         $variables = [];
-        preg_match_all('/(\\??[\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s+\$([A-Za-z_][A-Za-z0-9_]*)/', $text, $matches, \PREG_SET_ORDER);
-        foreach ($matches as $match) {
-            $type = $php->resolveName(ltrim($match[1], '?'));
-            if (\in_array($type, ['Symfony\\Component\\EventDispatcher\\EventDispatcher', 'Symfony\\Component\\EventDispatcher\\EventDispatcherInterface', 'Symfony\\Contracts\\EventDispatcher\\EventDispatcherInterface'], true)) {
-                $variables[$match[2]] = true;
+        foreach ($php->typedVariables() as $variable) {
+            if ([] !== array_intersect(self::DISPATCHER_TYPES, $variable->types())) {
+                $variables[$variable->name()] = true;
             }
         }
 
         return $variables;
+    }
+
+    private function hasDispatcherReceiver(PhpMethodCall $call, PhpDocument $php): bool
+    {
+        $receiver = $call->receiverContext();
+        if (null === $receiver->name()) {
+            return false;
+        }
+        foreach ($php->typedVariables() as $variable) {
+            if ($receiver->name() !== $variable->name() || [] === array_intersect(self::DISPATCHER_TYPES, $variable->types())) {
+                continue;
+            }
+            if (PhpMethodReceiverKind::Variable === $receiver->kind()
+                && \in_array($variable->kind(), [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                && $call->scopeStartOffset() === $variable->scopeStartOffset()
+            ) {
+                return true;
+            }
+            if (PhpMethodReceiverKind::ThisProperty === $receiver->kind()
+                && \in_array($variable->kind(), [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
+                && $call->className() === $variable->className()
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return array{name: string, offset: int}|null */
+    private function newClassArgument(?PhpArgument $argument): ?array
+    {
+        $expression = $argument?->expression();
+        $offset = $argument?->expressionStartOffset();
+        if (!\is_string($expression) || !\is_int($offset) || 1 !== preg_match('/^\s*new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)/', $expression, $match, \PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+
+        return ['name' => $match[1][0], 'offset' => $offset + $match[1][1]];
     }
 
     private function matchingBrace(string $text, int $open): int

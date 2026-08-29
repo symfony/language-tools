@@ -38,6 +38,8 @@ The server recognizes event references in these contexts:
 * ``EventSubscriberInterface::getSubscribedEvents()`` return values;
 * ``kernel.event_listener`` service tags.
 
+Typed parameters are matched only inside their declaring method. Typed
+properties, including promoted properties, remain available across methods.
 Commented-out PHP attributes and calls are ignored.
 
 Code Lenses

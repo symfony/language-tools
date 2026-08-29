@@ -103,6 +103,38 @@ YAML;
         self::assertSame(['command.bus'], array_map(static fn ($symbol): string => $symbol->name(), $incompleteFacts->symbols()));
     }
 
+    public function testScopesMessageBusParametersToTheirMethod(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new MessengerExtractor(
+            $converter,
+            new TolerantPhpParser(new Parser()),
+            new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
+            new PhpCommentParser(),
+        );
+        $facts = $extractor->extract('file:///workspace/src/Dispatch.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Component\Messenger\MessageBusInterface;
+
+            final class Dispatch
+            {
+                public function message(MessageBusInterface $bus): void
+                {
+                    $bus->dispatch(new ExpectedMessage());
+                }
+
+                public function unrelated(object $bus): void
+                {
+                    $bus->dispatch(new IgnoredMessage());
+                }
+            }
+            PHP);
+
+        self::assertSame(['App\ExpectedMessage'], array_map(static fn ($symbol): string => $symbol->name(), $facts->symbols()));
+    }
+
     public function testCompletesHoversNavigatesDiagnosesAndProvidesCodeLenses(): void
     {
         $yamlUri = 'file:///workspace/config/packages/messenger.yaml';

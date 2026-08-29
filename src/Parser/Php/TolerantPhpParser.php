@@ -15,8 +15,10 @@ use Microsoft\PhpParser\Node\DelimitedList\ExpressionList;
 use Microsoft\PhpParser\Node\DelimitedList\ParameterDeclarationList;
 use Microsoft\PhpParser\Node\DelimitedList\QualifiedNameList;
 use Microsoft\PhpParser\Node\EnumCaseDeclaration;
+use Microsoft\PhpParser\Node\Expression\AnonymousFunctionCreationExpression;
 use Microsoft\PhpParser\Node\Expression\ArgumentExpression;
 use Microsoft\PhpParser\Node\Expression\ArrayCreationExpression;
+use Microsoft\PhpParser\Node\Expression\ArrowFunctionCreationExpression;
 use Microsoft\PhpParser\Node\Expression\AssignmentExpression;
 use Microsoft\PhpParser\Node\Expression\CallExpression;
 use Microsoft\PhpParser\Node\Expression\MemberAccessExpression;
@@ -32,6 +34,7 @@ use Microsoft\PhpParser\Node\PropertyDeclaration;
 use Microsoft\PhpParser\Node\QualifiedName;
 use Microsoft\PhpParser\Node\Statement\ClassDeclaration;
 use Microsoft\PhpParser\Node\Statement\EnumDeclaration;
+use Microsoft\PhpParser\Node\Statement\FunctionDeclaration;
 use Microsoft\PhpParser\Node\Statement\InterfaceDeclaration;
 use Microsoft\PhpParser\Node\Statement\NamespaceDefinition;
 use Microsoft\PhpParser\Node\Statement\NamespaceUseDeclaration;
@@ -139,11 +142,29 @@ final class TolerantPhpParser implements PhpParserInterface
             if ([] === $types) {
                 continue;
             }
+            [$owner, $scope] = $this->enclosingContext($declaration);
+            $className = null === $owner ? null : (string) $owner->getNamespacedName();
             if ($declaration instanceof Parameter) {
                 $name = $this->variableName($declaration->variableName, $source);
-                if (null !== $name) {
-                    $variables[] = new PhpTypedVariable($name, $types);
+                if (null === $name) {
+                    continue;
                 }
+                $methodName = $scope instanceof MethodDeclaration && $scope->name instanceof Token ? $scope->name->getText($source) : null;
+                $promoted = \is_string($methodName) && '__construct' === strtolower($methodName) && $declaration->visibilityToken instanceof Token;
+                $variables[] = new PhpTypedVariable(
+                    $name,
+                    $types,
+                    $promoted ? PhpTypedVariableKind::PromotedProperty : PhpTypedVariableKind::Parameter,
+                    $className,
+                    \is_string($methodName) && '' !== $methodName ? $methodName : null,
+                    $scope?->getStartPosition(),
+                    $declaration->variableName->getStartPosition() + 1,
+                    $declaration->variableName->getEndPosition(),
+                );
+
+                continue;
+            }
+            if (null === $className) {
                 continue;
             }
             $elements = get_object_vars($declaration)['propertyElements'] ?? null;
@@ -154,9 +175,19 @@ final class TolerantPhpParser implements PhpParserInterface
                 $variable = $element instanceof Variable
                     ? $element
                     : ($element instanceof AssignmentExpression && $element->leftOperand instanceof Variable ? $element->leftOperand : null);
-                if (null !== $variable && null !== $name = $this->variableName($variable, $source)) {
-                    $variables[] = new PhpTypedVariable($name, $types);
+                if (null === $variable || null === $name = $this->variableName($variable, $source)) {
+                    continue;
                 }
+                $variables[] = new PhpTypedVariable(
+                    $name,
+                    $types,
+                    PhpTypedVariableKind::Property,
+                    $className,
+                    null,
+                    null,
+                    $variable->getStartPosition() + 1,
+                    $variable->getEndPosition(),
+                );
             }
         }
 
@@ -289,6 +320,36 @@ final class TolerantPhpParser implements PhpParserInterface
         $name = $variable->getText($source);
 
         return \is_string($name) && 1 === preg_match('/^\\$[A-Za-z_][A-Za-z0-9_]*$/', $name) ? substr($name, 1) : null;
+    }
+
+    /**
+     * @return array{
+     *     ClassDeclaration|InterfaceDeclaration|TraitDeclaration|EnumDeclaration|null,
+     *     MethodDeclaration|FunctionDeclaration|AnonymousFunctionCreationExpression|ArrowFunctionCreationExpression|null
+     * }
+     */
+    private function enclosingContext(Node $node): array
+    {
+        $owner = null;
+        $scope = null;
+        $anonymousClass = false;
+        while (null !== $node = $node->getParent()) {
+            if (null === $scope && ($node instanceof MethodDeclaration || $node instanceof FunctionDeclaration || $node instanceof AnonymousFunctionCreationExpression || $node instanceof ArrowFunctionCreationExpression)) {
+                $scope = $node;
+            }
+            if (null === $owner) {
+                if ($node instanceof ObjectCreationExpression && null !== $node->classMembers) {
+                    $anonymousClass = true;
+                } elseif (!$anonymousClass && ($node instanceof ClassDeclaration || $node instanceof InterfaceDeclaration || $node instanceof TraitDeclaration || $node instanceof EnumDeclaration)) {
+                    $owner = $node;
+                }
+            }
+            if (null !== $scope && (null !== $owner || $anonymousClass)) {
+                break;
+            }
+        }
+
+        return [$owner, $scope];
     }
 
     /** @param array<string, string> $imports */
@@ -652,18 +713,51 @@ final class TolerantPhpParser implements PhpParserInterface
         if (!$memberAccess instanceof MemberAccessExpression) {
             return null;
         }
-        $receiver = $memberAccess->dereferencableExpression->getText($source);
-        $method = $memberAccess->memberName->getText($source);
+        $receiverNode = $memberAccess->dereferencableExpression;
+        $receiver = $receiverNode->getText($source);
+        $methodNode = $memberAccess->memberName;
+        $method = $methodNode->getText($source);
         if (!\is_string($method)) {
             return null;
         }
+        [$owner, $scope] = $this->enclosingContext($call);
+        $methodName = $scope instanceof MethodDeclaration && $scope->name instanceof Token ? $scope->name->getText($source) : null;
 
         return new PhpMethodCall(
             $receiver,
+            $this->methodReceiver($receiverNode, $source),
             $method,
             $call->getStartPosition(),
+            $call->getEndPosition(),
+            $methodNode->getStartPosition(),
+            $methodNode->getEndPosition(),
             $this->arguments($call->argumentExpressionList->children ?? [], $source),
+            null === $owner ? null : (string) $owner->getNamespacedName(),
+            \is_string($methodName) && '' !== $methodName ? $methodName : null,
+            $scope?->getStartPosition(),
         );
+    }
+
+    private function methodReceiver(Node|Token $receiver, string $source): PhpMethodReceiver
+    {
+        $kind = PhpMethodReceiverKind::Other;
+        $name = null;
+        if ($receiver instanceof Variable) {
+            $raw = $receiver->getText($source);
+            if ('$this' === $raw) {
+                $kind = PhpMethodReceiverKind::This;
+            } elseif (null !== $name = $this->variableName($receiver, $source)) {
+                $kind = PhpMethodReceiverKind::Variable;
+            }
+        } elseif ($receiver instanceof MemberAccessExpression && $receiver->dereferencableExpression instanceof Variable && '$this' === $receiver->dereferencableExpression->getText($source)) {
+            $member = $receiver->memberName->getText($source);
+            if (\is_string($member) && 1 === preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $member)) {
+                $kind = PhpMethodReceiverKind::ThisProperty;
+                $name = $member;
+            }
+        }
+
+        return new PhpMethodReceiver($kind, $name, $receiver->getStartPosition(), $receiver->getEndPosition());
     }
 
     /**

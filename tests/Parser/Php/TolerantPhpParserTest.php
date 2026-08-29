@@ -7,7 +7,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpConstantKind;
+use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
+use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 use Symfony\Lsp\Parser\Php\PhpTypeKind;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 
@@ -181,6 +183,61 @@ final class TolerantPhpParserTest extends TestCase
             ['Vendor\Package\Other'],
             ['Vendor\Package\Handler', 'Vendor\Package\Other', 'Vendor\Package\Service'],
         ], array_map(static fn ($variable): array => $variable->types(), $variables));
+    }
+
+    public function testExposesScopedTypedReceiversAndCalls(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+
+            use Vendor\Bus;
+
+            final class Handler
+            {
+                public function __construct(private Bus $bus) {}
+
+                public function first(Bus $local): void
+                {
+                    $local->dispatch('first');
+                    $this->bus->dispatch('property');
+                }
+
+                public function second(Bus $local): void
+                {
+                    $local->dispatch('second');
+                    $other->dispatch('ignored');
+                }
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        [$promoted, $firstParameter, $secondParameter] = $document->typedVariables();
+        [$firstCall, $propertyCall, $secondCall, $otherCall] = $document->methodCalls();
+        $firstArgument = $firstCall->argument(0);
+        self::assertInstanceOf(PhpArgument::class, $firstArgument);
+        $firstArgumentStart = $firstArgument->expressionStartOffset();
+        $firstArgumentEnd = $firstArgument->expressionEndOffset();
+        self::assertIsInt($firstArgumentStart);
+        self::assertIsInt($firstArgumentEnd);
+
+        self::assertSame([PhpTypedVariableKind::PromotedProperty, PhpTypedVariableKind::Parameter, PhpTypedVariableKind::Parameter], array_map(static fn ($variable): PhpTypedVariableKind => $variable->kind(), $document->typedVariables()));
+        self::assertSame(array_fill(0, 3, 'App\Handler'), array_map(static fn ($variable): ?string => $variable->className(), $document->typedVariables()));
+        self::assertSame(['__construct', 'first', 'second'], array_map(static fn ($variable): ?string => $variable->methodName(), $document->typedVariables()));
+        self::assertNotSame($firstParameter->scopeStartOffset(), $secondParameter->scopeStartOffset());
+        self::assertSame('bus', substr($source, $promoted->nameStartOffset(), $promoted->nameEndOffset() - $promoted->nameStartOffset()));
+        self::assertSame(PhpMethodReceiverKind::Variable, $firstCall->receiverContext()->kind());
+        self::assertSame('local', $firstCall->receiverContext()->name());
+        self::assertSame($firstParameter->scopeStartOffset(), $firstCall->scopeStartOffset());
+        self::assertSame('first', $firstCall->enclosingMethod());
+        self::assertSame('App\Handler', $firstCall->className());
+        self::assertSame(PhpMethodReceiverKind::ThisProperty, $propertyCall->receiverContext()->kind());
+        self::assertSame('bus', $propertyCall->receiverContext()->name());
+        self::assertSame($secondParameter->scopeStartOffset(), $secondCall->scopeStartOffset());
+        self::assertSame(PhpMethodReceiverKind::Variable, $otherCall->receiverContext()->kind());
+        self::assertSame('dispatch', substr($source, $firstCall->methodStartOffset(), $firstCall->methodEndOffset() - $firstCall->methodStartOffset()));
+        self::assertSame("'first'", substr($source, $firstArgumentStart, $firstArgumentEnd - $firstArgumentStart));
+        self::assertSame('$local->dispatch(\'first\')', substr($source, $firstCall->startOffset(), $firstCall->endOffset() - $firstCall->startOffset()));
     }
 
     public function testExposesPropertyDeclarationsWithoutInitializerValues(): void

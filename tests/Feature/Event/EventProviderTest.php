@@ -75,6 +75,32 @@ YAML;
         self::assertSame('legacy.order_placed', $extractor->extract('file:///workspace/config/services.yaml', 'yaml', $yaml)->symbols()[0]->name());
     }
 
+    public function testScopesEventDispatcherParametersToTheirMethod(): void
+    {
+        $extractor = new EventExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $facts = $extractor->extract('file:///workspace/src/Dispatch.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+
+            final class Dispatch
+            {
+                public function event(EventDispatcherInterface $dispatcher): void
+                {
+                    $dispatcher->dispatch(new ExpectedEvent());
+                }
+
+                public function unrelated(object $dispatcher): void
+                {
+                    $dispatcher->dispatch(new IgnoredEvent());
+                }
+            }
+            PHP);
+
+        self::assertSame(['App\ExpectedEvent'], array_map(static fn ($symbol): string => $symbol->name(), $facts->symbols()));
+    }
+
     public function testCompletesHoversNavigatesDiagnosesAndProvidesCodeLenses(): void
     {
         $eventUri = 'file:///workspace/src/Event/OrderPlaced.php';
