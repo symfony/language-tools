@@ -3,11 +3,18 @@
 namespace Symfony\Lsp\Feature\Doctrine;
 
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
+use Symfony\Lsp\Parser\Php\PhpArgument;
+use Symfony\Lsp\Parser\Php\PhpAttribute;
+use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
+use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpMethodCall;
+use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpPropertyDeclaration;
+use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
+use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
 final class DoctrineExtractor
 {
@@ -17,7 +24,6 @@ final class DoctrineExtractor
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $phpParser,
         private readonly PhpCommentParserInterface $phpComments,
-        private readonly BalancedDelimiterMatcher $delimiters,
     ) {
     }
 
@@ -28,31 +34,48 @@ final class DoctrineExtractor
         }
         $php = $this->phpParser->parse($text);
         $source = $this->phpComments->mask($text);
-        $classes = $this->classes($source, $text, $php);
         $entities = [];
         $repositories = [];
         $symbols = [];
-        foreach ($classes as $class) {
-            if ($this->hasMappingAttribute($class['attributes'], $php, ['Entity', 'MappedSuperclass'])) {
-                [$repositoryClass, $repositoryOffset] = $this->repositoryClass($class, $php);
-                $fields = $this->fields($uri, $text, $class, $php);
-                $entity = new DoctrineEntity($class['className'], $uri, $class['range'], $repositoryClass, $fields);
+        foreach ($php->typeDeclarations() as $type) {
+            if (!$type->isClass()) {
+                continue;
+            }
+            $range = $this->converter->toRange($text, $type->nameStartOffset(), $type->nameEndOffset() - $type->nameStartOffset());
+            if ([] !== $this->mappingAttributes($php, PhpAttributeTargetKind::Type, $type->name(), null, ['Entity', 'MappedSuperclass'])) {
+                $repositoryReference = $this->repositoryClassReference($php, $type->name());
+                $fields = $this->fields($uri, $text, $type->name(), $php);
+                $entity = new DoctrineEntity($type->name(), $uri, $range, $repositoryReference?->className(), $fields);
                 $entities[] = $entity;
                 $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Entity, $entity->className(), null, $uri, $entity->range(), true);
                 foreach ($fields as $field) {
                     $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, $field->name(), $entity->className(), $uri, $field->range(), true);
                 }
-                if (null !== $repositoryClass && null !== $repositoryOffset) {
-                    $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Repository, $repositoryClass, null, $uri, $this->converter->toRange($text, $repositoryOffset, $this->shortNameLengthAt($text, $repositoryOffset)), false);
+                if (null !== $repositoryReference) {
+                    $symbols[] = new DoctrineSourceSymbol(
+                        DoctrineSymbolKind::Repository,
+                        $repositoryReference->className(),
+                        null,
+                        $uri,
+                        $this->converter->toRange($text, $repositoryReference->startOffset(), $repositoryReference->endOffset() - $repositoryReference->startOffset()),
+                        false,
+                    );
                 }
             }
-            $repository = $this->repository($uri, $text, $class, $php);
+            $repository = $this->repository($uri, $text, $source, $type, $php);
             if (null !== $repository) {
                 $repositories[] = $repository;
                 $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Repository, $repository->className(), null, $uri, $repository->range(), true);
-                $entityOffset = $this->repositoryEntityOffset($class);
-                if (null !== $entityOffset) {
-                    $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Entity, $repository->entityClass(), null, $uri, $this->converter->toRange($text, $entityOffset, $this->shortNameLengthAt($text, $entityOffset)), false);
+                $entityReference = $this->repositoryEntityReference($source, $type, $php);
+                if (null !== $entityReference) {
+                    $symbols[] = new DoctrineSourceSymbol(
+                        DoctrineSymbolKind::Entity,
+                        $repository->entityClass(),
+                        null,
+                        $uri,
+                        $this->converter->toRange($text, $entityReference->startOffset(), $entityReference->endOffset() - $entityReference->startOffset()),
+                        false,
+                    );
                 }
             }
         }
@@ -88,121 +111,127 @@ final class DoctrineExtractor
         return $this->repositoryCompletionContext($text, $source, $offset, $php);
     }
 
-    /**
-     * @param array{className: string, shortName: string, header: string, body: string, bodyOffset: int, attributes: string, attributesOffset: int, before: string, range: Range} $class
-     *
-     * @return list<DoctrineField>
-     */
-    private function fields(string $uri, string $text, array $class, PhpDocument $php): array
+    /** @return list<DoctrineField> */
+    private function fields(string $uri, string $text, string $className, PhpDocument $php): array
     {
-        preg_match_all(
-            '/(?:(?:public|protected|private|var|readonly|static)\s+)+(?:(\??[A-Za-z_\\\\][A-Za-z0-9_\\\\|?]*)\s+)?\$([A-Za-z_][A-Za-z0-9_]*)/',
-            $class['body'],
-            $properties,
-            \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE,
-        );
         $fields = [];
-        foreach ($properties as $property) {
-            $before = substr($class['body'], 0, $property[0][1]);
-            $boundary = max((int) strrpos($before, ';'), (int) strrpos($before, '{'), (int) strrpos($before, '}'));
-            $attributes = substr($before, $boundary + 1);
-            if (!$this->hasMappingAttribute($attributes, $php, ['Column', 'Embedded', 'Id', 'ManyToMany', 'ManyToOne', 'OneToMany', 'OneToOne'])) {
+        foreach ($php->propertyDeclarations() as $property) {
+            if ($className !== $property->className()) {
                 continue;
             }
-            $association = $this->hasMappingAttribute($attributes, $php, self::ASSOCIATIONS);
-            $type = '' !== $property[1][0] ? ltrim($property[1][0], '?') : null;
-            $targetEntity = $this->associationTarget($attributes, $type, $php);
-            $offset = $class['bodyOffset'] + $property[2][1];
+            $attributes = $this->mappingAttributes(
+                $php,
+                PhpAttributeTargetKind::Property,
+                $className,
+                $property->name(),
+                ['Column', 'Embedded', 'Id', 'ManyToMany', 'ManyToOne', 'OneToMany', 'OneToOne'],
+            );
+            if ([] === $attributes) {
+                continue;
+            }
+            $associationAttributes = array_values(array_filter(
+                $attributes,
+                static fn (PhpAttribute $attribute): bool => \in_array(substr($attribute->name(), \strlen('Doctrine\\ORM\\Mapping\\')), self::ASSOCIATIONS, true),
+            ));
+            $type = [] === $property->types() ? null : implode('|', $property->types());
             $fields[] = new DoctrineField(
-                $property[2][0],
+                $property->name(),
                 $uri,
-                $this->converter->toRange($text, $offset, \strlen($property[2][0])),
-                $association,
+                $this->converter->toRange($text, $property->nameStartOffset(), $property->nameEndOffset() - $property->nameStartOffset()),
+                [] !== $associationAttributes,
                 $type,
-                $targetEntity,
+                $this->associationTarget($associationAttributes, $property, $php),
             );
         }
 
         return $fields;
     }
 
-    /**
-     * @param array{className: string, shortName: string, header: string, body: string, bodyOffset: int, attributes: string, attributesOffset: int, before: string, range: Range} $class
-     *
-     * @return array{?string, ?int}
-     */
-    private function repositoryClass(array $class, PhpDocument $php): array
+    private function repositoryClassReference(PhpDocument $php, string $className): ?PhpClassReference
     {
-        foreach ($this->attributes($class['attributes'], $php) as $attribute) {
-            if ('Doctrine\\ORM\\Mapping\\Entity' !== $attribute['class'] || !preg_match('/\brepositoryClass\s*:\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class/', $attribute['arguments'], $repository, \PREG_OFFSET_CAPTURE)) {
-                continue;
+        foreach ($this->mappingAttributes($php, PhpAttributeTargetKind::Type, $className, null, ['Entity']) as $attribute) {
+            $reference = $this->classReferenceArgument($php, $attribute->argument('repositoryClass'));
+            if (null !== $reference) {
+                return $reference;
             }
-            $offset = $class['attributesOffset'] + $attribute['argumentsOffset'] + $repository[1][1];
-
-            return [$php->resolveName($repository[1][0]), $offset];
         }
 
-        return [null, null];
+        return null;
     }
 
-    /**
-     * @param array{className: string, shortName: string, header: string, body: string, bodyOffset: int, attributes: string, attributesOffset: int, before: string, range: Range} $class
-     */
-    private function repository(string $uri, string $text, array $class, PhpDocument $php): ?DoctrineRepository
+    private function repository(string $uri, string $text, string $source, PhpTypeDeclaration $type, PhpDocument $php): ?DoctrineRepository
     {
-        if (!preg_match('/\bextends\s+([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)/', $class['header'], $parent)
-            || 'Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository' !== $php->resolveName($parent[1])) {
+        if ('Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository' !== $type->parentClassName()) {
             return null;
         }
-        $entityClass = null;
-        if (preg_match('/\bparent\s*::\s*__construct\s*\([^,]+,\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class/', $class['body'], $entity)) {
-            $entityClass = $php->resolveName($entity[1]);
-        } elseif (preg_match('/@extends\s+(?:[A-Za-z_\\\\][A-Za-z0-9_\\\\]*\\\\)?ServiceEntityRepository\s*<\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*>/', $class['before'], $entity)) {
-            $entityClass = $php->resolveName($entity[1]);
+        $entityClass = $this->repositoryEntityReference($source, $type, $php)?->className();
+        if (null === $entityClass) {
+            $before = substr($text, max(0, $type->startOffset() - 1000), min(1000, $type->startOffset()));
+            if (preg_match('/@extends\s+(?:[A-Za-z_\\\\][A-Za-z0-9_\\\\]*\\\\)?ServiceEntityRepository\s*<\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*>/', $before, $entity)) {
+                $entityClass = $php->resolveName($entity[1]);
+            }
         }
         if (null === $entityClass) {
             return null;
         }
 
-        return new DoctrineRepository($class['className'], $entityClass, $uri, $class['range']);
+        return new DoctrineRepository(
+            $type->name(),
+            $entityClass,
+            $uri,
+            $this->converter->toRange($text, $type->nameStartOffset(), $type->nameEndOffset() - $type->nameStartOffset()),
+        );
     }
 
-    /**
-     * @param array{body: string, bodyOffset: int} $class
-     */
-    private function repositoryEntityOffset(array $class): ?int
+    private function repositoryEntityReference(string $source, PhpTypeDeclaration $type, PhpDocument $php): ?PhpClassReference
     {
-        if (!preg_match('/\bparent\s*::\s*__construct\s*\([^,]+,\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class/', $class['body'], $entity, \PREG_OFFSET_CAPTURE)) {
-            return null;
+        foreach ($php->classReferences() as $reference) {
+            if ($reference->startOffset() < $type->startOffset() || $reference->endOffset() > $type->endOffset()) {
+                continue;
+            }
+            $before = substr($source, $type->startOffset(), $reference->startOffset() - $type->startOffset());
+            $boundary = max((int) strrpos($before, ';'), (int) strrpos($before, '{'));
+            if (1 === preg_match('/\bparent\s*::\s*__construct\s*\([^,]+,\s*$/', substr($before, $boundary + 1))) {
+                return $reference;
+            }
         }
 
-        return $class['bodyOffset'] + $entity[1][1];
+        return null;
     }
 
     /** @return list<DoctrineSourceSymbol> */
     private function formSymbols(string $uri, string $text, string $source, PhpDocument $php): array
     {
-        preg_match_all('/([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*,\s*\[/', $source, $formTypes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         $symbols = [];
-        foreach ($formTypes as $formType) {
-            if ('Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $php->resolveName($formType[1][0])) {
+        foreach ($php->methodCalls() as $call) {
+            if (!\in_array($call->method(), ['createForm', 'createNamed', 'add'], true)) {
                 continue;
             }
-            $open = $formType[0][1] + \strlen($formType[0][0]) - 1;
-            $close = $this->delimiters->matching($source, $open, '[', ']');
-            if (null === $close) {
+            $typeIndex = 'createNamed' === $call->method() ? 1 : ('add' === $call->method() ? 1 : 0);
+            $optionsIndex = 'createNamed' === $call->method() ? 3 : 2;
+            $formType = $this->classReferenceArgument($php, $call->argument($typeIndex));
+            $options = $call->argument($optionsIndex);
+            if ('Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $formType?->className() || null === $options) {
                 continue;
             }
-            $options = substr($source, $open + 1, $close - $open - 1);
-            if (!preg_match('/[\'"]class[\'"]\s*=>\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class/', $options, $entity, \PREG_OFFSET_CAPTURE)) {
+            $entity = $this->arrayClassReference($source, $php, $options, 'class');
+            $expression = $options->expression();
+            $offset = $options->expressionStartOffset();
+            if (null === $entity || !\is_string($expression) || !\is_int($offset)) {
                 continue;
             }
-            $entityClass = $php->resolveName($entity[1][0]);
-            $entityOffset = $open + 1 + $entity[1][1];
-            $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Entity, $entityClass, null, $uri, $this->converter->toRange($text, $entityOffset, \strlen($entity[1][0])), false);
-            preg_match_all('/[\'"](?:choice_label|choice_value|group_by)[\'"]\s*=>\s*([\'"])([A-Za-z_][A-Za-z0-9_]*)\1/', $options, $fields, \PREG_OFFSET_CAPTURE);
+            $entityClass = $entity->className();
+            $symbols[] = new DoctrineSourceSymbol(
+                DoctrineSymbolKind::Entity,
+                $entityClass,
+                null,
+                $uri,
+                $this->converter->toRange($text, $entity->startOffset(), $entity->endOffset() - $entity->startOffset()),
+                false,
+            );
+            preg_match_all('/[\'"](?:choice_label|choice_value|group_by)[\'"]\s*=>\s*([\'"])([A-Za-z_][A-Za-z0-9_]*)\1/', $expression, $fields, \PREG_OFFSET_CAPTURE);
             foreach ($fields[2] as [$field, $fieldOffset]) {
-                $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, $field, $entityClass, $uri, $this->converter->toRange($text, $open + 1 + $fieldOffset, \strlen($field)), false);
+                $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, $field, $entityClass, $uri, $this->converter->toRange($text, $offset + $fieldOffset, \strlen($field)), false);
             }
         }
 
@@ -216,50 +245,38 @@ final class DoctrineExtractor
      */
     private function repositorySymbols(string $uri, string $text, string $source, PhpDocument $php, array $localRepositories): array
     {
-        $repositoryVariables = $this->repositoryVariables($source, $php);
-        $entityVariables = [];
-        preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*[^;]*?->\s*getRepository\s*\(\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*\)/', $source, $assignments, \PREG_SET_ORDER);
-        foreach ($assignments as $assignment) {
-            $entityVariables[$assignment[1]] = $php->resolveName($assignment[2]);
+        $localRepositoryClasses = [];
+        foreach ($localRepositories as $repository) {
+            $localRepositoryClasses[$repository->className()] = true;
         }
+        $entityVariables = $this->repositoryAssignmentEntities($source, $php);
         $symbols = [];
-        preg_match_all('/(\$this(?:->([A-Za-z_][A-Za-z0-9_]*))?|\$([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:findBy|findOneBy|count)\s*\(\s*\[/', $source, $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-        foreach ($calls as $call) {
-            $owner = null;
-            if ('$this' === $call[1][0] && isset($localRepositories[0])) {
-                $owner = $localRepositories[0]->className();
-            } else {
-                $variable = '' !== ($call[2][0] ?? '') ? $call[2][0] : ($call[3][0] ?? '');
-                $owner = $repositoryVariables[$variable] ?? $entityVariables[$variable] ?? null;
+        foreach ($php->methodCalls() as $call) {
+            if (!\in_array($call->method(), ['findBy', 'findOneBy', 'count'], true) || null === $call->argument(0)) {
+                continue;
             }
+            $owner = $this->repositoryCallOwner($php, $call, $localRepositoryClasses, $entityVariables);
             if (null === $owner) {
                 continue;
             }
-            $open = $call[0][1] + \strlen($call[0][0]) - 1;
-            array_push($symbols, ...$this->criteriaSymbols($uri, $text, $source, $open, $owner));
-        }
-        preg_match_all('/getRepository\s*\(\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*\)\s*->\s*(?:findBy|findOneBy|count)\s*\(\s*\[/', $source, $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-        foreach ($calls as $call) {
-            $owner = $php->resolveName($call[1][0]);
-            $open = $call[0][1] + \strlen($call[0][0]) - 1;
-            array_push($symbols, ...$this->criteriaSymbols($uri, $text, $source, $open, $owner));
+            array_push($symbols, ...$this->criteriaSymbols($uri, $text, $call->argument(0), $owner));
         }
 
         return $symbols;
     }
 
     /** @return list<DoctrineSourceSymbol> */
-    private function criteriaSymbols(string $uri, string $text, string $source, int $open, string $owner): array
+    private function criteriaSymbols(string $uri, string $text, PhpArgument $argument, string $owner): array
     {
-        $close = $this->delimiters->matching($source, $open, '[', ']');
-        if (null === $close) {
+        $array = $argument->expression();
+        $offset = $argument->expressionStartOffset();
+        if (!\is_string($array) || !\is_int($offset) || !preg_match('/^\s*\[/', $array)) {
             return [];
         }
-        $array = substr($source, $open + 1, $close - $open - 1);
         preg_match_all('/([\'"])([A-Za-z_][A-Za-z0-9_]*)\1\s*=>/', $array, $keys, \PREG_OFFSET_CAPTURE);
         $symbols = [];
-        foreach ($keys[2] as [$field, $offset]) {
-            $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, $field, $owner, $uri, $this->converter->toRange($text, $open + 1 + $offset, \strlen($field)), false);
+        foreach ($keys[2] as [$field, $fieldOffset]) {
+            $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, $field, $owner, $uri, $this->converter->toRange($text, $offset + $fieldOffset, \strlen($field)), false);
         }
 
         return $symbols;
@@ -271,15 +288,18 @@ final class DoctrineExtractor
         if (!preg_match('/(?:\[|,)\s*[\'"]([A-Za-z_][A-Za-z0-9_]*)$/s', $before, $prefix, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
-        $repositoryVariables = $this->repositoryVariables($source, $php);
+        $repositoryVariables = $this->repositoryVariables($php);
         $entityVariables = [];
         preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*[^;]*?->\s*getRepository\s*\(\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*\)/', $source, $assignments, \PREG_SET_ORDER);
         foreach ($assignments as $assignment) {
             $entityVariables[$assignment[1]] = $php->resolveName($assignment[2]);
         }
         $localRepositories = [];
-        foreach ($this->classes($source, $text, $php) as $class) {
-            $repository = $this->repository('', $text, $class, $php);
+        foreach ($php->typeDeclarations() as $type) {
+            if (!$type->isClass()) {
+                continue;
+            }
+            $repository = $this->repository('', $text, $source, $type, $php);
             if (null !== $repository) {
                 $localRepositories[] = $repository;
             }
@@ -313,85 +333,181 @@ final class DoctrineExtractor
     }
 
     /** @return array<string, string> */
-    private function repositoryVariables(string $text, PhpDocument $php): array
+    private function repositoryVariables(PhpDocument $php): array
     {
-        preg_match_all('/([A-Za-z_\\\\][A-Za-z0-9_\\\\]*Repository)\s+\$([A-Za-z_][A-Za-z0-9_]*)/', $text, $types, \PREG_SET_ORDER);
         $variables = [];
-        foreach ($types as $type) {
-            $variables[$type[2]] = $php->resolveName($type[1]);
+        foreach ($php->typedVariables() as $variable) {
+            foreach ($variable->types() as $type) {
+                if (str_ends_with($type, 'Repository')) {
+                    $variables[$variable->name()] = $type;
+                    break;
+                }
+            }
         }
 
         return $variables;
     }
 
-    private function associationTarget(string $attributes, ?string $type, PhpDocument $php): ?string
+    /** @return array<string, string> */
+    private function repositoryAssignmentEntities(string $source, PhpDocument $php): array
     {
-        if (preg_match('/\btargetEntity\s*:\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class/', $attributes, $target)) {
-            return $php->resolveName($target[1]);
-        }
-        if (null === $type || \in_array(strtolower($type), ['array', 'collection', 'iterable', 'mixed'], true)) {
-            return null;
+        $entities = [];
+        foreach ($php->methodCalls() as $call) {
+            if ('getRepository' !== $call->method() || null === $reference = $this->classReferenceArgument($php, $call->argument(0))) {
+                continue;
+            }
+            $before = substr($source, 0, $call->startOffset());
+            $boundary = max((int) strrpos($before, ';'), (int) strrpos($before, '{'));
+            if (!preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*$/', substr($before, $boundary + 1), $assignment)) {
+                continue;
+            }
+            $entities[$this->variableScopeKey($call, $assignment[1])] = $reference->className();
         }
 
-        return $php->resolveName($type);
+        return $entities;
     }
 
-    /** @param list<string> $names */
-    private function hasMappingAttribute(string $text, PhpDocument $php, array $names): bool
+    /**
+     * @param array<string, true>   $localRepositories
+     * @param array<string, string> $entityVariables
+     */
+    private function repositoryCallOwner(PhpDocument $php, PhpMethodCall $call, array $localRepositories, array $entityVariables): ?string
     {
-        foreach ($this->attributes($text, $php) as $attribute) {
-            if (str_starts_with($attribute['class'], 'Doctrine\\ORM\\Mapping\\') && \in_array(substr($attribute['class'], \strlen('Doctrine\\ORM\\Mapping\\')), $names, true)) {
-                return true;
+        $receiver = $call->receiverContext();
+        if (PhpMethodReceiverKind::This === $receiver->kind() && null !== $call->className() && isset($localRepositories[$call->className()])) {
+            return $call->className();
+        }
+        if (null !== $receiver->name()) {
+            foreach ($php->typedVariables() as $variable) {
+                if ($receiver->name() !== $variable->name()) {
+                    continue;
+                }
+                $repositoryType = null;
+                foreach ($variable->types() as $type) {
+                    if (str_ends_with($type, 'Repository')) {
+                        $repositoryType = $type;
+                        break;
+                    }
+                }
+                if (null === $repositoryType) {
+                    continue;
+                }
+                if (PhpMethodReceiverKind::Variable === $receiver->kind()
+                    && \in_array($variable->kind(), [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                    && $call->scopeStartOffset() === $variable->scopeStartOffset()
+                ) {
+                    return $repositoryType;
+                }
+                if (PhpMethodReceiverKind::ThisProperty === $receiver->kind()
+                    && \in_array($variable->kind(), [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
+                    && $call->className() === $variable->className()
+                ) {
+                    return $repositoryType;
+                }
+            }
+            $assigned = $entityVariables[$this->variableScopeKey($call, $receiver->name())] ?? null;
+            if (null !== $assigned) {
+                return $assigned;
+            }
+        }
+        if (PhpMethodReceiverKind::Other !== $receiver->kind() || 1 !== preg_match('/->\s*getRepository\s*\(/', $call->receiver())) {
+            return null;
+        }
+        $references = [];
+        foreach ($php->classReferences() as $reference) {
+            if ($reference->startOffset() >= $receiver->startOffset() && $reference->endOffset() <= $receiver->endOffset()) {
+                $references[] = $reference;
             }
         }
 
-        return false;
+        return 1 === \count($references) ? $references[0]->className() : null;
     }
 
-    /** @return list<array{class: string, arguments: string, argumentsOffset: int}> */
-    private function attributes(string $text, PhpDocument $php): array
+    private function variableScopeKey(PhpMethodCall $call, string $variable): string
     {
-        preg_match_all('/#\[\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)(?:\s*\((.*?)\))?\s*]/s', $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL);
+        return ($call->scopeStartOffset() ?? -1).'|'.$variable;
+    }
+
+    /**
+     * @param list<string> $names
+     *
+     * @return list<PhpAttribute>
+     */
+    private function mappingAttributes(PhpDocument $php, PhpAttributeTargetKind $kind, string $className, ?string $memberName, array $names): array
+    {
         $attributes = [];
-        foreach ($matches as $match) {
-            $attributes[] = [
-                'class' => $php->resolveName((string) $match[1][0]),
-                'arguments' => \is_string($match[2][0] ?? null) ? $match[2][0] : '',
-                'argumentsOffset' => $match[2][1] >= 0 ? $match[2][1] : 0,
-            ];
+        foreach ($php->attributes() as $attribute) {
+            if (!str_starts_with($attribute->name(), 'Doctrine\\ORM\\Mapping\\')
+                || !\in_array(substr($attribute->name(), \strlen('Doctrine\\ORM\\Mapping\\')), $names, true)
+            ) {
+                continue;
+            }
+            foreach ($attribute->targets() as $target) {
+                if ($kind === $target->kind() && $className === $target->className() && $memberName === $target->memberName()) {
+                    $attributes[] = $attribute;
+                    break;
+                }
+            }
         }
 
         return $attributes;
     }
 
-    /** @return list<array{className: string, shortName: string, header: string, body: string, bodyOffset: int, attributes: string, attributesOffset: int, before: string, range: Range}> */
-    private function classes(string $source, string $text, PhpDocument $php): array
+    private function classReferenceArgument(PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
     {
-        preg_match_all('/(?:(?:final|abstract|readonly)\s+)*class\s+([A-Za-z_][A-Za-z0-9_]*)[^\{]*\{/', $source, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-        $classes = [];
-        foreach ($matches as $match) {
-            $open = $match[0][1] + \strlen($match[0][0]) - 1;
-            $close = $this->delimiters->matching($source, $open, '{', '}') ?? \strlen($source);
-            $before = substr($source, 0, $match[0][1]);
-            $originalBefore = substr($text, 0, $match[0][1]);
-            $boundary = max((int) strrpos($before, ';'), (int) strrpos($before, '}'));
-            $attributeText = substr($before, $boundary + 1);
-            $attributeOffset = $boundary + 1;
-            $shortName = $match[1][0];
-            $classes[] = [
-                'className' => $php->resolveName($shortName),
-                'shortName' => $shortName,
-                'header' => $match[0][0],
-                'body' => substr($source, $open + 1, $close - $open - 1),
-                'bodyOffset' => $open + 1,
-                'attributes' => $attributeText,
-                'attributesOffset' => $attributeOffset,
-                'before' => substr($originalBefore, max(0, \strlen($originalBefore) - 1000)),
-                'range' => $this->converter->toRange($text, $match[1][1], \strlen($shortName)),
-            ];
+        $start = $argument?->expressionStartOffset();
+        $end = $argument?->expressionEndOffset();
+        if (!\is_int($start) || !\is_int($end)) {
+            return null;
+        }
+        $references = [];
+        foreach ($php->classReferences() as $reference) {
+            if ($reference->startOffset() >= $start && $reference->endOffset() <= $end) {
+                $references[] = $reference;
+            }
         }
 
-        return $classes;
+        return 1 === \count($references) ? $references[0] : null;
+    }
+
+    private function arrayClassReference(string $source, PhpDocument $php, PhpArgument $argument, string $key): ?PhpClassReference
+    {
+        $start = $argument->expressionStartOffset();
+        $end = $argument->expressionEndOffset();
+        if (!\is_int($start) || !\is_int($end)) {
+            return null;
+        }
+        foreach ($php->classReferences() as $reference) {
+            if ($reference->startOffset() < $start || $reference->endOffset() > $end) {
+                continue;
+            }
+            $before = substr($source, $start, $reference->startOffset() - $start);
+            $boundary = max((int) strrpos($before, ','), (int) strrpos($before, '['));
+            if (1 === preg_match('/[\'"]'.preg_quote($key, '/').'[\'"]\s*=>\s*$/', substr($before, $boundary + 1))) {
+                return $reference;
+            }
+        }
+
+        return null;
+    }
+
+    /** @param list<PhpAttribute> $attributes */
+    private function associationTarget(array $attributes, PhpPropertyDeclaration $property, PhpDocument $php): ?string
+    {
+        foreach ($attributes as $attribute) {
+            $reference = $this->classReferenceArgument($php, $attribute->argument('targetEntity'));
+            if (null !== $reference) {
+                return $reference->className();
+            }
+        }
+        if (1 !== \count($property->types())) {
+            return null;
+        }
+        $type = $property->types()[0];
+        $separator = strrpos($type, '\\');
+        $shortName = strtolower(false === $separator ? $type : substr($type, $separator + 1));
+
+        return \in_array($shortName, ['array', 'collection', 'iterable', 'mixed'], true) ? null : $type;
     }
 
     /** @param list<DoctrineSourceSymbol> $symbols
@@ -407,10 +523,5 @@ final class DoctrineExtractor
         }
 
         return array_values($unique);
-    }
-
-    private function shortNameLengthAt(string $text, int $offset): int
-    {
-        return preg_match('/[A-Za-z_\\\\][A-Za-z0-9_\\\\]*/A', substr($text, $offset), $name) ? \strlen($name[0]) : 0;
     }
 }

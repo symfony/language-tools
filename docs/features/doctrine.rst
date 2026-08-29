@@ -16,6 +16,11 @@ the entity from:
 * a call inside a mapped repository class;
 * ``getRepository(Entity::class)`` chains and local assignments.
 
+Typed repository parameters are scoped to their declaring method, so
+same-named parameters with unrelated types in other methods are ignored.
+When one Doctrine attribute maps several properties declared in the same
+statement, each property is available.
+
 For example, ``name`` and ``category`` are completed from the ``Product``
 entity:
 

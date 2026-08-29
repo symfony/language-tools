@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Scope typed Doctrine repository receivers to their declaring methods
+- Recognize attributed multi-property Doctrine declarations
 - Scope typed Event and Messenger receivers to their declaring methods
 - Resolve aliased Event, Messenger and Twig Component attributes
 - Ignore commented Event, Messenger and Security PHP constructs

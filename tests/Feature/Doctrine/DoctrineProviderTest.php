@@ -19,7 +19,6 @@ use Symfony\Lsp\Feature\Doctrine\DoctrineIndexRegistry;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipCodeLensProvider;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipProvider;
 use Symfony\Lsp\Feature\Doctrine\DoctrineSymbolKind;
-use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
@@ -117,7 +116,7 @@ final class DoctrineProviderTest extends TestCase
             PHP;
 
         $converter = new PositionConverter();
-        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser(), new BalancedDelimiterMatcher());
+        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -181,10 +180,74 @@ final class DoctrineProviderTest extends TestCase
         self::assertSame('Entity: App\\Entity\\Product', $repositoryLenses[0]['command']['title'] ?? null);
     }
 
+    public function testUsesPropertyPlacementAndScopedRepositoryReceivers(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $entityText = <<<'PHP'
+            <?php
+            namespace App\Entity;
+
+            use Doctrine\ORM\Mapping as ORM;
+
+            #[ORM\Entity]
+            final class Product
+            {
+                #[ORM\Column]
+                private string $name, $sku;
+            }
+            PHP;
+        $repositoryText = <<<'PHP'
+            <?php
+            namespace App\Repository;
+
+            use App\Entity\Product;
+            use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+
+            /** @extends ServiceEntityRepository<Product> */
+            final class ProductRepository extends ServiceEntityRepository
+            {
+            }
+            PHP;
+        $usageText = <<<'PHP'
+            <?php
+            namespace App\Service;
+
+            use App\Repository\ProductRepository;
+
+            final class ProductFinder
+            {
+                public function find(ProductRepository $products): void
+                {
+                    $products->findBy(['name' => 'Symfony']);
+                }
+
+                public function unrelated(object $products): void
+                {
+                    $products->findBy(['ignored' => true]);
+                }
+            }
+            PHP;
+
+        $entityFacts = $extractor->extract('file:///workspace/src/Entity/Product.php', 'php', $entityText);
+        self::assertSame(['name', 'sku'], array_map(static fn (DoctrineField $field): string => $field->name(), $entityFacts->entities()[0]->fields()));
+
+        $repositoryFacts = $extractor->extract('file:///workspace/src/Repository/ProductRepository.php', 'php', $repositoryText);
+        self::assertSame('App\Entity\Product', $repositoryFacts->repositories()[0]->entityClass());
+
+        $usageFacts = $extractor->extract('file:///workspace/src/Service/ProductFinder.php', 'php', $usageText);
+        $fieldReferences = array_values(array_filter(
+            $usageFacts->symbols(),
+            static fn ($symbol): bool => DoctrineSymbolKind::Field === $symbol->kind(),
+        ));
+        self::assertSame(['name'], array_map(static fn ($symbol): string => $symbol->name(), $fieldReferences));
+        self::assertSame(strpos($usageText, "'name'") + 1, $converter->toByteOffset($usageText, $fieldReferences[0]->range()->start()));
+    }
+
     public function testIgnoresCommentedDoctrinePhpWhilePreservingActiveRanges(): void
     {
         $converter = new PositionConverter();
-        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser(), new BalancedDelimiterMatcher());
+        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
         $text = <<<'PHP'
             <?php
             namespace App\Form;
@@ -249,7 +312,7 @@ final class DoctrineProviderTest extends TestCase
     public function testNavigatesToRuntimeOnlyEntities(): void
     {
         $converter = new PositionConverter();
-        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser(), new BalancedDelimiterMatcher());
+        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -285,7 +348,7 @@ final class DoctrineProviderTest extends TestCase
 
     public function testOffersNoDoctrineCompletionsInsidePhpComments(): void
     {
-        $extractor = new DoctrineExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new BalancedDelimiterMatcher());
+        $extractor = new DoctrineExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
         $text = <<<'PHP'
             <?php
             use App\Repository\ProductRepository;
