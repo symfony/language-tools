@@ -115,7 +115,8 @@ final class ConsoleExtractor
         $complete = true;
         $configureRanges = $this->methodBodyRanges($text, $type, 'configure');
         foreach ($php->methodCalls() as $call) {
-            if ($type->name() !== $call->className() || 'configure' !== $call->enclosingMethod() || !$this->isDefinitionReceiver($call->receiver())) {
+            $receiver = substr($text, $call->receiverContext()->startOffset(), $call->receiverContext()->endOffset() - $call->receiverContext()->startOffset());
+            if ($type->name() !== $call->className() || 'configure' !== $call->enclosingMethod() || !$this->isDefinitionReceiver($receiver)) {
                 continue;
             }
             if ('addArgument' === $call->method() || 'addOption' === $call->method()) {

@@ -47,6 +47,7 @@ final class ConsoleExtractorTest extends TestCase
                 {
                     $this
                         ->addArgument('report\\name')
+                        /* keep the chain readable */
                         ->addOption("out\"put")
                     ;
                     $this->setDefinition(new InputDefinition([
