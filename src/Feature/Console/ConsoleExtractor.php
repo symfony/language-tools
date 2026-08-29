@@ -4,13 +4,17 @@ namespace Symfony\Lsp\Feature\Console;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpExpressionParser;
+use Symfony\Lsp\Parser\Php\PhpMethodCall;
+use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
+use Symfony\Lsp\Parser\Php\PhpTypeKind;
+use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
 final class ConsoleExtractor
 {
@@ -24,7 +28,6 @@ final class ConsoleExtractor
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $parser,
         private readonly PhpExpressionParser $expressionParser,
-        private readonly QuotedArgumentMatcher $matcher,
         private readonly PhpCommentParserInterface $phpComments,
     ) {
     }
@@ -39,25 +42,28 @@ final class ConsoleExtractor
         $php = $this->parser->parse($masked);
         $declarations = [];
         foreach ($php->typeDeclarations() as $type) {
-            if (!$type->isClass() && !$this->isTrait($masked, $type)) {
+            if (!\in_array($type->kind(), [PhpTypeKind::Class_, PhpTypeKind::Trait_], true)) {
                 continue;
             }
             $declarations[] = $this->declaration($masked, $php, $type);
         }
 
         $references = [];
-        foreach ($this->matcher->methodCalls($masked, ['getArgument', 'getOption']) as $call) {
-            $type = $this->containingType($php, $call->nameOffset);
-            $receiver = $this->receiverName($masked, $call->nameOffset);
-            if (null === $type || null === $receiver || !isset($this->inputVariables($masked, $php, $type)[$receiver])) {
+        foreach ($php->methodCalls() as $call) {
+            if (!\in_array($call->method(), ['getArgument', 'getOption'], true) || !$this->hasInputReceiver($call, $php)) {
+                continue;
+            }
+            $name = $call->argument(0)?->stringLiteral();
+            $className = $call->className();
+            if (null === $name || null === $className) {
                 continue;
             }
             $references[] = new ConsoleInputReference(
-                'getArgument' === $call->name ? ConsoleInputKind::Argument : ConsoleInputKind::Option,
-                $call->value,
+                'getArgument' === $call->method() ? ConsoleInputKind::Argument : ConsoleInputKind::Option,
+                $name->value(),
                 $uri,
-                $call->range,
-                $type->name(),
+                new Range($this->converter->toPosition($text, $name->startOffset()), $this->converter->toPosition($text, $name->endOffset())),
+                $className,
             );
         }
 
@@ -77,8 +83,10 @@ final class ConsoleExtractor
         $php = $this->parser->parse($masked);
         $methodOffset = $match[3][1];
         $type = $this->containingType($php, $methodOffset);
-        $receiver = \is_string($match[2][0] ?? null) ? $match[2][0] : ($match[1][0] ?? null);
-        if (null === $type || !\is_string($receiver) || !isset($this->inputVariables($masked, $php, $type)[$receiver])) {
+        $property = \is_string($match[2][0] ?? null);
+        $receiver = $property ? $match[2][0] : ($match[1][0] ?? null);
+        $method = null === $type ? null : $this->containingMethod($php, $type, $methodOffset);
+        if (null === $type || !\is_string($receiver) || null === $method || !$this->hasInputVariable($php, $type->name(), $method, $receiver, $property)) {
             return null;
         }
         $rawPrefix = $match['prefix'][0];
@@ -107,7 +115,7 @@ final class ConsoleExtractor
         $complete = true;
         $configureRanges = $this->methodBodyRanges($text, $type, 'configure');
         foreach ($php->methodCalls() as $call) {
-            if (!$this->isDefinitionReceiver($call->receiver()) || !$this->inRanges($call->startOffset(), $configureRanges)) {
+            if ($type->name() !== $call->className() || 'configure' !== $call->enclosingMethod() || !$this->isDefinitionReceiver($call->receiver())) {
                 continue;
             }
             if ('addArgument' === $call->method() || 'addOption' === $call->method()) {
@@ -142,7 +150,7 @@ final class ConsoleExtractor
             }
         }
 
-        $command = $this->hasAttribute($text, $php, $type, self::AS_COMMAND_ATTRIBUTE)
+        $command = $this->hasTypeAttribute($php, $type, self::AS_COMMAND_ATTRIBUTE)
             || 0 === strcasecmp(self::COMMAND, (string) $type->parentClassName());
         [$attributeArguments, $attributeOptions, $attributesComplete] = $this->invokableAttributes($text, $php, $type);
         $arguments = [...$arguments, ...$attributeArguments];
@@ -314,29 +322,70 @@ final class ConsoleExtractor
         return PhpStringLiteralDecoder::decode($expression[0], substr($expression, 1, -1));
     }
 
-    /** @return array<string, true> */
-    private function inputVariables(string $text, PhpDocument $php, PhpTypeDeclaration $type): array
+    private function hasInputReceiver(PhpMethodCall $call, PhpDocument $php): bool
     {
-        $source = substr($text, $type->startOffset(), $type->endOffset() - $type->startOffset());
-        preg_match_all('/(?<type>\??\\\\?[A-Za-z_][\\\\A-Za-z0-9_]*)\s+\$(?<name>[A-Za-z_][A-Za-z0-9_]*)/', $source, $matches, \PREG_SET_ORDER);
-        $variables = [];
-        foreach ($matches as $match) {
-            if (self::INPUT_INTERFACE === $php->resolveName(ltrim($match['type'], '?'))) {
-                $variables[$match['name']] = true;
+        $receiver = $call->receiverContext();
+        if (null === $receiver->name()) {
+            return false;
+        }
+        foreach ($php->typedVariables() as $variable) {
+            if ($receiver->name() !== $variable->name() || !\in_array(self::INPUT_INTERFACE, $variable->types(), true)) {
+                continue;
+            }
+            if (PhpMethodReceiverKind::Variable === $receiver->kind()
+                && \in_array($variable->kind(), [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                && $call->scopeStartOffset() === $variable->scopeStartOffset()
+            ) {
+                return true;
+            }
+            if (PhpMethodReceiverKind::ThisProperty === $receiver->kind()
+                && \in_array($variable->kind(), [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
+                && $call->className() === $variable->className()
+            ) {
+                return true;
             }
         }
 
-        return $variables;
+        return false;
     }
 
-    private function receiverName(string $text, int $methodNameOffset): ?string
+    private function hasInputVariable(PhpDocument $php, string $className, string $methodName, string $name, bool $property): bool
     {
-        $before = substr($text, 0, max(0, $methodNameOffset - 2));
-        if (!preg_match('/(?:\$this\s*->\s*|\$)([A-Za-z_][A-Za-z0-9_]*)\s*$/', $before, $match)) {
-            return null;
+        foreach ($php->typedVariables() as $variable) {
+            if ($name !== $variable->name() || !\in_array(self::INPUT_INTERFACE, $variable->types(), true)) {
+                continue;
+            }
+            if ($property
+                && \in_array($variable->kind(), [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
+                && $className === $variable->className()
+            ) {
+                return true;
+            }
+            if (!$property
+                && \in_array($variable->kind(), [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                && $className === $variable->className()
+                && $methodName === $variable->methodName()
+            ) {
+                return true;
+            }
         }
 
-        return $match[1];
+        return false;
+    }
+
+    private function containingMethod(PhpDocument $php, PhpTypeDeclaration $type, int $offset): ?string
+    {
+        $name = null;
+        $nameOffset = -1;
+        foreach ($php->methodDeclarations() as $method) {
+            if ($type->name() !== $method->className() || $method->nameStartOffset() > $offset || $method->nameStartOffset() <= $nameOffset) {
+                continue;
+            }
+            $name = $method->name();
+            $nameOffset = $method->nameStartOffset();
+        }
+
+        return $name;
     }
 
     private function containingType(PhpDocument $php, int $offset): ?PhpTypeDeclaration
@@ -350,18 +399,16 @@ final class ConsoleExtractor
         return null;
     }
 
-    private function isTrait(string $text, PhpTypeDeclaration $type): bool
+    private function hasTypeAttribute(PhpDocument $php, PhpTypeDeclaration $type, string $attributeName): bool
     {
-        return 1 === preg_match('/\btrait\s*$/', substr($text, $type->startOffset(), $type->nameStartOffset() - $type->startOffset()));
-    }
-
-    private function hasAttribute(string $text, PhpDocument $php, PhpTypeDeclaration $type, string $attribute): bool
-    {
-        $header = substr($text, $type->startOffset(), $type->nameStartOffset() - $type->startOffset());
-        preg_match_all('/#\[\s*([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\b/', $header, $attributes);
-        foreach ($attributes[1] as $name) {
-            if ($attribute === $php->resolveName($name)) {
-                return true;
+        foreach ($php->attributes() as $attribute) {
+            if ($attributeName !== $attribute->name()) {
+                continue;
+            }
+            foreach ($attribute->targets() as $target) {
+                if (PhpAttributeTargetKind::Type === $target->kind() && $type->name() === $target->className()) {
+                    return true;
+                }
             }
         }
 
@@ -398,12 +445,6 @@ final class ConsoleExtractor
         }
 
         return $ranges;
-    }
-
-    /** @param list<array{start: int, end: int, closed: bool}> $ranges */
-    private function inRanges(int $offset, array $ranges): bool
-    {
-        return array_any($ranges, static fn (array $range): bool => $offset >= $range['start'] && $offset <= $range['end']);
     }
 
     /** @return array{int, int}|null */

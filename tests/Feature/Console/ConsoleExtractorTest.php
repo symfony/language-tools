@@ -13,7 +13,6 @@ use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpExpressionParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 
 final class ConsoleExtractorTest extends TestCase
 {
@@ -102,6 +101,96 @@ final class ConsoleExtractorTest extends TestCase
         self::assertSame([ConsoleInputKind::Argument, ConsoleInputKind::Option], array_map(static fn ($reference): ConsoleInputKind => $reference->kind(), $facts->references()));
     }
 
+    public function testScopesInputReferencesToTheirOwningMethods(): void
+    {
+        $facts = $this->extractor()->extract('file:///workspace/src/Command/ScopedCommand.php', 'php', <<<'PHP'
+            <?php
+            use Symfony\Component\Console\Input\InputInterface;
+
+            final class ScopedCommand
+            {
+                public function first(InputInterface $input): void
+                {
+                    $input->getArgument('tracked');
+                }
+
+                public function second(object $input): void
+                {
+                    $input->getArgument('ignored');
+                }
+            }
+            PHP);
+
+        self::assertSame(['tracked'], array_map(static fn ($reference): string => $reference->name(), $facts->references()));
+        self::assertSame(['ScopedCommand'], array_map(static fn ($reference): string => $reference->commandClass(), $facts->references()));
+    }
+
+    public function testKeepsDeclarationsCallsAndAttributesWithTheirOwningTypes(): void
+    {
+        $facts = $this->extractor()->extract('file:///workspace/src/Command/Declarations.php', 'php', <<<'PHP'
+            <?php
+            namespace App\Command;
+
+            use Symfony\Component\Console\Attribute\AsCommand;
+
+            trait SharedDefinition
+            {
+                protected function configure(): void
+                {
+                    $this->addArgument('shared');
+                }
+            }
+
+            interface CommandContract
+            {
+                public function run(): void;
+            }
+
+            enum CommandState
+            {
+                case Ready;
+
+                protected function configure(): void
+                {
+                    $this->addArgument('enum');
+                }
+            }
+
+            #[AsCommand]
+            final class FirstCommand
+            {
+                protected function configure(): void
+                {
+                    $this->addArgument('first');
+                }
+            }
+
+            final class NeighborCommand
+            {
+                #[AsCommand]
+                protected function configure(): void
+                {
+                    $this->addArgument('neighbor');
+                }
+            }
+            PHP);
+        $declarations = [];
+        foreach ($facts->declarations() as $declaration) {
+            $declarations[$declaration->className()] = $declaration;
+        }
+
+        self::assertSame([
+            'App\Command\SharedDefinition',
+            'App\Command\FirstCommand',
+            'App\Command\NeighborCommand',
+        ], array_keys($declarations));
+        self::assertSame(['shared'], $declarations['App\Command\SharedDefinition']->arguments());
+        self::assertSame(['first'], $declarations['App\Command\FirstCommand']->arguments());
+        self::assertSame(['neighbor'], $declarations['App\Command\NeighborCommand']->arguments());
+        self::assertTrue($declarations['App\Command\FirstCommand']->isCommand());
+        self::assertFalse($declarations['App\Command\NeighborCommand']->isCommand());
+    }
+
     public function testMarksDynamicDefinitionsIncomplete(): void
     {
         $facts = $this->extractor()->extract('file:///workspace/src/Command/DynamicCommand.php', 'php', <<<'PHP'
@@ -159,6 +248,45 @@ final class ConsoleExtractorTest extends TestCase
         self::assertNull($this->extractor()->completionContext('php', $unrelated, $cursor));
     }
 
+    public function testScopesIncompleteCompletionReceiversToTheirOwningMethods(): void
+    {
+        $text = <<<'PHP'
+            <?php
+            use Symfony\Component\Console\Input\InputInterface;
+
+            final class DemoCommand
+            {
+                public function first(InputInterface $input): void
+                {
+                }
+
+                public function second(object $input): void
+                {
+                    $input->getOption('ver|
+                }
+            }
+            PHP;
+        $cursor = strpos($text, '|');
+        self::assertIsInt($cursor);
+        $text = str_replace('|', '', $text);
+
+        self::assertNull($this->extractor()->completionContext('php', $text, $cursor));
+    }
+
+    public function testMarksUnterminatedConfigureIncomplete(): void
+    {
+        $facts = $this->extractor()->extract('file:///workspace/src/Command/DraftCommand.php', 'php', <<<'PHP'
+            <?php
+            final class DraftCommand
+            {
+                protected function configure(): void
+                {
+                    $this->addArgument('draft');
+            PHP);
+
+        self::assertFalse($facts->declarations()[0]->isComplete());
+    }
+
     public function testKeepsDocumentParseCachedWhileParsingDefinitionExpressions(): void
     {
         $text = <<<'PHP'
@@ -181,7 +309,6 @@ final class ConsoleExtractorTest extends TestCase
             $converter,
             $parser,
             new PhpExpressionParser($expressionParser),
-            new QuotedArgumentMatcher($converter),
             new PhpCommentParser(),
         );
 
@@ -201,7 +328,6 @@ final class ConsoleExtractorTest extends TestCase
             $converter,
             new TolerantPhpParser(new Parser()),
             new PhpExpressionParser(new TolerantPhpParser(new Parser())),
-            new QuotedArgumentMatcher($converter),
             new PhpCommentParser(),
         );
     }

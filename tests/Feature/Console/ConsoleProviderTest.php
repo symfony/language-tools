@@ -17,7 +17,6 @@ use Symfony\Lsp\Feature\Console\ConsoleSourceIndexRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpExpressionParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -156,7 +155,7 @@ final class ConsoleProviderTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new ConsoleExtractor($converter, new TolerantPhpParser(new Parser()), new PhpExpressionParser(new TolerantPhpParser(new Parser())), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+        $extractor = new ConsoleExtractor($converter, new TolerantPhpParser(new Parser()), new PhpExpressionParser(new TolerantPhpParser(new Parser())), new PhpCommentParser());
         $sourceIndexes = new ConsoleSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($extractor->extract($uri, 'php', $text));
         $indexes = new ConsoleIndexRegistry();
