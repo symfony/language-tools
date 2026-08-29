@@ -321,6 +321,10 @@ final class TolerantPhpParser implements PhpParserInterface
             $name = $type->getResolvedName();
             $resolved[] = null === $name ? $names->resolve($this->qualifiedName($type, $source)) : (string) $name;
         }
+        preg_match_all('/(?<![A-Za-z0-9_\\\\])(?:array|bool|callable|false|float|int|iterable|mixed|never|object|string|true|void)(?![A-Za-z0-9_\\\\])/i', $types->getText($source), $builtinTypes);
+        foreach ($builtinTypes[0] as $type) {
+            $resolved[] = strtolower($type);
+        }
 
         return array_values(array_unique($resolved));
     }

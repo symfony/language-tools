@@ -177,14 +177,16 @@ final class TolerantPhpParserTest extends TestCase
 
         $variables = (new TolerantPhpParser(new Parser()))->parse($source)->typedVariables();
 
-        self::assertSame(['service', 'handler', 'property', 'first', 'second', 'combined'], array_map(static fn ($variable): string => $variable->name(), $variables));
+        self::assertSame(['service', 'handler', 'property', 'first', 'second', 'scalar', 'combined', 'count'], array_map(static fn ($variable): string => $variable->name(), $variables));
         self::assertSame([
             ['Vendor\Package\Service'],
             ['Vendor\Package\Handler', 'Vendor\Package\Other'],
             ['Vendor\Package\Service'],
             ['Vendor\Package\Other'],
             ['Vendor\Package\Other'],
+            ['int'],
             ['Vendor\Package\Handler', 'Vendor\Package\Other', 'Vendor\Package\Service'],
+            ['int'],
         ], array_map(static fn ($variable): array => $variable->types(), $variables));
     }
 
@@ -281,7 +283,7 @@ final class TolerantPhpParserTest extends TestCase
             ['Vendor\Identity\Identifier'],
             ['Vendor\Identity\Identifier'],
             ['Vendor\Profile'],
-            [],
+            ['string'],
             [],
         ], array_map(static fn ($property): array => $property->types(), $properties));
         self::assertSame(['private', 'private', 'protected', 'public', 'private'], array_map(static fn ($property): string => $property->visibility(), $properties));
@@ -453,6 +455,7 @@ final class TolerantPhpParserTest extends TestCase
         self::assertNull($methods[1]->firstParameterType());
         self::assertFalse($methods[2]->isPublic());
         self::assertSame([], $methods[3]->attributes());
+        self::assertSame('string', $methods[3]->firstParameterType());
     }
 
     public function testExposesClassConstantsAndEnumCases(): void
