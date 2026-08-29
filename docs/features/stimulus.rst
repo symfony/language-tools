@@ -51,9 +51,12 @@ Hover identifies Live Components and their properties and actions. Go to
 Definition and Find All References connect action attributes to their PHP
 methods and component templates.
 
-Events declared by ``#[LiveListener]`` are completed in static ``emit()`` calls
-inside Live Components. Hover shows listeners, Go to Definition opens listener
-declarations and Find All References lists static emitters and listeners.
+Events declared by ``#[LiveListener]`` are completed in literal
+``$this->emit()`` calls inside their declaring Live Component, including calls
+that use the named ``event`` argument. Calls on other receivers and calls in
+unrelated classes are ignored. Hover shows listeners, Go to Definition opens
+listener declarations and Find All References lists static emitters and
+listeners.
 
 Limitations
 -----------

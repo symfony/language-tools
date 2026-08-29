@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Scope Live Component emit events to their declaring components
 - Match Messenger handler signatures to their declaring classes
 - Scope typed Doctrine repository receivers to their declaring methods
 - Recognize attributed multi-property Doctrine declarations

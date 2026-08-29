@@ -6,7 +6,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpAttributeTarget;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -25,7 +25,6 @@ final class TwigComponentExtractor
         private readonly TemplateNameResolver $templateNameResolver,
         private readonly TwigCommentParser $commentParser,
         private readonly QuotedArgumentMatcher $matcher,
-        private readonly PhpCommentParserInterface $phpComments,
         private readonly PhpParserInterface $phpParser,
     ) {
     }
@@ -37,7 +36,6 @@ final class TwigComponentExtractor
         $actionReferences = [];
         $events = [];
         if ('php' === $languageId) {
-            $masked = $this->phpComments->mask($text);
             $php = $this->phpParser->parse($text);
             $attributes = $php->attributes();
             foreach ($attributes as $attribute) {
@@ -114,8 +112,35 @@ final class TwigComponentExtractor
                     array_values($actions),
                 );
                 if ($live) {
-                    foreach ($this->matcher->functionCalls($masked, ['emit']) as $emit) {
-                        $events[] = new LiveComponentEvent($emit->value, $uri, $emit->range, false, $name);
+                    foreach ($php->methodCalls() as $call) {
+                        if ('emit' !== $call->method()
+                            || PhpMethodReceiverKind::This !== $call->receiverContext()->kind()
+                            || $className !== $call->className()
+                        ) {
+                            continue;
+                        }
+                        $argument = null;
+                        foreach ($call->arguments() as $candidate) {
+                            if ('event' === $candidate->name()) {
+                                $argument = $candidate;
+                                break;
+                            }
+                        }
+                        $argument ??= $call->argument(0);
+                        if (null !== $argument?->name() && 'event' !== $argument->name()) {
+                            continue;
+                        }
+                        $event = $argument?->stringLiteral();
+                        if (null === $event) {
+                            continue;
+                        }
+                        $events[] = new LiveComponentEvent(
+                            $event->value(),
+                            $uri,
+                            $this->converter->toRange($text, $event->startOffset(), $event->endOffset() - $event->startOffset()),
+                            false,
+                            $name,
+                        );
                     }
                 }
             }

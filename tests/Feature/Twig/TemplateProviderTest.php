@@ -210,7 +210,7 @@ final class TemplateProviderTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver(), $commentParser, new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()));
+        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver(), $commentParser, new QuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
         $classUri = 'file:///workspace/src/Twig/Alert.php';
         $classText = <<<'PHP'
             <?php
@@ -313,7 +313,7 @@ final class TemplateProviderTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver(), $commentParser, new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()));
+        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver(), $commentParser, new QuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
         $usageUri = 'file:///workspace/templates/page.html.twig';
         $usageText = "{## Use <twig:Documented /> in examples. #}\n<twig:ux:icon name=\"x\" />\n<twig:uX:iCoN name=\"x\" />\n<twig:Alert />\n<twig:alert />\n<twig:Card />\n<twig:acme:badge />\n<twig:Unknown />";
         $documents = new DocumentStore();
@@ -365,7 +365,7 @@ final class TemplateProviderTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver(), $commentParser, new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()));
+        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver(), $commentParser, new QuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
         $completionUri = 'file:///workspace/templates/completion.html.twig';
         $completionText = '<twig:';
         $documents = new DocumentStore();

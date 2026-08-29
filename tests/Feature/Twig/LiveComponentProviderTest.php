@@ -33,7 +33,7 @@ final class LiveComponentProviderTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), $commentParser, new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()));
+        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), $commentParser, new QuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
         $classUri = 'file:///workspace/src/Twig/Components/Search.php';
         $classText = <<<'PHP'
             <?php
@@ -123,7 +123,7 @@ final class LiveComponentProviderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
-        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()));
+        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
         $facts = $extractor->extract($project, 'file:///workspace/src/Twig/Components/Card.php', 'php', <<<'PHP'
             <?php
             use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
@@ -152,7 +152,7 @@ final class LiveComponentProviderTest extends TestCase
     public function testOffersNoEmitCompletionsInsidePhpComments(): void
     {
         $converter = new PositionConverter();
-        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()));
+        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
         $uri = 'file:///workspace/src/Twig/Components/Search.php';
         $text = <<<'PHP'
             <?php
@@ -178,10 +178,60 @@ final class LiveComponentProviderTest extends TestCase
         self::assertNull($provider->complete($this->params($converter, $uri, $text, strpos($text, 'search:c') + \strlen('search:c'))));
     }
 
+    public function testAttributesEmitCallsToTheirOwningLiveComponents(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
+
+        $facts = $extractor->extract(new Project('/workspace', 'file:///workspace', '^8.0'), 'file:///workspace/src/Twig/Components/Events.php', 'php', <<<'PHP'
+            <?php
+            namespace App\Twig\Components;
+
+            use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
+
+            #[AsLiveComponent(name: 'Alpha')]
+            final class Alpha
+            {
+                public function submit(): void
+                {
+                    $this->emit('alpha:done');
+                    $this->emit(event: 'alpha:named');
+                    $bus->emit('ignored:receiver');
+                }
+            }
+
+            #[AsLiveComponent(name: 'Beta')]
+            final class Beta
+            {
+                public function submit(): void
+                {
+                    $this->emit('beta:done');
+                }
+            }
+
+            final class Helper
+            {
+                public function submit(): void
+                {
+                    $this->emit('ignored:class');
+                }
+            }
+            PHP);
+
+        self::assertSame(
+            [
+                ['alpha:done', 'Alpha'],
+                ['alpha:named', 'Alpha'],
+                ['beta:done', 'Beta'],
+            ],
+            array_map(static fn ($event): array => [$event->name(), $event->component()], $facts->events()),
+        );
+    }
+
     public function testIgnoresEmitCallsInPhpComments(): void
     {
         $converter = new PositionConverter();
-        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()));
+        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
 
         $facts = $extractor->extract(new Project('/workspace', 'file:///workspace', '^8.0'), 'file:///workspace/src/Twig/Components/Search.php', 'php', <<<'PHP'
             <?php
