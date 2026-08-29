@@ -383,7 +383,12 @@ final class MetadataProviderTest extends TestCase
 
                 public function buildForm(FormBuilderInterface $builder): void
                 {
-                    $builder->add('title', NestedArticleType::class, ['active_option' => true]);
+                    $builder->add('title', /* type */ NestedArticleType::class, ['active_option' => true]);
+                }
+
+                public function controller(): void
+                {
+                    $this->createForm($this->resolve(NestedArticleType::class), null, ['nested_option' => true]);
                 }
 
                 public function unrelatedBuilder(object $builder): void
@@ -400,6 +405,7 @@ final class MetadataProviderTest extends TestCase
         }
         self::assertSame(['App\Form\ArticleType' => 'App\Dto\Article'], $dataClasses);
         self::assertSame(['active_option'], array_column($extractor->formOptions($text), 'option'));
+        self::assertNull($extractor->completionContext('php', $text, strpos($text, "'ignored'") + \strlen("'ign")));
 
         $references = array_values(array_filter(
             $facts->symbols(),
@@ -434,7 +440,7 @@ final class MetadataProviderTest extends TestCase
             }
 
             // #[Assert\Length(commented_constraint: 1)]
-            #[Assert\Length(active_constraint: 1)]
+            #[Assert\Length(active_constraint: 1), Assert\NotBlank]
             final class Input
             {
                 // #[Groups(['commented_group'])]
@@ -471,12 +477,16 @@ final class MetadataProviderTest extends TestCase
 
         $symbols = $extractor->extract($uri, 'php', $text)->symbols();
         $serializerGroups = [];
+        $constraints = [];
         foreach ($symbols as $symbol) {
             self::assertStringNotContainsString('commented_', $symbol->name());
             if (MetadataSymbolKind::SerializerGroup === $symbol->kind()) {
                 $serializerGroups[] = $symbol;
+            } elseif (MetadataSymbolKind::Constraint === $symbol->kind() && !$symbol->isDeclaration()) {
+                $constraints[] = $symbol->name();
             }
         }
+        self::assertSame(['Length', 'NotBlank'], $constraints);
         self::assertCount(1, $serializerGroups);
         self::assertSame('active_group', $serializerGroups[0]->name());
         self::assertSame(strpos($text, 'active_group'), $converter->toByteOffset($text, $serializerGroups[0]->range()->start()));

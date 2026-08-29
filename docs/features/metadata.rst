@@ -18,8 +18,9 @@ known form types. Dynamic option arrays and unresolved form types are ignored.
 For form types that configure a static ``data_class`` with ``setDefaults()``
 or ``setDefault()``, literal field names passed to
 ``FormBuilderInterface::add()`` are linked to the corresponding class property.
-Property completion is available while entering the field name. Hover shows the
-PHP property signature and description. Go to Definition opens the declaration.
+Property completion is available while entering the field name and is scoped to
+the method that declares the typed form builder. Hover shows the PHP property
+signature and description. Go to Definition opens the declaration.
 Find All References includes the form field and mapped validation or serializer
 metadata.
 
@@ -45,8 +46,9 @@ Definitely unknown options are diagnosed only when the constraint itself is
 known. In PHP, the attribute must resolve to an installed constraint; unrelated
 attributes that share its short name are ignored. Validation applies to
 top-level named arguments; positional values and expressions nested inside
-argument values are ignored. Go to Definition and Find All References connect
-application constraint classes to static PHP and YAML usages.
+argument values are ignored. Every constraint in a grouped PHP attribute is
+indexed. Go to Definition and Find All References connect application constraint
+classes to static PHP and YAML usages.
 
 Serializer Groups and Mapped Properties
 ---------------------------------------
