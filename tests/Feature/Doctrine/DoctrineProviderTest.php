@@ -226,6 +226,11 @@ final class DoctrineProviderTest extends TestCase
                 {
                     $products->findBy(['ignored' => true]);
                 }
+
+                public function ambiguous(ProductRepository|\stdClass $products): void
+                {
+                    $products->findBy(['ambiguous' => true]);
+                }
             }
             PHP;
 

@@ -337,11 +337,9 @@ final class DoctrineExtractor
     {
         $variables = [];
         foreach ($php->typedVariables() as $variable) {
-            foreach ($variable->types() as $type) {
-                if (str_ends_with($type, 'Repository')) {
-                    $variables[$variable->name()] = $type;
-                    break;
-                }
+            $type = $this->repositoryType($variable->types());
+            if (null !== $type) {
+                $variables[$variable->name()] = $type;
             }
         }
 
@@ -382,13 +380,7 @@ final class DoctrineExtractor
                 if ($receiver->name() !== $variable->name()) {
                     continue;
                 }
-                $repositoryType = null;
-                foreach ($variable->types() as $type) {
-                    if (str_ends_with($type, 'Repository')) {
-                        $repositoryType = $type;
-                        break;
-                    }
-                }
+                $repositoryType = $this->repositoryType($variable->types());
                 if (null === $repositoryType) {
                     continue;
                 }
@@ -426,6 +418,12 @@ final class DoctrineExtractor
     private function variableScopeKey(PhpMethodCall $call, string $variable): string
     {
         return ($call->scopeStartOffset() ?? -1).'|'.$variable;
+    }
+
+    /** @param list<string> $types */
+    private function repositoryType(array $types): ?string
+    {
+        return 1 === \count($types) && str_ends_with($types[0], 'Repository') ? $types[0] : null;
     }
 
     /**
