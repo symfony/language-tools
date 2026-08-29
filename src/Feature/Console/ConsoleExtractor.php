@@ -13,8 +13,8 @@ use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
-use Symfony\Lsp\Parser\Php\PhpTypeKind;
 use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
+use Symfony\Lsp\Parser\Php\PhpTypeKind;
 
 final class ConsoleExtractor
 {
@@ -39,7 +39,7 @@ final class ConsoleExtractor
         }
 
         $masked = $this->phpComments->mask($text);
-        $php = $this->parser->parse($masked);
+        $php = $this->parser->parse($text);
         $declarations = [];
         foreach ($php->typeDeclarations() as $type) {
             if (!\in_array($type->kind(), [PhpTypeKind::Class_, PhpTypeKind::Trait_], true)) {
@@ -80,7 +80,7 @@ final class ConsoleExtractor
         if (!preg_match('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(getArgument|getOption)\s*\(\s*([\'\"])(?<prefix>(?:\\\\.|(?!\4).)*)$/s', $before, $match, \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL)) {
             return null;
         }
-        $php = $this->parser->parse($masked);
+        $php = $this->parser->parse($text);
         $methodOffset = $match[3][1];
         $type = $this->containingType($php, $methodOffset);
         $property = \is_string($match[2][0] ?? null);

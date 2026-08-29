@@ -295,9 +295,13 @@ final class ConsoleExtractorTest extends TestCase
 
             final class ReportCommand
             {
+                /** Configures report input. */
                 protected function configure(): void
                 {
-                    $this->setDefinition([new InputArgument('report')]);
+                    $this->setDefinition([
+                        // The expression parser must accept comments.
+                        new InputArgument('report'),
+                    ]);
                 }
             }
             PHP;
@@ -317,7 +321,8 @@ final class ConsoleExtractorTest extends TestCase
 
         self::assertSame(['report'], $facts->declarations()[0]->arguments());
         self::assertSame([$text], $inner->sources);
-        self::assertSame(["<?php [new InputArgument('report')];"], $expressionParser->sources);
+        self::assertCount(1, $expressionParser->sources);
+        self::assertStringContainsString('// The expression parser must accept comments.', $expressionParser->sources[0]);
     }
 
     private function extractor(): ConsoleExtractor
