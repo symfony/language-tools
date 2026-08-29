@@ -5,15 +5,21 @@ namespace Symfony\Lsp\Feature\Event;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\Php\PhpArgument;
+use Symfony\Lsp\Parser\Php\PhpAttribute;
+use Symfony\Lsp\Parser\Php\PhpAttributeTarget;
+use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
+use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
 use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
 final class EventExtractor
 {
+    private const AS_EVENT_LISTENER = 'Symfony\\Component\\EventDispatcher\\Attribute\\AsEventListener';
     private const DISPATCHER_TYPES = [
         'Symfony\\Component\\EventDispatcher\\EventDispatcher',
         'Symfony\\Component\\EventDispatcher\\EventDispatcherInterface',
@@ -81,15 +87,26 @@ final class EventExtractor
         $invalidListenerMethods = [];
         $php = $this->parser->parse($text);
         $source = $this->phpComments->mask($text);
-        preg_match_all('/#\[\s*(?:[\\\\A-Za-z_][\\\\A-Za-z0-9_]*\\\\)*AsEventListener\b(?:\([^)]*\))?\s*\]/s', $source, $listenerAttributes);
-        $listeners = $listenerAttributes[0];
-
-        preg_match_all('/AsEventListener\s*\(([^)]*)\)/s', $source, $attributes, \PREG_OFFSET_CAPTURE);
-        foreach ($attributes[1] as [$arguments, $argumentsOffset]) {
-            if (preg_match('/\bevent\s*:\s*["\']([^"\']+)/', $arguments, $match, \PREG_OFFSET_CAPTURE)) {
-                $symbols[] = $this->symbol($match[1][0], $uri, $text, $argumentsOffset + $match[1][1], true);
-            } elseif (preg_match('/\bevent\s*:\s*([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)::class/', $arguments, $match, \PREG_OFFSET_CAPTURE)) {
-                $symbols[] = $this->symbol($php->resolveName($match[1][0]), $uri, $text, $argumentsOffset + $match[1][1], true, \strlen($match[1][0]));
+        $listeners = [];
+        foreach ($php->attributes() as $attribute) {
+            if (self::AS_EVENT_LISTENER !== $attribute->name()
+                || null === $target = $this->attributeTarget($attribute)
+            ) {
+                continue;
+            }
+            $listeners[] = substr($text, $attribute->startOffset(), $attribute->endOffset() - $attribute->startOffset());
+            $eventArgument = $attribute->argument('event');
+            $event = $eventArgument?->stringLiteral();
+            if (null !== $event && '' !== $event->value()) {
+                $symbols[] = $this->symbol($event->value(), $uri, $text, $event->startOffset(), true, $event->endOffset() - $event->startOffset());
+            } elseif (null !== $eventReference = $this->classReferenceArgument($php, $eventArgument)) {
+                $symbols[] = $this->symbol($eventReference->className(), $uri, $text, $eventReference->startOffset(), true, $eventReference->endOffset() - $eventReference->startOffset());
+            }
+            if (PhpAttributeTargetKind::Type === $target->kind()) {
+                $invalid = $this->invalidListenerMethod($attribute, $target, $php, $source, $text);
+                if (null !== $invalid) {
+                    $invalidListenerMethods[] = $invalid;
+                }
             }
         }
 
@@ -126,21 +143,6 @@ final class EventExtractor
             preg_match_all('/([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)::class\s*=>/', $body, $classEvents, \PREG_OFFSET_CAPTURE);
             foreach ($classEvents[1] as [$name, $offset]) {
                 $symbols[] = $this->symbol($php->resolveName($name), $uri, $text, $open + 1 + $offset, true, \strlen($name));
-            }
-        }
-
-        preg_match_all('/#\[\s*(?:[\\\\A-Za-z_][\\\\A-Za-z0-9_]*\\\\)*AsEventListener\s*\((.*?)\)\s*\]\s*(?:(?:final|abstract|readonly)\s+)*class\s+([A-Za-z_][A-Za-z0-9_]*)([^\{]*)\{/s', $source, $classListeners, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-        foreach ($classListeners as $listener) {
-            if (!preg_match('/\bmethod\s*:\s*["\']([^"\']+)["\']/', $listener[1][0], $method, \PREG_OFFSET_CAPTURE)) {
-                continue;
-            }
-            $open = $listener[0][1] + \strlen($listener[0][0]) - 1;
-            $close = $this->matchingBrace($source, $open);
-            $body = substr($source, $open + 1, $close - $open - 1);
-            if (!str_contains($listener[3][0], 'extends') && !preg_match('/\buse\s+[^;]+;/', $body) && !preg_match('/\bfunction\s+'.preg_quote($method[1][0], '/').'\s*\(/', $body)) {
-                $className = $php->resolveName($listener[2][0]);
-                $methodOffset = $listener[1][1] + $method[1][1];
-                $invalidListenerMethods[] = new InvalidEventListenerMethod($className, $method[1][0], new Range($this->converter->toPosition($text, $methodOffset), $this->converter->toPosition($text, $methodOffset + \strlen($method[1][0]))));
             }
         }
 
@@ -214,6 +216,66 @@ final class EventExtractor
     private function symbol(string $name, string $uri, string $text, int $offset, bool $declaration, ?int $length = null): EventSourceSymbol
     {
         return new EventSourceSymbol(ltrim($name, '\\'), $uri, new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + ($length ?? \strlen($name)))), $declaration);
+    }
+
+    private function attributeTarget(PhpAttribute $attribute): ?PhpAttributeTarget
+    {
+        foreach ($attribute->targets() as $target) {
+            if (\in_array($target->kind(), [PhpAttributeTargetKind::Type, PhpAttributeTargetKind::Method], true)) {
+                return $target;
+            }
+        }
+
+        return null;
+    }
+
+    private function classReferenceArgument(PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
+    {
+        $start = $argument?->expressionStartOffset();
+        $end = $argument?->expressionEndOffset();
+        if (!\is_int($start) || !\is_int($end)) {
+            return null;
+        }
+        foreach ($php->classReferences() as $reference) {
+            if ($reference->startOffset() >= $start && $reference->endOffset() <= $end) {
+                return $reference;
+            }
+        }
+
+        return null;
+    }
+
+    private function invalidListenerMethod(PhpAttribute $attribute, PhpAttributeTarget $target, PhpDocument $php, string $source, string $text): ?InvalidEventListenerMethod
+    {
+        $method = $attribute->argument('method')?->stringLiteral();
+        if (null === $method || '' === $method->value()) {
+            return null;
+        }
+        $type = null;
+        foreach ($php->typeDeclarations() as $declaration) {
+            if ($target->className() === $declaration->name() && $declaration->isClass()) {
+                $type = $declaration;
+                break;
+            }
+        }
+        if (!$type instanceof PhpTypeDeclaration || null !== $type->parentClassName() || str_contains($type->signature(), 'extends')) {
+            return null;
+        }
+        $body = substr($source, $type->startOffset(), $type->endOffset() - $type->startOffset());
+        if (preg_match('/\buse\s+[^;]+;/', $body)) {
+            return null;
+        }
+        foreach ($php->methodDeclarations() as $declaration) {
+            if ($type->name() === $declaration->className() && $method->value() === $declaration->name()) {
+                return null;
+            }
+        }
+
+        return new InvalidEventListenerMethod(
+            $type->name(),
+            $method->value(),
+            new Range($this->converter->toPosition($text, $method->startOffset()), $this->converter->toPosition($text, $method->endOffset())),
+        );
     }
 
     /** @return array<string, true> */

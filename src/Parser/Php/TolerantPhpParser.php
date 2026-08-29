@@ -59,6 +59,7 @@ final class TolerantPhpParser implements PhpParserInterface
         $typedVariableNodes = [];
         $objectCreationNodes = [];
         $methodDeclarationNodes = [];
+        $classReferenceNodes = [];
         $constantDeclarations = [];
         $typeDeclarations = [];
         $namespaceDefinition = null;
@@ -80,6 +81,8 @@ final class TolerantPhpParser implements PhpParserInterface
                 $objectCreationNodes[] = $node;
             } elseif ($node instanceof MethodDeclaration) {
                 $methodDeclarationNodes[] = $node;
+            } elseif ($node instanceof ScopedPropertyAccessExpression && 'class' === $node->memberName->getText($source)) {
+                $classReferenceNodes[] = $node;
             } elseif ($node instanceof ClassConstDeclaration) {
                 array_push($constantDeclarations, ...$this->classConstants($node, $source));
             } elseif ($node instanceof EnumCaseDeclaration) {
@@ -125,8 +128,15 @@ final class TolerantPhpParser implements PhpParserInterface
             }
         }
         $propertyDeclarations = $this->propertyDeclarations($typedVariableNodes, $source, $names);
+        $classReferences = [];
+        foreach ($classReferenceNodes as $node) {
+            $reference = $this->classReference($node, $source, $names);
+            if (null !== $reference) {
+                $classReferences[] = $reference;
+            }
+        }
 
-        return new PhpDocument($attributes, $methodCalls, $typeDeclarations, $diagnostics, $typedVariables, $names, $objectCreations, $methodDeclarations, $constantDeclarations, $propertyDeclarations);
+        return new PhpDocument($attributes, $methodCalls, $typeDeclarations, $diagnostics, $typedVariables, $names, $objectCreations, $methodDeclarations, $constantDeclarations, $propertyDeclarations, $classReferences);
     }
 
     /**
@@ -788,6 +798,34 @@ final class TolerantPhpParser implements PhpParserInterface
         }
 
         return $arguments;
+    }
+
+    private function classReference(ScopedPropertyAccessExpression $reference, string $source, PhpNameContext $names): ?PhpClassReference
+    {
+        $member = $reference->memberName->getText($source);
+        $qualifier = $reference->scopeResolutionQualifier;
+        if ('class' !== $member || !$qualifier instanceof QualifiedName) {
+            return null;
+        }
+        $text = trim($this->qualifiedName($qualifier, $source), '\\');
+        $keyword = strtolower($text);
+        if (\in_array($keyword, ['self', 'static'], true)) {
+            [$owner] = $this->enclosingContext($reference);
+            $className = null === $owner ? null : (string) $owner->getNamespacedName();
+        } elseif ('parent' === $keyword) {
+            [$owner] = $this->enclosingContext($reference);
+            $base = $owner instanceof ClassDeclaration ? (get_object_vars($owner)['classBaseClause'] ?? null) : null;
+            $parent = $base instanceof ClassBaseClause ? $base->baseClass->getResolvedName() : null;
+            $className = null === $parent ? null : (string) $parent;
+        } else {
+            $resolved = $qualifier->getResolvedName();
+            $className = null === $resolved ? $names->resolve($text) : (string) $resolved;
+        }
+        if (null === $className || '' === $className) {
+            return null;
+        }
+
+        return new PhpClassReference(ltrim($className, '\\'), $qualifier->getStartPosition(), $qualifier->getEndPosition());
     }
 
     private function phpCallable(mixed $expression, string $source, PhpNameContext $names, ?ClassDeclaration $owner): ?PhpCallable

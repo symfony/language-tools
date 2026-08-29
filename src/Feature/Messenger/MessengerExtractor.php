@@ -7,6 +7,7 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
+use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
@@ -70,12 +71,9 @@ final class MessengerExtractor
                     }
                     $symbols[] = $this->symbol($kind, $literal->value(), $uri, $text, $literal->startOffset(), false, $literal->endOffset() - $literal->startOffset());
                 }
-                $handles = $attribute->argument('handles');
-                $expression = $handles?->expression();
-                $expressionOffset = $handles?->expressionStartOffset();
-                if (\is_string($expression) && \is_int($expressionOffset) && preg_match('/^\s*([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s*::class\s*$/', $expression, $message, \PREG_OFFSET_CAPTURE)) {
-                    $name = $message[1][0];
-                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $php->resolveName($name), $uri, $text, $expressionOffset + $message[1][1], false, \strlen($name));
+                $handles = $this->classReferenceArgument($php, $attribute->argument('handles'));
+                if (null !== $handles) {
+                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $handles->className(), $uri, $text, $handles->startOffset(), false, $handles->endOffset() - $handles->startOffset());
                 }
             }
             preg_match_all('/BusNameStamp\s*\(\s*["\']([A-Za-z_][A-Za-z0-9_.-]*)/', $source, $matches, \PREG_OFFSET_CAPTURE);
@@ -168,6 +166,22 @@ final class MessengerExtractor
         }
 
         return $parents;
+    }
+
+    private function classReferenceArgument(PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
+    {
+        $start = $argument?->expressionStartOffset();
+        $end = $argument?->expressionEndOffset();
+        if (!\is_int($start) || !\is_int($end)) {
+            return null;
+        }
+        foreach ($php->classReferences() as $reference) {
+            if ($reference->startOffset() >= $start && $reference->endOffset() <= $end) {
+                return $reference;
+            }
+        }
+
+        return null;
     }
 
     private function hasBusReceiver(PhpMethodCall $call, PhpDocument $php): bool

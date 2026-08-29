@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Scope typed Event and Messenger receivers to their declaring methods
-- Resolve aliased Messenger and Twig Component attributes
+- Resolve aliased Event, Messenger and Twig Component attributes
 - Ignore commented Event, Messenger and Security PHP constructs
 - Apply configured environment variables to dogfood processes
 - Navigate and complete form fields mapped to data class properties

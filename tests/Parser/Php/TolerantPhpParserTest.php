@@ -87,7 +87,8 @@ final class TolerantPhpParserTest extends TestCase
             }
             PHP;
 
-        $attributes = (new TolerantPhpParser(new Parser()))->parse($source)->attributes();
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $attributes = $document->attributes();
         [$type, $property, $method, $parameter] = $attributes;
         $typeTarget = $type->targets()[0];
         $propertyTarget = $property->targets()[0];
@@ -119,6 +120,8 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame("name: 'service'", substr($source, $name->startOffset(), $name->endOffset() - $name->startOffset()));
         self::assertSame("'service'", substr($source, $nameExpressionStart, $nameExpressionEnd - $nameExpressionStart));
         self::assertSame('Dependency::class', substr($source, $optionExpressionStart, $optionExpressionEnd - $optionExpressionStart));
+        self::assertSame(['App\Dependency'], array_map(static fn ($reference): string => $reference->className(), $document->classReferences()));
+        self::assertSame('Dependency', substr($source, $document->classReferences()[0]->startOffset(), $document->classReferences()[0]->endOffset() - $document->classReferences()[0]->startOffset()));
     }
 
     public function testExposesNamespaceImportsAndNameResolution(): void

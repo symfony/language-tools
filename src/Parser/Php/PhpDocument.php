@@ -16,6 +16,7 @@ final class PhpDocument
      * @param list<PhpMethodDeclaration>   $methodDeclarations
      * @param list<PhpConstantDeclaration> $constantDeclarations
      * @param list<PhpPropertyDeclaration> $propertyDeclarations
+     * @param list<PhpClassReference>      $classReferences
      */
     public function __construct(
         private readonly array $attributes,
@@ -28,6 +29,7 @@ final class PhpDocument
         private readonly array $methodDeclarations = [],
         private readonly array $constantDeclarations = [],
         private readonly array $propertyDeclarations = [],
+        private readonly array $classReferences = [],
     ) {
         $this->names = $names ?? new PhpNameContext();
     }
@@ -72,6 +74,12 @@ final class PhpDocument
     public function propertyDeclarations(): array
     {
         return $this->propertyDeclarations;
+    }
+
+    /** @return list<PhpClassReference> */
+    public function classReferences(): array
+    {
+        return $this->classReferences;
     }
 
     /** @return list<PhpDiagnostic> */

@@ -38,7 +38,9 @@ final class EventProviderTest extends TestCase
 <?php
 namespace App;
 use App\Event\{OrderPlaced};
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener as Listener;
 use Symfony\Contracts\EventDispatcher\{EventDispatcherInterface};
+#[Listener(event: OrderPlaced::class)]
 final class Subscriber
 {
     public function __construct(private EventDispatcherInterface $dispatcher) {}
@@ -63,7 +65,7 @@ PHP;
             $declarations += $symbol->isDeclaration() ? 1 : 0;
         }
         self::assertSame(['App\\Event\\OrderPlaced', 'legacy.order_placed'], array_keys($names));
-        self::assertSame(2, $declarations);
+        self::assertSame(3, $declarations);
         self::assertSame(3, \count($facts->symbols()) - $declarations);
 
         $yaml = <<<'YAML'
@@ -109,8 +111,8 @@ YAML;
         $listener = <<<'PHP'
 <?php
 namespace App\EventListener;
-use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
-#[AsEventListener(event: 'App\Event\OrderPlaced', method: 'onOrderPlaced')]
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener as Listener;
+#[Listener(event: 'App\Event\OrderPlaced', method: 'onOrderPlaced')]
 final class NotifyCustomer
 {
     public function onOrderPlaced(): void {}
