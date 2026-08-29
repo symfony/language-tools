@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Resolve aliased Messenger and Twig Component attributes
 - Ignore commented Event, Messenger and Security PHP constructs
 - Apply configured environment variables to dogfood processes
 - Navigate and complete form fields mapped to data class properties

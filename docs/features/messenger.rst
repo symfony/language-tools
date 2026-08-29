@@ -48,6 +48,8 @@ The server recognizes message classes in these PHP contexts:
 * ``new Envelope(new Message())``;
 * the ``handles`` argument of ``#[AsMessageHandler]``.
 
+Imported aliases of ``AsMessageHandler`` are recognized.
+
 From a dispatch site, definition results include the message class and its
 registered handlers. From a message class, definition navigates to handlers and
 references include recognized dispatch sites. Handler classes navigate back to

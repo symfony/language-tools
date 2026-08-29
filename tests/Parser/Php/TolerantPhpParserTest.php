@@ -4,6 +4,8 @@ namespace Symfony\Lsp\Tests\Parser\Php;
 
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Parser\Php\PhpArgument;
+use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpConstantKind;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 use Symfony\Lsp\Parser\Php\PhpTypeKind;
@@ -63,6 +65,58 @@ final class TolerantPhpParserTest extends TestCase
         self::assertInstanceOf(PhpStringLiteral::class, $label);
         self::assertSame("tab\tbrace}end", $label->value());
         self::assertSame('tab\\tbrace\\x7dend', substr($source, $label->startOffset(), $label->endOffset() - $label->startOffset()));
+    }
+
+    public function testExposesAttributePlacementAndArgumentRanges(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+
+            // café
+            #[TypeAttribute(name: 'service')]
+            final class Service
+            {
+                #[PropertyAttribute]
+                public string $name;
+
+                #[MethodAttribute(option: Dependency::class)]
+                public function run(#[ParameterAttribute] string $value): void {}
+            }
+            PHP;
+
+        $attributes = (new TolerantPhpParser(new Parser()))->parse($source)->attributes();
+        [$type, $property, $method, $parameter] = $attributes;
+        $typeTarget = $type->targets()[0];
+        $propertyTarget = $property->targets()[0];
+        $methodTarget = $method->targets()[0];
+        $name = $type->argument('name');
+        $option = $method->argument('option');
+        self::assertInstanceOf(PhpArgument::class, $name);
+        self::assertInstanceOf(PhpArgument::class, $option);
+        $nameExpressionStart = $name->expressionStartOffset();
+        $nameExpressionEnd = $name->expressionEndOffset();
+        $optionExpressionStart = $option->expressionStartOffset();
+        $optionExpressionEnd = $option->expressionEndOffset();
+        self::assertIsInt($nameExpressionStart);
+        self::assertIsInt($nameExpressionEnd);
+        self::assertIsInt($optionExpressionStart);
+        self::assertIsInt($optionExpressionEnd);
+
+        self::assertSame("#[TypeAttribute(name: 'service')]", substr($source, $type->startOffset(), $type->endOffset() - $type->startOffset()));
+        self::assertSame('TypeAttribute', substr($source, $type->nameStartOffset(), $type->nameEndOffset() - $type->nameStartOffset()));
+        self::assertSame(PhpAttributeTargetKind::Type, $typeTarget->kind());
+        self::assertSame('App\Service', $typeTarget->className());
+        self::assertNull($typeTarget->memberName());
+        self::assertSame('Service', substr($source, $typeTarget->nameStartOffset(), $typeTarget->nameEndOffset() - $typeTarget->nameStartOffset()));
+        self::assertSame(PhpAttributeTargetKind::Property, $propertyTarget->kind());
+        self::assertSame('name', $propertyTarget->memberName());
+        self::assertSame(PhpAttributeTargetKind::Method, $methodTarget->kind());
+        self::assertSame('run', $methodTarget->memberName());
+        self::assertSame([], $parameter->targets());
+        self::assertSame("name: 'service'", substr($source, $name->startOffset(), $name->endOffset() - $name->startOffset()));
+        self::assertSame("'service'", substr($source, $nameExpressionStart, $nameExpressionEnd - $nameExpressionStart));
+        self::assertSame('Dependency::class', substr($source, $optionExpressionStart, $optionExpressionEnd - $optionExpressionStart));
     }
 
     public function testExposesNamespaceImportsAndNameResolution(): void

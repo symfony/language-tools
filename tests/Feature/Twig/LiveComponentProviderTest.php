@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\Twig;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -16,6 +17,7 @@ use Symfony\Lsp\Feature\Twig\TwigComponentIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigComponentRelationshipProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
@@ -31,25 +33,30 @@ final class LiveComponentProviderTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), $commentParser, new QuotedArgumentMatcher($converter), new PhpCommentParser());
+        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), $commentParser, new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()));
         $classUri = 'file:///workspace/src/Twig/Components/Search.php';
         $classText = <<<'PHP'
             <?php
             namespace App\Twig\Components;
 
-            #[AsLiveComponent(name: 'Search', template: 'components/Search.html.twig')]
+            use Symfony\UX\LiveComponent\Attribute\AsLiveComponent as Component;
+            use Symfony\UX\LiveComponent\Attribute\LiveAction as Action;
+            use Symfony\UX\LiveComponent\Attribute\LiveListener as Listener;
+            use Symfony\UX\LiveComponent\Attribute\LiveProp as Property;
+
+            #[Component(name: 'Search', template: 'components/Search.html.twig')]
             final class Search
             {
-                #[LiveProp]
+                #[Property]
                 private string $query = '';
 
-                #[LiveAction]
+                #[Action]
                 public function submit(): void
                 {
                     $this->emit('search:completed');
                 }
 
-                #[LiveListener('search:completed')]
+                #[Listener('search:completed')]
                 public function refresh(): void
                 {
                 }
@@ -112,6 +119,25 @@ final class LiveComponentProviderTest extends TestCase
         self::assertStringContainsString('Listener: `Search#refresh`', $eventHover['contents']['value']);
     }
 
+    public function testRecoversComponentFromIncompletePhp(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $converter = new PositionConverter();
+        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()));
+        $facts = $extractor->extract($project, 'file:///workspace/src/Twig/Components/Card.php', 'php', <<<'PHP'
+            <?php
+            use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
+
+            #[AsTwigComponent(name: 'Card')
+            final class Card
+            {
+                public string $title;
+            PHP);
+
+        self::assertSame(['Card'], array_map(static fn ($component): string => $component->name(), $facts->components()));
+        self::assertSame(['title'], $facts->components()[0]->properties());
+    }
+
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
     private function params(PositionConverter $converter, string $uri, string $text, int $offset): array
     {
@@ -126,10 +152,12 @@ final class LiveComponentProviderTest extends TestCase
     public function testOffersNoEmitCompletionsInsidePhpComments(): void
     {
         $converter = new PositionConverter();
-        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()));
         $uri = 'file:///workspace/src/Twig/Components/Search.php';
         $text = <<<'PHP'
             <?php
+            use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
+
             #[AsLiveComponent(name: 'Search')]
             final class Search
             {
@@ -153,11 +181,14 @@ final class LiveComponentProviderTest extends TestCase
     public function testIgnoresEmitCallsInPhpComments(): void
     {
         $converter = new PositionConverter();
-        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()));
 
         $facts = $extractor->extract(new Project('/workspace', 'file:///workspace', '^8.0'), 'file:///workspace/src/Twig/Components/Search.php', 'php', <<<'PHP'
             <?php
             namespace App\Twig\Components;
+
+            use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
+            use Symfony\UX\LiveComponent\Attribute\LiveAction;
 
             #[AsLiveComponent(name: 'Search', template: 'components/Search.html.twig')]
             final class Search

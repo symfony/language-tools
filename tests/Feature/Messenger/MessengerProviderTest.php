@@ -70,10 +70,37 @@ YAML;
         $handlerFacts = $extractor->extract(
             'file:///workspace/src/Handler.php',
             'php',
-            "<?php\n#[AsMessageHandler(bus: 'command.bus')]\nfinal class Handler {}\n",
+            <<<'PHP'
+                <?php
+                namespace App;
+
+                use App\Message\Ping;
+                use Symfony\Component\Messenger\Attribute\AsMessageHandler as HandlerAttribute;
+
+                #[HandlerAttribute(bus: 'command.bus')]
+                final class Handler
+                {
+                    #[HandlerAttribute(fromTransport: 'async', handles: Ping::class)]
+                    public function __invoke(): void {}
+                }
+                PHP,
         );
-        self::assertSame(["#[AsMessageHandler(bus: 'command.bus')]"], $handlerFacts->handlers());
+        self::assertSame([
+            "#[HandlerAttribute(bus: 'command.bus')]",
+            "#[HandlerAttribute(fromTransport: 'async', handles: Ping::class)]",
+        ], $handlerFacts->handlers());
+        self::assertSame(['command.bus', 'async', 'App\Message\Ping'], array_map(static fn ($symbol): string => $symbol->name(), $handlerFacts->symbols()));
         self::assertFalse($handlerFacts->symbols()[0]->isDeclaration());
+
+        $incompleteFacts = $extractor->extract('file:///workspace/src/IncompleteHandler.php', 'php', <<<'PHP'
+            <?php
+            use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+
+            #[AsMessageHandler(bus: 'command.bus')
+            final class IncompleteHandler {}
+            PHP);
+        self::assertSame(["#[AsMessageHandler(bus: 'command.bus')"], $incompleteFacts->handlers());
+        self::assertSame(['command.bus'], array_map(static fn ($symbol): string => $symbol->name(), $incompleteFacts->symbols()));
     }
 
     public function testCompletesHoversNavigatesDiagnosesAndProvidesCodeLenses(): void

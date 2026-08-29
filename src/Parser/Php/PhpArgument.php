@@ -7,8 +7,12 @@ final class PhpArgument
     public function __construct(
         private readonly ?string $name,
         private readonly ?PhpStringLiteral $stringLiteral,
-        private readonly ?PhpCallable $callable = null,
-        private readonly ?string $expression = null,
+        private readonly ?PhpCallable $callable,
+        private readonly ?string $expression,
+        private readonly int $startOffset,
+        private readonly int $endOffset,
+        private readonly ?int $expressionStartOffset,
+        private readonly ?int $expressionEndOffset,
     ) {
     }
 
@@ -30,5 +34,25 @@ final class PhpArgument
     public function expression(): ?string
     {
         return $this->expression;
+    }
+
+    public function startOffset(): int
+    {
+        return $this->startOffset;
+    }
+
+    public function endOffset(): int
+    {
+        return $this->endOffset;
+    }
+
+    public function expressionStartOffset(): ?int
+    {
+        return $this->expressionStartOffset;
+    }
+
+    public function expressionEndOffset(): ?int
+    {
+        return $this->expressionEndOffset;
     }
 }

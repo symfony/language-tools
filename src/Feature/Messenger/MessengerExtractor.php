@@ -5,12 +5,15 @@ namespace Symfony\Lsp\Feature\Messenger;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
+use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
 final class MessengerExtractor
 {
+    private const AS_MESSAGE_HANDLER = 'Symfony\\Component\\Messenger\\Attribute\\AsMessageHandler';
+
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $parser,
@@ -42,18 +45,29 @@ final class MessengerExtractor
         if ('php' === $languageId) {
             $php = $this->parser->parse($text);
             $source = $this->phpComments->mask($text);
-            preg_match_all('/#\[\s*(?:[\\\\A-Za-z_][\\\\A-Za-z0-9_]*\\\\)*AsMessageHandler\b(?:\([^)]*\))?\s*\]/s', $source, $handlerAttributes);
-            $handlers = $handlerAttributes[0];
-            preg_match_all('/AsMessageHandler\s*\(([^)]*)\)/s', $source, $attributes, \PREG_OFFSET_CAPTURE);
-            foreach ($attributes[1] as [$arguments, $argumentsOffset]) {
+            foreach ($php->attributes() as $attribute) {
+                if (self::AS_MESSAGE_HANDLER !== $attribute->name()
+                    || !array_any($attribute->targets(), static fn ($target): bool => \in_array($target->kind(), [PhpAttributeTargetKind::Type, PhpAttributeTargetKind::Method], true))
+                ) {
+                    continue;
+                }
+                $handlers[] = substr($text, $attribute->startOffset(), $attribute->endOffset() - $attribute->startOffset());
                 foreach ([
-                    [MessengerSymbolKind::Bus, '/\bbus\s*:\s*["\']([A-Za-z_][A-Za-z0-9_.-]*)/'],
-                    [MessengerSymbolKind::Transport, '/\bfromTransport\s*:\s*["\']([A-Za-z_][A-Za-z0-9_.-]*)/'],
-                ] as [$kind, $pattern]) {
-                    preg_match_all($pattern, $arguments, $matches, \PREG_OFFSET_CAPTURE);
-                    foreach ($matches[1] as [$name, $offset]) {
-                        $symbols[] = $this->symbol($kind, $name, $uri, $text, $argumentsOffset + $offset, false);
+                    [MessengerSymbolKind::Bus, 'bus'],
+                    [MessengerSymbolKind::Transport, 'fromTransport'],
+                ] as [$kind, $argumentName]) {
+                    $literal = $attribute->argument($argumentName)?->stringLiteral();
+                    if (null === $literal || 1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_.-]*$/D', $literal->value())) {
+                        continue;
                     }
+                    $symbols[] = $this->symbol($kind, $literal->value(), $uri, $text, $literal->startOffset(), false, $literal->endOffset() - $literal->startOffset());
+                }
+                $handles = $attribute->argument('handles');
+                $expression = $handles?->expression();
+                $expressionOffset = $handles?->expressionStartOffset();
+                if (\is_string($expression) && \is_int($expressionOffset) && preg_match('/^\s*([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s*::class\s*$/', $expression, $message, \PREG_OFFSET_CAPTURE)) {
+                    $name = $message[1][0];
+                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $php->resolveName($name), $uri, $text, $expressionOffset + $message[1][1], false, \strlen($name));
                 }
             }
             preg_match_all('/BusNameStamp\s*\(\s*["\']([A-Za-z_][A-Za-z0-9_.-]*)/', $source, $matches, \PREG_OFFSET_CAPTURE);
@@ -74,10 +88,6 @@ final class MessengerExtractor
                 if ('Symfony\\Component\\Messenger\\Envelope' === $php->resolveName($envelopes[1][$index][0])) {
                     $symbols[] = $this->symbol(MessengerSymbolKind::Message, $php->resolveName($name), $uri, $text, $offset, false, \strlen($name));
                 }
-            }
-            preg_match_all('/AsMessageHandler\s*\([^)]*\bhandles\s*:\s*([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)::class/', $source, $handledMessages, \PREG_OFFSET_CAPTURE);
-            foreach ($handledMessages[1] as [$name, $offset]) {
-                $symbols[] = $this->symbol(MessengerSymbolKind::Message, $php->resolveName($name), $uri, $text, $offset, false, \strlen($name));
             }
         }
 

@@ -6,6 +6,7 @@ use Microsoft\PhpParser\DiagnosticsProvider;
 use Microsoft\PhpParser\Node;
 use Microsoft\PhpParser\Node\ArrayElement;
 use Microsoft\PhpParser\Node\Attribute;
+use Microsoft\PhpParser\Node\AttributeGroup;
 use Microsoft\PhpParser\Node\ClassBaseClause;
 use Microsoft\PhpParser\Node\ClassConstDeclaration;
 use Microsoft\PhpParser\Node\ConstElement;
@@ -558,10 +559,91 @@ final class TolerantPhpParser implements PhpParserInterface
 
     private function attribute(Attribute $attribute, string $source): PhpAttribute
     {
+        $group = $attribute->getFirstAncestor(AttributeGroup::class);
+
         return new PhpAttribute(
             $this->attributeName($attribute->name, $source),
             $this->arguments($attribute->argumentExpressionList->children ?? [], $source),
+            $group instanceof AttributeGroup ? $group->getStartPosition() : $attribute->getStartPosition(),
+            $group instanceof AttributeGroup ? $group->getEndPosition() : $attribute->getEndPosition(),
+            $attribute->name->getStartPosition(),
+            $attribute->name->getEndPosition(),
+            $this->attributeTargets($attribute, $source),
         );
+    }
+
+    /** @return list<PhpAttributeTarget> */
+    private function attributeTargets(Attribute $attribute, string $source): array
+    {
+        $group = $attribute->getFirstAncestor(AttributeGroup::class);
+        $declaration = $group?->getParent();
+        if (null === $declaration) {
+            return [];
+        }
+        if ($declaration instanceof ClassDeclaration || $declaration instanceof InterfaceDeclaration || $declaration instanceof TraitDeclaration || $declaration instanceof EnumDeclaration) {
+            return [new PhpAttributeTarget(
+                PhpAttributeTargetKind::Type,
+                (string) $declaration->getNamespacedName(),
+                null,
+                $declaration->name->getStartPosition(),
+                $declaration->name->getEndPosition(),
+            )];
+        }
+
+        $owner = $declaration->getFirstAncestor(
+            ObjectCreationExpression::class,
+            ClassDeclaration::class,
+            InterfaceDeclaration::class,
+            TraitDeclaration::class,
+            EnumDeclaration::class,
+        );
+        if ($owner instanceof ObjectCreationExpression || (!$owner instanceof ClassDeclaration && !$owner instanceof InterfaceDeclaration && !$owner instanceof TraitDeclaration && !$owner instanceof EnumDeclaration)) {
+            return [];
+        }
+        if ($declaration instanceof MethodDeclaration) {
+            $nameToken = $declaration->name;
+            if (!$nameToken instanceof Token) {
+                return [];
+            }
+            $name = $nameToken->getText($source);
+            if (!\is_string($name) || '' === $name) {
+                return [];
+            }
+
+            return [new PhpAttributeTarget(
+                PhpAttributeTargetKind::Method,
+                (string) $owner->getNamespacedName(),
+                $name,
+                $nameToken->getStartPosition(),
+                $nameToken->getEndPosition(),
+            )];
+        }
+        if (!$declaration instanceof PropertyDeclaration) {
+            return [];
+        }
+
+        $elements = $declaration->propertyElements;
+        if (!$elements instanceof ExpressionList) {
+            return [];
+        }
+        $targets = [];
+        foreach ($elements->children as $element) {
+            $variable = $element instanceof Variable
+                ? $element
+                : ($element instanceof AssignmentExpression && $element->leftOperand instanceof Variable ? $element->leftOperand : null);
+            if (null === $variable || null === $name = $this->variableName($variable, $source)) {
+                continue;
+            }
+            $targets[] = new PhpAttributeTarget(
+                PhpAttributeTargetKind::Property,
+                (string) $owner->getNamespacedName(),
+                $name,
+                $variable->getStartPosition() + 1,
+                $variable->getEndPosition(),
+            );
+        }
+
+        return $targets;
     }
 
     private function methodCall(CallExpression $call, string $source): ?PhpMethodCall
@@ -604,6 +686,10 @@ final class TolerantPhpParser implements PhpParserInterface
                 $child->expression instanceof StringLiteral ? $this->stringLiteral($child->expression, $source) : null,
                 null === $names ? null : $this->phpCallable($child->expression, $source, $names, $owner),
                 \is_string($expression) ? $expression : null,
+                $child->getStartPosition(),
+                $child->getEndPosition(),
+                $child->expression?->getStartPosition(),
+                $child->expression?->getEndPosition(),
             );
         }
 

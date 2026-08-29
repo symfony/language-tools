@@ -3,19 +3,30 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Parser\Php\PhpAttribute;
+use Symfony\Lsp\Parser\Php\PhpAttributeTarget;
+use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 
 final class TwigComponentExtractor
 {
+    private const AS_LIVE_COMPONENT = 'Symfony\\UX\\LiveComponent\\Attribute\\AsLiveComponent';
+    private const AS_TWIG_COMPONENT = 'Symfony\\UX\\TwigComponent\\Attribute\\AsTwigComponent';
+    private const LIVE_ACTION = 'Symfony\\UX\\LiveComponent\\Attribute\\LiveAction';
+    private const LIVE_LISTENER = 'Symfony\\UX\\LiveComponent\\Attribute\\LiveListener';
+    private const LIVE_PROP = 'Symfony\\UX\\LiveComponent\\Attribute\\LiveProp';
+
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly TemplateNameResolver $templateNameResolver,
         private readonly TwigCommentParser $commentParser,
         private readonly QuotedArgumentMatcher $matcher,
         private readonly PhpCommentParserInterface $phpComments,
+        private readonly PhpParserInterface $phpParser,
     ) {
     }
 
@@ -27,53 +38,76 @@ final class TwigComponentExtractor
         $events = [];
         if ('php' === $languageId) {
             $masked = $this->phpComments->mask($text);
-            preg_match('/\bnamespace\s+([^;{]+)[;{]/', $masked, $namespace);
-            $namespace = isset($namespace[1]) ? trim($namespace[1]).'\\' : '';
-            preg_match_all(
-                '/#\[\s*[^\r\n]*?\b(?:AsTwigComponent|AsLiveComponent)\b\s*(?:\((.*?)\))?\s*]\s*(?:(?:final|readonly|abstract)\s+)*class\s+([A-Za-z_][A-Za-z0-9_]*)/s',
-                $masked,
-                $matches,
-                \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL,
-            );
-            foreach ($matches as $match) {
-                $arguments = \is_string($match[1][0] ?? null) ? $match[1][0] : '';
-                $class = $match[2][0] ?? null;
-                $offset = $match[2][1];
-                if (!\is_string($class)) {
+            $php = $this->phpParser->parse($text);
+            $attributes = $php->attributes();
+            foreach ($attributes as $attribute) {
+                if (!\in_array($attribute->name(), [self::AS_TWIG_COMPONENT, self::AS_LIVE_COMPONENT], true)
+                    || null === $target = $this->attributeTarget($attribute, PhpAttributeTargetKind::Type)
+                ) {
                     continue;
                 }
-                $template = $this->attributeString($arguments, 'template');
-                $name = $this->attributeString($arguments, 'name')
-                    ?? $this->firstString($arguments)
+                $className = $target->className();
+                if (!array_any($php->typeDeclarations(), static fn ($type): bool => $type->isClass() && $className === $type->name())) {
+                    continue;
+                }
+                $separator = strrpos($className, '\\');
+                $class = false === $separator ? $className : substr($className, $separator + 1);
+                $template = $this->stringArgument($attribute, 'template');
+                $name = $this->stringArgument($attribute, 'name')
+                    ?? $this->stringArgument($attribute, 0)
                     ?? $this->nameFromTemplate($template)
-                    ?? $this->nameFromClass($namespace.$class)
+                    ?? $this->nameFromClass($className)
                     ?? $class;
-                preg_match_all('/\bpublic\s+(?:(?:readonly|static)\s+)*(?:[^$(),;=]+\s+)?\$([A-Za-z_][A-Za-z0-9_]*)/', $masked, $properties);
-                preg_match_all('/#\[\s*(?:[^\]\r\n]*\\\\)?LiveProp\b[^]]*]\s*(?:(?:public|protected|private|readonly|static)\s+)*(?:[^$(),;=]+\s+)?\$([A-Za-z_][A-Za-z0-9_]*)/', $masked, $liveProperties);
-                $componentProperties = array_values(array_unique([...$properties[1], ...$liveProperties[1]]));
+                $componentProperties = [];
+                foreach ($php->propertyDeclarations() as $property) {
+                    if ($className !== $property->className()
+                        || (!$property->isPublic() && !$this->hasAttribute($attributes, self::LIVE_PROP, PhpAttributeTargetKind::Property, $className, $property->name()))
+                    ) {
+                        continue;
+                    }
+                    $componentProperties[] = $property->name();
+                }
+                $componentProperties = array_values(array_unique($componentProperties));
                 sort($componentProperties);
-                preg_match_all('/#\[\s*(?:[^\]\r\n]*\\\\)?(?:LiveAction|LiveListener)\b[^]]*](?:\s*#\[[^]]+])*\s*(?:(?:public|protected|private|final|static)\s+)*function\s+([A-Za-z_][A-Za-z0-9_]*)/', $masked, $actionMatches, \PREG_OFFSET_CAPTURE);
                 $actions = [];
-                foreach ($actionMatches[1] as [$action, $actionOffset]) {
-                    $actions[$action] = new TwigComponentAction($action, $this->converter->toRange($text, $actionOffset, \strlen($action)));
+                foreach ($php->methodDeclarations() as $method) {
+                    if ($className !== $method->className()) {
+                        continue;
+                    }
+                    $action = $this->hasAttribute($attributes, self::LIVE_ACTION, PhpAttributeTargetKind::Method, $className, $method->name());
+                    $listeners = $this->attributesForTarget($attributes, self::LIVE_LISTENER, PhpAttributeTargetKind::Method, $className, $method->name());
+                    if (!$action && [] === $listeners) {
+                        continue;
+                    }
+                    $actions[$method->name()] = new TwigComponentAction($method->name(), $this->converter->toRange($text, $method->nameStartOffset(), $method->nameEndOffset() - $method->nameStartOffset()));
+                    foreach ($listeners as $listener) {
+                        $eventArgument = $listener->argument('event');
+                        if (null === $eventArgument) {
+                            $eventArgument = $listener->argument(0);
+                            if (null !== $eventArgument?->name()) {
+                                $eventArgument = null;
+                            }
+                        }
+                        $event = $eventArgument?->stringLiteral();
+                        if (null === $event || '' === $event->value()) {
+                            continue;
+                        }
+                        $events[] = new LiveComponentEvent(
+                            $event->value(),
+                            $uri,
+                            $this->converter->toRange($text, $event->startOffset(), $event->endOffset() - $event->startOffset()),
+                            true,
+                            $name,
+                            $method->name(),
+                        );
+                    }
                 }
-                preg_match_all('/#\[\s*(?:[^\]\r\n]*\\\\)?LiveListener\s*\(\s*(?:event\s*:\s*)?([\'"])([^\'"]+)\1[^]]*](?:\s*#\[[^]]+])*\s*(?:(?:public|protected|private|final|static)\s+)*function\s+([A-Za-z_][A-Za-z0-9_]*)/', $masked, $listenerMatches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-                foreach ($listenerMatches as $listener) {
-                    $events[] = new LiveComponentEvent(
-                        $listener[2][0],
-                        $uri,
-                        $this->converter->toRange($text, $listener[2][1], \strlen($listener[2][0])),
-                        true,
-                        $name,
-                        $listener[3][0],
-                    );
-                }
-                $live = str_contains((string) $match[0][0], 'AsLiveComponent');
+                $live = self::AS_LIVE_COMPONENT === $attribute->name();
                 $components[] = new TwigComponent(
                     $name,
                     $uri,
-                    $this->converter->toRange($text, $offset, \strlen($class)),
-                    $namespace.$class,
+                    $this->converter->toRange($text, $target->nameStartOffset(), $target->nameEndOffset() - $target->nameStartOffset()),
+                    $className,
                     $template,
                     $componentProperties,
                     $live,
@@ -137,14 +171,56 @@ final class TwigComponentExtractor
         return explode(':', end($parts))[0];
     }
 
-    private function attributeString(string $arguments, string $name): ?string
+    /**
+     * @param list<PhpAttribute> $attributes
+     */
+    private function hasAttribute(array $attributes, string $name, PhpAttributeTargetKind $kind, string $className, ?string $memberName): bool
     {
-        return preg_match('/\b'.preg_quote($name, '/').'\s*:\s*([\'"])([^\'"]+)\1/', $arguments, $match) ? $match[2] : null;
+        return [] !== $this->attributesForTarget($attributes, $name, $kind, $className, $memberName);
     }
 
-    private function firstString(string $arguments): ?string
+    /**
+     * @param list<PhpAttribute> $attributes
+     *
+     * @return list<PhpAttribute>
+     */
+    private function attributesForTarget(array $attributes, string $name, PhpAttributeTargetKind $kind, string $className, ?string $memberName): array
     {
-        return preg_match('/^\s*([\'"])([^\'"]+)\1/', $arguments, $match) ? $match[2] : null;
+        $matches = [];
+        foreach ($attributes as $attribute) {
+            if ($name !== $attribute->name()) {
+                continue;
+            }
+            foreach ($attribute->targets() as $target) {
+                if ($kind === $target->kind() && $className === $target->className() && $memberName === $target->memberName()) {
+                    $matches[] = $attribute;
+                    break;
+                }
+            }
+        }
+
+        return $matches;
+    }
+
+    private function attributeTarget(PhpAttribute $attribute, PhpAttributeTargetKind $kind): ?PhpAttributeTarget
+    {
+        foreach ($attribute->targets() as $target) {
+            if ($kind === $target->kind()) {
+                return $target;
+            }
+        }
+
+        return null;
+    }
+
+    private function stringArgument(PhpAttribute $attribute, string|int $name): ?string
+    {
+        $argument = $attribute->argument($name);
+        if (\is_int($name) && null !== $argument?->name()) {
+            return null;
+        }
+
+        return $argument?->stringLiteral()?->value();
     }
 
     private function anonymousName(Project $project, string $uri): ?string

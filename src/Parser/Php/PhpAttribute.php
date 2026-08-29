@@ -5,11 +5,17 @@ namespace Symfony\Lsp\Parser\Php;
 final class PhpAttribute
 {
     /**
-     * @param list<PhpArgument> $arguments
+     * @param list<PhpArgument>        $arguments
+     * @param list<PhpAttributeTarget> $targets
      */
     public function __construct(
         private readonly string $name,
         private readonly array $arguments,
+        private readonly int $startOffset,
+        private readonly int $endOffset,
+        private readonly int $nameStartOffset,
+        private readonly int $nameEndOffset,
+        private readonly array $targets,
     ) {
     }
 
@@ -22,6 +28,32 @@ final class PhpAttribute
     public function arguments(): array
     {
         return $this->arguments;
+    }
+
+    public function startOffset(): int
+    {
+        return $this->startOffset;
+    }
+
+    public function endOffset(): int
+    {
+        return $this->endOffset;
+    }
+
+    public function nameStartOffset(): int
+    {
+        return $this->nameStartOffset;
+    }
+
+    public function nameEndOffset(): int
+    {
+        return $this->nameEndOffset;
+    }
+
+    /** @return list<PhpAttributeTarget> */
+    public function targets(): array
+    {
+        return $this->targets;
     }
 
     public function argument(string|int $name): ?PhpArgument
