@@ -412,6 +412,29 @@ final class TolerantPhpParserTest extends TestCase
         ], $document->imports());
     }
 
+    public function testKeepsFactsBeforeTruncatedSource(): void
+    {
+        $source = file_get_contents(__DIR__.'/../../Fixtures/Parser/php/boundary.php.txt');
+        if (false === $source) {
+            self::fail('Unable to read the PHP boundary fixture.');
+        }
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $creation = $document->objectCreations()[0];
+        $literal = $creation->argument('name')?->stringLiteral();
+
+        self::assertSame('App\Handler', $document->typeDeclarations()[0]->name());
+        self::assertSame(['__construct', '__invoke', 'draft'], array_map(static fn ($method): string => $method->name(), $document->methodDeclarations()));
+        self::assertSame('$this->bus', $document->methodCalls()[0]->receiver());
+        self::assertSame('dispatch', $document->methodCalls()[0]->method());
+        self::assertSame('Vendor\Package\Message', $creation->className());
+        self::assertSame('__invoke', $creation->enclosingMethod());
+        self::assertInstanceOf(PhpStringLiteral::class, $literal);
+        self::assertSame('café', $literal->value());
+        self::assertSame('café', substr($source, $literal->startOffset(), $literal->endOffset() - $literal->startOffset()));
+        self::assertCount(6, $document->diagnostics());
+    }
+
     public function testRejectsInterpolatedStringsAsLiteralsAndReportsSyntaxDiagnostics(): void
     {
         $source = <<<'PHP'

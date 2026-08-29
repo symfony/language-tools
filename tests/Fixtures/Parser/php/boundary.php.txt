@@ -1,0 +1,25 @@
+<?php
+
+namespace App;
+
+use Vendor\Package\{Listener, Message};
+
+// café stays outside the syntax facts.
+#[Listener(event: 'app.created', options: ['nested' => ['value']])]
+final class Handler
+{
+    public function __construct(private Message $message)
+    {
+    }
+
+    public function __invoke(): void
+    {
+        // $this->bus->dispatch(new CommentedMessage());
+        $this->bus->dispatch(new Message(
+            name: "café",
+            options: ['nested' => true],
+        ));
+    }
+
+    #[Listener(event: 'incomplete'
+    public function draft(
