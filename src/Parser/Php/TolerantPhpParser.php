@@ -570,6 +570,10 @@ final class TolerantPhpParser implements PhpParserInterface
                 $names,
                 $owner instanceof ClassDeclaration ? $owner : null,
             ),
+            $creation->getStartPosition(),
+            $creation->getEndPosition(),
+            $creation->classTypeDesignator->getStartPosition(),
+            $creation->classTypeDesignator->getEndPosition(),
             \is_string($methodName) && '' !== $methodName ? $methodName : null,
         );
     }

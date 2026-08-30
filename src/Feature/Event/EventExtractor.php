@@ -117,16 +117,16 @@ final class EventExtractor
                 continue;
             }
             if ('dispatch' === $call->method) {
-                $event = $this->newClassArgument($call->argument(0));
+                $event = $this->newClassArgument($call->positionalArgument(0));
                 if (null !== $event) {
                     $symbols[] = $this->symbol($php->resolveName($event['name']), $uri, $text, $event['offset'], false, \strlen($event['name']));
                 }
-                $name = $call->argument(1)?->stringLiteral;
+                $name = $call->positionalArgument(1)?->stringLiteral;
                 if (null !== $name && '' !== $name->value) {
                     $symbols[] = $this->symbol($name->value, $uri, $text, $name->startOffset, false, $name->endOffset - $name->startOffset);
                 }
             } elseif ('addListener' === $call->method) {
-                $name = $call->argument(0)?->stringLiteral;
+                $name = $call->positionalArgument(0)?->stringLiteral;
                 if (null !== $name && '' !== $name->value) {
                     $symbols[] = $this->symbol($name->value, $uri, $text, $name->startOffset, false, $name->endOffset - $name->startOffset);
                 }

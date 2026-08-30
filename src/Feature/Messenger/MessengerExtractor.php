@@ -83,7 +83,7 @@ final class MessengerExtractor
                 if ('dispatch' !== $call->method || !$this->hasBusReceiver($call, $php)) {
                     continue;
                 }
-                $message = $this->newClassArgument($call->argument(0));
+                $message = $this->newClassArgument($call->positionalArgument(0));
                 if (null !== $message) {
                     $symbols[] = $this->symbol(MessengerSymbolKind::Message, $php->resolveName($message['name']), $uri, $text, $message['offset'], false, \strlen($message['name']));
                 }

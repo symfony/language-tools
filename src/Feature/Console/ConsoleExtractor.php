@@ -53,7 +53,7 @@ final class ConsoleExtractor
             if (!\in_array($call->method, ['getArgument', 'getOption'], true) || !$this->hasInputReceiver($call, $php)) {
                 continue;
             }
-            $name = $call->argument(0)?->stringLiteral;
+            $name = $call->positionalArgument(0)?->stringLiteral;
             $className = $call->className;
             if (null === $name || null === $className) {
                 continue;
@@ -120,7 +120,7 @@ final class ConsoleExtractor
                 continue;
             }
             if ('addArgument' === $call->method || 'addOption' === $call->method) {
-                $name = $call->argument(0)?->stringLiteral?->value;
+                $name = $call->positionalArgument(0)?->stringLiteral?->value;
                 if (null === $name) {
                     $complete = false;
                     continue;
@@ -135,7 +135,7 @@ final class ConsoleExtractor
             if ('setDefinition' !== $call->method) {
                 continue;
             }
-            $expression = $call->argument(0)?->expression;
+            $expression = $call->positionalArgument(0)?->expression;
             if (null === $expression) {
                 $complete = false;
                 continue;
@@ -201,7 +201,7 @@ final class ConsoleExtractor
                 continue;
             }
             $recognized = true;
-            $name = $creation->argument(0)?->stringLiteral?->value;
+            $name = $creation->positionalArgument(0)?->stringLiteral?->value;
             if (null === $name) {
                 $complete = false;
                 continue;

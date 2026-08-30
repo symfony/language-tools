@@ -43,7 +43,7 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame('article_list', substr($source, $name->startOffset, $name->endOffset - $name->startOffset));
         self::assertSame('$routes', $document->methodCalls[0]->receiver);
         self::assertSame('add', $document->methodCalls[0]->method);
-        self::assertSame('article_list', $document->methodCalls[0]->argument(0)?->stringLiteral?->value);
+        self::assertSame('article_list', $document->methodCalls[0]->positionalArgument(0)?->stringLiteral?->value);
         self::assertSame('ArticleController', $document->typeDeclarations[0]->name);
         self::assertSame('Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController', $document->typeDeclarations[0]->parentClassName);
         self::assertTrue($document->typeDeclarations[0]->contains((int) strpos($source, 'ArticleController')));
@@ -61,8 +61,8 @@ final class TolerantPhpParserTest extends TestCase
             PHP;
 
         $attribute = (new TolerantPhpParser(new Parser()))->parse($source)->attributes[0];
-        $service = $attribute->argument(0)?->stringLiteral;
-        $label = $attribute->argument(1)?->stringLiteral;
+        $service = $attribute->positionalArgument(0)?->stringLiteral;
+        $label = $attribute->positionalArgument(1)?->stringLiteral;
 
         self::assertInstanceOf(PhpStringLiteral::class, $service);
         self::assertSame('App\Mailer', $service->value);
@@ -222,7 +222,7 @@ final class TolerantPhpParserTest extends TestCase
         $document = (new TolerantPhpParser(new Parser()))->parse($source);
         [$promoted, $firstParameter, $secondParameter] = $document->typedVariables;
         [$firstCall, $propertyCall, $secondCall, $otherCall] = $document->methodCalls;
-        $firstArgument = $firstCall->argument(0);
+        $firstArgument = $firstCall->positionalArgument(0);
         self::assertInstanceOf(PhpArgument::class, $firstArgument);
         $firstArgumentStart = $firstArgument->expressionStartOffset;
         $firstArgumentEnd = $firstArgument->expressionEndOffset;
@@ -399,7 +399,7 @@ final class TolerantPhpParserTest extends TestCase
         $document = (new TolerantPhpParser(new Parser()))->parse($source);
         $creations = $document->objectCreations;
 
-        self::assertSame(['array_name', 'self_name', 'this_name', 'property_name', 'untyped_name', 'static_name', 'empty_name'], array_map(static fn ($creation): ?string => $creation->argument('name')?->stringLiteral->value ?? $creation->argument(0)?->stringLiteral?->value, $creations));
+        self::assertSame(['array_name', 'self_name', 'this_name', 'property_name', 'untyped_name', 'static_name', 'empty_name'], array_map(static fn ($creation): ?string => $creation->argument('name')?->stringLiteral->value ?? $creation->positionalArgument(0)?->stringLiteral?->value, $creations));
         self::assertSame(array_fill(0, 7, 'getFunctions'), array_map(static fn ($creation): ?string => $creation->enclosingMethod, $creations));
         self::assertSame([
             ['App\Twig\Runtime\AppRuntime', 'fromArray'],
@@ -410,8 +410,8 @@ final class TolerantPhpParserTest extends TestCase
             ['App\Twig\Runtime\AppRuntime', 'fromStatic'],
             [null, null],
         ], array_map(static fn ($creation): array => [
-            ($creation->argument('callable') ?? $creation->argument(1))?->callable?->className,
-            ($creation->argument('callable') ?? $creation->argument(1))?->callable?->method,
+            ($creation->argument('callable') ?? $creation->positionalArgument(1))?->callable?->className,
+            ($creation->argument('callable') ?? $creation->positionalArgument(1))?->callable?->method,
         ], $creations));
         $method = array_values(array_filter($document->methodDeclarations, static fn ($method): bool => 'ownMethod' === $method->name))[0];
         self::assertSame('App\Twig\AppExtension', $method->className);
@@ -462,7 +462,7 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame(['format', 'union', 'hidden', 'parameter', 'anonymous'], array_map(static fn (PhpMethodDeclaration $method): string => $method->name, $methods));
         self::assertSame($document->attributes[0], $methods[0]->attributes[0]);
         self::assertSame('Twig\Attribute\AsTwigFunction', $methods[0]->attributes[0]->name);
-        self::assertSame('format', $methods[0]->attributes[0]->argument(0)?->stringLiteral?->value);
+        self::assertSame('format', $methods[0]->attributes[0]->positionalArgument(0)?->stringLiteral?->value);
         self::assertSame('Twig\Environment', $methods[0]->firstParameterType);
         self::assertFalse($methods[0]->firstParameterVariadic);
         self::assertTrue($methods[0]->variadic);
@@ -582,5 +582,121 @@ final class TolerantPhpParserTest extends TestCase
         self::assertNull($document->attributes[0]->argument('name')?->stringLiteral);
         self::assertCount(1, $document->diagnostics);
         self::assertSame("'}' expected.", $document->diagnostics[0]->message);
+    }
+
+    public function testPositionalArgumentsRejectNamedCandidates(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+            use App\Attribute\AsThing;
+            #[AsThing(option: 'first', 'second')]
+            final class Sample
+            {
+            }
+            PHP;
+
+        $attribute = (new TolerantPhpParser(new Parser()))->parse($source)->attributes[0];
+
+        self::assertNull($attribute->positionalArgument(0));
+        self::assertSame('second', $attribute->positionalArgument(1)?->stringLiteral?->value);
+        self::assertSame('first', $attribute->argument('option')?->stringLiteral?->value);
+        self::assertNull($attribute->argument('missing'));
+    }
+
+    public function testFindsClassReferencesAndObjectCreationsInsideArguments(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+            use App\Entity\Article;
+            use App\Entity\Comment;
+            use App\Message\Created;
+            final class Sample
+            {
+                public function run(Registry $registry, Bus $bus): void
+                {
+                    $registry->single(Article::class);
+                    $registry->pair([Article::class, Comment::class]);
+                    $bus->dispatch(new Created('body'));
+                }
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        [$single, $pair, $dispatch] = $document->methodCalls;
+
+        self::assertSame('App\Entity\Article', $document->soleClassReference($single->positionalArgument(0))?->className);
+        self::assertNull($document->soleClassReference($pair->positionalArgument(0)));
+        self::assertSame('App\Entity\Article', $document->firstClassReference($pair->positionalArgument(0))?->className);
+        self::assertNull($document->soleClassReference(null));
+        $creation = $document->firstObjectCreation($dispatch->positionalArgument(0));
+        self::assertSame('App\Message\Created', $creation?->className);
+        self::assertSame('new Created(\'body\')', substr($source, $creation->startOffset, $creation->endOffset - $creation->startOffset));
+        self::assertSame('Created', substr($source, $creation->classNameStartOffset, $creation->classNameEndOffset - $creation->classNameStartOffset));
+        self::assertNull($document->firstObjectCreation($single->positionalArgument(0)));
+    }
+
+    public function testResolvesReceiverVariablesWithinTheirScopes(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+            use Psr\Log\LoggerInterface;
+            final class First
+            {
+                public function __construct(private readonly LoggerInterface $logger)
+                {
+                }
+
+                public function direct(LoggerInterface $output): void
+                {
+                    $output->info('a');
+                    $this->logger->info('b');
+                }
+
+                public function other(string $output): void
+                {
+                    $output->info('c');
+                }
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        [$direct, $property, $unrelated] = $document->methodCalls;
+
+        self::assertSame([['Psr\Log\LoggerInterface']], array_map(static fn ($variable): array => $variable->types, $document->receiverVariables($direct)));
+        self::assertSame([['Psr\Log\LoggerInterface']], array_map(static fn ($variable): array => $variable->types, $document->receiverVariables($property)));
+        self::assertSame([['string']], array_map(static fn ($variable): array => $variable->types, $document->receiverVariables($unrelated)));
+    }
+
+    public function testFiltersAttributesByTarget(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+            use App\Attribute\OnClass;
+            use App\Attribute\OnMethod;
+            #[OnClass]
+            final class First
+            {
+                #[OnMethod]
+                public function handle(): void
+                {
+                }
+            }
+            #[OnClass]
+            final class Second
+            {
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+
+        self::assertCount(1, $document->attributesOn(PhpAttributeTargetKind::Type, 'App\First'));
+        self::assertCount(1, $document->attributesOn(PhpAttributeTargetKind::Type, 'App\Second'));
+        self::assertSame([], $document->attributesOn(PhpAttributeTargetKind::Type, 'App\Third'));
+        self::assertSame(['App\Attribute\OnMethod'], array_map(static fn ($attribute): string => $attribute->name, $document->attributesOn(PhpAttributeTargetKind::Method, 'App\First', 'handle')));
+        self::assertSame([], $document->attributesOn(PhpAttributeTargetKind::Method, 'App\First', 'missing'));
     }
 }

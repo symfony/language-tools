@@ -4,6 +4,8 @@ namespace Symfony\Lsp\Parser\Php;
 
 final class PhpMethodCall
 {
+    use PhpArgumentAccess;
+
     /**
      * @param list<PhpArgument> $arguments
      */
@@ -18,10 +20,5 @@ final class PhpMethodCall
         public readonly ?string $enclosingMethod,
         public readonly ?int $scopeStartOffset,
     ) {
-    }
-
-    public function argument(int $position): ?PhpArgument
-    {
-        return $this->arguments[$position] ?? null;
     }
 }

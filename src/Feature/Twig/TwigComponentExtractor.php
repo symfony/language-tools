@@ -81,7 +81,7 @@ final class TwigComponentExtractor
                     foreach ($listeners as $listener) {
                         $eventArgument = $listener->argument('event');
                         if (null === $eventArgument) {
-                            $eventArgument = $listener->argument(0);
+                            $eventArgument = $listener->positionalArgument(0);
                             if (null !== $eventArgument?->name) {
                                 $eventArgument = null;
                             }
@@ -126,7 +126,7 @@ final class TwigComponentExtractor
                                 break;
                             }
                         }
-                        $argument ??= $call->argument(0);
+                        $argument ??= $call->positionalArgument(0);
                         if (null !== $argument?->name && 'event' !== $argument->name) {
                             continue;
                         }
@@ -240,10 +240,7 @@ final class TwigComponentExtractor
 
     private function stringArgument(PhpAttribute $attribute, string|int $name): ?string
     {
-        $argument = $attribute->argument($name);
-        if (\is_int($name) && null !== $argument?->name) {
-            return null;
-        }
+        $argument = \is_int($name) ? $attribute->positionalArgument($name) : $attribute->argument($name);
 
         return $argument?->stringLiteral?->value;
     }

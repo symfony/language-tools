@@ -202,13 +202,13 @@ final class DoctrineExtractor
             }
             $typeIndex = 'createNamed' === $call->method ? 1 : ('add' === $call->method ? 1 : 0);
             $optionsIndex = 'createNamed' === $call->method ? 3 : 2;
-            $options = $call->argument($optionsIndex);
+            $options = $call->positionalArgument($optionsIndex);
             $start = $options?->expressionStartOffset;
             $end = $options?->expressionEndOffset;
             if (!\is_int($start) || !\is_int($end) || $offset < $start || $offset > $end) {
                 continue;
             }
-            $formType = $this->classReferenceArgument($php, $call->argument($typeIndex));
+            $formType = $this->classReferenceArgument($php, $call->positionalArgument($typeIndex));
             if ('Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $formType?->className) {
                 continue;
             }
@@ -229,8 +229,8 @@ final class DoctrineExtractor
             }
             $typeIndex = 'createNamed' === $call->method ? 1 : ('add' === $call->method ? 1 : 0);
             $optionsIndex = 'createNamed' === $call->method ? 3 : 2;
-            $formType = $this->classReferenceArgument($php, $call->argument($typeIndex));
-            $options = $call->argument($optionsIndex);
+            $formType = $this->classReferenceArgument($php, $call->positionalArgument($typeIndex));
+            $options = $call->positionalArgument($optionsIndex);
             if ('Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $formType?->className || null === $options) {
                 continue;
             }
@@ -272,7 +272,7 @@ final class DoctrineExtractor
         $receivers = $this->repositoryReceivers->resolveCalls($source, $php, $php->methodCalls, $localRepositoryClasses);
         $symbols = [];
         foreach ($php->methodCalls as $call) {
-            if (!\in_array($call->method, ['findBy', 'findOneBy', 'count'], true) || null === $call->argument(0)) {
+            if (!\in_array($call->method, ['findBy', 'findOneBy', 'count'], true) || null === $call->positionalArgument(0)) {
                 continue;
             }
             $receiver = $receivers[spl_object_id($call)] ?? null;
@@ -280,7 +280,7 @@ final class DoctrineExtractor
             if (null === $owner) {
                 continue;
             }
-            array_push($symbols, ...$this->criteriaSymbols($uri, $text, $call->argument(0), $owner));
+            array_push($symbols, ...$this->criteriaSymbols($uri, $text, $call->positionalArgument(0), $owner));
         }
 
         return $symbols;

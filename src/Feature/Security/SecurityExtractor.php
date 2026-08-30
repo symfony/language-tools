@@ -137,13 +137,13 @@ final class SecurityExtractor
             if (self::IS_GRANTED_ATTRIBUTE !== $attribute->name) {
                 continue;
             }
-            $role = ($attribute->argument('attribute') ?? $attribute->argument(0))?->stringLiteral;
+            $role = ($attribute->argument('attribute') ?? $attribute->positionalArgument(0))?->stringLiteral;
             if (null !== $role && preg_match('/^ROLE_[A-Z0-9_]+$/D', $role->value)) {
                 $symbols[] = $this->symbol(SecuritySymbolKind::Role, $role->value, $uri, $text, $role->startOffset);
             }
         }
         foreach ($php->methodCalls as $call) {
-            $argument = $call->argument(0)?->stringLiteral;
+            $argument = $call->positionalArgument(0)?->stringLiteral;
             if (null === $argument) {
                 continue;
             }

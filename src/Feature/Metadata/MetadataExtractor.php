@@ -69,8 +69,8 @@ final class MetadataExtractor
         foreach ($this->formCalls($php) as $call) {
             $typeIndex = 'createNamed' === $call->method ? 1 : ('add' === $call->method ? 1 : 0);
             $optionsIndex = 'createNamed' === $call->method ? 3 : 2;
-            $type = $this->leadingClassReferenceArgument($source, $php, $call->argument($typeIndex));
-            $argument = $call->argument($optionsIndex);
+            $type = $this->leadingClassReferenceArgument($source, $php, $call->positionalArgument($typeIndex));
+            $argument = $call->positionalArgument($optionsIndex);
             if (null === $type || null === $argument) {
                 continue;
             }
@@ -145,7 +145,7 @@ final class MetadataExtractor
                     continue;
                 }
                 if ('setDefaults' === $call->method) {
-                    $argument = $call->argument(0);
+                    $argument = $call->positionalArgument(0);
                     $expression = $argument?->expression;
                     $offset = $argument?->expressionStartOffset;
                     if (!\is_string($expression) || !\is_int($offset) || null === $entries = $this->arrayEntries($expression, $offset)) {
@@ -157,10 +157,10 @@ final class MetadataExtractor
                     }
                     $dataClassExpression = $entries['data_class'];
                 } else {
-                    if ('data_class' !== $this->quotedIdentifier($call->argument(0)->expression ?? '')) {
+                    if ('data_class' !== $this->quotedIdentifier($call->positionalArgument(0)->expression ?? '')) {
                         continue;
                     }
-                    $argument = $call->argument(1);
+                    $argument = $call->positionalArgument(1);
                     $expression = $argument?->expression;
                     $offset = $argument?->expressionStartOffset;
                     if (!\is_string($expression) || !\is_int($offset)) {
@@ -244,7 +244,7 @@ final class MetadataExtractor
                 ) {
                     continue;
                 }
-                $field = null === $call->argument(0) ? null : $this->quotedIdentifierArgument($text, $call->argument(0));
+                $field = null === $call->positionalArgument(0) ? null : $this->quotedIdentifierArgument($text, $call->positionalArgument(0));
                 $property = null === $field ? null : $this->formPropertyName($call->arguments, $field['name']);
                 if (null === $field || null === $property) {
                     continue;

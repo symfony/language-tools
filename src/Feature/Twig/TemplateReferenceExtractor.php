@@ -116,7 +116,7 @@ final class TemplateReferenceExtractor
         if (null !== $argument = $attribute->argument($name)) {
             return $argument;
         }
-        $positional = $attribute->argument($position);
+        $positional = $attribute->positionalArgument($position);
 
         return null === $positional?->name ? $positional : null;
     }

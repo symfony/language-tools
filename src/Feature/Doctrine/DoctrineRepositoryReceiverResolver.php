@@ -98,7 +98,7 @@ final class DoctrineRepositoryReceiverResolver
     {
         $entities = [];
         foreach ($php->methodCalls as $call) {
-            if ('getRepository' !== $call->method || null === $reference = $this->classReferenceArgument($php, $call->argument(0))) {
+            if ('getRepository' !== $call->method || null === $reference = $this->classReferenceArgument($php, $call->positionalArgument(0))) {
                 continue;
             }
             $before = substr($source, 0, $call->startOffset);
