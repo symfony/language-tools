@@ -8,30 +8,39 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterTree;
 
 final class YamlDocumentParser
 {
-    public function __construct(private readonly TreeSitterParserInterface $parser)
-    {
+    public function __construct(
+        private readonly TreeSitterParserInterface $parser,
+        private readonly YamlScalarDecoder $scalarDecoder = new YamlScalarDecoder(),
+        private readonly YamlRecoveryParser $recoveryParser = new YamlRecoveryParser(),
+    ) {
     }
 
     /** @return list<YamlMapping> */
     public function parse(string $source): array
     {
+        return $this->parseSource($source, false)->mappings;
+    }
+
+    public function parseDocument(string $source): YamlDocument
+    {
+        return $this->parseSource($source, true);
+    }
+
+    private function parseSource(string $source, bool $collectScalars): YamlDocument
+    {
         $mappings = [];
+        $scalars = [];
         $tree = $this->parser->parse('yaml', $source);
-        $this->visit($tree, $tree->root(), $source, [], [], false, 'base', $mappings);
+        $this->visit($tree, $tree->root(), $source, [], [], 'base', $collectScalars, $mappings, $scalars);
         if ($tree->hasError) {
-            $indexedOffsets = [];
-            foreach ($mappings as $mapping) {
-                $indexedOffsets[$mapping->keyStartByte] = true;
+            $recovered = $this->recoveryParser->parse($source);
+            $mappings = $this->mergeMappings($mappings, $recovered->mappings);
+            if ($collectScalars) {
+                $scalars = $this->mergeScalars($scalars, $recovered->scalars);
             }
-            foreach ($this->fallbackMappings($source) as $mapping) {
-                if (!isset($indexedOffsets[$mapping->keyStartByte])) {
-                    $mappings[] = $mapping;
-                }
-            }
-            usort($mappings, static fn (YamlMapping $left, YamlMapping $right): int => $left->keyStartByte <=> $right->keyStartByte);
         }
 
-        return $mappings;
+        return new YamlDocument($mappings, $scalars);
     }
 
     /** @return list<string> */
@@ -47,65 +56,101 @@ final class YamlDocumentParser
     }
 
     /**
-     * @param list<string>      $path
-     * @param list<int>         $sequenceDepths
-     * @param list<YamlMapping> $mappings
+     * @param list<string>           $path
+     * @param list<YamlSequenceItem> $sequence
+     * @param list<YamlMapping>      $mappings
+     * @param list<YamlScalar>       $scalars
      */
-    private function visit(TreeSitterTree $tree, TreeSitterNode $node, string $source, array $path, array $sequenceDepths, bool $pendingSequence, string $scope, array &$mappings): void
+    private function visit(TreeSitterTree $tree, TreeSitterNode $node, string $source, array $path, array $sequence, string $scope, bool $collectScalars, array &$mappings, array &$scalars): void
     {
-        if ('block_sequence_item' === $node->type) {
-            $pendingSequence = true;
+        if (\in_array($node->type, ['block_mapping_pair', 'flow_pair'], true)) {
+            $this->visitPair($tree, $node, $source, $path, $sequence, $scope, $collectScalars, $mappings, $scalars);
+
+            return;
+        }
+        if (\in_array($node->type, ['block_sequence', 'flow_sequence'], true)) {
+            $index = 0;
+            foreach ($tree->children($node) as $child) {
+                if ('block_sequence' === $node->type && 'block_sequence_item' !== $child->type) {
+                    continue;
+                }
+                $item = new YamlSequenceItem(\count($path), $index++);
+                $this->visit($tree, $child, $source, $path, [...$sequence, $item], $scope, $collectScalars, $mappings, $scalars);
+            }
+
+            return;
         }
 
-        if (\in_array($node->type, ['block_mapping_pair', 'flow_pair'], true)) {
-            $keyNode = $tree->childByField($node, 'key');
-            if (null === $keyNode) {
-                return;
-            }
-            [$key, $keyStart, $keyEnd] = $this->scalar($tree, $keyNode, $source);
-            if ('' === $key) {
-                return;
-            }
-
-            $valueNode = $tree->childByField($node, 'value');
-            $environmentSection = str_starts_with($key, 'when@');
-            $mappingPath = $environmentSection ? $path : [...$path, $key];
-            $mappingDepths = $pendingSequence && !$environmentSection ? [...$sequenceDepths, \count($path)] : $sequenceDepths;
-            $mappingScope = $environmentSection ? $key : $scope;
-            if (!$environmentSection) {
-                [$value, $valueStart, $valueEnd] = $this->value($tree, $valueNode, $source, $node->endByte);
-                $mappings[] = new YamlMapping($mappingPath, $value, $keyStart, $keyEnd, $valueStart, $valueEnd, $mappingDepths, $mappingScope);
-            }
-
-            if (null !== $valueNode) {
-                $this->visit($tree, $valueNode, $source, $mappingPath, $mappingDepths, false, $mappingScope, $mappings);
+        $scalarNode = $this->directScalarNode($tree, $node);
+        if (null !== $scalarNode) {
+            if ($collectScalars) {
+                $scalars[] = $this->treeScalar($tree, $node, $scalarNode, $source, $path, $sequence, $scope);
             }
 
             return;
         }
 
         foreach ($tree->children($node) as $child) {
-            $this->visit($tree, $child, $source, $path, $sequenceDepths, $pendingSequence, $scope, $mappings);
+            $this->visit($tree, $child, $source, $path, $sequence, $scope, $collectScalars, $mappings, $scalars);
         }
     }
 
-    /** @return array{string, int, int} */
-    private function scalar(TreeSitterTree $tree, TreeSitterNode $node, string $source): array
+    /**
+     * @param list<string>           $path
+     * @param list<YamlSequenceItem> $sequence
+     * @param list<YamlMapping>      $mappings
+     * @param list<YamlScalar>       $scalars
+     */
+    private function visitPair(TreeSitterTree $tree, TreeSitterNode $node, string $source, array $path, array $sequence, string $scope, bool $collectScalars, array &$mappings, array &$scalars): void
     {
-        $start = $node->startByte;
-        $end = $node->endByte;
-        $value = $tree->text($node, $source);
-        if (\strlen($value) >= 2 && (("'" === $value[0] && str_ends_with($value, "'")) || ('"' === $value[0] && str_ends_with($value, '"')))) {
-            ++$start;
-            --$end;
-            $value = substr($value, 1, -1);
+        $keyNode = $tree->childByField($node, 'key');
+        if (null === $keyNode) {
+            return;
+        }
+        [$key, $keyStart, $keyEnd] = $this->key($tree, $keyNode, $source);
+        if ('' === $key) {
+            return;
         }
 
-        return [$value, $start, $end];
+        $valueNode = $tree->childByField($node, 'value');
+        $environmentSection = str_starts_with($key, 'when@');
+        $mappingPath = $environmentSection ? $path : [...$path, $key];
+        $mappingScope = $environmentSection ? $key : $scope;
+        if (!$environmentSection) {
+            [$value, $valueStart, $valueEnd] = $this->mappingValue($tree, $valueNode, $source, $node->endByte);
+            $mappings[] = new YamlMapping(
+                $mappingPath,
+                $value,
+                $keyStart,
+                $keyEnd,
+                $valueStart,
+                $valueEnd,
+                array_values(array_unique(array_map(static fn (YamlSequenceItem $item): int => $item->pathDepth, $sequence))),
+                $mappingScope,
+            );
+        }
+
+        if (null !== $valueNode) {
+            $this->visit($tree, $valueNode, $source, $mappingPath, $sequence, $mappingScope, $collectScalars, $mappings, $scalars);
+        }
     }
 
     /** @return array{string, int, int} */
-    private function value(TreeSitterTree $tree, ?TreeSitterNode $node, string $source, int $fallbackOffset): array
+    private function key(TreeSitterTree $tree, TreeSitterNode $node, string $source): array
+    {
+        $scalar = $this->directScalarNode($tree, $node);
+        if (null === $scalar) {
+            return ['', $node->startByte, $node->endByte];
+        }
+        $raw = $tree->text($scalar, $source);
+        $style = $this->scalarDecoder->style($scalar->type, $raw);
+        [$start, $end] = $this->scalarDecoder->contentOffsets($raw, $scalar->startByte, $scalar->endByte, $style);
+
+        return [$this->scalarDecoder->decode($raw, $style), $start, $end];
+    }
+
+    /** @return array{string, int, int} */
+    private function mappingValue(TreeSitterTree $tree, ?TreeSitterNode $node, string $source, int $fallbackOffset): array
     {
         if (null === $node || $this->containsBlockCollection($tree, $node)) {
             while (isset($source[$fallbackOffset]) && \in_array($source[$fallbackOffset], [' ', "\t"], true)) {
@@ -118,105 +163,103 @@ final class YamlDocumentParser
         return [trim($tree->text($node, $source)), $node->startByte, $node->endByte];
     }
 
-    /** @return list<YamlMapping> */
-    private function fallbackMappings(string $source): array
+    private function directScalarNode(TreeSitterTree $tree, TreeSitterNode $node): ?TreeSitterNode
     {
-        $mappings = [];
-        /** @var array<int, array{path: list<string>, childDepths: list<int>, scope: string}> $stack */
-        $stack = [];
-        preg_match_all('/^.*(?:\R|$)/m', $source, $lines, \PREG_OFFSET_CAPTURE);
-        foreach ($lines[0] as [$line, $lineOffset]) {
-            $line = rtrim($line, "\r\n");
-            $parsed = $this->fallbackLine($line);
-            if (null === $parsed) {
-                continue;
+        if (\in_array($node->type, ['plain_scalar', 'single_quote_scalar', 'double_quote_scalar', 'block_scalar'], true)) {
+            return $node;
+        }
+        foreach ($tree->children($node) as $child) {
+            if (\in_array($child->type, ['plain_scalar', 'single_quote_scalar', 'double_quote_scalar', 'block_scalar'], true)) {
+                return $child;
             }
-            foreach (array_keys($stack) as $level) {
-                if ($level >= $parsed['indent']) {
-                    unset($stack[$level]);
-                }
-            }
-            ksort($stack);
-            $parent = [];
-            $childDepths = [];
-            $scope = 'base';
-            foreach ($stack as $entry) {
-                $parent = $entry['path'];
-                $childDepths = $entry['childDepths'];
-                $scope = $entry['scope'];
-            }
-            $environmentSection = str_starts_with($parsed['key'], 'when@');
-            if ($environmentSection) {
-                $scope = $parsed['key'];
-            }
-            $depths = $parsed['sequence'] ? [...$childDepths, \count($parent)] : $childDepths;
-            $path = $environmentSection ? $parent : [...$parent, $parsed['key']];
-            if ($environmentSection || '' === $parsed['value']) {
-                $stack[$parsed['indent']] = ['path' => $path, 'childDepths' => $environmentSection ? $childDepths : $depths, 'scope' => $scope];
-            } elseif ($parsed['sequence']) {
-                $stack[$parsed['indent']] = ['path' => $parent, 'childDepths' => $depths, 'scope' => $scope];
-            }
-            if ($environmentSection) {
-                continue;
-            }
-            $keyStart = $lineOffset + $parsed['keyOffset'];
-            $valueStart = $lineOffset + $parsed['valueOffset'];
-            $mappings[] = new YamlMapping(
-                $path,
-                $parsed['value'],
-                $keyStart,
-                $keyStart + \strlen($parsed['key']),
-                $valueStart,
-                $valueStart + \strlen($parsed['value']),
-                $depths,
-                $scope,
-            );
         }
 
-        return $mappings;
+        return null;
     }
 
-    /** @return array{indent: int, key: string, keyOffset: int, value: string, valueOffset: int, sequence: bool}|null */
-    private function fallbackLine(string $line): ?array
+    /**
+     * @param list<string>           $path
+     * @param list<YamlSequenceItem> $sequence
+     */
+    private function treeScalar(TreeSitterTree $tree, TreeSitterNode $container, TreeSitterNode $node, string $source, array $path, array $sequence, string $scope): YamlScalar
     {
-        if ('' === trim($line) || str_starts_with(ltrim($line), '#') || !preg_match('/^(?<indent>\s*)(?:(?<sequence>-)\s+)?(?<quote>[\'"]?)(?<key>[^:\'"]+)\k<quote>\s*:(?<rest>.*)$/', $line, $match, \PREG_OFFSET_CAPTURE)) {
-            return null;
+        $raw = $tree->text($node, $source);
+        $style = $this->scalarDecoder->style($node->type, $raw);
+        $baseIndent = $this->lineIndent($source, $node->startByte);
+        [$contentStart, $contentEnd] = $this->scalarDecoder->contentOffsets($raw, $node->startByte, $node->endByte, $style, $baseIndent);
+        $tag = null;
+        foreach ($tree->children($container) as $child) {
+            if ('tag' === $child->type) {
+                $tag = $tree->text($child, $source);
+                break;
+            }
         }
-        $key = trim($match['key'][0]);
-        $keyOffset = $match['key'][1] + \strlen($match['key'][0]) - \strlen(ltrim($match['key'][0]));
-        $rest = $match['rest'][0];
-        $value = $this->fallbackValue($rest);
-        $valueOffset = $match['rest'][1] + \strlen($rest) - \strlen(ltrim($rest));
 
-        return [
-            'indent' => \strlen($match['indent'][0]),
-            'key' => $key,
-            'keyOffset' => $keyOffset,
-            'value' => $value,
-            'valueOffset' => $valueOffset,
-            'sequence' => '-' === $match['sequence'][0],
-        ];
+        return new YamlScalar(
+            $this->scalarDecoder->decode($raw, $style, $baseIndent),
+            $raw,
+            $node->startByte,
+            $node->endByte,
+            $contentStart,
+            $contentEnd,
+            $style,
+            $path,
+            $sequence,
+            'base' === $scope ? null : substr($scope, \strlen('when@')),
+            $tag,
+        );
     }
 
-    private function fallbackValue(string $value): string
+    private function lineIndent(string $source, int $offset): int
     {
-        $quote = null;
-        for ($index = 0, $length = \strlen($value); $index < $length; ++$index) {
-            $character = $value[$index];
-            if (null === $quote && \in_array($character, ["'", '"'], true)) {
-                $quote = $character;
-                continue;
-            }
-            if ($character === $quote && ('"' !== $quote || 0 === $index || '\\' !== $value[$index - 1])) {
-                $quote = null;
-                continue;
-            }
-            if (null === $quote && '#' === $character && (0 === $index || ctype_space($value[$index - 1]))) {
-                return trim(substr($value, 0, $index));
+        $lineStart = strrpos(substr($source, 0, $offset), "\n");
+        $lineStart = false === $lineStart ? 0 : $lineStart + 1;
+
+        return strspn($source, " \t", $lineStart, $offset - $lineStart);
+    }
+
+    /**
+     * @param list<YamlMapping> $parsed
+     * @param list<YamlMapping> $recovered
+     *
+     * @return list<YamlMapping>
+     */
+    private function mergeMappings(array $parsed, array $recovered): array
+    {
+        $indexed = [];
+        foreach ($parsed as $mapping) {
+            $indexed[$mapping->keyStartByte] = true;
+        }
+        foreach ($recovered as $mapping) {
+            if (!isset($indexed[$mapping->keyStartByte])) {
+                $parsed[] = $mapping;
             }
         }
+        usort($parsed, static fn (YamlMapping $left, YamlMapping $right): int => $left->keyStartByte <=> $right->keyStartByte);
 
-        return trim($value);
+        return $parsed;
+    }
+
+    /**
+     * @param list<YamlScalar> $parsed
+     * @param list<YamlScalar> $recovered
+     *
+     * @return list<YamlScalar>
+     */
+    private function mergeScalars(array $parsed, array $recovered): array
+    {
+        $merged = [];
+        foreach ($recovered as $scalar) {
+            $merged[$scalar->startByte."\0".$scalar->endByte] = $scalar;
+        }
+        foreach ($parsed as $scalar) {
+            $key = $scalar->startByte."\0".$scalar->endByte;
+            $merged[$key] ??= $scalar;
+        }
+        $scalars = array_values($merged);
+        usort($scalars, static fn (YamlScalar $left, YamlScalar $right): int => $left->startByte <=> $right->startByte);
+
+        return $scalars;
     }
 
     private function containsBlockCollection(TreeSitterTree $tree, TreeSitterNode $node): bool
