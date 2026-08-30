@@ -55,10 +55,10 @@ final class MessengerSourceIndex extends AbstractSourceFactsIndex
         $this->symbols = [];
         $this->parents = [];
         foreach ($this->facts() as $source) {
-            foreach ($source->symbols() as $symbol) {
-                $this->symbols[$symbol->kind()->name][$symbol->name()][] = $symbol;
+            foreach ($source->symbols as $symbol) {
+                $this->symbols[$symbol->kind->name][$symbol->name][] = $symbol;
             }
-            foreach ($source->parents() as $class => $parents) {
+            foreach ($source->parents as $class => $parents) {
                 $this->parents[$class] = $parents;
             }
         }

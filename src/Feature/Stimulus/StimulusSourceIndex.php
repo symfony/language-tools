@@ -49,12 +49,12 @@ final class StimulusSourceIndex extends AbstractSourceFactsIndex
         $this->declarationsByName = [];
         $this->references = [];
         foreach ($this->facts() as $facts) {
-            foreach ($facts->declarations() as $declaration) {
+            foreach ($facts->declarations as $declaration) {
                 $this->declarations[] = $declaration;
-                $this->declarationsByName[$declaration->name()][] = $declaration;
+                $this->declarationsByName[$declaration->name][] = $declaration;
             }
-            foreach ($facts->references() as $reference) {
-                $this->references[$reference->controller()][$this->referenceKey($reference->kind(), $reference->member())][] = $reference;
+            foreach ($facts->references as $reference) {
+                $this->references[$reference->controller][$this->referenceKey($reference->kind, $reference->member)][] = $reference;
             }
         }
         $this->indexed = true;

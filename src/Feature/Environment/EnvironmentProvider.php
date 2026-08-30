@@ -76,19 +76,19 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         }
         [$reference, $project] = $resolved;
         $index = $this->indexes->forProject($project);
-        $details = [\sprintf('Environment variable: `%s`', $reference->name())];
-        if ([] !== $reference->processors()) {
-            $details[] = \sprintf('Processors: `%s`', implode('`, `', $reference->processors()));
-            foreach ($reference->processors() as $processor) {
+        $details = [\sprintf('Environment variable: `%s`', $reference->name)];
+        if ([] !== $reference->processors) {
+            $details[] = \sprintf('Processors: `%s`', implode('`, `', $reference->processors));
+            foreach ($reference->processors as $processor) {
                 if (isset($index->processors()[$processor])) {
                     $details[] = \sprintf('Expected type: `%s`', $index->processors()[$processor]);
                     break;
                 }
             }
         }
-        foreach ($index->declarations($reference->name()) as $declaration) {
-            $details[] = \sprintf('Declared in: `%s`', $declaration->uri());
-            $details[] = 'Default present: '.($declaration->hasDefault() ? 'yes' : 'no');
+        foreach ($index->declarations($reference->name) as $declaration) {
+            $details[] = \sprintf('Declared in: `%s`', $declaration->uri);
+            $details[] = 'Default present: '.($declaration->hasDefault ? 'yes' : 'no');
         }
 
         return $this->protocol->markdownHover(implode("\n\n", $details));
@@ -102,7 +102,7 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         }
         [$reference, $project] = $resolved;
 
-        return array_map(fn (EnvironmentDeclaration $declaration): array => $this->protocol->location($declaration->uri(), $declaration->range()), $this->indexes->forProject($project)->declarations($reference->name()));
+        return array_map(fn (EnvironmentDeclaration $declaration): array => $this->protocol->location($declaration->uri, $declaration->range), $this->indexes->forProject($project)->declarations($reference->name));
     }
 
     public function references(array $params): ?array
@@ -113,7 +113,7 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         }
         [$reference, $project] = $resolved;
 
-        return array_map(fn (EnvironmentReference $item): array => $this->protocol->location($item->uri(), $item->range()), $this->indexes->forProject($project)->references($reference->name()));
+        return array_map(fn (EnvironmentReference $item): array => $this->protocol->location($item->uri, $item->range), $this->indexes->forProject($project)->references($reference->name));
     }
 
     public function name(): string
@@ -130,17 +130,17 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         $index = $this->indexes->forProject($request->project);
         $processors = $index->processors();
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->references() as $reference) {
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->references as $reference) {
             $skipNext = false;
             $previousProcessor = null;
-            foreach ($reference->processors() as $processor) {
+            foreach ($reference->processors as $processor) {
                 if ($skipNext) {
                     $skipNext = false;
                     $previousProcessor = null;
                     continue;
                 }
                 if ('' === $processor) {
-                    $diagnostics[] = $this->protocol->diagnostic($reference->range(), 1, 'env.malformed_chain', 'Environment processor chains cannot contain empty segments.');
+                    $diagnostics[] = $this->protocol->diagnostic($reference->range, 1, 'env.malformed_chain', 'Environment processor chains cannot contain empty segments.');
                     continue;
                 }
                 if (\in_array($processor, self::ARGUMENT_PROCESSORS, true)) {
@@ -148,7 +148,7 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
                 }
                 $customProcessorArgument = null !== $previousProcessor && isset($processors[$previousProcessor]) && !\in_array($previousProcessor, self::BUILT_IN_PROCESSORS, true);
                 if ($index->processorsComplete() && !$customProcessorArgument && !isset($processors[$processor])) {
-                    $diagnostics[] = $this->protocol->diagnostic($reference->range(), 1, 'env.unknown_processor', \sprintf('Environment processor "%s" is not installed.', $processor));
+                    $diagnostics[] = $this->protocol->diagnostic($reference->range, 1, 'env.unknown_processor', \sprintf('Environment processor "%s" is not installed.', $processor));
                 }
                 $previousProcessor = $processor;
             }
@@ -176,13 +176,13 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
         $facts = $this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text);
-        foreach ($facts->declarations() as $declaration) {
-            if ($this->converter->containsByteOffset($request->document->text, $declaration->range(), $offset, inclusiveEnd: true)) {
-                return [new EnvironmentReference($declaration->name(), $request->document->uri, $declaration->range(), []), $request->project];
+        foreach ($facts->declarations as $declaration) {
+            if ($this->converter->containsByteOffset($request->document->text, $declaration->range, $offset, inclusiveEnd: true)) {
+                return [new EnvironmentReference($declaration->name, $request->document->uri, $declaration->range, []), $request->project];
             }
         }
-        foreach ($facts->references() as $reference) {
-            if ($this->converter->containsByteOffset($request->document->text, $reference->range(), $offset, inclusiveEnd: true)) {
+        foreach ($facts->references as $reference) {
+            if ($this->converter->containsByteOffset($request->document->text, $reference->range, $offset, inclusiveEnd: true)) {
                 return [$reference, $request->project];
             }
         }

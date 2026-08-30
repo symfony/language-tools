@@ -19,19 +19,19 @@ final class ConsoleSourceIndexTest extends TestCase
         );
 
         $definition = $index->definition('App\ReportCommand');
-        self::assertTrue($definition->isCommand());
-        self::assertTrue($definition->isComplete());
-        self::assertSame(['base', 'report', 'shared'], $definition->arguments());
-        self::assertSame(['format', 'quiet'], $definition->options());
+        self::assertTrue($definition->command);
+        self::assertTrue($definition->complete);
+        self::assertSame(['base', 'report', 'shared'], $definition->arguments);
+        self::assertSame(['format', 'quiet'], $definition->options);
 
         $index->overlay($this->facts('file:///workspace/src/ReportCommand.php', new ConsoleCommandDeclaration('App\ReportCommand', 'App\BaseCommand', [], ['overlay'], [], false, true)));
-        self::assertSame(['base', 'overlay', 'shared'], $index->definition('App\ReportCommand')->arguments());
+        self::assertSame(['base', 'overlay', 'shared'], $index->definition('App\ReportCommand')->arguments);
 
         $index->removeOverlay('file:///workspace/src/ReportCommand.php');
-        self::assertSame(['base', 'report', 'shared'], $index->definition('App\ReportCommand')->arguments());
+        self::assertSame(['base', 'report', 'shared'], $index->definition('App\ReportCommand')->arguments);
 
         $index->replaceSource($this->facts('file:///workspace/src/ReportCommand.php', new ConsoleCommandDeclaration('App\ReportCommand', 'App\MissingBaseCommand', [], ['report'], [], false, true)));
-        self::assertFalse($index->definition('App\ReportCommand')->isComplete());
+        self::assertFalse($index->definition('App\ReportCommand')->complete);
     }
 
     private function facts(string $uri, ConsoleCommandDeclaration $declaration): ConsoleSourceFacts

@@ -17,7 +17,7 @@ final class ProjectTranslationSnapshotLoaderTest extends TestCase
             ['key' => 'article.title', 'domain' => 'messages', 'locale' => 'en', 'message' => 'Article %name%'],
         ]]]]);
 
-        self::assertSame('Article %name%', $indexes->forProject($project)->messages('messages', 'article.title')[0]->message());
+        self::assertSame('Article %name%', $indexes->forProject($project)->messages('messages', 'article.title')[0]->message);
         self::assertTrue($indexes->forProject($project)->isComplete());
     }
 }

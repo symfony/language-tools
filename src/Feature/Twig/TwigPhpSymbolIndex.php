@@ -75,7 +75,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
         $members = [];
         foreach ($this->members[$this->classKey($className)] ?? [] as $name => $declarations) {
             foreach ($declarations as $declaration) {
-                if (!$declaration->isPublic() || ($enumCasesOnly && TwigPhpSymbolKind::EnumCase !== $declaration->kind())) {
+                if (!$declaration->public || ($enumCasesOnly && TwigPhpSymbolKind::EnumCase !== $declaration->kind)) {
                     continue;
                 }
                 $members[$name] = $declaration;
@@ -91,8 +91,8 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     {
         $this->index();
         foreach ($this->declarationsByUri[$uri] ?? [] as $declaration) {
-            $start = $declaration->range()->start;
-            $end = $declaration->range()->end;
+            $start = $declaration->range->start;
+            $end = $declaration->range->end;
             if (($position->line > $start->line || ($position->line === $start->line && $position->character >= $start->character))
                 && ($position->line < $end->line || ($position->line === $end->line && $position->character <= $end->character))) {
                 return $declaration;
@@ -120,28 +120,28 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
         $enumNames = [];
         $constantTypeNames = [];
         foreach ($this->facts() as $facts) {
-            foreach ($facts->declarations() as $declaration) {
-                $classKey = $this->classKey($declaration->className());
-                $this->declarationsByUri[$declaration->uri()][] = $declaration;
-                if ($declaration->kind()->isType()) {
+            foreach ($facts->declarations as $declaration) {
+                $classKey = $this->classKey($declaration->className);
+                $this->declarationsByUri[$declaration->uri][] = $declaration;
+                if ($declaration->kind->isType()) {
                     $this->types[$classKey][] = $declaration;
-                    if (TwigPhpSymbolKind::Enum === $declaration->kind()) {
-                        $enumNames[$declaration->className()] = true;
+                    if (TwigPhpSymbolKind::Enum === $declaration->kind) {
+                        $enumNames[$declaration->className] = true;
                     }
 
                     continue;
                 }
-                $memberName = $declaration->memberName();
+                $memberName = $declaration->memberName;
                 if (null === $memberName) {
                     continue;
                 }
                 $this->members[$classKey][$memberName][] = $declaration;
-                if ($declaration->isPublic()) {
-                    $constantTypeNames[$declaration->className()] = true;
+                if ($declaration->public) {
+                    $constantTypeNames[$declaration->className] = true;
                 }
             }
-            foreach ($facts->references() as $reference) {
-                $this->references[$this->referenceKey($reference->className(), $reference->memberName())][] = $reference;
+            foreach ($facts->references as $reference) {
+                $this->references[$this->referenceKey($reference->className, $reference->memberName)][] = $reference;
             }
         }
 
@@ -149,7 +149,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
         sort($this->enumNames);
         $this->constantTypeNames = array_keys($constantTypeNames);
         sort($this->constantTypeNames);
-        $byDeclarationLocation = static fn (TwigPhpSymbolDeclaration $left, TwigPhpSymbolDeclaration $right): int => [$left->uri(), $left->range()->start->line, $left->range()->start->character] <=> [$right->uri(), $right->range()->start->line, $right->range()->start->character];
+        $byDeclarationLocation = static fn (TwigPhpSymbolDeclaration $left, TwigPhpSymbolDeclaration $right): int => [$left->uri, $left->range->start->line, $left->range->start->character] <=> [$right->uri, $right->range->start->line, $right->range->start->character];
         foreach ($this->types as &$declarations) {
             usort($declarations, $byDeclarationLocation);
         }
@@ -166,7 +166,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
         }
         unset($declarations);
         foreach ($this->references as &$references) {
-            usort($references, static fn (TwigPhpSymbolReference $left, TwigPhpSymbolReference $right): int => [$left->uri(), $left->range()->start->line, $left->range()->start->character] <=> [$right->uri(), $right->range()->start->line, $right->range()->start->character]);
+            usort($references, static fn (TwigPhpSymbolReference $left, TwigPhpSymbolReference $right): int => [$left->uri, $left->range->start->line, $left->range->start->character] <=> [$right->uri, $right->range->start->line, $right->range->start->character]);
         }
         unset($references);
         $this->indexed = true;

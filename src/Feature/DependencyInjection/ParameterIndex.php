@@ -13,7 +13,7 @@ final class ParameterIndex
     {
         $this->parameters = [];
         foreach ($parameters as $parameter) {
-            $this->parameters[$parameter->name()] = $parameter;
+            $this->parameters[$parameter->name] = $parameter;
         }
         ksort($this->parameters);
         $this->complete = $complete;
@@ -29,7 +29,7 @@ final class ParameterIndex
     {
         return array_values(array_filter(
             $this->parameters,
-            static fn (Parameter $parameter): bool => str_starts_with($parameter->name(), $prefix),
+            static fn (Parameter $parameter): bool => str_starts_with($parameter->name, $prefix),
         ));
     }
 

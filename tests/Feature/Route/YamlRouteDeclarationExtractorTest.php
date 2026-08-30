@@ -30,12 +30,12 @@ final class YamlRouteDeclarationExtractorTest extends TestCase
         );
 
         self::assertSame(['article_show', 'article_edit'], array_map(
-            static fn (RouteDeclaration $declaration): string => $declaration->name(),
+            static fn (RouteDeclaration $declaration): string => $declaration->name,
             $declarations,
         ));
-        self::assertSame(3, $declarations[0]->range()->start->line);
-        self::assertSame(0, $declarations[0]->range()->start->character);
-        self::assertSame(7, $declarations[1]->range()->start->line);
-        self::assertSame(1, $declarations[1]->range()->start->character);
+        self::assertSame(3, $declarations[0]->range->start->line);
+        self::assertSame(0, $declarations[0]->range->start->character);
+        self::assertSame(7, $declarations[1]->range->start->line);
+        self::assertSame(1, $declarations[1]->range->start->character);
     }
 }

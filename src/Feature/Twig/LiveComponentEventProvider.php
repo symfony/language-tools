@@ -60,10 +60,10 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
             return null;
         }
         [$event, $project] = $resolved;
-        $details = [\sprintf('Live component event: `%s`', $event->name())];
-        foreach ($this->indexes->forProject($project)->events($event->name()) as $candidate) {
-            if ($candidate->isDeclaration() && null !== $candidate->component() && null !== $candidate->action()) {
-                $details[] = \sprintf('Listener: `%s#%s`', $candidate->component(), $candidate->action());
+        $details = [\sprintf('Live component event: `%s`', $event->name)];
+        foreach ($this->indexes->forProject($project)->events($event->name) as $candidate) {
+            if ($candidate->declaration && null !== $candidate->component && null !== $candidate->action) {
+                $details[] = \sprintf('Listener: `%s#%s`', $candidate->component, $candidate->action);
             }
         }
 
@@ -78,9 +78,9 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
         }
         [$event, $project] = $resolved;
         $locations = [];
-        foreach ($this->indexes->forProject($project)->events($event->name()) as $candidate) {
-            if ($candidate->isDeclaration()) {
-                $locations[] = $this->protocol->location($candidate->uri(), $candidate->range());
+        foreach ($this->indexes->forProject($project)->events($event->name) as $candidate) {
+            if ($candidate->declaration) {
+                $locations[] = $this->protocol->location($candidate->uri, $candidate->range);
             }
         }
 
@@ -95,7 +95,7 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
         }
         [$event, $project] = $resolved;
 
-        return array_map(fn (LiveComponentEvent $candidate): array => $this->protocol->location($candidate->uri(), $candidate->range()), $this->indexes->forProject($project)->events($event->name()));
+        return array_map(fn (LiveComponentEvent $candidate): array => $this->protocol->location($candidate->uri, $candidate->range), $this->indexes->forProject($project)->events($event->name));
     }
 
     /**
@@ -110,8 +110,8 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        foreach ($this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text)->events() as $event) {
-            if ($this->converter->containsByteOffset($request->document->text, $event->range(), $offset, inclusiveEnd: true)) {
+        foreach ($this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text)->events as $event) {
+            if ($this->converter->containsByteOffset($request->document->text, $event->range, $offset, inclusiveEnd: true)) {
                 return [$event, $request->project];
             }
         }

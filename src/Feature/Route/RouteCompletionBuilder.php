@@ -11,9 +11,9 @@ final class RouteCompletionBuilder
     {
         return array_map(
             static fn (Route $route): array => [
-                'label' => $route->name(),
+                'label' => $route->name,
                 'kind' => 12,
-                'detail' => $route->path() ?? 'Symfony route',
+                'detail' => $route->path ?? 'Symfony route',
             ],
             $routeIndex->matching($prefix),
         );

@@ -24,7 +24,7 @@ final class EnvironmentIndexTest extends TestCase
 
         [$secondFacts, $secondDeclaration, $secondReference] = $this->facts('SECOND');
         $index->replaceSource($secondFacts);
-        $index->removeSource($firstFacts->uri());
+        $index->removeSource($firstFacts->uri);
 
         self::assertSame(['SECOND'], $index->names());
         self::assertSame([], $index->declarations('FIRST'));

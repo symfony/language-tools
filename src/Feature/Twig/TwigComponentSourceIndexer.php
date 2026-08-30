@@ -30,8 +30,8 @@ final class TwigComponentSourceIndexer extends AbstractSourceIndexer
         }
 
         return [
-            ...$data->components(),
-            ...array_filter($data->events(), static fn (LiveComponentEvent $event): bool => $event->isDeclaration()),
+            ...$data->components,
+            ...array_filter($data->events, static fn (LiveComponentEvent $event): bool => $event->declaration),
         ];
     }
 

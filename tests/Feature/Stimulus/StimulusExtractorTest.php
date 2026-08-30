@@ -20,7 +20,7 @@ final class StimulusExtractorTest extends TestCase
         $extractor = new StimulusExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new TwigCommentParser());
         $facts = $extractor->extract($project, 'file:///workspace/assets/controllers/example_controller.js', $languageId, $text);
 
-        self::assertSame($expected, $facts->declarations()[0]->isLazy());
+        self::assertSame($expected, $facts->declarations[0]->lazy);
     }
 
     public function testIgnoresTwigReferencesInsideDocumentationComments(): void
@@ -32,7 +32,7 @@ final class StimulusExtractorTest extends TestCase
             {{ stimulus_controller('real') }}
             TWIG);
 
-        self::assertSame(['real'], array_map(static fn ($reference): string => $reference->controller(), $facts->references()));
+        self::assertSame(['real'], array_map(static fn ($reference): string => $reference->controller, $facts->references));
     }
 
     /** @return iterable<string, array{string, string, bool}> */

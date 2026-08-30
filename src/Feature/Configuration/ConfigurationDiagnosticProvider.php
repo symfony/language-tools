@@ -77,35 +77,35 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
         $diagnostics = [];
         $seen = [];
         foreach ($occurrences as $occurrence) {
-            if (!\in_array($occurrence->scope(), ['base', $environmentScope], true)) {
+            if (!\in_array($occurrence->scope, ['base', $environmentScope], true)) {
                 continue;
             }
-            $path = $occurrence->path();
+            $path = $occurrence->path;
             $root = $path[0] ?? null;
             if (null === $root || \in_array($root, ['parameters', 'services'], true) || !isset($index->roots()[$root])) {
                 continue;
             }
             $key = implode('.', $path);
-            $identity = $occurrence->scope().'|'.$key;
+            $identity = $occurrence->scope.'|'.$key;
             if (isset($seen[$identity]) && !$occurrence->sequenceItem()) {
-                $diagnostics[] = $this->diagnostic($occurrence->keyRange(), 1, 'config.duplicate_key', \sprintf('Configuration key "%s" is duplicated.', $key));
+                $diagnostics[] = $this->diagnostic($occurrence->keyRange, 1, 'config.duplicate_key', \sprintf('Configuration key "%s" is duplicated.', $key));
             }
             $seen[$identity] = true;
-            $node = $index->find($path, $occurrence->sequenceDepths(), $occurrence->literalDepths());
+            $node = $index->find($path, $occurrence->sequenceDepths, $occurrence->literalDepths);
             if (null === $node) {
-                if (!$index->allowsUnknownKeys($path, $occurrence->sequenceDepths(), $occurrence->literalDepths())) {
-                    $diagnostics[] = $this->diagnostic($occurrence->keyRange(), 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', $key));
+                if (!$index->allowsUnknownKeys($path, $occurrence->sequenceDepths, $occurrence->literalDepths)) {
+                    $diagnostics[] = $this->diagnostic($occurrence->keyRange, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', $key));
                 }
                 continue;
             }
-            if ($node->deprecated()) {
-                $diagnostics[] = $this->diagnostic($occurrence->keyRange(), 2, 'config.deprecated_key', \sprintf('Configuration key "%s" is deprecated.', $key));
+            if ($node->deprecated) {
+                $diagnostics[] = $this->diagnostic($occurrence->keyRange, 2, 'config.deprecated_key', \sprintf('Configuration key "%s" is deprecated.', $key));
             }
-            $environmentType = $this->values->environmentType($project, $occurrence->value());
+            $environmentType = $this->values->environmentType($project, $occurrence->value);
             if (null !== $environmentType && !$this->values->acceptsType($node, $environmentType)) {
-                $diagnostics[] = $this->diagnostic($occurrence->valueRange(), 1, 'env.incompatible_type', \sprintf('Environment expression returns %s, but "%s" expects %s.', $environmentType, $key, $node->type()));
-            } elseif ('' !== $occurrence->value() && !$this->values->acceptsValue($node, $occurrence->value())) {
-                $diagnostics[] = $this->diagnostic($occurrence->valueRange(), 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $node->type(), $key));
+                $diagnostics[] = $this->diagnostic($occurrence->valueRange, 1, 'env.incompatible_type', \sprintf('Environment expression returns %s, but "%s" expects %s.', $environmentType, $key, $node->type));
+            } elseif ('' !== $occurrence->value && !$this->values->acceptsValue($node, $occurrence->value)) {
+                $diagnostics[] = $this->diagnostic($occurrence->valueRange, 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $node->type, $key));
             }
         }
         preg_match_all('/^\t+\S.*$/m', $document->text, $tabbedLines, \PREG_OFFSET_CAPTURE);
@@ -218,12 +218,12 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
                     }
                     break;
                 }
-                if ($node->deprecated()) {
+                if ($node->deprecated) {
                     $diagnostics[] = $this->diagnostic($range, 2, 'config.deprecated_key', \sprintf('Configuration key "%s" is deprecated.', implode('.', $path)));
                 }
                 $argument = trim($method[2][0]);
                 if ('' !== $argument && !$this->values->acceptsValue($node, $argument)) {
-                    $diagnostics[] = $this->diagnostic($range, 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $node->type(), implode('.', $path)));
+                    $diagnostics[] = $this->diagnostic($range, 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $node->type, implode('.', $path)));
                 }
             }
         }
@@ -264,7 +264,7 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
                 if (!$index->allowsUnknownKeys($path)) {
                     $diagnostics[] = $this->diagnostic($nameRange, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', implode('.', $path)));
                 }
-            } elseif ($node->deprecated()) {
+            } elseif ($node->deprecated) {
                 $diagnostics[] = $this->diagnostic($nameRange, 2, 'config.deprecated_key', \sprintf('Configuration key "%s" is deprecated.', implode('.', $path)));
             }
             if (null !== $node) {
@@ -279,7 +279,7 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
                             $diagnostics[] = $this->diagnostic($range, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', implode('.', $attributePath)));
                         }
                     } elseif (!$this->values->acceptsValue($child, $attribute[3][0])) {
-                        $diagnostics[] = $this->diagnostic($range, 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $child->type(), implode('.', $attributePath)));
+                        $diagnostics[] = $this->diagnostic($range, 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $child->type, implode('.', $attributePath)));
                     }
                 }
             }

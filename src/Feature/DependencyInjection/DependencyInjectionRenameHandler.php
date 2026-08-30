@@ -34,8 +34,8 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
         }
 
         return [
-            'range' => $this->protocol->range($symbol->range()),
-            'placeholder' => $symbol->name(),
+            'range' => $this->protocol->range($symbol->range),
+            'placeholder' => $symbol->name,
         ];
     }
 
@@ -49,7 +49,7 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
 
         [$project, $symbol] = $resolved;
         if (!$this->isApplicationOwned($project, $symbol)
-            || !$this->validName($symbol->kind(), $newName)
+            || !$this->validName($symbol->kind, $newName)
             || $this->exists($project, $symbol, $newName)
         ) {
             return null;
@@ -57,17 +57,17 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
 
         $index = $this->sourceIndexes->forProject($project);
         $locations = [];
-        foreach ($index->references($symbol->kind(), $symbol->name()) as $reference) {
-            if ($this->pathResolver->isApplicationOwned($project, $reference->uri())) {
-                $locations[] = [$reference->uri(), $reference->range()];
+        foreach ($index->references($symbol->kind, $symbol->name) as $reference) {
+            if ($this->pathResolver->isApplicationOwned($project, $reference->uri)) {
+                $locations[] = [$reference->uri, $reference->range];
             }
         }
-        $declarations = DependencyInjectionSymbolKind::Service === $symbol->kind()
-            ? $index->serviceDeclarations($symbol->name())
-            : $index->parameterDeclarations($symbol->name());
+        $declarations = DependencyInjectionSymbolKind::Service === $symbol->kind
+            ? $index->serviceDeclarations($symbol->name)
+            : $index->parameterDeclarations($symbol->name);
         foreach ($declarations as $declaration) {
-            if ($this->pathResolver->isApplicationOwned($project, $declaration->uri())) {
-                $locations[] = [$declaration->uri(), $declaration->range()];
+            if ($this->pathResolver->isApplicationOwned($project, $declaration->uri)) {
+                $locations[] = [$declaration->uri, $declaration->range];
             }
         }
 
@@ -89,13 +89,13 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
             ];
         }
 
-        $kind = DependencyInjectionSymbolKind::Service === $symbol->kind() ? 'service' : 'parameter';
+        $kind = DependencyInjectionSymbolKind::Service === $symbol->kind ? 'service' : 'parameter';
 
         return [
             'documentChanges' => $documentChanges,
             'changeAnnotations' => [
                 'dependencyInjectionRename' => [
-                    'label' => \sprintf('Rename %s "%s" to "%s"', $kind, $symbol->name(), $newName),
+                    'label' => \sprintf('Rename %s "%s" to "%s"', $kind, $symbol->name, $newName),
                     'needsConfirmation' => true,
                     'description' => 'Dynamic references may remain unchanged.',
                 ],
@@ -128,13 +128,13 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
     {
         $index = $this->sourceIndexes->forProject($project);
 
-        $declarations = DependencyInjectionSymbolKind::Service === $symbol->kind()
-            ? $index->serviceDeclarations($symbol->name())
-            : $index->parameterDeclarations($symbol->name());
+        $declarations = DependencyInjectionSymbolKind::Service === $symbol->kind
+            ? $index->serviceDeclarations($symbol->name)
+            : $index->parameterDeclarations($symbol->name);
 
         return [] !== array_filter(
             $declarations,
-            fn (ServiceDeclaration|ParameterDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri()),
+            fn (ServiceDeclaration|ParameterDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri),
         );
     }
 
@@ -149,12 +149,12 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
 
     private function exists(Project $project, DependencyInjectionSymbol $symbol, string $newName): bool
     {
-        if ($newName === $symbol->name()) {
+        if ($newName === $symbol->name) {
             return false;
         }
 
         $index = $this->sourceIndexes->forProject($project);
-        if (DependencyInjectionSymbolKind::Service === $symbol->kind()) {
+        if (DependencyInjectionSymbolKind::Service === $symbol->kind) {
             return null !== $this->serviceIndexes->forProject($project)->get($newName)
                 || [] !== $index->serviceDeclarations($newName);
         }

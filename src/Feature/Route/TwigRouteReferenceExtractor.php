@@ -57,8 +57,8 @@ final class TwigRouteReferenceExtractor
     public function at(string $text, int $byteOffset): ?RouteReference
     {
         foreach ($this->extract($text) as $reference) {
-            $start = $this->positionConverter->toByteOffset($text, $reference->range()->start);
-            $end = $this->positionConverter->toByteOffset($text, $reference->range()->end);
+            $start = $this->positionConverter->toByteOffset($text, $reference->range->start);
+            $end = $this->positionConverter->toByteOffset($text, $reference->range->end);
             if ($byteOffset >= $start && $byteOffset <= $end) {
                 return $reference;
             }

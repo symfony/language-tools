@@ -23,13 +23,13 @@ final class TwigComponentCodeLensProvider implements CodeLensProviderInterface
             return null;
         }
         $lenses = [];
-        foreach ($this->extractor->extract($request->project, $request->document->uri, 'php', $request->document->text)->components() as $component) {
+        foreach ($this->extractor->extract($request->project, $request->document->uri, 'php', $request->document->text)->components as $component) {
             $locations = [];
-            foreach ($this->indexes->forProject($request->project)->references($component->name()) as $reference) {
-                $locations[] = $this->protocol->location($reference->uri(), $reference->range());
+            foreach ($this->indexes->forProject($request->project)->references($component->name) as $reference) {
+                $locations[] = $this->protocol->location($reference->uri, $reference->range);
             }
             $count = \count($locations);
-            $lenses[] = $this->protocol->referenceLens($component->range(), \sprintf('%d Twig component usage%s', $count, 1 === $count ? '' : 's'), $component->uri(), $locations);
+            $lenses[] = $this->protocol->referenceLens($component->range, \sprintf('%d Twig component usage%s', $count, 1 === $count ? '' : 's'), $component->uri, $locations);
         }
 
         return $lenses;

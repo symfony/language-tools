@@ -32,7 +32,7 @@ final class ProjectMetadataSnapshotLoaderTest extends TestCase
         $index = $indexes->forProject($project);
         self::assertTrue($index->formsComplete());
         self::assertTrue($index->constraintsComplete());
-        self::assertSame(['action', 'method'], $index->formType('App\\Form\\PostType')?->options());
-        self::assertSame(['max', 'min'], $index->constraint('Length')?->options());
+        self::assertSame(['action', 'method'], $index->formType('App\\Form\\PostType')?->options);
+        self::assertSame(['max', 'min'], $index->constraint('Length')?->options);
     }
 }

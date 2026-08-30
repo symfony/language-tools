@@ -35,16 +35,16 @@ final class DependencyInjectionReferencesHandler implements ReferencesProviderIn
 
         $index = $this->sourceIndexes->forProject($request->project);
         $locations = array_map(
-            fn (DependencyInjectionReference $reference): array => $this->protocol->location($reference->uri(), $reference->range()),
-            $index->references($symbol->kind(), $symbol->name()),
+            fn (DependencyInjectionReference $reference): array => $this->protocol->location($reference->uri, $reference->range),
+            $index->references($symbol->kind, $symbol->name),
         );
         $context = $params['context'] ?? null;
         if (\is_array($context) && true === ($context['includeDeclaration'] ?? null)) {
-            $declarations = DependencyInjectionSymbolKind::Service === $symbol->kind()
-                ? $index->serviceDeclarations($symbol->name())
-                : $index->parameterDeclarations($symbol->name());
+            $declarations = DependencyInjectionSymbolKind::Service === $symbol->kind
+                ? $index->serviceDeclarations($symbol->name)
+                : $index->parameterDeclarations($symbol->name);
             foreach ($declarations as $declaration) {
-                $locations[] = $this->protocol->location($declaration->uri(), $declaration->range());
+                $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
             }
         }
 

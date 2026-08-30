@@ -23,9 +23,9 @@ final class TwigCallableIndexTest extends TestCase
         self::assertSame([$firstDeclaration], $index->declarations(TwigCallableKind::Function, 'first'));
         self::assertSame([$firstDeclaration], $index->declarationsForCallable('app\\extension', 'FIRST'));
         self::assertTrue($index->hasCallableDeclarations());
-        self::assertSame($firstDeclaration, $index->declarationAt($firstDeclaration->uri(), new Position(0, 0)));
-        self::assertSame($firstDeclaration, $index->declarationAt($firstDeclaration->uri(), new Position(0, 1)));
-        self::assertNull($index->declarationAt($firstDeclaration->uri(), new Position(0, 2)));
+        self::assertSame($firstDeclaration, $index->declarationAt($firstDeclaration->uri, new Position(0, 0)));
+        self::assertSame($firstDeclaration, $index->declarationAt($firstDeclaration->uri, new Position(0, 1)));
+        self::assertNull($index->declarationAt($firstDeclaration->uri, new Position(0, 2)));
         self::assertNull($index->declarationAt('file:///src/Other.php', new Position(0, 0)));
         self::assertSame([$firstUsage], $index->usages(TwigCallableKind::Function, 'first'));
 
@@ -37,7 +37,7 @@ final class TwigCallableIndexTest extends TestCase
         self::assertSame([], $index->declarationsForCallable('App\\Extension', 'first'));
         self::assertSame([$secondDeclaration], $index->declarations(TwigCallableKind::Function, 'second'));
         self::assertSame([$secondDeclaration], $index->declarationsForCallable('App\\Extension', 'second'));
-        self::assertSame($secondDeclaration, $index->declarationAt($secondDeclaration->uri(), new Position(0, 0)));
+        self::assertSame($secondDeclaration, $index->declarationAt($secondDeclaration->uri, new Position(0, 0)));
         self::assertSame([], $index->usages(TwigCallableKind::Function, 'first'));
         self::assertSame([$secondUsage], $index->usages(TwigCallableKind::Function, 'second'));
     }

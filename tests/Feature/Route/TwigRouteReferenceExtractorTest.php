@@ -36,11 +36,11 @@ final class TwigRouteReferenceExtractorTest extends TestCase
             TWIG);
 
         self::assertSame(['article_show', 'homepage'], array_map(
-            static fn (RouteReference $reference): string => $reference->name(),
+            static fn (RouteReference $reference): string => $reference->name,
             $references,
         ));
-        self::assertSame(['id'], $references[0]->providedParameters());
-        self::assertSame([], $references[1]->providedParameters());
+        self::assertSame(['id'], $references[0]->providedParameters);
+        self::assertSame([], $references[1]->providedParameters);
     }
 
     public function testExtractsShorthandMappingParametersConservatively(): void
@@ -63,7 +63,7 @@ final class TwigRouteReferenceExtractorTest extends TestCase
                 null,
                 null,
             ],
-            array_map(static fn (RouteReference $reference): ?array => $reference->providedParameters(), $references),
+            array_map(static fn (RouteReference $reference): ?array => $reference->providedParameters, $references),
         );
     }
 

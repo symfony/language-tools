@@ -37,11 +37,11 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
         );
 
         self::assertCount(2, $declarations);
-        self::assertSame('article_show', $declarations[0]->name());
-        self::assertSame('file:///workspace/src/ArticleController.php', $declarations[0]->uri());
-        self::assertSame(5, $declarations[0]->range()->start->line);
-        self::assertSame(36, $declarations[0]->range()->start->character);
-        self::assertSame('article_edit', $declarations[1]->name());
+        self::assertSame('article_show', $declarations[0]->name);
+        self::assertSame('file:///workspace/src/ArticleController.php', $declarations[0]->uri);
+        self::assertSame(5, $declarations[0]->range->start->line);
+        self::assertSame(36, $declarations[0]->range->start->character);
+        self::assertSame('article_edit', $declarations[1]->name);
     }
 
     public function testExtractsCanonicalNameFromInternationalizedRouteAttribute(): void
@@ -65,7 +65,7 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
         );
 
         self::assertCount(1, $declarations);
-        self::assertSame('app_home', $declarations[0]->name());
+        self::assertSame('app_home', $declarations[0]->name);
     }
 
     public function testDecodesEscapedRouteNames(): void
@@ -89,7 +89,7 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
         );
 
         self::assertSame(['blog\'s\\archive'], array_map(
-            static fn (RouteDeclaration $declaration): string => $declaration->name(),
+            static fn (RouteDeclaration $declaration): string => $declaration->name,
             $declarations,
         ));
     }
@@ -115,7 +115,7 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
         );
 
         self::assertSame(['aliased_route', 'legacy_route'], array_map(
-            static fn (RouteDeclaration $declaration): string => $declaration->name(),
+            static fn (RouteDeclaration $declaration): string => $declaration->name,
             $declarations,
         ));
     }
@@ -137,8 +137,8 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
             $text,
         );
 
-        self::assertSame('draft_route', $declarations[0]->name());
-        self::assertSame(3, $declarations[0]->range()->start->line);
+        self::assertSame('draft_route', $declarations[0]->name);
+        self::assertSame(3, $declarations[0]->range->start->line);
     }
 
     public function testExtractsRoutingConfiguratorAndRouteCollectionDeclarations(): void
@@ -163,7 +163,7 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
         );
 
         self::assertSame(['article_list', 'legacy_article'], array_map(
-            static fn (RouteDeclaration $declaration): string => $declaration->name(),
+            static fn (RouteDeclaration $declaration): string => $declaration->name,
             $declarations,
         ));
     }

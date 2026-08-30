@@ -29,7 +29,7 @@ final class TranslationSourceIndexer extends AbstractSourceIndexer
             throw new \UnexpectedValueException('The translation source facts are invalid.');
         }
 
-        return $data->declarations();
+        return $data->declarations;
     }
 
     protected function factsClass(): string

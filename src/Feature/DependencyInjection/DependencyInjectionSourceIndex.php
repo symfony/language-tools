@@ -89,7 +89,7 @@ final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
             }
             $visited[$classKey] = true;
             $declarations = $this->classDeclarations($className);
-            if (1 !== \count($declarations) || null === $className = $declarations[0]->parentClassName()) {
+            if (1 !== \count($declarations) || null === $className = $declarations[0]->parentClassName) {
                 $result = false;
                 break;
             }
@@ -145,20 +145,20 @@ final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
         $this->classDeclarations = [];
         $this->decorators = [];
         foreach ($this->facts() as $source) {
-            foreach ($source->services() as $declaration) {
-                $this->serviceDeclarations[$declaration->id()][] = $declaration;
-                if (null !== $decorated = $declaration->decorates()) {
+            foreach ($source->services as $declaration) {
+                $this->serviceDeclarations[$declaration->id][] = $declaration;
+                if (null !== $decorated = $declaration->decorates) {
                     $this->decorators[$decorated][] = $declaration;
                 }
             }
-            foreach ($source->parameters() as $declaration) {
-                $this->parameterDeclarations[$declaration->name()][] = $declaration;
+            foreach ($source->parameters as $declaration) {
+                $this->parameterDeclarations[$declaration->name][] = $declaration;
             }
-            foreach ($source->references() as $reference) {
-                $this->references[$reference->kind()->value][$reference->name()][] = $reference;
+            foreach ($source->references as $reference) {
+                $this->references[$reference->kind->value][$reference->name][] = $reference;
             }
-            foreach ($source->classes() as $declaration) {
-                $this->classDeclarations[strtolower(ltrim($declaration->className(), '\\'))][] = $declaration;
+            foreach ($source->classes as $declaration) {
+                $this->classDeclarations[strtolower(ltrim($declaration->className, '\\'))][] = $declaration;
             }
         }
 

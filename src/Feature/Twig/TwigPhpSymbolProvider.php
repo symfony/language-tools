@@ -34,10 +34,10 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
             return null;
         }
         $index = $this->indexes->forProject($request->project);
-        if (\in_array($context->kind(), [TwigPhpSymbolCompletionKind::ConstantType, TwigPhpSymbolCompletionKind::EnumType], true)) {
-            $names = TwigPhpSymbolCompletionKind::ConstantType === $context->kind() ? $index->constantTypeNames() : $index->enumNames();
-            $leadingSlash = str_starts_with($context->prefix(), '\\');
-            $prefix = ltrim($context->prefix(), '\\');
+        if (\in_array($context->kind, [TwigPhpSymbolCompletionKind::ConstantType, TwigPhpSymbolCompletionKind::EnumType], true)) {
+            $names = TwigPhpSymbolCompletionKind::ConstantType === $context->kind ? $index->constantTypeNames() : $index->enumNames();
+            $leadingSlash = str_starts_with($context->prefix, '\\');
+            $prefix = ltrim($context->prefix, '\\');
             $items = [];
             foreach ($names as $name) {
                 if (!str_starts_with($name, $prefix)) {
@@ -50,31 +50,31 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
                 $inserted = str_replace('\\', '\\\\', ($leadingSlash ? '\\' : '').$name);
                 $items[] = [
                     'label' => $name,
-                    'kind' => $this->completionItemKind($declaration->kind()),
-                    'detail' => 'PHP '.$declaration->kind()->value,
+                    'kind' => $this->completionItemKind($declaration->kind),
+                    'detail' => 'PHP '.$declaration->kind->value,
                     'filterText' => $inserted,
-                    'textEdit' => $this->protocol->textEdit($context->range(), $inserted),
+                    'textEdit' => $this->protocol->textEdit($context->range, $inserted),
                 ];
             }
 
             return $items;
         }
-        $className = $context->className();
+        $className = $context->className;
         if (null === $className) {
             return null;
         }
-        $declarations = $index->completableMembers($className, TwigPhpSymbolCompletionKind::EnumCase === $context->kind());
+        $declarations = $index->completableMembers($className, TwigPhpSymbolCompletionKind::EnumCase === $context->kind);
         $items = [];
         foreach ($declarations as $declaration) {
-            $name = $declaration->memberName();
-            if (null === $name || !str_starts_with($name, $context->prefix())) {
+            $name = $declaration->memberName;
+            if (null === $name || !str_starts_with($name, $context->prefix)) {
                 continue;
             }
             $items[] = [
                 'label' => $name,
-                'kind' => $this->completionItemKind($declaration->kind()),
-                'detail' => 'PHP '.$declaration->kind()->value,
-                'textEdit' => $this->protocol->textEdit($context->range(), $name),
+                'kind' => $this->completionItemKind($declaration->kind),
+                'detail' => 'PHP '.$declaration->kind->value,
+                'textEdit' => $this->protocol->textEdit($context->range, $name),
             ];
         }
 
@@ -89,16 +89,16 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
         }
         [$reference, $declarations] = $resolved;
         $declaration = $declarations[0];
-        $symbol = $reference->className();
-        if (null !== $reference->memberName()) {
-            $symbol .= '::'.$reference->memberName();
+        $symbol = $reference->className;
+        if (null !== $reference->memberName) {
+            $symbol .= '::'.$reference->memberName;
         }
-        $value = \sprintf('PHP %s: `%s`', $declaration->kind()->value, $this->markdownCode($symbol));
-        if ('' !== $declaration->signature()) {
-            $value .= "\n\n```php\n".$declaration->signature()."\n```";
+        $value = \sprintf('PHP %s: `%s`', $declaration->kind->value, $this->markdownCode($symbol));
+        if ('' !== $declaration->signature) {
+            $value .= "\n\n```php\n".$declaration->signature."\n```";
         }
-        if (null !== $declaration->description()) {
-            $value .= "\n\n".$declaration->description();
+        if (null !== $declaration->description) {
+            $value .= "\n\n".$declaration->description;
         }
 
         return $this->protocol->markdownHover($value);
@@ -113,7 +113,7 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
         [, $declarations] = $resolved;
 
         return array_map(
-            fn (TwigPhpSymbolDeclaration $declaration): array => $this->protocol->location($declaration->uri(), $declaration->range()),
+            fn (TwigPhpSymbolDeclaration $declaration): array => $this->protocol->location($declaration->uri, $declaration->range),
             $declarations,
         );
     }
@@ -130,8 +130,8 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
             if (null === $declaration) {
                 return null;
             }
-            $className = $declaration->className();
-            $memberName = $declaration->memberName();
+            $className = $declaration->className;
+            $memberName = $declaration->memberName;
             $declarations = [$declaration];
         } else {
             $text = $request->document->text;
@@ -139,8 +139,8 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
             if (null === $reference) {
                 return null;
             }
-            $className = $reference->className();
-            $memberName = $reference->memberName();
+            $className = $reference->className;
+            $memberName = $reference->memberName;
             $declarations = $this->declarations($index, $className, $memberName);
             if ([] === $declarations) {
                 return null;
@@ -148,13 +148,13 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
         }
 
         $locations = array_map(
-            fn (TwigPhpSymbolReference $reference): array => $this->protocol->location($reference->uri(), $reference->range()),
+            fn (TwigPhpSymbolReference $reference): array => $this->protocol->location($reference->uri, $reference->range),
             $index->references($className, $memberName),
         );
         $context = $params['context'] ?? null;
         if (\is_array($context) && true === ($context['includeDeclaration'] ?? null)) {
             foreach ($declarations as $declaration) {
-                $locations[] = $this->protocol->location($declaration->uri(), $declaration->range());
+                $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
             }
         }
 
@@ -177,7 +177,7 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
         if (null === $reference) {
             return null;
         }
-        $declarations = $this->declarations($this->indexes->forProject($request->project), $reference->className(), $reference->memberName());
+        $declarations = $this->declarations($this->indexes->forProject($request->project), $reference->className, $reference->memberName);
 
         return [] === $declarations ? null : [$reference, $declarations, $request->project];
     }

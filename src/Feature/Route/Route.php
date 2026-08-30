@@ -13,77 +13,19 @@ final class Route
      * @param list<string>|null     $requiredParameters
      */
     public function __construct(
-        private readonly string $name,
-        private readonly ?string $path,
-        private readonly array $methods,
-        private readonly array $schemes,
-        private readonly ?string $host,
-        private readonly ?string $controller,
-        private readonly array $defaults = [],
-        private readonly array $requirements = [],
-        private readonly ?string $alias = null,
-        private readonly ?string $canonicalName = null,
+        public readonly string $name,
+        public readonly ?string $path,
+        public readonly array $methods,
+        public readonly array $schemes,
+        public readonly ?string $host,
+        public readonly ?string $controller,
+        public readonly array $defaults = [],
+        public readonly array $requirements = [],
+        public readonly ?string $alias = null,
+        public readonly ?string $canonicalName = null,
         private readonly ?array $parameters = null,
         private readonly ?array $requiredParameters = null,
     ) {
-    }
-
-    public function name(): string
-    {
-        return $this->name;
-    }
-
-    public function path(): ?string
-    {
-        return $this->path;
-    }
-
-    /** @return list<string> */
-    public function methods(): array
-    {
-        return $this->methods;
-    }
-
-    /** @return list<string> */
-    public function schemes(): array
-    {
-        return $this->schemes;
-    }
-
-    public function host(): ?string
-    {
-        return $this->host;
-    }
-
-    public function controller(): ?string
-    {
-        return $this->controller;
-    }
-
-    /**
-     * @return list<string>
-     */
-    public function defaults(): array
-    {
-        return $this->defaults;
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public function requirements(): array
-    {
-        return $this->requirements;
-    }
-
-    public function alias(): ?string
-    {
-        return $this->alias;
-    }
-
-    public function canonicalName(): ?string
-    {
-        return $this->canonicalName;
     }
 
     /**

@@ -47,11 +47,11 @@ final class XmlDependencyInjectionExtractorTest extends TestCase
                 ['single.quoted', 'App\SingleQuoted', null, null, ['single.tag']],
             ],
             array_map(
-                static fn ($service): array => [$service->id(), $service->className(), $service->alias(), $service->decorates(), $service->tags()],
-                $facts->services(),
+                static fn ($service): array => [$service->id, $service->className, $service->alias, $service->decorates, $service->tags],
+                $facts->services,
             ),
         );
-        self::assertSame(['shopware.cdn.url', 'single.parameter'], array_map(static fn ($parameter): string => $parameter->name(), $facts->parameters()));
+        self::assertSame(['shopware.cdn.url', 'single.parameter'], array_map(static fn ($parameter): string => $parameter->name, $facts->parameters));
         self::assertSame(
             [
                 [DependencyInjectionSymbolKind::Service, 'Shopware\Core\Checkout\Cart\CartRuleLoader', false],
@@ -63,8 +63,8 @@ final class XmlDependencyInjectionExtractorTest extends TestCase
                 [DependencyInjectionSymbolKind::Parameter, 'single.parameter', false],
             ],
             array_map(
-                static fn ($reference): array => [$reference->kind(), $reference->name(), $reference->isOptional()],
-                $facts->references(),
+                static fn ($reference): array => [$reference->kind, $reference->name, $reference->optional],
+                $facts->references,
             ),
         );
     }

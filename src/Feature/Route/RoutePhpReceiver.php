@@ -38,12 +38,7 @@ final class RoutePhpReceiver
     }
 
     private function __construct(
-        private readonly ?string $controllerClass,
+        public readonly ?string $controllerClass,
     ) {
-    }
-
-    public function controllerClass(): ?string
-    {
-        return $this->controllerClass;
     }
 }

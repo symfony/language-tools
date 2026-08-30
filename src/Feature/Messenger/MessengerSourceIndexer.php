@@ -30,9 +30,9 @@ final class MessengerSourceIndexer extends AbstractSourceIndexer
         }
 
         return [
-            ...array_filter($data->symbols(), static fn (MessengerSourceSymbol $symbol): bool => $symbol->isDeclaration()),
-            $data->parents(),
-            $data->handlers(),
+            ...array_filter($data->symbols, static fn (MessengerSourceSymbol $symbol): bool => $symbol->declaration),
+            $data->parents,
+            $data->handlers,
         ];
     }
 

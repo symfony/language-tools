@@ -28,7 +28,7 @@ final class DoctrineIndexTest extends TestCase
 
         [$secondFacts, $secondEntity, $secondRepository, $secondSymbol] = $this->facts('Second');
         $index->replaceSource($secondFacts);
-        $index->removeSource($firstFacts->uri());
+        $index->removeSource($firstFacts->uri);
 
         self::assertNull($index->entity('App\\First'));
         self::assertSame($secondEntity, $index->entity('App\\Second'));
@@ -58,10 +58,10 @@ final class DoctrineIndexTest extends TestCase
     private function facts(string $name): array
     {
         $entity = $this->entity($name);
-        $repository = new DoctrineRepository('App\\'.$name.'Repository', 'App\\'.$name, $entity->uri(), $this->range());
-        $symbol = new DoctrineSourceSymbol(DoctrineSymbolKind::Entity, 'App\\'.$name, null, $entity->uri(), $this->range(), true);
+        $repository = new DoctrineRepository('App\\'.$name.'Repository', 'App\\'.$name, $entity->uri, $this->range());
+        $symbol = new DoctrineSourceSymbol(DoctrineSymbolKind::Entity, 'App\\'.$name, null, $entity->uri, $this->range(), true);
 
-        return [new DoctrineSourceFacts($entity->uri(), [$entity], [$repository], [$symbol]), $entity, $repository, $symbol];
+        return [new DoctrineSourceFacts($entity->uri, [$entity], [$repository], [$symbol]), $entity, $repository, $symbol];
     }
 
     private function entity(string $name): DoctrineEntity

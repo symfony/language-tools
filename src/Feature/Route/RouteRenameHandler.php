@@ -37,8 +37,8 @@ final class RouteRenameHandler implements RenameProviderInterface
         [, $symbol] = $resolved;
 
         return [
-            'range' => $this->protocol->range($symbol->range()),
-            'placeholder' => $symbol->name(),
+            'range' => $this->protocol->range($symbol->range),
+            'placeholder' => $symbol->name,
         ];
     }
 
@@ -60,28 +60,28 @@ final class RouteRenameHandler implements RenameProviderInterface
         }
 
         [$project, $symbol] = $resolved;
-        if ($newName !== $symbol->name() && null !== $this->routeIndexes->forProject($project)->get($newName)) {
+        if ($newName !== $symbol->name && null !== $this->routeIndexes->forProject($project)->get($newName)) {
             return null;
         }
 
-        $declarations = $this->declarationIndexes->forProject($project)->find($symbol->name());
+        $declarations = $this->declarationIndexes->forProject($project)->find($symbol->name);
         if ([] === array_filter(
             $declarations,
-            fn (RouteDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri()),
+            fn (RouteDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri),
         )) {
             return null;
         }
 
         /** @var array<string, list<array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, newText: string, annotationId: string}>> $editsByUri */
         $editsByUri = [];
-        foreach ($this->referenceIndexes->forProject($project)->find($symbol->name()) as $reference) {
-            if ($this->pathResolver->isApplicationOwned($project, $reference->uri())) {
-                $editsByUri[$reference->uri()][] = $this->edit($reference->range(), $newName);
+        foreach ($this->referenceIndexes->forProject($project)->find($symbol->name) as $reference) {
+            if ($this->pathResolver->isApplicationOwned($project, $reference->uri)) {
+                $editsByUri[$reference->uri][] = $this->edit($reference->range, $newName);
             }
         }
         foreach ($declarations as $declaration) {
-            if ($this->pathResolver->isApplicationOwned($project, $declaration->uri())) {
-                $editsByUri[$declaration->uri()][] = $this->edit($declaration->range(), $newName);
+            if ($this->pathResolver->isApplicationOwned($project, $declaration->uri)) {
+                $editsByUri[$declaration->uri][] = $this->edit($declaration->range, $newName);
             }
         }
         ksort($editsByUri);
@@ -98,7 +98,7 @@ final class RouteRenameHandler implements RenameProviderInterface
             'documentChanges' => $documentChanges,
             'changeAnnotations' => [
                 'routeRename' => [
-                    'label' => \sprintf('Rename route "%s" to "%s"', $symbol->name(), $newName),
+                    'label' => \sprintf('Rename route "%s" to "%s"', $symbol->name, $newName),
                     'needsConfirmation' => true,
                     'description' => 'Dynamic route references may remain unchanged.',
                 ],

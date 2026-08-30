@@ -23,7 +23,7 @@ final class SourceFactsStore
     {
         $saved = [];
         foreach ($facts as $item) {
-            $saved[$item->uri()] = $item;
+            $saved[$item->uri] = $item;
         }
         if ($this->saved === $saved) {
             return false;
@@ -38,7 +38,7 @@ final class SourceFactsStore
     /** @param TFacts $facts */
     public function replaceSavedFact(SourceFactsInterface $facts): bool
     {
-        $uri = $facts->uri();
+        $uri = $facts->uri;
         if (($this->saved[$uri] ?? null) === $facts) {
             return false;
         }
@@ -64,7 +64,7 @@ final class SourceFactsStore
     /** @param TFacts $facts */
     public function replaceOverlay(SourceFactsInterface $facts): bool
     {
-        $uri = $facts->uri();
+        $uri = $facts->uri;
         if (($this->overlays[$uri] ?? null) === $facts) {
             return false;
         }

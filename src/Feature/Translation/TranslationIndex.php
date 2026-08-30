@@ -116,24 +116,24 @@ final class TranslationIndex extends AbstractSourceFactsIndex
         $domains = [];
         $locales = [];
         foreach ($this->runtime as $message) {
-            $domain = $message->domain();
-            $key = $message->key();
+            $domain = $message->domain;
+            $key = $message->key;
             $this->messages[$domain][$key][] = $message;
             $keys[$domain][$key] = true;
             $domains[$domain] = true;
-            $locales[$message->locale()] = true;
+            $locales[$message->locale] = true;
         }
         foreach ($this->facts() as $facts) {
-            foreach ($facts->declarations() as $declaration) {
-                $domain = $declaration->domain();
-                $key = $declaration->key();
+            foreach ($facts->declarations as $declaration) {
+                $domain = $declaration->domain;
+                $key = $declaration->key;
                 $this->declarations[$domain][$key][] = $declaration;
                 $keys[$domain][$key] = true;
                 $domains[$domain] = true;
-                $locales[$declaration->locale()] = true;
+                $locales[$declaration->locale] = true;
             }
-            foreach ($facts->references() as $reference) {
-                $this->references[$reference->domain()][$reference->key()][] = $reference;
+            foreach ($facts->references as $reference) {
+                $this->references[$reference->domain][$reference->key][] = $reference;
             }
         }
 

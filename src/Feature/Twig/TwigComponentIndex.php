@@ -120,11 +120,11 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
         $this->anonymousTemplateDirectory = $anonymousTemplateDirectory;
         $this->runtimeComponents = [];
         foreach ($components as $component) {
-            $this->runtimeComponents[$component->name()] = $component;
+            $this->runtimeComponents[$component->name] = $component;
         }
         $this->caseInsensitiveRuntimeComponents = [];
         foreach ($this->runtimeComponents as $component) {
-            $this->caseInsensitiveRuntimeComponents[strtolower($component->name())] ??= $component;
+            $this->caseInsensitiveRuntimeComponents[strtolower($component->name)] ??= $component;
         }
     }
 
@@ -173,22 +173,22 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
         $this->events = [];
         $eventNames = [];
         foreach ($this->facts() as $facts) {
-            foreach ($facts->components() as $component) {
-                $name = $component->name();
+            foreach ($facts->components as $component) {
+                $name = $component->name;
                 $this->declarations[$name][] = $component;
                 $this->componentsByName[$name] = $this->merge($this->componentsByName[$name] ?? null, $component);
             }
-            foreach ($facts->references() as $reference) {
-                $this->references[$reference->name()][] = $reference;
-                $this->caseInsensitiveReferences[strtolower($reference->name())][] = $reference;
+            foreach ($facts->references as $reference) {
+                $this->references[$reference->name][] = $reference;
+                $this->caseInsensitiveReferences[strtolower($reference->name)][] = $reference;
             }
-            foreach ($facts->actionReferences() as $reference) {
-                $this->actionReferences[$reference->component()][$reference->action()][] = $reference;
+            foreach ($facts->actionReferences as $reference) {
+                $this->actionReferences[$reference->component][$reference->action][] = $reference;
             }
-            foreach ($facts->events() as $event) {
-                $this->events[$event->name()][] = $event;
-                if ($event->isDeclaration()) {
-                    $eventNames['s'.$event->name()] = $event->name();
+            foreach ($facts->events as $event) {
+                $this->events[$event->name][] = $event;
+                if ($event->declaration) {
+                    $eventNames['s'.$event->name] = $event->name;
                 }
             }
         }
@@ -207,18 +207,18 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
         }
 
         $actions = [];
-        foreach ([...$current->actions(), ...$component->actions()] as $action) {
-            $actions[$action->name()] = $action;
+        foreach ([...$current->actions, ...$component->actions] as $action) {
+            $actions[$action->name] = $action;
         }
 
         return new TwigComponent(
-            $component->name(),
-            null !== $component->className() ? $component->uri() : $current->uri(),
-            null !== $component->className() ? $component->range() : $current->range(),
-            $component->className() ?? $current->className(),
-            $component->template() ?? $current->template(),
-            array_values(array_unique([...$current->properties(), ...$component->properties()])),
-            $current->isLive() || $component->isLive(),
+            $component->name,
+            null !== $component->className ? $component->uri : $current->uri,
+            null !== $component->className ? $component->range : $current->range,
+            $component->className ?? $current->className,
+            $component->template ?? $current->template,
+            array_values(array_unique([...$current->properties, ...$component->properties])),
+            $current->live || $component->live,
             array_values($actions),
         );
     }

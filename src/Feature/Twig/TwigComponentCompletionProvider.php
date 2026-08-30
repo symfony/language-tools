@@ -34,23 +34,23 @@ final class TwigComponentCompletionProvider implements CompletionProviderInterfa
         if (null !== $liveActionContext) {
             [$component, $prefix] = $liveActionContext;
             $values = [];
-            foreach ($component->actions() as $action) {
-                $values[] = $action->name();
+            foreach ($component->actions as $action) {
+                $values[] = $action->name;
             }
-            $detail = \sprintf('Live action of component %s', $component->name());
+            $detail = \sprintf('Live action of component %s', $component->name);
         } elseif (preg_match('/<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\s+[^>]*?([A-Za-z_][A-Za-z0-9_]*)$/', $before, $match)) {
             $component = $index->get($match[1]);
             if (null === $component) {
                 return null;
             }
             $prefix = $match[2];
-            $values = $component->properties();
-            $detail = \sprintf('Property of Twig component %s', $component->name());
+            $values = $component->properties;
+            $detail = \sprintf('Property of Twig component %s', $component->name);
         } elseif (preg_match('/<twig:([A-Za-z_][A-Za-z0-9_:.-]*)?$/', $before, $match)) {
             $prefix = $match[1] ?? '';
             $names = [];
             foreach ($index->components() as $component) {
-                $names[$component->name()] = true;
+                $names[$component->name] = true;
             }
             foreach ($index->runtimeNames() as $name) {
                 $names[$name] = true;

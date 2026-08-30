@@ -59,21 +59,21 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
         $this->index();
         $repository = $this->repositoriesByClass[$repositoryClass] ?? null;
 
-        return null !== $repository ? $this->entitiesByClass[$repository->entityClass()] ?? null : $this->entitiesByRepository[$repositoryClass] ?? null;
+        return null !== $repository ? $this->entitiesByClass[$repository->entityClass] ?? null : $this->entitiesByRepository[$repositoryClass] ?? null;
     }
 
     /** @return list<DoctrineSourceSymbol> */
     public function relatedSymbols(DoctrineSourceSymbol $selected): array
     {
         $this->index();
-        $symbols = $this->symbols[$selected->kind()->value][$selected->name()] ?? [];
-        if (DoctrineSymbolKind::Field !== $selected->kind()) {
+        $symbols = $this->symbols[$selected->kind->value][$selected->name] ?? [];
+        if (DoctrineSymbolKind::Field !== $selected->kind) {
             return $symbols;
         }
 
-        $selectedOwner = $this->entityClass($selected->owner());
+        $selectedOwner = $this->entityClass($selected->owner);
 
-        return array_values(array_filter($symbols, fn (DoctrineSourceSymbol $symbol): bool => $selectedOwner === $this->entityClass($symbol->owner())));
+        return array_values(array_filter($symbols, fn (DoctrineSourceSymbol $symbol): bool => $selectedOwner === $this->entityClass($symbol->owner)));
     }
 
     protected function factsChanged(): void
@@ -87,7 +87,7 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
             return null;
         }
 
-        return null !== $this->entity($owner) ? $owner : $this->entityForRepository($owner)?->className();
+        return null !== $this->entity($owner) ? $owner : $this->entityForRepository($owner)?->className;
     }
 
     private function index(): void
@@ -99,23 +99,23 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
         $firstRuntimeEntities = [];
         $mergedEntities = [];
         foreach ($this->runtime as $entity) {
-            $firstRuntimeEntities[$entity->className()] ??= $entity;
-            $mergedEntities[$entity->className()] = $entity;
+            $firstRuntimeEntities[$entity->className] ??= $entity;
+            $mergedEntities[$entity->className] = $entity;
         }
 
         $firstSourceEntities = [];
         $this->repositoriesByClass = [];
         $this->symbols = [];
         foreach ($this->facts() as $facts) {
-            foreach ($facts->entities() as $entity) {
-                $firstSourceEntities[$entity->className()] ??= $entity;
-                $mergedEntities[$entity->className()] = $entity;
+            foreach ($facts->entities as $entity) {
+                $firstSourceEntities[$entity->className] ??= $entity;
+                $mergedEntities[$entity->className] = $entity;
             }
-            foreach ($facts->repositories() as $repository) {
-                $this->repositoriesByClass[$repository->className()] ??= $repository;
+            foreach ($facts->repositories as $repository) {
+                $this->repositoriesByClass[$repository->className] ??= $repository;
             }
-            foreach ($facts->symbols() as $symbol) {
-                $this->symbols[$symbol->kind()->value][$symbol->name()][] = $symbol;
+            foreach ($facts->symbols as $symbol) {
+                $this->symbols[$symbol->kind->value][$symbol->name][] = $symbol;
             }
         }
 
@@ -124,7 +124,7 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
         $this->entities = array_values($mergedEntities);
         $this->entitiesByRepository = [];
         foreach ($this->entities as $entity) {
-            if (null !== $repositoryClass = $entity->repositoryClass()) {
+            if (null !== $repositoryClass = $entity->repositoryClass) {
                 $this->entitiesByRepository[$repositoryClass] ??= $entity;
             }
         }

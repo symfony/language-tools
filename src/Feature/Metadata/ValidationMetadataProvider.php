@@ -36,7 +36,7 @@ final class ValidationMetadataProvider implements DiagnosticProviderInterface, H
             }
             $constraint = $this->indexes->forProject($request->project)->constraint($option['constraint']);
 
-            return null === $constraint ? null : $this->protocol->markdownHover(\sprintf("Constraint option: `%s`\n\nConstraint: `%s`", $option['option'], $constraint->className()));
+            return null === $constraint ? null : $this->protocol->markdownHover(\sprintf("Constraint option: `%s`\n\nConstraint: `%s`", $option['option'], $constraint->className));
         }
 
         return null;
@@ -60,8 +60,8 @@ final class ValidationMetadataProvider implements DiagnosticProviderInterface, H
         $diagnostics = [];
         foreach ($constraintOptions as $option) {
             $constraint = $index->constraint($option['constraint']);
-            if (null !== $constraint && !\in_array($option['option'], $constraint->options(), true)) {
-                $diagnostics[] = $this->diagnostic($option['range'], 'validation.unknown_constraint_option', \sprintf('Unknown option "%s" for constraint "%s".', $option['option'], $constraint->name()));
+            if (null !== $constraint && !\in_array($option['option'], $constraint->options, true)) {
+                $diagnostics[] = $this->diagnostic($option['range'], 'validation.unknown_constraint_option', \sprintf('Unknown option "%s" for constraint "%s".', $option['option'], $constraint->name));
             }
         }
 

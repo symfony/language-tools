@@ -9,20 +9,10 @@ use Symfony\Lsp\Document\Range;
 final class ParameterCompletionContext
 {
     public function __construct(
-        private readonly string $prefix,
-        private readonly Range $replacementRange,
+        public readonly string $prefix,
+        public readonly Range $replacementRange,
         private readonly bool $appendClosingPercent,
     ) {
-    }
-
-    public function prefix(): string
-    {
-        return $this->prefix;
-    }
-
-    public function replacementRange(): Range
-    {
-        return $this->replacementRange;
     }
 
     public function completionText(string $name): string

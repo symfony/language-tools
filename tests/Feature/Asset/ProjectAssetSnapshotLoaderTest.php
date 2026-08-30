@@ -34,8 +34,8 @@ final class ProjectAssetSnapshotLoaderTest extends TestCase
         $index = $indexes->forProject($project);
         self::assertTrue($index->assetsComplete());
         self::assertTrue($index->importMapComplete());
-        self::assertSame('/workspace/assets/app.js', $index->asset('app.js')?->sourcePath());
-        self::assertTrue($index->importMapEntry('app')?->isEntrypoint());
+        self::assertSame('/workspace/assets/app.js', $index->asset('app.js')?->sourcePath);
+        self::assertTrue($index->importMapEntry('app')?->entrypoint);
     }
 
     public function testMapsContainerSourcePathsToTheHost(): void
@@ -61,7 +61,7 @@ final class ProjectAssetSnapshotLoaderTest extends TestCase
         ]]]);
 
         $index = $indexes->forProject($project);
-        self::assertSame('/workspace/assets/app.js', $index->asset('app.js')?->sourcePath());
-        self::assertSame('./assets/app.js', $index->importMapEntry('app')?->path());
+        self::assertSame('/workspace/assets/app.js', $index->asset('app.js')?->sourcePath);
+        self::assertSame('./assets/app.js', $index->importMapEntry('app')?->path);
     }
 }

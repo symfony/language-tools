@@ -33,11 +33,11 @@ final class StimulusDiagnosticProvider implements DiagnosticProviderInterface
         }
         $known = array_fill_keys($this->stimulus->controllerNames($request->project), true);
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text)->references() as $reference) {
-            if (null !== $reference->kind() || isset($known[$reference->controller()])) {
+        foreach ($this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text)->references as $reference) {
+            if (null !== $reference->kind || isset($known[$reference->controller])) {
                 continue;
             }
-            $diagnostics[] = $this->protocol->diagnostic($reference->range(), 1, 'stimulus.unknown_controller', \sprintf('Unknown Stimulus controller "%s".', $reference->controller()));
+            $diagnostics[] = $this->protocol->diagnostic($reference->range, 1, 'stimulus.unknown_controller', \sprintf('Unknown Stimulus controller "%s".', $reference->controller));
         }
 
         return $diagnostics;

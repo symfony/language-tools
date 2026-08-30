@@ -109,16 +109,16 @@ final class SecurityExtractor
     {
         $symbols = [];
         foreach ($this->yaml->parse($text) as $occurrence) {
-            $path = $occurrence->path();
+            $path = $occurrence->path;
             if (3 === \count($path) && 'security' === $path[0] && 'providers' === $path[1]) {
-                $symbols[] = new SecuritySourceSymbol(SecuritySymbolKind::Provider, $path[2], $uri, $occurrence->keyRange(), true);
+                $symbols[] = new SecuritySourceSymbol(SecuritySymbolKind::Provider, $path[2], $uri, $occurrence->keyRange, true);
             } elseif (3 === \count($path) && 'security' === $path[0] && 'firewalls' === $path[1]) {
-                $symbols[] = new SecuritySourceSymbol(SecuritySymbolKind::Firewall, $path[2], $uri, $occurrence->keyRange(), true);
+                $symbols[] = new SecuritySourceSymbol(SecuritySymbolKind::Firewall, $path[2], $uri, $occurrence->keyRange, true);
             } elseif (4 === \count($path) && 'security' === $path[0] && 'firewalls' === $path[1] && 'provider' === $path[3]) {
                 array_push($symbols, ...$this->valueSymbols(SecuritySymbolKind::Provider, '/[A-Za-z_][A-Za-z0-9_.-]*/', $uri, $text, $occurrence));
             }
             if (3 === \count($path) && 'security' === $path[0] && 'role_hierarchy' === $path[1] && str_starts_with($path[2], 'ROLE_')) {
-                $symbols[] = new SecuritySourceSymbol(SecuritySymbolKind::Role, $path[2], $uri, $occurrence->keyRange(), true);
+                $symbols[] = new SecuritySourceSymbol(SecuritySymbolKind::Role, $path[2], $uri, $occurrence->keyRange, true);
                 array_push($symbols, ...$this->valueSymbols(SecuritySymbolKind::Role, '/ROLE_[A-Z0-9_]+/', $uri, $text, $occurrence));
             } elseif ('security' === ($path[0] ?? null) && 'roles' === ($path[array_key_last($path)] ?? null)) {
                 array_push($symbols, ...$this->valueSymbols(SecuritySymbolKind::Role, '/ROLE_[A-Z0-9_]+/', $uri, $text, $occurrence));
@@ -190,8 +190,8 @@ final class SecurityExtractor
      */
     private function valueSymbols(SecuritySymbolKind $kind, string $pattern, string $uri, string $text, ConfigurationOccurrence $occurrence): array
     {
-        $start = $this->converter->toByteOffset($text, $occurrence->valueRange()->start);
-        $end = $this->converter->toByteOffset($text, $occurrence->valueRange()->end);
+        $start = $this->converter->toByteOffset($text, $occurrence->valueRange->start);
+        $end = $this->converter->toByteOffset($text, $occurrence->valueRange->end);
         $value = substr($text, $start, $end - $start);
         preg_match_all($pattern, $value, $matches, \PREG_OFFSET_CAPTURE);
         $symbols = [];
@@ -325,7 +325,7 @@ final class SecurityExtractor
     {
         $unique = [];
         foreach ($symbols as $symbol) {
-            $key = $symbol->kind()->value.'|'.$symbol->range()->start->line.'|'.$symbol->range()->start->character;
+            $key = $symbol->kind->value.'|'.$symbol->range->start->line.'|'.$symbol->range->start->character;
             $unique[$key] = $symbol;
         }
 

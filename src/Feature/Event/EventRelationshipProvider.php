@@ -26,24 +26,24 @@ final class EventRelationshipProvider implements DefinitionProviderInterface, Ho
         [$symbol, $class, $project] = $resolved;
         $index = $this->indexes->forProject($project);
         if ($symbol instanceof EventSourceSymbol) {
-            return $this->relationships->eventHover($index, $symbol->name());
+            return $this->relationships->eventHover($index, $symbol->name);
         }
         if (!$class instanceof PhpClassDeclaration) {
             return null;
         }
-        if (null !== $index->event($class->className()) || [] !== $index->listenersForEvent($class->className())) {
-            return $this->relationships->eventHover($index, $class->className());
+        if (null !== $index->event($class->className) || [] !== $index->listenersForEvent($class->className)) {
+            return $this->relationships->eventHover($index, $class->className);
         }
-        $listeners = $index->listenersByClass($class->className());
+        $listeners = $index->listenersByClass($class->className);
         if ([] === $listeners) {
             return null;
         }
         $events = [];
         foreach ($listeners as $listener) {
-            $events[$listener->event()] = true;
+            $events[$listener->event] = true;
         }
 
-        return $this->protocol->markdownHover('Event listener: `'.$class->className().'`'."\n\n".'Events: `'.implode('`, `', array_keys($events)).'`');
+        return $this->protocol->markdownHover('Event listener: `'.$class->className.'`'."\n\n".'Events: `'.implode('`, `', array_keys($events)).'`');
     }
 
     public function definition(array $params): ?array
@@ -55,22 +55,22 @@ final class EventRelationshipProvider implements DefinitionProviderInterface, Ho
         [$symbol, $class, $project] = $resolved;
         $index = $this->indexes->forProject($project);
         if ($symbol instanceof EventSourceSymbol) {
-            return $this->relationships->eventDefinitionLocations($project, $index, $symbol->name());
+            return $this->relationships->eventDefinitionLocations($project, $index, $symbol->name);
         }
         if (!$class instanceof PhpClassDeclaration) {
             return null;
         }
-        if (null !== $index->event($class->className()) || [] !== $index->listenersForEvent($class->className())) {
+        if (null !== $index->event($class->className) || [] !== $index->listenersForEvent($class->className)) {
             $classes = [];
-            foreach ($index->listenersForEvent($class->className()) as $listener) {
-                $classes[] = $listener->className();
+            foreach ($index->listenersForEvent($class->className) as $listener) {
+                $classes[] = $listener->className;
             }
 
             return $this->relationships->classLocations($project, $classes);
         }
         $eventClasses = [];
-        foreach ($index->listenersByClass($class->className()) as $listener) {
-            if (null !== $eventClass = $index->event($listener->event())?->className()) {
+        foreach ($index->listenersByClass($class->className) as $listener) {
+            if (null !== $eventClass = $index->event($listener->event)?->className) {
                 $eventClasses[] = $eventClass;
             }
         }
@@ -86,18 +86,18 @@ final class EventRelationshipProvider implements DefinitionProviderInterface, Ho
         }
         [$symbol, $class, $project] = $resolved;
         if ($symbol instanceof EventSourceSymbol) {
-            return $this->relationships->sourceLocations($project, $symbol->name());
+            return $this->relationships->sourceLocations($project, $symbol->name);
         }
         if (!$class instanceof PhpClassDeclaration) {
             return null;
         }
         $index = $this->indexes->forProject($project);
-        if (null !== $index->event($class->className()) || [] !== $index->listenersForEvent($class->className())) {
-            return $this->relationships->sourceLocations($project, $class->className());
+        if (null !== $index->event($class->className) || [] !== $index->listenersForEvent($class->className)) {
+            return $this->relationships->sourceLocations($project, $class->className);
         }
         $locations = [];
-        foreach ($index->listenersByClass($class->className()) as $listener) {
-            array_push($locations, ...$this->relationships->sourceLocations($project, $listener->event()));
+        foreach ($index->listenersByClass($class->className) as $listener) {
+            array_push($locations, ...$this->relationships->sourceLocations($project, $listener->event));
         }
 
         return $this->relationships->uniqueLocations($locations);

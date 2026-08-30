@@ -129,11 +129,11 @@ final class DoctrineProviderTest extends TestCase
             $extractor->extract($usageUri, 'php', $usageText),
         );
         $fieldNames = [];
-        foreach ($index->entity('App\\Entity\\Product')?->fields() ?? [] as $field) {
-            $fieldNames[] = $field->name();
+        foreach ($index->entity('App\\Entity\\Product')->fields ?? [] as $field) {
+            $fieldNames[] = $field->name;
         }
         self::assertSame(['id', 'name', 'category'], $fieldNames);
-        self::assertSame('App\\Entity\\Product', $index->repository('App\\Repository\\ProductRepository')?->entityClass());
+        self::assertSame('App\\Entity\\Product', $index->repository('App\\Repository\\ProductRepository')?->entityClass);
 
         $documents = new DocumentStore();
         foreach ([
@@ -236,18 +236,18 @@ final class DoctrineProviderTest extends TestCase
             PHP;
 
         $entityFacts = $extractor->extract('file:///workspace/src/Entity/Product.php', 'php', $entityText);
-        self::assertSame(['name', 'sku'], array_map(static fn (DoctrineField $field): string => $field->name(), $entityFacts->entities()[0]->fields()));
+        self::assertSame(['name', 'sku'], array_map(static fn (DoctrineField $field): string => $field->name, $entityFacts->entities[0]->fields));
 
         $repositoryFacts = $extractor->extract('file:///workspace/src/Repository/ProductRepository.php', 'php', $repositoryText);
-        self::assertSame('App\Entity\Product', $repositoryFacts->repositories()[0]->entityClass());
+        self::assertSame('App\Entity\Product', $repositoryFacts->repositories[0]->entityClass);
 
         $usageFacts = $extractor->extract('file:///workspace/src/Service/ProductFinder.php', 'php', $usageText);
         $fieldReferences = array_values(array_filter(
-            $usageFacts->symbols(),
-            static fn ($symbol): bool => DoctrineSymbolKind::Field === $symbol->kind(),
+            $usageFacts->symbols,
+            static fn ($symbol): bool => DoctrineSymbolKind::Field === $symbol->kind,
         ));
-        self::assertSame(['name'], array_map(static fn ($symbol): string => $symbol->name(), $fieldReferences));
-        self::assertSame(strpos($usageText, "'name'") + 1, $converter->toByteOffset($usageText, $fieldReferences[0]->range()->start));
+        self::assertSame(['name'], array_map(static fn ($symbol): string => $symbol->name, $fieldReferences));
+        self::assertSame(strpos($usageText, "'name'") + 1, $converter->toByteOffset($usageText, $fieldReferences[0]->range->start));
     }
 
     public function testScopesRepositoryCompletionToTheContainingMethod(): void
@@ -277,7 +277,7 @@ final class DoctrineProviderTest extends TestCase
         $offset = strpos($text, "'name'") + \strlen("'na");
         $context = $extractor->completionContext('php', $text, $offset);
 
-        self::assertSame('App\\Repository\\ProductRepository', $context?->repositoryClass());
+        self::assertSame('App\\Repository\\ProductRepository', $context?->repositoryClass);
     }
 
     public function testScopesThisRepositoryCompletionToTheContainingClass(): void
@@ -317,7 +317,7 @@ final class DoctrineProviderTest extends TestCase
         $offset = strpos($text, "'title'") + \strlen("'ti");
         $context = $extractor->completionContext('php', $text, $offset);
 
-        self::assertSame('App\\Repository\\CategoryRepository', $context?->repositoryClass());
+        self::assertSame('App\\Repository\\CategoryRepository', $context?->repositoryClass);
     }
 
     public function testIgnoresCommentedDoctrinePhpWhilePreservingActiveRanges(): void
@@ -351,27 +351,27 @@ final class DoctrineProviderTest extends TestCase
             PHP;
 
         $facts = $extractor->extract('file:///workspace/src/Form/ProductType.php', 'php', $text);
-        self::assertSame([], $facts->entities());
+        self::assertSame([], $facts->entities);
 
-        $references = array_values(array_filter($facts->symbols(), static fn ($symbol): bool => !$symbol->isDeclaration()));
+        $references = array_values(array_filter($facts->symbols, static fn ($symbol): bool => !$symbol->declaration));
         foreach ($references as $reference) {
-            self::assertStringNotContainsString('commented_', $reference->name());
-            self::assertNotSame('App\\Entity\\Ghost', $reference->name());
+            self::assertStringNotContainsString('commented_', $reference->name);
+            self::assertNotSame('App\\Entity\\Ghost', $reference->name);
         }
 
-        $entityReferences = array_values(array_filter($references, static fn ($symbol): bool => DoctrineSymbolKind::Entity === $symbol->kind()));
+        $entityReferences = array_values(array_filter($references, static fn ($symbol): bool => DoctrineSymbolKind::Entity === $symbol->kind));
         self::assertCount(1, $entityReferences);
-        self::assertSame('App\\Entity\\Product', $entityReferences[0]->name());
-        self::assertSame(strpos($text, 'Product::class'), $converter->toByteOffset($text, $entityReferences[0]->range()->start));
+        self::assertSame('App\\Entity\\Product', $entityReferences[0]->name);
+        self::assertSame(strpos($text, 'Product::class'), $converter->toByteOffset($text, $entityReferences[0]->range->start));
 
-        $fieldReferences = array_values(array_filter($references, static fn ($symbol): bool => DoctrineSymbolKind::Field === $symbol->kind()));
+        $fieldReferences = array_values(array_filter($references, static fn ($symbol): bool => DoctrineSymbolKind::Field === $symbol->kind));
         $fieldNames = [];
         foreach ($fieldReferences as $fieldReference) {
-            $fieldNames[] = $fieldReference->name();
+            $fieldNames[] = $fieldReference->name;
         }
         self::assertSame(['active_entity_type', 'active_criteria'], $fieldNames);
-        self::assertSame(strpos($text, 'active_entity_type'), $converter->toByteOffset($text, $fieldReferences[0]->range()->start));
-        self::assertSame(strpos($text, 'active_criteria'), $converter->toByteOffset($text, $fieldReferences[1]->range()->start));
+        self::assertSame(strpos($text, 'active_entity_type'), $converter->toByteOffset($text, $fieldReferences[0]->range->start));
+        self::assertSame(strpos($text, 'active_criteria'), $converter->toByteOffset($text, $fieldReferences[1]->range->start));
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */

@@ -37,30 +37,30 @@ final class ConsoleProvider implements CompletionProviderInterface, DiagnosticPr
             return null;
         }
 
-        $sourceDefinition = $this->sourceIndexes->forProject($request->project)->definition($context->commandClass());
-        $runtimeDefinition = $this->indexes->forProject($request->project)->command($context->commandClass());
-        if (!$sourceDefinition->isCommand() && null === $runtimeDefinition) {
+        $sourceDefinition = $this->sourceIndexes->forProject($request->project)->definition($context->commandClass);
+        $runtimeDefinition = $this->indexes->forProject($request->project)->command($context->commandClass);
+        if (!$sourceDefinition->command && null === $runtimeDefinition) {
             return [];
         }
-        $names = ConsoleInputKind::Argument === $context->kind()
-            ? $sourceDefinition->arguments()
-            : $sourceDefinition->options();
+        $names = ConsoleInputKind::Argument === $context->kind
+            ? $sourceDefinition->arguments
+            : $sourceDefinition->options;
         if (null !== $runtimeDefinition) {
-            $names = [...$names, ...(ConsoleInputKind::Argument === $context->kind() ? $runtimeDefinition->arguments() : $runtimeDefinition->options())];
+            $names = [...$names, ...(ConsoleInputKind::Argument === $context->kind ? $runtimeDefinition->arguments : $runtimeDefinition->options)];
         }
         $names = array_values(array_unique($names));
         sort($names);
 
         $items = [];
         foreach ($names as $name) {
-            if (!str_starts_with($name, $context->prefix())) {
+            if (!str_starts_with($name, $context->prefix)) {
                 continue;
             }
             $items[] = [
                 'label' => $name,
-                'detail' => ConsoleInputKind::Argument === $context->kind() ? 'Console input argument' : 'Console input option',
+                'detail' => ConsoleInputKind::Argument === $context->kind ? 'Console input argument' : 'Console input option',
                 'kind' => 12,
-                'textEdit' => $this->protocol->textEdit($context->range(), $name),
+                'textEdit' => $this->protocol->textEdit($context->range, $name),
             ];
         }
 
@@ -79,27 +79,27 @@ final class ConsoleProvider implements CompletionProviderInterface, DiagnosticPr
         }
         $sourceIndex = $this->sourceIndexes->forProject($request->project);
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->document->uri, 'php', $request->document->text)->references() as $reference) {
-            $runtimeDefinition = $runtimeIndex->command($reference->commandClass());
-            $sourceDefinition = $sourceIndex->definition($reference->commandClass());
+        foreach ($this->extractor->extract($request->document->uri, 'php', $request->document->text)->references as $reference) {
+            $runtimeDefinition = $runtimeIndex->command($reference->commandClass);
+            $sourceDefinition = $sourceIndex->definition($reference->commandClass);
             if (null === $runtimeDefinition
-                || !$runtimeDefinition->isComplete()
-                || !$sourceDefinition->isCommand()
-                || !$sourceDefinition->isComplete()
+                || !$runtimeDefinition->complete
+                || !$sourceDefinition->command
+                || !$sourceDefinition->complete
             ) {
                 continue;
             }
-            $knownNames = ConsoleInputKind::Argument === $reference->kind()
-                ? [...$runtimeDefinition->arguments(), ...$sourceDefinition->arguments()]
-                : [...$runtimeDefinition->options(), ...$sourceDefinition->options()];
-            if (\in_array($reference->name(), $knownNames, true)) {
+            $knownNames = ConsoleInputKind::Argument === $reference->kind
+                ? [...$runtimeDefinition->arguments, ...$sourceDefinition->arguments]
+                : [...$runtimeDefinition->options, ...$sourceDefinition->options];
+            if (\in_array($reference->name, $knownNames, true)) {
                 continue;
             }
             $diagnostics[] = $this->protocol->diagnostic(
-                $reference->range(),
+                $reference->range,
                 1,
-                ConsoleInputKind::Argument === $reference->kind() ? 'console.unknown_argument' : 'console.unknown_option',
-                \sprintf('Unknown Console input %s "%s".', $reference->kind()->value, $reference->name()),
+                ConsoleInputKind::Argument === $reference->kind ? 'console.unknown_argument' : 'console.unknown_option',
+                \sprintf('Unknown Console input %s "%s".', $reference->kind->value, $reference->name),
             );
         }
 

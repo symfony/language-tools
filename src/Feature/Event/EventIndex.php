@@ -18,7 +18,7 @@ final class EventIndex
     {
         $this->events = [];
         foreach ($events as $event) {
-            $this->events[$event->name()] = $event;
+            $this->events[$event->name] = $event;
         }
         ksort($this->events);
         $this->listeners = $listeners;
@@ -39,13 +39,13 @@ final class EventIndex
     /** @return list<EventListener> */
     public function listenersForEvent(string $name): array
     {
-        return array_values(array_filter($this->listeners, static fn (EventListener $listener): bool => $listener->event() === ltrim($name, '\\')));
+        return array_values(array_filter($this->listeners, static fn (EventListener $listener): bool => $listener->event === ltrim($name, '\\')));
     }
 
     /** @return list<EventListener> */
     public function listenersByClass(string $className): array
     {
-        return array_values(array_filter($this->listeners, static fn (EventListener $listener): bool => $listener->className() === ltrim($className, '\\')));
+        return array_values(array_filter($this->listeners, static fn (EventListener $listener): bool => $listener->className === ltrim($className, '\\')));
     }
 
     public function isComplete(): bool

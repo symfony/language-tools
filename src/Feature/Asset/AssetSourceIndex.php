@@ -55,12 +55,12 @@ final class AssetSourceIndex extends AbstractSourceFactsIndex
         $this->symbolsByName = [];
         $declarationNames = [];
         foreach ($this->facts() as $facts) {
-            foreach ($facts->symbols() as $symbol) {
-                $kind = $symbol->kind()->value;
-                $name = $symbol->name();
+            foreach ($facts->symbols as $symbol) {
+                $kind = $symbol->kind->value;
+                $name = $symbol->name;
                 $this->symbols[$kind][] = $symbol;
                 $this->symbolsByName[$kind][$name][] = $symbol;
-                if ($symbol->isDeclaration()) {
+                if ($symbol->declaration) {
                     $declarationNames[$kind][$name] = true;
                 }
             }

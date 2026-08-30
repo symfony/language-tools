@@ -12,34 +12,11 @@ final class MessengerSourceFacts implements SourceFactsInterface
      * @param list<string>                $handlers
      */
     public function __construct(
-        private readonly string $uri,
-        private readonly array $symbols,
-        private readonly array $parents = [],
-        private readonly array $handlers = [],
+        public readonly string $uri,
+        public readonly array $symbols,
+        public readonly array $parents = [],
+        public readonly array $handlers = [],
     ) {
-    }
-
-    public function uri(): string
-    {
-        return $this->uri;
-    }
-
-    /** @return list<MessengerSourceSymbol> */
-    public function symbols(): array
-    {
-        return $this->symbols;
-    }
-
-    /** @return array<string, list<string>> */
-    public function parents(): array
-    {
-        return $this->parents;
-    }
-
-    /** @return list<string> */
-    public function handlers(): array
-    {
-        return $this->handlers;
     }
 
     public function isEmpty(): bool

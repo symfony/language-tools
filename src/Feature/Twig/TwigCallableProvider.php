@@ -157,7 +157,7 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
     {
         $pairs = [];
         foreach ($declarations as $declaration) {
-            $pairs[$declaration->kind()->value."\0".$declaration->name()] = [$declaration->kind(), $declaration->name()];
+            $pairs[$declaration->kind->value."\0".$declaration->name] = [$declaration->kind, $declaration->name];
         }
         $usages = [];
         $index = $this->indexes->forProject($project);
@@ -165,11 +165,11 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
             array_push($usages, ...$index->usages($kind, $name));
         }
         if (1 < \count($pairs)) {
-            usort($usages, static fn (TwigCallableUsage $left, TwigCallableUsage $right): int => [$left->uri(), $left->range()->start->line, $left->range()->start->character] <=> [$right->uri(), $right->range()->start->line, $right->range()->start->character]);
+            usort($usages, static fn (TwigCallableUsage $left, TwigCallableUsage $right): int => [$left->uri, $left->range->start->line, $left->range->start->character] <=> [$right->uri, $right->range->start->line, $right->range->start->character]);
         }
 
         return array_map(
-            fn (TwigCallableUsage $usage): array => $this->protocol->location($usage->uri(), $usage->range()),
+            fn (TwigCallableUsage $usage): array => $this->protocol->location($usage->uri, $usage->range),
             $usages,
         );
     }
@@ -382,11 +382,11 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
             $types[] = $match[1];
             $phpVariadic = $phpVariadic || '' !== $match[2];
         }
-        if ($matchedDeclaration->optionsKnown()) {
-            $skip = (int) $matchedDeclaration->needsCharset()
-                + (int) $matchedDeclaration->needsEnvironment()
-                + (int) $matchedDeclaration->needsContext()
-                + (int) $matchedDeclaration->needsIsSandboxed();
+        if ($matchedDeclaration->optionsKnown) {
+            $skip = (int) $matchedDeclaration->needsCharset
+                + (int) $matchedDeclaration->needsEnvironment
+                + (int) $matchedDeclaration->needsContext
+                + (int) $matchedDeclaration->needsIsSandboxed;
         } else {
             $skip = 'charset' === ($all[0] ?? '') ? 1 : 0;
             if (str_contains($types[$skip] ?? '', 'Environment')) {
@@ -402,13 +402,13 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
         if (TwigCallableKind::Filter === $kind) {
             ++$skip;
         }
-        $variadic = $phpVariadic || $matchedDeclaration->isVariadic();
+        $variadic = $phpVariadic || $matchedDeclaration->variadic;
         $nameable = \array_slice($all, $skip);
         if ($variadic) {
             array_pop($nameable);
         }
 
-        return ['all' => $all, 'nameable' => $nameable, 'variadic' => $variadic || !$matchedDeclaration->optionsKnown()];
+        return ['all' => $all, 'nameable' => $nameable, 'variadic' => $variadic || !$matchedDeclaration->optionsKnown];
     }
 
     public function hover(array $params): ?array
@@ -418,11 +418,11 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
             return null;
         }
         [$reference, $declarations, $project] = $resolved;
-        $value = \sprintf('Twig %s: `%s`', $reference->kind()->value, $reference->name());
+        $value = \sprintf('Twig %s: `%s`', $reference->kind->value, $reference->name);
         $callables = [];
         foreach ($declarations as $declaration) {
-            if (null !== $declaration->className() && null !== $declaration->method()) {
-                $callables[$declaration->className().'::'.$declaration->method()] = $declaration;
+            if (null !== $declaration->className && null !== $declaration->method) {
+                $callables[$declaration->className.'::'.$declaration->method] = $declaration;
             }
         }
         ksort($callables);
@@ -455,7 +455,7 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
         foreach ($declarations as $declaration) {
             $methods = $this->callableMethods($project, $declaration);
             if ([] === $methods) {
-                $locations[] = $this->protocol->location($declaration->uri(), $declaration->range());
+                $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
                 continue;
             }
             foreach ($methods as $method) {
@@ -488,7 +488,7 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
         if (null === $reference) {
             return null;
         }
-        $declarations = $this->indexes->forProject($request->project)->declarations($reference->kind(), $reference->name());
+        $declarations = $this->indexes->forProject($request->project)->declarations($reference->kind, $reference->name);
 
         return [] === $declarations ? null : [$reference, $declarations, $request->project];
     }
@@ -496,18 +496,18 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
     /** @return list<array{uri: string, text: string, method: PhpMethodDeclaration}> */
     private function callableMethods(Project $project, TwigCallableDeclaration $declaration): array
     {
-        if (null === $declaration->className() || null === $declaration->method()) {
+        if (null === $declaration->className || null === $declaration->method) {
             return [];
         }
         $methods = [];
-        foreach ($this->classIndexes->forProject($project)->classDeclarations($declaration->className()) as $class) {
-            $text = $this->source($project, $class->uri());
+        foreach ($this->classIndexes->forProject($project)->classDeclarations($declaration->className) as $class) {
+            $text = $this->source($project, $class->uri);
             if (null === $text) {
                 continue;
             }
             foreach ($this->phpParser->parse($text)->methodDeclarations as $method) {
-                if (0 === strcasecmp($declaration->className(), $method->className) && 0 === strcasecmp($declaration->method(), $method->name)) {
-                    $methods[] = ['uri' => $class->uri(), 'text' => $text, 'method' => $method];
+                if (0 === strcasecmp($declaration->className, $method->className) && 0 === strcasecmp($declaration->method, $method->name)) {
+                    $methods[] = ['uri' => $class->uri, 'text' => $text, 'method' => $method];
                 }
             }
         }

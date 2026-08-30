@@ -7,30 +7,10 @@ use Symfony\Lsp\Document\Range;
 final class PhpClassDeclaration
 {
     public function __construct(
-        private readonly string $className,
-        private readonly string $uri,
-        private readonly Range $range,
-        private readonly ?string $parentClassName = null,
+        public readonly string $className,
+        public readonly string $uri,
+        public readonly Range $range,
+        public readonly ?string $parentClassName = null,
     ) {
-    }
-
-    public function className(): string
-    {
-        return $this->className;
-    }
-
-    public function uri(): string
-    {
-        return $this->uri;
-    }
-
-    public function range(): Range
-    {
-        return $this->range;
-    }
-
-    public function parentClassName(): ?string
-    {
-        return $this->parentClassName;
     }
 }

@@ -35,7 +35,7 @@ final class TemplateSourceIndexer extends AbstractSourceIndexer
             throw new \UnexpectedValueException('The template source facts are invalid.');
         }
 
-        return null === $data->declaration() ? [] : [$data->declaration()];
+        return null === $data->declaration ? [] : [$data->declaration];
     }
 
     protected function factsClass(): string

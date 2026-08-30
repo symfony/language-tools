@@ -9,43 +9,13 @@ use Symfony\Lsp\Document\Range;
 final class TranslationCompletionContext
 {
     public function __construct(
-        private readonly string $kind,
-        private readonly string $prefix,
-        private readonly Range $range,
-        private readonly string $domain = 'messages',
-        private readonly ?string $key = null,
-        private readonly ?string $quote = null,
+        public readonly string $kind,
+        public readonly string $prefix,
+        public readonly Range $range,
+        public readonly string $domain = 'messages',
+        public readonly ?string $key = null,
+        public readonly ?string $quote = null,
     ) {
-    }
-
-    public function kind(): string
-    {
-        return $this->kind;
-    }
-
-    public function prefix(): string
-    {
-        return $this->prefix;
-    }
-
-    public function range(): Range
-    {
-        return $this->range;
-    }
-
-    public function domain(): string
-    {
-        return $this->domain;
-    }
-
-    public function key(): ?string
-    {
-        return $this->key;
-    }
-
-    public function quote(): ?string
-    {
-        return $this->quote;
     }
 
     public static function create(string $languageId, string $text, Position $position, PositionConverter $converter): ?self

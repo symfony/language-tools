@@ -7,30 +7,10 @@ use Symfony\Lsp\Document\Range;
 final class RouteReferenceLocation
 {
     public function __construct(
-        private readonly string $name,
-        private readonly string $uri,
-        private readonly Range $range,
-        private readonly ?string $controllerClass = null,
+        public readonly string $name,
+        public readonly string $uri,
+        public readonly Range $range,
+        public readonly ?string $controllerClass = null,
     ) {
-    }
-
-    public function name(): string
-    {
-        return $this->name;
-    }
-
-    public function uri(): string
-    {
-        return $this->uri;
-    }
-
-    public function range(): Range
-    {
-        return $this->range;
-    }
-
-    public function controllerClass(): ?string
-    {
-        return $this->controllerClass;
     }
 }

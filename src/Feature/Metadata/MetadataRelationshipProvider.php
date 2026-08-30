@@ -28,13 +28,13 @@ final class MetadataRelationshipProvider implements DefinitionProviderInterface,
             return null;
         }
         [$symbol, $project] = $resolved;
-        $symbols = $this->sourceIndexes->forProject($project)->symbols($symbol->kind(), $symbol->name());
+        $symbols = $this->sourceIndexes->forProject($project)->symbols($symbol->kind, $symbol->name);
         $count = \count($symbols);
-        $value = match ($symbol->kind()) {
-            MetadataSymbolKind::Constraint => 'Validation constraint: `'.$symbol->name().'`',
-            MetadataSymbolKind::MappedClass => 'Mapped class: `'.$symbol->name().'`',
+        $value = match ($symbol->kind) {
+            MetadataSymbolKind::Constraint => 'Validation constraint: `'.$symbol->name.'`',
+            MetadataSymbolKind::MappedClass => 'Mapped class: `'.$symbol->name.'`',
             MetadataSymbolKind::Property => $this->propertyHover($symbol, $symbols),
-            MetadataSymbolKind::SerializerGroup => \sprintf("Serializer group: `%s`\n\n%d known occurrence%s", $symbol->name(), $count, 1 === $count ? '' : 's'),
+            MetadataSymbolKind::SerializerGroup => \sprintf("Serializer group: `%s`\n\n%d known occurrence%s", $symbol->name, $count, 1 === $count ? '' : 's'),
         };
 
         return $this->protocol->markdownHover($value);
@@ -48,9 +48,9 @@ final class MetadataRelationshipProvider implements DefinitionProviderInterface,
         }
         [$symbol, $project] = $resolved;
         $locations = [];
-        foreach ($this->sourceIndexes->forProject($project)->symbols($symbol->kind(), $symbol->name()) as $candidate) {
-            if ($candidate->isDeclaration()) {
-                $locations[] = $this->protocol->location($candidate->uri(), $candidate->range());
+        foreach ($this->sourceIndexes->forProject($project)->symbols($symbol->kind, $symbol->name) as $candidate) {
+            if ($candidate->declaration) {
+                $locations[] = $this->protocol->location($candidate->uri, $candidate->range);
             }
         }
 
@@ -65,8 +65,8 @@ final class MetadataRelationshipProvider implements DefinitionProviderInterface,
         }
         [$symbol, $project] = $resolved;
         $locations = [];
-        foreach ($this->sourceIndexes->forProject($project)->symbols($symbol->kind(), $symbol->name()) as $candidate) {
-            $locations[] = $this->protocol->location($candidate->uri(), $candidate->range());
+        foreach ($this->sourceIndexes->forProject($project)->symbols($symbol->kind, $symbol->name) as $candidate) {
+            $locations[] = $this->protocol->location($candidate->uri, $candidate->range);
         }
 
         return $locations;
@@ -75,20 +75,20 @@ final class MetadataRelationshipProvider implements DefinitionProviderInterface,
     /** @param list<MetadataSourceSymbol> $symbols */
     private function propertyHover(MetadataSourceSymbol $symbol, array $symbols): string
     {
-        $declaration = $symbol->isDeclaration() ? $symbol : null;
+        $declaration = $symbol->declaration ? $symbol : null;
         foreach ($symbols as $candidate) {
-            if ($candidate->isDeclaration()) {
+            if ($candidate->declaration) {
                 $declaration = $candidate;
                 break;
             }
         }
 
-        $value = 'PHP property: `'.$symbol->name().'`';
-        if (null !== $declaration?->signature()) {
-            $value .= "\n\n```php\n".$declaration->signature()."\n```";
+        $value = 'PHP property: `'.$symbol->name.'`';
+        if (null !== $declaration?->signature) {
+            $value .= "\n\n```php\n".$declaration->signature."\n```";
         }
-        if (null !== $declaration?->description()) {
-            $value .= "\n\n".$declaration->description();
+        if (null !== $declaration?->description) {
+            $value .= "\n\n".$declaration->description;
         }
 
         return $value;
@@ -106,8 +106,8 @@ final class MetadataRelationshipProvider implements DefinitionProviderInterface,
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols() as $symbol) {
-            if ($this->converter->containsByteOffset($request->document->text, $symbol->range(), $offset, inclusiveEnd: true)) {
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols as $symbol) {
+            if ($this->converter->containsByteOffset($request->document->text, $symbol->range, $offset, inclusiveEnd: true)) {
                 return [$symbol, $request->project];
             }
         }

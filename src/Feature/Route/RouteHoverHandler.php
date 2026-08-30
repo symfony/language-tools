@@ -37,38 +37,38 @@ final class RouteHoverHandler implements HoverProviderInterface
         $reference = 'twig' === $request->document->languageId
             ? $this->twigReferenceExtractor->at($request->document->text, $offset)
             : $this->phpReferenceExtractor->at($request->document->text, $offset, $this->classIndexes->forProject($request->project));
-        if (null === $reference || null === $route = $this->routeIndexes->forProject($request->project)->get($reference->name())) {
+        if (null === $reference || null === $route = $this->routeIndexes->forProject($request->project)->get($reference->name)) {
             return null;
         }
 
-        $details = [\sprintf('`%s`', $route->name())];
-        if (null !== $route->alias()) {
-            $details[] = \sprintf('Alias of: `%s`', $route->alias());
+        $details = [\sprintf('`%s`', $route->name)];
+        if (null !== $route->alias) {
+            $details[] = \sprintf('Alias of: `%s`', $route->alias);
         }
-        if (null !== $route->path()) {
-            $details[] = \sprintf('Path: `%s`', $route->path());
+        if (null !== $route->path) {
+            $details[] = \sprintf('Path: `%s`', $route->path);
         }
-        if (null !== $route->host()) {
-            $details[] = \sprintf('Host: `%s`', $route->host());
+        if (null !== $route->host) {
+            $details[] = \sprintf('Host: `%s`', $route->host);
         }
-        if ([] !== $route->methods()) {
-            $details[] = \sprintf('Methods: `%s`', implode('`, `', $route->methods()));
+        if ([] !== $route->methods) {
+            $details[] = \sprintf('Methods: `%s`', implode('`, `', $route->methods));
         }
-        if ([] !== $route->schemes()) {
-            $details[] = \sprintf('Schemes: `%s`', implode('`, `', $route->schemes()));
+        if ([] !== $route->schemes) {
+            $details[] = \sprintf('Schemes: `%s`', implode('`, `', $route->schemes));
         }
-        if ([] !== $route->defaults()) {
-            $details[] = \sprintf('Defaults: `%s`', implode('`, `', $route->defaults()));
+        if ([] !== $route->defaults) {
+            $details[] = \sprintf('Defaults: `%s`', implode('`, `', $route->defaults));
         }
-        if ([] !== $route->requirements()) {
+        if ([] !== $route->requirements) {
             $requirements = [];
-            foreach ($route->requirements() as $name => $requirement) {
+            foreach ($route->requirements as $name => $requirement) {
                 $requirements[] = $name.': '.$requirement;
             }
             $details[] = \sprintf('Requirements: `%s`', implode('`, `', $requirements));
         }
-        if (null !== $route->controller()) {
-            $details[] = \sprintf('Controller: `%s`', $route->controller());
+        if (null !== $route->controller) {
+            $details[] = \sprintf('Controller: `%s`', $route->controller);
         }
 
         return $this->protocol->markdownHover(implode("\n\n", $details));

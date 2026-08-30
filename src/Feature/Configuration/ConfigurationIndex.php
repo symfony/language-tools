@@ -68,11 +68,11 @@ final class ConfigurationIndex
         $normalizeKeys = true;
         $depth = 1;
         foreach ($path as $name) {
-            $prototype = $node?->prototype();
+            $prototype = $node?->prototype;
             $sequenceChild = \in_array($depth, $sequenceDepths, true) && null !== $prototype;
             $normalizingNode = $sequenceChild ? $prototype : $node;
             if (null !== $normalizingNode) {
-                $normalizeKeys = $normalizingNode->normalizesKeys();
+                $normalizeKeys = $normalizingNode->normalizeKeys;
             }
             $normalized[] = $normalizeKeys && !\in_array($depth, $literalDepths, true) ? ConfigurationNode::normalizeKey($name) : $name;
             $node = $node?->child($name, $sequenceChild);

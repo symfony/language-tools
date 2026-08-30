@@ -21,11 +21,11 @@ final class AssetSourceIndexTest extends TestCase
         );
         $index->overlay($this->facts('file:///first.php', 'overlay-first'));
 
-        self::assertSame(['overlay-first', 'saved-second'], array_map(static fn (AssetSourceSymbol $symbol): string => $symbol->name(), $index->symbols(AssetSymbolKind::Asset)));
+        self::assertSame(['overlay-first', 'saved-second'], array_map(static fn (AssetSourceSymbol $symbol): string => $symbol->name, $index->symbols(AssetSymbolKind::Asset)));
 
         $index->removeOverlay('file:///first.php');
 
-        self::assertSame(['saved-first', 'saved-second'], array_map(static fn (AssetSourceSymbol $symbol): string => $symbol->name(), $index->symbols(AssetSymbolKind::Asset)));
+        self::assertSame(['saved-first', 'saved-second'], array_map(static fn (AssetSourceSymbol $symbol): string => $symbol->name, $index->symbols(AssetSymbolKind::Asset)));
     }
 
     public function testInvalidatesCachedSymbolsAndDeclarationNames(): void
@@ -34,14 +34,14 @@ final class AssetSourceIndexTest extends TestCase
         $first = $this->facts('file:///assets.php', 'first', true);
         $index->replace($first);
 
-        self::assertSame([$first->symbols()[0]], $index->symbols(AssetSymbolKind::Asset, 'first'));
+        self::assertSame([$first->symbols[0]], $index->symbols(AssetSymbolKind::Asset, 'first'));
         self::assertSame(['first'], $index->declarationNames(AssetSymbolKind::Asset));
 
         $second = $this->facts('file:///assets.php', 'second', true);
         $index->replaceSource($second);
 
         self::assertSame([], $index->symbols(AssetSymbolKind::Asset, 'first'));
-        self::assertSame([$second->symbols()[0]], $index->symbols(AssetSymbolKind::Asset, 'second'));
+        self::assertSame([$second->symbols[0]], $index->symbols(AssetSymbolKind::Asset, 'second'));
         self::assertSame(['second'], $index->declarationNames(AssetSymbolKind::Asset));
     }
 

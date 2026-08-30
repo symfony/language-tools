@@ -36,7 +36,7 @@ final class PhpDocument
 
     public function namespace(): string
     {
-        return $this->names->namespace();
+        return $this->names->namespace;
     }
 
     /** @return array<string, string> */

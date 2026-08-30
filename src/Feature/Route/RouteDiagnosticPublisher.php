@@ -53,29 +53,29 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
             ? $this->twigReferenceExtractor->extract($request->document->text)
             : $this->phpReferenceExtractor->extract($request->document->text, $this->classIndexes->forProject($request->project));
         foreach ($references as $reference) {
-            $route = $routeIndex->get($reference->name());
+            $route = $routeIndex->get($reference->name);
             if (null === $route) {
-                $diagnostics[] = $this->protocol->diagnostic($reference->range(), 1, 'route.not_found', \sprintf('Route "%s" does not exist in the selected environment.', $reference->name()));
+                $diagnostics[] = $this->protocol->diagnostic($reference->range, 1, 'route.not_found', \sprintf('Route "%s" does not exist in the selected environment.', $reference->name));
 
                 continue;
             }
 
-            if (null === $reference->providedParameters()) {
+            if (null === $reference->providedParameters) {
                 continue;
             }
 
             $missingParameters = array_values(array_diff(
                 $route->requiredParameters(),
-                $reference->providedParameters(),
+                $reference->providedParameters,
             ));
             if ([] !== $missingParameters) {
                 $diagnostics[] = $this->protocol->diagnostic(
-                    $reference->range(),
+                    $reference->range,
                     1,
                     'route.missing_parameters',
                     \sprintf(
                         'Route "%s" requires parameter%s "%s".',
-                        $reference->name(),
+                        $reference->name,
                         1 === \count($missingParameters) ? '' : 's',
                         implode('", "', $missingParameters),
                     ),

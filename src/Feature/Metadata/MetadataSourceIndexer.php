@@ -30,8 +30,8 @@ final class MetadataSourceIndexer extends AbstractSourceIndexer
         }
 
         return [
-            ...array_values(array_filter($data->symbols(), static fn (MetadataSourceSymbol $symbol): bool => $symbol->isDeclaration())),
-            ...$data->formDataClasses(),
+            ...array_values(array_filter($data->symbols, static fn (MetadataSourceSymbol $symbol): bool => $symbol->declaration)),
+            ...$data->formDataClasses,
         ];
     }
 

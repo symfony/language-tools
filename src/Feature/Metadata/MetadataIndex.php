@@ -21,14 +21,14 @@ final class MetadataIndex
     {
         $this->formTypes = [];
         foreach ($formTypes as $formType) {
-            $this->formTypes[$formType->className()] = $formType;
+            $this->formTypes[$formType->className] = $formType;
         }
         ksort($this->formTypes);
         $this->constraints = [];
         $this->constraintsByClass = [];
         foreach ($constraints as $constraint) {
-            $this->constraints[$constraint->name()] = $constraint;
-            $this->constraintsByClass[$constraint->className()] = $constraint;
+            $this->constraints[$constraint->name] = $constraint;
+            $this->constraintsByClass[$constraint->className] = $constraint;
         }
         ksort($this->constraints);
         $this->formsComplete = $formsComplete;

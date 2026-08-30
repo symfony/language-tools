@@ -30,8 +30,8 @@ final class EventSourceIndexer extends AbstractSourceIndexer
         }
 
         return [
-            ...array_filter($data->symbols(), static fn (EventSourceSymbol $symbol): bool => $symbol->isDeclaration()),
-            ...$data->listeners(),
+            ...array_filter($data->symbols, static fn (EventSourceSymbol $symbol): bool => $symbol->declaration),
+            ...$data->listeners,
         ];
     }
 

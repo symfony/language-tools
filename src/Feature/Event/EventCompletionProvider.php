@@ -33,8 +33,8 @@ final class EventCompletionProvider implements CompletionProviderInterface
         }
         $items = [];
         foreach ($this->indexes->forProject($request->project)->events() as $event) {
-            if (str_starts_with($event->name(), $prefix)) {
-                $items[] = $this->completion($event->name(), $request->document->text, $offset - \strlen($prefix), $request->position);
+            if (str_starts_with($event->name, $prefix)) {
+                $items[] = $this->completion($event->name, $request->document->text, $offset - \strlen($prefix), $request->position);
             }
         }
 

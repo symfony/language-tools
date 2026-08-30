@@ -19,12 +19,12 @@ final class AssetIndex
     {
         $this->assets = [];
         foreach ($assets as $asset) {
-            $this->assets[$asset->logicalPath()] = $asset;
+            $this->assets[$asset->logicalPath] = $asset;
         }
         ksort($this->assets);
         $this->importMapEntries = [];
         foreach ($importMapEntries as $entry) {
-            $this->importMapEntries[$entry->name()] = $entry;
+            $this->importMapEntries[$entry->name] = $entry;
         }
         ksort($this->importMapEntries);
         $this->assetsComplete = $assetsComplete;

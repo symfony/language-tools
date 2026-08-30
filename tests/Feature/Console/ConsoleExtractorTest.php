@@ -86,20 +86,20 @@ final class ConsoleExtractorTest extends TestCase
 
         $facts = $this->extractor()->extract('file:///workspace/src/Command/ReportCommand.php', 'php', $text);
         $declarations = [];
-        foreach ($facts->declarations() as $declaration) {
-            $declarations[$declaration->className()] = $declaration;
+        foreach ($facts->declarations as $declaration) {
+            $declarations[$declaration->className] = $declaration;
         }
 
-        self::assertSame(['shared'], $declarations['App\Command\SharedDefinition']->arguments());
-        self::assertSame(['format', 'report\name'], $declarations['App\Command\ReportCommand']->arguments());
-        self::assertSame(['color', 'out"put'], $declarations['App\Command\ReportCommand']->options());
-        self::assertSame(['App\Command\SharedDefinition'], $declarations['App\Command\ReportCommand']->traits());
-        self::assertTrue($declarations['App\Command\ReportCommand']->isComplete());
-        self::assertSame(['source-path'], $declarations['App\Command\ImportCommand']->arguments());
-        self::assertSame(['dry-run', 'output-format'], $declarations['App\Command\ImportCommand']->options());
+        self::assertSame(['shared'], $declarations['App\Command\SharedDefinition']->arguments);
+        self::assertSame(['format', 'report\name'], $declarations['App\Command\ReportCommand']->arguments);
+        self::assertSame(['color', 'out"put'], $declarations['App\Command\ReportCommand']->options);
+        self::assertSame(['App\Command\SharedDefinition'], $declarations['App\Command\ReportCommand']->traits);
+        self::assertTrue($declarations['App\Command\ReportCommand']->complete);
+        self::assertSame(['source-path'], $declarations['App\Command\ImportCommand']->arguments);
+        self::assertSame(['dry-run', 'output-format'], $declarations['App\Command\ImportCommand']->options);
 
-        self::assertSame(['report\name', 'out"put'], array_map(static fn ($reference): string => $reference->name(), $facts->references()));
-        self::assertSame([ConsoleInputKind::Argument, ConsoleInputKind::Option], array_map(static fn ($reference): ConsoleInputKind => $reference->kind(), $facts->references()));
+        self::assertSame(['report\name', 'out"put'], array_map(static fn ($reference): string => $reference->name, $facts->references));
+        self::assertSame([ConsoleInputKind::Argument, ConsoleInputKind::Option], array_map(static fn ($reference): ConsoleInputKind => $reference->kind, $facts->references));
     }
 
     public function testScopesInputReferencesToTheirOwningMethods(): void
@@ -122,8 +122,8 @@ final class ConsoleExtractorTest extends TestCase
             }
             PHP);
 
-        self::assertSame(['tracked'], array_map(static fn ($reference): string => $reference->name(), $facts->references()));
-        self::assertSame(['ScopedCommand'], array_map(static fn ($reference): string => $reference->commandClass(), $facts->references()));
+        self::assertSame(['tracked'], array_map(static fn ($reference): string => $reference->name, $facts->references));
+        self::assertSame(['ScopedCommand'], array_map(static fn ($reference): string => $reference->commandClass, $facts->references));
     }
 
     public function testKeepsDeclarationsCallsAndAttributesWithTheirOwningTypes(): void
@@ -176,8 +176,8 @@ final class ConsoleExtractorTest extends TestCase
             }
             PHP);
         $declarations = [];
-        foreach ($facts->declarations() as $declaration) {
-            $declarations[$declaration->className()] = $declaration;
+        foreach ($facts->declarations as $declaration) {
+            $declarations[$declaration->className] = $declaration;
         }
 
         self::assertSame([
@@ -185,11 +185,11 @@ final class ConsoleExtractorTest extends TestCase
             'App\Command\FirstCommand',
             'App\Command\NeighborCommand',
         ], array_keys($declarations));
-        self::assertSame(['shared'], $declarations['App\Command\SharedDefinition']->arguments());
-        self::assertSame(['first'], $declarations['App\Command\FirstCommand']->arguments());
-        self::assertSame(['neighbor'], $declarations['App\Command\NeighborCommand']->arguments());
-        self::assertTrue($declarations['App\Command\FirstCommand']->isCommand());
-        self::assertFalse($declarations['App\Command\NeighborCommand']->isCommand());
+        self::assertSame(['shared'], $declarations['App\Command\SharedDefinition']->arguments);
+        self::assertSame(['first'], $declarations['App\Command\FirstCommand']->arguments);
+        self::assertSame(['neighbor'], $declarations['App\Command\NeighborCommand']->arguments);
+        self::assertTrue($declarations['App\Command\FirstCommand']->command);
+        self::assertFalse($declarations['App\Command\NeighborCommand']->command);
     }
 
     public function testMarksDynamicDefinitionsIncomplete(): void
@@ -218,8 +218,8 @@ final class ConsoleExtractorTest extends TestCase
             }
             PHP);
 
-        self::assertFalse($facts->declarations()[0]->isComplete());
-        self::assertFalse($facts->declarations()[1]->isComplete());
+        self::assertFalse($facts->declarations[0]->complete);
+        self::assertFalse($facts->declarations[1]->complete);
     }
 
     public function testCompletesOnlyInputInterfaceReceiversWithIncompleteSyntax(): void
@@ -241,9 +241,9 @@ final class ConsoleExtractorTest extends TestCase
         $text = str_replace('|', '', $text);
         $context = $this->extractor()->completionContext('php', $text, $cursor);
 
-        self::assertSame(ConsoleInputKind::Option, $context?->kind());
-        self::assertSame('ver', $context->prefix());
-        self::assertSame('DemoCommand', $context->commandClass());
+        self::assertSame(ConsoleInputKind::Option, $context?->kind);
+        self::assertSame('ver', $context->prefix);
+        self::assertSame('DemoCommand', $context->commandClass);
 
         $unrelated = str_replace('InputInterface $input', 'object $input', $text);
         self::assertNull($this->extractor()->completionContext('php', $unrelated, $cursor));
@@ -285,7 +285,7 @@ final class ConsoleExtractorTest extends TestCase
                     $this->addArgument('draft');
             PHP);
 
-        self::assertFalse($facts->declarations()[0]->isComplete());
+        self::assertFalse($facts->declarations[0]->complete);
     }
 
     public function testKeepsDocumentParseCachedWhileParsingDefinitionExpressions(): void
@@ -320,7 +320,7 @@ final class ConsoleExtractorTest extends TestCase
         $facts = $extractor->extract('file:///workspace/src/Command/ReportCommand.php', 'php', $text);
         $parser->parse($text);
 
-        self::assertSame(['report'], $facts->declarations()[0]->arguments());
+        self::assertSame(['report'], $facts->declarations[0]->arguments);
         self::assertSame([$text], $inner->sources);
         self::assertCount(1, $expressionParser->sources);
         self::assertStringContainsString('// The expression parser must accept comments.', $expressionParser->sources[0]);

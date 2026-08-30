@@ -29,19 +29,19 @@ final class StimulusCompletionProvider implements CompletionProviderInterface
         if (null === $context) {
             return null;
         }
-        $values = null === $context->kind()
+        $values = null === $context->kind
             ? $this->stimulus->controllerNames($request->project)
-            : $this->stimulus->members($request->project, $context->controller() ?? '', $context->kind());
+            : $this->stimulus->members($request->project, $context->controller ?? '', $context->kind);
         $items = [];
         foreach ($values as $value) {
-            if (!str_starts_with($value, $context->prefix())) {
+            if (!str_starts_with($value, $context->prefix)) {
                 continue;
             }
             $items[] = [
                 'label' => $value,
-                'kind' => null === $context->kind() ? 7 : 2,
-                'detail' => null === $context->kind() ? 'Stimulus controller' : \sprintf('Stimulus %s', $context->kind()->value),
-                'textEdit' => $this->protocol->textEdit($context->range(), $value),
+                'kind' => null === $context->kind ? 7 : 2,
+                'detail' => null === $context->kind ? 'Stimulus controller' : \sprintf('Stimulus %s', $context->kind->value),
+                'textEdit' => $this->protocol->textEdit($context->range, $value),
             ];
         }
 

@@ -303,8 +303,8 @@ final class MetadataProviderTest extends TestCase
             PHP;
         $formFacts = $extractor->extract($formUri, 'php', $formText);
         $dataClasses = [];
-        foreach ($formFacts->formDataClasses() as $formDataClass) {
-            $dataClasses[$formDataClass->formClass()] = $formDataClass->dataClass();
+        foreach ($formFacts->formDataClasses as $formDataClass) {
+            $dataClasses[$formDataClass->formClass] = $formDataClass->dataClass;
         }
         self::assertSame([
             'App\\Form\\ArticleType' => 'App\\Dto\\Article',
@@ -404,19 +404,19 @@ final class MetadataProviderTest extends TestCase
 
         $facts = $extractor->extract('file:///workspace/src/Form/ArticleType.php', 'php', $text);
         $dataClasses = [];
-        foreach ($facts->formDataClasses() as $dataClass) {
-            $dataClasses[$dataClass->formClass()] = $dataClass->dataClass();
+        foreach ($facts->formDataClasses as $dataClass) {
+            $dataClasses[$dataClass->formClass] = $dataClass->dataClass;
         }
         self::assertSame(['App\Form\ArticleType' => 'App\Dto\Article'], $dataClasses);
         self::assertSame(['active_option'], array_column($extractor->formOptions($text), 'option'));
         self::assertNull($extractor->completionContext('php', $text, strpos($text, "'ignored'") + \strlen("'ign")));
 
         $references = array_values(array_filter(
-            $facts->symbols(),
-            static fn ($symbol): bool => MetadataSymbolKind::Property === $symbol->kind() && !$symbol->isDeclaration(),
+            $facts->symbols,
+            static fn ($symbol): bool => MetadataSymbolKind::Property === $symbol->kind && !$symbol->declaration,
         ));
-        self::assertSame(['App\Dto\Article::$title'], array_map(static fn ($symbol): string => $symbol->name(), $references));
-        self::assertSame(strpos($text, "'title'") + 1, $converter->toByteOffset($text, $references[0]->range()->start));
+        self::assertSame(['App\Dto\Article::$title'], array_map(static fn ($symbol): string => $symbol->name, $references));
+        self::assertSame(strpos($text, "'title'") + 1, $converter->toByteOffset($text, $references[0]->range->start));
     }
 
     public function testIgnoresCommentedPhpMetadataWhilePreservingActiveRanges(): void
@@ -479,21 +479,21 @@ final class MetadataProviderTest extends TestCase
         self::assertSame([], (new FormMetadataProvider($resolver, $converter, $protocol, $indexes, $extractor))->diagnostics(['textDocument' => ['uri' => $uri]]));
         self::assertSame([], (new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $extractor))->diagnostics(['textDocument' => ['uri' => $uri]]));
 
-        $symbols = $extractor->extract($uri, 'php', $text)->symbols();
+        $symbols = $extractor->extract($uri, 'php', $text)->symbols;
         $serializerGroups = [];
         $constraints = [];
         foreach ($symbols as $symbol) {
-            self::assertStringNotContainsString('commented_', $symbol->name());
-            if (MetadataSymbolKind::SerializerGroup === $symbol->kind()) {
+            self::assertStringNotContainsString('commented_', $symbol->name);
+            if (MetadataSymbolKind::SerializerGroup === $symbol->kind) {
                 $serializerGroups[] = $symbol;
-            } elseif (MetadataSymbolKind::Constraint === $symbol->kind() && !$symbol->isDeclaration()) {
-                $constraints[] = $symbol->name();
+            } elseif (MetadataSymbolKind::Constraint === $symbol->kind && !$symbol->declaration) {
+                $constraints[] = $symbol->name;
             }
         }
         self::assertSame(['Length', 'NotBlank'], $constraints);
         self::assertCount(1, $serializerGroups);
-        self::assertSame('active_group', $serializerGroups[0]->name());
-        self::assertSame(strpos($text, 'active_group'), $converter->toByteOffset($text, $serializerGroups[0]->range()->start));
+        self::assertSame('active_group', $serializerGroups[0]->name);
+        self::assertSame(strpos($text, 'active_group'), $converter->toByteOffset($text, $serializerGroups[0]->range->start));
     }
 
     /** @return list<string> */
@@ -553,7 +553,7 @@ final class MetadataProviderTest extends TestCase
         $converter = new PositionConverter();
         $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new BalancedDelimiterMatcher());
 
-        self::assertSame($expectedPrefix, $extractor->completionContext('php', $text, \strlen($text))?->prefix());
+        self::assertSame($expectedPrefix, $extractor->completionContext('php', $text, \strlen($text))?->prefix);
     }
 
     /** @return iterable<string, array{string, ?string}> */

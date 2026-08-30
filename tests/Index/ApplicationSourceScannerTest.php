@@ -929,7 +929,7 @@ final class ObjectFactsSourceIndexProvider implements SourceIndexProviderInterfa
             throw new \UnexpectedValueException();
         }
         ++$this->restores;
-        $this->restoredUris[] = $data->uri();
+        $this->restoredUris[] = $data->uri;
     }
 
     public function finish(Project $project): void
@@ -947,7 +947,7 @@ final class ObjectFactsSourceIndexProvider implements SourceIndexProviderInterfa
             throw new \UnexpectedValueException();
         }
 
-        return $data->declarations();
+        return $data->declarations;
     }
 
     public function remove(Project $project, string $uri): void
@@ -1074,11 +1074,11 @@ final class RecordingSourceIndexProvider implements SourceIndexProviderInterface
 
     public function restore(Project $project, mixed $data): void
     {
-        if (!$data instanceof RouteSourceFacts || 1 !== \count($data->declarations())) {
+        if (!$data instanceof RouteSourceFacts || 1 !== \count($data->declarations)) {
             throw new \UnexpectedValueException();
         }
         ++$this->restores;
-        $this->sources[$data->uri()] = $data->declarations()[0]->name();
+        $this->sources[$data->uri] = $data->declarations[0]->name;
     }
 
     public function finish(Project $project): void
@@ -1098,7 +1098,7 @@ final class RecordingSourceIndexProvider implements SourceIndexProviderInterface
             throw new \UnexpectedValueException();
         }
 
-        return $data->declarations();
+        return $data->declarations;
     }
 
     public function remove(Project $project, string $uri): void
@@ -1159,10 +1159,10 @@ final class GenerationalSourceIndexProvider implements SourceIndexProviderInterf
 
     public function restore(Project $project, mixed $data): void
     {
-        if (!$data instanceof RouteSourceFacts || 1 !== \count($data->declarations())) {
+        if (!$data instanceof RouteSourceFacts || 1 !== \count($data->declarations)) {
             throw new \UnexpectedValueException();
         }
-        $this->staged[$project->rootPath][$data->uri()] = $data->declarations()[0]->name();
+        $this->staged[$project->rootPath][$data->uri] = $data->declarations[0]->name;
     }
 
     public function finish(Project $project): void
@@ -1186,7 +1186,7 @@ final class GenerationalSourceIndexProvider implements SourceIndexProviderInterf
             throw new \UnexpectedValueException();
         }
 
-        return $data->declarations();
+        return $data->declarations;
     }
 
     public function remove(Project $project, string $uri): void
@@ -1210,16 +1210,11 @@ final class GenerationalSourceIndexProvider implements SourceIndexProviderInterf
 
 final class UninitializedFacts implements SourceFactsInterface
 {
-    private string $uri;
+    public string $uri;
 
     public function __construct(string $uri)
     {
         $this->uri = $uri;
-    }
-
-    public function uri(): string
-    {
-        return $this->uri;
     }
 
     public function isEmpty(): bool

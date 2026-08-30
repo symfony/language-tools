@@ -41,12 +41,12 @@ final class ConfigurationHoverProvider implements HoverProviderInterface
             return null;
         }
         foreach ($this->yaml->parse($request->document->text, $index) as $occurrence) {
-            if (!$this->converter->containsByteOffset($request->document->text, $occurrence->keyRange(), $offset, inclusiveEnd: true)) {
+            if (!$this->converter->containsByteOffset($request->document->text, $occurrence->keyRange, $offset, inclusiveEnd: true)) {
                 continue;
             }
-            $node = $index->find($occurrence->path(), $occurrence->sequenceDepths(), $occurrence->literalDepths());
+            $node = $index->find($occurrence->path, $occurrence->sequenceDepths, $occurrence->literalDepths);
 
-            return null === $node ? null : $this->protocol->markdownHover($this->description($occurrence->path(), $node));
+            return null === $node ? null : $this->protocol->markdownHover($this->description($occurrence->path, $node));
         }
 
         return null;
@@ -55,22 +55,22 @@ final class ConfigurationHoverProvider implements HoverProviderInterface
     /** @param list<string> $path */
     private function description(array $path, ConfigurationNode $node): string
     {
-        $lines = ['`'.implode('.', $path).'`', '', 'Type: `'.$node->type().'`'];
-        if (null !== $node->info()) {
+        $lines = ['`'.implode('.', $path).'`', '', 'Type: `'.$node->type.'`'];
+        if (null !== $node->info) {
             $lines[] = '';
-            $lines[] = $node->info();
+            $lines[] = $node->info;
         }
-        if ($node->required()) {
+        if ($node->required) {
             $lines[] = '';
             $lines[] = 'Required: yes';
         }
-        if ($node->hasDefault()) {
+        if ($node->hasDefault) {
             $lines[] = '';
-            $lines[] = 'Default: '.$node->defaultSummary();
+            $lines[] = 'Default: '.$node->defaultSummary;
         }
-        if ([] !== $node->allowedValues()) {
+        if ([] !== $node->allowedValues) {
             $allowedValues = [];
-            foreach ($node->allowedValues() as $value) {
+            foreach ($node->allowedValues as $value) {
                 $allowedValues[] = match ($value) {
                     true => 'true',
                     false => 'false',
@@ -81,11 +81,11 @@ final class ConfigurationHoverProvider implements HoverProviderInterface
             $lines[] = '';
             $lines[] = 'Allowed values: `'.implode('`, `', $allowedValues).'`';
         }
-        if (null !== $node->example()) {
+        if (null !== $node->example) {
             $lines[] = '';
-            $lines[] = 'Example: `'.json_encode($node->example(), \JSON_UNESCAPED_SLASHES).'`';
+            $lines[] = 'Example: `'.json_encode($node->example, \JSON_UNESCAPED_SLASHES).'`';
         }
-        if ($node->deprecated()) {
+        if ($node->deprecated) {
             $lines[] = '';
             $lines[] = '**Deprecated**';
         }

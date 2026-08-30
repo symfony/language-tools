@@ -18,6 +18,6 @@ final class YamlConfigurationParserTest extends TestCase
         $source = "framework:\n    property-info:\n        with-hyphen: true\n";
 
         self::assertSame(['framework', 'property-info', 'with-hyphen'], $documentParser->parse($source)[2]->path);
-        self::assertSame(['framework', 'property_info', 'with_hyphen'], $configurationParser->parse($source)[2]->path());
+        self::assertSame(['framework', 'property_info', 'with_hyphen'], $configurationParser->parse($source)[2]->path);
     }
 }

@@ -71,7 +71,7 @@ final class TemplateProviderTest extends TestCase
 
         self::assertSame(
             ['base.html.twig', 'card.html.twig'],
-            array_map(static fn (TemplateReference $reference): string => $reference->name(), $references),
+            array_map(static fn (TemplateReference $reference): string => $reference->name, $references),
         );
     }
 
@@ -84,7 +84,7 @@ final class TemplateProviderTest extends TestCase
             'php',
             "<?php \$this->render('article/show.html.twig', ['article' => \$article, 'can_edit' => true]);",
         )[0];
-        self::assertSame(['article', 'can_edit'], $reference->variables());
+        self::assertSame(['article', 'can_edit'], $reference->variables);
 
         $uri = 'file:///workspace/templates/article/show.html.twig';
         $text = '{{ art }} {{ app }}';
@@ -235,8 +235,8 @@ final class TemplateProviderTest extends TestCase
         );
         $component = $indexes->forProject($project)->get('Alert');
         self::assertInstanceOf(TwigComponent::class, $component);
-        self::assertSame('App\\Twig\\Alert', $component->className());
-        self::assertSame(['title'], $component->properties());
+        self::assertSame('App\\Twig\\Alert', $component->className);
+        self::assertSame(['title'], $component->properties);
 
         $documents = new DocumentStore();
         $completionUri = 'file:///workspace/templates/completion.html.twig';
@@ -425,7 +425,7 @@ final class TemplateProviderTest extends TestCase
                 'paths' => [['namespace' => '(None)', 'path' => $root.'/templates']],
             ]]]);
 
-            self::assertSame('file://'.$root.'/templates/index.html', $indexes->forProject($project)->get('index.html')?->uri());
+            self::assertSame('file://'.$root.'/templates/index.html', $indexes->forProject($project)->get('index.html')?->uri);
         } finally {
             @unlink($root.'/templates/index.html');
             @rmdir($root.'/templates');
@@ -449,7 +449,7 @@ final class TemplateProviderTest extends TestCase
                 'paths' => [['namespace' => '(None)', 'path' => '/app/templates']],
             ]]]);
 
-            self::assertSame('file://'.$root.'/templates/index.html.twig', $indexes->forProject($project)->get('index.html.twig')?->uri());
+            self::assertSame('file://'.$root.'/templates/index.html.twig', $indexes->forProject($project)->get('index.html.twig')?->uri);
         } finally {
             @unlink($root.'/templates/index.html.twig');
             @rmdir($root.'/templates');
@@ -476,7 +476,7 @@ final class TemplateProviderTest extends TestCase
                 'paths' => [['namespace' => '(None)', 'path' => $root.'/templates']],
             ]]]);
 
-            self::assertSame('file://'.$root.'/templates/index.html.twig', $indexes->forProject($project)->get('index.html.twig')?->uri());
+            self::assertSame('file://'.$root.'/templates/index.html.twig', $indexes->forProject($project)->get('index.html.twig')?->uri);
         } finally {
             chmod($root.'/templates/admin', 0755);
             @unlink($root.'/templates/index.html.twig');
@@ -741,7 +741,7 @@ final class TemplateProviderTest extends TestCase
             $this->render('live.html.twig');
             PHP);
 
-        self::assertSame(['live.html.twig'], array_map(static fn ($reference): string => $reference->name(), $references));
+        self::assertSame(['live.html.twig'], array_map(static fn ($reference): string => $reference->name, $references));
     }
 
     public function testExtractsTemplateAttributeReferences(): void
@@ -798,7 +798,7 @@ final class TemplateProviderTest extends TestCase
                 ['product/export.html.twig', []],
                 ['product/list.html.twig', []],
             ],
-            array_map(static fn (TemplateReference $reference): array => [$reference->name(), $reference->variables()], $references),
+            array_map(static fn (TemplateReference $reference): array => [$reference->name, $reference->variables], $references),
         );
     }
 
@@ -808,7 +808,7 @@ final class TemplateProviderTest extends TestCase
         $converter = new PositionConverter();
         $context = TemplateCompletionContext::create('php', $text, $converter->toPosition($text, \strlen($text)), $converter);
 
-        self::assertSame($expectedPrefix, $context?->prefix());
+        self::assertSame($expectedPrefix, $context?->prefix);
     }
 
     /** @return iterable<string, array{string, ?string}> */

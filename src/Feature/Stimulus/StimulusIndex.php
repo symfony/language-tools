@@ -12,7 +12,7 @@ final class StimulusIndex
     {
         $this->controllers = [];
         foreach ($controllers as $controller) {
-            $this->controllers[$controller->name()] = $controller;
+            $this->controllers[$controller->name] = $controller;
         }
         ksort($this->controllers);
         $this->complete = $complete;

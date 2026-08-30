@@ -38,10 +38,10 @@ final class TemplateCompletionHandler implements CompletionProviderInterface
         }
 
         return array_map(fn (TemplateDeclaration $template): array => [
-            'label' => $template->name(),
+            'label' => $template->name,
             'kind' => 17,
-            'detail' => $template->uri(),
-            'textEdit' => $this->protocol->textEdit($context->range(), $template->name()),
-        ], $this->indexes->forProject($request->project)->matching($context->prefix()));
+            'detail' => $template->uri,
+            'textEdit' => $this->protocol->textEdit($context->range, $template->name),
+        ], $this->indexes->forProject($request->project)->matching($context->prefix));
     }
 }

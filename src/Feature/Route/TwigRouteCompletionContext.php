@@ -9,19 +9,9 @@ use Symfony\Lsp\Document\Range;
 final class TwigRouteCompletionContext
 {
     public function __construct(
-        private readonly string $prefix,
-        private readonly Range $replacementRange,
+        public readonly string $prefix,
+        public readonly Range $replacementRange,
     ) {
-    }
-
-    public function prefix(): string
-    {
-        return $this->prefix;
-    }
-
-    public function replacementRange(): Range
-    {
-        return $this->replacementRange;
     }
 
     public static function fromTwig(string $text, Position $position, PositionConverter $positionConverter): ?self

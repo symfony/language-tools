@@ -106,7 +106,7 @@ final class TwigCallableProviderTest extends TestCase
             }
             PHP;
 
-        $declarations = $extractor->extract('file:///workspace/src/Twig/AppExtension.php', $source)->declarations();
+        $declarations = $extractor->extract('file:///workspace/src/Twig/AppExtension.php', $source)->declarations;
 
         self::assertSame([
             [TwigCallableKind::Filter, 'filter_name', 'App\Twig\AppExtensionRuntime', 'doSomething', false, false, true, false, false, true],
@@ -122,21 +122,21 @@ final class TwigCallableProviderTest extends TestCase
             [TwigCallableKind::Function, 'foo', 'App\Twig\AppExtension', 'escapedAttribute', false, false, false, false, false, true],
             [TwigCallableKind::Function, 'trait_function', 'App\Twig\SharedExtension', 'traitFunction', false, false, false, false, false, true],
         ], array_map(static fn ($declaration): array => [
-            $declaration->kind(),
-            $declaration->name(),
-            $declaration->className(),
-            $declaration->method(),
-            $declaration->needsCharset(),
-            $declaration->needsEnvironment(),
-            $declaration->needsContext(),
-            $declaration->needsIsSandboxed(),
-            $declaration->isVariadic(),
-            $declaration->optionsKnown(),
+            $declaration->kind,
+            $declaration->name,
+            $declaration->className,
+            $declaration->method,
+            $declaration->needsCharset,
+            $declaration->needsEnvironment,
+            $declaration->needsContext,
+            $declaration->needsIsSandboxed,
+            $declaration->variadic,
+            $declaration->optionsKnown,
         ], $declarations));
         $functionOffset = strpos($source, 'function_name');
         self::assertIsInt($functionOffset);
-        self::assertSame($converter->toPosition($source, $functionOffset)->line, $declarations[2]->range()->start->line);
-        self::assertSame($converter->toPosition($source, $functionOffset)->character, $declarations[2]->range()->start->character);
+        self::assertSame($converter->toPosition($source, $functionOffset)->line, $declarations[2]->range->start->line);
+        self::assertSame($converter->toPosition($source, $functionOffset)->character, $declarations[2]->range->start->character);
     }
 
     public function testIgnoresIncompleteAttributedDeclarations(): void
@@ -155,9 +155,9 @@ final class TwigCallableProviderTest extends TestCase
             }
             PHP;
 
-        $declarations = $this->declarationExtractor(new PositionConverter())->extract('file:///workspace/src/Twig/AppExtension.php', $source)->declarations();
+        $declarations = $this->declarationExtractor(new PositionConverter())->extract('file:///workspace/src/Twig/AppExtension.php', $source)->declarations;
 
-        self::assertSame(['complete'], array_map(static fn ($declaration): string => $declaration->name(), $declarations));
+        self::assertSame(['complete'], array_map(static fn ($declaration): string => $declaration->name, $declarations));
     }
 
     public function testProvidesHoverAndDefinitionForCustomTwigFunctionsAndFilters(): void

@@ -19,14 +19,14 @@ final class MetadataSourceIndexTest extends TestCase
         $first = $this->facts('file:///entity.php', 'first');
         $index->replace($first);
 
-        self::assertSame([$first->symbols()[0]], $index->symbols(MetadataSymbolKind::SerializerGroup, 'first'));
+        self::assertSame([$first->symbols[0]], $index->symbols(MetadataSymbolKind::SerializerGroup, 'first'));
         self::assertSame(['first'], $index->names(MetadataSymbolKind::SerializerGroup));
 
         $second = $this->facts('file:///entity.php', 'second');
         $index->replaceSource($second);
 
         self::assertSame([], $index->symbols(MetadataSymbolKind::SerializerGroup, 'first'));
-        self::assertSame([$second->symbols()[0]], $index->symbols(MetadataSymbolKind::SerializerGroup, 'second'));
+        self::assertSame([$second->symbols[0]], $index->symbols(MetadataSymbolKind::SerializerGroup, 'second'));
         self::assertSame(['second'], $index->names(MetadataSymbolKind::SerializerGroup));
     }
 
@@ -47,7 +47,7 @@ final class MetadataSourceIndexTest extends TestCase
         );
         $index->overlay($this->facts('file:///first.php', 'overlay-first'));
 
-        self::assertSame(['overlay-first', 'saved-second'], array_map(static fn (MetadataSourceSymbol $symbol): string => $symbol->name(), $index->symbols(MetadataSymbolKind::SerializerGroup)));
+        self::assertSame(['overlay-first', 'saved-second'], array_map(static fn (MetadataSourceSymbol $symbol): string => $symbol->name, $index->symbols(MetadataSymbolKind::SerializerGroup)));
     }
 
     public function testIndexesAndReplacesFormDataClasses(): void

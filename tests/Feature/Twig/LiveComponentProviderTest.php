@@ -134,8 +134,8 @@ final class LiveComponentProviderTest extends TestCase
                 public string $title;
             PHP);
 
-        self::assertSame(['Card'], array_map(static fn ($component): string => $component->name(), $facts->components()));
-        self::assertSame(['title'], $facts->components()[0]->properties());
+        self::assertSame(['Card'], array_map(static fn ($component): string => $component->name, $facts->components));
+        self::assertSame(['title'], $facts->components[0]->properties);
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
@@ -224,7 +224,7 @@ final class LiveComponentProviderTest extends TestCase
                 ['alpha:named', 'Alpha'],
                 ['beta:done', 'Beta'],
             ],
-            array_map(static fn ($event): array => [$event->name(), $event->component()], $facts->events()),
+            array_map(static fn ($event): array => [$event->name, $event->component], $facts->events),
         );
     }
 
@@ -252,6 +252,6 @@ final class LiveComponentProviderTest extends TestCase
             }
             PHP);
 
-        self::assertSame(['live:event'], array_map(static fn ($event): string => $event->name(), $facts->events()));
+        self::assertSame(['live:event'], array_map(static fn ($event): string => $event->name, $facts->events));
     }
 }

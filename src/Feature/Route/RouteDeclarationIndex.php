@@ -19,7 +19,7 @@ final class RouteDeclarationIndex
     {
         $this->declarations = array_values(array_filter(
             $this->declarations,
-            static fn (RouteDeclaration $declaration): bool => $declaration->uri() !== $uri,
+            static fn (RouteDeclaration $declaration): bool => $declaration->uri !== $uri,
         ));
         array_push($this->declarations, ...$declarations);
     }
@@ -46,13 +46,13 @@ final class RouteDeclarationIndex
     {
         $declarations = [];
         foreach ($this->declarations as $declaration) {
-            if ($declaration->name() === $name && !isset($this->overlays[$declaration->uri()])) {
+            if ($declaration->name === $name && !isset($this->overlays[$declaration->uri])) {
                 $declarations[] = $declaration;
             }
         }
         foreach ($this->overlays as $overlayDeclarations) {
             foreach ($overlayDeclarations as $declaration) {
-                if ($declaration->name() === $name) {
+                if ($declaration->name === $name) {
                     $declarations[] = $declaration;
                 }
             }

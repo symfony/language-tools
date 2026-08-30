@@ -61,13 +61,13 @@ PHP;
         $facts = $extractor->extract('file:///workspace/src/Subscriber.php', 'php', $php);
         $names = [];
         $declarations = 0;
-        foreach ($facts->symbols() as $symbol) {
-            $names[$symbol->name()] = true;
-            $declarations += $symbol->isDeclaration() ? 1 : 0;
+        foreach ($facts->symbols as $symbol) {
+            $names[$symbol->name] = true;
+            $declarations += $symbol->declaration ? 1 : 0;
         }
         self::assertSame(['App\\Event\\OrderPlaced', 'legacy.order_placed'], array_keys($names));
         self::assertSame(3, $declarations);
-        self::assertSame(3, \count($facts->symbols()) - $declarations);
+        self::assertSame(3, \count($facts->symbols) - $declarations);
 
         $yaml = <<<'YAML'
 services:
@@ -75,7 +75,7 @@ services:
     tags:
       - { name: kernel.event_listener, event: legacy.order_placed }
 YAML;
-        self::assertSame('legacy.order_placed', $extractor->extract('file:///workspace/config/services.yaml', 'yaml', $yaml)->symbols()[0]->name());
+        self::assertSame('legacy.order_placed', $extractor->extract('file:///workspace/config/services.yaml', 'yaml', $yaml)->symbols[0]->name);
     }
 
     public function testScopesEventDispatcherParametersToTheirMethod(): void
@@ -101,7 +101,7 @@ YAML;
             }
             PHP);
 
-        self::assertSame(['App\ExpectedEvent'], array_map(static fn ($symbol): string => $symbol->name(), $facts->symbols()));
+        self::assertSame(['App\ExpectedEvent'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
     }
 
     public function testCompletesHoversNavigatesDiagnosesAndProvidesCodeLenses(): void
@@ -222,8 +222,8 @@ PHP;
 
         $facts = $extractor->extract('file:///workspace/src/Listener.php', 'php', $text);
 
-        self::assertSame([], $facts->symbols());
-        self::assertSame([], $facts->listeners());
+        self::assertSame([], $facts->symbols);
+        self::assertSame([], $facts->listeners);
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */

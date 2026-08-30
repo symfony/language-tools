@@ -345,8 +345,8 @@ final class YamlDependencyInjectionExtractor
     {
         $unique = [];
         foreach ($references as $reference) {
-            $key = $reference->kind()->value.'\0'.$reference->name().'\0'
-                .$reference->range()->start->line.'\0'.$reference->range()->start->character;
+            $key = $reference->kind->value.'\0'.$reference->name.'\0'
+                .$reference->range->start->line.'\0'.$reference->range->start->character;
             $unique[$key] = $reference;
         }
 

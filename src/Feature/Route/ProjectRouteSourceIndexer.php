@@ -39,7 +39,7 @@ final class ProjectRouteSourceIndexer extends AbstractSourceIndexer
             throw new \UnexpectedValueException('The route source facts are invalid.');
         }
 
-        return $data->declarations();
+        return $data->declarations;
     }
 
     protected function factsClass(): string
@@ -75,10 +75,10 @@ final class ProjectRouteSourceIndexer extends AbstractSourceIndexer
 
         return new RouteSourceFacts($uri, $declarations, array_map(
             static fn (RouteReference $reference): RouteReferenceLocation => new RouteReferenceLocation(
-                $reference->name(),
+                $reference->name,
                 $uri,
-                $reference->range(),
-                $reference->controllerClass(),
+                $reference->range,
+                $reference->controllerClass,
             ),
             $references,
         ));

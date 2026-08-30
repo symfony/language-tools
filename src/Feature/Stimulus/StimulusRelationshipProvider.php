@@ -26,29 +26,29 @@ final class StimulusRelationshipProvider implements DefinitionProviderInterface,
             return null;
         }
         [$reference, $project] = $resolved;
-        $controller = $this->indexes->forProject($project)->controller($reference->controller());
-        $declarations = $this->sourceIndexes->forProject($project)->declarations($reference->controller());
+        $controller = $this->indexes->forProject($project)->controller($reference->controller);
+        $declarations = $this->sourceIndexes->forProject($project)->declarations($reference->controller);
         if (null === $controller && [] === $declarations) {
             return null;
         }
-        if (null !== $reference->kind() && null !== $reference->member()) {
-            if (!\in_array($reference->member(), $this->stimulus->members($project, $reference->controller(), $reference->kind()), true)) {
+        if (null !== $reference->kind && null !== $reference->member) {
+            if (!\in_array($reference->member, $this->stimulus->members($project, $reference->controller, $reference->kind), true)) {
                 return null;
             }
 
-            return $this->protocol->markdownHover(\sprintf('Stimulus %s: `%s#%s`', $reference->kind()->value, $reference->controller(), $reference->member()));
+            return $this->protocol->markdownHover(\sprintf('Stimulus %s: `%s#%s`', $reference->kind->value, $reference->controller, $reference->member));
         }
-        $details = [\sprintf('Stimulus controller: `%s`', $reference->controller())];
-        $source = $controller?->sourcePath() ?? (isset($declarations[0]) ? $this->uriConverter->convert($declarations[0]->uri()) : null);
+        $details = [\sprintf('Stimulus controller: `%s`', $reference->controller)];
+        $source = $controller->sourcePath ?? (isset($declarations[0]) ? $this->uriConverter->convert($declarations[0]->uri) : null);
         if (null !== $source) {
             $details[] = \sprintf('Source: `%s`', $source);
         }
-        $details[] = 'Lazy: '.($controller?->isLazy() || ($declarations[0] ?? null)?->isLazy() ? 'yes' : 'no');
+        $details[] = 'Lazy: '.($controller?->lazy || ($declarations[0] ?? null)?->lazy ? 'yes' : 'no');
         if (null !== $controller) {
-            $details[] = 'Vendor: '.($controller->isVendor() ? 'yes' : 'no');
+            $details[] = 'Vendor: '.($controller->vendor ? 'yes' : 'no');
         }
         foreach (StimulusMemberKind::cases() as $kind) {
-            $members = $this->stimulus->members($project, $reference->controller(), $kind);
+            $members = $this->stimulus->members($project, $reference->controller, $kind);
             if ([] !== $members) {
                 $details[] = ucfirst($kind->value).'s: `'.implode('`, `', $members).'`';
             }
@@ -68,12 +68,12 @@ final class StimulusRelationshipProvider implements DefinitionProviderInterface,
         if ([] !== $locations) {
             return $locations;
         }
-        if (null !== $reference->kind() && (null === $reference->member() || !\in_array($reference->member(), $this->stimulus->members($project, $reference->controller(), $reference->kind()), true))) {
+        if (null !== $reference->kind && (null === $reference->member || !\in_array($reference->member, $this->stimulus->members($project, $reference->controller, $reference->kind), true))) {
             return [];
         }
-        $controller = $this->indexes->forProject($project)->controller($reference->controller());
+        $controller = $this->indexes->forProject($project)->controller($reference->controller);
 
-        return null === $controller ? [] : [['uri' => $this->uriConverter->toUri($controller->sourcePath()), 'range' => $this->protocol->zeroRange()]];
+        return null === $controller ? [] : [['uri' => $this->uriConverter->toUri($controller->sourcePath), 'range' => $this->protocol->zeroRange()]];
     }
 
     public function references(array $params): ?array
@@ -84,8 +84,8 @@ final class StimulusRelationshipProvider implements DefinitionProviderInterface,
         }
         [$reference, $project] = $resolved;
         $locations = $this->stimulus->declarationLocations($project, $reference);
-        foreach ($this->sourceIndexes->forProject($project)->references($reference->controller(), $reference->kind(), $reference->member()) as $candidate) {
-            $locations[] = $this->protocol->location($candidate->uri(), $candidate->range());
+        foreach ($this->sourceIndexes->forProject($project)->references($reference->controller, $reference->kind, $reference->member) as $candidate) {
+            $locations[] = $this->protocol->location($candidate->uri, $candidate->range);
         }
 
         return $locations;

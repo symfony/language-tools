@@ -25,21 +25,21 @@ final readonly class TranslationReferenceResolver
         $text = $request->document->text;
         $offset = $this->positions->toByteOffset($text, $request->position);
         $facts = $this->extractor->extract($request->document->uri, $request->document->languageId, $text);
-        foreach ($facts->declarations() as $declaration) {
-            if ($this->positions->containsByteOffset($text, $declaration->range(), $offset, inclusiveEnd: true)) {
+        foreach ($facts->declarations as $declaration) {
+            if ($this->positions->containsByteOffset($text, $declaration->range, $offset, inclusiveEnd: true)) {
                 return new ResolvedTranslationReference(
                     new TranslationReference(
-                        $declaration->key(),
-                        $declaration->domain(),
+                        $declaration->key,
+                        $declaration->domain,
                         $request->document->uri,
-                        $declaration->range(),
+                        $declaration->range,
                     ),
                     $request->project,
                 );
             }
         }
-        foreach ($facts->references() as $reference) {
-            if ($this->positions->containsByteOffset($text, $reference->range(), $offset, inclusiveEnd: true)) {
+        foreach ($facts->references as $reference) {
+            if ($this->positions->containsByteOffset($text, $reference->range, $offset, inclusiveEnd: true)) {
                 return new ResolvedTranslationReference($reference, $request->project);
             }
         }

@@ -26,7 +26,7 @@ final class RouteReferenceIndex
     {
         $this->references = array_values(array_filter(
             $this->references,
-            static fn (RouteReferenceLocation $reference): bool => $reference->uri() !== $uri,
+            static fn (RouteReferenceLocation $reference): bool => $reference->uri !== $uri,
         ));
         array_push($this->references, ...$references);
     }
@@ -53,13 +53,13 @@ final class RouteReferenceIndex
     {
         $references = [];
         foreach ($this->references as $reference) {
-            if ($reference->name() === $name && !isset($this->overlays[$reference->uri()]) && $this->isSupported($reference)) {
+            if ($reference->name === $name && !isset($this->overlays[$reference->uri]) && $this->isSupported($reference)) {
                 $references[] = $reference;
             }
         }
         foreach ($this->overlays as $overlayReferences) {
             foreach ($overlayReferences as $reference) {
-                if ($reference->name() === $name && $this->isSupported($reference)) {
+                if ($reference->name === $name && $this->isSupported($reference)) {
                     $references[] = $reference;
                 }
             }
@@ -70,9 +70,9 @@ final class RouteReferenceIndex
 
     private function isSupported(RouteReferenceLocation $reference): bool
     {
-        return null === $reference->controllerClass()
+        return null === $reference->controllerClass
             || $this->classIndex->isSubclassOf(
-                $reference->controllerClass(),
+                $reference->controllerClass,
                 'Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController',
             );
     }

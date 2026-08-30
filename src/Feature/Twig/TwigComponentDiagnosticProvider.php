@@ -37,12 +37,12 @@ final class TwigComponentDiagnosticProvider implements DiagnosticProviderInterfa
             return null;
         }
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->project, $request->document->uri, 'twig', $request->document->text)->references() as $reference) {
-            $name = $reference->name();
+        foreach ($this->extractor->extract($request->project, $request->document->uri, 'twig', $request->document->text)->references as $reference) {
+            $name = $reference->name;
             if (null !== $index->get($name) || $index->hasRuntimeName($name) || $this->components->anonymousTemplateExists($request->project, $name)) {
                 continue;
             }
-            $diagnostics[] = $this->protocol->diagnostic($reference->range(), 1, 'twig_component.not_found', \sprintf('Twig component "%s" does not exist.', $name));
+            $diagnostics[] = $this->protocol->diagnostic($reference->range, 1, 'twig_component.not_found', \sprintf('Twig component "%s" does not exist.', $name));
         }
 
         return $diagnostics;

@@ -34,8 +34,8 @@ final class RouteDefinitionHandler implements DefinitionProviderInterface
         }
 
         return array_map(
-            fn (RouteDeclaration $declaration): array => $this->protocol->location($declaration->uri(), $declaration->range()),
-            $this->declarationIndexes->forProject($request->project)->find($symbol->name()),
+            fn (RouteDeclaration $declaration): array => $this->protocol->location($declaration->uri, $declaration->range),
+            $this->declarationIndexes->forProject($request->project)->find($symbol->name),
         );
     }
 }

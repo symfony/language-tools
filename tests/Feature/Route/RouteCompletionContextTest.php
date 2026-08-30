@@ -31,7 +31,7 @@ final class RouteCompletionContextTest extends TestCase
             static fn (string $source): bool => $extractor->isSymfonyReceiver($source, new DependencyInjectionSourceIndex()),
         );
 
-        self::assertSame($prefix, $context?->prefix());
+        self::assertSame($prefix, $context?->prefix);
     }
 
     /**

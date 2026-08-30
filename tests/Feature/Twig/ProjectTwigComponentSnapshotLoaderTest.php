@@ -39,9 +39,9 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
         // UX Icons registers UX:Icon with a case-insensitive renderer alias
         $vendor = $index->get('ux:icon');
         self::assertNotNull($vendor);
-        self::assertSame('file:///workspace/vendor/symfony/ux-icons/src/Twig/UXIconComponent.php', $vendor->uri());
-        self::assertSame('Symfony\UX\Icons\Twig\UXIconComponent', $vendor->className());
-        self::assertSame('@UXIcons/Icon.html.twig', $vendor->template());
+        self::assertSame('file:///workspace/vendor/symfony/ux-icons/src/Twig/UXIconComponent.php', $vendor->uri);
+        self::assertSame('Symfony\UX\Icons\Twig\UXIconComponent', $vendor->className);
+        self::assertSame('@UXIcons/Icon.html.twig', $vendor->template);
         self::assertNotNull($index->get('UX:Icon'));
         self::assertNull($index->get('broken'));
         self::assertTrue($index->isRuntimeComplete());

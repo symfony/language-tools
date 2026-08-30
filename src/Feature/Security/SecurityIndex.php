@@ -24,17 +24,17 @@ final class SecurityIndex
     {
         $this->firewalls = [];
         foreach ($firewalls as $firewall) {
-            $this->firewalls[$firewall->name()] = $firewall;
+            $this->firewalls[$firewall->name] = $firewall;
         }
         ksort($this->firewalls);
         $this->providers = [];
         foreach ($providers as $provider) {
-            $this->providers[$provider->name()] = $provider;
+            $this->providers[$provider->name] = $provider;
         }
         ksort($this->providers);
         $this->roles = [];
         foreach ($roles as $role) {
-            $this->roles[$role->name()] = $role;
+            $this->roles[$role->name] = $role;
         }
         ksort($this->roles);
         $this->voters = $voters;

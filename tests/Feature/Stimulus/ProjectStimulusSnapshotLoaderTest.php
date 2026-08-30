@@ -35,13 +35,13 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
         self::assertTrue($index->isComplete());
         $controller = $index->controller('search');
         self::assertInstanceOf(StimulusController::class, $controller);
-        self::assertSame('/workspace/assets/controllers/search_controller.js', $controller->sourcePath());
-        self::assertTrue($controller->isLazy());
-        self::assertSame(['open'], $controller->actions());
-        self::assertSame(['results'], $controller->targets());
-        self::assertSame(['url'], $controller->values());
-        self::assertSame(['dialog'], $controller->outlets());
-        self::assertSame(['loading'], $controller->classes());
+        self::assertSame('/workspace/assets/controllers/search_controller.js', $controller->sourcePath);
+        self::assertTrue($controller->lazy);
+        self::assertSame(['open'], $controller->actions);
+        self::assertSame(['results'], $controller->targets);
+        self::assertSame(['url'], $controller->values);
+        self::assertSame(['dialog'], $controller->outlets);
+        self::assertSame(['loading'], $controller->classes);
     }
 
     public function testMapsContainerSourcePathsToTheHost(): void
@@ -62,7 +62,7 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
 
         self::assertSame(
             '/workspace/assets/controllers/search_controller.js',
-            $indexes->forProject($project)->controller('search')?->sourcePath(),
+            $indexes->forProject($project)->controller('search')?->sourcePath,
         );
     }
 }

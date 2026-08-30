@@ -10,33 +10,10 @@ final class RouteReference
      * @param list<string>|null $providedParameters
      */
     public function __construct(
-        private readonly string $name,
-        private readonly Range $range,
-        private readonly ?array $providedParameters = null,
-        private readonly ?string $controllerClass = null,
+        public readonly string $name,
+        public readonly Range $range,
+        public readonly ?array $providedParameters = null,
+        public readonly ?string $controllerClass = null,
     ) {
-    }
-
-    public function name(): string
-    {
-        return $this->name;
-    }
-
-    public function range(): Range
-    {
-        return $this->range;
-    }
-
-    /**
-     * @return list<string>|null
-     */
-    public function providedParameters(): ?array
-    {
-        return $this->providedParameters;
-    }
-
-    public function controllerClass(): ?string
-    {
-        return $this->controllerClass;
     }
 }

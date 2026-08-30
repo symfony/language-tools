@@ -30,8 +30,8 @@ final class EnvironmentSourceIndexer extends AbstractSourceIndexer
         }
 
         return [
-            ...$data->declarations(),
-            ...$data->references(),
+            ...$data->declarations,
+            ...$data->references,
         ];
     }
 

@@ -18,17 +18,17 @@ final class MessengerSourceIndexTest extends TestCase
         $first = $this->facts('FirstMessage', ['App\\ParentMessage']);
         $index->replace($first);
 
-        self::assertSame([$first->symbols()[0]], $index->symbols(MessengerSymbolKind::Message, 'App\\FirstMessage'));
+        self::assertSame([$first->symbols[0]], $index->symbols(MessengerSymbolKind::Message, 'App\\FirstMessage'));
         self::assertSame(['App\\ParentMessage'], $index->ancestors('\\App\\FirstMessage'));
 
         $second = $this->facts('SecondMessage', ['App\\IntermediateMessage']);
         $parent = $this->facts('IntermediateMessage', ['App\\RootMessage']);
         $index->replaceSource($second);
         $index->replaceSource($parent);
-        $index->removeSource($first->uri());
+        $index->removeSource($first->uri);
 
         self::assertSame([], $index->symbols(MessengerSymbolKind::Message, 'App\\FirstMessage'));
-        self::assertSame([$second->symbols()[0]], $index->symbols(MessengerSymbolKind::Message, 'App\\SecondMessage'));
+        self::assertSame([$second->symbols[0]], $index->symbols(MessengerSymbolKind::Message, 'App\\SecondMessage'));
         self::assertSame(['App\\IntermediateMessage', 'App\\RootMessage'], $index->ancestors('App\\SecondMessage'));
     }
 

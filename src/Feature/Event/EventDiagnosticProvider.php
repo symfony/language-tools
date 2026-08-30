@@ -27,12 +27,12 @@ final class EventDiagnosticProvider implements DiagnosticProviderInterface
             return null;
         }
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->invalidListenerMethods() as $listener) {
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->invalidListenerMethods as $listener) {
             $diagnostics[] = $this->protocol->diagnostic(
-                $listener->range(),
+                $listener->range,
                 1,
                 'event.invalid_listener_method',
-                \sprintf('Event listener method "%s::%s" does not exist.', $listener->className(), $listener->method()),
+                \sprintf('Event listener method "%s::%s" does not exist.', $listener->className, $listener->method),
             );
         }
 

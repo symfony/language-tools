@@ -24,10 +24,10 @@ final class StimulusResolver
     {
         $names = [];
         foreach ($this->indexes->forProject($project)->controllers() as $controller) {
-            $names[$controller->name()] = true;
+            $names[$controller->name] = true;
         }
         foreach ($this->sourceIndexes->forProject($project)->declarations() as $declaration) {
-            $names[$declaration->name()] = true;
+            $names[$declaration->name] = true;
         }
         $names = array_keys($names);
         sort($names);
@@ -40,20 +40,20 @@ final class StimulusResolver
     {
         $controller = $this->indexes->forProject($project)->controller($controllerName);
         $members = null === $controller ? [] : match ($kind) {
-            StimulusMemberKind::Action => $controller->actions(),
-            StimulusMemberKind::ClassName => $controller->classes(),
-            StimulusMemberKind::Outlet => $controller->outlets(),
-            StimulusMemberKind::Target => $controller->targets(),
-            StimulusMemberKind::Value => $controller->values(),
+            StimulusMemberKind::Action => $controller->actions,
+            StimulusMemberKind::ClassName => $controller->classes,
+            StimulusMemberKind::Outlet => $controller->outlets,
+            StimulusMemberKind::Target => $controller->targets,
+            StimulusMemberKind::Value => $controller->values,
         };
         $unique = [];
         foreach ($members as $member) {
             $unique[$member] = true;
         }
         foreach ($this->sourceIndexes->forProject($project)->declarations($controllerName) as $declaration) {
-            foreach ($declaration->members() as $member) {
-                if ($kind === $member->kind()) {
-                    $unique[$member->name()] = true;
+            foreach ($declaration->members as $member) {
+                if ($kind === $member->kind) {
+                    $unique[$member->name] = true;
                 }
             }
         }
@@ -76,19 +76,19 @@ final class StimulusResolver
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
         $facts = $this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text);
-        foreach ($facts->references() as $reference) {
-            if ($this->converter->containsByteOffset($request->document->text, $reference->range(), $offset, inclusiveEnd: true)) {
+        foreach ($facts->references as $reference) {
+            if ($this->converter->containsByteOffset($request->document->text, $reference->range, $offset, inclusiveEnd: true)) {
                 return [$reference, $request->project];
             }
         }
-        foreach ($facts->declarations() as $declaration) {
-            foreach ($declaration->members() as $member) {
-                if ($this->converter->containsByteOffset($request->document->text, $member->range(), $offset, inclusiveEnd: true)) {
-                    return [new StimulusReference($declaration->name(), $member->kind(), $member->name(), $declaration->uri(), $member->range()), $request->project];
+        foreach ($facts->declarations as $declaration) {
+            foreach ($declaration->members as $member) {
+                if ($this->converter->containsByteOffset($request->document->text, $member->range, $offset, inclusiveEnd: true)) {
+                    return [new StimulusReference($declaration->name, $member->kind, $member->name, $declaration->uri, $member->range), $request->project];
                 }
             }
-            if ($this->converter->containsByteOffset($request->document->text, $declaration->range(), $offset, inclusiveEnd: true)) {
-                return [new StimulusReference($declaration->name(), null, null, $declaration->uri(), $declaration->range()), $request->project];
+            if ($this->converter->containsByteOffset($request->document->text, $declaration->range, $offset, inclusiveEnd: true)) {
+                return [new StimulusReference($declaration->name, null, null, $declaration->uri, $declaration->range), $request->project];
             }
         }
 
@@ -99,14 +99,14 @@ final class StimulusResolver
     public function declarationLocations(Project $project, StimulusReference $reference): array
     {
         $locations = [];
-        foreach ($this->sourceIndexes->forProject($project)->declarations($reference->controller()) as $declaration) {
-            if (null === $reference->kind()) {
-                $locations[] = $this->protocol->location($declaration->uri(), $declaration->range());
+        foreach ($this->sourceIndexes->forProject($project)->declarations($reference->controller) as $declaration) {
+            if (null === $reference->kind) {
+                $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
                 continue;
             }
-            foreach ($declaration->members() as $member) {
-                if ($reference->kind() === $member->kind() && $reference->member() === $member->name()) {
-                    $locations[] = $this->protocol->location($declaration->uri(), $member->range());
+            foreach ($declaration->members as $member) {
+                if ($reference->kind === $member->kind && $reference->member === $member->name) {
+                    $locations[] = $this->protocol->location($declaration->uri, $member->range);
                 }
             }
         }

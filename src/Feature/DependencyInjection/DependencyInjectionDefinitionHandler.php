@@ -36,44 +36,44 @@ final class DependencyInjectionDefinitionHandler implements DefinitionProviderIn
 
         $index = $this->sourceIndexes->forProject($request->project);
         $locations = [];
-        if (DependencyInjectionSymbolKind::Parameter === $symbol->kind()) {
-            foreach ($index->parameterDeclarations($symbol->name()) as $declaration) {
-                $locations[] = $this->protocol->location($declaration->uri(), $declaration->range());
+        if (DependencyInjectionSymbolKind::Parameter === $symbol->kind) {
+            foreach ($index->parameterDeclarations($symbol->name) as $declaration) {
+                $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
             }
 
             return $locations;
         }
 
-        $serviceNames = [$symbol->name()];
-        $runtimeService = $this->serviceIndexes->forProject($request->project)->get($symbol->name());
-        if (null !== $runtimeService?->alias()) {
-            $serviceNames[] = $runtimeService->alias();
+        $serviceNames = [$symbol->name];
+        $runtimeService = $this->serviceIndexes->forProject($request->project)->get($symbol->name);
+        if (null !== $runtimeService?->alias) {
+            $serviceNames[] = $runtimeService->alias;
         }
-        foreach ($index->serviceDeclarations($symbol->name()) as $declaration) {
-            $locations[] = $this->protocol->location($declaration->uri(), $declaration->range());
-            if (null !== $declaration->alias()) {
-                $serviceNames[] = $declaration->alias();
+        foreach ($index->serviceDeclarations($symbol->name) as $declaration) {
+            $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
+            if (null !== $declaration->alias) {
+                $serviceNames[] = $declaration->alias;
             }
         }
-        foreach ($index->decoratorsOf($symbol->name()) as $declaration) {
-            $locations[] = $this->protocol->location($declaration->uri(), $declaration->range());
+        foreach ($index->decoratorsOf($symbol->name) as $declaration) {
+            $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
         }
 
         $classNames = [];
         foreach (array_values(array_unique($serviceNames)) as $serviceName) {
             $service = $this->serviceIndexes->forProject($request->project)->get($serviceName);
-            if (null !== $service?->className()) {
-                $classNames[] = $service->className();
+            if (null !== $service?->className) {
+                $classNames[] = $service->className;
             }
             foreach ($index->serviceDeclarations($serviceName) as $declaration) {
-                if (null !== $declaration->className()) {
-                    $classNames[] = $declaration->className();
+                if (null !== $declaration->className) {
+                    $classNames[] = $declaration->className;
                 }
             }
         }
         foreach (array_values(array_unique($classNames)) as $className) {
             foreach ($index->classDeclarations($className) as $declaration) {
-                $locations[] = $this->protocol->location($declaration->uri(), $declaration->range());
+                $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
             }
         }
 

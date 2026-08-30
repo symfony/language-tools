@@ -21,11 +21,11 @@ final class SecuritySourceIndexTest extends TestCase
         );
         $index->overlay($this->facts('file:///first.php', 'ROLE_USER'));
 
-        self::assertSame(['file:///second.php', 'file:///first.php'], array_map(static fn (SecuritySourceSymbol $symbol): string => $symbol->uri(), $index->symbols(SecuritySymbolKind::Role, 'ROLE_USER')));
+        self::assertSame(['file:///second.php', 'file:///first.php'], array_map(static fn (SecuritySourceSymbol $symbol): string => $symbol->uri, $index->symbols(SecuritySymbolKind::Role, 'ROLE_USER')));
 
         $index->removeOverlay('file:///first.php');
 
-        self::assertSame(['file:///first.php', 'file:///second.php'], array_map(static fn (SecuritySourceSymbol $symbol): string => $symbol->uri(), $index->symbols(SecuritySymbolKind::Role, 'ROLE_USER')));
+        self::assertSame(['file:///first.php', 'file:///second.php'], array_map(static fn (SecuritySourceSymbol $symbol): string => $symbol->uri, $index->symbols(SecuritySymbolKind::Role, 'ROLE_USER')));
     }
 
     public function testInvalidatesCachedSymbolsAndNames(): void
@@ -34,7 +34,7 @@ final class SecuritySourceIndexTest extends TestCase
         $first = $this->facts('file:///security.php', 'ROLE_FIRST', true);
         $index->replace($first);
 
-        self::assertSame([$first->symbols()[0]], $index->symbols(SecuritySymbolKind::Role, 'ROLE_FIRST'));
+        self::assertSame([$first->symbols[0]], $index->symbols(SecuritySymbolKind::Role, 'ROLE_FIRST'));
         self::assertSame(['ROLE_FIRST'], $index->names(SecuritySymbolKind::Role));
         self::assertSame(['ROLE_FIRST'], $index->declarationNames(SecuritySymbolKind::Role));
 
@@ -42,7 +42,7 @@ final class SecuritySourceIndexTest extends TestCase
         $index->replaceSource($second);
 
         self::assertSame([], $index->symbols(SecuritySymbolKind::Role, 'ROLE_FIRST'));
-        self::assertSame([$second->symbols()[0]], $index->symbols(SecuritySymbolKind::Role, 'ROLE_SECOND'));
+        self::assertSame([$second->symbols[0]], $index->symbols(SecuritySymbolKind::Role, 'ROLE_SECOND'));
         self::assertSame(['ROLE_SECOND'], $index->names(SecuritySymbolKind::Role));
         self::assertSame([], $index->declarationNames(SecuritySymbolKind::Role));
     }

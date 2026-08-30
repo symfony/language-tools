@@ -35,46 +35,46 @@ final class DependencyInjectionHoverHandler implements HoverProviderInterface
             return null;
         }
 
-        if (DependencyInjectionSymbolKind::Parameter === $symbol->kind()) {
-            $parameter = $this->parameterIndexes->forProject($request->project)->get($symbol->name());
-            $declarations = $this->sourceIndexes->forProject($request->project)->parameterDeclarations($symbol->name());
+        if (DependencyInjectionSymbolKind::Parameter === $symbol->kind) {
+            $parameter = $this->parameterIndexes->forProject($request->project)->get($symbol->name);
+            $declarations = $this->sourceIndexes->forProject($request->project)->parameterDeclarations($symbol->name);
             if (null === $parameter && [] === $declarations) {
                 return null;
             }
 
-            $details = [\sprintf('Parameter: `%s`', $symbol->name())];
-            if (null !== $parameter?->deprecation()) {
-                $details[] = 'Deprecated: '.$parameter->deprecation();
+            $details = [\sprintf('Parameter: `%s`', $symbol->name)];
+            if (null !== $parameter?->deprecation) {
+                $details[] = 'Deprecated: '.$parameter->deprecation;
             }
 
             return $this->protocol->markdownHover(implode("\n\n", $details));
         }
 
-        $service = $this->serviceIndexes->forProject($request->project)->get($symbol->name());
-        $declaration = $this->sourceIndexes->forProject($request->project)->serviceDeclarations($symbol->name())[0] ?? null;
+        $service = $this->serviceIndexes->forProject($request->project)->get($symbol->name);
+        $declaration = $this->sourceIndexes->forProject($request->project)->serviceDeclarations($symbol->name)[0] ?? null;
         if (null === $service && null === $declaration) {
             return null;
         }
 
-        $details = [\sprintf('Service: `%s`', $symbol->name())];
-        $alias = $service?->alias() ?? $declaration?->alias();
-        $className = $service?->className() ?? $declaration?->className();
-        $decorates = $service?->decorates() ?? $declaration?->decorates();
-        $tags = $service?->tags() ?? $declaration?->tags() ?? [];
+        $details = [\sprintf('Service: `%s`', $symbol->name)];
+        $alias = $service->alias ?? $declaration?->alias;
+        $className = $service->className ?? $declaration?->className;
+        $decorates = $service->decorates ?? $declaration?->decorates;
+        $tags = $service->tags ?? $declaration->tags ?? [];
         if (null !== $alias) {
             $details[] = \sprintf('Alias of: `%s`', $alias);
         }
         if (null !== $className) {
             $details[] = \sprintf('Class: `%s`', $className);
         }
-        if (null !== $service?->isPublic()) {
-            $details[] = 'Visibility: '.($service->isPublic() ? 'public' : 'private');
+        if (null !== $service?->public) {
+            $details[] = 'Visibility: '.($service->public ? 'public' : 'private');
         }
-        if (true === $service?->isLazy()) {
+        if (true === $service?->lazy) {
             $details[] = 'Lazy: yes';
         }
-        if (null !== $service?->deprecation()) {
-            $details[] = 'Deprecated: '.$service->deprecation();
+        if (null !== $service?->deprecation) {
+            $details[] = 'Deprecated: '.$service->deprecation;
         }
         if (null !== $decorates) {
             $details[] = \sprintf('Decorates: `%s`', $decorates);
@@ -82,11 +82,11 @@ final class DependencyInjectionHoverHandler implements HoverProviderInterface
         if ([] !== $tags) {
             $details[] = \sprintf('Tags: `%s`', implode('`, `', $tags));
         }
-        $autowiringTypes = $service?->autowiringTypes() ?? [];
+        $autowiringTypes = $service->autowiringTypes ?? [];
         if ([] !== $autowiringTypes) {
             $details[] = \sprintf('Autowiring types: `%s`', implode('`, `', $autowiringTypes));
         }
-        $decorationStack = $service?->decorationStack() ?? [];
+        $decorationStack = $service->decorationStack ?? [];
         if ([] !== $decorationStack) {
             $details[] = \sprintf('Decoration stack: `%s`', implode('` → `', $decorationStack));
         }

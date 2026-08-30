@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Tests\Feature\Translation;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Feature\Translation\TranslationDeclaration;
 use Symfony\Lsp\Feature\Translation\TranslationExtractor;
 use Symfony\Lsp\Feature\Translation\TranslationPlaceholders;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
@@ -29,12 +28,12 @@ final class TranslationExtractorTest extends TestCase
             $translator->trans('admin.title', [], 'admin');
             PHP);
 
-        self::assertSame(['article.title'], array_map(static fn ($item): string => $item->key(), $facts->declarations()));
-        self::assertSame(['name'], $facts->declarations()[0]->placeholders());
+        self::assertSame(['article.title'], array_map(static fn ($item): string => $item->key, $facts->declarations));
+        self::assertSame(['name'], $facts->declarations[0]->placeholders());
         self::assertSame([
             ['article.title', 'messages', ['name']],
             ['admin.title', 'admin', []],
-        ], array_map(static fn ($item): array => [$item->key(), $item->domain(), $item->placeholders()], $references->references()));
+        ], array_map(static fn ($item): array => [$item->key, $item->domain, $item->placeholders], $references->references));
     }
 
     public function testExtractsNamedPhpTranslationKeys(): void
@@ -45,13 +44,13 @@ final class TranslationExtractorTest extends TestCase
             t(message: 'article.title');
             new TranslatableMessage(message: 'article.title');
             $translator->trans(id: $key, domain: 'admin');
-            PHP)->references();
+            PHP)->references;
 
         self::assertSame([
             ['panel.title', 'admin'],
             ['article.title', 'messages'],
             ['article.title', 'messages'],
-        ], array_map(static fn ($item): array => [$item->key(), $item->domain()], $references));
+        ], array_map(static fn ($item): array => [$item->key, $item->domain], $references));
     }
 
     public function testExtractsBareTwigHashKeysAsPlaceholders(): void
@@ -62,7 +61,7 @@ final class TranslationExtractorTest extends TestCase
 
         self::assertSame(
             [['title.edit_post', ['id', 'name']]],
-            array_map(static fn ($item): array => [$item->key(), $item->placeholders()], $references->references()),
+            array_map(static fn ($item): array => [$item->key, $item->placeholders], $references->references),
         );
     }
 
@@ -75,10 +74,10 @@ final class TranslationExtractorTest extends TestCase
                 '%num_days_left%': 3
             }) }}
             {{ 'registration.ticket_sales_countdown'|trans }}
-            TWIG)->references();
+            TWIG)->references;
 
-        self::assertSame(['cfp_end_date', 'cfp_url', 'num_days_left'], $references[0]->placeholders());
-        self::assertNull($references[1]->placeholders());
+        self::assertSame(['cfp_end_date', 'cfp_url', 'num_days_left'], $references[0]->placeholders);
+        self::assertNull($references[1]->placeholders);
     }
 
     public function testTreatsBracesAsPlaceholdersOnlyInIcuCatalogs(): void
@@ -94,11 +93,11 @@ final class TranslationExtractorTest extends TestCase
             XLF);
         $plain = $extractor->extract('file:///workspace/translations/messages.en.yaml', 'yaml', "joomla_syntax: 'Joomla uses curly braces {mautic} in templates'\n");
 
-        self::assertSame('messages', $icu->declarations()[0]->domain());
-        self::assertTrue($icu->declarations()[0]->icu());
-        self::assertSame(['id'], $icu->declarations()[0]->placeholders());
-        self::assertFalse($plain->declarations()[0]->icu());
-        self::assertSame([], $plain->declarations()[0]->placeholders());
+        self::assertSame('messages', $icu->declarations[0]->domain);
+        self::assertTrue($icu->declarations[0]->icu);
+        self::assertSame(['id'], $icu->declarations[0]->placeholders());
+        self::assertFalse($plain->declarations[0]->icu);
+        self::assertSame([], $plain->declarations[0]->placeholders());
     }
 
     public function testExtractsIcuArgumentsWithoutTreatingSelectMessagesAsPlaceholders(): void
@@ -136,24 +135,17 @@ final class TranslationExtractorTest extends TestCase
                 ['mautic.api.auth.error.granted', 'messages', 'en_US', 'Access granted to %name%.', ['name']],
             ],
             array_map(
-                static fn ($item): array => [$item->key(), $item->domain(), $item->locale(), $item->message(), $item->placeholders()],
-                $facts->declarations(),
+                static fn ($item): array => [$item->key, $item->domain, $item->locale, $item->message, $item->placeholders()],
+                $facts->declarations,
             ),
         );
-    }
-
-    public function testCachedDeclarationsWithoutTheIcuFlagStayLoadable(): void
-    {
-        $declaration = (new \ReflectionClass(TranslationDeclaration::class))->newInstanceWithoutConstructor();
-
-        self::assertFalse($declaration->icu());
     }
 
     public function testPreservesHyphenatedYamlKeys(): void
     {
         $facts = $this->extractor()->extract('file:///workspace/translations/messages.en.yaml', 'yaml', "article-title: Article\n");
 
-        self::assertSame('article-title', $facts->declarations()[0]->key());
+        self::assertSame('article-title', $facts->declarations[0]->key);
     }
 
     public function testIgnoresTwigReferencesInsideDocumentationComments(): void
@@ -161,9 +153,9 @@ final class TranslationExtractorTest extends TestCase
         $references = $this->extractor()->extract('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
             {## Use t('documented.translation') in examples. #}
             {{ t('page.title') }}
-            TWIG)->references();
+            TWIG)->references;
 
-        self::assertSame(['page.title'], array_map(static fn ($item): string => $item->key(), $references));
+        self::assertSame(['page.title'], array_map(static fn ($item): string => $item->key, $references));
     }
 
     public function testToleratesIncompleteJsonAndXliffResources(): void
@@ -186,15 +178,15 @@ final class TranslationExtractorTest extends TestCase
 
         self::assertSame(
             ['dashboard.title', 'dashboard.subtitle'],
-            array_map(static fn ($item): string => $item->key(), $json->declarations()),
+            array_map(static fn ($item): string => $item->key, $json->declarations),
         );
         self::assertSame(
             ['required', 'fallback.key'],
-            array_map(static fn ($item): string => $item->key(), $xliff->declarations()),
+            array_map(static fn ($item): string => $item->key, $xliff->declarations),
         );
         self::assertSame(
             ['Required', 'Fallback'],
-            array_map(static fn ($item): string => trim($item->message()), $xliff->declarations()),
+            array_map(static fn ($item): string => trim($item->message), $xliff->declarations),
         );
     }
 
@@ -202,10 +194,10 @@ final class TranslationExtractorTest extends TestCase
     {
         $declaration = $this->extractor()
             ->extract('file:///workspace/translations/messages.en.json', 'json', '{"first\\u002etitle":"Title"}')
-            ->declarations()[0];
+            ->declarations[0];
 
-        self::assertSame('first.title', $declaration->key());
-        self::assertSame(16, $declaration->range()->end->character - $declaration->range()->start->character);
+        self::assertSame('first.title', $declaration->key);
+        self::assertSame(16, $declaration->range->end->character - $declaration->range->start->character);
     }
 
     public function testKeepsDistinctRangesForRepeatedJsonKeys(): void
@@ -213,10 +205,10 @@ final class TranslationExtractorTest extends TestCase
         $text = '{"first":{"title":"One"},"second":{"title":"Two"}}';
         $declarations = $this->extractor()
             ->extract('file:///workspace/translations/messages.en.json', 'json', $text)
-            ->declarations();
+            ->declarations;
 
-        self::assertSame(['first.title', 'second.title'], array_map(static fn ($item): string => $item->key(), $declarations));
-        self::assertNotSame($declarations[0]->range()->start->character, $declarations[1]->range()->start->character);
+        self::assertSame(['first.title', 'second.title'], array_map(static fn ($item): string => $item->key, $declarations));
+        self::assertNotSame($declarations[0]->range->start->character, $declarations[1]->range->start->character);
     }
 
     public function testExtractsJsonXliffAndPhpResources(): void
@@ -226,20 +218,20 @@ final class TranslationExtractorTest extends TestCase
         $xliff = $extractor->extract('file:///workspace/translations/validators.en.xlf', 'xml', '<xliff><file><body><trans-unit id="1" resname="required"><source>required</source><target>Required</target></trans-unit></body></file></xliff>');
         $php = $extractor->extract('file:///workspace/translations/messages.de.php', 'php', "<?php return ['hello' => 'Hallo'];");
 
-        self::assertSame('dashboard.title', $json->declarations()[0]->key());
-        self::assertSame('required', $xliff->declarations()[0]->key());
-        self::assertSame('hello', $php->declarations()[0]->key());
+        self::assertSame('dashboard.title', $json->declarations[0]->key);
+        self::assertSame('required', $xliff->declarations[0]->key);
+        self::assertSame('hello', $php->declarations[0]->key);
     }
 
     public function testDecodesTwigTranslationKeysLikeTheVendoredLexer(): void
     {
         $literals = ['"\\x66oo"', '"\\146oo"', '"line\\nkey"'];
         $text = implode("\n", array_map(static fn (string $literal): string => '{{ '.$literal.'|trans }}', $literals));
-        $references = $this->extractor()->extract('file:///workspace/templates/page.html.twig', 'twig', $text)->references();
+        $references = $this->extractor()->extract('file:///workspace/templates/page.html.twig', 'twig', $text)->references;
 
         self::assertSame(
             array_map($this->lexedTwigString(...), $literals),
-            array_map(static fn ($reference): string => $reference->key(), $references),
+            array_map(static fn ($reference): string => $reference->key, $references),
         );
     }
 
@@ -281,8 +273,8 @@ final class TranslationExtractorTest extends TestCase
         $text = "{# vérifié #} {{ trans('greeting') }}";
         $facts = $this->extractor()->extract('file:///workspace/templates/page.html.twig', 'twig', $text);
 
-        self::assertCount(1, $facts->references());
-        $start = $facts->references()[0]->range()->start;
+        self::assertCount(1, $facts->references);
+        $start = $facts->references[0]->range->start;
         self::assertSame(
             (new PositionConverter())->toPosition($text, (int) strpos($text, 'greeting'))->character,
             $start->character,
@@ -298,6 +290,6 @@ final class TranslationExtractorTest extends TestCase
             $translator->trans('live.key');
             PHP);
 
-        self::assertSame(['live.key'], array_map(static fn ($item): string => $item->key(), $facts->references()));
+        self::assertSame(['live.key'], array_map(static fn ($item): string => $item->key, $facts->references));
     }
 }

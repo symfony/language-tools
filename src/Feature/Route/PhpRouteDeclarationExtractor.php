@@ -70,8 +70,8 @@ final class PhpRouteDeclarationExtractor
 
         usort(
             $declarations,
-            static fn (RouteDeclaration $left, RouteDeclaration $right): int => $left->range()->start->line <=> $right->range()->start->line
-                ?: $left->range()->start->character <=> $right->range()->start->character,
+            static fn (RouteDeclaration $left, RouteDeclaration $right): int => $left->range->start->line <=> $right->range->start->line
+                ?: $left->range->start->character <=> $right->range->start->character,
         );
 
         return $declarations;

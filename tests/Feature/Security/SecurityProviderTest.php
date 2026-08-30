@@ -51,7 +51,7 @@ final class AdminController extends AbstractController
 PHP;
         self::assertSame(
             ['ROLE_ADMIN', 'ROLE_USER'],
-            array_map(static fn ($symbol): string => $symbol->name(), $extractor->extract('file:///workspace/src/AdminController.php', 'php', $php)->symbols()),
+            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract('file:///workspace/src/AdminController.php', 'php', $php)->symbols),
         );
 
         $yaml = <<<'YAML'
@@ -70,7 +70,7 @@ security:
 YAML;
         self::assertSame(
             ['users', 'main', 'users', 'ROLE_ADMIN', 'ROLE_USER', 'ROLE_EDITOR'],
-            array_map(static fn ($symbol): string => $symbol->name(), $extractor->extract('file:///workspace/config/packages/security.yaml', 'yaml', $yaml)->symbols()),
+            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract('file:///workspace/config/packages/security.yaml', 'yaml', $yaml)->symbols),
         );
     }
 
@@ -97,7 +97,7 @@ YAML;
 
         self::assertSame(
             ['ROLE_ALLOWED'],
-            array_map(static fn ($symbol): string => $symbol->name(), $extractor->extract('file:///workspace/src/Controller.php', 'php', $text)->symbols()),
+            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract('file:///workspace/src/Controller.php', 'php', $text)->symbols),
         );
 
         $completion = str_replace("isGranted('ROLE_UNRELATED');", "isGranted('ROLE_U", $text);
@@ -134,7 +134,7 @@ YAML;
 
         self::assertSame(
             ['ROLE_ADMIN'],
-            array_map(static fn ($symbol): string => $symbol->name(), $extractor->extract('file:///workspace/src/Controller.php', 'php', $text)->symbols()),
+            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract('file:///workspace/src/Controller.php', 'php', $text)->symbols),
         );
 
         $completion = str_replace("isGranted('ROLE_UNRELATED');", "isGranted('ROLE_U", $text);
@@ -167,7 +167,7 @@ YAML;
 
         self::assertSame(
             ['ROLE_ADMIN'],
-            array_map(static fn ($symbol): string => $symbol->name(), $extractor->extract('file:///workspace/src/Controller.php', 'php', $text)->symbols()),
+            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract('file:///workspace/src/Controller.php', 'php', $text)->symbols),
         );
 
         $completion = str_replace("denyAccessUnlessGranted('ROLE_UNRELATED');", "denyAccessUnlessGranted('ROLE_U", $text);
@@ -195,14 +195,14 @@ YAML;
 
         self::assertSame(
             ['ROLE_ALIAS', 'ROLE_FULL'],
-            array_map(static fn ($symbol): string => $symbol->name(), $extractor->extract('file:///workspace/src/Controller.php', 'php', $text)->symbols()),
+            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract('file:///workspace/src/Controller.php', 'php', $text)->symbols),
         );
 
         $aliasedCompletion = str_replace("ROLE_ALIAS')]", 'ROLE_A', $text);
-        self::assertSame('ROLE_A', $extractor->completionContext('php', $aliasedCompletion, strpos($aliasedCompletion, 'ROLE_A') + \strlen('ROLE_A'))?->prefix());
+        self::assertSame('ROLE_A', $extractor->completionContext('php', $aliasedCompletion, strpos($aliasedCompletion, 'ROLE_A') + \strlen('ROLE_A'))?->prefix);
 
         $fullyQualifiedCompletion = str_replace("ROLE_FULL')]", 'ROLE_F', $text);
-        self::assertSame('ROLE_F', $extractor->completionContext('php', $fullyQualifiedCompletion, strpos($fullyQualifiedCompletion, 'ROLE_F') + \strlen('ROLE_F'))?->prefix());
+        self::assertSame('ROLE_F', $extractor->completionContext('php', $fullyQualifiedCompletion, strpos($fullyQualifiedCompletion, 'ROLE_F') + \strlen('ROLE_F'))?->prefix);
 
         $unrelatedCompletion = str_replace("ROLE_UNRELATED')]", 'ROLE_U', $text);
         self::assertNull($extractor->completionContext('php', $unrelatedCompletion, strrpos($unrelatedCompletion, 'ROLE_U') + \strlen('ROLE_U')));
@@ -233,7 +233,7 @@ YAML;
             }
             PHP;
 
-        self::assertSame([], $extractor->extract('file:///workspace/src/AdminController.php', 'php', $text)->symbols());
+        self::assertSame([], $extractor->extract('file:///workspace/src/AdminController.php', 'php', $text)->symbols);
     }
 
     public function testOffersNoSecurityCompletionsInsidePhpComments(): void

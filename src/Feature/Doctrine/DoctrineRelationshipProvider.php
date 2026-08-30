@@ -29,38 +29,38 @@ final class DoctrineRelationshipProvider implements DefinitionProviderInterface,
         }
         [$symbol, $project] = $resolved;
         $index = $this->indexes->forProject($project);
-        if (DoctrineSymbolKind::Field === $symbol->kind()) {
+        if (DoctrineSymbolKind::Field === $symbol->kind) {
             $entity = $this->entityForSymbol($index, $symbol);
-            $field = $entity?->field($symbol->name());
+            $field = $entity?->field($symbol->name);
             if (null === $entity || null === $field) {
                 return null;
             }
-            $details = [\sprintf('Doctrine %s: `%s::$%s`', $field->isAssociation() ? 'association' : 'field', $entity->className(), $field->name())];
-            if (null !== $field->type()) {
-                $details[] = 'Type: `'.$field->type().'`';
+            $details = [\sprintf('Doctrine %s: `%s::$%s`', $field->association ? 'association' : 'field', $entity->className, $field->name)];
+            if (null !== $field->type) {
+                $details[] = 'Type: `'.$field->type.'`';
             }
-            if (null !== $field->targetEntity()) {
-                $details[] = 'Target entity: `'.$field->targetEntity().'`';
+            if (null !== $field->targetEntity) {
+                $details[] = 'Target entity: `'.$field->targetEntity.'`';
             }
 
             return $this->protocol->markdownHover(implode("\n\n", $details));
         }
-        if (DoctrineSymbolKind::Entity === $symbol->kind()) {
-            $entity = $index->entity($symbol->name());
+        if (DoctrineSymbolKind::Entity === $symbol->kind) {
+            $entity = $index->entity($symbol->name);
             if (null === $entity) {
                 return null;
             }
-            $details = ['Doctrine entity: `'.$entity->className().'`'];
-            if (null !== $entity->repositoryClass()) {
-                $details[] = 'Repository: `'.$entity->repositoryClass().'`';
+            $details = ['Doctrine entity: `'.$entity->className.'`'];
+            if (null !== $entity->repositoryClass) {
+                $details[] = 'Repository: `'.$entity->repositoryClass.'`';
             }
-            $details[] = \sprintf('%d mapped field%s', \count($entity->fields()), 1 === \count($entity->fields()) ? '' : 's');
+            $details[] = \sprintf('%d mapped field%s', \count($entity->fields), 1 === \count($entity->fields) ? '' : 's');
 
             return $this->protocol->markdownHover(implode("\n\n", $details));
         }
-        $repository = $index->repository($symbol->name());
+        $repository = $index->repository($symbol->name);
 
-        return null === $repository ? null : $this->protocol->markdownHover(\sprintf("Doctrine repository: `%s`\n\nEntity: `%s`", $repository->className(), $repository->entityClass()));
+        return null === $repository ? null : $this->protocol->markdownHover(\sprintf("Doctrine repository: `%s`\n\nEntity: `%s`", $repository->className, $repository->entityClass));
     }
 
     public function definition(array $params): ?array
@@ -73,23 +73,23 @@ final class DoctrineRelationshipProvider implements DefinitionProviderInterface,
         $index = $this->indexes->forProject($project);
         $locations = [];
         foreach ($index->relatedSymbols($symbol) as $candidate) {
-            if ($candidate->isDeclaration()) {
-                $locations[] = $this->protocol->location($candidate->uri(), $candidate->range());
+            if ($candidate->declaration) {
+                $locations[] = $this->protocol->location($candidate->uri, $candidate->range);
             }
         }
         if ([] === $locations) {
             // runtime-only entities, such as XML mappings or vendor classes,
             // have no source declaration symbols
-            if (DoctrineSymbolKind::Field === $symbol->kind() && null !== $symbol->owner()) {
-                $entity = $index->entity($symbol->owner()) ?? $index->entityForRepository($symbol->owner());
-                $field = $entity?->field($symbol->name());
+            if (DoctrineSymbolKind::Field === $symbol->kind && null !== $symbol->owner) {
+                $entity = $index->entity($symbol->owner) ?? $index->entityForRepository($symbol->owner);
+                $field = $entity?->field($symbol->name);
                 if (null !== $field) {
-                    $locations[] = $this->protocol->location($field->uri(), $field->range());
+                    $locations[] = $this->protocol->location($field->uri, $field->range);
                 }
-            } elseif (DoctrineSymbolKind::Entity === $symbol->kind()) {
-                $entity = $index->entity($symbol->name());
+            } elseif (DoctrineSymbolKind::Entity === $symbol->kind) {
+                $entity = $index->entity($symbol->name);
                 if (null !== $entity) {
-                    $locations[] = $this->protocol->location($entity->uri(), $entity->range());
+                    $locations[] = $this->protocol->location($entity->uri, $entity->range);
                 }
             }
         }
@@ -106,7 +106,7 @@ final class DoctrineRelationshipProvider implements DefinitionProviderInterface,
         [$symbol, $project] = $resolved;
         $locations = [];
         foreach ($this->indexes->forProject($project)->relatedSymbols($symbol) as $candidate) {
-            $locations[] = $this->protocol->location($candidate->uri(), $candidate->range());
+            $locations[] = $this->protocol->location($candidate->uri, $candidate->range);
         }
 
         return $locations;
@@ -124,8 +124,8 @@ final class DoctrineRelationshipProvider implements DefinitionProviderInterface,
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols() as $symbol) {
-            if ($this->converter->containsByteOffset($request->document->text, $symbol->range(), $offset, inclusiveEnd: true)) {
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols as $symbol) {
+            if ($this->converter->containsByteOffset($request->document->text, $symbol->range, $offset, inclusiveEnd: true)) {
                 return [$symbol, $request->project];
             }
         }
@@ -135,7 +135,7 @@ final class DoctrineRelationshipProvider implements DefinitionProviderInterface,
 
     private function entityForSymbol(DoctrineIndex $index, DoctrineSourceSymbol $symbol): ?DoctrineEntity
     {
-        $owner = $symbol->owner();
+        $owner = $symbol->owner;
         if (null === $owner) {
             return null;
         }

@@ -40,12 +40,12 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
                 continue;
             }
             foreach ($references as $reference) {
-                if (!$this->protocol->sameRange($reference->range(), $range)
-                    || null !== $this->indexes->forProject($request->project)->get($reference->name())
+                if (!$this->protocol->sameRange($reference->range, $range)
+                    || null !== $this->indexes->forProject($request->project)->get($reference->name)
                 ) {
                     continue;
                 }
-                $path = $this->path($request->project->rootPath, $reference->name());
+                $path = $this->path($request->project->rootPath, $reference->name);
                 if (null === $path || is_file($path)) {
                     continue;
                 }
@@ -54,7 +54,7 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
                     continue;
                 }
                 $actions[] = [
-                    'title' => \sprintf('Create template "%s"', $reference->name()),
+                    'title' => \sprintf('Create template "%s"', $reference->name),
                     'kind' => 'quickfix',
                     'diagnostics' => [$diagnostic],
                     'isPreferred' => true,

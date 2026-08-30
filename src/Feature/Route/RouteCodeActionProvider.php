@@ -49,14 +49,14 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
                 continue;
             }
             foreach ($references as $reference) {
-                if (!$this->protocol->sameRange($reference->range(), $range)) {
+                if (!$this->protocol->sameRange($reference->range, $range)) {
                     continue;
                 }
-                $route = $this->indexes->forProject($request->project)->get($reference->name());
-                if (null === $route || null === $reference->providedParameters()) {
+                $route = $this->indexes->forProject($request->project)->get($reference->name);
+                if (null === $route || null === $reference->providedParameters) {
                     continue;
                 }
-                $missing = array_values(array_diff($route->requiredParameters(), $reference->providedParameters()));
+                $missing = array_values(array_diff($route->requiredParameters(), $reference->providedParameters));
                 $edit = $this->edit($request->document, $reference, $missing);
                 if (null === $edit) {
                     continue;
@@ -89,7 +89,7 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
             return null;
         }
         $text = $document->text;
-        $end = $this->converter->toByteOffset($text, $reference->range()->end);
+        $end = $this->converter->toByteOffset($text, $reference->range->end);
         $after = substr($text, $end);
         $twig = 'twig' === $document->languageId;
         $separator = $twig ? ': ' : ' => ';

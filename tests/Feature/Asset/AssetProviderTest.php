@@ -207,6 +207,6 @@ final class AssetProviderTest extends TestCase
             ];
             PHP);
 
-        self::assertSame(['live'], array_map(static fn ($symbol): string => $symbol->name(), $facts->symbols()));
+        self::assertSame(['live'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
     }
 }

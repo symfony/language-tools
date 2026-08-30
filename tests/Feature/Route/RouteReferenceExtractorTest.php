@@ -102,8 +102,8 @@ final class RouteReferenceExtractorTest extends TestCase
         );
         $references = (new RouteReferenceExtractor($converter, $parser, new QuotedArgumentMatcher($converter), new PhpCommentParser()))->extract($controller, $classIndex);
 
-        self::assertSame(['article_show'], array_map(static fn ($reference): string => $reference->name(), $references));
-        self::assertSame('App\\Controller\\DemoController', $references[0]->controllerClass());
+        self::assertSame(['article_show'], array_map(static fn ($reference): string => $reference->name, $references));
+        self::assertSame('App\\Controller\\DemoController', $references[0]->controllerClass);
 
         $referenceIndexes = new RouteReferenceIndexRegistry($classIndexes);
         $referenceIndexes->forProject($project)->replace(
@@ -112,7 +112,7 @@ final class RouteReferenceExtractorTest extends TestCase
         );
 
         self::assertSame([$controllerUri], array_map(
-            static fn (RouteReferenceLocation $reference): string => $reference->uri(),
+            static fn (RouteReferenceLocation $reference): string => $reference->uri,
             $referenceIndexes->forProject($project)->find('article_show'),
         ));
 
@@ -127,7 +127,7 @@ final class RouteReferenceExtractorTest extends TestCase
         /** @var list<RouteReferenceLocation> $restoredReferences */
         $restoredReferences = $referenceIndexes->forProject($project)->find('article_show');
         self::assertSame([$controllerUri], array_map(
-            static fn (RouteReferenceLocation $reference): string => $reference->uri(),
+            static fn (RouteReferenceLocation $reference): string => $reference->uri,
             $restoredReferences,
         ));
     }
@@ -152,7 +152,7 @@ final class RouteReferenceExtractorTest extends TestCase
         $references = $extractor->extract($source);
 
         self::assertCount(1, $references);
-        self::assertSame("it's_a_route", $references[0]->name());
+        self::assertSame("it's_a_route", $references[0]->name);
     }
 
     public function testIgnoresRouteCallsInPhpComments(): void
@@ -172,6 +172,6 @@ final class RouteReferenceExtractorTest extends TestCase
         $converter = new PositionConverter();
         $extractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter), new PhpCommentParser());
 
-        self::assertSame(['live_route'], array_map(static fn (RouteReference $reference): string => $reference->name(), $extractor->extract($source)));
+        self::assertSame(['live_route'], array_map(static fn (RouteReference $reference): string => $reference->name, $extractor->extract($source)));
     }
 }

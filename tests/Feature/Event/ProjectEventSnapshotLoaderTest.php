@@ -26,8 +26,8 @@ final class ProjectEventSnapshotLoaderTest extends TestCase
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->isComplete());
-        self::assertSame('App\\Event\\OrderPlaced', $index->event('App\\Event\\OrderPlaced')?->className());
-        self::assertSame('App\\EventListener\\NotifyCustomer', $index->listenersForEvent('App\\Event\\OrderPlaced')[0]->className());
-        self::assertSame(10, $index->listenersForEvent('App\\Event\\OrderPlaced')[0]->priority());
+        self::assertSame('App\\Event\\OrderPlaced', $index->event('App\\Event\\OrderPlaced')?->className);
+        self::assertSame('App\\EventListener\\NotifyCustomer', $index->listenersForEvent('App\\Event\\OrderPlaced')[0]->className);
+        self::assertSame(10, $index->listenersForEvent('App\\Event\\OrderPlaced')[0]->priority);
     }
 }

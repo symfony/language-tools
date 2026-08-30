@@ -35,7 +35,7 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
             return null;
         }
 
-        $references = $this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->references();
+        $references = $this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->references;
         $actions = [];
         foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
             if (!\is_array($diagnostic) || 'translation.not_found' !== ($diagnostic['code'] ?? null)) {
@@ -46,12 +46,12 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
                 continue;
             }
             foreach ($references as $reference) {
-                if (!$this->protocol->sameRange($reference->range(), $range)
-                    || [] !== $this->indexes->forProject($request->project)->declarations($reference->domain(), $reference->key())
+                if (!$this->protocol->sameRange($reference->range, $range)
+                    || [] !== $this->indexes->forProject($request->project)->declarations($reference->domain, $reference->key)
                 ) {
                     continue;
                 }
-                $targetPath = $this->target($request->project->rootPath, $reference->domain());
+                $targetPath = $this->target($request->project->rootPath, $reference->domain);
                 if (null === $targetPath) {
                     continue;
                 }
@@ -61,10 +61,10 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
                     continue;
                 }
                 $position = $this->converter->toPosition($target->text, \strlen($target->text));
-                $escapedKey = str_replace("'", "''", $reference->key());
+                $escapedKey = str_replace("'", "''", $reference->key);
                 $newText = ('' === $target->text || str_ends_with($target->text, "\n") ? '' : "\n")."'{$escapedKey}': '{$escapedKey}'\n";
                 $actions[] = [
-                    'title' => \sprintf('Add translation "%s" to %s', $reference->key(), basename($targetPath)),
+                    'title' => \sprintf('Add translation "%s" to %s', $reference->key, basename($targetPath)),
                     'kind' => 'quickfix',
                     'diagnostics' => [$diagnostic],
                     'isPreferred' => true,

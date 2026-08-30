@@ -12,56 +12,18 @@ final class ConfigurationOccurrence
      * @param list<int>    $literalDepths
      */
     public function __construct(
-        private readonly array $path,
-        private readonly string $value,
-        private readonly Range $keyRange,
-        private readonly Range $valueRange,
-        private readonly array $sequenceDepths,
-        private readonly string $scope,
-        private readonly array $literalDepths = [],
+        public readonly array $path,
+        public readonly string $value,
+        public readonly Range $keyRange,
+        public readonly Range $valueRange,
+        public readonly array $sequenceDepths,
+        public readonly string $scope,
+        public readonly array $literalDepths = [],
     ) {
-    }
-
-    /** @return list<string> */
-    public function path(): array
-    {
-        return $this->path;
-    }
-
-    public function value(): string
-    {
-        return $this->value;
-    }
-
-    public function keyRange(): Range
-    {
-        return $this->keyRange;
-    }
-
-    public function valueRange(): Range
-    {
-        return $this->valueRange;
     }
 
     public function sequenceItem(): bool
     {
         return [] !== $this->sequenceDepths;
-    }
-
-    /** @return list<int> */
-    public function sequenceDepths(): array
-    {
-        return $this->sequenceDepths;
-    }
-
-    /** @return list<int> */
-    public function literalDepths(): array
-    {
-        return $this->literalDepths;
-    }
-
-    public function scope(): string
-    {
-        return $this->scope;
     }
 }

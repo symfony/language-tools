@@ -79,13 +79,13 @@ final class ContainerProjectRootBridgeTest extends TestCase
 
             $template = $templateIndexes->forProject($project)->get('fixture.html.twig');
             self::assertNotNull($template);
-            self::assertStringStartsWith('file://'.$hostRoot.'/', $template->uri());
+            self::assertStringStartsWith('file://'.$hostRoot.'/', $template->uri);
             $asset = $assetIndexes->forProject($project)->asset('app.js');
             self::assertNotNull($asset);
-            self::assertStringStartsWith($hostRoot.'/', $asset->sourcePath());
+            self::assertStringStartsWith($hostRoot.'/', $asset->sourcePath);
             $controller = $stimulusIndexes->forProject($project)->controller('search');
             self::assertNotNull($controller);
-            self::assertStringStartsWith($hostRoot.'/', $controller->sourcePath());
+            self::assertStringStartsWith($hostRoot.'/', $controller->sourcePath);
         } finally {
             (new Filesystem())->remove($containerRoot.'/var/symfony-lsp/container-test');
             unlink($hostRoot);

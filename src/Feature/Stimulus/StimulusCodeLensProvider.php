@@ -23,13 +23,13 @@ final class StimulusCodeLensProvider implements CodeLensProviderInterface
             return null;
         }
         $lenses = [];
-        foreach ($this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text)->declarations() as $declaration) {
+        foreach ($this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text)->declarations as $declaration) {
             $locations = [];
-            foreach ($this->sourceIndexes->forProject($request->project)->references($declaration->name()) as $reference) {
-                $locations[] = $this->protocol->location($reference->uri(), $reference->range());
+            foreach ($this->sourceIndexes->forProject($request->project)->references($declaration->name) as $reference) {
+                $locations[] = $this->protocol->location($reference->uri, $reference->range);
             }
             $count = \count($locations);
-            $lenses[] = $this->protocol->referenceLens($declaration->range(), \sprintf('%d Stimulus controller usage%s', $count, 1 === $count ? '' : 's'), $declaration->uri(), $locations);
+            $lenses[] = $this->protocol->referenceLens($declaration->range, \sprintf('%d Stimulus controller usage%s', $count, 1 === $count ? '' : 's'), $declaration->uri, $locations);
         }
 
         return $lenses;

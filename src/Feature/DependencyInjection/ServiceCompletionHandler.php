@@ -52,31 +52,31 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
     private function completeServices(Project $project, ServiceCompletionContext $context): array
     {
         $items = [];
-        foreach ($this->serviceIndexes->forProject($project)->matching($context->prefix()) as $service) {
-            $items[$service->id()] = [
-                'label' => $service->id(),
+        foreach ($this->serviceIndexes->forProject($project)->matching($context->prefix) as $service) {
+            $items[$service->id] = [
+                'label' => $service->id,
                 'kind' => 18,
                 'detail' => $this->serviceDetail($service),
-                'textEdit' => $this->protocol->textEdit($context->replacementRange(), $service->id()),
+                'textEdit' => $this->protocol->textEdit($context->replacementRange, $service->id),
             ];
         }
 
         $sourceIndex = $this->sourceIndexes->forProject($project);
         foreach ($sourceIndex->serviceIds() as $id) {
-            if (isset($items[$id]) || !str_starts_with($id, $context->prefix())) {
+            if (isset($items[$id]) || !str_starts_with($id, $context->prefix)) {
                 continue;
             }
 
             $declaration = $sourceIndex->serviceDeclarations($id)[0] ?? null;
-            $detail = $declaration?->className();
-            if (null !== $declaration?->alias()) {
-                $detail = 'Alias of '.$declaration->alias();
+            $detail = $declaration?->className;
+            if (null !== $declaration?->alias) {
+                $detail = 'Alias of '.$declaration->alias;
             }
             $items[$id] = [
                 'label' => $id,
                 'kind' => 18,
                 'detail' => $detail ?? 'Symfony service',
-                'textEdit' => $this->protocol->textEdit($context->replacementRange(), $id),
+                'textEdit' => $this->protocol->textEdit($context->replacementRange, $id),
             ];
         }
         ksort($items);
@@ -88,20 +88,20 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
     private function completeParameters(Project $project, ParameterCompletionContext $context): array
     {
         $items = [];
-        foreach ($this->parameterIndexes->forProject($project)->matching($context->prefix()) as $parameter) {
-            $items[$parameter->name()] = [
-                'label' => $parameter->name(),
+        foreach ($this->parameterIndexes->forProject($project)->matching($context->prefix) as $parameter) {
+            $items[$parameter->name] = [
+                'label' => $parameter->name,
                 'kind' => 12,
-                'detail' => null !== $parameter->deprecation() ? 'Deprecated Symfony parameter' : 'Symfony parameter',
+                'detail' => null !== $parameter->deprecation ? 'Deprecated Symfony parameter' : 'Symfony parameter',
                 'textEdit' => $this->protocol->textEdit(
-                    $context->replacementRange(),
-                    $context->completionText($parameter->name()),
+                    $context->replacementRange,
+                    $context->completionText($parameter->name),
                 ),
             ];
         }
 
         foreach ($this->sourceIndexes->forProject($project)->parameterNames() as $name) {
-            if (isset($items[$name]) || !str_starts_with($name, $context->prefix())) {
+            if (isset($items[$name]) || !str_starts_with($name, $context->prefix)) {
                 continue;
             }
 
@@ -109,7 +109,7 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
                 'label' => $name,
                 'kind' => 12,
                 'detail' => 'Symfony parameter',
-                'textEdit' => $this->protocol->textEdit($context->replacementRange(), $context->completionText($name)),
+                'textEdit' => $this->protocol->textEdit($context->replacementRange, $context->completionText($name)),
             ];
         }
         ksort($items);
@@ -119,10 +119,10 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
 
     private function serviceDetail(Service $service): string
     {
-        if (null !== $service->alias()) {
-            return 'Alias of '.$service->alias();
+        if (null !== $service->alias) {
+            return 'Alias of '.$service->alias;
         }
 
-        return $service->className() ?? 'Symfony service';
+        return $service->className ?? 'Symfony service';
     }
 }

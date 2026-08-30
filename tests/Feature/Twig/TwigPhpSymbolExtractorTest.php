@@ -64,11 +64,11 @@ final class TwigPhpSymbolExtractorTest extends TestCase
             [TwigPhpSymbolKind::ClassConstant, 'App\Model\ViewOptions', 'FORMAT', true],
             [TwigPhpSymbolKind::ClassConstant, 'App\Model\ViewOptions', 'SECRET', false],
         ], array_map(static fn ($declaration): array => [
-            $declaration->kind(),
-            $declaration->className(),
-            $declaration->memberName(),
-            $declaration->isPublic(),
-        ], $phpFacts->declarations()));
+            $declaration->kind,
+            $declaration->className,
+            $declaration->memberName,
+            $declaration->public,
+        ], $phpFacts->declarations));
 
         $twigFacts = $extractor->extract('file:///workspace/templates/page.html.twig', 'twig', $twig);
         self::assertNotNull($twigFacts);
@@ -82,11 +82,11 @@ final class TwigPhpSymbolExtractorTest extends TestCase
             ['App\Model\Status', null],
             ['App\Model\Status', null],
             ['App\Model\Status', 'Draft'],
-        ], array_map(static fn ($reference): array => [$reference->className(), $reference->memberName()], $twigFacts->references()));
-        self::assertSame(15, $twigFacts->references()[0]->range()->start->character);
-        foreach ($twigFacts->references() as $reference) {
-            $start = $converter->toByteOffset($twig, $reference->range()->start);
-            $end = $converter->toByteOffset($twig, $reference->range()->end);
+        ], array_map(static fn ($reference): array => [$reference->className, $reference->memberName], $twigFacts->references));
+        self::assertSame(15, $twigFacts->references[0]->range->start->character);
+        foreach ($twigFacts->references as $reference) {
+            $start = $converter->toByteOffset($twig, $reference->range->start);
+            $end = $converter->toByteOffset($twig, $reference->range->end);
             self::assertNotSame('', substr($twig, $start, $end - $start));
         }
     }
@@ -98,28 +98,28 @@ final class TwigPhpSymbolExtractorTest extends TestCase
         $constantType = "{{ constant('App\\\\Mod";
         $context = $extractor->completionContext($constantType, \strlen($constantType));
         self::assertNotNull($context);
-        self::assertSame(TwigPhpSymbolCompletionKind::ConstantType, $context->kind());
-        self::assertSame('App\Mod', $context->prefix());
+        self::assertSame(TwigPhpSymbolCompletionKind::ConstantType, $context->kind);
+        self::assertSame('App\Mod', $context->prefix);
 
         $constantMember = "{{ constant('App\\\\Model\\\\ViewOptions::FO";
         $context = $extractor->completionContext($constantMember, \strlen($constantMember));
         self::assertNotNull($context);
-        self::assertSame(TwigPhpSymbolCompletionKind::ConstantMember, $context->kind());
-        self::assertSame('App\Model\ViewOptions', $context->className());
-        self::assertSame('FO', $context->prefix());
+        self::assertSame(TwigPhpSymbolCompletionKind::ConstantMember, $context->kind);
+        self::assertSame('App\Model\ViewOptions', $context->className);
+        self::assertSame('FO', $context->prefix);
 
         $enumType = "{{ enum_cases('App\\\\Model\\\\St";
         $context = $extractor->completionContext($enumType, \strlen($enumType));
         self::assertNotNull($context);
-        self::assertSame(TwigPhpSymbolCompletionKind::EnumType, $context->kind());
-        self::assertSame('App\Model\St', $context->prefix());
+        self::assertSame(TwigPhpSymbolCompletionKind::EnumType, $context->kind);
+        self::assertSame('App\Model\St', $context->prefix);
 
         $enumCase = "{{ enum('App\\\\Model\\\\Status').Pu";
         $context = $extractor->completionContext($enumCase, \strlen($enumCase));
         self::assertNotNull($context);
-        self::assertSame(TwigPhpSymbolCompletionKind::EnumCase, $context->kind());
-        self::assertSame('App\Model\Status', $context->className());
-        self::assertSame('Pu', $context->prefix());
+        self::assertSame(TwigPhpSymbolCompletionKind::EnumCase, $context->kind);
+        self::assertSame('App\Model\Status', $context->className);
+        self::assertSame('Pu', $context->prefix);
 
         $comment = "{# {{ enum('App\\\\Model\\\\Status').Pu";
         self::assertNull($extractor->completionContext($comment, \strlen($comment)));

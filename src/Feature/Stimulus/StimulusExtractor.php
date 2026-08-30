@@ -99,7 +99,7 @@ final class StimulusExtractor
             array_push($members, ...$this->stringArrayMembers($text, $property, $kind));
         }
         array_push($members, ...$this->valueMembers($text));
-        usort($members, fn (StimulusMember $a, StimulusMember $b): int => $this->converter->toByteOffset($text, $a->range()->start) <=> $this->converter->toByteOffset($text, $b->range()->start));
+        usort($members, fn (StimulusMember $a, StimulusMember $b): int => $this->converter->toByteOffset($text, $a->range->start) <=> $this->converter->toByteOffset($text, $b->range->start));
         $offset = preg_match('/\bexport\s+default\s+class\b/', $text, $match, \PREG_OFFSET_CAPTURE) ? $match[0][1] : 0;
 
         return [new StimulusControllerDeclaration(

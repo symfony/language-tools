@@ -13,7 +13,7 @@ final class ServiceIndex
     {
         $this->services = [];
         foreach ($services as $service) {
-            $this->services[$service->id()] = $service;
+            $this->services[$service->id] = $service;
         }
         ksort($this->services);
         $this->complete = $complete;
@@ -31,7 +31,7 @@ final class ServiceIndex
     {
         return array_values(array_filter(
             $this->services,
-            static fn (Service $service): bool => str_starts_with($service->id(), $prefix),
+            static fn (Service $service): bool => str_starts_with($service->id, $prefix),
         ));
     }
 

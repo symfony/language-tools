@@ -115,8 +115,8 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
     {
         $variables = $this->indexes->forProject($project)->variables($template);
         foreach ($this->componentIndexes->forProject($project)->components() as $component) {
-            if ($component->template() === $template) {
-                array_push($variables, ...$component->properties());
+            if ($component->template === $template) {
+                array_push($variables, ...$component->properties);
             }
         }
         array_push($variables, ...array_keys($declarations));

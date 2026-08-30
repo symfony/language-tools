@@ -46,10 +46,10 @@ final class DependencyInjectionSourceIndexer extends AbstractSourceIndexer
         }
 
         return [
-            ...$data->services(),
-            ...$data->parameters(),
-            ...$data->references(),
-            ...$data->classes(),
+            ...$data->services,
+            ...$data->parameters,
+            ...$data->references,
+            ...$data->classes,
         ];
     }
 

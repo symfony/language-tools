@@ -36,14 +36,14 @@ final class ProjectDoctrineSnapshotLoaderTest extends TestCase
         $index = $indexes->forProject($project);
         $entity = $index->entity('App\Entity\Book');
         self::assertNotNull($entity);
-        self::assertSame('file:///workspace/src/Entity/Book.php', $entity->uri());
-        self::assertSame('App\Repository\BookRepository', $entity->repositoryClass());
-        self::assertSame('string', $entity->field('title')?->type());
+        self::assertSame('file:///workspace/src/Entity/Book.php', $entity->uri);
+        self::assertSame('App\Repository\BookRepository', $entity->repositoryClass);
+        self::assertSame('string', $entity->field('title')?->type);
         $author = $entity->field('author');
         self::assertNotNull($author);
-        self::assertTrue($author->isAssociation());
-        self::assertSame('App\Entity\Author', $author->targetEntity());
+        self::assertTrue($author->association);
+        self::assertSame('App\Entity\Author', $author->targetEntity);
         self::assertNull($index->entity('App\Entity\Broken'));
-        self::assertSame(['App\Entity\Book'], array_map(static fn ($item): string => $item->className(), $index->entities()));
+        self::assertSame(['App\Entity\Book'], array_map(static fn ($item): string => $item->className, $index->entities()));
     }
 }

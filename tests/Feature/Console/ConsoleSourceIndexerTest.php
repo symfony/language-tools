@@ -57,8 +57,8 @@ final class ConsoleSourceIndexerTest extends TestCase
         $restored->finish($project);
 
         $definition = $restoredIndexes->forProject($project)->definition('ReportCommand');
-        self::assertSame(['report'], $definition->arguments());
-        self::assertTrue($definition->isComplete());
+        self::assertSame(['report'], $definition->arguments);
+        self::assertTrue($definition->complete);
     }
 
     private function indexer(ConsoleSourceIndexRegistry $indexes): ConsoleSourceIndexer

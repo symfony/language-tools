@@ -35,7 +35,7 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
             throw new \UnexpectedValueException('The Twig callable source facts are invalid.');
         }
 
-        return $data->declarations();
+        return $data->declarations;
     }
 
     protected function factsClass(): string

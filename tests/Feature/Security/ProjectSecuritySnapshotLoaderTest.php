@@ -23,10 +23,10 @@ final class ProjectSecuritySnapshotLoaderTest extends TestCase
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->isComplete());
-        self::assertSame('users', $index->firewall('main')?->provider());
-        self::assertSame(['App\\Security\\Authenticator'], $index->firewall('main')->authenticators());
-        self::assertSame('entity', $index->provider('users')?->type());
-        self::assertSame(['ROLE_USER'], $index->role('ROLE_ADMIN')?->inheritedRoles());
-        self::assertSame('App\\Security\\PostVoter', $index->voters()[0]->className());
+        self::assertSame('users', $index->firewall('main')?->provider);
+        self::assertSame(['App\\Security\\Authenticator'], $index->firewall('main')->authenticators);
+        self::assertSame('entity', $index->provider('users')?->type);
+        self::assertSame(['ROLE_USER'], $index->role('ROLE_ADMIN')?->inheritedRoles);
+        self::assertSame('App\\Security\\PostVoter', $index->voters()[0]->className);
     }
 }

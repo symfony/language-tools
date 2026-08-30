@@ -15,19 +15,9 @@ final class RouteCompletionContext
     ];
 
     public function __construct(
-        private readonly string $prefix,
-        private readonly Range $replacementRange,
+        public readonly string $prefix,
+        public readonly Range $replacementRange,
     ) {
-    }
-
-    public function prefix(): string
-    {
-        return $this->prefix;
-    }
-
-    public function replacementRange(): Range
-    {
-        return $this->replacementRange;
     }
 
     /** @param callable(string): bool $isSymfonyReceiver */

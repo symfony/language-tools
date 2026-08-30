@@ -27,7 +27,7 @@ final class TemplateIndex
     {
         $this->runtime = [];
         foreach ($templates as $template) {
-            $this->runtime[$template->name()] = $template;
+            $this->runtime[$template->name] = $template;
         }
         $this->complete = $complete;
     }
@@ -36,7 +36,7 @@ final class TemplateIndex
     {
         $this->sources = [];
         foreach ($templates as $template) {
-            $this->sources[$template->uri()] = $template;
+            $this->sources[$template->uri] = $template;
         }
     }
 
@@ -44,7 +44,7 @@ final class TemplateIndex
     {
         $this->references = [];
         foreach ($references as $reference) {
-            $this->references[$reference->uri()][] = $reference;
+            $this->references[$reference->uri][] = $reference;
         }
     }
 
@@ -79,12 +79,12 @@ final class TemplateIndex
     {
         $name = $this->normalize($name);
         foreach ($this->overlays as $overlay) {
-            if ($overlay['declaration']?->name() === $name) {
+            if ($overlay['declaration']?->name === $name) {
                 return $overlay['declaration'];
             }
         }
         foreach ($this->sourceDeclarations() as $declaration) {
-            if ($declaration->name() === $name) {
+            if ($declaration->name === $name) {
                 return $declaration;
             }
         }
@@ -98,18 +98,18 @@ final class TemplateIndex
         $prefix = $this->normalize($prefix);
         $templates = $this->runtime;
         foreach ($this->sourceDeclarations() as $template) {
-            $templates[$template->name()] = $template;
+            $templates[$template->name] = $template;
         }
         foreach ($this->overlays as $overlay) {
             if (null !== $overlay['declaration']) {
-                $templates[$overlay['declaration']->name()] = $overlay['declaration'];
+                $templates[$overlay['declaration']->name] = $overlay['declaration'];
             }
         }
         ksort($templates);
 
         return array_values(array_filter(
             $templates,
-            static fn (TemplateDeclaration $template): bool => str_starts_with($template->name(), $prefix),
+            static fn (TemplateDeclaration $template): bool => str_starts_with($template->name, $prefix),
         ));
     }
 
@@ -123,14 +123,14 @@ final class TemplateIndex
                 continue;
             }
             foreach ($indexed as $reference) {
-                if ($this->normalize($reference->name()) === $name) {
+                if ($this->normalize($reference->name) === $name) {
                     $references[] = $reference;
                 }
             }
         }
         foreach ($this->overlays as $overlay) {
             foreach ($overlay['references'] as $reference) {
-                if ($this->normalize($reference->name()) === $name) {
+                if ($this->normalize($reference->name) === $name) {
                     $references[] = $reference;
                 }
             }
@@ -147,7 +147,7 @@ final class TemplateIndex
     public function isRuntimeTemplateUri(string $uri): bool
     {
         foreach ($this->runtime as $template) {
-            if ($template->uri() === $uri) {
+            if ($template->uri === $uri) {
                 return true;
             }
         }
@@ -160,7 +160,7 @@ final class TemplateIndex
     {
         $variables = array_fill_keys($this->globals, true);
         foreach ($this->references($template) as $reference) {
-            foreach ($reference->variables() as $variable) {
+            foreach ($reference->variables as $variable) {
                 $variables[$variable] = true;
             }
         }
@@ -180,7 +180,7 @@ final class TemplateIndex
     {
         return array_values(array_filter(
             $this->sources,
-            fn (TemplateDeclaration $template): bool => !isset($this->overlays[$template->uri()]),
+            fn (TemplateDeclaration $template): bool => !isset($this->overlays[$template->uri]),
         ));
     }
 

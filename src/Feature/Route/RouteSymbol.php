@@ -7,18 +7,8 @@ use Symfony\Lsp\Document\Range;
 final class RouteSymbol
 {
     public function __construct(
-        private readonly string $name,
-        private readonly Range $range,
+        public readonly string $name,
+        public readonly Range $range,
     ) {
-    }
-
-    public function name(): string
-    {
-        return $this->name;
-    }
-
-    public function range(): Range
-    {
-        return $this->range;
     }
 }

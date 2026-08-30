@@ -32,12 +32,12 @@ final class FormMetadataProvider implements DiagnosticProviderInterface, HoverPr
                 continue;
             }
             $type = $this->indexes->forProject($request->project)->formType($option['class']);
-            if (null === $type || !\in_array($option['option'], $type->options(), true)) {
+            if (null === $type || !\in_array($option['option'], $type->options, true)) {
                 return null;
             }
-            $required = \in_array($option['option'], $type->requiredOptions(), true);
+            $required = \in_array($option['option'], $type->requiredOptions, true);
 
-            return $this->protocol->markdownHover(\sprintf("Form option: `%s`\n\nType: `%s`\n\nRequired: %s", $option['option'], $type->className(), $required ? 'yes' : 'no'));
+            return $this->protocol->markdownHover(\sprintf("Form option: `%s`\n\nType: `%s`\n\nRequired: %s", $option['option'], $type->className, $required ? 'yes' : 'no'));
         }
 
         return null;
@@ -58,8 +58,8 @@ final class FormMetadataProvider implements DiagnosticProviderInterface, HoverPr
         $diagnostics = [];
         foreach ($this->extractor->formOptions($request->document->text) as $option) {
             $type = $index->formType($option['class']);
-            if (null !== $type && !\in_array($option['option'], $type->options(), true)) {
-                $diagnostics[] = $this->diagnostic($option['range'], 'form.unknown_option', \sprintf('Unknown option "%s" for form type "%s".', $option['option'], $type->className()));
+            if (null !== $type && !\in_array($option['option'], $type->options, true)) {
+                $diagnostics[] = $this->diagnostic($option['range'], 'form.unknown_option', \sprintf('Unknown option "%s" for form type "%s".', $option['option'], $type->className));
             }
         }
 

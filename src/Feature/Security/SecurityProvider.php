@@ -36,26 +36,26 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
             return null;
         }
         $index = $this->indexes->forProject($request->project);
-        $names = match ($context->kind()) {
-            SecuritySymbolKind::Firewall => array_map(static fn (SecurityFirewall $firewall): string => $firewall->name(), $index->firewalls()),
-            SecuritySymbolKind::Provider => array_map(static fn (SecurityUserProvider $provider): string => $provider->name(), $index->providers()),
-            SecuritySymbolKind::Role => array_map(static fn (SecurityRole $role): string => $role->name(), $index->roles()),
+        $names = match ($context->kind) {
+            SecuritySymbolKind::Firewall => array_map(static fn (SecurityFirewall $firewall): string => $firewall->name, $index->firewalls()),
+            SecuritySymbolKind::Provider => array_map(static fn (SecurityUserProvider $provider): string => $provider->name, $index->providers()),
+            SecuritySymbolKind::Role => array_map(static fn (SecurityRole $role): string => $role->name, $index->roles()),
         };
         $sourceIndex = $this->sourceIndexes->forProject($request->project);
-        $sourceNames = SecuritySymbolKind::Role === $context->kind()
-            ? $sourceIndex->names($context->kind())
-            : $sourceIndex->declarationNames($context->kind());
+        $sourceNames = SecuritySymbolKind::Role === $context->kind
+            ? $sourceIndex->names($context->kind)
+            : $sourceIndex->declarationNames($context->kind);
         array_push($names, ...$sourceNames);
         $names = array_values(array_unique($names));
         sort($names);
         $items = [];
         foreach ($names as $name) {
-            if (str_starts_with($name, $context->prefix())) {
+            if (str_starts_with($name, $context->prefix)) {
                 $items[] = [
                     'label' => $name,
                     'kind' => 12,
-                    'detail' => 'Symfony security '.$context->kind()->value,
-                    'textEdit' => $this->protocol->textEdit($context->range(), $name),
+                    'detail' => 'Symfony security '.$context->kind->value,
+                    'textEdit' => $this->protocol->textEdit($context->range, $name),
                 ];
             }
         }
@@ -71,10 +71,10 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
         }
         [$symbol, $project] = $resolved;
         $index = $this->indexes->forProject($project);
-        $lines = match ($symbol->kind()) {
-            SecuritySymbolKind::Firewall => $this->firewallHover($index, $symbol->name()),
-            SecuritySymbolKind::Provider => $this->providerHover($index, $symbol->name()),
-            SecuritySymbolKind::Role => $this->roleHover($index, $symbol->name()),
+        $lines = match ($symbol->kind) {
+            SecuritySymbolKind::Firewall => $this->firewallHover($index, $symbol->name),
+            SecuritySymbolKind::Provider => $this->providerHover($index, $symbol->name),
+            SecuritySymbolKind::Role => $this->roleHover($index, $symbol->name),
         };
 
         return [] === $lines ? null : $this->protocol->markdownHover(implode("\n", $lines));
@@ -88,11 +88,11 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
         }
         [$symbol, $project] = $resolved;
         $declarations = array_filter(
-            $this->sourceIndexes->forProject($project)->symbols($symbol->kind(), $symbol->name()),
-            static fn (SecuritySourceSymbol $candidate): bool => $candidate->isDeclaration(),
+            $this->sourceIndexes->forProject($project)->symbols($symbol->kind, $symbol->name),
+            static fn (SecuritySourceSymbol $candidate): bool => $candidate->declaration,
         );
 
-        return array_map(fn (SecuritySourceSymbol $candidate): array => $this->protocol->location($candidate->uri(), $candidate->range()), array_values($declarations));
+        return array_map(fn (SecuritySourceSymbol $candidate): array => $this->protocol->location($candidate->uri, $candidate->range), array_values($declarations));
     }
 
     public function references(array $params): ?array
@@ -103,7 +103,7 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
         }
         [$symbol, $project] = $resolved;
 
-        return array_map(fn (SecuritySourceSymbol $candidate): array => $this->protocol->location($candidate->uri(), $candidate->range()), $this->sourceIndexes->forProject($project)->symbols($symbol->kind(), $symbol->name()));
+        return array_map(fn (SecuritySourceSymbol $candidate): array => $this->protocol->location($candidate->uri, $candidate->range), $this->sourceIndexes->forProject($project)->symbols($symbol->kind, $symbol->name));
     }
 
     public function name(): string
@@ -123,15 +123,15 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
         }
         $sourceIndex = $this->sourceIndexes->forProject($request->project);
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols() as $symbol) {
-            if ($symbol->isDeclaration() || SecuritySymbolKind::Role === $symbol->kind()) {
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols as $symbol) {
+            if ($symbol->declaration || SecuritySymbolKind::Role === $symbol->kind) {
                 continue;
             }
-            $known = SecuritySymbolKind::Firewall === $symbol->kind()
-                ? null !== $index->firewall($symbol->name())
-                : null !== $index->provider($symbol->name());
-            if (!$known && !\in_array($symbol->name(), $sourceIndex->declarationNames($symbol->kind()), true)) {
-                $diagnostics[] = $this->protocol->diagnostic($symbol->range(), 1, SecuritySymbolKind::Firewall === $symbol->kind() ? 'security.unknown_firewall' : 'security.unknown_provider', \sprintf('Unknown security %s "%s".', $symbol->kind()->value, $symbol->name()));
+            $known = SecuritySymbolKind::Firewall === $symbol->kind
+                ? null !== $index->firewall($symbol->name)
+                : null !== $index->provider($symbol->name);
+            if (!$known && !\in_array($symbol->name, $sourceIndex->declarationNames($symbol->kind), true)) {
+                $diagnostics[] = $this->protocol->diagnostic($symbol->range, 1, SecuritySymbolKind::Firewall === $symbol->kind ? 'security.unknown_firewall' : 'security.unknown_provider', \sprintf('Unknown security %s "%s".', $symbol->kind->value, $symbol->name));
             }
         }
 
@@ -150,9 +150,9 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols() as $symbol) {
-            $start = $this->converter->toByteOffset($request->document->text, $symbol->range()->start);
-            $end = $this->converter->toByteOffset($request->document->text, $symbol->range()->end);
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols as $symbol) {
+            $start = $this->converter->toByteOffset($request->document->text, $symbol->range->start);
+            $end = $this->converter->toByteOffset($request->document->text, $symbol->range->end);
             if ($offset >= $start && $offset <= $end) {
                 return [$symbol, $request->project];
             }
@@ -172,15 +172,15 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
         return [
             'Security firewall: `'.$name.'`',
             '',
-            'Enabled: '.($firewall->isEnabled() ? 'yes' : 'no'),
+            'Enabled: '.($firewall->enabled ? 'yes' : 'no'),
             '',
-            'Provider: '.(null === $firewall->provider() ? 'none' : '`'.$firewall->provider().'`'),
+            'Provider: '.(null === $firewall->provider ? 'none' : '`'.$firewall->provider.'`'),
             '',
-            'Stateless: '.($firewall->isStateless() ? 'yes' : 'no'),
+            'Stateless: '.($firewall->stateless ? 'yes' : 'no'),
             '',
-            'Lazy: '.($firewall->isLazy() ? 'yes' : 'no'),
+            'Lazy: '.($firewall->lazy ? 'yes' : 'no'),
             '',
-            'Authenticators: '.([] === $firewall->authenticators() ? 'none' : '`'.implode('`, `', $firewall->authenticators()).'`'),
+            'Authenticators: '.([] === $firewall->authenticators ? 'none' : '`'.implode('`, `', $firewall->authenticators).'`'),
         ];
     }
 
@@ -191,14 +191,14 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
         if (null === $provider) {
             return [];
         }
-        $firewalls = array_values(array_filter($index->firewalls(), static fn (SecurityFirewall $firewall): bool => $firewall->provider() === $name));
+        $firewalls = array_values(array_filter($index->firewalls(), static fn (SecurityFirewall $firewall): bool => $firewall->provider === $name));
 
         return [
             'Security user provider: `'.$name.'`',
             '',
-            'Type: `'.$provider->type().'`',
+            'Type: `'.$provider->type.'`',
             '',
-            'Firewalls: '.([] === $firewalls ? 'none' : '`'.implode('`, `', array_map(static fn (SecurityFirewall $firewall): string => $firewall->name(), $firewalls)).'`'),
+            'Firewalls: '.([] === $firewalls ? 'none' : '`'.implode('`, `', array_map(static fn (SecurityFirewall $firewall): string => $firewall->name, $firewalls)).'`'),
         ];
     }
 
@@ -211,16 +211,16 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
         }
         $parents = [];
         foreach ($index->roles() as $candidate) {
-            if (\in_array($name, $candidate->inheritedRoles(), true)) {
-                $parents[] = $candidate->name();
+            if (\in_array($name, $candidate->inheritedRoles, true)) {
+                $parents[] = $candidate->name;
             }
         }
-        $voters = array_map(static fn (SecurityVoter $voter): string => $voter->className(), $index->voters());
+        $voters = array_map(static fn (SecurityVoter $voter): string => $voter->className, $index->voters());
 
         return [
             'Security role: `'.$name.'`',
             '',
-            'Inherits: '.([] === $role->inheritedRoles() ? 'none' : '`'.implode('`, `', $role->inheritedRoles()).'`'),
+            'Inherits: '.([] === $role->inheritedRoles ? 'none' : '`'.implode('`, `', $role->inheritedRoles).'`'),
             '',
             'Inherited by: '.([] === $parents ? 'none' : '`'.implode('`, `', $parents).'`'),
             '',

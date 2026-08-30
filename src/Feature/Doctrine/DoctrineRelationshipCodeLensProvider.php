@@ -25,16 +25,16 @@ final class DoctrineRelationshipCodeLensProvider implements CodeLensProviderInte
         $index = $this->indexes->forProject($request->project);
         $facts = $this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text);
         $lenses = [];
-        foreach ($facts->entities() as $entity) {
-            $repository = null === $entity->repositoryClass() ? null : $index->repository($entity->repositoryClass());
+        foreach ($facts->entities as $entity) {
+            $repository = null === $entity->repositoryClass ? null : $index->repository($entity->repositoryClass);
             if (null !== $repository) {
-                $lenses[] = $this->protocol->referenceLens($entity->range(), 'Repository: '.$repository->className(), $entity->uri(), [$this->protocol->location($repository->uri(), $repository->range())]);
+                $lenses[] = $this->protocol->referenceLens($entity->range, 'Repository: '.$repository->className, $entity->uri, [$this->protocol->location($repository->uri, $repository->range)]);
             }
         }
-        foreach ($facts->repositories() as $repository) {
-            $entity = $index->entity($repository->entityClass());
+        foreach ($facts->repositories as $repository) {
+            $entity = $index->entity($repository->entityClass);
             if (null !== $entity) {
-                $lenses[] = $this->protocol->referenceLens($repository->range(), 'Entity: '.$entity->className(), $repository->uri(), [$this->protocol->location($entity->uri(), $entity->range())]);
+                $lenses[] = $this->protocol->referenceLens($repository->range, 'Entity: '.$entity->className, $repository->uri, [$this->protocol->location($entity->uri, $entity->range)]);
             }
         }
 

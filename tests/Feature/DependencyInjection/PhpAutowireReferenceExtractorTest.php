@@ -44,13 +44,13 @@ final class PhpAutowireReferenceExtractorTest extends TestCase
             ['parameter', 'app.storage_dir'],
             ['parameter', 'app.api_key'],
         ], array_map(
-            static fn ($reference): array => [$reference->kind()->value, $reference->name()],
+            static fn ($reference): array => [$reference->kind->value, $reference->name],
             $references,
         ));
         self::assertSame(
             ['App\\Controller\\DemoController'],
             array_map(
-                static fn ($declaration): string => $declaration->className(),
+                static fn ($declaration): string => $declaration->className,
                 (new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser())))->extract(
                     'file:///workspace/src/Controller/DemoController.php',
                     $text,
@@ -81,9 +81,9 @@ final class PhpAutowireReferenceExtractorTest extends TestCase
         );
 
         self::assertCount(1, $references);
-        self::assertSame('App\Transport\Smtp', $references[0]->name());
-        $start = $references[0]->range()->start;
-        $end = $references[0]->range()->end;
+        self::assertSame('App\Transport\Smtp', $references[0]->name);
+        $start = $references[0]->range->start;
+        $end = $references[0]->range->end;
         self::assertSame("'App\\\\Transport\\\\Smtp'", substr(
             explode("\n", $text)[$start->line],
             $start->character - 1,

@@ -27,47 +27,47 @@ final class MessengerRelationshipProvider implements DefinitionProviderInterface
         $index = $this->indexes->forProject($project);
         $lines = [];
         if ($symbol instanceof MessengerSourceSymbol) {
-            $message = MessengerSymbolKind::Message === $symbol->kind() ? $index->message($symbol->name()) : null;
-            if (MessengerSymbolKind::Bus === $symbol->kind() && null !== $bus = $index->bus($symbol->name())) {
+            $message = MessengerSymbolKind::Message === $symbol->kind ? $index->message($symbol->name) : null;
+            if (MessengerSymbolKind::Bus === $symbol->kind && null !== $bus = $index->bus($symbol->name)) {
                 $handled = 0;
                 foreach ($index->messages() as $knownMessage) {
-                    foreach ($index->handlersForMessage($knownMessage->className()) as $handler) {
-                        if ($handler->bus() === $bus->name()) {
+                    foreach ($index->handlersForMessage($knownMessage->className) as $handler) {
+                        if ($handler->bus === $bus->name) {
                             ++$handled;
                             break;
                         }
                     }
                 }
-                $lines = ['Messenger bus: `'.$bus->name().'`', '', 'Default: '.($bus->isDefault() ? 'yes' : 'no'), '', 'Handled messages: '.$handled];
-            } elseif (MessengerSymbolKind::Transport === $symbol->kind() && null !== $transport = $index->transport($symbol->name())) {
+                $lines = ['Messenger bus: `'.$bus->name.'`', '', 'Default: '.($bus->default ? 'yes' : 'no'), '', 'Handled messages: '.$handled];
+            } elseif (MessengerSymbolKind::Transport === $symbol->kind && null !== $transport = $index->transport($symbol->name)) {
                 $routed = 0;
                 foreach ($index->messages() as $knownMessage) {
-                    if (\in_array($transport->name(), $knownMessage->transports(), true)) {
+                    if (\in_array($transport->name, $knownMessage->transports, true)) {
                         ++$routed;
                     }
                 }
-                $lines = ['Messenger transport: `'.$transport->name().'`', '', 'Failure transport: '.($transport->isFailure() ? 'yes' : 'no'), '', 'Routed messages: '.$routed];
-            } elseif (MessengerSymbolKind::Message === $symbol->kind()) {
-                $handlers = $this->relationships->handlersForMessage($project, $index, $symbol->name());
+                $lines = ['Messenger transport: `'.$transport->name.'`', '', 'Failure transport: '.($transport->failure ? 'yes' : 'no'), '', 'Routed messages: '.$routed];
+            } elseif (MessengerSymbolKind::Message === $symbol->kind) {
+                $handlers = $this->relationships->handlersForMessage($project, $index, $symbol->name);
                 if (null !== $message || [] !== $handlers) {
-                    $lines = $this->messageLines($symbol->name(), $message?->transports() ?? [], $handlers);
+                    $lines = $this->messageLines($symbol->name, $message->transports ?? [], $handlers);
                 }
             }
         } elseif ($class instanceof PhpClassDeclaration) {
-            $message = $index->message($class->className());
-            $messageHandlers = $this->relationships->handlersForMessage($project, $index, $class->className());
+            $message = $index->message($class->className);
+            $messageHandlers = $this->relationships->handlersForMessage($project, $index, $class->className);
             if (null !== $message || [] !== $messageHandlers) {
-                $lines = $this->messageLines($class->className(), $message?->transports() ?? [], $messageHandlers);
+                $lines = $this->messageLines($class->className, $message->transports ?? [], $messageHandlers);
             } else {
-                $handled = $index->handlersByClass($class->className());
+                $handled = $index->handlersByClass($class->className);
                 if ([] !== $handled) {
                     $messages = [];
                     $buses = [];
                     foreach ($handled as $handler) {
-                        $messages[$handler->message()] = true;
-                        $buses[$handler->bus()] = true;
+                        $messages[$handler->message] = true;
+                        $buses[$handler->bus] = true;
                     }
-                    $lines = ['Messenger handler: `'.$class->className().'`', '', 'Messages: `'.implode('`, `', array_keys($messages)).'`', '', 'Buses: `'.implode('`, `', array_keys($buses)).'`'];
+                    $lines = ['Messenger handler: `'.$class->className.'`', '', 'Messages: `'.implode('`, `', array_keys($messages)).'`', '', 'Buses: `'.implode('`, `', array_keys($buses)).'`'];
                 }
             }
         }
@@ -95,7 +95,7 @@ final class MessengerRelationshipProvider implements DefinitionProviderInterface
     {
         $handlerNames = [];
         foreach ($handlers as $handler) {
-            $handlerNames[] = $handler->className().'::'.$handler->method();
+            $handlerNames[] = $handler->className.'::'.$handler->method;
         }
 
         return ['Messenger message: `'.$className.'`', '', 'Transports: '.([] === $transports ? 'none' : '`'.implode('`, `', $transports).'`'), '', 'Handlers: '.([] === $handlerNames ? 'none' : '`'.implode('`, `', $handlerNames).'`')];

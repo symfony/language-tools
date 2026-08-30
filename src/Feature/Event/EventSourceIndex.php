@@ -33,8 +33,8 @@ final class EventSourceIndex extends AbstractSourceFactsIndex
 
         $this->symbols = [];
         foreach ($this->facts() as $source) {
-            foreach ($source->symbols() as $symbol) {
-                $this->symbols[$symbol->name()][] = $symbol;
+            foreach ($source->symbols as $symbol) {
+                $this->symbols[$symbol->name][] = $symbol;
             }
         }
         $this->indexed = true;

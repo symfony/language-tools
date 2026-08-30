@@ -30,17 +30,17 @@ final class RouteSymbolResolver
             ? $this->twigReferenceExtractor->at($text, $offset)
             : $this->phpReferenceExtractor->at($text, $offset, $this->classIndexes->forProject($project));
         if (null !== $reference) {
-            return new RouteSymbol($reference->name(), $reference->range());
+            return new RouteSymbol($reference->name, $reference->range);
         }
 
         $declarations = \in_array($extension, ['yaml', 'yml'], true)
             ? $this->yamlDeclarationExtractor->extract($uri, $text)
             : $this->phpDeclarationExtractor->extract($uri, $text);
         foreach ($declarations as $declaration) {
-            $start = $this->positionConverter->toByteOffset($text, $declaration->range()->start);
-            $end = $this->positionConverter->toByteOffset($text, $declaration->range()->end);
+            $start = $this->positionConverter->toByteOffset($text, $declaration->range->start);
+            $end = $this->positionConverter->toByteOffset($text, $declaration->range->end);
             if ($offset >= $start && $offset <= $end) {
-                return new RouteSymbol($declaration->name(), $declaration->range());
+                return new RouteSymbol($declaration->name, $declaration->range);
             }
         }
 

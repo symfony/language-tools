@@ -24,17 +24,17 @@ final class MessengerIndex
     {
         $this->buses = [];
         foreach ($buses as $bus) {
-            $this->buses[$bus->name()] = $bus;
+            $this->buses[$bus->name] = $bus;
         }
         ksort($this->buses);
         $this->transports = [];
         foreach ($transports as $transport) {
-            $this->transports[$transport->name()] = $transport;
+            $this->transports[$transport->name] = $transport;
         }
         ksort($this->transports);
         $this->messages = [];
         foreach ($messages as $message) {
-            $this->messages[$message->className()] = $message;
+            $this->messages[$message->className] = $message;
         }
         ksort($this->messages);
         $this->handlers = $handlers;
@@ -77,13 +77,13 @@ final class MessengerIndex
     /** @return list<MessengerHandler> */
     public function handlersForMessage(string $className): array
     {
-        return array_values(array_filter($this->handlers, static fn (MessengerHandler $handler): bool => $handler->message() === ltrim($className, '\\')));
+        return array_values(array_filter($this->handlers, static fn (MessengerHandler $handler): bool => $handler->message === ltrim($className, '\\')));
     }
 
     /** @return list<MessengerHandler> */
     public function handlersByClass(string $className): array
     {
-        return array_values(array_filter($this->handlers, static fn (MessengerHandler $handler): bool => $handler->className() === ltrim($className, '\\')));
+        return array_values(array_filter($this->handlers, static fn (MessengerHandler $handler): bool => $handler->className === ltrim($className, '\\')));
     }
 
     public function isComplete(): bool

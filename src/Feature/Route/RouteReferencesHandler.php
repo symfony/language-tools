@@ -35,13 +35,13 @@ final class RouteReferencesHandler implements ReferencesProviderInterface
         }
 
         $locations = array_map(
-            fn (RouteReferenceLocation $reference): array => $this->protocol->location($reference->uri(), $reference->range()),
-            $this->referenceIndexes->forProject($request->project)->find($symbol->name()),
+            fn (RouteReferenceLocation $reference): array => $this->protocol->location($reference->uri, $reference->range),
+            $this->referenceIndexes->forProject($request->project)->find($symbol->name),
         );
         $context = $params['context'] ?? null;
         if (\is_array($context) && true === ($context['includeDeclaration'] ?? null)) {
-            foreach ($this->declarationIndexes->forProject($request->project)->find($symbol->name()) as $declaration) {
-                $locations[] = $this->protocol->location($declaration->uri(), $declaration->range());
+            foreach ($this->declarationIndexes->forProject($request->project)->find($symbol->name) as $declaration) {
+                $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
             }
         }
 

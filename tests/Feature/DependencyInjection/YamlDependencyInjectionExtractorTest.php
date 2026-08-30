@@ -18,11 +18,11 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
             YAML;
 
         $configuration = $extractor->extract('file:///workspace/config/packages/assets.yaml', $yaml);
-        self::assertSame(['kernel.project_dir'], array_map(static fn ($reference): string => $reference->name(), $configuration->references()));
+        self::assertSame(['kernel.project_dir'], array_map(static fn ($reference): string => $reference->name, $configuration->references));
 
         // outside a config directory the same yaml could be a translation catalog with literal placeholders
         $catalog = $extractor->extract('file:///workspace/translations/messages.en.yaml', "greeting: 'Hello %name%'\n");
-        self::assertSame([], $catalog->references());
+        self::assertSame([], $catalog->references);
 
         // %% escapes a literal percent, as in monolog line formats
         $monolog = $extractor->extract('file:///workspace/config/services.yaml', <<<'YAML'
@@ -31,7 +31,7 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
                     main:
                         formatter: "[%%datetime%%] %%message%% in %kernel.environment%"
             YAML);
-        self::assertSame(['kernel.environment'], array_map(static fn ($reference): string => $reference->name(), $monolog->references()));
+        self::assertSame(['kernel.environment'], array_map(static fn ($reference): string => $reference->name, $monolog->references));
     }
 
     public function testExtractsDeclarationsMetadataAndStaticReferencesWithoutValues(): void
@@ -68,16 +68,16 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
 
         self::assertSame(
             ['app.api_key', 'app.storage_dir', 'app.message'],
-            array_map(static fn ($declaration): string => $declaration->name(), $facts->parameters()),
+            array_map(static fn ($declaration): string => $declaration->name, $facts->parameters),
         );
         self::assertSame(
             ['app.mailer', 'mailer', 'app.decorator'],
-            array_map(static fn ($declaration): string => $declaration->id(), $facts->services()),
+            array_map(static fn ($declaration): string => $declaration->id, $facts->services),
         );
-        self::assertSame('App\\Mailer', $facts->services()[0]->className());
-        self::assertSame(['mailer.transport', 'kernel.reset'], $facts->services()[0]->tags());
-        self::assertSame('app.mailer', $facts->services()[1]->alias());
-        self::assertSame('app.mailer', $facts->services()[2]->decorates());
+        self::assertSame('App\\Mailer', $facts->services[0]->className);
+        self::assertSame(['mailer.transport', 'kernel.reset'], $facts->services[0]->tags);
+        self::assertSame('app.mailer', $facts->services[1]->alias);
+        self::assertSame('app.mailer', $facts->services[2]->decorates);
         self::assertSame([
             ['parameter', 'kernel.project_dir', false],
             ['parameter', 'kernel.project_dir', false],
@@ -88,17 +88,17 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
             ['service', 'app.mailer', false],
         ], array_map(
             static fn ($reference): array => [
-                $reference->kind()->value,
-                $reference->name(),
-                $reference->isOptional(),
+                $reference->kind->value,
+                $reference->name,
+                $reference->optional,
             ],
-            $facts->references(),
+            $facts->references,
         ));
         self::assertStringNotContainsString(
             'CANARY_SECRET_VALUE',
             implode(' ', [
-                ...array_map(static fn ($declaration): string => $declaration->name(), $facts->parameters()),
-                ...array_map(static fn ($declaration): string => $declaration->id(), $facts->services()),
+                ...array_map(static fn ($declaration): string => $declaration->name, $facts->parameters),
+                ...array_map(static fn ($declaration): string => $declaration->id, $facts->services),
             ]),
         );
     }

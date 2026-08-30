@@ -7,30 +7,10 @@ use Symfony\Lsp\Document\Range;
 final class ConsoleCompletionContext
 {
     public function __construct(
-        private readonly ConsoleInputKind $kind,
-        private readonly string $prefix,
-        private readonly Range $range,
-        private readonly string $commandClass,
+        public readonly ConsoleInputKind $kind,
+        public readonly string $prefix,
+        public readonly Range $range,
+        public readonly string $commandClass,
     ) {
-    }
-
-    public function kind(): ConsoleInputKind
-    {
-        return $this->kind;
-    }
-
-    public function prefix(): string
-    {
-        return $this->prefix;
-    }
-
-    public function range(): Range
-    {
-        return $this->range;
-    }
-
-    public function commandClass(): string
-    {
-        return $this->commandClass;
     }
 }

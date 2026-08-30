@@ -13,25 +13,25 @@ final class ConsoleIndex
     {
         $this->commands = [];
         foreach ($commands as $command) {
-            $key = strtolower(ltrim($command->className(), '\\'));
+            $key = strtolower(ltrim($command->className, '\\'));
             if (!isset($this->commands[$key])) {
                 $this->commands[$key] = $command;
                 continue;
             }
             $existing = $this->commands[$key];
-            $arguments = array_values(array_unique([...$existing->arguments(), ...$command->arguments()]));
-            $options = array_values(array_unique([...$existing->options(), ...$command->options()]));
+            $arguments = array_values(array_unique([...$existing->arguments, ...$command->arguments]));
+            $options = array_values(array_unique([...$existing->options, ...$command->options]));
             sort($arguments);
             sort($options);
             $this->commands[$key] = new ConsoleCommandMetadata(
-                $existing->className(),
-                $existing->file() ?? $command->file(),
+                $existing->className,
+                $existing->file ?? $command->file,
                 $arguments,
                 $options,
-                $existing->isComplete()
-                    && $command->isComplete()
-                    && $existing->arguments() === $command->arguments()
-                    && $existing->options() === $command->options(),
+                $existing->complete
+                    && $command->complete
+                    && $existing->arguments === $command->arguments
+                    && $existing->options === $command->options,
             );
         }
         ksort($this->commands);

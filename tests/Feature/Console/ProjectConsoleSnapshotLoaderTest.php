@@ -38,10 +38,10 @@ final class ProjectConsoleSnapshotLoaderTest extends TestCase
         $command = $index->command('App\Command\ReportCommand');
         self::assertTrue($index->isComplete());
         self::assertInstanceOf(ConsoleCommandMetadata::class, $command);
-        self::assertSame('/workspace/src/Command/ReportCommand.php', $command->file());
-        self::assertSame(['report'], $command->arguments());
-        self::assertSame(['format', 'verbose'], $command->options());
-        self::assertTrue($command->isComplete());
+        self::assertSame('/workspace/src/Command/ReportCommand.php', $command->file);
+        self::assertSame(['report'], $command->arguments);
+        self::assertSame(['format', 'verbose'], $command->options);
+        self::assertTrue($command->complete);
         self::assertCount(1, $index->commands());
     }
 

@@ -28,7 +28,7 @@ final class ConfigurationValueValidator
 
     public function acceptsType(ConfigurationNode $node, string $actual): bool
     {
-        $expected = 'boolean' === $node->type() ? 'bool' : $node->type();
+        $expected = 'boolean' === $node->type ? 'bool' : $node->type;
         if (!\in_array($expected, ['array', 'bool', 'float', 'integer'], true)) {
             return true;
         }
@@ -52,11 +52,11 @@ final class ConfigurationValueValidator
         if (null === $literal && $node->acceptsNull()) {
             return true;
         }
-        if ([] !== $node->allowedValues() && !\in_array($literal, $node->allowedValues(), true)) {
+        if ([] !== $node->allowedValues && !\in_array($literal, $node->allowedValues, true)) {
             return false;
         }
 
-        return match ($node->type()) {
+        return match ($node->type) {
             'boolean' => \is_bool($literal) || \in_array($literal, [0, 1], true),
             'integer' => \is_int($literal),
             'float' => \is_int($literal) || \is_float($literal),

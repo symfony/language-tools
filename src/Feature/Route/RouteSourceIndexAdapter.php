@@ -18,8 +18,8 @@ final class RouteSourceIndexAdapter implements SourceFactsIndexInterface
         $declarations = [];
         $references = [];
         foreach ($facts as $source) {
-            array_push($declarations, ...$source->declarations());
-            array_push($references, ...$source->references());
+            array_push($declarations, ...$source->declarations);
+            array_push($references, ...$source->references);
         }
         $this->declarations->replace(...$declarations);
         $this->references->replace(...$references);
@@ -28,8 +28,8 @@ final class RouteSourceIndexAdapter implements SourceFactsIndexInterface
     /** @param RouteSourceFacts $facts */
     public function replaceSource(SourceFactsInterface $facts): void
     {
-        $this->declarations->replaceSource($facts->uri(), ...$facts->declarations());
-        $this->references->replaceSource($facts->uri(), ...$facts->references());
+        $this->declarations->replaceSource($facts->uri, ...$facts->declarations);
+        $this->references->replaceSource($facts->uri, ...$facts->references);
     }
 
     public function removeSource(string $uri): void
@@ -41,8 +41,8 @@ final class RouteSourceIndexAdapter implements SourceFactsIndexInterface
     /** @param RouteSourceFacts $facts */
     public function overlay(SourceFactsInterface $facts): void
     {
-        $this->declarations->replaceForUri($facts->uri(), ...$facts->declarations());
-        $this->references->replaceForUri($facts->uri(), ...$facts->references());
+        $this->declarations->replaceForUri($facts->uri, ...$facts->declarations);
+        $this->references->replaceForUri($facts->uri, ...$facts->references);
     }
 
     public function removeOverlay(string $uri): void

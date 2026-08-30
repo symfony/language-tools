@@ -22,27 +22,27 @@ final class TwigComponentRelationshipProvider implements DefinitionProviderInter
         if (null !== $action) {
             [$component, $componentAction] = $action;
 
-            return $this->protocol->markdownHover(\sprintf('Live action: `%s#%s`', $component->name(), $componentAction->name()));
+            return $this->protocol->markdownHover(\sprintf('Live action: `%s#%s`', $component->name, $componentAction->name));
         }
         $resolved = $this->components->resolveComponent($params);
         if (null === $resolved) {
             return null;
         }
         [$component] = $resolved;
-        $details = [\sprintf('%s component: `%s`', $component->isLive() ? 'Live' : 'Twig', $component->name())];
-        if (null !== $component->className()) {
-            $details[] = \sprintf('Class: `%s`', $component->className());
+        $details = [\sprintf('%s component: `%s`', $component->live ? 'Live' : 'Twig', $component->name)];
+        if (null !== $component->className) {
+            $details[] = \sprintf('Class: `%s`', $component->className);
         }
-        if (null !== $component->template()) {
-            $details[] = \sprintf('Template: `%s`', $component->template());
+        if (null !== $component->template) {
+            $details[] = \sprintf('Template: `%s`', $component->template);
         }
-        if ([] !== $component->properties()) {
-            $details[] = \sprintf('Properties: `%s`', implode('`, `', $component->properties()));
+        if ([] !== $component->properties) {
+            $details[] = \sprintf('Properties: `%s`', implode('`, `', $component->properties));
         }
-        if ([] !== $component->actions()) {
+        if ([] !== $component->actions) {
             $actions = [];
-            foreach ($component->actions() as $componentAction) {
-                $actions[] = $componentAction->name();
+            foreach ($component->actions as $componentAction) {
+                $actions[] = $componentAction->name;
             }
             $details[] = \sprintf('Actions: `%s`', implode('`, `', $actions));
         }
@@ -56,10 +56,10 @@ final class TwigComponentRelationshipProvider implements DefinitionProviderInter
         if (null !== $action) {
             [$component, $componentAction, $project] = $action;
             $locations = [];
-            foreach ($this->indexes->forProject($project)->declarations($component->name()) as $declaration) {
-                foreach ($declaration->actions() as $declarationAction) {
-                    if ($componentAction->name() === $declarationAction->name()) {
-                        $locations[] = $this->protocol->location($declaration->uri(), $declarationAction->range());
+            foreach ($this->indexes->forProject($project)->declarations($component->name) as $declaration) {
+                foreach ($declaration->actions as $declarationAction) {
+                    if ($componentAction->name === $declarationAction->name) {
+                        $locations[] = $this->protocol->location($declaration->uri, $declarationAction->range);
                     }
                 }
             }
@@ -72,12 +72,12 @@ final class TwigComponentRelationshipProvider implements DefinitionProviderInter
         }
         [$component, $project] = $resolved;
         $locations = [];
-        foreach ($this->indexes->forProject($project)->declarations($component->name()) as $declaration) {
-            $locations[] = $this->protocol->location($declaration->uri(), $declaration->range());
+        foreach ($this->indexes->forProject($project)->declarations($component->name) as $declaration) {
+            $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
         }
-        if ([] === $locations && '' !== $component->uri()) {
+        if ([] === $locations && '' !== $component->uri) {
             // vendor components have no source declaration; open the class
-            $locations[] = $this->protocol->location($component->uri(), $component->range());
+            $locations[] = $this->protocol->location($component->uri, $component->range);
         }
 
         return $locations;
@@ -89,8 +89,8 @@ final class TwigComponentRelationshipProvider implements DefinitionProviderInter
         if (null !== $action) {
             [$component, $componentAction, $project] = $action;
             $locations = $this->definition($params) ?? [];
-            foreach ($this->indexes->forProject($project)->actionReferences($component->name(), $componentAction->name()) as $reference) {
-                $locations[] = $this->protocol->location($reference->uri(), $reference->range());
+            foreach ($this->indexes->forProject($project)->actionReferences($component->name, $componentAction->name) as $reference) {
+                $locations[] = $this->protocol->location($reference->uri, $reference->range);
             }
 
             return $locations;
@@ -101,8 +101,8 @@ final class TwigComponentRelationshipProvider implements DefinitionProviderInter
         }
         [$component, $project] = $resolved;
         $locations = [];
-        foreach ($this->indexes->forProject($project)->references($component->name()) as $reference) {
-            $locations[] = $this->protocol->location($reference->uri(), $reference->range());
+        foreach ($this->indexes->forProject($project)->references($component->name) as $reference) {
+            $locations[] = $this->protocol->location($reference->uri, $reference->range);
         }
 
         return $locations;

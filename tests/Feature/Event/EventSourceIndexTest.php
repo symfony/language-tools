@@ -17,14 +17,14 @@ final class EventSourceIndexTest extends TestCase
         $first = $this->facts('FirstEvent');
         $index->replace($first);
 
-        self::assertSame([$first->symbols()[0]], $index->symbols('\\App\\FirstEvent'));
+        self::assertSame([$first->symbols[0]], $index->symbols('\\App\\FirstEvent'));
 
         $second = $this->facts('SecondEvent');
         $index->replaceSource($second);
-        $index->removeSource($first->uri());
+        $index->removeSource($first->uri);
 
         self::assertSame([], $index->symbols('App\\FirstEvent'));
-        self::assertSame([$second->symbols()[0]], $index->symbols('\\App\\SecondEvent'));
+        self::assertSame([$second->symbols[0]], $index->symbols('\\App\\SecondEvent'));
     }
 
     private function facts(string $name): EventSourceFacts

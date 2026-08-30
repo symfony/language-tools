@@ -25,15 +25,15 @@ final class TranslationRenameHandler implements RenameProviderInterface
         }
         $reference = $resolved->reference;
         $project = $resolved->project;
-        $declarations = $this->indexes->forProject($project)->declarations($reference->domain(), $reference->key());
+        $declarations = $this->indexes->forProject($project)->declarations($reference->domain, $reference->key);
         if ([] === array_filter(
             $declarations,
-            fn (TranslationDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri()),
+            fn (TranslationDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri),
         )) {
             return null;
         }
 
-        return ['range' => $this->protocol->range($reference->range()), 'placeholder' => $reference->key()];
+        return ['range' => $this->protocol->range($reference->range), 'placeholder' => $reference->key];
     }
 
     public function rename(array $params): ?array
@@ -47,31 +47,31 @@ final class TranslationRenameHandler implements RenameProviderInterface
         $reference = $resolved->reference;
         $project = $resolved->project;
         $index = $this->indexes->forProject($project);
-        $declarations = $index->declarations($reference->domain(), $reference->key());
+        $declarations = $index->declarations($reference->domain, $reference->key);
         if ([] === array_filter(
             $declarations,
-            fn (TranslationDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri()),
+            fn (TranslationDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri),
         )
-            || [] !== $index->declarations($reference->domain(), $newName)
-            || [] !== $index->messages($reference->domain(), $newName)
+            || [] !== $index->declarations($reference->domain, $newName)
+            || [] !== $index->messages($reference->domain, $newName)
         ) {
             return null;
         }
 
-        $declarationText = $this->declarationText($reference->key(), $newName);
+        $declarationText = $this->declarationText($reference->key, $newName);
         if (null === $declarationText) {
             return null;
         }
 
         $byUri = [];
-        foreach ($index->references($reference->domain(), $reference->key()) as $item) {
-            if ($this->pathResolver->isApplicationOwned($project, $item->uri())) {
-                $byUri[$item->uri()][] = $this->edit($item->range(), $newName);
+        foreach ($index->references($reference->domain, $reference->key) as $item) {
+            if ($this->pathResolver->isApplicationOwned($project, $item->uri)) {
+                $byUri[$item->uri][] = $this->edit($item->range, $newName);
             }
         }
         foreach ($declarations as $item) {
-            if ($this->pathResolver->isApplicationOwned($project, $item->uri())) {
-                $byUri[$item->uri()][] = $this->edit($item->range(), $declarationText);
+            if ($this->pathResolver->isApplicationOwned($project, $item->uri)) {
+                $byUri[$item->uri][] = $this->edit($item->range, $declarationText);
             }
         }
         ksort($byUri);
@@ -83,7 +83,7 @@ final class TranslationRenameHandler implements RenameProviderInterface
         return [
             'documentChanges' => $changes,
             'changeAnnotations' => ['translationRename' => [
-                'label' => \sprintf('Rename translation "%s" to "%s"', $reference->key(), $newName),
+                'label' => \sprintf('Rename translation "%s" to "%s"', $reference->key, $newName),
                 'needsConfirmation' => true,
                 'description' => 'Dynamic translation references may remain unchanged.',
             ]],
@@ -94,7 +94,7 @@ final class TranslationRenameHandler implements RenameProviderInterface
     private function resolve(array $params): ?ResolvedTranslationReference
     {
         $resolved = $this->referenceResolver->resolve($params);
-        if (null === $resolved || !$this->pathResolver->isApplicationOwned($resolved->project, $resolved->reference->uri())) {
+        if (null === $resolved || !$this->pathResolver->isApplicationOwned($resolved->project, $resolved->reference->uri)) {
             return null;
         }
 

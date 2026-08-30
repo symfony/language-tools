@@ -83,11 +83,11 @@ final class EnvironmentIndex extends AbstractSourceFactsIndex
         $this->declarations = [];
         $this->references = [];
         foreach ($this->facts() as $facts) {
-            foreach ($facts->declarations() as $declaration) {
-                $this->declarations[$declaration->name()][] = $declaration;
+            foreach ($facts->declarations as $declaration) {
+                $this->declarations[$declaration->name][] = $declaration;
             }
-            foreach ($facts->references() as $reference) {
-                $this->references[$reference->name()][] = $reference;
+            foreach ($facts->references as $reference) {
+                $this->references[$reference->name][] = $reference;
             }
         }
 

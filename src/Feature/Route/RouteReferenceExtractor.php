@@ -36,7 +36,7 @@ final class RouteReferenceExtractor
 
         return array_values(array_filter(
             $this->extractFromDocument($text, $document),
-            fn (RouteReference $reference): bool => $this->isControllerClass($reference->controllerClass(), $document, $classIndex),
+            fn (RouteReference $reference): bool => $this->isControllerClass($reference->controllerClass, $document, $classIndex),
         ));
     }
 
@@ -55,14 +55,14 @@ final class RouteReferenceExtractor
         $document = $this->parser->parse($source);
         $receiver = RoutePhpReceiver::resolve($source, \strlen($source), $document->typeDeclarations);
 
-        return null !== $receiver && $this->isControllerClass($receiver->controllerClass(), $document, $classIndex);
+        return null !== $receiver && $this->isControllerClass($receiver->controllerClass, $document, $classIndex);
     }
 
     public function at(string $text, int $byteOffset, ?DependencyInjectionSourceIndex $classIndex = null): ?RouteReference
     {
         foreach ($this->extract($text, $classIndex) as $reference) {
-            $start = $this->positionConverter->toByteOffset($text, $reference->range()->start);
-            $end = $this->positionConverter->toByteOffset($text, $reference->range()->end);
+            $start = $this->positionConverter->toByteOffset($text, $reference->range->start);
+            $end = $this->positionConverter->toByteOffset($text, $reference->range->end);
             if ($byteOffset >= $start && $byteOffset <= $end) {
                 return $reference;
             }
@@ -93,7 +93,7 @@ final class RouteReferenceExtractor
                 $call->value,
                 $call->range,
                 $this->providedParameters(substr($masked, $call->end())),
-                $receiver->controllerClass(),
+                $receiver->controllerClass,
             );
         }
 

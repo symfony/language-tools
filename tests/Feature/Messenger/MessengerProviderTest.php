@@ -59,14 +59,14 @@ YAML;
 
         $names = [];
         $declarations = [];
-        foreach ($facts->symbols() as $symbol) {
-            $names[] = $symbol->name();
-            $declarations[] = $symbol->isDeclaration();
+        foreach ($facts->symbols as $symbol) {
+            $names[] = $symbol->name;
+            $declarations[] = $symbol->declaration;
         }
         self::assertSame(['command.bus', 'async', 'failed', 'App\\Message\\Ping', 'async', 'command.bus', 'failed'], $names);
         self::assertSame([true, true, true, false, false, false, false], $declarations);
         $phpFacts = $extractor->extract('file:///workspace/src/Example.php', 'php', "<?php\nfoo(bus: 'not_messenger');\n\$dispatcher->dispatch(new NotAMessage());\n");
-        self::assertSame([], $phpFacts->symbols());
+        self::assertSame([], $phpFacts->symbols);
 
         $handlerFacts = $extractor->extract(
             'file:///workspace/src/Handler.php',
@@ -89,9 +89,9 @@ YAML;
         self::assertSame([
             "#[HandlerAttribute(bus: 'command.bus')]",
             "#[HandlerAttribute(fromTransport: 'async', handles: Ping::class)]",
-        ], $handlerFacts->handlers());
-        self::assertSame(['command.bus', 'async', 'App\Message\Ping'], array_map(static fn ($symbol): string => $symbol->name(), $handlerFacts->symbols()));
-        self::assertFalse($handlerFacts->symbols()[0]->isDeclaration());
+        ], $handlerFacts->handlers);
+        self::assertSame(['command.bus', 'async', 'App\Message\Ping'], array_map(static fn ($symbol): string => $symbol->name, $handlerFacts->symbols));
+        self::assertFalse($handlerFacts->symbols[0]->declaration);
 
         $incompleteFacts = $extractor->extract('file:///workspace/src/IncompleteHandler.php', 'php', <<<'PHP'
             <?php
@@ -100,8 +100,8 @@ YAML;
             #[AsMessageHandler(bus: 'command.bus')
             final class IncompleteHandler {}
             PHP);
-        self::assertSame(["#[AsMessageHandler(bus: 'command.bus')"], $incompleteFacts->handlers());
-        self::assertSame(['command.bus'], array_map(static fn ($symbol): string => $symbol->name(), $incompleteFacts->symbols()));
+        self::assertSame(["#[AsMessageHandler(bus: 'command.bus')"], $incompleteFacts->handlers);
+        self::assertSame(['command.bus'], array_map(static fn ($symbol): string => $symbol->name, $incompleteFacts->symbols));
     }
 
     public function testScopesMessageBusParametersToTheirMethod(): void
@@ -133,7 +133,7 @@ YAML;
             }
             PHP);
 
-        self::assertSame(['App\ExpectedMessage'], array_map(static fn ($symbol): string => $symbol->name(), $facts->symbols()));
+        self::assertSame(['App\ExpectedMessage'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
     }
 
     public function testCompletesHoversNavigatesDiagnosesAndProvidesCodeLenses(): void
@@ -249,8 +249,8 @@ YAML;
 
         $facts = $extractor->extract('file:///workspace/src/Handler.php', 'php', $text);
 
-        self::assertSame([], $facts->symbols());
-        self::assertSame([], $facts->handlers());
+        self::assertSame([], $facts->symbols);
+        self::assertSame([], $facts->handlers);
     }
 
     /** @param list<string> $expectedLabels */

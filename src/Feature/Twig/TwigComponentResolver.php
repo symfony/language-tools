@@ -24,7 +24,7 @@ final class TwigComponentResolver
         $value = null;
         if (preg_match('/<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\b[^>]*\bdata-live-action-param\s*=\s*([\'"])([^\'"]*)$/s', $before, $match)) {
             $tagComponent = $this->indexes->forProject($project)->get($match[1]);
-            if ($tagComponent?->isLive()) {
+            if ($tagComponent?->live) {
                 $component = $tagComponent;
                 $value = $match[3];
             }
@@ -54,7 +54,7 @@ final class TwigComponentResolver
         $names = [];
         $directory = rtrim($index->anonymousTemplateDirectory(), '/').'/';
         foreach ($templates->matching('') as $template) {
-            $templateName = $template->name();
+            $templateName = $template->name;
             if (str_starts_with($templateName, $directory)) {
                 $path = substr($templateName, \strlen($directory));
             } elseif (str_starts_with($templateName, '@') && \is_int($marker = strpos($templateName, '/components/'))) {
@@ -114,24 +114,24 @@ final class TwigComponentResolver
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
         $facts = $this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text);
-        foreach ($facts->actionReferences() as $reference) {
-            if (!$this->converter->containsByteOffset($request->document->text, $reference->range(), $offset, inclusiveEnd: true)) {
+        foreach ($facts->actionReferences as $reference) {
+            if (!$this->converter->containsByteOffset($request->document->text, $reference->range, $offset, inclusiveEnd: true)) {
                 continue;
             }
-            $component = $this->indexes->forProject($request->project)->get($reference->component());
+            $component = $this->indexes->forProject($request->project)->get($reference->component);
             if (null === $component) {
                 return null;
             }
-            foreach ($component->actions() as $action) {
-                if ($reference->action() === $action->name()) {
+            foreach ($component->actions as $action) {
+                if ($reference->action === $action->name) {
                     return [$component, $action, $request->project];
                 }
             }
         }
-        foreach ($facts->components() as $component) {
-            foreach ($component->actions() as $action) {
-                if ($this->converter->containsByteOffset($request->document->text, $action->range(), $offset, inclusiveEnd: true)) {
-                    return [$this->indexes->forProject($request->project)->get($component->name()) ?? $component, $action, $request->project];
+        foreach ($facts->components as $component) {
+            foreach ($component->actions as $action) {
+                if ($this->converter->containsByteOffset($request->document->text, $action->range, $offset, inclusiveEnd: true)) {
+                    return [$this->indexes->forProject($request->project)->get($component->name) ?? $component, $action, $request->project];
                 }
             }
         }
@@ -152,16 +152,16 @@ final class TwigComponentResolver
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
         $facts = $this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text);
-        foreach ($facts->references() as $reference) {
-            if ($this->converter->containsByteOffset($request->document->text, $reference->range(), $offset, inclusiveEnd: true)) {
-                $component = $this->indexes->forProject($request->project)->get($reference->name());
+        foreach ($facts->references as $reference) {
+            if ($this->converter->containsByteOffset($request->document->text, $reference->range, $offset, inclusiveEnd: true)) {
+                $component = $this->indexes->forProject($request->project)->get($reference->name);
 
                 return null === $component ? null : [$component, $request->project];
             }
         }
-        foreach ($facts->components() as $component) {
-            if ($this->converter->containsByteOffset($request->document->text, $component->range(), $offset, inclusiveEnd: true)) {
-                return [$this->indexes->forProject($request->project)->get($component->name()) ?? $component, $request->project];
+        foreach ($facts->components as $component) {
+            if ($this->converter->containsByteOffset($request->document->text, $component->range, $offset, inclusiveEnd: true)) {
+                return [$this->indexes->forProject($request->project)->get($component->name) ?? $component, $request->project];
             }
         }
 
@@ -171,8 +171,8 @@ final class TwigComponentResolver
     private function componentForUri(Project $project, string $uri): ?TwigComponent
     {
         foreach ($this->indexes->forProject($project)->components() as $component) {
-            foreach ($this->indexes->forProject($project)->declarations($component->name()) as $declaration) {
-                if ($uri === $declaration->uri() && $component->isLive()) {
+            foreach ($this->indexes->forProject($project)->declarations($component->name) as $declaration) {
+                if ($uri === $declaration->uri && $component->live) {
                     return $component;
                 }
             }

@@ -35,14 +35,14 @@ final class EventRelationshipResolver
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols() as $symbol) {
-            if ($this->converter->containsByteOffset($request->document->text, $symbol->range(), $offset, inclusiveEnd: true)) {
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols as $symbol) {
+            if ($this->converter->containsByteOffset($request->document->text, $symbol->range, $offset, inclusiveEnd: true)) {
                 return [$symbol, null, $request->project];
             }
         }
         if ('php' === $request->document->languageId) {
             foreach ($this->classExtractor->extract($request->document->uri, $request->document->text) as $class) {
-                if ($this->converter->containsByteOffset($request->document->text, $class->range(), $offset, inclusiveEnd: true)) {
+                if ($this->converter->containsByteOffset($request->document->text, $class->range, $offset, inclusiveEnd: true)) {
                     return [null, $class, $request->project];
                 }
             }
@@ -60,13 +60,13 @@ final class EventRelationshipResolver
             return null;
         }
         $lines = ['Symfony event: `'.$name.'`'];
-        if (null !== $event?->className()) {
+        if (null !== $event?->className) {
             $lines[] = '';
-            $lines[] = 'Class: `'.$event->className().'`';
+            $lines[] = 'Class: `'.$event->className.'`';
         }
         $listenerNames = [];
         foreach ($listeners as $listener) {
-            $listenerNames[] = $listener->className().'::'.$listener->method().' ('.$listener->priority().')';
+            $listenerNames[] = $listener->className.'::'.$listener->method.' ('.$listener->priority.')';
         }
         $lines[] = '';
         $lines[] = 'Listeners: '.([] === $listenerNames ? 'none' : '`'.implode('`, `', $listenerNames).'`');
@@ -78,11 +78,11 @@ final class EventRelationshipResolver
     public function eventDefinitionLocations(Project $project, EventIndex $index, string $name): array
     {
         $classes = [];
-        if (null !== $eventClass = $index->event($name)?->className()) {
+        if (null !== $eventClass = $index->event($name)?->className) {
             $classes[$eventClass] = true;
         }
         foreach ($index->listenersForEvent($name) as $listener) {
-            $classes[$listener->className()] = true;
+            $classes[$listener->className] = true;
         }
 
         return $this->classLocations($project, array_keys($classes));
@@ -93,7 +93,7 @@ final class EventRelationshipResolver
     {
         $locations = [];
         foreach ($this->sourceIndexes->forProject($project)->symbols($name) as $symbol) {
-            $locations[] = $this->protocol->location($symbol->uri(), $symbol->range());
+            $locations[] = $this->protocol->location($symbol->uri, $symbol->range);
         }
 
         return $locations;
@@ -113,7 +113,7 @@ final class EventRelationshipResolver
         }
         foreach (array_keys($uniqueClasses) as $className) {
             foreach ($this->classIndexes->forProject($project)->classDeclarations($className) as $declaration) {
-                $locations[] = $this->protocol->location($declaration->uri(), $declaration->range());
+                $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
             }
         }
 

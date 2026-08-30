@@ -57,12 +57,12 @@ final class SecuritySourceIndex extends AbstractSourceFactsIndex
         $names = [];
         $declarationNames = [];
         foreach ($this->facts() as $source) {
-            foreach ($source->symbols() as $symbol) {
-                $kind = $symbol->kind()->value;
-                $name = $symbol->name();
+            foreach ($source->symbols as $symbol) {
+                $kind = $symbol->kind->value;
+                $name = $symbol->name;
                 $this->symbols[$kind][$name][] = $symbol;
                 $names[$kind][$name] = true;
-                if ($symbol->isDeclaration()) {
+                if ($symbol->declaration) {
                     $declarationNames[$kind][$name] = true;
                 }
             }

@@ -355,7 +355,7 @@ final class EventExtractor
     {
         $unique = [];
         foreach ($symbols as $symbol) {
-            $key = $symbol->name().'|'.$symbol->range()->start->line.'|'.$symbol->range()->start->character;
+            $key = $symbol->name.'|'.$symbol->range->start->line.'|'.$symbol->range->start->character;
             $unique[$key] = $symbol;
         }
 

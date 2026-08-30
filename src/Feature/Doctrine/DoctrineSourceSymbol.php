@@ -7,42 +7,12 @@ use Symfony\Lsp\Document\Range;
 final class DoctrineSourceSymbol
 {
     public function __construct(
-        private readonly DoctrineSymbolKind $kind,
-        private readonly string $name,
-        private readonly ?string $owner,
-        private readonly string $uri,
-        private readonly Range $range,
-        private readonly bool $declaration,
+        public readonly DoctrineSymbolKind $kind,
+        public readonly string $name,
+        public readonly ?string $owner,
+        public readonly string $uri,
+        public readonly Range $range,
+        public readonly bool $declaration,
     ) {
-    }
-
-    public function kind(): DoctrineSymbolKind
-    {
-        return $this->kind;
-    }
-
-    public function name(): string
-    {
-        return $this->name;
-    }
-
-    public function owner(): ?string
-    {
-        return $this->owner;
-    }
-
-    public function uri(): string
-    {
-        return $this->uri;
-    }
-
-    public function range(): Range
-    {
-        return $this->range;
-    }
-
-    public function isDeclaration(): bool
-    {
-        return $this->declaration;
     }
 }

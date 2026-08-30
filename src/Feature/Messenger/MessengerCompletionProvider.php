@@ -68,11 +68,11 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
         $index = $this->indexes->forProject($request->project);
         if (MessengerSymbolKind::Bus === $kind) {
             foreach ($index->buses() as $bus) {
-                $names[] = $bus->name();
+                $names[] = $bus->name;
             }
         } else {
             foreach ($index->transports() as $transport) {
-                $names[] = $transport->name();
+                $names[] = $transport->name;
             }
         }
         $items = [];

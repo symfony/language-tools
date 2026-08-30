@@ -31,9 +31,9 @@ final class ProjectMessengerSnapshotLoaderTest extends TestCase
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->isComplete());
-        self::assertTrue($index->bus('command.bus')?->isDefault());
-        self::assertSame(['async'], $index->message('App\\Message\\Ping')?->transports());
-        self::assertSame('App\\MessageHandler\\PingHandler', $index->handlersForMessage('App\\Message\\Ping')[0]->className());
-        self::assertSame(10, $index->handlersForMessage('App\\Message\\Ping')[0]->priority());
+        self::assertTrue($index->bus('command.bus')?->default);
+        self::assertSame(['async'], $index->message('App\\Message\\Ping')?->transports);
+        self::assertSame('App\\MessageHandler\\PingHandler', $index->handlersForMessage('App\\Message\\Ping')[0]->className);
+        self::assertSame(10, $index->handlersForMessage('App\\Message\\Ping')[0]->priority);
     }
 }

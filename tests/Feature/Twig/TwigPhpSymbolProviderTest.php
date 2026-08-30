@@ -100,11 +100,11 @@ final class TwigPhpSymbolProviderTest extends TestCase
 
         $format = $indexes->forProject($project)->memberDeclarations('App\Model\ViewOptions', 'FORMAT')[0];
         self::assertSame([
-            $protocol->location($phpUri, $format->range()),
+            $protocol->location($phpUri, $format->range),
         ], $provider->definition($this->params($twigUri, $twig, 'FORMAT', $converter)));
         $status = $indexes->forProject($project)->typeDeclarations('App\Model\Status')[0];
         self::assertSame([
-            $protocol->location($phpUri, $status->range()),
+            $protocol->location($phpUri, $status->range),
         ], $provider->definition($this->params($twigUri, $twig, 'App\\\\Model\\\\Status', $converter)));
 
         self::assertCount(2, $provider->references($this->params($twigUri, $twig, 'Published', $converter, strpos($twig, ').Published') + 2)) ?? []);

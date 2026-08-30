@@ -29,7 +29,7 @@ final class SecuritySourceIndexer extends AbstractSourceIndexer
             throw new \UnexpectedValueException('The security source facts are invalid.');
         }
 
-        return array_values(array_filter($data->symbols(), static fn (SecuritySourceSymbol $symbol): bool => $symbol->isDeclaration()));
+        return array_values(array_filter($data->symbols, static fn (SecuritySourceSymbol $symbol): bool => $symbol->declaration));
     }
 
     protected function factsClass(): string

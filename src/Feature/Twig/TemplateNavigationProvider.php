@@ -33,8 +33,8 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
 
         return $this->protocol->markdownHover(\sprintf(
             "Template: `%s`\n\nFile: `%s`",
-            $template->name(),
-            $template->uri(),
+            $template->name,
+            $template->uri,
         ));
     }
 
@@ -46,7 +46,7 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
         }
         [$template] = $resolved;
 
-        return [$this->protocol->location($template->uri(), $template->range())];
+        return [$this->protocol->location($template->uri, $template->range)];
     }
 
     public function references(array $params): ?array
@@ -57,7 +57,7 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
         }
         [$template, $project] = $resolved;
 
-        return array_map(fn (TemplateReference $reference): array => $this->protocol->location($reference->uri(), $reference->range()), $this->indexes->forProject($project)->references($template->name()));
+        return array_map(fn (TemplateReference $reference): array => $this->protocol->location($reference->uri, $reference->range), $this->indexes->forProject($project)->references($template->name));
     }
 
     public function links(array $params): ?array
@@ -68,9 +68,9 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
         }
         $links = [];
         foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text) as $reference) {
-            $template = $this->indexes->forProject($request->project)->get($reference->name());
+            $template = $this->indexes->forProject($request->project)->get($reference->name);
             if (null !== $template) {
-                $links[] = ['range' => $this->protocol->range($reference->range()), 'target' => $template->uri()];
+                $links[] = ['range' => $this->protocol->range($reference->range), 'target' => $template->uri];
             }
         }
 
@@ -97,8 +97,8 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
         }
         $diagnostics = [];
         foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text) as $reference) {
-            if (null === $index->get($reference->name())) {
-                $diagnostics[] = $this->protocol->diagnostic($reference->range(), 1, 'template.not_found', \sprintf('Template "%s" does not exist in the selected environment.', $reference->name()));
+            if (null === $index->get($reference->name)) {
+                $diagnostics[] = $this->protocol->diagnostic($reference->range, 1, 'template.not_found', \sprintf('Template "%s" does not exist in the selected environment.', $reference->name));
             }
         }
 
@@ -121,7 +121,7 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
         if (null === $reference) {
             return null;
         }
-        $template = $this->indexes->forProject($request->project)->get($reference->name());
+        $template = $this->indexes->forProject($request->project)->get($reference->name);
 
         return null === $template ? null : [$template, $request->project];
     }

@@ -52,16 +52,16 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         $line = substr($before, $lineStart);
         $index = $this->indexes->forProject($project);
         foreach ($this->yaml->parse($document->text, $index) as $occurrence) {
-            if (!$this->converter->containsByteOffset($document->text, $occurrence->valueRange(), $offset, inclusiveEnd: true)) {
+            if (!$this->converter->containsByteOffset($document->text, $occurrence->valueRange, $offset, inclusiveEnd: true)) {
                 continue;
             }
-            $node = $index->find($occurrence->path(), $occurrence->sequenceDepths(), $occurrence->literalDepths());
-            if (null === $node || [] === $node->allowedValues()) {
+            $node = $index->find($occurrence->path, $occurrence->sequenceDepths, $occurrence->literalDepths);
+            if (null === $node || [] === $node->allowedValues) {
                 continue;
             }
-            $prefix = trim(substr($document->text, $this->converter->toByteOffset($document->text, $occurrence->valueRange()->start), $offset));
+            $prefix = trim(substr($document->text, $this->converter->toByteOffset($document->text, $occurrence->valueRange->start), $offset));
             $items = [];
-            foreach ($node->allowedValues() as $value) {
+            foreach ($node->allowedValues as $value) {
                 $value = $this->formatValue($value);
                 $items[] = $this->completion($value, $value, 'Allowed value', $document->text, $offset - \strlen($prefix), $position);
             }
@@ -77,17 +77,17 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         $parentSequenceDepths = [];
         $previous = array_reverse($this->yaml->parse(substr($document->text, 0, $lineStart), $index));
         foreach ($previous as $occurrence) {
-            if ($occurrence->keyRange()->start->character < $indent) {
-                $parent = $occurrence->path();
-                $parentSequenceDepths = $occurrence->sequenceDepths();
+            if ($occurrence->keyRange->start->character < $indent) {
+                $parent = $occurrence->path;
+                $parentSequenceDepths = $occurrence->sequenceDepths;
                 break;
             }
         }
         $nodes = [] === $parent ? array_values($index->roots()) : $this->completionChildren($index->find($parent, $parentSequenceDepths));
         $items = [];
         foreach ($nodes as $node) {
-            if (str_starts_with($node->name(), $prefix)) {
-                $items[] = $this->completion($node->name(), $node->name().':'.$this->yamlSnippet($node), $this->shortDescription($node), $document->text, $offset - \strlen($prefix), $position);
+            if (str_starts_with($node->name, $prefix)) {
+                $items[] = $this->completion($node->name, $node->name.':'.$this->yamlSnippet($node), $this->shortDescription($node), $document->text, $offset - \strlen($prefix), $position);
             }
         }
 
@@ -114,7 +114,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         }
         $items = [];
         foreach ($this->completionChildren($parent) as $node) {
-            $method = lcfirst(str_replace(' ', '', ucwords(str_replace('_', ' ', $node->name()))));
+            $method = lcfirst(str_replace(' ', '', ucwords(str_replace('_', ' ', $node->name))));
             if (str_starts_with($method, $prefix)) {
                 $items[] = $this->completion($method, $method.'('.$this->phpSnippet($node).')', $this->shortDescription($node), $document->text, $offset - \strlen($prefix), $position);
             }
@@ -137,7 +137,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
                 $prefix = $attributeMatch['prefix'][0] ?? '';
                 $items = [];
                 foreach ($this->completionChildren(null === $path ? null : $index->find($path)) as $node) {
-                    $xmlName = str_replace('_', '-', $node->name());
+                    $xmlName = str_replace('_', '-', $node->name);
                     if (str_starts_with($xmlName, $prefix)) {
                         $items[] = $this->completion($xmlName, $xmlName.'="${1}"', $this->shortDescription($node), $document->text, $offset - \strlen($prefix), $position);
                     }
@@ -158,7 +158,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         $nodes = [] === $path ? array_values($index->roots()) : $this->completionChildren($index->find($path));
         $items = [];
         foreach ($nodes as $node) {
-            $xmlName = str_replace('_', '-', $node->name());
+            $xmlName = str_replace('_', '-', $node->name);
             if (str_starts_with($xmlName, $prefix)) {
                 $newText = ('' !== $alias ? $alias.':' : '').$xmlName.'>';
                 $items[] = $this->completion($xmlName, $newText, $this->shortDescription($node), $document->text, $offset - \strlen($prefix), $position);
@@ -174,23 +174,23 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         if (null === $node) {
             return [];
         }
-        if ([] !== $node->children()) {
-            return $node->children();
+        if ([] !== $node->children) {
+            return $node->children;
         }
 
-        return $node->prototype()?->children() ?? [];
+        return $node->prototype->children ?? [];
     }
 
     private function phpSnippet(ConfigurationNode $node): string
     {
-        if ('array' === $node->type()) {
+        if ('array' === $node->type) {
             return '';
         }
-        if ('boolean' === $node->type()) {
+        if ('boolean' === $node->type) {
             return '${1:true}';
         }
-        if ([] !== $node->allowedValues()) {
-            $value = $node->allowedValues()[0];
+        if ([] !== $node->allowedValues) {
+            $value = $node->allowedValues[0];
             $snippet = '${1:'.$this->formatValue($value).'}';
 
             return \is_string($value) ? "'".$snippet."'" : $snippet;
@@ -201,7 +201,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
 
     private function yamlSnippet(ConfigurationNode $node): string
     {
-        return match ($node->type()) {
+        return match ($node->type) {
             'boolean' => ' ${1:true}', 'integer', 'float', 'scalar', 'enum', 'variable' => ' ${1}', default => '',
         };
     }
@@ -218,7 +218,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
 
     private function shortDescription(ConfigurationNode $node): string
     {
-        return $node->type().(null !== $node->info() ? ' - '.$node->info() : '');
+        return $node->type.(null !== $node->info ? ' - '.$node->info : '');
     }
 
     /** @return array<array-key, mixed> */

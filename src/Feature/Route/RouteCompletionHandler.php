@@ -44,7 +44,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
                 $this->positionConverter,
             );
             if (null !== $parameterContext) {
-                $route = $routeIndex->get($parameterContext->routeName());
+                $route = $routeIndex->get($parameterContext->routeName);
                 if (null === $route) {
                     return [];
                 }
@@ -52,10 +52,10 @@ final class RouteCompletionHandler implements CompletionProviderInterface
                 return $this->withTextEdits(
                     $this->completeParameters(
                         $route,
-                        $parameterContext->prefix(),
-                        $parameterContext->existingParameters(),
+                        $parameterContext->prefix,
+                        $parameterContext->existingParameters,
                     ),
-                    $parameterContext->replacementRange(),
+                    $parameterContext->replacementRange,
                 );
             }
 
@@ -69,8 +69,8 @@ final class RouteCompletionHandler implements CompletionProviderInterface
             }
 
             return $this->withTextEdits(
-                $this->completionBuilder->complete($routeIndex, $routeContext->prefix()),
-                $routeContext->replacementRange(),
+                $this->completionBuilder->complete($routeIndex, $routeContext->prefix),
+                $routeContext->replacementRange,
             );
         }
         $classIndex = $this->classIndexes->forProject($request->project);
@@ -83,7 +83,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
             $isSymfonyReceiver,
         );
         if (null !== $parameterContext) {
-            $route = $routeIndex->get($parameterContext->routeName());
+            $route = $routeIndex->get($parameterContext->routeName);
             if (null === $route) {
                 return [];
             }
@@ -91,10 +91,10 @@ final class RouteCompletionHandler implements CompletionProviderInterface
             return $this->withTextEdits(
                 $this->completeParameters(
                     $route,
-                    $parameterContext->prefix(),
-                    $parameterContext->existingParameters(),
+                    $parameterContext->prefix,
+                    $parameterContext->existingParameters,
                 ),
-                $parameterContext->replacementRange(),
+                $parameterContext->replacementRange,
             );
         }
 
@@ -109,8 +109,8 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         }
 
         return $this->withTextEdits(
-            $this->completionBuilder->complete($routeIndex, $routeContext->prefix()),
-            $routeContext->replacementRange(),
+            $this->completionBuilder->complete($routeIndex, $routeContext->prefix),
+            $routeContext->replacementRange,
         );
     }
 
@@ -125,7 +125,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
             static fn (string $parameter): array => [
                 'label' => $parameter,
                 'kind' => 10,
-                'detail' => \sprintf('Parameter of route %s', $route->name()),
+                'detail' => \sprintf('Parameter of route %s', $route->name),
             ],
             array_values(array_filter(
                 $route->parameters(),

@@ -39,10 +39,10 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         if (null === $context) {
             return null;
         }
-        if (AssetSymbolKind::Asset === $context->kind()) {
+        if (AssetSymbolKind::Asset === $context->kind) {
             $candidates = [];
             foreach ($this->indexes->forProject($request->project)->assets() as $asset) {
-                $candidates[$asset->logicalPath()] = 'AssetMapper asset';
+                $candidates[$asset->logicalPath] = 'AssetMapper asset';
             }
             foreach ($this->publicAssets->logicalPaths($request->project) as $path) {
                 $candidates[$path] ??= 'Public asset';
@@ -53,14 +53,14 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         }
         $items = [];
         foreach ($candidates as $name => $detail) {
-            if (!str_starts_with((string) $name, $context->prefix())) {
+            if (!str_starts_with((string) $name, $context->prefix)) {
                 continue;
             }
             $items[] = [
                 'label' => (string) $name,
-                'kind' => AssetSymbolKind::Asset === $context->kind() ? 17 : 12,
+                'kind' => AssetSymbolKind::Asset === $context->kind ? 17 : 12,
                 'detail' => $detail,
-                'textEdit' => $this->protocol->textEdit($context->range(), (string) $name),
+                'textEdit' => $this->protocol->textEdit($context->range, (string) $name),
             ];
         }
 
@@ -74,33 +74,33 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
             return null;
         }
         [$symbol, $project] = $resolved;
-        if (AssetSymbolKind::Asset === $symbol->kind()) {
-            $asset = $this->indexes->forProject($project)->asset($symbol->name());
+        if (AssetSymbolKind::Asset === $symbol->kind) {
+            $asset = $this->indexes->forProject($project)->asset($symbol->name);
             if (null === $asset) {
-                $path = $this->publicAssets->path($project, $symbol->name());
+                $path = $this->publicAssets->path($project, $symbol->name);
 
                 return null === $path ? null : $this->protocol->markdownHover(\sprintf(
                     "Public asset: `%s`\n\nSource: `%s`",
-                    $symbol->name(),
+                    $symbol->name,
                     $path,
                 ));
             }
 
             return $this->protocol->markdownHover(\sprintf(
                 "AssetMapper asset: `%s`\n\nSource: `%s`\n\nVendor: %s",
-                $asset->logicalPath(),
-                $asset->sourcePath(),
-                $asset->isVendor() ? 'yes' : 'no',
+                $asset->logicalPath,
+                $asset->sourcePath,
+                $asset->vendor ? 'yes' : 'no',
             ));
         }
-        $entry = $this->indexes->forProject($project)->importMapEntry($symbol->name());
-        $lines = ['Importmap entrypoint: `'.$symbol->name().'`'];
+        $entry = $this->indexes->forProject($project)->importMapEntry($symbol->name);
+        $lines = ['Importmap entrypoint: `'.$symbol->name.'`'];
         if (null !== $entry) {
             $lines[] = '';
-            $lines[] = 'Path: `'.$entry->path().'`';
-            if (null !== $entry->version()) {
+            $lines[] = 'Path: `'.$entry->path.'`';
+            if (null !== $entry->version) {
                 $lines[] = '';
-                $lines[] = 'Version: `'.$entry->version().'`';
+                $lines[] = 'Version: `'.$entry->version.'`';
             }
         }
 
@@ -114,18 +114,18 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
             return null;
         }
         [$symbol, $project] = $resolved;
-        if (AssetSymbolKind::Asset === $symbol->kind()) {
-            $asset = $this->indexes->forProject($project)->asset($symbol->name());
-            $path = null !== $asset ? $asset->sourcePath() : $this->publicAssets->path($project, $symbol->name());
+        if (AssetSymbolKind::Asset === $symbol->kind) {
+            $asset = $this->indexes->forProject($project)->asset($symbol->name);
+            $path = null !== $asset ? $asset->sourcePath : $this->publicAssets->path($project, $symbol->name);
 
             return null === $path ? [] : [['uri' => $this->uriConverter->toUri($path), 'range' => $this->protocol->zeroRange()]];
         }
         $declarations = array_values(array_filter(
-            $this->sourceIndexes->forProject($project)->symbols(AssetSymbolKind::Entrypoint, $symbol->name()),
-            static fn (AssetSourceSymbol $candidate): bool => $candidate->isDeclaration(),
+            $this->sourceIndexes->forProject($project)->symbols(AssetSymbolKind::Entrypoint, $symbol->name),
+            static fn (AssetSourceSymbol $candidate): bool => $candidate->declaration,
         ));
 
-        return array_map(fn (AssetSourceSymbol $candidate): array => $this->protocol->location($candidate->uri(), $candidate->range()), $declarations);
+        return array_map(fn (AssetSourceSymbol $candidate): array => $this->protocol->location($candidate->uri, $candidate->range), $declarations);
     }
 
     public function references(array $params): ?array
@@ -136,7 +136,7 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         }
         [$symbol, $project] = $resolved;
 
-        return array_map(fn (AssetSourceSymbol $candidate): array => $this->protocol->location($candidate->uri(), $candidate->range()), $this->sourceIndexes->forProject($project)->symbols($symbol->kind(), $symbol->name()));
+        return array_map(fn (AssetSourceSymbol $candidate): array => $this->protocol->location($candidate->uri, $candidate->range), $this->sourceIndexes->forProject($project)->symbols($symbol->kind, $symbol->name));
     }
 
     public function links(array $params): ?array
@@ -146,10 +146,10 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
             return null;
         }
         $links = [];
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols() as $symbol) {
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols as $symbol) {
             $target = $this->target($request->project, $symbol);
             if (null !== $target) {
-                $links[] = ['range' => $this->protocol->range($symbol->range()), 'target' => $target];
+                $links[] = ['range' => $this->protocol->range($symbol->range), 'target' => $target];
             }
         }
 
@@ -173,15 +173,15 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         }
         $known = array_fill_keys($this->entrypointNames($request->project), true);
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols() as $symbol) {
-            if (AssetSymbolKind::Entrypoint !== $symbol->kind() || isset($known[$symbol->name()])) {
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols as $symbol) {
+            if (AssetSymbolKind::Entrypoint !== $symbol->kind || isset($known[$symbol->name])) {
                 continue;
             }
             $diagnostics[] = $this->protocol->diagnostic(
-                $symbol->range(),
+                $symbol->range,
                 1,
                 'importmap.unknown_entrypoint',
-                \sprintf('Unknown importmap entrypoint "%s".', $symbol->name()),
+                \sprintf('Unknown importmap entrypoint "%s".', $symbol->name),
             );
         }
 
@@ -193,8 +193,8 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
     {
         $names = $this->sourceIndexes->forProject($project)->declarationNames(AssetSymbolKind::Entrypoint);
         foreach ($this->indexes->forProject($project)->importMapEntries() as $entry) {
-            if ($entry->isEntrypoint()) {
-                $names[] = $entry->name();
+            if ($entry->entrypoint) {
+                $names[] = $entry->name;
             }
         }
         $names = array_values(array_unique($names));
@@ -215,8 +215,8 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols() as $symbol) {
-            if ($this->converter->containsByteOffset($request->document->text, $symbol->range(), $offset, inclusiveEnd: true)) {
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols as $symbol) {
+            if ($this->converter->containsByteOffset($request->document->text, $symbol->range, $offset, inclusiveEnd: true)) {
                 return [$symbol, $request->project];
             }
         }
@@ -226,15 +226,15 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
 
     private function target(Project $project, AssetSourceSymbol $symbol): ?string
     {
-        if (AssetSymbolKind::Asset === $symbol->kind()) {
-            $asset = $this->indexes->forProject($project)->asset($symbol->name());
-            $path = null !== $asset ? $asset->sourcePath() : $this->publicAssets->path($project, $symbol->name());
+        if (AssetSymbolKind::Asset === $symbol->kind) {
+            $asset = $this->indexes->forProject($project)->asset($symbol->name);
+            $path = null !== $asset ? $asset->sourcePath : $this->publicAssets->path($project, $symbol->name);
 
             return null === $path ? null : $this->uriConverter->toUri($path);
         }
-        foreach ($this->sourceIndexes->forProject($project)->symbols(AssetSymbolKind::Entrypoint, $symbol->name()) as $candidate) {
-            if ($candidate->isDeclaration()) {
-                return $candidate->uri();
+        foreach ($this->sourceIndexes->forProject($project)->symbols(AssetSymbolKind::Entrypoint, $symbol->name) as $candidate) {
+            if ($candidate->declaration) {
+                return $candidate->uri;
             }
         }
 

@@ -8,31 +8,10 @@ final class EnvironmentReference
 {
     /** @param list<string> $processors */
     public function __construct(
-        private readonly string $name,
-        private readonly string $uri,
-        private readonly Range $range,
-        private readonly array $processors,
+        public readonly string $name,
+        public readonly string $uri,
+        public readonly Range $range,
+        public readonly array $processors,
     ) {
-    }
-
-    public function name(): string
-    {
-        return $this->name;
-    }
-
-    public function uri(): string
-    {
-        return $this->uri;
-    }
-
-    public function range(): Range
-    {
-        return $this->range;
-    }
-
-    /** @return list<string> */
-    public function processors(): array
-    {
-        return $this->processors;
     }
 }

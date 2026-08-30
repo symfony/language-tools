@@ -8,31 +8,10 @@ final class TemplateReference
 {
     /** @param list<string> $variables */
     public function __construct(
-        private readonly string $name,
-        private readonly string $uri,
-        private readonly Range $range,
-        private readonly array $variables = [],
+        public readonly string $name,
+        public readonly string $uri,
+        public readonly Range $range,
+        public readonly array $variables = [],
     ) {
-    }
-
-    public function name(): string
-    {
-        return $this->name;
-    }
-
-    public function uri(): string
-    {
-        return $this->uri;
-    }
-
-    public function range(): Range
-    {
-        return $this->range;
-    }
-
-    /** @return list<string> */
-    public function variables(): array
-    {
-        return $this->variables;
     }
 }

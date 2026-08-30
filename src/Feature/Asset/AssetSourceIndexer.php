@@ -29,7 +29,7 @@ final class AssetSourceIndexer extends AbstractSourceIndexer
             throw new \UnexpectedValueException('The asset source facts are invalid.');
         }
 
-        return array_values(array_filter($data->symbols(), static fn (AssetSourceSymbol $symbol): bool => $symbol->isDeclaration()));
+        return array_values(array_filter($data->symbols, static fn (AssetSourceSymbol $symbol): bool => $symbol->declaration));
     }
 
     protected function factsClass(): string

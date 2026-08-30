@@ -4,7 +4,7 @@ namespace Symfony\Lsp\Index;
 
 interface SourceFactsInterface
 {
-    public function uri(): string;
+    public string $uri { get; }
 
     public function isEmpty(): bool;
 }

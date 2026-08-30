@@ -27,13 +27,13 @@ final class EnvironmentProviderTest extends TestCase
         $extractor = new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser(), new PhpCommentParser(), new YamlCommentParser(), new XmlCommentParser());
         $facts = $extractor->extract('file:///workspace/.env', 'dotenv', "APP_SECRET=CANARY_SECRET_VALUE\nAPP_URL=https://example.com\nEMPTY=\nCHILD=\${APP_URL:-\${FALLBACK_URL}}/\$EMPTY\nPARTIAL=\${UNFINISHED\nESCAPED=\\\$IGNORED\n");
 
-        self::assertSame(['APP_SECRET', 'APP_URL', 'EMPTY', 'CHILD', 'PARTIAL', 'ESCAPED'], array_map(static fn ($item): string => $item->name(), $facts->declarations()));
-        self::assertSame(['APP_URL', 'FALLBACK_URL', 'EMPTY', 'UNFINISHED'], array_map(static fn ($item): string => $item->name(), $facts->references()));
-        self::assertTrue($facts->declarations()[2]->hasDefault());
-        self::assertStringNotContainsString('CANARY_SECRET_VALUE', implode(' ', array_map(static fn ($item): string => $item->name(), $facts->declarations())));
+        self::assertSame(['APP_SECRET', 'APP_URL', 'EMPTY', 'CHILD', 'PARTIAL', 'ESCAPED'], array_map(static fn ($item): string => $item->name, $facts->declarations));
+        self::assertSame(['APP_URL', 'FALLBACK_URL', 'EMPTY', 'UNFINISHED'], array_map(static fn ($item): string => $item->name, $facts->references));
+        self::assertTrue($facts->declarations[2]->hasDefault);
+        self::assertStringNotContainsString('CANARY_SECRET_VALUE', implode(' ', array_map(static fn ($item): string => $item->name, $facts->declarations)));
 
         $twigFacts = $extractor->extract('file:///workspace/templates/page.html.twig', 'twig', "{## %env(DOCUMENTED_ENV)% #}\n{{ '%env(REAL_ENV)%' }}");
-        self::assertSame(['REAL_ENV'], array_map(static fn ($item): string => $item->name(), $twigFacts->references()));
+        self::assertSame(['REAL_ENV'], array_map(static fn ($item): string => $item->name, $twigFacts->references));
     }
 
     public function testCompletesHoversNavigatesAndDiagnosesProcessors(): void
@@ -189,7 +189,7 @@ final class EnvironmentProviderTest extends TestCase
             $dsn = '%env(LIVE_ENV)%';
             PHP);
 
-        self::assertSame(['LIVE_ENV'], array_map(static fn ($reference): string => $reference->name(), $facts->references()));
+        self::assertSame(['LIVE_ENV'], array_map(static fn ($reference): string => $reference->name, $facts->references));
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */

@@ -66,12 +66,12 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
         $this->formDataClasses = [];
         $names = [];
         foreach ($this->facts() as $facts) {
-            foreach ($facts->formDataClasses() as $formDataClass) {
-                $this->formDataClasses[strtolower(ltrim($formDataClass->formClass(), '\\'))] = $formDataClass->dataClass();
+            foreach ($facts->formDataClasses as $formDataClass) {
+                $this->formDataClasses[strtolower(ltrim($formDataClass->formClass, '\\'))] = $formDataClass->dataClass;
             }
-            foreach ($facts->symbols() as $symbol) {
-                $kind = $symbol->kind()->value;
-                $name = $symbol->name();
+            foreach ($facts->symbols as $symbol) {
+                $kind = $symbol->kind->value;
+                $name = $symbol->name;
                 $this->symbols[$kind][] = $symbol;
                 $this->symbolsByName[$kind][$name][] = $symbol;
                 $names[$kind]['s'.$name] = $name;

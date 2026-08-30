@@ -12,34 +12,11 @@ final class TwigRouteParameterCompletionContext
      * @param list<string> $existingParameters
      */
     public function __construct(
-        private readonly string $routeName,
-        private readonly string $prefix,
-        private readonly Range $replacementRange,
-        private readonly array $existingParameters,
+        public readonly string $routeName,
+        public readonly string $prefix,
+        public readonly Range $replacementRange,
+        public readonly array $existingParameters,
     ) {
-    }
-
-    public function routeName(): string
-    {
-        return $this->routeName;
-    }
-
-    public function prefix(): string
-    {
-        return $this->prefix;
-    }
-
-    public function replacementRange(): Range
-    {
-        return $this->replacementRange;
-    }
-
-    /**
-     * @return list<string>
-     */
-    public function existingParameters(): array
-    {
-        return $this->existingParameters;
     }
 
     public static function fromTwig(string $text, Position $position, PositionConverter $positionConverter): ?self

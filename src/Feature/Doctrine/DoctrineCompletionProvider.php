@@ -30,7 +30,7 @@ final class DoctrineCompletionProvider implements CompletionProviderInterface
         }
         $index = $this->indexes->forProject($request->project);
 
-        return match ($context->kind()) {
+        return match ($context->kind) {
             DoctrineCompletionKind::EntityTypeField => $this->completionBuilder->build($context, $index),
             DoctrineCompletionKind::RepositoryCriteria => $this->completionBuilder->build($context, $index),
         };

@@ -31,7 +31,7 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
             return null;
         }
 
-        return match ($context->kind()) {
+        return match ($context->kind) {
             MetadataCompletionKind::FormOption => $this->formOptions($context, $this->indexes->forProject($request->project)),
             MetadataCompletionKind::FormProperty => $this->formProperties($context, $this->sourceIndexes->forProject($request->project)),
             MetadataCompletionKind::Constraint => $this->constraints($context, $this->indexes->forProject($request->project), $this->sourceIndexes->forProject($request->project)),
@@ -44,20 +44,20 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
     /** @return list<array<array-key, mixed>> */
     private function formOptions(MetadataCompletionContext $context, MetadataIndex $index): array
     {
-        $type = null === $context->owner() ? null : $index->formType($context->owner());
+        $type = null === $context->owner ? null : $index->formType($context->owner);
         if (null === $type) {
             return [];
         }
         $items = [];
-        foreach ($type->options() as $option) {
-            if (!str_starts_with($option, $context->prefix())) {
+        foreach ($type->options as $option) {
+            if (!str_starts_with($option, $context->prefix)) {
                 continue;
             }
             $items[] = [
                 'label' => $option,
-                'detail' => \in_array($option, $type->requiredOptions(), true) ? 'Required form option' : 'Form option',
+                'detail' => \in_array($option, $type->requiredOptions, true) ? 'Required form option' : 'Form option',
                 'kind' => 14,
-                'textEdit' => $this->protocol->textEdit($context->range(), $option),
+                'textEdit' => $this->protocol->textEdit($context->range, $option),
             ];
         }
 
@@ -70,13 +70,13 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
         $items = $this->constraintItems($index, $sourceIndex, $context);
         $completion = [];
         foreach ($items as $item) {
-            if (!str_starts_with($item['label'], $context->prefix())) {
+            if (!str_starts_with($item['label'], $context->prefix)) {
                 continue;
             }
             $completion[] = [
                 ...$item,
                 'kind' => 14,
-                'textEdit' => $this->protocol->textEdit($context->range(), $item['label']),
+                'textEdit' => $this->protocol->textEdit($context->range, $item['label']),
             ];
         }
 
@@ -86,20 +86,20 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
     /** @return list<array<array-key, mixed>> */
     private function constraintOptions(MetadataCompletionContext $context, MetadataIndex $index): array
     {
-        $constraint = null === $context->owner() ? null : $index->constraint($context->owner());
+        $constraint = null === $context->owner ? null : $index->constraint($context->owner);
         if (null === $constraint) {
             return [];
         }
         $items = [];
-        foreach ($constraint->options() as $option) {
-            if (!str_starts_with($option, $context->prefix())) {
+        foreach ($constraint->options as $option) {
+            if (!str_starts_with($option, $context->prefix)) {
                 continue;
             }
             $items[] = [
                 'label' => $option,
                 'detail' => 'Constraint option',
                 'kind' => 14,
-                'textEdit' => $this->protocol->textEdit($context->range(), $option),
+                'textEdit' => $this->protocol->textEdit($context->range, $option),
             ];
         }
 
@@ -111,14 +111,14 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
     {
         $items = [];
         foreach ($sourceIndex->names(MetadataSymbolKind::SerializerGroup) as $name) {
-            if (!str_starts_with($name, $context->prefix())) {
+            if (!str_starts_with($name, $context->prefix)) {
                 continue;
             }
             $items[] = [
                 'label' => $name,
                 'detail' => 'Serializer group',
                 'kind' => 14,
-                'textEdit' => $this->protocol->textEdit($context->range(), $name),
+                'textEdit' => $this->protocol->textEdit($context->range, $name),
             ];
         }
 
@@ -128,7 +128,7 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
     /** @return list<array<array-key, mixed>> */
     private function formProperties(MetadataCompletionContext $context, MetadataSourceIndex $sourceIndex): array
     {
-        $dataClass = null === $context->owner() ? null : $sourceIndex->formDataClass($context->owner());
+        $dataClass = null === $context->owner ? null : $sourceIndex->formDataClass($context->owner);
         if (null === $dataClass) {
             return [];
         }
@@ -139,7 +139,7 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
     /** @return list<array<array-key, mixed>> */
     private function properties(MetadataCompletionContext $context, MetadataSourceIndex $sourceIndex): array
     {
-        return null === $context->owner() ? [] : $this->propertyItems($context, $sourceIndex, $context->owner());
+        return null === $context->owner ? [] : $this->propertyItems($context, $sourceIndex, $context->owner);
     }
 
     /** @return list<array<array-key, mixed>> */
@@ -148,21 +148,21 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
         $prefix = $className.'::$';
         $declarations = [];
         foreach ($sourceIndex->symbols(MetadataSymbolKind::Property) as $symbol) {
-            if ($symbol->isDeclaration() && str_starts_with($symbol->name(), $prefix)) {
-                $declarations[substr($symbol->name(), \strlen($prefix))] = $symbol;
+            if ($symbol->declaration && str_starts_with($symbol->name, $prefix)) {
+                $declarations[substr($symbol->name, \strlen($prefix))] = $symbol;
             }
         }
         ksort($declarations);
         $items = [];
         foreach ($declarations as $name => $declaration) {
-            if (!str_starts_with($name, $context->prefix())) {
+            if (!str_starts_with($name, $context->prefix)) {
                 continue;
             }
             $items[] = [
                 'label' => $name,
-                'detail' => $declaration->signature() ?? 'Mapped property',
+                'detail' => $declaration->signature ?? 'Mapped property',
                 'kind' => 10,
-                'textEdit' => $this->protocol->textEdit($context->range(), $name),
+                'textEdit' => $this->protocol->textEdit($context->range, $name),
             ];
         }
 
@@ -172,28 +172,28 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
     /** @return list<array{label: string, detail: string}> */
     private function constraintItems(MetadataIndex $index, MetadataSourceIndex $sourceIndex, MetadataCompletionContext $context): array
     {
-        if ([] !== $context->candidates()) {
+        if ([] !== $context->candidates) {
             $items = [];
-            foreach ($context->candidates() as $candidate) {
+            foreach ($context->candidates as $candidate) {
                 if (null === $constraint = $index->constraint($candidate['class'])) {
                     continue;
                 }
-                $items[] = ['label' => $candidate['label'], 'detail' => $constraint->className()];
+                $items[] = ['label' => $candidate['label'], 'detail' => $constraint->className];
             }
 
             return $items;
         }
-        if (null !== $context->owner()) {
-            $constraint = $index->constraint($context->owner());
+        if (null !== $context->owner) {
+            $constraint = $index->constraint($context->owner);
 
             return null === $constraint ? [] : [[
-                'label' => $constraint->name(),
-                'detail' => $constraint->className(),
+                'label' => $constraint->name,
+                'detail' => $constraint->className,
             ]];
         }
         $items = [];
         foreach ($index->constraints() as $constraint) {
-            $items[$constraint->name()] = ['label' => $constraint->name(), 'detail' => $constraint->className()];
+            $items[$constraint->name] = ['label' => $constraint->name, 'detail' => $constraint->className];
         }
         foreach ($sourceIndex->names(MetadataSymbolKind::Constraint) as $name) {
             $items[$name] ??= ['label' => $name, 'detail' => 'Validation constraint'];

@@ -26,15 +26,15 @@ final class StimulusDocumentLinkProvider implements DocumentLinkProviderInterfac
             return null;
         }
         $links = [];
-        foreach ($this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text)->references() as $reference) {
+        foreach ($this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text)->references as $reference) {
             $locations = $this->stimulus->declarationLocations($request->project, $reference);
             $target = $locations[0]['uri'] ?? null;
             if (!\is_string($target)) {
-                $controller = $this->indexes->forProject($request->project)->controller($reference->controller());
-                $target = null === $controller ? null : $this->uriConverter->toUri($controller->sourcePath());
+                $controller = $this->indexes->forProject($request->project)->controller($reference->controller);
+                $target = null === $controller ? null : $this->uriConverter->toUri($controller->sourcePath);
             }
             if (null !== $target) {
-                $links[] = ['range' => $this->protocol->range($reference->range()), 'target' => $target];
+                $links[] = ['range' => $this->protocol->range($reference->range), 'target' => $target];
             }
         }
 

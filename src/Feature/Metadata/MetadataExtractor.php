@@ -107,7 +107,7 @@ final class MetadataExtractor
     {
         $options = [];
         foreach ($this->yaml->parse($text) as $occurrence) {
-            $path = $occurrence->path();
+            $path = $occurrence->path;
             $count = \count($path);
             if ($count < 5 || 'properties' !== $path[1]) {
                 continue;
@@ -115,7 +115,7 @@ final class MetadataExtractor
             $options[] = [
                 'constraint' => $path[$count - 2],
                 'option' => $path[$count - 1],
-                'range' => $occurrence->keyRange(),
+                'range' => $occurrence->keyRange,
             ];
         }
 
@@ -224,7 +224,7 @@ final class MetadataExtractor
 
         $dataClasses = [];
         foreach ($formDataClasses as $formDataClass) {
-            $dataClasses[strtolower(ltrim($formDataClass->formClass(), '\\'))] = $formDataClass->dataClass();
+            $dataClasses[strtolower(ltrim($formDataClass->formClass, '\\'))] = $formDataClass->dataClass;
         }
         foreach ($php->methodDeclarations as $method) {
             $dataClass = $dataClasses[strtolower(ltrim($method->className, '\\'))] ?? null;
@@ -320,13 +320,13 @@ final class MetadataExtractor
     {
         $symbols = [];
         foreach ($this->yaml->parse($text) as $occurrence) {
-            $path = $occurrence->path();
+            $path = $occurrence->path;
             if (1 === \count($path) && str_contains($path[0], '\\')) {
                 $symbols[] = new MetadataSourceSymbol(
                     MetadataSymbolKind::MappedClass,
                     $path[0],
                     $uri,
-                    $occurrence->keyRange(),
+                    $occurrence->keyRange,
                     false,
                 );
             }
@@ -335,7 +335,7 @@ final class MetadataExtractor
                     MetadataSymbolKind::Property,
                     $path[0].'::$'.$path[2],
                     $uri,
-                    $occurrence->keyRange(),
+                    $occurrence->keyRange,
                     false,
                 );
             }
@@ -344,15 +344,15 @@ final class MetadataExtractor
                     MetadataSymbolKind::Constraint,
                     $path[3],
                     $uri,
-                    $occurrence->keyRange(),
+                    $occurrence->keyRange,
                     false,
                 );
             }
             if ([] === $path || 'groups' !== $path[array_key_last($path)]) {
                 continue;
             }
-            $start = $this->converter->toByteOffset($text, $occurrence->valueRange()->start);
-            $end = $this->converter->toByteOffset($text, $occurrence->valueRange()->end);
+            $start = $this->converter->toByteOffset($text, $occurrence->valueRange->start);
+            $end = $this->converter->toByteOffset($text, $occurrence->valueRange->end);
             $value = substr($text, $start, $end - $start);
             preg_match_all('/[A-Za-z_][A-Za-z0-9_.:-]*/', $value, $names, \PREG_OFFSET_CAPTURE);
             foreach ($names[0] as [$name, $offset]) {
@@ -873,7 +873,7 @@ final class MetadataExtractor
     {
         $unique = [];
         foreach ($symbols as $symbol) {
-            $key = $symbol->kind()->value.'|'.$symbol->range()->start->line.'|'.$symbol->range()->start->character;
+            $key = $symbol->kind->value.'|'.$symbol->range->start->line.'|'.$symbol->range->start->character;
             $unique[$key] = $symbol;
         }
 

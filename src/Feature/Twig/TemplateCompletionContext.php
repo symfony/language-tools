@@ -8,18 +8,8 @@ use Symfony\Lsp\Document\Range;
 
 final class TemplateCompletionContext
 {
-    public function __construct(private readonly string $prefix, private readonly Range $range)
+    public function __construct(public readonly string $prefix, public readonly Range $range)
     {
-    }
-
-    public function prefix(): string
-    {
-        return $this->prefix;
-    }
-
-    public function range(): Range
-    {
-        return $this->range;
     }
 
     public static function create(string $languageId, string $text, Position $position, PositionConverter $converter): ?self

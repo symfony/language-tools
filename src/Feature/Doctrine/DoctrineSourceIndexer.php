@@ -30,13 +30,13 @@ final class DoctrineSourceIndexer extends AbstractSourceIndexer
         }
 
         $declarations = [];
-        foreach ($data->symbols() as $symbol) {
-            if ($symbol->isDeclaration()) {
+        foreach ($data->symbols as $symbol) {
+            if ($symbol->declaration) {
                 $declarations[] = $symbol;
             }
         }
 
-        return [...$data->entities(), ...$data->repositories(), ...$declarations];
+        return [...$data->entities, ...$data->repositories, ...$declarations];
     }
 
     protected function factsClass(): string

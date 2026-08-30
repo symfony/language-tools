@@ -19,25 +19,25 @@ final class DependencyInjectionSymbolResolver
         $offset = $this->positionConverter->toByteOffset($text, $position);
         if ('yaml' === $languageId) {
             $facts = $this->yamlExtractor->extract($uri, $text);
-            foreach ($facts->services() as $declaration) {
-                if ($this->positionConverter->containsByteOffset($text, $declaration->range(), $offset, inclusiveEnd: true)) {
+            foreach ($facts->services as $declaration) {
+                if ($this->positionConverter->containsByteOffset($text, $declaration->range, $offset, inclusiveEnd: true)) {
                     return new DependencyInjectionSymbol(
                         DependencyInjectionSymbolKind::Service,
-                        $declaration->id(),
-                        $declaration->range(),
+                        $declaration->id,
+                        $declaration->range,
                     );
                 }
             }
-            foreach ($facts->parameters() as $declaration) {
-                if ($this->positionConverter->containsByteOffset($text, $declaration->range(), $offset, inclusiveEnd: true)) {
+            foreach ($facts->parameters as $declaration) {
+                if ($this->positionConverter->containsByteOffset($text, $declaration->range, $offset, inclusiveEnd: true)) {
                     return new DependencyInjectionSymbol(
                         DependencyInjectionSymbolKind::Parameter,
-                        $declaration->name(),
-                        $declaration->range(),
+                        $declaration->name,
+                        $declaration->range,
                     );
                 }
             }
-            $references = $facts->references();
+            $references = $facts->references;
         } elseif ('php' === $languageId) {
             $references = $this->autowireExtractor->extract($uri, $text);
         } else {
@@ -45,11 +45,11 @@ final class DependencyInjectionSymbolResolver
         }
 
         foreach ($references as $reference) {
-            if ($this->positionConverter->containsByteOffset($text, $reference->range(), $offset, inclusiveEnd: true)) {
+            if ($this->positionConverter->containsByteOffset($text, $reference->range, $offset, inclusiveEnd: true)) {
                 return new DependencyInjectionSymbol(
-                    $reference->kind(),
-                    $reference->name(),
-                    $reference->range(),
+                    $reference->kind,
+                    $reference->name,
+                    $reference->range,
                 );
             }
         }

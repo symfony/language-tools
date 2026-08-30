@@ -28,9 +28,9 @@ final class RouteIndex
         $this->resources = array_fill_keys($resources, true);
         $localizedRoutes = [];
         foreach ($routes as $route) {
-            $this->routes[$route->name()] = $route;
-            if (null === $canonicalName = $route->canonicalName()) {
-                $this->completionRoutes[$route->name()] = $route;
+            $this->routes[$route->name] = $route;
+            if (null === $canonicalName = $route->canonicalName) {
+                $this->completionRoutes[$route->name] = $route;
             } else {
                 $localizedRoutes[$canonicalName][] = $route;
             }
@@ -81,33 +81,33 @@ final class RouteIndex
     private function aggregate(string $name, array $variants): Route
     {
         $first = $variants[0];
-        $path = $first->path();
-        $host = $first->host();
-        $controller = $first->controller();
-        $alias = $first->alias();
+        $path = $first->path;
+        $host = $first->host;
+        $controller = $first->controller;
+        $alias = $first->alias;
         $methods = [];
         $schemes = [];
         $defaults = [];
-        $requirements = $first->requirements();
+        $requirements = $first->requirements;
         $parameters = [];
         $requiredParameters = $first->requiredParameters();
         foreach ($variants as $variant) {
-            if ($path !== $variant->path()) {
+            if ($path !== $variant->path) {
                 $path = null;
             }
-            if ($host !== $variant->host()) {
+            if ($host !== $variant->host) {
                 $host = null;
             }
-            if ($controller !== $variant->controller()) {
+            if ($controller !== $variant->controller) {
                 $controller = null;
             }
-            if ($alias !== $variant->alias()) {
+            if ($alias !== $variant->alias) {
                 $alias = null;
             }
-            $methods = array_merge($methods, $variant->methods());
-            $schemes = array_merge($schemes, $variant->schemes());
-            $defaults = array_merge($defaults, $variant->defaults());
-            $requirements = array_intersect_assoc($requirements, $variant->requirements());
+            $methods = array_merge($methods, $variant->methods);
+            $schemes = array_merge($schemes, $variant->schemes);
+            $defaults = array_merge($defaults, $variant->defaults);
+            $requirements = array_intersect_assoc($requirements, $variant->requirements);
             $parameters = array_merge($parameters, $variant->parameters());
             $requiredParameters = array_intersect($requiredParameters, $variant->requiredParameters());
         }

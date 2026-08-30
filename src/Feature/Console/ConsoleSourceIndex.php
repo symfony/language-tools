@@ -48,8 +48,8 @@ final class ConsoleSourceIndex extends AbstractSourceFactsIndex
 
         $this->declarations = [];
         foreach ($this->facts() as $facts) {
-            foreach ($facts->declarations() as $declaration) {
-                $this->declarations[strtolower(ltrim($declaration->className(), '\\'))][] = $declaration;
+            foreach ($facts->declarations as $declaration) {
+                $this->declarations[strtolower(ltrim($declaration->className, '\\'))][] = $declaration;
             }
         }
         $this->indexed = true;
@@ -71,23 +71,23 @@ final class ConsoleSourceIndex extends AbstractSourceFactsIndex
         }
         $visited[$key] = true;
         $declaration = $declarations[0];
-        $arguments = $declaration->arguments();
-        $options = $declaration->options();
-        $command = $declaration->isCommand();
-        $complete = $declaration->isComplete();
+        $arguments = $declaration->arguments;
+        $options = $declaration->options;
+        $command = $declaration->command;
+        $complete = $declaration->complete;
 
-        if (null !== $parent = $declaration->parentClassName()) {
+        if (null !== $parent = $declaration->parentClassName) {
             $parentDefinition = $this->resolve(ltrim($parent, '\\'), $visited);
-            $arguments = [...$arguments, ...$parentDefinition->arguments()];
-            $options = [...$options, ...$parentDefinition->options()];
-            $command = $command || $parentDefinition->isCommand();
-            $complete = $complete && $parentDefinition->isComplete();
+            $arguments = [...$arguments, ...$parentDefinition->arguments];
+            $options = [...$options, ...$parentDefinition->options];
+            $command = $command || $parentDefinition->command;
+            $complete = $complete && $parentDefinition->complete;
         }
-        foreach ($declaration->traits() as $trait) {
+        foreach ($declaration->traits as $trait) {
             $traitDefinition = $this->resolve(ltrim($trait, '\\'), $visited);
-            $arguments = [...$arguments, ...$traitDefinition->arguments()];
-            $options = [...$options, ...$traitDefinition->options()];
-            $complete = $complete && $traitDefinition->isComplete();
+            $arguments = [...$arguments, ...$traitDefinition->arguments];
+            $options = [...$options, ...$traitDefinition->options];
+            $complete = $complete && $traitDefinition->complete;
         }
 
         $arguments = array_values(array_unique($arguments));

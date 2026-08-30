@@ -58,12 +58,12 @@ final class TwigPhpSymbolSourceIndexerTest extends TestCase
         $index = $indexes->forProject($project);
         self::assertSame(['App\Status'], $index->enumNames());
         self::assertSame(['App\Options', 'App\Status'], $index->constantTypeNames());
-        self::assertSame(['FORMAT'], array_map(static fn ($declaration): ?string => $declaration->memberName(), $index->completableMembers('app\options', false)));
-        self::assertSame(['Draft', 'Published'], array_map(static fn ($declaration): ?string => $declaration->memberName(), $index->completableMembers('App\Status', true)));
+        self::assertSame(['FORMAT'], array_map(static fn ($declaration): ?string => $declaration->memberName, $index->completableMembers('app\options', false)));
+        self::assertSame(['Draft', 'Published'], array_map(static fn ($declaration): ?string => $declaration->memberName, $index->completableMembers('App\Status', true)));
         self::assertCount(1, $index->references('App\Status', 'Published'));
         $published = $index->memberDeclarations('App\Status', 'Published')[0];
-        self::assertSame(TwigPhpSymbolKind::EnumCase, $published->kind());
-        self::assertSame($published, $index->declarationAt($phpUri, new Position($published->range()->start->line, $published->range()->start->character)));
+        self::assertSame(TwigPhpSymbolKind::EnumCase, $published->kind);
+        self::assertSame($published, $index->declarationAt($phpUri, new Position($published->range->start->line, $published->range->start->character)));
 
         $codec = new SourceIndexPayloadCodec();
         $codec->validate([$indexer]);

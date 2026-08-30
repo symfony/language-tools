@@ -45,9 +45,9 @@ final class DoctrineExtractor
                 $fields = $this->fields($uri, $text, $type->name, $php);
                 $entity = new DoctrineEntity($type->name, $uri, $range, $repositoryReference?->className, $fields);
                 $entities[] = $entity;
-                $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Entity, $entity->className(), null, $uri, $entity->range(), true);
+                $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Entity, $entity->className, null, $uri, $entity->range, true);
                 foreach ($fields as $field) {
-                    $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, $field->name(), $entity->className(), $uri, $field->range(), true);
+                    $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, $field->name, $entity->className, $uri, $field->range, true);
                 }
                 if (null !== $repositoryReference) {
                     $symbols[] = new DoctrineSourceSymbol(
@@ -63,12 +63,12 @@ final class DoctrineExtractor
             $repository = $this->repository($uri, $text, $source, $type, $php);
             if (null !== $repository) {
                 $repositories[] = $repository;
-                $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Repository, $repository->className(), null, $uri, $repository->range(), true);
+                $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Repository, $repository->className, null, $uri, $repository->range, true);
                 $entityReference = $this->repositoryEntityReference($source, $type, $php);
                 if (null !== $entityReference) {
                     $symbols[] = new DoctrineSourceSymbol(
                         DoctrineSymbolKind::Entity,
-                        $repository->entityClass(),
+                        $repository->entityClass,
                         null,
                         $uri,
                         $this->converter->toRange($text, $entityReference->startOffset, $entityReference->endOffset - $entityReference->startOffset),
@@ -267,7 +267,7 @@ final class DoctrineExtractor
     {
         $localRepositoryClasses = [];
         foreach ($localRepositories as $repository) {
-            $localRepositoryClasses[$repository->className()] = true;
+            $localRepositoryClasses[$repository->className] = true;
         }
         $receivers = $this->repositoryReceivers->resolveCalls($source, $php, $php->methodCalls, $localRepositoryClasses);
         $symbols = [];
@@ -326,7 +326,7 @@ final class DoctrineExtractor
             }
             $repository = $this->repository('', $text, $source, $type, $php);
             if (null !== $repository) {
-                $localRepositoryClasses[$repository->className()] = true;
+                $localRepositoryClasses[$repository->className] = true;
             }
         }
         $receiver = $this->repositoryReceivers->resolveCall($source, $php, $call, $localRepositoryClasses);
@@ -434,7 +434,7 @@ final class DoctrineExtractor
     {
         $unique = [];
         foreach ($symbols as $symbol) {
-            $key = implode('|', [$symbol->kind()->value, $symbol->owner(), $symbol->name(), $symbol->uri(), serialize($symbol->range())]);
+            $key = implode('|', [$symbol->kind->value, $symbol->owner, $symbol->name, $symbol->uri, serialize($symbol->range)]);
             $unique[$key] = $symbol;
         }
 

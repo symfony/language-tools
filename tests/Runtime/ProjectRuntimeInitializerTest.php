@@ -105,9 +105,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
         $initializer->initialize($project);
 
-        self::assertSame('homepage', $indexes->forProject($project)->get('homepage')?->name());
-        self::assertSame('app.mailer', $serviceIndexes->forProject($project)->get('app.mailer')?->id());
-        self::assertSame('app.storage_dir', $parameterIndexes->forProject($project)->get('app.storage_dir')?->name());
+        self::assertSame('homepage', $indexes->forProject($project)->get('homepage')?->name);
+        self::assertSame('app.mailer', $serviceIndexes->forProject($project)->get('app.mailer')?->id);
+        self::assertSame('app.storage_dir', $parameterIndexes->forProject($project)->get('app.storage_dir')?->name);
         self::assertSame('project-php', $processRunner->command[0]);
         self::assertSame('--flag', $processRunner->command[1]);
         self::assertSame('--environment=test', $processRunner->command[4]);
@@ -306,8 +306,8 @@ final class ProjectRuntimeInitializerTest extends TestCase
         } catch (\RuntimeException $error) {
             self::assertSame('The project bridge could not load runtime metadata: routes.', $error->getMessage());
         }
-        self::assertSame('app.mailer', $serviceIndexes->forProject($project)->get('app.mailer')?->id());
-        self::assertSame('existing', $routeIndexes->forProject($project)->get('existing')?->name());
+        self::assertSame('app.mailer', $serviceIndexes->forProject($project)->get('app.mailer')?->id);
+        self::assertSame('existing', $routeIndexes->forProject($project)->get('existing')?->name);
         self::assertNull($routeIndexes->forProject($project)->get('replacement'));
     }
 
@@ -367,9 +367,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
             self::assertSame('The project bridge could not load runtime metadata: container.', $error->getMessage());
         }
 
-        self::assertSame('new_route', $routeIndexes->forProject($project)->get('new_route')?->name());
+        self::assertSame('new_route', $routeIndexes->forProject($project)->get('new_route')?->name);
         self::assertNull($routeIndexes->forProject($project)->get('old_route'));
-        self::assertSame('old.service', $serviceIndexes->forProject($project)->get('old.service')?->id());
+        self::assertSame('old.service', $serviceIndexes->forProject($project)->get('old.service')?->id);
         self::assertNull($serviceIndexes->forProject($project)->get('new.service'));
         self::assertTrue($state->has($project));
     }
@@ -516,7 +516,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         } catch (BridgeExecutionException) {
         }
 
-        self::assertSame('homepage', $restoredIndexes->forProject($project)->get('homepage')?->name());
+        self::assertSame('homepage', $restoredIndexes->forProject($project)->get('homepage')?->name);
         $status = $restoredStatuses->status($project)['runtime'];
         self::assertSame('stale', $status['state']);
         self::assertMatchesRegularExpression('/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+00:00$/D', $status['lastSuccessfulAt'] ?? '');
@@ -561,7 +561,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         } catch (BridgeExecutionException) {
         }
 
-        self::assertSame('current', $indexes->forProject($project)->get('current')?->name());
+        self::assertSame('current', $indexes->forProject($project)->get('current')?->name);
         self::assertNull($indexes->forProject($project)->get('persisted'));
     }
 
@@ -618,7 +618,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         }
 
         self::assertSame(ConfigurationValidationResult::INVALID, $validations->result($project)->state);
-        self::assertSame('homepage', $indexes->forProject($project)->get('homepage')?->name());
+        self::assertSame('homepage', $indexes->forProject($project)->get('homepage')?->name);
         self::assertSame('stale', $statuses->status($project)['runtime']['state']);
         self::assertSame('configuration', $statuses->status($project)['runtime']['stage'] ?? null);
     }
@@ -676,7 +676,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
         $initializer->initialize($project);
 
-        self::assertSame('homepage', $indexes->forProject($project)->get('homepage')?->name());
+        self::assertSame('homepage', $indexes->forProject($project)->get('homepage')?->name);
     }
 
     public function testRejectsMissingPayloadWithoutExposingErrorOutput(): void

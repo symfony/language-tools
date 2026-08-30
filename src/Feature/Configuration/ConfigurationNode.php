@@ -13,22 +13,22 @@ final class ConfigurationNode
      * @param array<string, string>            $aliases
      */
     public function __construct(
-        private readonly string $name,
-        private readonly string $type,
-        private readonly bool $required,
-        private readonly bool $hasDefault,
-        private readonly ?string $defaultSummary,
-        private readonly ?string $info,
-        private readonly mixed $example,
-        private readonly bool $deprecated,
-        private readonly array $allowedValues,
-        private readonly array $children,
-        private readonly ?self $prototype,
+        public readonly string $name,
+        public readonly string $type,
+        public readonly bool $required,
+        public readonly bool $hasDefault,
+        public readonly ?string $defaultSummary,
+        public readonly ?string $info,
+        public readonly mixed $example,
+        public readonly bool $deprecated,
+        public readonly array $allowedValues,
+        public readonly array $children,
+        public readonly ?self $prototype,
         private readonly array $accepts = [],
         private readonly array $aliases = [],
         private readonly ?string $keyAttribute = null,
         ?string $entryKeyAttribute = null,
-        private readonly bool $normalizeKeys = true,
+        public readonly bool $normalizeKeys = true,
     ) {
         $this->entryKeyNode = null === $entryKeyAttribute ? null : new self(
             $entryKeyAttribute,
@@ -70,68 +70,6 @@ final class ConfigurationNode
         return true === ($this->accepts['unknownKeys'] ?? false);
     }
 
-    public function name(): string
-    {
-        return $this->name;
-    }
-
-    public function type(): string
-    {
-        return $this->type;
-    }
-
-    public function required(): bool
-    {
-        return $this->required;
-    }
-
-    public function hasDefault(): bool
-    {
-        return $this->hasDefault;
-    }
-
-    public function defaultSummary(): ?string
-    {
-        return $this->defaultSummary;
-    }
-
-    public function info(): ?string
-    {
-        return $this->info;
-    }
-
-    public function example(): mixed
-    {
-        return $this->example;
-    }
-
-    public function deprecated(): bool
-    {
-        return $this->deprecated;
-    }
-
-    /** @return list<string|int|float|bool|null> */
-    public function allowedValues(): array
-    {
-        return $this->allowedValues;
-    }
-
-    /** @return list<self> */
-    public function children(): array
-    {
-        return $this->children;
-    }
-
-    public function prototype(): ?self
-    {
-        return $this->prototype;
-    }
-
-    public function normalizesKeys(): bool
-    {
-        return $this->normalizeKeys;
-    }
-
     public function normalizeChildName(string $name): string
     {
         return $this->normalizeKeys ? self::normalizeKey($name) : $name;
@@ -147,12 +85,12 @@ final class ConfigurationNode
     {
         if ($sequenceItem && null !== $this->prototype) {
             return $this->prototype->child($name, false, $normalizeName)
-                ?? ([] === $this->prototype->children() || $this->prototype->acceptsUnknownKeys() ? $this->prototype : null);
+                ?? ([] === $this->prototype->children || $this->prototype->acceptsUnknownKeys() ? $this->prototype : null);
         }
         if ($normalizeName) {
             $name = $this->normalizeChildName($name);
         }
-        if ($name === $this->entryKeyNode?->name()) {
+        if ($name === $this->entryKeyNode?->name) {
             return $this->entryKeyNode;
         }
         $name = $this->aliases[$name] ?? $name;
@@ -172,7 +110,7 @@ final class ConfigurationNode
     public function definedChild(string $name): ?self
     {
         foreach ($this->children as $child) {
-            if ($child->name() === $name) {
+            if ($child->name === $name) {
                 return $child;
             }
         }
