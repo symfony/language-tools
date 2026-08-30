@@ -61,6 +61,8 @@ use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\LastResultTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
+use Symfony\Lsp\Parser\Xml\XmlCommentParser;
+use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Progress\ProgressReporterInterface;
 use Symfony\Lsp\Project\ProjectStateCleaner;
 use Symfony\Lsp\Project\ProjectStateInterface;
@@ -166,6 +168,8 @@ return static function (ContainerConfigurator $container): void {
     $services->load('Symfony\\Lsp\\Parser\\', '../src/Parser/**/*{Parser,Decoder}.php');
     $services->set(BalancedDelimiterMatcher::class);
     $services->set(QuotedArgumentMatcher::class);
+    $services->set(XmlCommentParser::class);
+    $services->set(YamlCommentParser::class);
     $services->load('Symfony\\Lsp\\Project\\', '../src/Project/*{Discovery,Registry,Resolver,Settings,Converter,Configuration,Trust,Manager,Matcher,Cleaner}.php');
     $services->load('Symfony\\Lsp\\Protocol\\', '../src/Protocol/*Mapper.php');
     $services->load('Symfony\\Lsp\\Runtime\\', '../src/Runtime/*{Installer,Runner,Initializer,Refresher,Scheduler,Configuration,Registry,Planner,Mapper,Store,State}.php');
