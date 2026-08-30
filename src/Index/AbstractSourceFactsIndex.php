@@ -20,39 +20,44 @@ abstract class AbstractSourceFactsIndex implements SourceFactsIndexInterface
     /** @param TFacts ...$facts */
     final public function replace(SourceFactsInterface ...$facts): void
     {
-        $this->facts->replaceSaved(...$facts);
+        if ($this->facts->replaceSaved(...$facts)) {
+            $this->factsChanged();
+        }
         $this->factsReplaced();
     }
 
     /** @param TFacts $facts */
     final public function replaceSource(SourceFactsInterface $facts): void
     {
-        $this->facts->replaceSavedFact($facts);
-        $this->factsChanged();
+        if ($this->facts->replaceSavedFact($facts)) {
+            $this->factsChanged();
+        }
     }
 
     final public function removeSource(string $uri): void
     {
-        $this->facts->removeSaved($uri);
-        $this->factsChanged();
+        if ($this->facts->removeSaved($uri)) {
+            $this->factsChanged();
+        }
     }
 
     /** @param TFacts $facts */
     final public function overlay(SourceFactsInterface $facts): void
     {
-        $this->facts->replaceOverlay($facts);
-        $this->factsChanged();
+        if ($this->facts->replaceOverlay($facts)) {
+            $this->factsChanged();
+        }
     }
 
     final public function removeOverlay(string $uri): void
     {
-        $this->facts->removeOverlay($uri);
-        $this->factsChanged();
+        if ($this->facts->removeOverlay($uri)) {
+            $this->factsChanged();
+        }
     }
 
     protected function factsReplaced(): void
     {
-        $this->factsChanged();
     }
 
     protected function factsChanged(): void

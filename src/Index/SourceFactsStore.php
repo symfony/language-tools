@@ -19,39 +19,72 @@ final class SourceFactsStore
     }
 
     /** @param TFacts ...$facts */
-    public function replaceSaved(SourceFactsInterface ...$facts): void
+    public function replaceSaved(SourceFactsInterface ...$facts): bool
     {
-        $this->saved = [];
+        $saved = [];
         foreach ($facts as $item) {
-            $this->saved[$item->uri()] = $item;
+            $saved[$item->uri()] = $item;
         }
+        if ($this->saved === $saved) {
+            return false;
+        }
+
+        $this->saved = $saved;
         $this->effective = null;
+
+        return true;
     }
 
     /** @param TFacts $facts */
-    public function replaceSavedFact(SourceFactsInterface $facts): void
+    public function replaceSavedFact(SourceFactsInterface $facts): bool
     {
-        $this->saved[$facts->uri()] = $facts;
+        $uri = $facts->uri();
+        if (($this->saved[$uri] ?? null) === $facts) {
+            return false;
+        }
+
+        $this->saved[$uri] = $facts;
         $this->effective = null;
+
+        return true;
     }
 
-    public function removeSaved(string $uri): void
+    public function removeSaved(string $uri): bool
     {
+        if (!isset($this->saved[$uri])) {
+            return false;
+        }
+
         unset($this->saved[$uri]);
         $this->effective = null;
+
+        return true;
     }
 
     /** @param TFacts $facts */
-    public function replaceOverlay(SourceFactsInterface $facts): void
+    public function replaceOverlay(SourceFactsInterface $facts): bool
     {
-        $this->overlays[$facts->uri()] = $facts;
+        $uri = $facts->uri();
+        if (($this->overlays[$uri] ?? null) === $facts) {
+            return false;
+        }
+
+        $this->overlays[$uri] = $facts;
         $this->effective = null;
+
+        return true;
     }
 
-    public function removeOverlay(string $uri): void
+    public function removeOverlay(string $uri): bool
     {
+        if (!isset($this->overlays[$uri])) {
+            return false;
+        }
+
         unset($this->overlays[$uri]);
         $this->effective = null;
+
+        return true;
     }
 
     /** @return list<TFacts> */

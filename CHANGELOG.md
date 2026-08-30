@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Avoid rebuilding source indexes for unchanged document overlays
 - Ignore commented configuration constructs in PHP, XML and YAML files
 - Ignore commented environment expressions in YAML and XML files
 - Complete event names only in resolved event-listener attributes

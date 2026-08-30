@@ -152,7 +152,6 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     protected function factsReplaced(): void
     {
         $this->complete = true;
-        $this->factsChanged();
     }
 
     protected function factsChanged(): void
