@@ -11,7 +11,6 @@ use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
-use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpTypedVariable;
 use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
@@ -138,9 +137,7 @@ final class MetadataExtractor
                 if (!\in_array($call->method, ['setDefaults', 'setDefault'], true)
                     || $method->className !== $call->className
                     || $method->name !== $call->enclosingMethod
-                    || $resolver->scopeStartOffset !== $call->scopeStartOffset
-                    || PhpMethodReceiverKind::Variable !== $call->receiverContext->kind
-                    || $resolver->name !== $call->receiverContext->name
+                    || !\in_array($resolver, $php->receiverVariables($call), true)
                 ) {
                     continue;
                 }
@@ -239,7 +236,7 @@ final class MetadataExtractor
                 if ('add' !== $call->method
                     || $method->className !== $call->className
                     || $method->name !== $call->enclosingMethod
-                    || $builder->scopeStartOffset !== $call->scopeStartOffset
+                    || !\in_array($builder, $this->formBuilderReceiverVariables($php, $call), true)
                     || !$this->isDirectFormBuilderReceiver($call->receiver, $builder->name)
                 ) {
                     continue;
@@ -504,12 +501,9 @@ final class MetadataExtractor
 
     private function formBuilderVariableForCall(PhpDocument $php, PhpMethodCall $call): ?PhpTypedVariable
     {
-        foreach ($php->typedVariables as $variable) {
+        foreach ($this->formBuilderReceiverVariables($php, $call) as $variable) {
             if (PhpTypedVariableKind::Parameter !== $variable->kind
                 || !\in_array('Symfony\\Component\\Form\\FormBuilderInterface', $variable->types, true)
-                || $call->className !== $variable->className
-                || $call->enclosingMethod !== $variable->methodName
-                || $call->scopeStartOffset !== $variable->scopeStartOffset
                 || 1 !== preg_match('/^\s*\\$'.preg_quote($variable->name, '/').'\b/', $call->receiver)
             ) {
                 continue;
@@ -519,6 +513,27 @@ final class MetadataExtractor
         }
 
         return null;
+    }
+
+    /** @return list<PhpTypedVariable> */
+    private function formBuilderReceiverVariables(PhpDocument $php, PhpMethodCall $call): array
+    {
+        if ([] !== $variables = $php->receiverVariables($call)) {
+            return $variables;
+        }
+        foreach ($php->methodCalls as $receiverCall) {
+            if ($call === $receiverCall
+                || $call->startOffset !== $receiverCall->startOffset
+                || $receiverCall->endOffset > $call->receiverContext->endOffset
+                || [] === $variables = $php->receiverVariables($receiverCall)
+            ) {
+                continue;
+            }
+
+            return $variables;
+        }
+
+        return [];
     }
 
     /** @param array<string, true> $variables */
@@ -637,26 +652,9 @@ final class MetadataExtractor
         return '' === $before && '::class' === $after ? $reference->className : null;
     }
 
-    private function classReferenceArgument(PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
-    {
-        $start = $argument?->expressionStartOffset;
-        $end = $argument?->expressionEndOffset;
-        if (!\is_int($start) || !\is_int($end)) {
-            return null;
-        }
-        $references = [];
-        foreach ($php->classReferences as $reference) {
-            if ($reference->startOffset >= $start && $reference->endOffset <= $end) {
-                $references[] = $reference;
-            }
-        }
-
-        return 1 === \count($references) ? $references[0] : null;
-    }
-
     private function leadingClassReferenceArgument(string $source, PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
     {
-        $reference = $this->classReferenceArgument($php, $argument);
+        $reference = $php->soleClassReference($argument);
         $start = $argument?->expressionStartOffset;
         $end = $argument?->expressionEndOffset;
         if (null === $reference || !\is_int($start) || !\is_int($end)) {

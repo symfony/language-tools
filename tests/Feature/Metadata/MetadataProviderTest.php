@@ -419,6 +419,22 @@ final class MetadataProviderTest extends TestCase
         self::assertSame(strpos($text, "'title'") + 1, $converter->toByteOffset($text, $references[0]->range->start));
     }
 
+    public function testIgnoresNamedArgumentsInPositionalMetadataSlots(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new BalancedDelimiterMatcher());
+        $text = <<<'PHP'
+            <?php
+            use App\Form\EventType;
+
+            $this->createForm(unrelated: EventType::class, data: null, options: [
+                'ignored_option' => true,
+            ]);
+            PHP;
+
+        self::assertSame([], $extractor->formOptions($text));
+    }
+
     public function testIgnoresCommentedPhpMetadataWhilePreservingActiveRanges(): void
     {
         $converter = new PositionConverter();
