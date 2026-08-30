@@ -23,6 +23,7 @@ use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -272,7 +273,7 @@ final class TwigCallableProviderTest extends TestCase
         $documents->open(new Document($extensionUri, 'php', 1, $extensionText));
         $documents->open(new Document($runtimeUri, 'php', 1, $runtimeText));
         $documents->open(new Document($outsideUri, 'php', 1, $outsideText));
-        $referenceExtractor = new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()), $commentParser, $converter);
+        $referenceExtractor = new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()), $commentParser, $converter, new TwigDirectiveLocator());
         $indexes = new TwigCallableIndexRegistry();
         $indexes->forProject($project)->replace(
             $this->declarationExtractor($converter, $phpParser)->extract($extensionUri, $extensionText),
@@ -529,7 +530,7 @@ final class TwigCallableProviderTest extends TestCase
             $converter,
             new LspProtocolMapper(),
             $indexes,
-            new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()), $commentParser, $converter),
+            new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()), $commentParser, $converter, new TwigDirectiveLocator()),
             $classIndexes,
             new ProjectDocumentReader($documents, new ProjectPathResolver(new UriToPathConverter())),
             $phpParser,

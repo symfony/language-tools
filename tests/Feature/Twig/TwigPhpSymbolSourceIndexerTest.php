@@ -17,6 +17,7 @@ use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 
@@ -115,6 +116,7 @@ final class TwigPhpSymbolSourceIndexerTest extends TestCase
             new TolerantPhpParser(new Parser()),
             new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
             $comments,
+            new TwigDirectiveLocator(),
         );
     }
 }

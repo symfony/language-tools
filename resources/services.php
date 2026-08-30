@@ -165,7 +165,7 @@ return static function (ContainerConfigurator $container): void {
     $services->load('Symfony\\Lsp\\Client\\', '../src/Client/*Client.php');
     $services->load('Symfony\\Lsp\\Document\\', '../src/Document/*{Resolver,Store,Synchronizer,Converter,Reader}.php');
     $services->load('Symfony\\Lsp\\Index\\', '../src/Index/*{Scanner,Handler,Store,Registry,Codec,Hasher,Enumerator}.php');
-    $services->load('Symfony\\Lsp\\Parser\\', '../src/Parser/**/*{Parser,Decoder}.php');
+    $services->load('Symfony\\Lsp\\Parser\\', '../src/Parser/**/*{Parser,Decoder,Locator}.php');
     $services->set(BalancedDelimiterMatcher::class);
     $services->set(QuotedArgumentMatcher::class);
     $services->set(XmlCommentParser::class);

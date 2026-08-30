@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Translation;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigStringDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\UriToPathConverter;
 

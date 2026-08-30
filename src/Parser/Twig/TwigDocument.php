@@ -76,6 +76,47 @@ final class TwigDocument
         return null;
     }
 
+    public function stringLiteral(TreeSitterNode $node): ?TwigStringLiteral
+    {
+        $string = $this->string($node);
+        if (null === $string) {
+            return null;
+        }
+        [$raw, $start, $end] = $string;
+
+        return new TwigStringLiteral($raw, TwigStringDecoder::decode($raw), $start, $end, $this->source[$start - 1]);
+    }
+
+    public function directStringLiteral(TreeSitterNode $node): ?TwigStringLiteral
+    {
+        $string = $this->directString($node);
+
+        return null === $string ? null : $this->stringLiteral($string);
+    }
+
+    public function firstStringLiteral(TreeSitterNode $node): ?TwigStringLiteral
+    {
+        $string = $this->firstString($node);
+
+        return null === $string ? null : $this->stringLiteral($string);
+    }
+
+    public function soleStringLiteral(TreeSitterNode $container): ?TwigStringLiteral
+    {
+        $node = $this->firstString($container);
+        if (null === $node) {
+            return null;
+        }
+        $text = $this->text($container);
+        $start = $container->startByte + \strlen($text) - \strlen(ltrim($text));
+        $end = $container->endByte - \strlen($text) + \strlen(rtrim($text));
+        if ($node->startByte !== $start || $node->endByte !== $end) {
+            return null;
+        }
+
+        return $this->stringLiteral($node);
+    }
+
     public function text(TreeSitterNode $node): string
     {
         return $this->tree->text($node, $this->source);

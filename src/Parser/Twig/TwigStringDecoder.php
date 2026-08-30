@@ -1,6 +1,6 @@
 <?php
 
-namespace Symfony\Lsp\Feature\Translation;
+namespace Symfony\Lsp\Parser\Twig;
 
 final class TwigStringDecoder
 {

@@ -7,7 +7,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
+use Symfony\Lsp\Parser\Twig\TwigStringDecoder;
 
 final class TwigDocumentParserTest extends TestCase
 {
@@ -74,6 +76,56 @@ final class TwigDocumentParserTest extends TestCase
     public function testPreservesUnclosedCommentErrors(): void
     {
         self::assertTrue($this->parser()->parse('{## unclosed')->hasErrors());
+    }
+
+    public function testDecodesStringLiteralsWithTwigEscapeSemantics(): void
+    {
+        $source = <<<'TWIG'
+            {{ single('plain value') }}
+            {{ double("say \"hi\" to \\ them") }}
+            TWIG;
+        $document = $this->parser()->parse($source);
+        $literals = [];
+        foreach ($document->nodesOfType('function_call') as $call) {
+            $literals[] = $document->firstStringLiteral($call);
+        }
+
+        self::assertSame('plain value', $literals[0]?->value);
+        self::assertSame("'", $literals[0]->quote);
+        self::assertSame($literals[0]->raw, substr($source, $literals[0]->startOffset, $literals[0]->endOffset - $literals[0]->startOffset));
+        self::assertSame('say "hi" to \ them', $literals[1]?->value);
+        self::assertSame('say \\"hi\\" to \\\\ them', $literals[1]->raw);
+        self::assertSame('"', $literals[1]->quote);
+    }
+
+    public function testRejectsInterpolatedStringsAsLiterals(): void
+    {
+        $document = $this->parser()->parse('{{ call("prefix #{name} suffix") }}');
+
+        foreach ($document->nodesOfType('function_call') as $call) {
+            self::assertNull($document->firstStringLiteral($call));
+        }
+    }
+
+    public function testDecoderMatchesTwigEscapeSemantics(): void
+    {
+        self::assertSame("it's \n raw", TwigStringDecoder::decode("it\\'s \\n raw"));
+        self::assertSame("tab\thexAoctalA", TwigStringDecoder::decode('tab\\thex\\x41octal\\101'));
+        self::assertSame('literal #{brace}', TwigStringDecoder::decode('literal \\#{brace}'));
+        self::assertSame('plain', TwigStringDecoder::decode('plain'));
+    }
+
+    public function testLocatesDirectiveContexts(): void
+    {
+        $locator = new TwigDirectiveLocator();
+        $source = '{{ call("a }} b") }} outside {% set x = [1, {{k: 2}}] %}';
+
+        self::assertTrue($locator->insideDirective($source, (int) strpos($source, '"a')));
+        self::assertTrue($locator->insideDirective($source, (int) strpos($source, 'b"')));
+        self::assertFalse($locator->insideDirective($source, (int) strpos($source, 'outside')));
+        self::assertTrue($locator->insideDirective($source, (int) strpos($source, '2')));
+        self::assertFalse($locator->insideDirective($source, \strlen($source)));
+        self::assertTrue($locator->insideDirective('{{ unclosed(', 12));
     }
 
     private function parser(): TwigDocumentParser

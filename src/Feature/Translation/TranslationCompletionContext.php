@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Translation;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Twig\TwigStringDecoder;
 
 final class TranslationCompletionContext
 {

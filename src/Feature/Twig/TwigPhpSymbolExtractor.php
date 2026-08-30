@@ -8,6 +8,7 @@ use Symfony\Lsp\Parser\Php\PhpConstantKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpTypeKind;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
 final class TwigPhpSymbolExtractor
@@ -17,6 +18,7 @@ final class TwigPhpSymbolExtractor
         private readonly PhpParserInterface $phpParser,
         private readonly TwigDocumentParser $twigParser,
         private readonly TwigCommentParser $comments,
+        private readonly TwigDirectiveLocator $directives,
     ) {
     }
 
@@ -43,7 +45,7 @@ final class TwigPhpSymbolExtractor
     public function completionContext(string $text, int $offset): ?TwigPhpSymbolCompletionContext
     {
         $masked = $this->comments->mask($text);
-        if (!$this->insideDirective($masked, $offset)) {
+        if (!$this->directives->insideDirective($masked, $offset)) {
             return null;
         }
         $before = substr($masked, 0, $offset);
@@ -284,51 +286,5 @@ final class TwigPhpSymbolExtractor
     private function validIdentifierPrefix(string $value): bool
     {
         return '' === $value || 1 === preg_match('/^[A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*$/D', $value);
-    }
-
-    private function insideDirective(string $text, int $offset): bool
-    {
-        $close = null;
-        $quote = null;
-        $escaped = false;
-        $brackets = [];
-        for ($cursor = 0; $cursor < $offset; ++$cursor) {
-            $character = $text[$cursor];
-            $pair = substr($text, $cursor, 2);
-            if (null === $close) {
-                if ('{{' === $pair) {
-                    $close = '}}';
-                    $brackets = [];
-                    ++$cursor;
-                } elseif ('{%' === $pair) {
-                    $close = '%}';
-                    $brackets = [];
-                    ++$cursor;
-                }
-                continue;
-            }
-            if (null !== $quote) {
-                if ($escaped) {
-                    $escaped = false;
-                } elseif ('\\' === $character) {
-                    $escaped = true;
-                } elseif ($quote === $character) {
-                    $quote = null;
-                }
-                continue;
-            }
-            if (\in_array($character, ["'", '"'], true)) {
-                $quote = $character;
-            } elseif (\in_array($character, ['(', '[', '{'], true)) {
-                $brackets[] = ['(' => ')', '[' => ']', '{' => '}'][$character];
-            } elseif ([] !== $brackets && $character === $brackets[array_key_last($brackets)]) {
-                array_pop($brackets);
-            } elseif ([] === $brackets && $close === $pair) {
-                $close = null;
-                ++$cursor;
-            }
-        }
-
-        return null !== $close;
     }
 }
