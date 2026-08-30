@@ -83,9 +83,6 @@ final class MetadataExtractor
         $php = $this->phpParser->parse($text);
         $options = [];
         foreach ($php->attributes() as $attribute) {
-            if (array_any($attribute->arguments(), static fn (PhpArgument $argument): bool => str_contains((string) $argument->expression(), 'new '))) {
-                continue;
-            }
             foreach ($attribute->arguments() as $argument) {
                 $name = $argument->name();
                 $start = $argument->nameStartOffset();

@@ -146,6 +146,7 @@ final class MetadataProviderTest extends TestCase
                 #[Validation\Choice(choices: [MapMarkerType::Community->value, MapMarkerType::Ecosystem->value], groups: ['Submit'])]
                 #[Validation\Choice(MapMarkerType::cases())]
                 #[Validation\Type(\DateTimeInterface::class, groups: ['Submit'])]
+                #[Validation\When(expression: 'true', constraints: [new Validation\NotBlank(message: 'm')], unexpected: 1)]
                 public string $value;
             }
             PHP;
@@ -160,9 +161,11 @@ final class MetadataProviderTest extends TestCase
         self::assertNull($this->hover($hoverProviders, $converter, $constraintUri, $constraintText, strpos($constraintText, 'Assert\\When') + \strlen('Assert\\')));
         self::assertNull($this->hover($hoverProviders, $converter, $constraintUri, $constraintText, strpos($constraintText, 'env:') + 1));
         self::assertIsArray($this->hover($hoverProviders, $converter, $constraintUri, $constraintText, strpos($constraintText, 'unknown:') + 1));
+        self::assertIsArray($this->hover($hoverProviders, $converter, $constraintUri, $constraintText, strpos($constraintText, "expression: 'true'") + 1));
         $diagnostics = $this->diagnostics($diagnosticProviders, $constraintUri);
-        self::assertSame(['validation.unknown_constraint_option'], array_column($diagnostics, 'code'));
+        self::assertSame(['validation.unknown_constraint_option', 'validation.unknown_constraint_option'], array_column($diagnostics, 'code'));
         self::assertSame('Unknown option "unknown" for constraint "Length".', $diagnostics[0]['message'] ?? null);
+        self::assertSame('Unknown option "unexpected" for constraint "When".', $diagnostics[1]['message'] ?? null);
 
         $directConstraintUri = 'file:///workspace/src/Dto/DirectInput.php';
         $directConstraintText = <<<'PHP'

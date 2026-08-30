@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Validate constraint options when arguments contain nested constraints
 - Scope form builder completion to its declaring method
 - Navigate every constraint in grouped PHP attributes
 - Scope Live Component emit events to their declaring components
