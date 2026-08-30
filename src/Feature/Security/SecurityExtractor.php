@@ -8,11 +8,23 @@ use Symfony\Lsp\Feature\Configuration\ConfigurationOccurrence;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpMethodCall;
+use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
+use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 
 final class SecurityExtractor
 {
+    private const ABSTRACT_CONTROLLER = 'Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController';
+    private const AUTHORIZATION_TYPES = [
+        'Symfony\\Bundle\\SecurityBundle\\Security',
+        'Symfony\\Component\\Security\\Core\\Authorization\\AuthorizationCheckerInterface',
+    ];
+    private const IS_GRANTED_ATTRIBUTE = 'Symfony\\Component\\Security\\Http\\Attribute\\IsGranted';
+    private const LOGOUT_URL_GENERATOR = 'Symfony\\Component\\Security\\Http\\Logout\\LogoutUrlGenerator';
+
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly YamlConfigurationParser $yaml,
@@ -46,27 +58,30 @@ final class SecurityExtractor
         }
         if ('php' === $languageId) {
             $php = $this->phpParser->parse($text);
-            if ($this->hasIsGrantedAttribute($php) && preg_match('/\bIsGranted\s*\(\s*(?:attribute\s*:\s*)?["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
-                return $this->context(SecuritySymbolKind::Role, $match[1][0], $text, $match[1][1]);
+            if (preg_match('/#\[\s*([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s*\(\s*(?:attribute\s*:\s*)?["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)
+                && self::IS_GRANTED_ATTRIBUTE === $php->resolveName($match[1][0])
+            ) {
+                return $this->context(SecuritySymbolKind::Role, $match[2][0], $text, $match[2][1]);
             }
-            if ($this->extendsAbstractController($php) && preg_match('/\$this\s*->\s*denyAccessUnlessGranted\s*\(\s*["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
-                return $this->context(SecuritySymbolKind::Role, $match[1][0], $text, $match[1][1]);
+            if (preg_match('/\$this\s*->\s*(denyAccessUnlessGranted)\s*\(\s*["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)
+                && $this->isAbstractControllerAt($php, $match[1][1])
+            ) {
+                return $this->context(SecuritySymbolKind::Role, $match[2][0], $text, $match[2][1]);
             }
-            $authorizationVariables = $this->typedVariables($php, [
-                'Symfony\\Bundle\\SecurityBundle\\Security',
-                'Symfony\\Component\\Security\\Core\\Authorization\\AuthorizationCheckerInterface',
-            ]);
-            if (preg_match('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*isGranted\s*\(\s*["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
-                $variable = '' !== $match[2][0] ? $match[2][0] : $match[1][0];
-                if (isset($authorizationVariables[$variable])) {
-                    return $this->context(SecuritySymbolKind::Role, $match[3][0], $text, $match[3][1]);
+            if (preg_match('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(isGranted)\s*\(\s*["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL)) {
+                $property = \is_string($match[2][0] ?? null);
+                $receiver = $property ? $match[2][0] : ($match[1][0] ?? null);
+                $prefix = $match[4][0];
+                if (\is_string($receiver) && \is_string($prefix) && $this->hasTypedVariableAt($php, self::AUTHORIZATION_TYPES, $match[3][1], $receiver, $property)) {
+                    return $this->context(SecuritySymbolKind::Role, $prefix, $text, $match[4][1]);
                 }
             }
-            $logoutVariables = $this->typedVariables($php, ['Symfony\\Component\\Security\\Http\\Logout\\LogoutUrlGenerator']);
-            if (preg_match('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*getLogout(?:Path|Url)\s*\(\s*["\']([A-Za-z0-9_.-]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
-                $variable = '' !== $match[2][0] ? $match[2][0] : $match[1][0];
-                if (isset($logoutVariables[$variable])) {
-                    return $this->context(SecuritySymbolKind::Firewall, $match[3][0], $text, $match[3][1]);
+            if (preg_match('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(getLogout(?:Path|Url))\s*\(\s*["\']([A-Za-z0-9_.-]*)$/', $before, $match, \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL)) {
+                $property = \is_string($match[2][0] ?? null);
+                $receiver = $property ? $match[2][0] : ($match[1][0] ?? null);
+                $prefix = $match[4][0];
+                if (\is_string($receiver) && \is_string($prefix) && $this->hasTypedVariableAt($php, [self::LOGOUT_URL_GENERATOR], $match[3][1], $receiver, $property)) {
+                    return $this->context(SecuritySymbolKind::Firewall, $prefix, $text, $match[4][1]);
                 }
             }
         }
@@ -118,36 +133,36 @@ final class SecurityExtractor
     {
         $symbols = [];
         $php = $this->phpParser->parse($text);
-        $source = $this->phpComments->mask($text);
-        if ($this->hasIsGrantedAttribute($php)) {
-            preg_match_all('/\bIsGranted\s*\(\s*(?:attribute\s*:\s*)?["\'](ROLE_[A-Z0-9_]+)["\']/', $source, $attributes, \PREG_OFFSET_CAPTURE);
-            foreach ($attributes[1] as [$role, $offset]) {
-                $symbols[] = $this->symbol(SecuritySymbolKind::Role, $role, $uri, $text, $offset);
+        foreach ($php->attributes() as $attribute) {
+            if (self::IS_GRANTED_ATTRIBUTE !== $attribute->name()) {
+                continue;
+            }
+            $role = ($attribute->argument('attribute') ?? $attribute->argument(0))?->stringLiteral();
+            if (null !== $role && preg_match('/^ROLE_[A-Z0-9_]+$/D', $role->value())) {
+                $symbols[] = $this->symbol(SecuritySymbolKind::Role, $role->value(), $uri, $text, $role->startOffset());
             }
         }
-        if ($this->extendsAbstractController($php)) {
-            preg_match_all('/\$this\s*->\s*denyAccessUnlessGranted\s*\(\s*["\'](ROLE_[A-Z0-9_]+)["\']/', $source, $controllerRoles, \PREG_OFFSET_CAPTURE);
-            foreach ($controllerRoles[1] as [$role, $offset]) {
-                $symbols[] = $this->symbol(SecuritySymbolKind::Role, $role, $uri, $text, $offset);
+        foreach ($php->methodCalls() as $call) {
+            $argument = $call->argument(0)?->stringLiteral();
+            if (null === $argument) {
+                continue;
             }
-        }
-        $authorizationVariables = $this->typedVariables($php, [
-            'Symfony\\Bundle\\SecurityBundle\\Security',
-            'Symfony\\Component\\Security\\Core\\Authorization\\AuthorizationCheckerInterface',
-        ]);
-        preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*isGranted\s*\(\s*["\'](ROLE_[A-Z0-9_]+)["\']/', $source, $roles, \PREG_OFFSET_CAPTURE);
-        foreach ($roles[3] as $index => [$role, $offset]) {
-            $variable = '' !== $roles[2][$index][0] ? $roles[2][$index][0] : $roles[1][$index][0];
-            if (isset($authorizationVariables[$variable])) {
-                $symbols[] = $this->symbol(SecuritySymbolKind::Role, $role, $uri, $text, $offset);
-            }
-        }
-        $logoutVariables = $this->typedVariables($php, ['Symfony\\Component\\Security\\Http\\Logout\\LogoutUrlGenerator']);
-        preg_match_all('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*getLogout(?:Path|Url)\s*\(\s*["\']([A-Za-z0-9_.-]+)["\']/', $source, $firewalls, \PREG_OFFSET_CAPTURE);
-        foreach ($firewalls[3] as $index => [$firewall, $offset]) {
-            $variable = '' !== $firewalls[2][$index][0] ? $firewalls[2][$index][0] : $firewalls[1][$index][0];
-            if (isset($logoutVariables[$variable])) {
-                $symbols[] = $this->symbol(SecuritySymbolKind::Firewall, $firewall, $uri, $text, $offset);
+            if ('isGranted' === $call->method()
+                && preg_match('/^ROLE_[A-Z0-9_]+$/D', $argument->value())
+                && $this->hasTypedReceiver($call, $php, self::AUTHORIZATION_TYPES)
+            ) {
+                $symbols[] = $this->symbol(SecuritySymbolKind::Role, $argument->value(), $uri, $text, $argument->startOffset());
+            } elseif ('denyAccessUnlessGranted' === $call->method()
+                && preg_match('/^ROLE_[A-Z0-9_]+$/D', $argument->value())
+                && PhpMethodReceiverKind::This === $call->receiverContext()->kind()
+                && $this->extendsAbstractController($php, $call->className())
+            ) {
+                $symbols[] = $this->symbol(SecuritySymbolKind::Role, $argument->value(), $uri, $text, $argument->startOffset());
+            } elseif (\in_array($call->method(), ['getLogoutPath', 'getLogoutUrl'], true)
+                && preg_match('/^[A-Za-z0-9_.-]+$/D', $argument->value())
+                && $this->hasTypedReceiver($call, $php, [self::LOGOUT_URL_GENERATOR])
+            ) {
+                $symbols[] = $this->symbol(SecuritySymbolKind::Firewall, $argument->value(), $uri, $text, $argument->startOffset());
             }
         }
 
@@ -197,40 +212,108 @@ final class SecurityExtractor
         return new SecuritySourceSymbol($kind, $name, $uri, new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + \strlen($name))), false);
     }
 
-    private function hasIsGrantedAttribute(PhpDocument $php): bool
+    /** @param list<string> $acceptedTypes */
+    private function hasTypedReceiver(PhpMethodCall $call, PhpDocument $php, array $acceptedTypes): bool
     {
-        return 'Symfony\\Component\\Security\\Http\\Attribute\\IsGranted' === ($php->imports()['IsGranted'] ?? null);
-    }
-
-    /**
-     * @param list<string> $acceptedTypes
-     *
-     * @return array<string, true>
-     */
-    private function typedVariables(PhpDocument $php, array $acceptedTypes): array
-    {
-        $variables = [];
-        foreach ($php->typedVariables() as $variable) {
-            foreach ($variable->types() as $type) {
-                if (\in_array($type, $acceptedTypes, true)) {
-                    $variables[$variable->name()] = true;
-                    break;
-                }
-            }
+        $receiver = $call->receiverContext();
+        if (null === $receiver->name()) {
+            return false;
         }
-
-        return $variables;
-    }
-
-    private function extendsAbstractController(PhpDocument $php): bool
-    {
-        foreach ($php->typeDeclarations() as $type) {
-            if ('Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController' === $type->parentClassName()) {
+        foreach ($php->typedVariables() as $variable) {
+            if ($receiver->name() !== $variable->name() || [] === array_intersect($acceptedTypes, $variable->types())) {
+                continue;
+            }
+            if (PhpMethodReceiverKind::Variable === $receiver->kind()
+                && \in_array($variable->kind(), [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                && $call->scopeStartOffset() === $variable->scopeStartOffset()
+            ) {
+                return true;
+            }
+            if (PhpMethodReceiverKind::ThisProperty === $receiver->kind()
+                && \in_array($variable->kind(), [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
+                && $call->className() === $variable->className()
+            ) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /** @param list<string> $acceptedTypes */
+    private function hasTypedVariableAt(PhpDocument $php, array $acceptedTypes, int $offset, string $name, bool $property): bool
+    {
+        $type = $this->containingType($php, $offset);
+        $method = null === $type ? null : $this->containingMethod($php, $type, $offset);
+        if (null === $type || null === $method) {
+            return false;
+        }
+        foreach ($php->typedVariables() as $variable) {
+            if ($name !== $variable->name() || [] === array_intersect($acceptedTypes, $variable->types())) {
+                continue;
+            }
+            if ($property
+                && \in_array($variable->kind(), [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
+                && $type->name() === $variable->className()
+            ) {
+                return true;
+            }
+            if (!$property
+                && \in_array($variable->kind(), [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                && $type->name() === $variable->className()
+                && $method === $variable->methodName()
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isAbstractControllerAt(PhpDocument $php, int $offset): bool
+    {
+        $type = $this->containingType($php, $offset);
+
+        return null !== $type
+            && null !== $this->containingMethod($php, $type, $offset)
+            && self::ABSTRACT_CONTROLLER === $type->parentClassName();
+    }
+
+    private function extendsAbstractController(PhpDocument $php, ?string $className): bool
+    {
+        foreach ($php->typeDeclarations() as $type) {
+            if ($className === $type->name() && self::ABSTRACT_CONTROLLER === $type->parentClassName()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function containingMethod(PhpDocument $php, PhpTypeDeclaration $type, int $offset): ?string
+    {
+        $name = null;
+        $nameOffset = -1;
+        foreach ($php->methodDeclarations() as $method) {
+            if ($type->name() !== $method->className() || $method->nameStartOffset() > $offset || $method->nameStartOffset() <= $nameOffset) {
+                continue;
+            }
+            $name = $method->name();
+            $nameOffset = $method->nameStartOffset();
+        }
+
+        return $name;
+    }
+
+    private function containingType(PhpDocument $php, int $offset): ?PhpTypeDeclaration
+    {
+        foreach ($php->typeDeclarations() as $type) {
+            if ($type->contains($offset)) {
+                return $type;
+            }
+        }
+
+        return null;
     }
 
     /**

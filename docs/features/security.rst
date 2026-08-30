@@ -12,13 +12,17 @@ Completion
 Completion is available for:
 
 * user providers referenced by firewall configuration;
-* roles in ``IsGranted`` attributes;
+* roles in imported, aliased and fully qualified ``IsGranted`` attributes;
 * roles passed to ``denyAccessUnlessGranted()`` on Symfony controllers;
 * roles passed to ``AuthorizationCheckerInterface::isGranted()``;
 * roles passed to Twig's ``is_granted()`` function;
 * roles in role hierarchy and access-control configuration;
 * firewall names passed to typed ``LogoutUrlGenerator`` calls and Twig's
   ``logout_path()`` and ``logout_url()`` functions.
+
+PHP method calls are recognized only when the receiver has the matching Symfony
+service type in the same class or method. Controller helper calls are limited to
+the ``AbstractController`` subclass that contains them.
 
 Hover
 -----

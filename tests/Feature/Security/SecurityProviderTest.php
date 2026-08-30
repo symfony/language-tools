@@ -74,6 +74,140 @@ YAML;
         );
     }
 
+    public function testScopesTypedSecurityReceiversToTheirOwningMethods(): void
+    {
+        $extractor = $this->extractor();
+        $text = <<<'PHP'
+            <?php
+            use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
+
+            final class Controller
+            {
+                public function allowed(AuthorizationCheckerInterface $security): void
+                {
+                    $security->isGranted('ROLE_ALLOWED');
+                }
+
+                public function unrelated(object $security): void
+                {
+                    $security->isGranted('ROLE_UNRELATED');
+                }
+            }
+            PHP;
+
+        self::assertSame(
+            ['ROLE_ALLOWED'],
+            array_map(static fn ($symbol): string => $symbol->name(), $extractor->extract('file:///workspace/src/Controller.php', 'php', $text)->symbols()),
+        );
+
+        $completion = str_replace("isGranted('ROLE_UNRELATED');", "isGranted('ROLE_U", $text);
+        self::assertNull($extractor->completionContext('php', $completion, \strlen($completion)));
+    }
+
+    public function testScopesTypedSecurityPropertiesToTheirOwningClasses(): void
+    {
+        $extractor = $this->extractor();
+        $text = <<<'PHP'
+            <?php
+            use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
+
+            final class AdminController
+            {
+                public function __construct(private AuthorizationCheckerInterface $security) {}
+
+                public function index(): void
+                {
+                    $this->security->isGranted('ROLE_ADMIN');
+                }
+            }
+
+            final class UnrelatedController
+            {
+                public function __construct(private object $security) {}
+
+                public function index(): void
+                {
+                    $this->security->isGranted('ROLE_UNRELATED');
+                }
+            }
+            PHP;
+
+        self::assertSame(
+            ['ROLE_ADMIN'],
+            array_map(static fn ($symbol): string => $symbol->name(), $extractor->extract('file:///workspace/src/Controller.php', 'php', $text)->symbols()),
+        );
+
+        $completion = str_replace("isGranted('ROLE_UNRELATED');", "isGranted('ROLE_U", $text);
+        self::assertNull($extractor->completionContext('php', $completion, \strlen($completion)));
+    }
+
+    public function testScopesControllerCallsToAbstractControllerSubclasses(): void
+    {
+        $extractor = $this->extractor();
+        $text = <<<'PHP'
+            <?php
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+
+            final class AdminController extends AbstractController
+            {
+                public function index(): void
+                {
+                    $this->denyAccessUnlessGranted('ROLE_ADMIN');
+                }
+            }
+
+            final class UnrelatedController
+            {
+                public function index(): void
+                {
+                    $this->denyAccessUnlessGranted('ROLE_UNRELATED');
+                }
+            }
+            PHP;
+
+        self::assertSame(
+            ['ROLE_ADMIN'],
+            array_map(static fn ($symbol): string => $symbol->name(), $extractor->extract('file:///workspace/src/Controller.php', 'php', $text)->symbols()),
+        );
+
+        $completion = str_replace("denyAccessUnlessGranted('ROLE_UNRELATED');", "denyAccessUnlessGranted('ROLE_U", $text);
+        self::assertNull($extractor->completionContext('php', $completion, \strlen($completion)));
+    }
+
+    public function testResolvesIsGrantedAttributesWithoutShortNameFalsePositives(): void
+    {
+        $extractor = $this->extractor();
+        $text = <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Component\Security\Http\Attribute\IsGranted as RequiresRole;
+
+            #[RequiresRole(attribute: 'ROLE_ALIAS')]
+            final class AliasedController {}
+
+            #[\Symfony\Component\Security\Http\Attribute\IsGranted('ROLE_FULL')]
+            final class FullyQualifiedController {}
+
+            #[IsGranted('ROLE_UNRELATED')]
+            final class UnrelatedController {}
+            PHP;
+
+        self::assertSame(
+            ['ROLE_ALIAS', 'ROLE_FULL'],
+            array_map(static fn ($symbol): string => $symbol->name(), $extractor->extract('file:///workspace/src/Controller.php', 'php', $text)->symbols()),
+        );
+
+        $aliasedCompletion = str_replace("ROLE_ALIAS')]", 'ROLE_A', $text);
+        self::assertSame('ROLE_A', $extractor->completionContext('php', $aliasedCompletion, strpos($aliasedCompletion, 'ROLE_A') + \strlen('ROLE_A'))?->prefix());
+
+        $fullyQualifiedCompletion = str_replace("ROLE_FULL')]", 'ROLE_F', $text);
+        self::assertSame('ROLE_F', $extractor->completionContext('php', $fullyQualifiedCompletion, strpos($fullyQualifiedCompletion, 'ROLE_F') + \strlen('ROLE_F'))?->prefix());
+
+        $unrelatedCompletion = str_replace("ROLE_UNRELATED')]", 'ROLE_U', $text);
+        self::assertNull($extractor->completionContext('php', $unrelatedCompletion, strrpos($unrelatedCompletion, 'ROLE_U') + \strlen('ROLE_U')));
+    }
+
     public function testIgnoresCommentedPhpSecurityConstructs(): void
     {
         $converter = new PositionConverter();
@@ -186,6 +320,13 @@ PHP;
         self::assertContains($twigUri, array_column($provider->references($this->params($phpUri, $rolePosition)) ?? [], 'uri'));
         self::assertSame(['security.unknown_provider'], array_column($provider->diagnostics(['textDocument' => ['uri' => $yamlUri]]) ?? [], 'code'));
         self::assertSame(['security.unknown_firewall'], array_column($provider->diagnostics(['textDocument' => ['uri' => $twigUri]]) ?? [], 'code'));
+    }
+
+    private function extractor(): SecurityExtractor
+    {
+        $converter = new PositionConverter();
+
+        return new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TwigCommentParser(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
