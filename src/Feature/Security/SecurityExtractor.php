@@ -12,7 +12,6 @@ use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
-use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 
 final class SecurityExtractor
@@ -72,7 +71,10 @@ final class SecurityExtractor
                 $property = \is_string($match[2][0] ?? null);
                 $receiver = $property ? $match[2][0] : ($match[1][0] ?? null);
                 $prefix = $match[4][0];
-                if (\is_string($receiver) && \is_string($prefix) && $this->hasTypedVariableAt($php, self::AUTHORIZATION_TYPES, $match[3][1], $receiver, $property)) {
+                $methodOffset = $match[3][1];
+                $receiverKind = $property ? PhpMethodReceiverKind::ThisProperty : PhpMethodReceiverKind::Variable;
+                $call = \is_string($receiver) ? array_find($php->methodCalls, static fn (PhpMethodCall $call): bool => $match[3][0] === $call->method && $receiver === $call->receiverContext->name && $receiverKind === $call->receiverContext->kind && $methodOffset >= $call->startOffset && $methodOffset < $call->endOffset) : null;
+                if (\is_string($prefix) && null !== $call && $this->hasTypedReceiver($call, $php, self::AUTHORIZATION_TYPES)) {
                     return $this->context(SecuritySymbolKind::Role, $prefix, $text, $match[4][1]);
                 }
             }
@@ -80,7 +82,10 @@ final class SecurityExtractor
                 $property = \is_string($match[2][0] ?? null);
                 $receiver = $property ? $match[2][0] : ($match[1][0] ?? null);
                 $prefix = $match[4][0];
-                if (\is_string($receiver) && \is_string($prefix) && $this->hasTypedVariableAt($php, [self::LOGOUT_URL_GENERATOR], $match[3][1], $receiver, $property)) {
+                $methodOffset = $match[3][1];
+                $receiverKind = $property ? PhpMethodReceiverKind::ThisProperty : PhpMethodReceiverKind::Variable;
+                $call = \is_string($receiver) ? array_find($php->methodCalls, static fn (PhpMethodCall $call): bool => $match[3][0] === $call->method && $receiver === $call->receiverContext->name && $receiverKind === $call->receiverContext->kind && $methodOffset >= $call->startOffset && $methodOffset < $call->endOffset) : null;
+                if (\is_string($prefix) && null !== $call && $this->hasTypedReceiver($call, $php, [self::LOGOUT_URL_GENERATOR])) {
                     return $this->context(SecuritySymbolKind::Firewall, $prefix, $text, $match[4][1]);
                 }
             }
@@ -215,59 +220,7 @@ final class SecurityExtractor
     /** @param list<string> $acceptedTypes */
     private function hasTypedReceiver(PhpMethodCall $call, PhpDocument $php, array $acceptedTypes): bool
     {
-        $receiver = $call->receiverContext;
-        if (null === $receiver->name) {
-            return false;
-        }
-        foreach ($php->typedVariables as $variable) {
-            if ($receiver->name !== $variable->name || [] === array_intersect($acceptedTypes, $variable->types)) {
-                continue;
-            }
-            if (PhpMethodReceiverKind::Variable === $receiver->kind
-                && \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                && $call->scopeStartOffset === $variable->scopeStartOffset
-            ) {
-                return true;
-            }
-            if (PhpMethodReceiverKind::ThisProperty === $receiver->kind
-                && \in_array($variable->kind, [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
-                && $call->className === $variable->className
-            ) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /** @param list<string> $acceptedTypes */
-    private function hasTypedVariableAt(PhpDocument $php, array $acceptedTypes, int $offset, string $name, bool $property): bool
-    {
-        $type = $this->containingType($php, $offset);
-        $method = null === $type ? null : $this->containingMethod($php, $type, $offset);
-        if (null === $type || null === $method) {
-            return false;
-        }
-        foreach ($php->typedVariables as $variable) {
-            if ($name !== $variable->name || [] === array_intersect($acceptedTypes, $variable->types)) {
-                continue;
-            }
-            if ($property
-                && \in_array($variable->kind, [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
-                && $type->name === $variable->className
-            ) {
-                return true;
-            }
-            if (!$property
-                && \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                && $type->name === $variable->className
-                && $method === $variable->methodName
-            ) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($php->receiverVariables($call), static fn ($variable): bool => [] !== array_intersect($acceptedTypes, $variable->types));
     }
 
     private function isAbstractControllerAt(PhpDocument $php, int $offset): bool
