@@ -1,0 +1,24 @@
+[1mdiff --git i/grammar.js w/grammar.js[m
+[1mindex b51807d..d5a9f95 100644[m
+[1m--- i/grammar.js[m
+[1m+++ w/grammar.js[m
+[36m@@ -1,6 +1,6 @@[m
+ const REGEX_NAME = /[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*/;[m
+[31m-const REGEX_STRING_SIMPLE_QUOTED = /\'([^\'\\\\]*(?:\\\\.[^\'\\\\]*)*)\'/;[m
+[31m-const REGEX_STRING_INTERPOLATED = /[^#"\\\\]+/;[m
+[32m+[m[32mconst REGEX_STRING_SIMPLE_QUOTED = /'([^'\\]*(?:\\.[^'\\]*)*)'/;[m
+[32m+[m[32mconst REGEX_STRING_INTERPOLATED = /[^#"\\]+/;[m
+ const REGEX_NUMBER = /[0-9]+(?:\.[0-9]+)?([Ee][\+\-][0-9]+)?/;[m
+ [m
+ module.exports = grammar({[m
+[36m@@ -182,9 +182,7 @@[m [mmodule.exports = grammar({[m
+         '"',[m
+         repeat([m
+           choice([m
+[31m-            '\\"',[m
+[31m-            '\\#',[m
+[31m-            '\\\\',[m
+[32m+[m[32m            /\\[\s\S]/,[m
+             REGEX_STRING_INTERPOLATED,[m
+             seq('#{', $._expression, '}')[m
+           )[m

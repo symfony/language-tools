@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Parse Twig string literals with escaped quotes and backslash escapes
 - Decode static Twig helper arguments with Twig string semantics
 - Decode escaped Twig literals in template, route and PHP symbol references
 - Ignore unrelated named arguments in positional Doctrine and Metadata call slots

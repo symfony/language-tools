@@ -81,8 +81,8 @@ final class TwigDocumentParserTest extends TestCase
     public function testDecodesStringLiteralsWithTwigEscapeSemantics(): void
     {
         $source = <<<'TWIG'
-            {{ single('plain value') }}
-            {{ double("say \"hi\" to \\ them") }}
+            {{ single('it\'s a plain value') }}
+            {{ double("say \"hi\"\twith\x41tab") }}
             TWIG;
         $document = $this->parser()->parse($source);
         $literals = [];
@@ -90,11 +90,11 @@ final class TwigDocumentParserTest extends TestCase
             $literals[] = $document->firstStringLiteral($call);
         }
 
-        self::assertSame('plain value', $literals[0]?->value);
+        self::assertSame("it's a plain value", $literals[0]?->value);
+        self::assertSame("it\\'s a plain value", $literals[0]->raw);
         self::assertSame("'", $literals[0]->quote);
         self::assertSame($literals[0]->raw, substr($source, $literals[0]->startOffset, $literals[0]->endOffset - $literals[0]->startOffset));
-        self::assertSame('say "hi" to \ them', $literals[1]?->value);
-        self::assertSame('say \\"hi\\" to \\\\ them', $literals[1]->raw);
+        self::assertSame("say \"hi\"\twithAtab", $literals[1]?->value);
         self::assertSame('"', $literals[1]->quote);
     }
 
