@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Rebuild persistent source index caches once after an internal format change
 - Refresh runtime metadata once after watched Composer files change
 - Avoid rebuilding source indexes for unchanged document overlays
 - Ignore commented configuration constructs in PHP, XML and YAML files
