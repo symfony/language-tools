@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Environment\EnvironmentExtractor;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Environment\EnvironmentProvider;
@@ -34,6 +35,76 @@ final class EnvironmentProviderTest extends TestCase
 
         $twigFacts = $extractor->extract('file:///workspace/templates/page.html.twig', 'twig', "{## %env(DOCUMENTED_ENV)% #}\n{{ '%env(REAL_ENV)%' }}");
         self::assertSame(['REAL_ENV'], array_map(static fn ($item): string => $item->name, $twigFacts->references));
+    }
+
+    #[DataProvider('yamlScalarContextProvider')]
+    public function testSupportsEnvironmentExpressionsInYamlScalarContexts(string $text): void
+    {
+        $uri = 'file:///workspace/config/services.yaml';
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'yaml', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $converter = new PositionConverter();
+        $twigComments = new TwigCommentParser();
+        $phpComments = new PhpCommentParser();
+        $yamlComments = new YamlCommentParser();
+        $xmlComments = new XmlCommentParser();
+        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $twigComments, $phpComments, $yamlComments, $xmlComments);
+        $indexes = new EnvironmentIndexRegistry();
+        $indexes->forProject($project)->replaceSources(
+            $extractor->extract('file:///workspace/.env', 'dotenv', "PARTIAL_ENV=value\n"),
+            $extractor->extract($uri, 'yaml', $text),
+        );
+        $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $twigComments, $phpComments, $yamlComments, $xmlComments);
+
+        $facts = $extractor->extract($uri, 'yaml', $text);
+        self::assertSame(['COMPLETE_ENV'], array_map(static fn ($reference): string => $reference->name, $facts->references));
+        self::assertSame($this->protocolRange($converter, $text, (int) strpos($text, 'COMPLETE_ENV'), \strlen('COMPLETE_ENV')), $this->protocolRangeFromObject($facts->references[0]->range));
+
+        $completionStart = (int) strpos($text, 'PARTIAL_EN');
+        $completionOffset = $completionStart + \strlen('PARTIAL_EN');
+        $completion = $provider->complete($this->positionParams($converter, $uri, $text, $completionOffset)) ?? [];
+        self::assertSame(['PARTIAL_ENV'], array_column($completion, 'label'));
+        /** @var array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} $textEdit */
+        $textEdit = $completion[0]['textEdit'];
+        self::assertSame($this->protocolRange($converter, $text, $completionStart, \strlen('PARTIAL_EN')), $textEdit['range']);
+
+        $malformed = '%env(MALFORMED_ENV%';
+        $malformedOffset = (int) strpos($text, $malformed);
+        $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['env.malformed_chain'], array_column($diagnostics, 'code'));
+        self::assertSame($this->protocolRange($converter, $text, $malformedOffset, \strlen($malformed)), $diagnostics[0]['range'] ?? null);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function yamlScalarContextProvider(): iterable
+    {
+        yield 'double quoted with escapes' => [<<<'YAML'
+            complete: "escaped\\n%env(COMPLETE_ENV)%"
+            completion: "escaped\\t%env(PARTIAL_EN"
+            malformed: "escaped\\u0020%env(MALFORMED_ENV%"
+            YAML];
+        yield 'block scalar' => [<<<'YAML'
+            complete: |-
+              %env(COMPLETE_ENV)%
+            completion: |-
+              %env(PARTIAL_EN
+            malformed: |-
+              %env(MALFORMED_ENV%
+            YAML];
+        yield 'block sequence item' => [<<<'YAML'
+            values:
+              - '%env(COMPLETE_ENV)%'
+              - '%env(PARTIAL_EN'
+              - '%env(MALFORMED_ENV%'
+            YAML];
+        yield 'environment section' => [<<<'YAML'
+            when@test:
+              complete: '%env(COMPLETE_ENV)%'
+              completion: '%env(PARTIAL_EN'
+              malformed: '%env(MALFORMED_ENV%'
+            YAML];
     }
 
     public function testCompletesHoversNavigatesAndDiagnosesProcessors(): void
@@ -198,6 +269,15 @@ final class EnvironmentProviderTest extends TestCase
         $position = $converter->toPosition($text, $offset);
 
         return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
+    }
+
+    /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */
+    private function protocolRangeFromObject(Range $range): array
+    {
+        return [
+            'start' => ['line' => $range->start->line, 'character' => $range->start->character],
+            'end' => ['line' => $range->end->line, 'character' => $range->end->character],
+        ];
     }
 
     /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */
