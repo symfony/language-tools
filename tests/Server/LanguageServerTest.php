@@ -117,6 +117,57 @@ final class LanguageServerTest extends TestCase
         }
     }
 
+    public function testWatchedComposerChangeBootsRuntimeTwice(): void
+    {
+        $root = realpath(\dirname(__DIR__).'/Fixtures/RuntimeApplication');
+        self::assertIsString($root);
+        $logFile = tempnam(sys_get_temp_dir(), 'symfony-lsp-runtime-');
+        self::assertIsString($logFile);
+        $initializationsBeforeChange = 0;
+        $initializationsAfterChange = 0;
+        $composerFile = $root.'/composer.json';
+        $composerContents = file_get_contents($composerFile);
+        self::assertIsString($composerContents);
+        $frames = [
+            $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => [
+                'rootUri' => 'file://'.$root,
+                'capabilities' => new \stdClass(),
+                'initializationOptions' => ['runtimeIndexing' => true, 'workspaceTrust' => true],
+            ]]),
+            $this->frame(['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []]),
+            $this->frame(['jsonrpc' => '2.0', 'method' => 'workspace/didChangeWatchedFiles', 'params' => [
+                'changes' => [['uri' => 'file://'.$root.'/composer.json', 'type' => 2]],
+            ]]),
+            $this->frame(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'shutdown']),
+            $this->frame(['jsonrpc' => '2.0', 'method' => 'exit']),
+        ];
+        $input = new ReadableIterableStream((function () use ($frames, $logFile, $composerFile, $composerContents, &$initializationsBeforeChange, &$initializationsAfterChange): \Generator {
+            yield $frames[0];
+            yield $frames[1];
+            $this->waitForBridgeInitializations($logFile, 1);
+            $initializationsBeforeChange = $this->bridgeInitializationCount($logFile);
+            file_put_contents($composerFile, $composerContents."\n");
+            yield $frames[2];
+            $this->waitForBridgeInitializations($logFile, 2);
+            $initializationsAfterChange = $this->bridgeInitializationCount($logFile);
+            yield $frames[3];
+            yield $frames[4];
+        })());
+        $output = new CapturingWritableStream();
+        $countingPhpCommand = realpath(\dirname(__DIR__).'/Fixtures/counting-php-command.php');
+        self::assertIsString($countingPhpCommand);
+
+        try {
+            self::assertSame(0, (new LanguageServerFactory(defaultPhpCommand: [\PHP_BINARY, $countingPhpCommand, $logFile]))->create($input, $output)->run());
+            self::assertSame(1, $initializationsBeforeChange);
+            self::assertSame(2, $initializationsAfterChange - $initializationsBeforeChange);
+        } finally {
+            file_put_contents($composerFile, $composerContents);
+            $this->removeDirectory($root.'/var/symfony-lsp/dev');
+            @unlink($logFile);
+        }
+    }
+
     #[DataProvider('composerFileProvider')]
     public function testWatchedComposerChangesCanCreateProgressWithoutDeadlockingListener(string $composerFile): void
     {
@@ -238,6 +289,43 @@ final class LanguageServerTest extends TestCase
         }
 
         return $messages;
+    }
+
+    private function waitForBridgeInitializations(string $logFile, int $minimum): void
+    {
+        $deadline = microtime(true) + 15;
+        $lastContents = null;
+        $quiescentSince = null;
+        while (microtime(true) < $deadline) {
+            $contents = file_get_contents($logFile);
+            self::assertIsString($contents);
+            $initializations = substr_count($contents, "start\n");
+            $completed = substr_count($contents, "finish\n");
+            if ($initializations >= $minimum && $initializations === $completed) {
+                if ($contents === $lastContents) {
+                    $quiescentSince ??= microtime(true);
+                    if (microtime(true) - $quiescentSince >= 0.5) {
+                        return;
+                    }
+                } else {
+                    $quiescentSince = null;
+                }
+            } else {
+                $quiescentSince = null;
+            }
+            $lastContents = $contents;
+            delay(0.01);
+        }
+
+        self::fail('The runtime bridge did not become quiescent.');
+    }
+
+    private function bridgeInitializationCount(string $logFile): int
+    {
+        $contents = file_get_contents($logFile);
+        self::assertIsString($contents);
+
+        return substr_count($contents, "start\n");
     }
 
     private function removeDirectory(string $directory): void
