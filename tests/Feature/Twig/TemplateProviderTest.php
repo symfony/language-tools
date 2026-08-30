@@ -38,6 +38,7 @@ use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
+use Symfony\Lsp\Parser\Twig\TwigQuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigTypeDeclarationParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -235,7 +236,7 @@ final class TemplateProviderTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver(), $commentParser, new QuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
+        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver(), $commentParser, new TwigQuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
         $classUri = 'file:///workspace/src/Twig/Alert.php';
         $classText = <<<'PHP'
             <?php
@@ -338,7 +339,7 @@ final class TemplateProviderTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver(), $commentParser, new QuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
+        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver(), $commentParser, new TwigQuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
         $usageUri = 'file:///workspace/templates/page.html.twig';
         $usageText = "{## Use <twig:Documented /> in examples. #}\n<twig:ux:icon name=\"x\" />\n<twig:uX:iCoN name=\"x\" />\n<twig:Alert />\n<twig:alert />\n<twig:Card />\n<twig:acme:badge />\n<twig:Unknown />";
         $documents = new DocumentStore();
@@ -390,7 +391,7 @@ final class TemplateProviderTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver(), $commentParser, new QuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
+        $extractor = new TwigComponentExtractor($converter, $this->templateNameResolver(), $commentParser, new TwigQuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
         $completionUri = 'file:///workspace/templates/completion.html.twig';
         $completionText = '<twig:';
         $documents = new DocumentStore();

@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigStringDecoder;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 
@@ -210,17 +211,19 @@ final class StimulusExtractor
                 $references[] = new StimulusReference($controller, StimulusMemberKind::Target, $name, $uri, $this->converter->toRange($text, $valueOffset + $offset, \strlen($name)));
             }
         }
-        preg_match_all('/\bstimulus_controller\s*\(\s*([\'"])([^\'"]+)\1/', $text, $controllers, \PREG_OFFSET_CAPTURE);
-        foreach ($controllers[2] as [$name, $offset]) {
-            $references[] = new StimulusReference($name, null, null, $uri, $this->converter->toRange($text, $offset, \strlen($name)));
+        preg_match_all('/\bstimulus_controller\s*\(\s*([\'"])((?:\\\\.|[^\'"])+)\1/', $text, $controllers, \PREG_OFFSET_CAPTURE);
+        foreach ($controllers[2] as [$rawName, $offset]) {
+            $references[] = new StimulusReference(TwigStringDecoder::decode($rawName), null, null, $uri, $this->converter->toRange($text, $offset, \strlen($rawName)));
         }
         foreach (['action' => StimulusMemberKind::Action, 'target' => StimulusMemberKind::Target] as $function => $kind) {
-            preg_match_all('/\bstimulus_'.$function.'\s*\(\s*([\'"])([^\'"]+)\1\s*,\s*([\'"])([^\'"]+)\3/', $text, $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+            preg_match_all('/\bstimulus_'.$function.'\s*\(\s*([\'"])((?:\\\\.|[^\'"])+)\1\s*,\s*([\'"])((?:\\\\.|[^\'"])+)\3/', $text, $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
             foreach ($calls as $call) {
-                $controller = $call[2][0];
-                $member = $call[4][0];
-                $references[] = new StimulusReference($controller, null, null, $uri, $this->converter->toRange($text, $call[2][1], \strlen($controller)));
-                $references[] = new StimulusReference($controller, $kind, $member, $uri, $this->converter->toRange($text, $call[4][1], \strlen($member)));
+                $rawController = $call[2][0];
+                $rawMember = $call[4][0];
+                $controller = TwigStringDecoder::decode($rawController);
+                $member = TwigStringDecoder::decode($rawMember);
+                $references[] = new StimulusReference($controller, null, null, $uri, $this->converter->toRange($text, $call[2][1], \strlen($rawController)));
+                $references[] = new StimulusReference($controller, $kind, $member, $uri, $this->converter->toRange($text, $call[4][1], \strlen($rawMember)));
             }
         }
 

@@ -4,8 +4,8 @@ namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigQuotedArgumentMatcher;
 use Symfony\Lsp\Project\UriToPathConverter;
 
 final class AssetExtractor
@@ -14,7 +14,7 @@ final class AssetExtractor
         private readonly PositionConverter $converter,
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly TwigCommentParser $commentParser,
-        private readonly QuotedArgumentMatcher $matcher,
+        private readonly TwigQuotedArgumentMatcher $matcher,
         private readonly PhpCommentParserInterface $phpComments,
     ) {
     }

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Decode static Twig helper arguments with Twig string semantics
 - Decode escaped Twig literals in template, route and PHP symbol references
 - Ignore unrelated named arguments in positional Doctrine and Metadata call slots
 - Ignore unrelated named arguments when indexing Event and Messenger dispatch calls

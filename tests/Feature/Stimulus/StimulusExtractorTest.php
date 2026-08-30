@@ -35,6 +35,28 @@ final class StimulusExtractorTest extends TestCase
         self::assertSame(['real'], array_map(static fn ($reference): string => $reference->controller, $facts->references));
     }
 
+    public function testDecodesEscapedTwigHelperArguments(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $extractor = new StimulusExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new TwigCommentParser());
+        $facts = $extractor->extract($project, 'file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+            {{ stimulus_controller('it\'s') }}
+            {{ stimulus_action('it\'s', 'open\'s') }}
+            {{ stimulus_target('it\'s', 'result\'s') }}
+            TWIG);
+
+        self::assertSame(
+            [
+                ["it's", null, null],
+                ["it's", null, null],
+                ["it's", 'action', "open's"],
+                ["it's", null, null],
+                ["it's", 'target', "result's"],
+            ],
+            array_map(static fn ($reference): array => [$reference->controller, $reference->kind?->value, $reference->member], $facts->references),
+        );
+    }
+
     /** @return iterable<string, array{string, string, bool}> */
     public static function lazyCommentProvider(): iterable
     {

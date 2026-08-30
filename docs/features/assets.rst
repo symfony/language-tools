@@ -27,6 +27,7 @@ including bundle-provided assets under ``vendor/``.
 Importmap hover shows the configured path and package version when available.
 Go to Definition opens the entrypoint declaration in ``importmap.php``. Find All
 References lists statically recognized Twig usages for assets and entrypoints.
+Escaped characters in these static helper arguments follow Twig's string rules.
 
 Diagnostics
 -----------

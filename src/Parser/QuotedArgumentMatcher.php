@@ -8,12 +8,12 @@ use Symfony\Lsp\Document\Range;
 /**
  * Matches a quoted string literal as the first argument of a named call.
  *
- * Single-quoted literals follow PHP escaping: a backslash escapes the next
- * character and unknown escapes stay literal. Double-quoted literals only
- * accept the escaped backslash and quote; interpolation and other escape
- * sequences are dynamic values and never match.
+ * Single-quoted literals use PHP escaping and preserve unknown escapes.
+ * Double-quoted literals only accept the escaped backslash and quote;
+ * interpolation and other escape sequences are dynamic values and never match.
+ * Twig sources must use TwigQuotedArgumentMatcher.
  */
-final class QuotedArgumentMatcher
+class QuotedArgumentMatcher
 {
     private const LITERAL = '(?:\'(?<single>(?:\\\\.|[^\'\\\\])+)\'|"(?<double>(?:\\\\[\\\\"]|[^"\\\\$])+)")';
 
@@ -60,9 +60,7 @@ final class QuotedArgumentMatcher
             if (!\is_string($raw) || !\is_string($name)) {
                 continue;
             }
-            $value = $single
-                ? strtr($raw, ['\\\\' => '\\', "\\'" => "'"])
-                : strtr($raw, ['\\\\' => '\\', '\\"' => '"']);
+            $value = $this->decode($raw, $single);
             $arguments[] = new QuotedArgument(
                 $name,
                 $match['name'][1],
@@ -77,5 +75,12 @@ final class QuotedArgumentMatcher
         }
 
         return $arguments;
+    }
+
+    protected function decode(string $raw, bool $single): string
+    {
+        return $single
+            ? strtr($raw, ['\\\\' => '\\', "\\'" => "'"])
+            : strtr($raw, ['\\\\' => '\\', '\\"' => '"']);
     }
 }

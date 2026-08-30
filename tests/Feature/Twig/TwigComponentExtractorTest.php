@@ -1,0 +1,55 @@
+<?php
+
+namespace Symfony\Lsp\Tests\Feature\Twig;
+
+use Microsoft\PhpParser\Parser;
+use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Twig\TemplateNameResolver;
+use Symfony\Lsp\Feature\Twig\TwigComponentExtractor;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigQuotedArgumentMatcher;
+use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathResolver;
+use Symfony\Lsp\Project\UriToPathConverter;
+
+final class TwigComponentExtractorTest extends TestCase
+{
+    public function testDecodesEscapedTwigComponentNames(): void
+    {
+        $facts = $this->extractor()->extract(
+            new Project('/workspace', 'file:///workspace', '^8.0'),
+            'file:///workspace/templates/page.html.twig',
+            'twig',
+            "{{ component('it\\'s') }}",
+        );
+
+        self::assertSame(["it's"], array_map(static fn ($reference): string => $reference->name, $facts->references));
+    }
+
+    public function testDecodesEscapedTwigLiveActionNames(): void
+    {
+        $facts = $this->extractor()->extract(
+            new Project('/workspace', 'file:///workspace', '^8.0'),
+            'file:///workspace/templates/components/Search.html.twig',
+            'twig',
+            "{{ live_action('it\\'s') }}",
+        );
+
+        self::assertSame(["it's"], array_map(static fn ($reference): string => $reference->action, $facts->actionReferences));
+    }
+
+    private function extractor(): TwigComponentExtractor
+    {
+        $converter = new PositionConverter();
+
+        return new TwigComponentExtractor(
+            $converter,
+            new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())),
+            new TwigCommentParser(),
+            new TwigQuotedArgumentMatcher($converter),
+            new TolerantPhpParser(new Parser()),
+        );
+    }
+}

@@ -8,8 +8,8 @@ use Symfony\Lsp\Parser\Php\PhpAttributeTarget;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigQuotedArgumentMatcher;
 use Symfony\Lsp\Project\Project;
 
 final class TwigComponentExtractor
@@ -24,7 +24,7 @@ final class TwigComponentExtractor
         private readonly PositionConverter $converter,
         private readonly TemplateNameResolver $templateNameResolver,
         private readonly TwigCommentParser $commentParser,
-        private readonly QuotedArgumentMatcher $matcher,
+        private readonly TwigQuotedArgumentMatcher $matcher,
         private readonly PhpParserInterface $phpParser,
     ) {
     }
