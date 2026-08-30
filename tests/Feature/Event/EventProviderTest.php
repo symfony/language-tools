@@ -104,6 +104,43 @@ YAML;
         self::assertSame(['App\ExpectedEvent'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
     }
 
+    public function testIndexesOnlyDirectPositionalEventCreations(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new EventExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $text = <<<'PHP'
+            <?php
+            namespace App;
+
+            use App\Event\OrderPlaced as AliasedEvent;
+            use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+
+            final class Dispatch
+            {
+                public function __construct(private EventDispatcherInterface $dispatcher) {}
+
+                public function dispatch(): void
+                {
+                    $this->dispatcher->dispatch(new AliasedEvent());
+                    $this->dispatcher->dispatch(new \App\Event\QualifiedEvent());
+                    $this->dispatcher->dispatch(unrelated: new IgnoredEvent());
+                    $this->dispatcher->dispatch(factory(new NestedEvent()));
+                }
+            }
+            PHP;
+
+        $facts = $extractor->extract('file:///workspace/src/Dispatch.php', 'php', $text);
+        $ranges = array_map(static function ($symbol) use ($converter, $text): string {
+            $start = $converter->toByteOffset($text, $symbol->range->start);
+            $end = $converter->toByteOffset($text, $symbol->range->end);
+
+            return substr($text, $start, $end - $start);
+        }, $facts->symbols);
+
+        self::assertSame(['App\Event\OrderPlaced', 'App\Event\QualifiedEvent'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
+        self::assertSame(['AliasedEvent', '\\App\Event\QualifiedEvent'], $ranges);
+    }
+
     public function testCompletesHoversNavigatesDiagnosesAndProvidesCodeLenses(): void
     {
         $eventUri = 'file:///workspace/src/Event/OrderPlaced.php';

@@ -5,15 +5,11 @@ namespace Symfony\Lsp\Feature\Messenger;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
-use Symfony\Lsp\Parser\Php\PhpArgument;
+use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
-use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
-use Symfony\Lsp\Parser\Php\PhpMethodCall;
-use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
-use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
 final class MessengerExtractor
 {
@@ -52,12 +48,24 @@ final class MessengerExtractor
         if ('php' === $languageId) {
             $php = $this->parser->parse($text);
             $source = $this->phpComments->mask($text);
-            foreach ($php->attributes as $attribute) {
-                if (self::AS_MESSAGE_HANDLER !== $attribute->name
-                    || !array_any($attribute->targets, static fn ($target): bool => \in_array($target->kind, [PhpAttributeTargetKind::Type, PhpAttributeTargetKind::Method], true))
-                ) {
-                    continue;
+            /** @var array<int, PhpAttribute> $handlerAttributes */
+            $handlerAttributes = [];
+            foreach ($php->typeDeclarations as $type) {
+                foreach ($php->attributesOn(PhpAttributeTargetKind::Type, $type->name) as $attribute) {
+                    if (self::AS_MESSAGE_HANDLER === $attribute->name) {
+                        $handlerAttributes[$attribute->startOffset] = $attribute;
+                    }
                 }
+            }
+            foreach ($php->methodDeclarations as $method) {
+                foreach ($php->attributesOn(PhpAttributeTargetKind::Method, $method->className, $method->name) as $attribute) {
+                    if (self::AS_MESSAGE_HANDLER === $attribute->name) {
+                        $handlerAttributes[$attribute->startOffset] = $attribute;
+                    }
+                }
+            }
+            ksort($handlerAttributes);
+            foreach ($handlerAttributes as $attribute) {
                 $handlers[] = substr($text, $attribute->startOffset, $attribute->endOffset - $attribute->startOffset);
                 foreach ([
                     [MessengerSymbolKind::Bus, 'bus'],
@@ -69,7 +77,7 @@ final class MessengerExtractor
                     }
                     $symbols[] = $this->symbol($kind, $literal->value, $uri, $text, $literal->startOffset, false, $literal->endOffset - $literal->startOffset);
                 }
-                $handles = $this->classReferenceArgument($php, $attribute->argument('handles'));
+                $handles = $php->firstClassReference($attribute->argument('handles'));
                 if (null !== $handles) {
                     $symbols[] = $this->symbol(MessengerSymbolKind::Message, $handles->className, $uri, $text, $handles->startOffset, false, $handles->endOffset - $handles->startOffset);
                 }
@@ -80,18 +88,23 @@ final class MessengerExtractor
             }
             $parents = $this->phpParents($source, $php);
             foreach ($php->methodCalls as $call) {
-                if ('dispatch' !== $call->method || !$this->hasBusReceiver($call, $php)) {
+                if ('dispatch' !== $call->method || !array_any($php->receiverVariables($call), static fn ($variable): bool => [] !== array_intersect(self::BUS_TYPES, $variable->types))) {
                     continue;
                 }
-                $message = $this->newClassArgument($call->positionalArgument(0));
-                if (null !== $message) {
-                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $php->resolveName($message['name']), $uri, $text, $message['offset'], false, \strlen($message['name']));
+                $messageArgument = $call->positionalArgument(0);
+                $message = $php->firstObjectCreation($messageArgument);
+                if (null !== $message && $message->startOffset === $messageArgument?->expressionStartOffset) {
+                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $message->className, $uri, $text, $message->classNameStartOffset, false, $message->classNameEndOffset - $message->classNameStartOffset);
                 }
             }
-            preg_match_all('/new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s*\(\s*new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)/', $source, $envelopes, \PREG_OFFSET_CAPTURE);
-            foreach ($envelopes[2] as $index => [$name, $offset]) {
-                if ('Symfony\\Component\\Messenger\\Envelope' === $php->resolveName($envelopes[1][$index][0])) {
-                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $php->resolveName($name), $uri, $text, $offset, false, \strlen($name));
+            foreach ($php->objectCreations as $envelope) {
+                if ('Symfony\\Component\\Messenger\\Envelope' !== $envelope->className) {
+                    continue;
+                }
+                $messageArgument = $envelope->positionalArgument(0);
+                $message = $php->firstObjectCreation($messageArgument);
+                if (null !== $message && $message->startOffset === $messageArgument?->expressionStartOffset) {
+                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $message->className, $uri, $text, $message->classNameStartOffset, false, $message->classNameEndOffset - $message->classNameStartOffset);
                 }
             }
         }
@@ -164,61 +177,6 @@ final class MessengerExtractor
         }
 
         return $parents;
-    }
-
-    private function classReferenceArgument(PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
-    {
-        $start = $argument?->expressionStartOffset;
-        $end = $argument?->expressionEndOffset;
-        if (!\is_int($start) || !\is_int($end)) {
-            return null;
-        }
-        foreach ($php->classReferences as $reference) {
-            if ($reference->startOffset >= $start && $reference->endOffset <= $end) {
-                return $reference;
-            }
-        }
-
-        return null;
-    }
-
-    private function hasBusReceiver(PhpMethodCall $call, PhpDocument $php): bool
-    {
-        $receiver = $call->receiverContext;
-        if (null === $receiver->name) {
-            return false;
-        }
-        foreach ($php->typedVariables as $variable) {
-            if ($receiver->name !== $variable->name || [] === array_intersect(self::BUS_TYPES, $variable->types)) {
-                continue;
-            }
-            if (PhpMethodReceiverKind::Variable === $receiver->kind
-                && \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                && $call->scopeStartOffset === $variable->scopeStartOffset
-            ) {
-                return true;
-            }
-            if (PhpMethodReceiverKind::ThisProperty === $receiver->kind
-                && \in_array($variable->kind, [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
-                && $call->className === $variable->className
-            ) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /** @return array{name: string, offset: int}|null */
-    private function newClassArgument(?PhpArgument $argument): ?array
-    {
-        $expression = $argument?->expression;
-        $offset = $argument?->expressionStartOffset;
-        if (!\is_string($expression) || !\is_int($offset) || 1 !== preg_match('/^\s*new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)/', $expression, $match, \PREG_OFFSET_CAPTURE)) {
-            return null;
-        }
-
-        return ['name' => $match[1][0], 'offset' => $offset + $match[1][1]];
     }
 
     /**

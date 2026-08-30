@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ignore unrelated named arguments when indexing Event and Messenger dispatch calls
 - Rebuild persistent source index caches once after an internal format change
 - Refresh runtime metadata once after watched Composer files change
 - Avoid rebuilding source indexes for unchanged document overlays

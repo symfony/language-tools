@@ -136,6 +136,63 @@ YAML;
         self::assertSame(['App\ExpectedMessage'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
     }
 
+    public function testIndexesOnlyDirectPositionalMessageCreations(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new MessengerExtractor(
+            $converter,
+            new TolerantPhpParser(new Parser()),
+            new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
+            new PhpCommentParser(),
+        );
+        $text = <<<'PHP'
+            <?php
+            namespace App;
+
+            use App\Message\Ping as AliasedMessage;
+            use Symfony\Component\Messenger\Envelope as MessageEnvelope;
+            use Symfony\Component\Messenger\MessageBusInterface;
+
+            final class Dispatch
+            {
+                public function __construct(private MessageBusInterface $bus) {}
+
+                public function dispatch(): void
+                {
+                    $this->bus->dispatch(new AliasedMessage());
+                    $this->bus->dispatch(new \App\Message\QualifiedMessage());
+                    $this->bus->dispatch(unrelated: new IgnoredMessage());
+                    $this->bus->dispatch(factory(new NestedMessage()));
+                    new MessageEnvelope(new AliasedEnvelopeMessage());
+                    new \Symfony\Component\Messenger\Envelope(new \App\Message\QualifiedEnvelopeMessage());
+                    new MessageEnvelope(unrelated: new IgnoredEnvelopeMessage());
+                    new MessageEnvelope(factory(new NestedEnvelopeMessage()));
+                }
+            }
+            PHP;
+
+        $facts = $extractor->extract('file:///workspace/src/Dispatch.php', 'php', $text);
+        $ranges = array_map(static function ($symbol) use ($converter, $text): string {
+            $start = $converter->toByteOffset($text, $symbol->range->start);
+            $end = $converter->toByteOffset($text, $symbol->range->end);
+
+            return substr($text, $start, $end - $start);
+        }, $facts->symbols);
+
+        self::assertSame([
+            'App\Message\Ping',
+            'App\Message\QualifiedMessage',
+            'App\AliasedEnvelopeMessage',
+            'App\Message\QualifiedEnvelopeMessage',
+        ], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
+        self::assertSame([
+            'AliasedMessage',
+            '\\App\Message\QualifiedMessage',
+            'AliasedEnvelopeMessage',
+            '\\App\Message\QualifiedEnvelopeMessage',
+        ], $ranges);
+    }
+
     public function testCompletesHoversNavigatesDiagnosesAndProvidesCodeLenses(): void
     {
         $yamlUri = 'file:///workspace/config/packages/messenger.yaml';
