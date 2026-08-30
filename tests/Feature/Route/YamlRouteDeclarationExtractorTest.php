@@ -24,10 +24,7 @@ final class YamlRouteDeclarationExtractorTest extends TestCase
                 methods: [GET]
             YAML;
 
-        $declarations = (new YamlRouteDeclarationExtractor(new PositionConverter()))->extract(
-            'file:///workspace/config/routes.yaml',
-            $text,
-        );
+        $declarations = $this->extract($text);
 
         self::assertSame(['article_show', 'article_edit'], array_map(
             static fn (RouteDeclaration $declaration): string => $declaration->name,
@@ -37,5 +34,85 @@ final class YamlRouteDeclarationExtractorTest extends TestCase
         self::assertSame(0, $declarations[0]->range->start->character);
         self::assertSame(7, $declarations[1]->range->start->line);
         self::assertSame(1, $declarations[1]->range->start->character);
+    }
+
+    public function testExtractsQuotedRouteNamesWithoutQuotesInTheirRanges(): void
+    {
+        $declarations = $this->extract(<<<'YAML'
+            'article_show':
+                path: /article/{id}
+
+            "article_edit":
+                controller: App\Controller\ArticleController::edit
+            YAML);
+
+        self::assertSame(['article_show', 'article_edit'], array_map(
+            static fn (RouteDeclaration $declaration): string => $declaration->name,
+            $declarations,
+        ));
+        self::assertSame(1, $declarations[0]->range->start->character);
+        self::assertSame(13, $declarations[0]->range->end->character);
+        self::assertSame(1, $declarations[1]->range->start->character);
+        self::assertSame(13, $declarations[1]->range->end->character);
+    }
+
+    public function testExtractsEnvironmentRouteSection(): void
+    {
+        $declarations = $this->extract(<<<'YAML'
+            when@test:
+                article_show:
+                    path: /article/{id}
+            YAML);
+
+        self::assertCount(1, $declarations);
+        self::assertSame('when@test', $declarations[0]->name);
+        self::assertSame(0, $declarations[0]->range->start->line);
+        self::assertSame(0, $declarations[0]->range->start->character);
+        self::assertSame(9, $declarations[0]->range->end->character);
+    }
+
+    public function testExtractsRouteMixedWithNonRouteMappings(): void
+    {
+        $declarations = $this->extract(<<<'YAML'
+            services:
+                App\Controller\ArticleController: ~
+
+            article_show:
+                path: /article/{id}
+
+            controllers:
+                resource: ../src/Controller/
+                type: attribute
+            YAML);
+
+        self::assertSame(['article_show'], array_map(
+            static fn (RouteDeclaration $declaration): string => $declaration->name,
+            $declarations,
+        ));
+    }
+
+    public function testExtractsRouteFromMalformedDocument(): void
+    {
+        $declarations = $this->extract(<<<'YAML'
+            article_show:
+                path: /article/{id}
+
+            broken: [
+            YAML);
+
+        self::assertCount(1, $declarations);
+        self::assertSame('article_show', $declarations[0]->name);
+        self::assertSame(0, $declarations[0]->range->start->line);
+        self::assertSame(0, $declarations[0]->range->start->character);
+        self::assertSame(12, $declarations[0]->range->end->character);
+    }
+
+    /** @return list<RouteDeclaration> */
+    private function extract(string $text): array
+    {
+        return (new YamlRouteDeclarationExtractor(new PositionConverter()))->extract(
+            'file:///workspace/config/routes.yaml',
+            $text,
+        );
     }
 }
