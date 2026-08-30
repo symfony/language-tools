@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Feature\Metadata;
 
 use Microsoft\PhpParser\Parser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -544,6 +545,36 @@ final class MetadataProviderTest extends TestCase
         $position = $converter->toPosition($text, $offset);
 
         return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+    }
+
+    #[DataProvider('serializerGroupsAttributeCompletionProvider')]
+    public function testCompletesSerializerGroupsOnlyInResolvedGroupsAttributes(string $text, ?string $expectedPrefix): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new MetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new BalancedDelimiterMatcher());
+
+        self::assertSame($expectedPrefix, $extractor->completionContext('php', $text, \strlen($text))?->prefix());
+    }
+
+    /** @return iterable<string, array{string, ?string}> */
+    public static function serializerGroupsAttributeCompletionProvider(): iterable
+    {
+        yield 'aliased attribute' => [<<<'PHP'
+            <?php
+            use Symfony\Component\Serializer\Attribute\Groups as Serializer;
+
+            #[Serializer(['adm
+            PHP, 'adm'];
+        yield 'fully qualified attribute' => [<<<'PHP'
+            <?php
+            #[\Symfony\Component\Serializer\Attribute\Groups(['adm
+            PHP, 'adm'];
+        yield 'unrelated attribute with the same short name' => [<<<'PHP'
+            <?php
+            use App\Attribute\Groups;
+
+            #[Groups(['adm
+            PHP, null];
     }
 
     public function testOffersNoMetadataCompletionsInsidePhpComments(): void

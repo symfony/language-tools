@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Feature\Messenger;
 
 use Microsoft\PhpParser\Parser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -191,7 +192,7 @@ YAML;
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $relationshipResolver = new MessengerRelationshipResolver($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
-        $completionProvider = new MessengerCompletionProvider($documentResolver, $converter, $protocol, $indexes, $yamlParser, new PhpCommentParser());
+        $completionProvider = new MessengerCompletionProvider($documentResolver, $converter, $protocol, $indexes, $yamlParser, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
         $relationshipProvider = new MessengerRelationshipProvider($protocol, $indexes, $relationshipResolver);
         $diagnosticProvider = new MessengerDiagnosticProvider($documentResolver, $converter, $protocol, $indexes, $extractor, new TolerantPhpParser(new Parser()));
         $codeLensProvider = new MessengerCodeLensProvider($documentResolver, $protocol, $indexes, $classExtractor, $relationshipResolver);
@@ -252,6 +253,53 @@ YAML;
         self::assertSame([], $facts->handlers());
     }
 
+    /** @param list<string> $expectedLabels */
+    #[DataProvider('messageHandlerAttributeCompletionProvider')]
+    public function testCompletesMessengerNamesOnlyInResolvedHandlerAttributes(string $text, array $expectedLabels): void
+    {
+        $uri = 'file:///workspace/src/Handler.php';
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $converter = new PositionConverter();
+        $indexes = new MessengerIndexRegistry();
+        $indexes->forProject($project)->replace([new MessengerBus('command.bus', true)], [], [], [], true);
+        $provider = new MessengerCompletionProvider(
+            new DocumentContextResolver($documents, $projects),
+            $converter,
+            new LspProtocolMapper(),
+            $indexes,
+            new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
+            new PhpCommentParser(),
+            new TolerantPhpParser(new Parser()),
+        );
+        $position = $converter->toPosition($text, \strlen($text));
+
+        self::assertSame($expectedLabels, array_column($provider->complete($this->params($uri, $position)) ?? [], 'label'));
+    }
+
+    /** @return iterable<string, array{string, list<string>}> */
+    public static function messageHandlerAttributeCompletionProvider(): iterable
+    {
+        yield 'aliased attribute' => [<<<'PHP'
+            <?php
+            use Symfony\Component\Messenger\Attribute\AsMessageHandler as Handler;
+
+            #[Handler(bus: 'command
+            PHP, ['command.bus']];
+        yield 'fully qualified attribute' => [<<<'PHP'
+            <?php
+            #[\Symfony\Component\Messenger\Attribute\AsMessageHandler(bus: 'command
+            PHP, ['command.bus']];
+        yield 'unrelated attribute with the same short name' => [<<<'PHP'
+            <?php
+            use App\Attribute\AsMessageHandler;
+
+            #[AsMessageHandler(bus: 'command
+            PHP, []];
+    }
+
     public function testOffersNoMessengerCompletionsInsidePhpComments(): void
     {
         $uri = 'file:///workspace/src/Service.php';
@@ -270,6 +318,7 @@ YAML;
             $indexes,
             new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
             new PhpCommentParser(),
+            new TolerantPhpParser(new Parser()),
         );
         $position = $converter->toPosition($text, \strlen($text));
 

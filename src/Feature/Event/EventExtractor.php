@@ -52,8 +52,10 @@ final class EventExtractor
             $php = $this->parser->parse($text);
             $masked = $this->phpComments->mask($text);
             $before = substr($masked, 0, $offset);
-            if (preg_match('/AsEventListener\s*\([^)]*\bevent\s*:\s*["\']([^"\']*)$/s', $before, $match)) {
-                return $match[1];
+            if (preg_match('/(?:#\[\s*|,\s*)([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s*\([^)]*\bevent\s*:\s*["\']([^"\']*)$/s', $before, $match)
+                && self::AS_EVENT_LISTENER === $php->resolveName($match[1])
+            ) {
+                return $match[2];
             }
             preg_match_all('/function\s+getSubscribedEvents\s*\([^)]*\)[^{]*\{/', $masked, $subscriberMethods, \PREG_OFFSET_CAPTURE);
             foreach ($subscriberMethods[0] as [$declaration, $declarationOffset]) {

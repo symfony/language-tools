@@ -18,6 +18,11 @@ use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
 final class MetadataExtractor
 {
+    private const SERIALIZER_GROUP_ATTRIBUTES = [
+        'Symfony\\Component\\Serializer\\Attribute\\Groups',
+        'Symfony\\Component\\Serializer\\Annotation\\Groups',
+    ];
+
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly YamlConfigurationParser $yaml,
@@ -255,10 +260,7 @@ final class MetadataExtractor
         }
 
         foreach ($php->attributes() as $attribute) {
-            if (\in_array($attribute->name(), [
-                'Symfony\\Component\\Serializer\\Attribute\\Groups',
-                'Symfony\\Component\\Serializer\\Annotation\\Groups',
-            ], true)) {
+            if (\in_array($attribute->name(), self::SERIALIZER_GROUP_ATTRIBUTES, true)) {
                 foreach ($attribute->arguments() as $argument) {
                     $expression = $argument->expression();
                     $offset = $argument->expressionStartOffset();
@@ -364,12 +366,17 @@ final class MetadataExtractor
     private function phpCompletionContext(string $text, int $offset): ?MetadataCompletionContext
     {
         $before = substr($this->phpComments->mask($text), 0, $offset);
-        if (preg_match('/(?:["\']groups["\']\s*=>\s*\[[^\]]*|(?:[A-Za-z_\\\\][A-Za-z0-9_\\\\]*\\\\)?Groups\s*\([^\)]*)["\']([A-Za-z_][A-Za-z0-9_.:-]*)$/s', $before, $match, \PREG_OFFSET_CAPTURE)) {
+        if (preg_match('/["\']groups["\']\s*=>\s*\[[^\]]*["\']([A-Za-z_][A-Za-z0-9_.:-]*)$/s', $before, $match, \PREG_OFFSET_CAPTURE)) {
             return $this->context(MetadataCompletionKind::SerializerGroup, $match[1][0], $text, $match[1][1]);
+        }
+        $php = $this->phpParser->parse($text);
+        if (preg_match('/(?:#\[\s*|,\s*)([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s*\([^)]*["\']([A-Za-z_][A-Za-z0-9_.:-]*)$/s', $before, $match, \PREG_OFFSET_CAPTURE)
+            && \in_array($php->resolveName($match[1][0]), self::SERIALIZER_GROUP_ATTRIBUTES, true)
+        ) {
+            return $this->context(MetadataCompletionKind::SerializerGroup, $match[2][0], $text, $match[2][1]);
         }
         $attribute = strrpos($before, '#[');
         if (false !== $attribute && !str_contains(substr($before, $attribute), ']')) {
-            $php = $this->phpParser->parse($text);
             $expression = substr($before, $attribute + 2);
             if (preg_match('/^\s*([\\\\A-Za-z_][A-Za-z0-9_\\\\]*)\s*\((.*)$/s', $expression, $constraint) && preg_match('/(?:^|,)\s*([A-Za-z_][A-Za-z0-9_]*)$/', $constraint[2], $option, \PREG_OFFSET_CAPTURE)) {
                 $optionOffset = $attribute + 2 + strpos($expression, $constraint[2]) + $option[1][1];

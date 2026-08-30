@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Feature\Event;
 
 use Microsoft\PhpParser\Parser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -229,6 +230,35 @@ PHP;
     private function params(string $uri, Position $position): array
     {
         return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+    }
+
+    #[DataProvider('eventListenerAttributeCompletionProvider')]
+    public function testCompletesEventNamesOnlyInResolvedEventListenerAttributes(string $text, ?string $expectedPrefix): void
+    {
+        $extractor = new EventExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+
+        self::assertSame($expectedPrefix, $extractor->completionPrefix('php', $text, \strlen($text)));
+    }
+
+    /** @return iterable<string, array{string, ?string}> */
+    public static function eventListenerAttributeCompletionProvider(): iterable
+    {
+        yield 'aliased attribute' => [<<<'PHP'
+            <?php
+            use Symfony\Component\EventDispatcher\Attribute\AsEventListener as Listener;
+
+            #[Listener(event: 'app.or
+            PHP, 'app.or'];
+        yield 'fully qualified attribute' => [<<<'PHP'
+            <?php
+            #[\Symfony\Component\EventDispatcher\Attribute\AsEventListener(event: 'app.or
+            PHP, 'app.or'];
+        yield 'unrelated attribute with the same short name' => [<<<'PHP'
+            <?php
+            use App\Attribute\AsEventListener;
+
+            #[AsEventListener(event: 'app.or
+            PHP, null];
     }
 
     public function testOffersNoEventCompletionsInsidePhpComments(): void

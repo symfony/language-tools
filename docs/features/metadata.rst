@@ -53,9 +53,11 @@ classes to static PHP and YAML usages.
 Serializer Groups and Mapped Properties
 ---------------------------------------
 
-Known serializer groups are completed in PHP ``Groups`` attributes, literal
-``groups`` context arrays, and YAML mappings. Hover and Find All References
-show their statically recognized occurrences.
+Known serializer groups are completed in resolved PHP ``Groups`` attributes,
+including imported aliases and fully qualified names, in literal ``groups``
+context arrays and in YAML mappings. Unrelated attributes that share the
+``Groups`` short name are ignored. Hover and Find All References show their
+statically recognized occurrences.
 
 Go to Definition connects YAML validation and serializer class and property
 mappings to application PHP declarations. Hover shows the PHP property signature

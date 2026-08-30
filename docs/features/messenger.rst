@@ -10,8 +10,10 @@ Completion
 
 Bus name completion is available in recognized ``bus`` and ``default_bus``
 options and in ``BusNameStamp`` arguments. Transport completion is available in
-``fromTransport``, ``from_transport`` and ``failure_transport`` options. YAML
-routing entries also complete transport names:
+``fromTransport``, ``from_transport`` and ``failure_transport`` options.
+``AsMessageHandler`` attribute completion recognizes imported aliases and fully
+qualified names, while unrelated attributes that share its short name are
+ignored. YAML routing entries also complete transport names:
 
 .. code-block:: yaml
 

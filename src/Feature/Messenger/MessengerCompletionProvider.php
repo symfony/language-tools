@@ -9,10 +9,13 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class MessengerCompletionProvider implements CompletionProviderInterface
 {
+    private const AS_MESSAGE_HANDLER = 'Symfony\\Component\\Messenger\\Attribute\\AsMessageHandler';
+
     public function __construct(
         private readonly DocumentContextResolver $documents,
         private readonly PositionConverter $converter,
@@ -20,6 +23,7 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
         private readonly MessengerIndexRegistry $indexes,
         private readonly YamlConfigurationParser $yaml,
         private readonly PhpCommentParserInterface $phpComments,
+        private readonly PhpParserInterface $phpParser,
     ) {
     }
 
@@ -38,7 +42,12 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
         $lineOffset = (int) strrpos("\n".$before, "\n");
         $kind = null;
         $prefix = '';
-        $messengerOptionContext = 'yaml' === $request->document->languageId() || ('php' === $request->document->languageId() && preg_match('/AsMessageHandler\s*\([^)]*$/s', $before));
+        $messengerOptionContext = 'yaml' === $request->document->languageId();
+        if ('php' === $request->document->languageId()
+            && preg_match('/(?:#\[\s*|,\s*)([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s*\([^)]*$/s', $before, $attribute)
+        ) {
+            $messengerOptionContext = self::AS_MESSAGE_HANDLER === $this->phpParser->parse($request->document->text())->resolveName($attribute[1]);
+        }
         if ($messengerOptionContext && preg_match('/(?:\bbus|default_bus)\s*:\s*["\']?([A-Za-z0-9_.-]*)$/', $before, $match)) {
             $kind = MessengerSymbolKind::Bus;
             $prefix = $match[1];

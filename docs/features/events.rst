@@ -8,9 +8,11 @@ environment.
 Completion
 ----------
 
-Event-name completion is available in ``AsEventListener`` attributes,
+Event-name completion is available in resolved ``AsEventListener`` attributes,
+including imported aliases and fully qualified names. It is also available in
 ``EventSubscriberInterface::getSubscribedEvents()`` arrays, event-listener
-service tags and calls on statically typed event dispatchers. PHP class
+service tags and calls on statically typed event dispatchers. Unrelated
+attributes that share the ``AsEventListener`` short name are ignored. PHP class
 completion remains the responsibility of the general PHP language server.
 
 Hover
@@ -38,8 +40,7 @@ The server recognizes event references in these contexts:
 * ``EventSubscriberInterface::getSubscribedEvents()`` return values;
 * ``kernel.event_listener`` service tags.
 
-Imported aliases of ``AsEventListener`` are recognized. Typed parameters are
-matched only inside their declaring method. Typed
+Typed parameters are matched only inside their declaring method. Typed
 properties, including promoted properties, remain available across methods.
 Commented-out PHP attributes and calls are ignored.
 
