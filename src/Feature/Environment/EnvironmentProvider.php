@@ -14,7 +14,7 @@ use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
-use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -31,7 +31,7 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         private readonly EnvironmentExtractor $extractor,
         private readonly TwigCommentParser $commentParser,
         private readonly PhpCommentParserInterface $phpComments,
-        private readonly YamlCommentParser $yamlComments,
+        private readonly YamlDocumentParser $yamlParser,
         private readonly XmlCommentParser $xmlComments,
     ) {
     }
@@ -43,8 +43,8 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
             return null;
         }
         $cursor = $this->converter->toByteOffset($request->document->text, $request->position);
-        $text = $this->commentFreeText($request->document->languageId, $request->document->text);
-        if (!preg_match('/%env\(([^)]*)$/', substr($text, 0, $cursor), $match, \PREG_OFFSET_CAPTURE)) {
+        $textBeforeCursor = $this->textBeforeCursor($request->document->languageId, $request->document->text, $cursor);
+        if (null === $textBeforeCursor || !preg_match('/%env\(([^)]*)$/', $textBeforeCursor, $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
         $expression = $match[1][0];
@@ -153,9 +153,7 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
                 $previousProcessor = $processor;
             }
         }
-        $text = $this->commentFreeText($request->document->languageId, $request->document->text);
-        preg_match_all('/%env\([^\)\r\n]*%/', $text, $malformed, \PREG_OFFSET_CAPTURE);
-        foreach ($malformed[0] as [$expression, $offset]) {
+        foreach ($this->malformedExpressions($request->document->languageId, $request->document->text) as [$expression, $offset]) {
             $range = new Range($this->converter->toPosition($request->document->text, $offset), $this->converter->toPosition($request->document->text, $offset + \strlen($expression)));
             $diagnostics[] = $this->protocol->diagnostic($range, 1, 'env.malformed_chain', 'Malformed environment expression; expected ")%".');
         }
@@ -190,12 +188,52 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         return null;
     }
 
+    private function textBeforeCursor(string $languageId, string $text, int $cursor): ?string
+    {
+        if ('yaml' === $languageId) {
+            foreach ($this->yamlParser->parseDocument($text)->scalars as $scalar) {
+                if ($cursor < $scalar->contentStartByte || $cursor > $scalar->contentEndByte) {
+                    continue;
+                }
+
+                $contentOffset = $scalar->contentStartByte - $scalar->startByte;
+
+                return substr($scalar->raw, $contentOffset, $cursor - $scalar->contentStartByte);
+            }
+
+            return null;
+        }
+
+        return substr($this->commentFreeText($languageId, $text), 0, $cursor);
+    }
+
+    /** @return iterable<array{string, int}> */
+    private function malformedExpressions(string $languageId, string $text): iterable
+    {
+        if ('yaml' === $languageId) {
+            foreach ($this->yamlParser->parseDocument($text)->scalars as $scalar) {
+                $contentOffset = $scalar->contentStartByte - $scalar->startByte;
+                $scalarText = substr($scalar->raw, $contentOffset, $scalar->contentEndByte - $scalar->contentStartByte);
+                preg_match_all('/%env\([^\)\r\n]*%/', $scalarText, $malformed, \PREG_OFFSET_CAPTURE);
+                foreach ($malformed[0] as [$expression, $offset]) {
+                    yield [$expression, $scalar->contentStartByte + $offset];
+                }
+            }
+
+            return;
+        }
+
+        preg_match_all('/%env\([^\)\r\n]*%/', $this->commentFreeText($languageId, $text), $malformed, \PREG_OFFSET_CAPTURE);
+        foreach ($malformed[0] as $match) {
+            yield $match;
+        }
+    }
+
     private function commentFreeText(string $languageId, string $text): string
     {
         return match ($languageId) {
             'twig' => $this->commentParser->mask($text),
             'php' => $this->phpComments->mask($text),
-            'yaml' => $this->yamlComments->mask($text),
             'xml' => $this->xmlComments->mask($text),
             default => $text,
         };

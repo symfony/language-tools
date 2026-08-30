@@ -13,9 +13,11 @@ use Symfony\Lsp\Feature\Environment\EnvironmentExtractor;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Environment\EnvironmentProvider;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
-use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -25,7 +27,7 @@ final class EnvironmentProviderTest extends TestCase
 {
     public function testIndexesNamesAndReferencesWithoutValues(): void
     {
-        $extractor = new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser(), new PhpCommentParser(), new YamlCommentParser(), new XmlCommentParser());
+        $extractor = new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser(), new PhpCommentParser(), $this->yamlParser(), new XmlCommentParser());
         $facts = $extractor->extract('file:///workspace/.env', 'dotenv', "APP_SECRET=CANARY_SECRET_VALUE\nAPP_URL=https://example.com\nEMPTY=\nCHILD=\${APP_URL:-\${FALLBACK_URL}}/\$EMPTY\nPARTIAL=\${UNFINISHED\nESCAPED=\\\$IGNORED\n");
 
         self::assertSame(['APP_SECRET', 'APP_URL', 'EMPTY', 'CHILD', 'PARTIAL', 'ESCAPED'], array_map(static fn ($item): string => $item->name, $facts->declarations));
@@ -48,15 +50,15 @@ final class EnvironmentProviderTest extends TestCase
         $converter = new PositionConverter();
         $twigComments = new TwigCommentParser();
         $phpComments = new PhpCommentParser();
-        $yamlComments = new YamlCommentParser();
+        $yamlParser = $this->yamlParser();
         $xmlComments = new XmlCommentParser();
-        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $twigComments, $phpComments, $yamlComments, $xmlComments);
+        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $twigComments, $phpComments, $yamlParser, $xmlComments);
         $indexes = new EnvironmentIndexRegistry();
         $indexes->forProject($project)->replaceSources(
             $extractor->extract('file:///workspace/.env', 'dotenv', "PARTIAL_ENV=value\n"),
             $extractor->extract($uri, 'yaml', $text),
         );
-        $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $twigComments, $phpComments, $yamlComments, $xmlComments);
+        $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $twigComments, $phpComments, $yamlParser, $xmlComments);
 
         $facts = $extractor->extract($uri, 'yaml', $text);
         self::assertSame(['COMPLETE_ENV'], array_map(static fn ($reference): string => $reference->name, $facts->references));
@@ -118,13 +120,13 @@ final class EnvironmentProviderTest extends TestCase
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
         $phpComments = new PhpCommentParser();
-        $yamlComments = new YamlCommentParser();
+        $yamlParser = $this->yamlParser();
         $xmlComments = new XmlCommentParser();
-        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $commentParser, $phpComments, $yamlComments, $xmlComments);
+        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $commentParser, $phpComments, $yamlParser, $xmlComments);
         $indexes = new EnvironmentIndexRegistry();
         $indexes->forProject($project)->replaceSources($extractor->extract('file:///workspace/.env', 'dotenv', "APP_URL=CANARY_SECRET_VALUE\n"), $extractor->extract($uri, 'yaml', $text));
         $indexes->forProject($project)->replaceProcessors(['custom' => 'string', 'json' => 'array']);
-        $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $commentParser, $phpComments, $yamlComments, $xmlComments);
+        $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $commentParser, $phpComments, $yamlParser, $xmlComments);
         $position = $converter->toPosition($text, strpos($text, 'APP_UR') + \strlen('APP_UR'));
         $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
 
@@ -162,16 +164,16 @@ final class EnvironmentProviderTest extends TestCase
         $converter = new PositionConverter();
         $twigComments = new TwigCommentParser();
         $phpComments = new PhpCommentParser();
-        $yamlComments = new YamlCommentParser();
+        $yamlParser = $this->yamlParser();
         $xmlComments = new XmlCommentParser();
-        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $twigComments, $phpComments, $yamlComments, $xmlComments);
+        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $twigComments, $phpComments, $yamlParser, $xmlComments);
         $indexes = new EnvironmentIndexRegistry();
         $indexes->forProject($project)->replaceSources(
             $extractor->extract('file:///workspace/.env', 'dotenv', "APP_URL=value\n"),
             $extractor->extract($uri, $languageId, $text),
         );
         $indexes->forProject($project)->replaceProcessors(['json' => 'array']);
-        $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $twigComments, $phpComments, $yamlComments, $xmlComments);
+        $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $twigComments, $phpComments, $yamlParser, $xmlComments);
 
         $commentCompletionOffset = strpos($text, 'APP_UR') + \strlen('APP_UR');
         self::assertNull($provider->complete($this->positionParams($converter, $uri, $text, $commentCompletionOffset)));
@@ -233,12 +235,12 @@ final class EnvironmentProviderTest extends TestCase
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
         $phpComments = new PhpCommentParser();
-        $yamlComments = new YamlCommentParser();
+        $yamlParser = $this->yamlParser();
         $xmlComments = new XmlCommentParser();
-        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $commentParser, $phpComments, $yamlComments, $xmlComments);
+        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $commentParser, $phpComments, $yamlParser, $xmlComments);
         $indexes = new EnvironmentIndexRegistry();
         $indexes->forProject($project)->replaceSources($extractor->extract('file:///workspace/.env', 'dotenv', "APP_URL=value\n"));
-        $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $commentParser, $phpComments, $yamlComments, $xmlComments);
+        $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $commentParser, $phpComments, $yamlParser, $xmlComments);
         $completionOffset = strpos($text, 'APP_U') + \strlen('APP_U');
         $position = $converter->toPosition($text, $completionOffset);
 
@@ -251,7 +253,7 @@ final class EnvironmentProviderTest extends TestCase
 
     public function testIgnoresEnvironmentReferencesInPhpComments(): void
     {
-        $extractor = new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser(), new PhpCommentParser(), new YamlCommentParser(), new XmlCommentParser());
+        $extractor = new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser(), new PhpCommentParser(), $this->yamlParser(), new XmlCommentParser());
 
         $facts = $extractor->extract('file:///workspace/src/Kernel.php', 'php', <<<'PHP'
             <?php
@@ -261,6 +263,11 @@ final class EnvironmentProviderTest extends TestCase
             PHP);
 
         self::assertSame(['LIVE_ENV'], array_map(static fn ($reference): string => $reference->name, $facts->references));
+    }
+
+    private function yamlParser(): YamlDocumentParser
+    {
+        return new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()));
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
