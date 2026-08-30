@@ -247,7 +247,7 @@ final class DoctrineProviderTest extends TestCase
             static fn ($symbol): bool => DoctrineSymbolKind::Field === $symbol->kind(),
         ));
         self::assertSame(['name'], array_map(static fn ($symbol): string => $symbol->name(), $fieldReferences));
-        self::assertSame(strpos($usageText, "'name'") + 1, $converter->toByteOffset($usageText, $fieldReferences[0]->range()->start()));
+        self::assertSame(strpos($usageText, "'name'") + 1, $converter->toByteOffset($usageText, $fieldReferences[0]->range()->start));
     }
 
     public function testScopesRepositoryCompletionToTheContainingMethod(): void
@@ -362,7 +362,7 @@ final class DoctrineProviderTest extends TestCase
         $entityReferences = array_values(array_filter($references, static fn ($symbol): bool => DoctrineSymbolKind::Entity === $symbol->kind()));
         self::assertCount(1, $entityReferences);
         self::assertSame('App\\Entity\\Product', $entityReferences[0]->name());
-        self::assertSame(strpos($text, 'Product::class'), $converter->toByteOffset($text, $entityReferences[0]->range()->start()));
+        self::assertSame(strpos($text, 'Product::class'), $converter->toByteOffset($text, $entityReferences[0]->range()->start));
 
         $fieldReferences = array_values(array_filter($references, static fn ($symbol): bool => DoctrineSymbolKind::Field === $symbol->kind()));
         $fieldNames = [];
@@ -370,8 +370,8 @@ final class DoctrineProviderTest extends TestCase
             $fieldNames[] = $fieldReference->name();
         }
         self::assertSame(['active_entity_type', 'active_criteria'], $fieldNames);
-        self::assertSame(strpos($text, 'active_entity_type'), $converter->toByteOffset($text, $fieldReferences[0]->range()->start()));
-        self::assertSame(strpos($text, 'active_criteria'), $converter->toByteOffset($text, $fieldReferences[1]->range()->start()));
+        self::assertSame(strpos($text, 'active_entity_type'), $converter->toByteOffset($text, $fieldReferences[0]->range()->start));
+        self::assertSame(strpos($text, 'active_criteria'), $converter->toByteOffset($text, $fieldReferences[1]->range()->start));
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
@@ -381,7 +381,7 @@ final class DoctrineProviderTest extends TestCase
 
         return [
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ];
     }
 

@@ -74,7 +74,7 @@ final class ServiceCompletionHandlerTest extends TestCase
 
         $result = $handler->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]);
 
         self::assertSame([[
@@ -119,7 +119,7 @@ final class ServiceCompletionHandlerTest extends TestCase
 
         self::assertNull($handler->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]));
     }
 
@@ -163,7 +163,7 @@ final class ServiceCompletionHandlerTest extends TestCase
         $yamlPosition = $converter->toPosition($yaml, strpos($yaml, 'app.st') + \strlen('app.st'));
         $yamlResult = $handler->complete([
             'textDocument' => ['uri' => $yamlUri],
-            'position' => ['line' => $yamlPosition->line(), 'character' => $yamlPosition->character()],
+            'position' => ['line' => $yamlPosition->line, 'character' => $yamlPosition->character],
         ]);
         self::assertIsArray($yamlResult);
         self::assertIsArray($yamlResult[0]['textEdit']);
@@ -177,7 +177,7 @@ final class ServiceCompletionHandlerTest extends TestCase
         $phpPosition = $converter->toPosition($php, strpos($php, 'app.a') + \strlen('app.a'));
         $phpResult = $handler->complete([
             'textDocument' => ['uri' => $phpUri],
-            'position' => ['line' => $phpPosition->line(), 'character' => $phpPosition->character()],
+            'position' => ['line' => $phpPosition->line, 'character' => $phpPosition->character],
         ]);
         self::assertIsArray($phpResult);
         self::assertIsArray($phpResult[0]['textEdit']);
@@ -195,8 +195,8 @@ final class ServiceCompletionHandlerTest extends TestCase
         $servicePhpResult = $handler->complete([
             'textDocument' => ['uri' => $servicePhpUri],
             'position' => [
-                'line' => $servicePhpPosition->line(),
-                'character' => $servicePhpPosition->character(),
+                'line' => $servicePhpPosition->line,
+                'character' => $servicePhpPosition->character,
             ],
         ]);
 

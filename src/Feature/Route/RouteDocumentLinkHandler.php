@@ -27,13 +27,13 @@ final class RouteDocumentLinkHandler implements DocumentLinkProviderInterface
     public function links(array $params): ?array
     {
         $request = $this->documentContextResolver->resolveDocument($params);
-        if (null === $request || !\in_array($request->document->languageId(), ['php', 'twig'], true)) {
+        if (null === $request || !\in_array($request->document->languageId, ['php', 'twig'], true)) {
             return null;
         }
 
-        $references = 'twig' === $request->document->languageId()
-            ? $this->twigReferenceExtractor->extract($request->document->text())
-            : $this->phpReferenceExtractor->extract($request->document->text(), $this->classIndexes->forProject($request->project));
+        $references = 'twig' === $request->document->languageId
+            ? $this->twigReferenceExtractor->extract($request->document->text)
+            : $this->phpReferenceExtractor->extract($request->document->text, $this->classIndexes->forProject($request->project));
         $links = [];
         foreach ($references as $reference) {
             $declarations = $this->declarationIndexes->forProject($request->project)->find($reference->name());
@@ -44,7 +44,7 @@ final class RouteDocumentLinkHandler implements DocumentLinkProviderInterface
             $declaration = $declarations[0];
             $links[] = [
                 'range' => $this->protocol->range($reference->range()),
-                'target' => $declaration->uri().'#L'.($declaration->range()->start()->line() + 1),
+                'target' => $declaration->uri().'#L'.($declaration->range()->start->line + 1),
                 'tooltip' => \sprintf('Open route "%s"', $reference->name()),
             ];
         }

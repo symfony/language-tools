@@ -38,9 +38,9 @@ final class ProjectDiscoveryTest extends TestCase
         ]);
 
         self::assertCount(1, $projects);
-        self::assertSame($this->temporaryDirectory, $projects[0]->rootPath());
-        self::assertSame($uri, $projects[0]->rootUri());
-        self::assertSame('^7.4', $projects[0]->frameworkBundleConstraint());
+        self::assertSame($this->temporaryDirectory, $projects[0]->rootPath);
+        self::assertSame($uri, $projects[0]->rootUri);
+        self::assertSame('^7.4', $projects[0]->frameworkBundleConstraint);
     }
 
     public function testDiscoversNestedAndExplicitProjectRoots(): void
@@ -63,14 +63,14 @@ final class ProjectDiscoveryTest extends TestCase
             $this->temporaryDirectory.'/.hidden',
             $this->temporaryDirectory.'/apps/admin',
             $this->temporaryDirectory.'/apps/ignored',
-        ], array_map(static fn (Project $project): string => $project->rootPath(), $projects));
+        ], array_map(static fn (Project $project): string => $project->rootPath, $projects));
 
         file_put_contents($this->temporaryDirectory.'/apps/admin/composer.json', json_encode([
             'require' => ['symfony/framework-bundle' => '^8.0'],
         ], \JSON_THROW_ON_ERROR));
         $projects = $discovery->discover($workspace, ['apps/admin']);
         self::assertCount(1, $projects);
-        self::assertSame($this->temporaryDirectory.'/apps/admin', $projects[0]->rootPath());
+        self::assertSame($this->temporaryDirectory.'/apps/admin', $projects[0]->rootPath);
     }
 
     public function testSkipsGitignoredProjectsUnlessExplicitlyConfigured(): void
@@ -91,12 +91,12 @@ final class ProjectDiscoveryTest extends TestCase
         $projects = $discovery->discover($workspace);
         self::assertSame(
             [$this->temporaryDirectory.'/apps/admin'],
-            array_map(static fn (Project $project): string => $project->rootPath(), $projects),
+            array_map(static fn (Project $project): string => $project->rootPath, $projects),
         );
 
         $projects = $discovery->discover($workspace, ['ignored/app']);
         self::assertCount(1, $projects);
-        self::assertSame($this->temporaryDirectory.'/ignored/app', $projects[0]->rootPath());
+        self::assertSame($this->temporaryDirectory.'/ignored/app', $projects[0]->rootPath);
     }
 
     public function testDiscoversProjectsAroundUnreadableDirectories(): void
@@ -121,7 +121,7 @@ final class ProjectDiscoveryTest extends TestCase
         }
 
         self::assertCount(1, $projects);
-        self::assertSame($this->temporaryDirectory, $projects[0]->rootPath());
+        self::assertSame($this->temporaryDirectory, $projects[0]->rootPath);
     }
 
     public function testDiscoversLegacyApplicationsWithAConsoleMarker(): void
@@ -137,7 +137,7 @@ final class ProjectDiscoveryTest extends TestCase
         ]);
 
         self::assertCount(1, $projects);
-        self::assertSame($this->temporaryDirectory, $projects[0]->rootPath());
+        self::assertSame($this->temporaryDirectory, $projects[0]->rootPath);
     }
 
     public function testSelectsMostSpecificProjectForDocument(): void
@@ -171,7 +171,7 @@ final class ProjectDiscoveryTest extends TestCase
         ]);
 
         self::assertCount(1, $projects);
-        self::assertSame('6.4.43', $projects[0]->frameworkBundleConstraint());
+        self::assertSame('6.4.43', $projects[0]->frameworkBundleConstraint);
     }
 
     public function testIgnoresApplicationsWithoutTheFrameworkBundleInTheLock(): void

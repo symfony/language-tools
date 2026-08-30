@@ -110,12 +110,12 @@ final class TemplateProviderTest extends TestCase
 
         self::assertSame(['article'], array_column($provider->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]) ?? [], 'label'));
         $hoverPosition = $converter->toPosition($text, strrpos($text, 'app') + 1);
         $hover = $provider->hover([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $hoverPosition->line(), 'character' => $hoverPosition->character()],
+            'position' => ['line' => $hoverPosition->line, 'character' => $hoverPosition->character],
         ]);
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
@@ -158,7 +158,7 @@ final class TemplateProviderTest extends TestCase
         $completionPosition = $converter->toPosition($text, strrpos($text, 'arti') + \strlen('arti'));
         $items = $provider->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $completionPosition->line(), 'character' => $completionPosition->character()],
+            'position' => ['line' => $completionPosition->line, 'character' => $completionPosition->character],
         ]);
 
         self::assertIsArray($items);
@@ -173,7 +173,7 @@ final class TemplateProviderTest extends TestCase
         $unicodePosition = $converter->toPosition($text, strrpos($text, 'café') + \strlen('café'));
         $unicodeItems = $provider->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $unicodePosition->line(), 'character' => $unicodePosition->character()],
+            'position' => ['line' => $unicodePosition->line, 'character' => $unicodePosition->character],
         ]);
         self::assertIsArray($unicodeItems);
         self::assertSame(['café'], array_column($unicodeItems, 'label'));
@@ -185,7 +185,7 @@ final class TemplateProviderTest extends TestCase
             ],
         ], $provider->hover([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $unicodePosition->line(), 'character' => $unicodePosition->character()],
+            'position' => ['line' => $unicodePosition->line, 'character' => $unicodePosition->character],
         ]));
 
         $hoverPosition = $converter->toPosition($text, strrpos($text, 'featured') + 1);
@@ -196,12 +196,12 @@ final class TemplateProviderTest extends TestCase
             ],
         ], $provider->hover([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $hoverPosition->line(), 'character' => $hoverPosition->character()],
+            'position' => ['line' => $hoverPosition->line, 'character' => $hoverPosition->character],
         ]));
         $commentPosition = $converter->toPosition($text, strpos($text, 'article to display') + 1);
         self::assertNull($provider->hover([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $commentPosition->line(), 'character' => $commentPosition->character()],
+            'position' => ['line' => $commentPosition->line, 'character' => $commentPosition->character],
         ]));
     }
 
@@ -261,7 +261,7 @@ final class TemplateProviderTest extends TestCase
         $completionPosition = $converter->toPosition($completionText, \strlen($completionText));
         self::assertSame(['Alert'], array_column($completionProvider->complete([
             'textDocument' => ['uri' => $completionUri],
-            'position' => ['line' => $completionPosition->line(), 'character' => $completionPosition->character()],
+            'position' => ['line' => $completionPosition->line, 'character' => $completionPosition->character],
         ]) ?? [], 'label'));
         $commentUri = 'file:///workspace/templates/comment.html.twig';
         $commentText = '{## Use <twig:Al in examples. #}';
@@ -269,13 +269,13 @@ final class TemplateProviderTest extends TestCase
         $commentPosition = $converter->toPosition($commentText, strpos($commentText, 'Al') + 2);
         self::assertNull($completionProvider->complete([
             'textDocument' => ['uri' => $commentUri],
-            'position' => ['line' => $commentPosition->line(), 'character' => $commentPosition->character()],
+            'position' => ['line' => $commentPosition->line, 'character' => $commentPosition->character],
         ]));
 
         $usagePosition = $converter->toPosition($usageText, strrpos($usageText, 'Alert') + 1);
         $params = [
             'textDocument' => ['uri' => $usageUri],
-            'position' => ['line' => $usagePosition->line(), 'character' => $usagePosition->character()],
+            'position' => ['line' => $usagePosition->line, 'character' => $usagePosition->character],
         ];
         self::assertSame([$classUri, $templateUri], array_column($relationshipProvider->definition($params) ?? [], 'uri'));
         self::assertCount(1, $relationshipProvider->references($params) ?? []);
@@ -304,7 +304,7 @@ final class TemplateProviderTest extends TestCase
         $variablePosition = $converter->toPosition($componentTemplateText, strpos($componentTemplateText, 'ti') + 2);
         self::assertSame(['title'], array_column($variableProvider->complete([
             'textDocument' => ['uri' => $templateUri],
-            'position' => ['line' => $variablePosition->line(), 'character' => $variablePosition->character()],
+            'position' => ['line' => $variablePosition->line, 'character' => $variablePosition->character],
         ]) ?? [], 'label'));
     }
 
@@ -390,7 +390,7 @@ final class TemplateProviderTest extends TestCase
         $position = $converter->toPosition($completionText, \strlen($completionText));
         $items = $provider->complete([
             'textDocument' => ['uri' => $completionUri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]);
 
         self::assertSame(['Alert', 'Card', 'acme:badge', 'ux:icon'], array_column($items ?? [], 'label'));
@@ -562,7 +562,7 @@ final class TemplateProviderTest extends TestCase
         [$completion, $navigation, $converter] = $this->providers($uri, 'php', $text);
         $position = $converter->toPosition($text, strpos($text, 'article/sh') + \strlen('article/sh'));
         $params = ['textDocument' => ['uri' => $uri], 'position' => [
-            'line' => $position->line(), 'character' => $position->character(),
+            'line' => $position->line, 'character' => $position->character,
         ]];
 
         self::assertSame(['article/show.html.twig'], array_column($completion->complete($params) ?? [], 'label'));
@@ -580,7 +580,7 @@ final class TemplateProviderTest extends TestCase
         $position = $converter->toPosition($text, strpos($text, 'article/sh') + \strlen('article/sh'));
 
         self::assertNull($completion->complete(['textDocument' => ['uri' => $uri], 'position' => [
-            'line' => $position->line(), 'character' => $position->character(),
+            'line' => $position->line, 'character' => $position->character,
         ]]));
     }
 
@@ -591,7 +591,7 @@ final class TemplateProviderTest extends TestCase
         [, $navigation, $converter] = $this->providers($uri, 'twig', $text);
         $position = $converter->toPosition($text, strpos($text, 'article/show') + 1);
         $params = ['textDocument' => ['uri' => $uri], 'position' => [
-            'line' => $position->line(), 'character' => $position->character(),
+            'line' => $position->line, 'character' => $position->character,
         ]];
 
         self::assertSame(
@@ -612,14 +612,14 @@ final class TemplateProviderTest extends TestCase
         $completionPosition = $completionConverter->toPosition($completionText, (int) strpos($completionText, "')"));
         self::assertSame(['snippet.txt'], array_column($completion->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $completionPosition->line(), 'character' => $completionPosition->character()],
+            'position' => ['line' => $completionPosition->line, 'character' => $completionPosition->character],
         ]) ?? [], 'label'));
 
         $text = "{{ source('./snippet.txt') }}";
         [, $navigation, $converter] = $this->providers($uri, 'twig', $text);
         $position = $converter->toPosition($text, strpos($text, 'snippet') + 1);
         $params = ['textDocument' => ['uri' => $uri], 'position' => [
-            'line' => $position->line(), 'character' => $position->character(),
+            'line' => $position->line, 'character' => $position->character,
         ]];
 
         self::assertSame([], $navigation->diagnostics(['textDocument' => ['uri' => $uri]]));
@@ -642,14 +642,14 @@ final class TemplateProviderTest extends TestCase
         $completionPosition = $completionConverter->toPosition($completionText, (int) strpos($completionText, "')"));
         self::assertSame([], $completion->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $completionPosition->line(), 'character' => $completionPosition->character()],
+            'position' => ['line' => $completionPosition->line, 'character' => $completionPosition->character],
         ]) ?? []);
 
         $text = "{{ source('./@Admin/foo.html.twig') }}";
         [, $navigation, $converter] = $this->providers($uri, 'twig', $text);
         $position = $converter->toPosition($text, strpos($text, '@Admin') + 1);
         $params = ['textDocument' => ['uri' => $uri], 'position' => [
-            'line' => $position->line(), 'character' => $position->character(),
+            'line' => $position->line, 'character' => $position->character,
         ]];
 
         self::assertSame(['template.not_found'], array_column($navigation->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
@@ -725,7 +725,7 @@ final class TemplateProviderTest extends TestCase
 
         self::assertNull($handler->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]));
     }
 
@@ -829,7 +829,7 @@ final class TemplateProviderTest extends TestCase
         [$completion, $navigation, $converter] = $this->providers($uri, 'php', $text);
         $position = $converter->toPosition($text, strpos($text, 'article/sh') + \strlen('article/sh'));
         $params = ['textDocument' => ['uri' => $uri], 'position' => [
-            'line' => $position->line(), 'character' => $position->character(),
+            'line' => $position->line, 'character' => $position->character,
         ]];
 
         self::assertSame(['article/show.html.twig'], array_column($completion->complete($params) ?? [], 'label'));

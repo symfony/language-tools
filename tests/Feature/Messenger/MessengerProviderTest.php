@@ -328,6 +328,6 @@ YAML;
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
     private function params(string $uri, Position $position): array
     {
-        return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+        return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
     }
 }

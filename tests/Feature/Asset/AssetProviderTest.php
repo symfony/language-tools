@@ -124,7 +124,7 @@ final class AssetProviderTest extends TestCase
         /** @var list<string> $labels */
         $labels = array_column($provider->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]) ?? [], 'label');
 
         return $labels;
@@ -135,7 +135,7 @@ final class AssetProviderTest extends TestCase
     {
         $position = $converter->toPosition($text, $offset);
 
-        return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+        return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
     }
 
     public function testFallsBackToPublicFilesWithoutAssetMapper(): void

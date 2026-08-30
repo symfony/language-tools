@@ -25,10 +25,10 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
     public function complete(array $params): ?array
     {
         $request = $this->documents->resolvePositioned($params);
-        if (null === $request || 'twig' !== $request->document->languageId()) {
+        if (null === $request || 'twig' !== $request->document->languageId) {
             return null;
         }
-        $text = $request->document->text();
+        $text = $request->document->text;
         $context = $this->extractor->completionContext($text, $this->converter->toByteOffset($text, $request->position));
         if (null === $context) {
             return null;
@@ -121,12 +121,12 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
     public function references(array $params): ?array
     {
         $request = $this->documents->resolvePositioned($params);
-        if (null === $request || !\in_array($request->document->languageId(), ['php', 'twig'], true)) {
+        if (null === $request || !\in_array($request->document->languageId, ['php', 'twig'], true)) {
             return null;
         }
         $index = $this->indexes->forProject($request->project);
-        if ('php' === $request->document->languageId()) {
-            $declaration = $index->declarationAt($request->document->uri(), $request->position);
+        if ('php' === $request->document->languageId) {
+            $declaration = $index->declarationAt($request->document->uri, $request->position);
             if (null === $declaration) {
                 return null;
             }
@@ -134,8 +134,8 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
             $memberName = $declaration->memberName();
             $declarations = [$declaration];
         } else {
-            $text = $request->document->text();
-            $reference = $this->extractor->referenceAt($request->document->uri(), $text, $this->converter->toByteOffset($text, $request->position));
+            $text = $request->document->text;
+            $reference = $this->extractor->referenceAt($request->document->uri, $text, $this->converter->toByteOffset($text, $request->position));
             if (null === $reference) {
                 return null;
             }
@@ -169,11 +169,11 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
     private function resolveTwig(array $params): ?array
     {
         $request = $this->documents->resolvePositioned($params);
-        if (null === $request || 'twig' !== $request->document->languageId()) {
+        if (null === $request || 'twig' !== $request->document->languageId) {
             return null;
         }
-        $text = $request->document->text();
-        $reference = $this->extractor->referenceAt($request->document->uri(), $text, $this->converter->toByteOffset($text, $request->position));
+        $text = $request->document->text;
+        $reference = $this->extractor->referenceAt($request->document->uri, $text, $this->converter->toByteOffset($text, $request->position));
         if (null === $reference) {
             return null;
         }

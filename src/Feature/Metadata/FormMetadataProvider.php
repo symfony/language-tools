@@ -26,9 +26,9 @@ final class FormMetadataProvider implements DiagnosticProviderInterface, HoverPr
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        foreach ($this->extractor->formOptions($request->document->text()) as $option) {
-            if (!$this->converter->containsByteOffset($request->document->text(), $option['range'], $offset, inclusiveEnd: true)) {
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        foreach ($this->extractor->formOptions($request->document->text) as $option) {
+            if (!$this->converter->containsByteOffset($request->document->text, $option['range'], $offset, inclusiveEnd: true)) {
                 continue;
             }
             $type = $this->indexes->forProject($request->project)->formType($option['class']);
@@ -51,12 +51,12 @@ final class FormMetadataProvider implements DiagnosticProviderInterface, HoverPr
     public function diagnostics(array $params): ?array
     {
         $request = $this->resolver->resolveDocument($params);
-        if (null === $request || 'php' !== $request->document->languageId()) {
+        if (null === $request || 'php' !== $request->document->languageId) {
             return null;
         }
         $index = $this->indexes->forProject($request->project);
         $diagnostics = [];
-        foreach ($this->extractor->formOptions($request->document->text()) as $option) {
+        foreach ($this->extractor->formOptions($request->document->text) as $option) {
             $type = $index->formType($option['class']);
             if (null !== $type && !\in_array($option['option'], $type->options(), true)) {
                 $diagnostics[] = $this->diagnostic($option['range'], 'form.unknown_option', \sprintf('Unknown option "%s" for form type "%s".', $option['option'], $type->className()));

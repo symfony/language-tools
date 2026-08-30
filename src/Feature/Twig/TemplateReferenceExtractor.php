@@ -70,8 +70,8 @@ final class TemplateReferenceExtractor
     public function at(string $uri, string $languageId, string $text, int $offset): ?TemplateReference
     {
         foreach ($this->extract($uri, $languageId, $text) as $reference) {
-            $start = $this->positionConverter->toByteOffset($text, $reference->range()->start());
-            $end = $this->positionConverter->toByteOffset($text, $reference->range()->end());
+            $start = $this->positionConverter->toByteOffset($text, $reference->range()->start);
+            $end = $this->positionConverter->toByteOffset($text, $reference->range()->end);
             if ($offset >= $start && $offset <= $end) {
                 return $reference;
             }
@@ -162,7 +162,7 @@ final class TemplateReferenceExtractor
      */
     private function sorted(array $references): array
     {
-        usort($references, static fn (TemplateReference $left, TemplateReference $right): int => $left->range()->start()->line() <=> $right->range()->start()->line() ?: $left->range()->start()->character() <=> $right->range()->start()->character());
+        usort($references, static fn (TemplateReference $left, TemplateReference $right): int => $left->range()->start->line <=> $right->range()->start->line ?: $left->range()->start->character <=> $right->range()->start->character);
 
         return $references;
     }

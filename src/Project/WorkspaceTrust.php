@@ -9,16 +9,16 @@ final class WorkspaceTrust implements ProjectStateInterface
 
     public function set(Project $project, TrustStatus $status): void
     {
-        $this->statuses[$project->rootPath()] = $status;
+        $this->statuses[$project->rootPath] = $status;
     }
 
     public function status(Project $project): TrustStatus
     {
-        return $this->statuses[$project->rootPath()] ?? TrustStatus::Unknown;
+        return $this->statuses[$project->rootPath] ?? TrustStatus::Unknown;
     }
 
     public function removeProject(Project $project): void
     {
-        unset($this->statuses[$project->rootPath()]);
+        unset($this->statuses[$project->rootPath]);
     }
 }

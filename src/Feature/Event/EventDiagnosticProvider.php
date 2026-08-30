@@ -23,11 +23,11 @@ final class EventDiagnosticProvider implements DiagnosticProviderInterface
     public function diagnostics(array $params): ?array
     {
         $request = $this->documents->resolveDocument($params);
-        if (null === $request || 'php' !== $request->document->languageId()) {
+        if (null === $request || 'php' !== $request->document->languageId) {
             return null;
         }
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->invalidListenerMethods() as $listener) {
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->invalidListenerMethods() as $listener) {
             $diagnostics[] = $this->protocol->diagnostic(
                 $listener->range(),
                 1,

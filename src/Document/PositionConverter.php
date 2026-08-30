@@ -45,16 +45,16 @@ final class PositionConverter
     public function containsByteOffset(string $text, Range $range, int $byteOffset, bool $inclusiveEnd = false): bool
     {
         $map = $this->map($text);
-        $start = $map->toByteOffset($range->start());
-        $end = $map->toByteOffset($range->end());
+        $start = $map->toByteOffset($range->start);
+        $end = $map->toByteOffset($range->end);
 
         return $byteOffset >= $start && ($inclusiveEnd ? $byteOffset <= $end : $byteOffset < $end);
     }
 
     public function applyChange(string $text, Range $range, string $replacement): string
     {
-        $start = $this->toByteOffset($text, $range->start());
-        $end = $this->toByteOffset($text, $range->end());
+        $start = $this->toByteOffset($text, $range->start);
+        $end = $this->toByteOffset($text, $range->end);
 
         return substr($text, 0, $start).$replacement.substr($text, $end);
     }

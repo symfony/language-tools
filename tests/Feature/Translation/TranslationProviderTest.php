@@ -35,14 +35,14 @@ final class TranslationProviderTest extends TestCase
         $text = "<?php \$translator->trans('article.ti');";
         [$provider, $converter] = $this->provider($uri, $text);
         $position = $converter->toPosition($text, strpos($text, 'article.ti') + \strlen('article.ti'));
-        $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+        $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
 
         self::assertSame(['article.title'], array_column($provider->complete($params) ?? [], 'label'));
 
         $fullText = "<?php \$translator->trans('article.title', ['%name%' => \$name]);";
         [$fullProvider, $fullConverter] = $this->provider($uri, $fullText);
         $fullPosition = $fullConverter->toPosition($fullText, strpos($fullText, 'article.title') + 1);
-        $hover = $fullProvider->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $fullPosition->line(), 'character' => $fullPosition->character()]]);
+        $hover = $fullProvider->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $fullPosition->line, 'character' => $fullPosition->character]]);
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents']);
         self::assertIsString($hover['contents']['value']);
@@ -56,7 +56,7 @@ final class TranslationProviderTest extends TestCase
         $text = '<?php '.$call;
         [$provider, $converter] = $this->provider($uri, $text);
         $position = $converter->toPosition($text, strpos($text, 'article.ti') + \strlen('article.ti'));
-        $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+        $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
 
         self::assertSame(['article.title'], array_column($provider->complete($params) ?? [], 'label'));
     }
@@ -70,7 +70,7 @@ final class TranslationProviderTest extends TestCase
 
         $result = $provider->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]);
         self::assertIsArray($result);
         self::assertIsArray($result[0]['textEdit']);
@@ -85,7 +85,7 @@ final class TranslationProviderTest extends TestCase
         [$provider, $converter] = $this->provider($uri, $text, 'twig');
         $position = $converter->toPosition($text, strpos($text, 'article.ti') + \strlen('article.ti'));
 
-        self::assertNull($provider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]]));
+        self::assertNull($provider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]));
     }
 
     public function testDecodesEscapedQuotesInTwigTranslationKeys(): void
@@ -99,7 +99,7 @@ final class TranslationProviderTest extends TestCase
         $position = $converter->toPosition($text, (int) strpos($text, "'|trans"));
 
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
-        $hover = $provider->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]]);
+        $hover = $provider->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]);
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertIsString($hover['contents']['value'] ?? null);
@@ -116,7 +116,7 @@ final class TranslationProviderTest extends TestCase
         $position = $converter->toPosition($text, (int) strpos($text, "'|trans"));
         $completion = $provider->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]);
 
         self::assertIsArray($completion);
@@ -144,7 +144,7 @@ final class TranslationProviderTest extends TestCase
         $position = $converter->toPosition($completionText, (int) strpos($completionText, '"|trans'));
         self::assertSame(['foo'], array_column($completionProvider->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]) ?? [], 'label'));
     }
 
@@ -326,7 +326,7 @@ final class TranslationProviderTest extends TestCase
         [$provider, $converter] = $this->provider($uri, $text);
         $position = $converter->toPosition($text, strpos($text, 'article.ti') + \strlen('article.ti'));
 
-        self::assertNull($provider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]]));
+        self::assertNull($provider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]));
     }
 
     /** @return iterable<string, array{string}> */

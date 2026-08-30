@@ -24,8 +24,8 @@ final class StimulusCompletionProvider implements CompletionProviderInterface
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $context = $this->extractor->completionContext($request->document->languageId(), $request->document->text(), $offset);
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $context = $this->extractor->completionContext($request->document->languageId, $request->document->text, $offset);
         if (null === $context) {
             return null;
         }

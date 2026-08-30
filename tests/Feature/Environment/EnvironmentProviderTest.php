@@ -55,7 +55,7 @@ final class EnvironmentProviderTest extends TestCase
         $indexes->forProject($project)->replaceProcessors(['custom' => 'string', 'json' => 'array']);
         $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $commentParser, $phpComments, $yamlComments, $xmlComments);
         $position = $converter->toPosition($text, strpos($text, 'APP_UR') + \strlen('APP_UR'));
-        $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+        $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
 
         $completion = $provider->complete($params) ?? [];
         self::assertSame(['APP_URL'], array_column($completion, 'label'));
@@ -73,7 +73,7 @@ final class EnvironmentProviderTest extends TestCase
         $commentText = "{## %env(APP_UR) %env(APP_URL% #}\n{{ '%env(APP_URL%' }}";
         $documents->open(new Document($commentUri, 'twig', 1, $commentText));
         $commentPosition = $converter->toPosition($commentText, strpos($commentText, 'APP_UR') + \strlen('APP_UR'));
-        self::assertNull($provider->complete(['textDocument' => ['uri' => $commentUri], 'position' => ['line' => $commentPosition->line(), 'character' => $commentPosition->character()]]));
+        self::assertNull($provider->complete(['textDocument' => ['uri' => $commentUri], 'position' => ['line' => $commentPosition->line, 'character' => $commentPosition->character]]));
         $malformedOffset = (int) strrpos($commentText, '%env(APP_URL%');
         $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $commentUri]]) ?? [];
         self::assertSame(['env.malformed_chain'], array_column($diagnostics, 'code'));
@@ -171,7 +171,7 @@ final class EnvironmentProviderTest extends TestCase
         $completionOffset = strpos($text, 'APP_U') + \strlen('APP_U');
         $position = $converter->toPosition($text, $completionOffset);
 
-        self::assertNull($provider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]]));
+        self::assertNull($provider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]));
         $malformedOffset = (int) strrpos($text, '%env(APP_URL%');
         $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
         self::assertSame(['env.malformed_chain'], array_column($diagnostics, 'code'));
@@ -197,7 +197,7 @@ final class EnvironmentProviderTest extends TestCase
     {
         $position = $converter->toPosition($text, $offset);
 
-        return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+        return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
     }
 
     /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */
@@ -207,8 +207,8 @@ final class EnvironmentProviderTest extends TestCase
         $end = $converter->toPosition($text, $offset + $length);
 
         return [
-            'start' => ['line' => $start->line(), 'character' => $start->character()],
-            'end' => ['line' => $end->line(), 'character' => $end->character()],
+            'start' => ['line' => $start->line, 'character' => $start->character],
+            'end' => ['line' => $end->line, 'character' => $end->character],
         ];
     }
 }

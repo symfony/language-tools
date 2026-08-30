@@ -44,7 +44,7 @@ final class ConfigurationProviderTest extends TestCase
         $text = "imports:\n    - { resource: ../shared.yaml }\nwhen@test:\n    framework:\n        rou";
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
         $position = $fixture->converter->toPosition($text, \strlen($text));
-        $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+        $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
 
         self::assertSame(['router'], array_column($fixture->completion->complete($params) ?? [], 'label'));
         self::assertSame('file:///workspace/config/shared.yaml', $fixture->links->links(['textDocument' => ['uri' => $uri]])[0]['target'] ?? null);
@@ -54,7 +54,7 @@ final class ConfigurationProviderTest extends TestCase
         $hoverOffset = strpos($text, 'utf8') + 2;
         $hoverPosition = $fixture->converter->toPosition($text, $hoverOffset);
         /** @var array{contents: array{value: string}} $hover */
-        $hover = $fixture->hover->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $hoverPosition->line(), 'character' => $hoverPosition->character()]]);
+        $hover = $fixture->hover->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $hoverPosition->line, 'character' => $hoverPosition->character]]);
         self::assertStringContainsString('framework.router.utf8', $hover['contents']['value']);
         self::assertSame(['config.invalid_type', 'config.deprecated_key', 'config.invalid_type', 'config.unknown_key', 'config.duplicate_key'], array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
     }
@@ -135,7 +135,7 @@ final class ConfigurationProviderTest extends TestCase
             $position = $fixture->converter->toPosition($text, strpos($text, $key) + 2);
             $hover = $fixture->hover->hover([
                 'textDocument' => ['uri' => $uri],
-                'position' => ['line' => $position->line(), 'character' => $position->character()],
+                'position' => ['line' => $position->line, 'character' => $position->character],
             ]);
             self::assertIsArray($hover);
             self::assertIsArray($hover['contents'] ?? null);
@@ -152,7 +152,7 @@ final class ConfigurationProviderTest extends TestCase
             $position = $fixture->converter->toPosition($text, \strlen($text));
             self::assertSame($expected, array_column($fixture->completion->complete([
                 'textDocument' => ['uri' => $uri],
-                'position' => ['line' => $position->line(), 'character' => $position->character()],
+                'position' => ['line' => $position->line, 'character' => $position->character],
             ]) ?? [], 'label'));
         }
     }
@@ -264,7 +264,7 @@ final class ConfigurationProviderTest extends TestCase
         $position = $fixture->converter->toPosition($text, \strlen($text));
 
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
-        self::assertSame(['name'], array_column($fixture->completion->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]]) ?? [], 'label'));
+        self::assertSame(['name'], array_column($fixture->completion->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]) ?? [], 'label'));
     }
 
     public function testDoesNotDiagnoseRequiredChildrenBeforeConfigurationIsMerged(): void
@@ -347,7 +347,7 @@ final class ConfigurationProviderTest extends TestCase
         $position = $fixture->converter->toPosition($text, \strlen($text));
         self::assertSame(['debug', 'info'], array_column($fixture->completion->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]) ?? [], 'label'));
     }
 
@@ -377,12 +377,12 @@ final class ConfigurationProviderTest extends TestCase
         $position = $fixture->converter->toPosition($text, \strlen($text));
         self::assertSame(['true', 'false', 'auto'], array_column($fixture->completion->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]) ?? [], 'label'));
         $position = $fixture->converter->toPosition($text, strpos($text, 'cookie_secure') + 2);
         $hover = $fixture->hover->hover([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]);
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
@@ -396,7 +396,7 @@ final class ConfigurationProviderTest extends TestCase
         $position = $fixture->converter->toPosition($text, \strlen($text));
         $completion = $fixture->completion->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]);
         self::assertIsArray($completion);
         self::assertIsArray($completion[0] ?? null);
@@ -415,7 +415,7 @@ final class ConfigurationProviderTest extends TestCase
             $fixture->documents->open(new Document($uri, $language, 1, $text));
             self::assertSame($diagnostics, array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
             $position = $fixture->converter->toPosition($text, strpos($text, $hovered) + 1);
-            self::assertIsArray($fixture->hover->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]]));
+            self::assertIsArray($fixture->hover->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]));
             $fixture->documents->close($uri);
         }
     }
@@ -433,7 +433,7 @@ final class ConfigurationProviderTest extends TestCase
         foreach ($cases as [$uri, $language, $text, $expected]) {
             $fixture->documents->open(new Document($uri, $language, 1, $text));
             $position = $fixture->converter->toPosition($text, \strlen($text));
-            self::assertSame($expected, array_column($fixture->completion->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]]) ?? [], 'label'));
+            self::assertSame($expected, array_column($fixture->completion->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]) ?? [], 'label'));
             $fixture->documents->close($uri);
         }
     }
@@ -569,7 +569,7 @@ final class ConfigurationProviderTest extends TestCase
     {
         $position = $converter->toPosition($text, $offset);
 
-        return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+        return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
     }
 
     /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */
@@ -579,8 +579,8 @@ final class ConfigurationProviderTest extends TestCase
         $end = $converter->toPosition($text, $offset + $length);
 
         return [
-            'start' => ['line' => $start->line(), 'character' => $start->character()],
-            'end' => ['line' => $end->line(), 'character' => $end->character()],
+            'start' => ['line' => $start->line, 'character' => $start->character],
+            'end' => ['line' => $end->line, 'character' => $end->character],
         ];
     }
 

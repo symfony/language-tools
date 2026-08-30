@@ -46,6 +46,6 @@ final class ConsoleSourceIndexer extends AbstractSourceIndexer
 
     protected function extract(Project $project, SourceDocument $document): ConsoleSourceFacts
     {
-        return $this->extractor->extract($document->uri(), $document->languageId(), $document->text());
+        return $this->extractor->extract($document->uri, $document->languageId, $document->text);
     }
 }

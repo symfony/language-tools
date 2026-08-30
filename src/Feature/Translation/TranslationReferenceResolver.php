@@ -22,16 +22,16 @@ final readonly class TranslationReferenceResolver
             return null;
         }
 
-        $text = $request->document->text();
+        $text = $request->document->text;
         $offset = $this->positions->toByteOffset($text, $request->position);
-        $facts = $this->extractor->extract($request->document->uri(), $request->document->languageId(), $text);
+        $facts = $this->extractor->extract($request->document->uri, $request->document->languageId, $text);
         foreach ($facts->declarations() as $declaration) {
             if ($this->positions->containsByteOffset($text, $declaration->range(), $offset, inclusiveEnd: true)) {
                 return new ResolvedTranslationReference(
                     new TranslationReference(
                         $declaration->key(),
                         $declaration->domain(),
-                        $request->document->uri(),
+                        $request->document->uri,
                         $declaration->range(),
                     ),
                     $request->project,

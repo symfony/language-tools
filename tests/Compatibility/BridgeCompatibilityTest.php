@@ -24,8 +24,8 @@ final class BridgeCompatibilityTest extends TestCase
             '--rebuild-container=1',
         ], $project);
 
-        $snapshot = $process->stdout();
-        self::assertSame(0, $process->exitCode(), $process->stderr()."\n".$snapshot);
+        $snapshot = $process->stdout;
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$snapshot);
         self::assertStringNotContainsString('CANARY_SECRET_', $snapshot);
         $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
         self::assertIsArray($result);
@@ -187,8 +187,8 @@ final class BridgeCompatibilityTest extends TestCase
             @unlink($configurationFile);
         }
 
-        $snapshot = $process->stdout();
-        self::assertSame(0, $process->exitCode(), $process->stderr()."\n".$snapshot);
+        $snapshot = $process->stdout;
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$snapshot);
         self::assertStringNotContainsString('CANARY_SECRET_CONFIGURATION_VALUE', $snapshot);
         self::assertStringNotContainsString('Unrecognized option', $snapshot);
         $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);

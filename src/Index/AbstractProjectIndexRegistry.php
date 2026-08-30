@@ -19,12 +19,12 @@ abstract class AbstractProjectIndexRegistry implements ProjectStateInterface
     /** @return TIndex */
     final public function forProject(Project $project): object
     {
-        return $this->indexes[$project->rootPath()] ??= $this->createIndex($project);
+        return $this->indexes[$project->rootPath] ??= $this->createIndex($project);
     }
 
     final public function removeProject(Project $project): void
     {
-        unset($this->indexes[$project->rootPath()]);
+        unset($this->indexes[$project->rootPath]);
     }
 
     /** @return TIndex */

@@ -19,25 +19,25 @@ final class DocumentPositionMap
 
     public function toByteOffset(Position $position): int
     {
-        if ($position->line() >= \count($this->lineStarts)) {
+        if ($position->line >= \count($this->lineStarts)) {
             return \strlen($this->text);
         }
 
-        $lineStart = $this->lineStarts[$position->line()];
-        $lineEnd = $this->lineStarts[$position->line() + 1] ?? \strlen($this->text);
+        $lineStart = $this->lineStarts[$position->line];
+        $lineEnd = $this->lineStarts[$position->line + 1] ?? \strlen($this->text);
         if ($lineEnd > $lineStart && "\n" === $this->text[$lineEnd - 1]) {
             --$lineEnd;
         }
         $lineText = substr($this->text, $lineStart, $lineEnd - $lineStart);
         if ('utf-8' === $this->encoding) {
-            return $lineStart + min($position->character(), \strlen($lineText));
+            return $lineStart + min($position->character, \strlen($lineText));
         }
 
         $byteOffset = 0;
         $characterOffset = 0;
         foreach (mb_str_split($lineText) as $character) {
             $units = 'utf-32' === $this->encoding ? 1 : \strlen(mb_convert_encoding($character, 'UTF-16LE', 'UTF-8')) / 2;
-            if ($characterOffset + $units > $position->character()) {
+            if ($characterOffset + $units > $position->character) {
                 break;
             }
 

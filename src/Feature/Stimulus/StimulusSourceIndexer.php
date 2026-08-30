@@ -44,6 +44,6 @@ final class StimulusSourceIndexer extends AbstractSourceIndexer
 
     protected function extract(Project $project, SourceDocument $document): StimulusSourceFacts
     {
-        return $this->extractor->extract($project, $document->uri(), $document->languageId(), $document->text());
+        return $this->extractor->extract($project, $document->uri, $document->languageId, $document->text);
     }
 }

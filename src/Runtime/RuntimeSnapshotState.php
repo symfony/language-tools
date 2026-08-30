@@ -12,26 +12,26 @@ final class RuntimeSnapshotState implements ProjectStateInterface
 
     public function markReady(Project $project): void
     {
-        $this->lastSuccessfulAt[$project->rootPath()] = gmdate(\DateTimeInterface::ATOM);
+        $this->lastSuccessfulAt[$project->rootPath] = gmdate(\DateTimeInterface::ATOM);
     }
 
     public function restore(Project $project, string $lastSuccessfulAt): void
     {
-        $this->lastSuccessfulAt[$project->rootPath()] = $lastSuccessfulAt;
+        $this->lastSuccessfulAt[$project->rootPath] = $lastSuccessfulAt;
     }
 
     public function has(Project $project): bool
     {
-        return isset($this->lastSuccessfulAt[$project->rootPath()]);
+        return isset($this->lastSuccessfulAt[$project->rootPath]);
     }
 
     public function lastSuccessfulAt(Project $project): ?string
     {
-        return $this->lastSuccessfulAt[$project->rootPath()] ?? null;
+        return $this->lastSuccessfulAt[$project->rootPath] ?? null;
     }
 
     public function removeProject(Project $project): void
     {
-        unset($this->lastSuccessfulAt[$project->rootPath()]);
+        unset($this->lastSuccessfulAt[$project->rootPath]);
     }
 }

@@ -33,9 +33,9 @@ final class YamlRouteDeclarationExtractorTest extends TestCase
             static fn (RouteDeclaration $declaration): string => $declaration->name(),
             $declarations,
         ));
-        self::assertSame(3, $declarations[0]->range()->start()->line());
-        self::assertSame(0, $declarations[0]->range()->start()->character());
-        self::assertSame(7, $declarations[1]->range()->start()->line());
-        self::assertSame(1, $declarations[1]->range()->start()->character());
+        self::assertSame(3, $declarations[0]->range()->start->line);
+        self::assertSame(0, $declarations[0]->range()->start->character);
+        self::assertSame(7, $declarations[1]->range()->start->line);
+        self::assertSame(1, $declarations[1]->range()->start->character);
     }
 }

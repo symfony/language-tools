@@ -31,14 +31,14 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
         $context = $params['context'] ?? null;
         if (null === $request
             || !\is_array($context)
-            || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri())
-            || !\in_array($request->document->languageId(), ['php', 'twig'], true)
+            || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)
+            || !\in_array($request->document->languageId, ['php', 'twig'], true)
         ) {
             return null;
         }
-        $references = 'twig' === $request->document->languageId()
-            ? $this->twigExtractor->extract($request->document->text())
-            : $this->phpExtractor->extract($request->document->text(), $this->classIndexes->forProject($request->project));
+        $references = 'twig' === $request->document->languageId
+            ? $this->twigExtractor->extract($request->document->text)
+            : $this->phpExtractor->extract($request->document->text, $this->classIndexes->forProject($request->project));
         $actions = [];
         foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
             if (!\is_array($diagnostic) || 'route.missing_parameters' !== ($diagnostic['code'] ?? null)) {
@@ -67,7 +67,7 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
                     'diagnostics' => [$diagnostic],
                     'isPreferred' => true,
                     'edit' => ['documentChanges' => [[
-                        'textDocument' => ['uri' => $request->document->uri(), 'version' => $request->document->version()],
+                        'textDocument' => ['uri' => $request->document->uri, 'version' => $request->document->version],
                         'edits' => [$edit],
                     ]]],
                 ];
@@ -88,10 +88,10 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
         if ([] === $missing) {
             return null;
         }
-        $text = $document->text();
-        $end = $this->converter->toByteOffset($text, $reference->range()->end());
+        $text = $document->text;
+        $end = $this->converter->toByteOffset($text, $reference->range()->end);
         $after = substr($text, $end);
-        $twig = 'twig' === $document->languageId();
+        $twig = 'twig' === $document->languageId;
         $separator = $twig ? ': ' : ' => ';
         $entries = implode(', ', array_map(
             static fn (string $name): string => "'".str_replace("'", "\\'", $name)."'".$separator.'null',

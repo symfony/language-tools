@@ -35,8 +35,8 @@ final class PositionConverterTest extends TestCase
 
         $position = $converter->toPosition("a😀b\néx", 5);
 
-        self::assertSame(0, $position->line());
-        self::assertSame(3, $position->character());
+        self::assertSame(0, $position->line);
+        self::assertSame(3, $position->character);
     }
 
     public function testConvertsPositionsAtLineBoundaries(): void
@@ -46,8 +46,8 @@ final class PositionConverterTest extends TestCase
 
         self::assertSame(6, $converter->toByteOffset($text, new Position(1, 0)));
         self::assertSame(13, $converter->toByteOffset($text, new Position(2, 0)));
-        self::assertSame([1, 0], [$converter->toPosition($text, 6)->line(), $converter->toPosition($text, 6)->character()]);
-        self::assertSame([2, 0], [$converter->toPosition($text, 13)->line(), $converter->toPosition($text, 13)->character()]);
+        self::assertSame([1, 0], [$converter->toPosition($text, 6)->line, $converter->toPosition($text, 6)->character]);
+        self::assertSame([2, 0], [$converter->toPosition($text, 13)->line, $converter->toPosition($text, 13)->character]);
     }
 
     public function testInvalidatesThePositionMapWhenTheTextChanges(): void
@@ -63,11 +63,11 @@ final class PositionConverterTest extends TestCase
         $converter = new PositionConverter();
 
         self::assertSame('utf-8', $converter->negotiate(['utf-8', 'utf-16']));
-        self::assertSame(5, $converter->toPosition('a😀b', 5)->character());
+        self::assertSame(5, $converter->toPosition('a😀b', 5)->character);
         self::assertSame(5, $converter->toByteOffset('a😀b', new Position(0, 5)));
 
         self::assertSame('utf-32', $converter->negotiate(['unsupported', 'utf-32']));
-        self::assertSame(2, $converter->toPosition('a😀b', 5)->character());
+        self::assertSame(2, $converter->toPosition('a😀b', 5)->character);
         self::assertSame(5, $converter->toByteOffset('a😀b', new Position(0, 2)));
     }
 
@@ -75,8 +75,8 @@ final class PositionConverterTest extends TestCase
     {
         $range = (new PositionConverter())->toRange("a😀b\néx", 1, 8);
 
-        self::assertSame([0, 1], [$range->start()->line(), $range->start()->character()]);
-        self::assertSame([1, 1], [$range->end()->line(), $range->end()->character()]);
+        self::assertSame([0, 1], [$range->start->line, $range->start->character]);
+        self::assertSame([1, 1], [$range->end->line, $range->end->character]);
     }
 
     public function testChecksWhetherByteOffsetsAreWithinRanges(): void

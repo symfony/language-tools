@@ -112,7 +112,7 @@ final class IndexCommandHandler
 
         return array_values(array_filter(
             $this->projects->all(),
-            static fn (Project $project): bool => $root === $project->rootPath() || $root === $project->rootUri(),
+            static fn (Project $project): bool => $root === $project->rootPath || $root === $project->rootUri,
         ));
     }
 }

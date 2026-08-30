@@ -126,10 +126,10 @@ final class WorkspaceConfiguration
 
         $unique = [];
         foreach ($projects as $project) {
-            $unique[$project->rootPath()] = $project;
+            $unique[$project->rootPath] = $project;
         }
         $projects = array_values($unique);
-        usort($projects, static fn (Project $left, Project $right): int => strcmp($left->rootPath(), $right->rootPath()));
+        usort($projects, static fn (Project $left, Project $right): int => strcmp($left->rootPath, $right->rootPath));
         if ([] !== $initializationRoots) {
             $this->validateInitializationRoots($initializationRoots, $projects);
         }
@@ -150,7 +150,7 @@ final class WorkspaceConfiguration
     {
         $discovered = [];
         foreach ($projects as $project) {
-            $discovered[$project->rootPath()] = true;
+            $discovered[$project->rootPath] = true;
         }
         foreach ($roots as $root) {
             $paths = [];

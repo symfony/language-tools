@@ -29,14 +29,14 @@ final class RouteHoverHandler implements HoverProviderInterface
     public function hover(array $params): ?array
     {
         $request = $this->documentContextResolver->resolvePositioned($params);
-        if (null === $request || !\in_array($request->document->languageId(), ['php', 'twig'], true)) {
+        if (null === $request || !\in_array($request->document->languageId, ['php', 'twig'], true)) {
             return null;
         }
 
-        $offset = $this->positionConverter->toByteOffset($request->document->text(), $request->position);
-        $reference = 'twig' === $request->document->languageId()
-            ? $this->twigReferenceExtractor->at($request->document->text(), $offset)
-            : $this->phpReferenceExtractor->at($request->document->text(), $offset, $this->classIndexes->forProject($request->project));
+        $offset = $this->positionConverter->toByteOffset($request->document->text, $request->position);
+        $reference = 'twig' === $request->document->languageId
+            ? $this->twigReferenceExtractor->at($request->document->text, $offset)
+            : $this->phpReferenceExtractor->at($request->document->text, $offset, $this->classIndexes->forProject($request->project));
         if (null === $reference || null === $route = $this->routeIndexes->forProject($request->project)->get($reference->name())) {
             return null;
         }

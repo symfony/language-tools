@@ -141,12 +141,12 @@ final class LifecycleSourceIndexer extends AbstractSourceIndexer
 
     protected function extract(Project $project, SourceDocument $document): ?SourceFactsInterface
     {
-        return '' === $document->text() ? null : new LifecycleSourceFacts($document->uri(), $document->text());
+        return '' === $document->text ? null : new LifecycleSourceFacts($document->uri, $document->text);
     }
 
     protected function supportsOverlay(Project $project, Document $document): bool
     {
-        return 'unsupported' !== $document->languageId();
+        return 'unsupported' !== $document->languageId;
     }
 }
 

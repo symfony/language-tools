@@ -73,7 +73,7 @@ final class DocumentSynchronizer
             $parsedChanges[] = [$range, $change['text']];
         }
 
-        $text = $document->text();
+        $text = $document->text;
         foreach ($parsedChanges as [$range, $replacement]) {
             $text = null === $range
                 ? $replacement

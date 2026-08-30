@@ -67,7 +67,7 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
             return null;
         }
         $links = [];
-        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text()) as $reference) {
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text) as $reference) {
             $template = $this->indexes->forProject($request->project)->get($reference->name());
             if (null !== $template) {
                 $links[] = ['range' => $this->protocol->range($reference->range()), 'target' => $template->uri()];
@@ -92,11 +92,11 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
         if (!$index->isComplete()) {
             return null;
         }
-        if ('twig' === $request->document->languageId() && !$index->isRuntimeTemplateUri($request->document->uri())) {
+        if ('twig' === $request->document->languageId && !$index->isRuntimeTemplateUri($request->document->uri)) {
             return [];
         }
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text()) as $reference) {
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text) as $reference) {
             if (null === $index->get($reference->name())) {
                 $diagnostics[] = $this->protocol->diagnostic($reference->range(), 1, 'template.not_found', \sprintf('Template "%s" does not exist in the selected environment.', $reference->name()));
             }
@@ -116,8 +116,8 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $reference = $this->extractor->at($request->document->uri(), $request->document->languageId(), $request->document->text(), $offset);
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $reference = $this->extractor->at($request->document->uri, $request->document->languageId, $request->document->text, $offset);
         if (null === $reference) {
             return null;
         }

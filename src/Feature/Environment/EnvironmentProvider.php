@@ -42,8 +42,8 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         if (null === $request) {
             return null;
         }
-        $cursor = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $text = $this->commentFreeText($request->document->languageId(), $request->document->text());
+        $cursor = $this->converter->toByteOffset($request->document->text, $request->position);
+        $text = $this->commentFreeText($request->document->languageId, $request->document->text);
         if (!preg_match('/%env\(([^)]*)$/', substr($text, 0, $cursor), $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
@@ -51,17 +51,17 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         $separator = strrpos($expression, ':');
         $prefix = false === $separator ? $expression : substr($expression, $separator + 1);
         $start = $cursor - \strlen($prefix);
-        $end = $this->converter->toPosition($request->document->text(), $cursor + strspn(substr($request->document->text(), $cursor), 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_'));
+        $end = $this->converter->toPosition($request->document->text, $cursor + strspn(substr($request->document->text, $cursor), 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_'));
         $items = [];
         $index = $this->indexes->forProject($request->project);
         foreach ($index->processors() as $name => $type) {
             if (str_starts_with($name, $prefix)) {
-                $items[] = $this->item($name, $name.':', 'Environment processor returning '.$type, $request->document->text(), $start, $end);
+                $items[] = $this->item($name, $name.':', 'Environment processor returning '.$type, $request->document->text, $start, $end);
             }
         }
         foreach ($index->names() as $name) {
             if (str_starts_with($name, $prefix)) {
-                $items[] = $this->item($name, $name, 'Environment variable', $request->document->text(), $start, $end);
+                $items[] = $this->item($name, $name, 'Environment variable', $request->document->text, $start, $end);
             }
         }
 
@@ -130,7 +130,7 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         $index = $this->indexes->forProject($request->project);
         $processors = $index->processors();
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->references() as $reference) {
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->references() as $reference) {
             $skipNext = false;
             $previousProcessor = null;
             foreach ($reference->processors() as $processor) {
@@ -153,10 +153,10 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
                 $previousProcessor = $processor;
             }
         }
-        $text = $this->commentFreeText($request->document->languageId(), $request->document->text());
+        $text = $this->commentFreeText($request->document->languageId, $request->document->text);
         preg_match_all('/%env\([^\)\r\n]*%/', $text, $malformed, \PREG_OFFSET_CAPTURE);
         foreach ($malformed[0] as [$expression, $offset]) {
-            $range = new Range($this->converter->toPosition($request->document->text(), $offset), $this->converter->toPosition($request->document->text(), $offset + \strlen($expression)));
+            $range = new Range($this->converter->toPosition($request->document->text, $offset), $this->converter->toPosition($request->document->text, $offset + \strlen($expression)));
             $diagnostics[] = $this->protocol->diagnostic($range, 1, 'env.malformed_chain', 'Malformed environment expression; expected ")%".');
         }
 
@@ -174,15 +174,15 @@ final class EnvironmentProvider implements CompletionProviderInterface, Definiti
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $facts = $this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text());
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $facts = $this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text);
         foreach ($facts->declarations() as $declaration) {
-            if ($this->converter->containsByteOffset($request->document->text(), $declaration->range(), $offset, inclusiveEnd: true)) {
-                return [new EnvironmentReference($declaration->name(), $request->document->uri(), $declaration->range(), []), $request->project];
+            if ($this->converter->containsByteOffset($request->document->text, $declaration->range(), $offset, inclusiveEnd: true)) {
+                return [new EnvironmentReference($declaration->name(), $request->document->uri, $declaration->range(), []), $request->project];
             }
         }
         foreach ($facts->references() as $reference) {
-            if ($this->converter->containsByteOffset($request->document->text(), $reference->range(), $offset, inclusiveEnd: true)) {
+            if ($this->converter->containsByteOffset($request->document->text, $reference->range(), $offset, inclusiveEnd: true)) {
                 return [$reference, $request->project];
             }
         }

@@ -11,8 +11,8 @@ final class LspProtocolMapper
     public function range(Range $range): array
     {
         return [
-            'start' => $this->position($range->start()),
-            'end' => $this->position($range->end()),
+            'start' => $this->position($range->start),
+            'end' => $this->position($range->end),
         ];
     }
 
@@ -57,10 +57,10 @@ final class LspProtocolMapper
 
         return \is_array($start)
             && \is_array($end)
-            && $range->start()->line() === ($start['line'] ?? null)
-            && $range->start()->character() === ($start['character'] ?? null)
-            && $range->end()->line() === ($end['line'] ?? null)
-            && $range->end()->character() === ($end['character'] ?? null);
+            && $range->start->line === ($start['line'] ?? null)
+            && $range->start->character === ($start['character'] ?? null)
+            && $range->end->line === ($end['line'] ?? null)
+            && $range->end->character === ($end['character'] ?? null);
     }
 
     /** @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, newText: string} */
@@ -81,7 +81,7 @@ final class LspProtocolMapper
             'command' => [
                 'title' => $title,
                 'command' => 'editor.action.showReferences',
-                'arguments' => [$uri, $this->position($range->start()), $locations],
+                'arguments' => [$uri, $this->position($range->start), $locations],
             ],
         ];
     }
@@ -89,6 +89,6 @@ final class LspProtocolMapper
     /** @return array{line: int, character: int} */
     private function position(Position $position): array
     {
-        return ['line' => $position->line(), 'character' => $position->character()];
+        return ['line' => $position->line, 'character' => $position->character];
     }
 }

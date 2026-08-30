@@ -17,7 +17,7 @@ use Symfony\Lsp\Project\ProjectStateInterface;
  */
 final class PersistentSourceIndexStore implements SourceIndexStoreInterface, ProjectStateInterface
 {
-    private const SCHEMA_VERSION = 7;
+    private const SCHEMA_VERSION = 8;
 
     /** @var array<string, array<string, array{int, int}>> project root => path => [offset, length] */
     private array $offsets = [];
@@ -46,13 +46,13 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface, Pro
         return new PersistentSourceIndexReader(
             $handle,
             $metadata,
-            $this->offsets[$project->rootPath()] ?? [],
+            $this->offsets[$project->rootPath] ?? [],
         );
     }
 
     public function loadPayloads(Project $project, string $relativePath): array
     {
-        $root = $project->rootPath();
+        $root = $project->rootPath;
         if (!isset($this->offsets[$root])) {
             $this->loadMetadata($project);
         }
@@ -106,7 +106,7 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface, Pro
 
     public function appendDeletion(Project $project, string $relativePath): void
     {
-        $root = $project->rootPath();
+        $root = $project->rootPath;
         $this->appendLine($project, $relativePath, json_encode(['path' => $relativePath, 'deleted' => true], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)."\n");
         unset($this->offsets[$root][$relativePath]);
     }
@@ -133,7 +133,7 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface, Pro
 
     public function path(Project $project): string
     {
-        return Path::join($project->rootPath(), 'var/symfony-lsp', $this->serverVersion, 'index/source.jsonl');
+        return Path::join($project->rootPath, 'var/symfony-lsp', $this->serverVersion, 'index/source.jsonl');
     }
 
     /**
@@ -141,13 +141,13 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface, Pro
      */
     public function replaceOffsets(Project $project, array $offsets): void
     {
-        $this->offsets[$project->rootPath()] = $offsets;
-        $this->needsReset[$project->rootPath()] = false;
+        $this->offsets[$project->rootPath] = $offsets;
+        $this->needsReset[$project->rootPath] = false;
     }
 
     public function removeProject(Project $project): void
     {
-        unset($this->offsets[$project->rootPath()], $this->needsReset[$project->rootPath()]);
+        unset($this->offsets[$project->rootPath], $this->needsReset[$project->rootPath]);
     }
 
     /**
@@ -155,7 +155,7 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface, Pro
      */
     private function readMetadata(Project $project): array
     {
-        $root = $project->rootPath();
+        $root = $project->rootPath;
         $this->offsets[$root] = [];
         $this->needsReset[$root] = true;
         $path = $this->path($project);
@@ -207,7 +207,7 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface, Pro
 
     private function appendLine(Project $project, string $relativePath, string $line): void
     {
-        $root = $project->rootPath();
+        $root = $project->rootPath;
         if (!isset($this->offsets[$root])) {
             $this->loadMetadata($project);
         }

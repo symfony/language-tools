@@ -25,15 +25,15 @@ final class ConfigurationDocumentLinkProvider implements DocumentLinkProviderInt
     public function links(array $params): ?array
     {
         $request = $this->resolver->resolveDocument($params);
-        if (null === $request || 'yaml' !== $request->document->languageId()) {
+        if (null === $request || 'yaml' !== $request->document->languageId) {
             return null;
         }
-        $documentPath = $this->uriToPathConverter->convert($request->document->uri());
+        $documentPath = $this->uriToPathConverter->convert($request->document->uri);
         if (null === $documentPath) {
             return [];
         }
         $links = [];
-        $text = $this->yamlComments->mask($request->document->text());
+        $text = $this->yamlComments->mask($request->document->text);
         preg_match_all('/\bresource\s*:\s*(["\']?)([^"\'\s#]+)\1/', $text, $matches, \PREG_OFFSET_CAPTURE);
         $basePath = Path::getDirectory($documentPath);
         foreach ($matches[2] as [$resource, $offset]) {
@@ -41,7 +41,7 @@ final class ConfigurationDocumentLinkProvider implements DocumentLinkProviderInt
                 continue;
             }
             $targetPath = Path::isAbsolute($resource) ? Path::canonicalize($resource) : Path::join($basePath, $resource);
-            $links[] = ['range' => $this->protocol->range(new Range($this->converter->toPosition($request->document->text(), $offset), $this->converter->toPosition($request->document->text(), $offset + \strlen($resource)))), 'target' => $this->uriToPathConverter->toUri($targetPath)];
+            $links[] = ['range' => $this->protocol->range(new Range($this->converter->toPosition($request->document->text, $offset), $this->converter->toPosition($request->document->text, $offset + \strlen($resource)))), 'target' => $this->uriToPathConverter->toUri($targetPath)];
         }
 
         return $links;

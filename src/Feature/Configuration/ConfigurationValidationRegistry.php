@@ -15,28 +15,28 @@ final class ConfigurationValidationRegistry implements ProjectStateInterface
 
     public function result(Project $project): ConfigurationValidationResult
     {
-        return $this->results[$project->rootPath()] ?? new ConfigurationValidationResult(ConfigurationValidationResult::UNAVAILABLE);
+        return $this->results[$project->rootPath] ?? new ConfigurationValidationResult(ConfigurationValidationResult::UNAVAILABLE);
     }
 
     public function replace(Project $project, ConfigurationValidationResult $result): void
     {
-        $this->results[$project->rootPath()] = $result;
+        $this->results[$project->rootPath] = $result;
     }
 
     public function pending(Project $project): void
     {
-        $root = $project->rootPath();
+        $root = $project->rootPath;
         $this->generations[$root] = ($this->generations[$root] ?? 0) + 1;
         $this->replace($project, new ConfigurationValidationResult(ConfigurationValidationResult::PENDING));
     }
 
     public function generation(Project $project): int
     {
-        return $this->generations[$project->rootPath()] ?? 0;
+        return $this->generations[$project->rootPath] ?? 0;
     }
 
     public function removeProject(Project $project): void
     {
-        unset($this->results[$project->rootPath()], $this->generations[$project->rootPath()]);
+        unset($this->results[$project->rootPath], $this->generations[$project->rootPath]);
     }
 }

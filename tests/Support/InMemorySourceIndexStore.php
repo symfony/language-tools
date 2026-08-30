@@ -20,38 +20,38 @@ final class InMemorySourceIndexStore implements SourceIndexStoreInterface
 
     public function loadMetadata(Project $project): array
     {
-        return $this->metadata[$project->rootPath()] ?? [];
+        return $this->metadata[$project->rootPath] ?? [];
     }
 
     public function beginRead(Project $project): SourceIndexReaderInterface
     {
         return new InMemorySourceIndexReader(
-            $this->metadata[$project->rootPath()] ?? [],
-            $this->payloads[$project->rootPath()] ?? [],
+            $this->metadata[$project->rootPath] ?? [],
+            $this->payloads[$project->rootPath] ?? [],
         );
     }
 
     public function loadPayloads(Project $project, string $relativePath): array
     {
-        return $this->payloads[$project->rootPath()][$relativePath] ?? [];
+        return $this->payloads[$project->rootPath][$relativePath] ?? [];
     }
 
     public function beginRewrite(Project $project): SourceIndexWriterInterface
     {
-        return new InMemorySourceIndexWriter($this, $project->rootPath());
+        return new InMemorySourceIndexWriter($this, $project->rootPath);
     }
 
     public function append(Project $project, string $relativePath, array $metadata, array $payloads): void
     {
-        $this->metadata[$project->rootPath()][$relativePath] = $metadata;
-        $this->payloads[$project->rootPath()][$relativePath] = $payloads;
+        $this->metadata[$project->rootPath][$relativePath] = $metadata;
+        $this->payloads[$project->rootPath][$relativePath] = $payloads;
     }
 
     public function appendDeletion(Project $project, string $relativePath): void
     {
         unset(
-            $this->metadata[$project->rootPath()][$relativePath],
-            $this->payloads[$project->rootPath()][$relativePath],
+            $this->metadata[$project->rootPath][$relativePath],
+            $this->payloads[$project->rootPath][$relativePath],
         );
     }
 

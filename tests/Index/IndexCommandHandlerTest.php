@@ -83,7 +83,7 @@ final class IndexCommandHandlerTest extends TestCase
 
         $result = $handler->execute([
             'command' => IndexCommandHandler::REFRESH_COMMAND,
-            'arguments' => [$project->rootUri()],
+            'arguments' => [$project->rootUri],
         ]);
 
         self::assertSame([$this->temporaryDirectory], $runtime->projects);
@@ -101,7 +101,7 @@ final class IndexCommandHandlerTest extends TestCase
 
         $switched = $handler->execute([
             'command' => IndexCommandHandler::SWITCH_ENVIRONMENT_COMMAND,
-            'arguments' => [$project->rootUri(), 'test'],
+            'arguments' => [$project->rootUri, 'test'],
         ]);
         self::assertSame('test', $runtimeConfiguration->environment($project));
         self::assertSame('test', $switched[0]['environment'] ?? null);
@@ -110,7 +110,7 @@ final class IndexCommandHandlerTest extends TestCase
         $workspaceTrust->set($project, TrustStatus::Untrusted);
         $untrusted = $handler->execute([
             'command' => IndexCommandHandler::STATUS_COMMAND,
-            'arguments' => [$project->rootUri()],
+            'arguments' => [$project->rootUri],
         ]);
         self::assertFalse($untrusted[0]['trusted'] ?? null);
     }
@@ -152,7 +152,7 @@ final class IndexCommandHandlerTest extends TestCase
 
         $result = $handler->execute([
             'command' => IndexCommandHandler::REFRESH_COMMAND,
-            'arguments' => [$project->rootUri()],
+            'arguments' => [$project->rootUri],
         ]);
 
         self::assertSame([$this->temporaryDirectory, $this->temporaryDirectory], $runtime->projects);
@@ -174,7 +174,7 @@ final class RecordingRuntimeInitializer implements RuntimeInitializerInterface
 
     public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
     {
-        $this->projects[] = $project->rootPath();
+        $this->projects[] = $project->rootPath;
         $this->plans[] = $plan ?? new RuntimeRefreshPlan();
         if (0 < $this->staleSnapshots) {
             --$this->staleSnapshots;

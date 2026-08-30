@@ -156,7 +156,7 @@ final class DebouncedRuntimeInitializer implements RuntimeInitializerInterface
 
     public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
     {
-        $this->projects[] = $project->rootPath();
+        $this->projects[] = $project->rootPath;
         $this->instances[] = $project;
         $this->plans[] = $plan ?? new RuntimeRefreshPlan();
     }

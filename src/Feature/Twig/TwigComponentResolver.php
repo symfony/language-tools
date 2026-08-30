@@ -112,10 +112,10 @@ final class TwigComponentResolver
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $facts = $this->extractor->extract($request->project, $request->document->uri(), $request->document->languageId(), $request->document->text());
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $facts = $this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text);
         foreach ($facts->actionReferences() as $reference) {
-            if (!$this->converter->containsByteOffset($request->document->text(), $reference->range(), $offset, inclusiveEnd: true)) {
+            if (!$this->converter->containsByteOffset($request->document->text, $reference->range(), $offset, inclusiveEnd: true)) {
                 continue;
             }
             $component = $this->indexes->forProject($request->project)->get($reference->component());
@@ -130,7 +130,7 @@ final class TwigComponentResolver
         }
         foreach ($facts->components() as $component) {
             foreach ($component->actions() as $action) {
-                if ($this->converter->containsByteOffset($request->document->text(), $action->range(), $offset, inclusiveEnd: true)) {
+                if ($this->converter->containsByteOffset($request->document->text, $action->range(), $offset, inclusiveEnd: true)) {
                     return [$this->indexes->forProject($request->project)->get($component->name()) ?? $component, $action, $request->project];
                 }
             }
@@ -150,17 +150,17 @@ final class TwigComponentResolver
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $facts = $this->extractor->extract($request->project, $request->document->uri(), $request->document->languageId(), $request->document->text());
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $facts = $this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text);
         foreach ($facts->references() as $reference) {
-            if ($this->converter->containsByteOffset($request->document->text(), $reference->range(), $offset, inclusiveEnd: true)) {
+            if ($this->converter->containsByteOffset($request->document->text, $reference->range(), $offset, inclusiveEnd: true)) {
                 $component = $this->indexes->forProject($request->project)->get($reference->name());
 
                 return null === $component ? null : [$component, $request->project];
             }
         }
         foreach ($facts->components() as $component) {
-            if ($this->converter->containsByteOffset($request->document->text(), $component->range(), $offset, inclusiveEnd: true)) {
+            if ($this->converter->containsByteOffset($request->document->text, $component->range(), $offset, inclusiveEnd: true)) {
                 return [$this->indexes->forProject($request->project)->get($component->name()) ?? $component, $request->project];
             }
         }

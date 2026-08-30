@@ -24,13 +24,13 @@ final class TwigComponentCompletionProvider implements CompletionProviderInterfa
     public function complete(array $params): ?array
     {
         $request = $this->documents->resolvePositioned($params);
-        if (null === $request || 'twig' !== $request->document->languageId()) {
+        if (null === $request || 'twig' !== $request->document->languageId) {
             return null;
         }
-        $cursor = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $before = substr($this->commentParser->mask($request->document->text()), 0, $cursor);
+        $cursor = $this->converter->toByteOffset($request->document->text, $request->position);
+        $before = substr($this->commentParser->mask($request->document->text), 0, $cursor);
         $index = $this->indexes->forProject($request->project);
-        $liveActionContext = $this->components->liveActionCompletionContext($request->project, $request->document->uri(), $before);
+        $liveActionContext = $this->components->liveActionCompletionContext($request->project, $request->document->uri, $before);
         if (null !== $liveActionContext) {
             [$component, $prefix] = $liveActionContext;
             $values = [];
@@ -64,7 +64,7 @@ final class TwigComponentCompletionProvider implements CompletionProviderInterfa
         } else {
             return null;
         }
-        $start = $this->converter->toPosition($request->document->text(), $cursor - \strlen($prefix));
+        $start = $this->converter->toPosition($request->document->text, $cursor - \strlen($prefix));
         $items = [];
         foreach ($values as $value) {
             if (!str_starts_with($value, $prefix)) {

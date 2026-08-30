@@ -84,7 +84,7 @@ final class CheckRunner
         $filesByProject = [];
         $selectedProjects = [];
         foreach ($files as $file) {
-            $root = $file->project->rootPath();
+            $root = $file->project->rootPath;
             $filesByProject[$root][] = $file;
             $selectedProjects[$root] = $file->project;
         }
@@ -126,7 +126,7 @@ final class CheckRunner
 
                 $prepared = true;
                 $preparedCount = 0;
-                foreach ($filesByProject[$project->rootPath()] as $file) {
+                foreach ($filesByProject[$project->rootPath] as $file) {
                     $this->expireDeadline($deadline, $signal, $timedOut);
                     $cancellation->throwIfRequested();
                     if (0 === ++$preparedCount % 64) {
@@ -191,18 +191,18 @@ final class CheckRunner
                         $errors[] = $reportedError;
                         $projectResults[] = $this->projectResult($project, $status, false);
                         if ($configurationFailure) {
-                            $diagnosable[$project->rootPath()] = true;
+                            $diagnosable[$project->rootPath] = true;
                         }
                         continue;
                     }
                 }
 
-                $diagnosable[$project->rootPath()] = true;
+                $diagnosable[$project->rootPath] = true;
                 $projectResults[] = $this->projectResult($project, $status, true);
             }
 
             foreach ($files as $file) {
-                if (!$file->excluded || !isset($diagnosable[$file->project->rootPath()], $preparedTexts[$file->path])) {
+                if (!$file->excluded || !isset($diagnosable[$file->project->rootPath], $preparedTexts[$file->path])) {
                     continue;
                 }
                 $this->documents->open(new Document($file->uri, $file->languageId, 0, $preparedTexts[$file->path]));
@@ -218,7 +218,7 @@ final class CheckRunner
                 if (0 === ++$diagnosedCount % 64) {
                     delay(0, cancellation: $cancellation);
                 }
-                if (!isset($diagnosable[$file->project->rootPath()])) {
+                if (!isset($diagnosable[$file->project->rootPath])) {
                     continue;
                 }
                 $cancellation->throwIfRequested();
@@ -509,7 +509,7 @@ final class CheckRunner
     {
         $discovered = [];
         foreach ($projects as $project) {
-            $discovered[Path::canonicalize($project->rootPath())] = true;
+            $discovered[Path::canonicalize($project->rootPath)] = true;
         }
         foreach ($roots as $root) {
             if (!isset($discovered[$root])) {

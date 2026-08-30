@@ -12,16 +12,16 @@ final class TranslationConfigurationRegistry implements ProjectStateInterface
 
     public function configure(Project $project, bool $enabled): void
     {
-        $this->missingKeyDiagnostics[$project->rootPath()] = $enabled;
+        $this->missingKeyDiagnostics[$project->rootPath] = $enabled;
     }
 
     public function missingKeyDiagnostics(Project $project): bool
     {
-        return $this->missingKeyDiagnostics[$project->rootPath()] ?? false;
+        return $this->missingKeyDiagnostics[$project->rootPath] ?? false;
     }
 
     public function removeProject(Project $project): void
     {
-        unset($this->missingKeyDiagnostics[$project->rootPath()]);
+        unset($this->missingKeyDiagnostics[$project->rootPath]);
     }
 }

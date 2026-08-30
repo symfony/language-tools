@@ -121,7 +121,7 @@ final class WorkspaceFileWatcher
         }
         $path = Path::canonicalize($path);
         foreach ($this->projects->all() as $project) {
-            if (Path::canonicalize($project->rootPath()) === \dirname($path)
+            if (Path::canonicalize($project->rootPath) === \dirname($path)
                 && !\in_array(basename($path), ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)
                 && preg_match('/^[A-Za-z0-9_.-]+$/D', basename($path))
             ) {
@@ -135,7 +135,7 @@ final class WorkspaceFileWatcher
     /** @return array{globPattern: array{baseUri: string, pattern: string}, kind?: int} */
     private function relative(Project $project, string $pattern, ?int $kind = null): array
     {
-        $watcher = ['globPattern' => ['baseUri' => $project->rootUri(), 'pattern' => $pattern]];
+        $watcher = ['globPattern' => ['baseUri' => $project->rootUri, 'pattern' => $pattern]];
         if (null !== $kind) {
             $watcher['kind'] = $kind;
         }
@@ -147,11 +147,11 @@ final class WorkspaceFileWatcher
     private function sourceDirectories(Project $project): array
     {
         $directories = [];
-        foreach (scandir($project->rootPath()) ?: [] as $entry) {
+        foreach (scandir($project->rootPath) ?: [] as $entry) {
             if ('.' === $entry || '..' === $entry || \in_array($entry, ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)) {
                 continue;
             }
-            if (preg_match('/^[A-Za-z0-9_.-]+$/D', $entry) && is_dir($project->rootPath().'/'.$entry)) {
+            if (preg_match('/^[A-Za-z0-9_.-]+$/D', $entry) && is_dir($project->rootPath.'/'.$entry)) {
                 $directories[] = $entry;
             }
         }

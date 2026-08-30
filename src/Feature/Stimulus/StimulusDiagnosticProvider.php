@@ -25,7 +25,7 @@ final class StimulusDiagnosticProvider implements DiagnosticProviderInterface
     public function diagnostics(array $params): ?array
     {
         $request = $this->documents->resolveDocument($params);
-        if (null === $request || 'twig' !== $request->document->languageId()) {
+        if (null === $request || 'twig' !== $request->document->languageId) {
             return null;
         }
         if (!$this->indexes->forProject($request->project)->isComplete()) {
@@ -33,7 +33,7 @@ final class StimulusDiagnosticProvider implements DiagnosticProviderInterface
         }
         $known = array_fill_keys($this->stimulus->controllerNames($request->project), true);
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->project, $request->document->uri(), $request->document->languageId(), $request->document->text())->references() as $reference) {
+        foreach ($this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text)->references() as $reference) {
             if (null !== $reference->kind() || isset($known[$reference->controller()])) {
                 continue;
             }

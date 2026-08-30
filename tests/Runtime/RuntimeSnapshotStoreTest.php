@@ -57,7 +57,7 @@ final class RuntimeSnapshotStoreTest extends TestCase
         self::assertSame([
             'schemaVersion' => 1,
             'project' => [
-                'root' => $this->project->rootPath(),
+                'root' => $this->project->rootPath,
                 'environment' => 'dev',
                 'debug' => true,
             ],
@@ -101,7 +101,7 @@ final class RuntimeSnapshotStoreTest extends TestCase
         self::assertSame([
             'schemaVersion' => 1,
             'project' => [
-                'root' => $this->project->rootPath(),
+                'root' => $this->project->rootPath,
                 'environment' => 'dev',
                 'debug' => true,
             ],
@@ -146,7 +146,7 @@ final class RuntimeSnapshotStoreTest extends TestCase
             true,
         );
 
-        $otherProject = new Project($this->project->rootPath().'-other', 'file://'.$this->project->rootPath().'-other', '^8.0');
+        $otherProject = new Project($this->project->rootPath.'-other', 'file://'.$this->project->rootPath.'-other', '^8.0');
         $phpCommand = new RuntimeConfiguration();
         $phpCommand->configure(['phpCommand' => ['custom-php']]);
         $containerRoot = new RuntimeConfiguration();
@@ -200,7 +200,7 @@ final class RuntimeSnapshotStoreTest extends TestCase
         $variant['payload']['schemaVersion'] = 2;
         $variants['snapshot schema'] = $this->withUpdatedIntegrity($variant);
         $variant = $envelope;
-        $variant['payload']['project']['root'] = $this->project->rootPath().'-other';
+        $variant['payload']['project']['root'] = $this->project->rootPath.'-other';
         $variants['project root'] = $this->withUpdatedIntegrity($variant);
         $variant = $envelope;
         $variant['payload']['project']['environment'] = 'prod';

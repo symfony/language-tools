@@ -34,15 +34,15 @@ final class EventRelationshipResolver
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->symbols() as $symbol) {
-            if ($this->converter->containsByteOffset($request->document->text(), $symbol->range(), $offset, inclusiveEnd: true)) {
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols() as $symbol) {
+            if ($this->converter->containsByteOffset($request->document->text, $symbol->range(), $offset, inclusiveEnd: true)) {
                 return [$symbol, null, $request->project];
             }
         }
-        if ('php' === $request->document->languageId()) {
-            foreach ($this->classExtractor->extract($request->document->uri(), $request->document->text()) as $class) {
-                if ($this->converter->containsByteOffset($request->document->text(), $class->range(), $offset, inclusiveEnd: true)) {
+        if ('php' === $request->document->languageId) {
+            foreach ($this->classExtractor->extract($request->document->uri, $request->document->text) as $class) {
+                if ($this->converter->containsByteOffset($request->document->text, $class->range(), $offset, inclusiveEnd: true)) {
                     return [null, $class, $request->project];
                 }
             }

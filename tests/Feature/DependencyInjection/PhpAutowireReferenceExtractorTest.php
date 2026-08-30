@@ -82,12 +82,12 @@ final class PhpAutowireReferenceExtractorTest extends TestCase
 
         self::assertCount(1, $references);
         self::assertSame('App\Transport\Smtp', $references[0]->name());
-        $start = $references[0]->range()->start();
-        $end = $references[0]->range()->end();
+        $start = $references[0]->range()->start;
+        $end = $references[0]->range()->end;
         self::assertSame("'App\\\\Transport\\\\Smtp'", substr(
-            explode("\n", $text)[$start->line()],
-            $start->character() - 1,
-            $end->character() - $start->character() + 2,
+            explode("\n", $text)[$start->line],
+            $start->character - 1,
+            $end->character - $start->character + 2,
         ));
     }
 }

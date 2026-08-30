@@ -205,7 +205,7 @@ final class TranslationExtractorTest extends TestCase
             ->declarations()[0];
 
         self::assertSame('first.title', $declaration->key());
-        self::assertSame(16, $declaration->range()->end()->character() - $declaration->range()->start()->character());
+        self::assertSame(16, $declaration->range()->end->character - $declaration->range()->start->character);
     }
 
     public function testKeepsDistinctRangesForRepeatedJsonKeys(): void
@@ -216,7 +216,7 @@ final class TranslationExtractorTest extends TestCase
             ->declarations();
 
         self::assertSame(['first.title', 'second.title'], array_map(static fn ($item): string => $item->key(), $declarations));
-        self::assertNotSame($declarations[0]->range()->start()->character(), $declarations[1]->range()->start()->character());
+        self::assertNotSame($declarations[0]->range()->start->character, $declarations[1]->range()->start->character);
     }
 
     public function testExtractsJsonXliffAndPhpResources(): void
@@ -282,10 +282,10 @@ final class TranslationExtractorTest extends TestCase
         $facts = $this->extractor()->extract('file:///workspace/templates/page.html.twig', 'twig', $text);
 
         self::assertCount(1, $facts->references());
-        $start = $facts->references()[0]->range()->start();
+        $start = $facts->references()[0]->range()->start;
         self::assertSame(
-            (new PositionConverter())->toPosition($text, (int) strpos($text, 'greeting'))->character(),
-            $start->character(),
+            (new PositionConverter())->toPosition($text, (int) strpos($text, 'greeting'))->character,
+            $start->character,
         );
     }
 

@@ -18,7 +18,7 @@ final class SerializedRuntimeInitializer implements RuntimeInitializerInterface
 
     public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
     {
-        $lock = $this->mutex->acquire(self::LOCK_PREFIX.$project->rootPath());
+        $lock = $this->mutex->acquire(self::LOCK_PREFIX.$project->rootPath);
         try {
             $cancellation?->throwIfRequested();
             $this->initializer->initialize($project, $plan, $cancellation);

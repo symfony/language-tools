@@ -96,7 +96,7 @@ final class RouteHoverHandlerTest extends TestCase
             ],
         ], $handler->hover([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]));
     }
 }

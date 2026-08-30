@@ -145,7 +145,7 @@ final class LiveComponentProviderTest extends TestCase
 
         return [
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ];
     }
 

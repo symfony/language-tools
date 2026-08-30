@@ -61,8 +61,8 @@ final class RouteReferenceExtractor
     public function at(string $text, int $byteOffset, ?DependencyInjectionSourceIndex $classIndex = null): ?RouteReference
     {
         foreach ($this->extract($text, $classIndex) as $reference) {
-            $start = $this->positionConverter->toByteOffset($text, $reference->range()->start());
-            $end = $this->positionConverter->toByteOffset($text, $reference->range()->end());
+            $start = $this->positionConverter->toByteOffset($text, $reference->range()->start);
+            $end = $this->positionConverter->toByteOffset($text, $reference->range()->end);
             if ($byteOffset >= $start && $byteOffset <= $end) {
                 return $reference;
             }

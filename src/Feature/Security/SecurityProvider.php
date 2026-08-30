@@ -30,8 +30,8 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $context = $this->extractor->completionContext($request->document->languageId(), $request->document->text(), $offset);
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $context = $this->extractor->completionContext($request->document->languageId, $request->document->text, $offset);
         if (null === $context) {
             return null;
         }
@@ -123,7 +123,7 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
         }
         $sourceIndex = $this->sourceIndexes->forProject($request->project);
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->symbols() as $symbol) {
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols() as $symbol) {
             if ($symbol->isDeclaration() || SecuritySymbolKind::Role === $symbol->kind()) {
                 continue;
             }
@@ -149,10 +149,10 @@ final class SecurityProvider implements CompletionProviderInterface, DefinitionP
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->symbols() as $symbol) {
-            $start = $this->converter->toByteOffset($request->document->text(), $symbol->range()->start());
-            $end = $this->converter->toByteOffset($request->document->text(), $symbol->range()->end());
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols() as $symbol) {
+            $start = $this->converter->toByteOffset($request->document->text, $symbol->range()->start);
+            $end = $this->converter->toByteOffset($request->document->text, $symbol->range()->end);
             if ($offset >= $start && $offset <= $end) {
                 return [$symbol, $request->project];
             }

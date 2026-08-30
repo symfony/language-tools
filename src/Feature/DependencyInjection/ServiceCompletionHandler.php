@@ -25,12 +25,12 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
     public function complete(array $params): ?array
     {
         $request = $this->documentContextResolver->resolvePositioned($params);
-        if (null === $request || !\in_array($request->document->languageId(), ['php', 'yaml'], true)) {
+        if (null === $request || !\in_array($request->document->languageId, ['php', 'yaml'], true)) {
             return null;
         }
 
-        $isYaml = 'yaml' === $request->document->languageId();
-        $text = $isYaml ? $request->document->text() : $this->phpComments->mask($request->document->text());
+        $isYaml = 'yaml' === $request->document->languageId;
+        $text = $isYaml ? $request->document->text : $this->phpComments->mask($request->document->text);
         $parameterContext = $isYaml
             ? ParameterCompletionContext::fromYaml($text, $request->position, $this->positionConverter)
             : ParameterCompletionContext::fromPhp($text, $request->position, $this->positionConverter);

@@ -34,13 +34,13 @@ final class ReportingRuntimeInitializer implements RuntimeInitializerInterface
                     $stale
                         ? 'Symfony Language Tools found invalid application configuration for "%s". The last valid runtime metadata remains active.'
                         : 'Symfony Language Tools found invalid application configuration for "%s".',
-                    $project->rootPath(),
+                    $project->rootPath,
                 )
                 : \sprintf(
                     $stale
                         ? 'Symfony Language Tools could not refresh runtime metadata for "%s". The last valid metadata remains active.'
                         : 'Symfony Language Tools could not initialize runtime metadata for "%s". Static-only features remain active.',
-                    $project->rootPath(),
+                    $project->rootPath,
                 );
             $this->client->notify('window/showMessage', [
                 'type' => 1,

@@ -32,17 +32,17 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
     public function complete(array $params): ?array
     {
         $request = $this->resolver->resolvePositioned($params);
-        if (null === $request || 'twig' !== $request->document->languageId() || null === $template = $this->nameResolver->resolve($request->project, $request->document->uri())) {
+        if (null === $request || 'twig' !== $request->document->languageId || null === $template = $this->nameResolver->resolve($request->project, $request->document->uri)) {
             return null;
         }
-        $cursor = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $before = substr($this->commentParser->mask($request->document->text()), 0, $cursor);
+        $cursor = $this->converter->toByteOffset($request->document->text, $request->position);
+        $before = substr($this->commentParser->mask($request->document->text), 0, $cursor);
         if (!preg_match('/(?:{{|{%)[^}\n]*?([A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*)?$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
         $prefix = $match[1][0] ?? '';
         $start = $cursor - \strlen($prefix);
-        $startPosition = $this->converter->toPosition($request->document->text(), $start);
+        $startPosition = $this->converter->toPosition($request->document->text, $start);
         $declarations = $this->typeDeclarations($request->document);
         $items = [];
         foreach ($this->variables($request->project, $template, $declarations) as $variable) {
@@ -75,10 +75,10 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
     public function hover(array $params): ?array
     {
         $request = $this->resolver->resolvePositioned($params);
-        if (null === $request || 'twig' !== $request->document->languageId() || null === $template = $this->nameResolver->resolve($request->project, $request->document->uri())) {
+        if (null === $request || 'twig' !== $request->document->languageId || null === $template = $this->nameResolver->resolve($request->project, $request->document->uri)) {
             return null;
         }
-        $name = $this->word($this->commentParser->mask($request->document->text()), $request->position);
+        $name = $this->word($this->commentParser->mask($request->document->text), $request->position);
         $declarations = $this->typeDeclarations($request->document);
         if (null === $name || !\in_array($name, $this->variables($request->project, $template, $declarations), true)) {
             return null;
@@ -130,7 +130,7 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
     private function typeDeclarations(Document $document): array
     {
         $declarations = [];
-        foreach ($this->typeDeclarationParser->parse($document->text()) as $declaration) {
+        foreach ($this->typeDeclarationParser->parse($document->text) as $declaration) {
             $declarations[$declaration->name] = $declaration;
         }
 

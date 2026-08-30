@@ -54,8 +54,8 @@ final class QuotedArgumentMatcherTest extends TestCase
         self::assertSame("it's here", $arguments[0]->value);
         self::assertSame(\strlen("it\\'s here"), $arguments[0]->length);
         self::assertSame('say "hi"', $arguments[1]->value);
-        $start = $this->converter->toByteOffset($text, $arguments[0]->range->start());
-        $end = $this->converter->toByteOffset($text, $arguments[0]->range->end());
+        $start = $this->converter->toByteOffset($text, $arguments[0]->range->start);
+        $end = $this->converter->toByteOffset($text, $arguments[0]->range->end);
         self::assertSame($arguments[0]->offset, $start);
         self::assertSame($arguments[0]->offset + $arguments[0]->length, $end);
     }
@@ -104,7 +104,7 @@ final class QuotedArgumentMatcherTest extends TestCase
         self::assertCount(1, $arguments);
         self::assertSame('clé.été', $arguments[0]->value);
         self::assertSame((int) strpos($text, 'clé.été'), $arguments[0]->offset);
-        $start = $this->converter->toByteOffset($text, $arguments[0]->range->start());
+        $start = $this->converter->toByteOffset($text, $arguments[0]->range->start);
         self::assertSame($arguments[0]->offset, $start);
     }
 
@@ -128,8 +128,8 @@ final class QuotedArgumentMatcherTest extends TestCase
 
         self::assertCount(1, $arguments);
         self::assertSame('checkout', $arguments[0]->value);
-        self::assertSame(31, $arguments[0]->range->start()->character());
-        self::assertSame(39, $arguments[0]->range->end()->character());
-        self::assertSame($arguments[0]->range->start()->character(), $this->converter->toPosition($original, $arguments[0]->offset)->character());
+        self::assertSame(31, $arguments[0]->range->start->character);
+        self::assertSame(39, $arguments[0]->range->end->character);
+        self::assertSame($arguments[0]->range->start->character, $this->converter->toPosition($original, $arguments[0]->offset)->character);
     }
 }

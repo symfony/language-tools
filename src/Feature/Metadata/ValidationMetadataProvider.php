@@ -26,12 +26,12 @@ final class ValidationMetadataProvider implements DiagnosticProviderInterface, H
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $constraintOptions = 'yaml' === $request->document->languageId()
-            ? $this->extractor->yamlConstraintOptions($request->document->text())
-            : $this->extractor->constraintOptions($request->document->text());
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $constraintOptions = 'yaml' === $request->document->languageId
+            ? $this->extractor->yamlConstraintOptions($request->document->text)
+            : $this->extractor->constraintOptions($request->document->text);
         foreach ($constraintOptions as $option) {
-            if (!$this->converter->containsByteOffset($request->document->text(), $option['range'], $offset, inclusiveEnd: true)) {
+            if (!$this->converter->containsByteOffset($request->document->text, $option['range'], $offset, inclusiveEnd: true)) {
                 continue;
             }
             $constraint = $this->indexes->forProject($request->project)->constraint($option['constraint']);
@@ -50,13 +50,13 @@ final class ValidationMetadataProvider implements DiagnosticProviderInterface, H
     public function diagnostics(array $params): ?array
     {
         $request = $this->resolver->resolveDocument($params);
-        if (null === $request || !\in_array($request->document->languageId(), ['php', 'yaml'], true)) {
+        if (null === $request || !\in_array($request->document->languageId, ['php', 'yaml'], true)) {
             return null;
         }
         $index = $this->indexes->forProject($request->project);
-        $constraintOptions = 'yaml' === $request->document->languageId()
-            ? $this->extractor->yamlConstraintOptions($request->document->text())
-            : $this->extractor->constraintOptions($request->document->text());
+        $constraintOptions = 'yaml' === $request->document->languageId
+            ? $this->extractor->yamlConstraintOptions($request->document->text)
+            : $this->extractor->constraintOptions($request->document->text);
         $diagnostics = [];
         foreach ($constraintOptions as $option) {
             $constraint = $index->constraint($option['constraint']);

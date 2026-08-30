@@ -17,7 +17,7 @@ final class ProgressRuntimeInitializer implements RuntimeInitializerInterface
 
     public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
     {
-        $token = $this->progress->begin('Symfony runtime index', $project->rootPath());
+        $token = $this->progress->begin('Symfony runtime index', $project->rootPath);
         $message = 'Runtime index ready';
         try {
             $this->initializer->initialize($project, $plan, $cancellation);

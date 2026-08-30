@@ -28,19 +28,19 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
     public function diagnostics(array $params): ?array
     {
         $request = $this->documentContextResolver->resolveDocument($params);
-        if (null === $request || !\in_array($request->document->languageId(), ['php', 'yaml'], true)) {
+        if (null === $request || !\in_array($request->document->languageId, ['php', 'yaml'], true)) {
             return null;
         }
 
         $localServices = [];
         $localParameters = [];
-        if ('yaml' === $request->document->languageId()) {
-            $facts = $this->yamlExtractor->extract($request->document->uri(), $request->document->text(), $this->runtimeConfiguration->environment($request->project));
+        if ('yaml' === $request->document->languageId) {
+            $facts = $this->yamlExtractor->extract($request->document->uri, $request->document->text, $this->runtimeConfiguration->environment($request->project));
             $references = $facts->references();
             $localServices = array_fill_keys(array_map(static fn (ServiceDeclaration $declaration): string => $declaration->id(), $facts->services()), true);
             $localParameters = array_fill_keys(array_map(static fn (ParameterDeclaration $declaration): string => $declaration->name(), $facts->parameters()), true);
         } else {
-            $references = $this->autowireExtractor->extract($request->document->uri(), $request->document->text());
+            $references = $this->autowireExtractor->extract($request->document->uri, $request->document->text);
         }
         $serviceIndex = $this->serviceIndexes->forProject($request->project);
         $parameterIndex = $this->parameterIndexes->forProject($request->project);

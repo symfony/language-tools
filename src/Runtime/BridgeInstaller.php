@@ -27,7 +27,7 @@ final class BridgeInstaller implements RuntimeInitializerInterface
     {
         $files = $this->bundleFiles();
         $hash = hash('sha256', serialize($files));
-        $baseDirectory = Path::join($project->rootPath(), 'var/symfony-lsp', $this->serverVersion);
+        $baseDirectory = Path::join($project->rootPath, 'var/symfony-lsp', $this->serverVersion);
         $this->filesystem->mkdir($baseDirectory);
 
         $directory = Path::join($baseDirectory, $hash);

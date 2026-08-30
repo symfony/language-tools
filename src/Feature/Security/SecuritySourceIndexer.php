@@ -44,6 +44,6 @@ final class SecuritySourceIndexer extends AbstractSourceIndexer
 
     protected function extract(Project $project, SourceDocument $document): SecuritySourceFacts
     {
-        return $this->extractor->extract($document->uri(), $document->languageId(), $document->text());
+        return $this->extractor->extract($document->uri, $document->languageId, $document->text);
     }
 }

@@ -34,7 +34,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
             return null;
         }
 
-        return match ($request->document->languageId()) {
+        return match ($request->document->languageId) {
             'yaml' => $this->completeYaml($request->document, $request->project, $request->position),
             'php' => $this->completePhp($request->document, $request->project, $request->position),
             'xml' => $this->completeXml($request->document, $request->project, $request->position),
@@ -45,25 +45,25 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
     /** @return list<array<array-key, mixed>>|null */
     private function completeYaml(Document $document, Project $project, Position $position): ?array
     {
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        $before = substr($document->text(), 0, $offset);
+        $offset = $this->converter->toByteOffset($document->text, $position);
+        $before = substr($document->text, 0, $offset);
         $lineStart = strrpos($before, "\n");
         $lineStart = false === $lineStart ? 0 : $lineStart + 1;
         $line = substr($before, $lineStart);
         $index = $this->indexes->forProject($project);
-        foreach ($this->yaml->parse($document->text(), $index) as $occurrence) {
-            if (!$this->converter->containsByteOffset($document->text(), $occurrence->valueRange(), $offset, inclusiveEnd: true)) {
+        foreach ($this->yaml->parse($document->text, $index) as $occurrence) {
+            if (!$this->converter->containsByteOffset($document->text, $occurrence->valueRange(), $offset, inclusiveEnd: true)) {
                 continue;
             }
             $node = $index->find($occurrence->path(), $occurrence->sequenceDepths(), $occurrence->literalDepths());
             if (null === $node || [] === $node->allowedValues()) {
                 continue;
             }
-            $prefix = trim(substr($document->text(), $this->converter->toByteOffset($document->text(), $occurrence->valueRange()->start()), $offset));
+            $prefix = trim(substr($document->text, $this->converter->toByteOffset($document->text, $occurrence->valueRange()->start), $offset));
             $items = [];
             foreach ($node->allowedValues() as $value) {
                 $value = $this->formatValue($value);
-                $items[] = $this->completion($value, $value, 'Allowed value', $document->text(), $offset - \strlen($prefix), $position);
+                $items[] = $this->completion($value, $value, 'Allowed value', $document->text, $offset - \strlen($prefix), $position);
             }
 
             return $items;
@@ -75,9 +75,9 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         $prefix = $match[2] ?? '';
         $parent = [];
         $parentSequenceDepths = [];
-        $previous = array_reverse($this->yaml->parse(substr($document->text(), 0, $lineStart), $index));
+        $previous = array_reverse($this->yaml->parse(substr($document->text, 0, $lineStart), $index));
         foreach ($previous as $occurrence) {
-            if ($occurrence->keyRange()->start()->character() < $indent) {
+            if ($occurrence->keyRange()->start->character < $indent) {
                 $parent = $occurrence->path();
                 $parentSequenceDepths = $occurrence->sequenceDepths();
                 break;
@@ -87,7 +87,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         $items = [];
         foreach ($nodes as $node) {
             if (str_starts_with($node->name(), $prefix)) {
-                $items[] = $this->completion($node->name(), $node->name().':'.$this->yamlSnippet($node), $this->shortDescription($node), $document->text(), $offset - \strlen($prefix), $position);
+                $items[] = $this->completion($node->name(), $node->name().':'.$this->yamlSnippet($node), $this->shortDescription($node), $document->text, $offset - \strlen($prefix), $position);
             }
         }
 
@@ -97,8 +97,8 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
     /** @return list<array<array-key, mixed>>|null */
     private function completePhp(Document $document, Project $project, Position $position): ?array
     {
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        $before = $this->phpComments->mask(substr($document->text(), 0, $offset));
+        $offset = $this->converter->toByteOffset($document->text, $position);
+        $before = $this->phpComments->mask(substr($document->text, 0, $offset));
         if (!preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)((?:->[A-Za-z_][A-Za-z0-9_]*\(\))*)->([A-Za-z_][A-Za-z0-9_]*)?$/', $before, $match)) {
             return null;
         }
@@ -116,7 +116,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         foreach ($this->completionChildren($parent) as $node) {
             $method = lcfirst(str_replace(' ', '', ucwords(str_replace('_', ' ', $node->name()))));
             if (str_starts_with($method, $prefix)) {
-                $items[] = $this->completion($method, $method.'('.$this->phpSnippet($node).')', $this->shortDescription($node), $document->text(), $offset - \strlen($prefix), $position);
+                $items[] = $this->completion($method, $method.'('.$this->phpSnippet($node).')', $this->shortDescription($node), $document->text, $offset - \strlen($prefix), $position);
             }
         }
 
@@ -126,8 +126,8 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
     /** @return list<array<array-key, mixed>>|null */
     private function completeXml(Document $document, Project $project, Position $position): ?array
     {
-        $offset = $this->converter->toByteOffset($document->text(), $position);
-        $before = $this->xmlComments->mask(substr($document->text(), 0, $offset));
+        $offset = $this->converter->toByteOffset($document->text, $position);
+        $before = $this->xmlComments->mask(substr($document->text, 0, $offset));
         $index = $this->indexes->forProject($project);
         if (preg_match('/<(?<element>[A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?)\b[^<>]*\s+(?<prefix>[A-Za-z_][A-Za-z0-9_.-]*)?$/', $before, $attributeMatch, \PREG_OFFSET_CAPTURE)) {
             $tagOffset = strrpos($before, '<');
@@ -139,7 +139,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
                 foreach ($this->completionChildren(null === $path ? null : $index->find($path)) as $node) {
                     $xmlName = str_replace('_', '-', $node->name());
                     if (str_starts_with($xmlName, $prefix)) {
-                        $items[] = $this->completion($xmlName, $xmlName.'="${1}"', $this->shortDescription($node), $document->text(), $offset - \strlen($prefix), $position);
+                        $items[] = $this->completion($xmlName, $xmlName.'="${1}"', $this->shortDescription($node), $document->text, $offset - \strlen($prefix), $position);
                     }
                 }
 
@@ -153,7 +153,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         $prefix = $match['prefix'] ?? '';
         $path = $this->paths->xmlPath(substr($before, 0, -\strlen($match[0])), $index);
         if ('' !== $alias && [] === $path && isset($index->roots()[$alias])) {
-            return str_starts_with('config', $prefix) ? [$this->completion('config', $alias.':config>', 'Bundle configuration root', $document->text(), $offset - \strlen($prefix), $position)] : [];
+            return str_starts_with('config', $prefix) ? [$this->completion('config', $alias.':config>', 'Bundle configuration root', $document->text, $offset - \strlen($prefix), $position)] : [];
         }
         $nodes = [] === $path ? array_values($index->roots()) : $this->completionChildren($index->find($path));
         $items = [];
@@ -161,7 +161,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
             $xmlName = str_replace('_', '-', $node->name());
             if (str_starts_with($xmlName, $prefix)) {
                 $newText = ('' !== $alias ? $alias.':' : '').$xmlName.'>';
-                $items[] = $this->completion($xmlName, $newText, $this->shortDescription($node), $document->text(), $offset - \strlen($prefix), $position);
+                $items[] = $this->completion($xmlName, $newText, $this->shortDescription($node), $document->text, $offset - \strlen($prefix), $position);
             }
         }
 

@@ -73,7 +73,7 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
 
         $editsByUri = [];
         foreach ($locations as [$uri, $range]) {
-            $key = $uri.'\0'.$range->start()->line().'\0'.$range->start()->character();
+            $key = $uri.'\0'.$range->start->line.'\0'.$range->start->character;
             $editsByUri[$uri][$key] = [
                 'range' => $this->protocol->range($range),
                 'newText' => $newName,
@@ -111,13 +111,13 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
     private function resolve(array $params): ?array
     {
         $request = $this->documentContextResolver->resolvePositioned($params);
-        if (null === $request || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri())) {
+        if (null === $request || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)) {
             return null;
         }
         $symbol = $this->symbolResolver->resolve(
-            $request->document->uri(),
-            $request->document->languageId(),
-            $request->document->text(),
+            $request->document->uri,
+            $request->document->languageId,
+            $request->document->text,
             $request->position,
         );
 

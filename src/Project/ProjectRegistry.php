@@ -17,17 +17,17 @@ final class ProjectRegistry
     {
         $previous = [];
         foreach ($this->projects as $project) {
-            $previous[$project->rootPath()] = $project;
+            $previous[$project->rootPath] = $project;
         }
         $current = [];
         foreach ($projects as $project) {
-            $current[$project->rootPath()] = $project;
+            $current[$project->rootPath] = $project;
         }
         $this->projects = $projects;
         $this->projectsBySpecificity = $projects;
         usort(
             $this->projectsBySpecificity,
-            static fn (Project $left, Project $right): int => \strlen($right->rootUri()) <=> \strlen($left->rootUri()),
+            static fn (Project $left, Project $right): int => \strlen($right->rootUri) <=> \strlen($left->rootUri),
         );
 
         return new ProjectCollectionChange(
@@ -39,7 +39,7 @@ final class ProjectRegistry
     public function contains(Project $project): bool
     {
         foreach ($this->projects as $candidate) {
-            if ($candidate->rootPath() === $project->rootPath()) {
+            if ($candidate->rootPath === $project->rootPath) {
                 return true;
             }
         }
@@ -58,7 +58,7 @@ final class ProjectRegistry
     public function forDocumentUri(string $uri): ?Project
     {
         foreach ($this->projectsBySpecificity as $project) {
-            $rootUri = rtrim($project->rootUri(), '/');
+            $rootUri = rtrim($project->rootUri, '/');
             if ($uri === $rootUri || str_starts_with($uri, $rootUri.'/')) {
                 return $project;
             }

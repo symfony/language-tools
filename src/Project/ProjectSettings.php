@@ -49,7 +49,7 @@ final class ProjectSettings
         try {
             $response = $this->client->request('workspace/configuration', [
                 'items' => array_map(static fn (Project $project): array => [
-                    'scopeUri' => $project->rootUri(),
+                    'scopeUri' => $project->rootUri,
                     'section' => 'symfonyLsp',
                 ], $projects),
             ]);

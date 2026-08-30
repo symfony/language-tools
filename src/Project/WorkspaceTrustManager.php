@@ -61,7 +61,7 @@ final class WorkspaceTrustManager implements ProjectStateInterface
                 'type' => 2,
                 'message' => \sprintf(
                     'Symfony Language Tools must execute application code to index runtime metadata for "%s".',
-                    $project->rootPath(),
+                    $project->rootPath,
                 ),
                 'actions' => [
                     ['title' => 'Trust and enable runtime indexing'],
@@ -85,7 +85,7 @@ final class WorkspaceTrustManager implements ProjectStateInterface
 
     public function invalidateRuntime(Project $project): void
     {
-        unset($this->runtimeStarted[$project->rootPath()]);
+        unset($this->runtimeStarted[$project->rootPath]);
     }
 
     public function removeProject(Project $project): void
@@ -102,15 +102,15 @@ final class WorkspaceTrustManager implements ProjectStateInterface
             $this->configuration->debug($project),
             $this->configuration->runtimeIndexing($project),
         ]));
-        if (($this->runtimeStarted[$project->rootPath()] ?? null) === $configuration) {
+        if (($this->runtimeStarted[$project->rootPath] ?? null) === $configuration) {
             return;
         }
 
         $this->runtimeInitializer->initialize($project);
         if ('ready' === $this->statuses->status($project)['runtime']['state']) {
-            $this->runtimeStarted[$project->rootPath()] = $configuration;
+            $this->runtimeStarted[$project->rootPath] = $configuration;
         } else {
-            unset($this->runtimeStarted[$project->rootPath()]);
+            unset($this->runtimeStarted[$project->rootPath]);
         }
     }
 }

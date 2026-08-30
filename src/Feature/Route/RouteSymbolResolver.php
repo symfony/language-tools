@@ -37,8 +37,8 @@ final class RouteSymbolResolver
             ? $this->yamlDeclarationExtractor->extract($uri, $text)
             : $this->phpDeclarationExtractor->extract($uri, $text);
         foreach ($declarations as $declaration) {
-            $start = $this->positionConverter->toByteOffset($text, $declaration->range()->start());
-            $end = $this->positionConverter->toByteOffset($text, $declaration->range()->end());
+            $start = $this->positionConverter->toByteOffset($text, $declaration->range()->start);
+            $end = $this->positionConverter->toByteOffset($text, $declaration->range()->end);
             if ($offset >= $start && $offset <= $end) {
                 return new RouteSymbol($declaration->name(), $declaration->range());
             }

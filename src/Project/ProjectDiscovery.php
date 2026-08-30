@@ -50,7 +50,7 @@ final class ProjectDiscovery
             }
         }
 
-        usort($projects, static fn (Project $left, Project $right): int => strcmp($left->rootPath(), $right->rootPath()));
+        usort($projects, static fn (Project $left, Project $right): int => strcmp($left->rootPath, $right->rootPath));
 
         return $projects;
     }

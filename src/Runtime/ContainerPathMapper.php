@@ -18,11 +18,11 @@ final class ContainerPathMapper
     public function toContainer(Project $project, string $path): string
     {
         $containerRoot = $this->configuration->containerProjectRoot($project);
-        if (null === $containerRoot || !Path::isBasePath($project->rootPath(), $path)) {
+        if (null === $containerRoot || !Path::isBasePath($project->rootPath, $path)) {
             return $path;
         }
 
-        return Path::join($containerRoot, Path::makeRelative($path, $project->rootPath()));
+        return Path::join($containerRoot, Path::makeRelative($path, $project->rootPath));
     }
 
     public function toHost(Project $project, string $path): string
@@ -32,6 +32,6 @@ final class ContainerPathMapper
             return $path;
         }
 
-        return Path::join($project->rootPath(), Path::makeRelative($path, $containerRoot));
+        return Path::join($project->rootPath, Path::makeRelative($path, $containerRoot));
     }
 }

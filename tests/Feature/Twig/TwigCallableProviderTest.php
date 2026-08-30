@@ -135,8 +135,8 @@ final class TwigCallableProviderTest extends TestCase
         ], $declarations));
         $functionOffset = strpos($source, 'function_name');
         self::assertIsInt($functionOffset);
-        self::assertSame($converter->toPosition($source, $functionOffset)->line(), $declarations[2]->range()->start()->line());
-        self::assertSame($converter->toPosition($source, $functionOffset)->character(), $declarations[2]->range()->start()->character());
+        self::assertSame($converter->toPosition($source, $functionOffset)->line, $declarations[2]->range()->start->line);
+        self::assertSame($converter->toPosition($source, $functionOffset)->character, $declarations[2]->range()->start->character);
     }
 
     public function testIgnoresIncompleteAttributedDeclarations(): void
@@ -380,7 +380,7 @@ final class TwigCallableProviderTest extends TestCase
             $position = $converter->toPosition($text, \strlen($text));
             $items = $provider->complete([
                 'textDocument' => ['uri' => $uri],
-                'position' => ['line' => $position->line(), 'character' => $position->character()],
+                'position' => ['line' => $position->line, 'character' => $position->character],
             ]);
 
             return null === $items ? null : array_column($items, 'label');
@@ -518,7 +518,7 @@ final class TwigCallableProviderTest extends TestCase
             $position = $converter->toPosition($text, \strlen($text));
             $items = $provider->complete([
                 'textDocument' => ['uri' => $uri],
-                'position' => ['line' => $position->line(), 'character' => $position->character()],
+                'position' => ['line' => $position->line, 'character' => $position->character],
             ]);
 
             return null === $items ? null : array_column($items, 'label');
@@ -599,7 +599,7 @@ final class TwigCallableProviderTest extends TestCase
 
         return [
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ];
     }
 }

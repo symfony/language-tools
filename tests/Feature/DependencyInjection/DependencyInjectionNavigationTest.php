@@ -92,7 +92,7 @@ final class DependencyInjectionNavigationTest extends TestCase
         $position = $converter->toPosition($consumer, strpos($consumer, 'app.mailer') + 1);
         $params = [
             'textDocument' => ['uri' => $consumerUri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ];
 
         return [

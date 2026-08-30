@@ -31,8 +31,8 @@ final class ConsoleProvider implements CompletionProviderInterface, DiagnosticPr
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $context = $this->extractor->completionContext($request->document->languageId(), $request->document->text(), $offset);
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $context = $this->extractor->completionContext($request->document->languageId, $request->document->text, $offset);
         if (null === $context) {
             return null;
         }
@@ -70,7 +70,7 @@ final class ConsoleProvider implements CompletionProviderInterface, DiagnosticPr
     public function diagnostics(array $params): ?array
     {
         $request = $this->documents->resolveDocument($params);
-        if (null === $request || 'php' !== $request->document->languageId()) {
+        if (null === $request || 'php' !== $request->document->languageId) {
             return null;
         }
         $runtimeIndex = $this->indexes->forProject($request->project);
@@ -79,7 +79,7 @@ final class ConsoleProvider implements CompletionProviderInterface, DiagnosticPr
         }
         $sourceIndex = $this->sourceIndexes->forProject($request->project);
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->document->uri(), 'php', $request->document->text())->references() as $reference) {
+        foreach ($this->extractor->extract($request->document->uri, 'php', $request->document->text)->references() as $reference) {
             $runtimeDefinition = $runtimeIndex->command($reference->commandClass());
             $sourceDefinition = $sourceIndex->definition($reference->commandClass());
             if (null === $runtimeDefinition

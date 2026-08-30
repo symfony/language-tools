@@ -115,13 +115,13 @@ final class RouteRenameHandler implements RenameProviderInterface
     {
         $request = $this->documentContextResolver->resolvePositioned($params);
         if (null === $request
-            || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri())
-            || !\in_array($request->document->languageId(), ['php', 'twig', 'yaml'], true)
+            || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)
+            || !\in_array($request->document->languageId, ['php', 'twig', 'yaml'], true)
         ) {
             return null;
         }
 
-        $symbol = $this->symbolResolver->resolve($request->project, $request->document->uri(), $request->document->text(), $request->position);
+        $symbol = $this->symbolResolver->resolve($request->project, $request->document->uri, $request->document->text, $request->position);
 
         return null === $symbol ? null : [$request->project, $symbol];
     }

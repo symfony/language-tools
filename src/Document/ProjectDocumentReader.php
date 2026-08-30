@@ -20,10 +20,10 @@ final class ProjectDocumentReader
             return null;
         }
         if (null !== $document = $this->documents->get($uri)) {
-            return new ProjectDocument($document->text(), $document->version());
+            return new ProjectDocument($document->text, $document->version);
         }
         $relativePath = $this->paths->relative($project, $uri);
-        if (null === $relativePath || !is_file($path = Path::join($project->rootPath(), $relativePath))) {
+        if (null === $relativePath || !is_file($path = Path::join($project->rootPath, $relativePath))) {
             return null;
         }
         $text = @file_get_contents($path);

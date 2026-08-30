@@ -65,7 +65,7 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
 
     public function removeProject(Project $project): void
     {
-        unset($this->statuses[$project->rootPath()]);
+        unset($this->statuses[$project->rootPath]);
         $this->runtimeSnapshots->removeProject($project);
     }
 
@@ -74,12 +74,12 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
      */
     public function status(Project $project): array
     {
-        $status = $this->statuses[$project->rootPath()] ?? [
+        $status = $this->statuses[$project->rootPath] ?? [
             'source' => ['state' => 'not-indexed'],
             'runtime' => ['state' => 'not-indexed'],
         ];
 
-        return ['root' => $project->rootPath(), ...$status];
+        return ['root' => $project->rootPath, ...$status];
     }
 
     /**
@@ -100,6 +100,6 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
             $status[$section]['stage'] = $stage;
         }
 
-        $this->statuses[$project->rootPath()] = $status;
+        $this->statuses[$project->rootPath] = $status;
     }
 }

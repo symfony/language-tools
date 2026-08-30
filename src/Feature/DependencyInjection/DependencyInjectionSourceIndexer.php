@@ -65,20 +65,20 @@ final class DependencyInjectionSourceIndexer extends AbstractSourceIndexer
 
     protected function extract(Project $project, SourceDocument $document): ?DependencyInjectionSourceFacts
     {
-        if ('yaml' === $document->languageId()) {
-            return $this->yamlExtractor->extract($document->uri(), $document->text());
+        if ('yaml' === $document->languageId) {
+            return $this->yamlExtractor->extract($document->uri, $document->text);
         }
-        if ('xml' === $document->languageId()) {
-            return $this->xmlExtractor->extract($document->uri(), $document->text());
+        if ('xml' === $document->languageId) {
+            return $this->xmlExtractor->extract($document->uri, $document->text);
         }
-        if ('php' !== $document->languageId()) {
+        if ('php' !== $document->languageId) {
             return null;
         }
 
         return new DependencyInjectionSourceFacts(
-            $document->uri(),
-            references: $this->autowireExtractor->extract($document->uri(), $document->text()),
-            classes: $this->classExtractor->extract($document->uri(), $document->text()),
+            $document->uri,
+            references: $this->autowireExtractor->extract($document->uri, $document->text),
+            classes: $this->classExtractor->extract($document->uri, $document->text),
         );
     }
 }

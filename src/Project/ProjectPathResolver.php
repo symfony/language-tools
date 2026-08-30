@@ -14,7 +14,7 @@ final class ProjectPathResolver
     public function relative(Project $project, string $uri): ?string
     {
         $path = $this->uriToPathConverter->convert($uri);
-        $root = Path::canonicalize($project->rootPath());
+        $root = Path::canonicalize($project->rootPath);
         if (null === $path || !Path::isBasePath($root, $path)) {
             return null;
         }
@@ -34,7 +34,7 @@ final class ProjectPathResolver
             }
         }
 
-        $root = realpath($project->rootPath());
+        $root = realpath($project->rootPath);
         if (false === $root) {
             return true;
         }

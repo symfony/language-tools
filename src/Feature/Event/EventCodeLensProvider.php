@@ -21,12 +21,12 @@ final class EventCodeLensProvider implements CodeLensProviderInterface
     public function codeLenses(array $params): ?array
     {
         $request = $this->documents->resolveDocument($params);
-        if (null === $request || 'php' !== $request->document->languageId()) {
+        if (null === $request || 'php' !== $request->document->languageId) {
             return null;
         }
         $index = $this->indexes->forProject($request->project);
         $lenses = [];
-        foreach ($this->classExtractor->extract($request->document->uri(), $request->document->text()) as $class) {
+        foreach ($this->classExtractor->extract($request->document->uri, $request->document->text) as $class) {
             $listeners = $index->listenersForEvent($class->className());
             if (null !== $index->event($class->className()) || [] !== $listeners) {
                 $related = [];

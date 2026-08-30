@@ -122,7 +122,7 @@ final class TwigPhpSymbolProviderTest extends TestCase
 
             return $provider->complete([
                 'textDocument' => ['uri' => $uri],
-                'position' => ['line' => $position->line(), 'character' => $position->character()],
+                'position' => ['line' => $position->line, 'character' => $position->character],
             ]) ?? [];
         };
         $items = $complete("{{ constant('App\\\\Model\\\\Vie");
@@ -179,7 +179,7 @@ final class TwigPhpSymbolProviderTest extends TestCase
 
         return [
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ];
     }
 }

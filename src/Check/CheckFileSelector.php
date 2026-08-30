@@ -64,7 +64,7 @@ final class CheckFileSelector
             foreach ($this->files->files($project, $includeExcluded) as $path) {
                 $path = Path::canonicalize($path);
                 $uri = $this->uriToPathConverter->toUri($path);
-                if ($this->projects->forDocumentUri($uri)?->rootPath() !== $project->rootPath()) {
+                if ($this->projects->forDocumentUri($uri)?->rootPath !== $project->rootPath) {
                     continue;
                 }
                 $projectPath = $this->files->relativePath($project, $path);
@@ -79,7 +79,7 @@ final class CheckFileSelector
                 if (!is_readable($path)) {
                     throw new InvalidConfigurationException(\sprintf('The application file "%s" is unreadable.', $this->projectConfiguration->workspaceRelativePath($project, $path)));
                 }
-                if (!$this->realPathBelongsToProject($project->rootPath(), $path)) {
+                if (!$this->realPathBelongsToProject($project->rootPath, $path)) {
                     throw new InvalidConfigurationException(\sprintf('The application file "%s" resolves outside its Symfony project.', $this->projectConfiguration->workspaceRelativePath($project, $path)));
                 }
                 $candidates[$path] = new CheckFile(
@@ -152,7 +152,7 @@ final class CheckFileSelector
             if (!$this->files->belongsToProject($project, $path)) {
                 return \sprintf('The selected file "%s" is in an excluded dependency or cache directory.', $selector);
             }
-            if ($this->files->gitignoreExcluded($project->rootPath(), $path)) {
+            if ($this->files->gitignoreExcluded($project->rootPath, $path)) {
                 return \sprintf('The selected file "%s" is ignored by the project .gitignore rules.', $selector);
             }
             if (null === $this->files->languageId($path)) {
@@ -195,12 +195,12 @@ final class CheckFileSelector
 
     private function assertReadableDirectories(Project $project): void
     {
-        $directories = [$project->rootPath()];
+        $directories = [$project->rootPath];
         while ([] !== $directories) {
             $directory = array_pop($directories);
             $entries = @scandir($directory);
             if (false === $entries) {
-                throw new InvalidConfigurationException(\sprintf('The application directory "%s" is unreadable.', $project->rootPath() === $directory ? '.' : $this->files->relativePath($project, $directory)));
+                throw new InvalidConfigurationException(\sprintf('The application directory "%s" is unreadable.', $project->rootPath === $directory ? '.' : $this->files->relativePath($project, $directory)));
             }
             foreach ($entries as $entry) {
                 if ('.' === $entry || '..' === $entry || \in_array($entry, ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)) {
@@ -213,11 +213,11 @@ final class CheckFileSelector
                 if ($this->files->isDirectoryExcluded($project, $path)) {
                     continue;
                 }
-                if ($this->files->gitignoreExcluded($project->rootPath(), $path)) {
+                if ($this->files->gitignoreExcluded($project->rootPath, $path)) {
                     continue;
                 }
                 if (is_link($path)) {
-                    if (!$this->realPathBelongsToProject($project->rootPath(), $path)) {
+                    if (!$this->realPathBelongsToProject($project->rootPath, $path)) {
                         throw new InvalidConfigurationException(\sprintf('The application directory "%s" resolves outside its Symfony project.', $this->files->relativePath($project, $path)));
                     }
                     continue;

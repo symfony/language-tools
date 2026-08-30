@@ -25,23 +25,23 @@ final class ConfigurationHoverProvider implements HoverProviderInterface
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
         $index = $this->indexes->forProject($request->project);
-        if ('php' === $request->document->languageId()) {
+        if ('php' === $request->document->languageId) {
             $resolved = $this->paths->resolvePhpNode($request->document, $index, $offset);
 
             return null === $resolved ? null : $this->protocol->markdownHover($this->description($resolved[0], $resolved[1]));
         }
-        if ('xml' === $request->document->languageId()) {
+        if ('xml' === $request->document->languageId) {
             $resolved = $this->paths->resolveXmlNode($request->document, $index, $offset);
 
             return null === $resolved ? null : $this->protocol->markdownHover($this->description($resolved[0], $resolved[1]));
         }
-        if ('yaml' !== $request->document->languageId()) {
+        if ('yaml' !== $request->document->languageId) {
             return null;
         }
-        foreach ($this->yaml->parse($request->document->text(), $index) as $occurrence) {
-            if (!$this->converter->containsByteOffset($request->document->text(), $occurrence->keyRange(), $offset, inclusiveEnd: true)) {
+        foreach ($this->yaml->parse($request->document->text, $index) as $occurrence) {
+            if (!$this->converter->containsByteOffset($request->document->text, $occurrence->keyRange(), $offset, inclusiveEnd: true)) {
                 continue;
             }
             $node = $index->find($occurrence->path(), $occurrence->sequenceDepths(), $occurrence->literalDepths());

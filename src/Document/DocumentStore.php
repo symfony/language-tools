@@ -9,7 +9,7 @@ final class DocumentStore
 
     public function open(Document $document): void
     {
-        $this->documents[$document->uri()] = $document;
+        $this->documents[$document->uri] = $document;
     }
 
     public function update(string $uri, int $version, string $text): void
@@ -19,7 +19,7 @@ final class DocumentStore
             throw new \InvalidArgumentException(\sprintf('Document "%s" is not open.', $uri));
         }
 
-        $this->documents[$uri] = new Document($uri, $document->languageId(), $version, $text);
+        $this->documents[$uri] = new Document($uri, $document->languageId, $version, $text);
     }
 
     public function close(string $uri): void

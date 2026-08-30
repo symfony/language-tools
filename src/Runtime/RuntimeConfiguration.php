@@ -62,19 +62,19 @@ final class RuntimeConfiguration implements ProjectStateInterface
     /** @param array<array-key, mixed> $settings */
     public function configureProject(Project $project, array $settings): void
     {
-        $this->projectSettings[$project->rootPath()] = $this->analysisSettings->normalizeProject($settings, false);
+        $this->projectSettings[$project->rootPath] = $this->analysisSettings->normalizeProject($settings, false);
     }
 
     public function setEnvironment(Project $project, string $environment): void
     {
-        $settings = $this->projectSettings[$project->rootPath()] ?? [];
+        $settings = $this->projectSettings[$project->rootPath] ?? [];
         $settings['environment'] = $environment;
         $this->configureProject($project, $settings);
     }
 
     public function removeProject(Project $project): void
     {
-        unset($this->projectSettings[$project->rootPath()]);
+        unset($this->projectSettings[$project->rootPath]);
     }
 
     /** @return array<string, mixed> */
@@ -156,7 +156,7 @@ final class RuntimeConfiguration implements ProjectStateInterface
     private function setting(?Project $project, string $name, mixed $default): mixed
     {
         if (null !== $project) {
-            $settings = $this->projectSettings[$project->rootPath()] ?? [];
+            $settings = $this->projectSettings[$project->rootPath] ?? [];
             if (\array_key_exists($name, $settings)) {
                 return $settings[$name];
             }

@@ -190,8 +190,8 @@ final class SecurityExtractor
      */
     private function valueSymbols(SecuritySymbolKind $kind, string $pattern, string $uri, string $text, ConfigurationOccurrence $occurrence): array
     {
-        $start = $this->converter->toByteOffset($text, $occurrence->valueRange()->start());
-        $end = $this->converter->toByteOffset($text, $occurrence->valueRange()->end());
+        $start = $this->converter->toByteOffset($text, $occurrence->valueRange()->start);
+        $end = $this->converter->toByteOffset($text, $occurrence->valueRange()->end);
         $value = substr($text, $start, $end - $start);
         preg_match_all($pattern, $value, $matches, \PREG_OFFSET_CAPTURE);
         $symbols = [];
@@ -325,7 +325,7 @@ final class SecurityExtractor
     {
         $unique = [];
         foreach ($symbols as $symbol) {
-            $key = $symbol->kind()->value.'|'.$symbol->range()->start()->line().'|'.$symbol->range()->start()->character();
+            $key = $symbol->kind()->value.'|'.$symbol->range()->start->line.'|'.$symbol->range()->start->character;
             $unique[$key] = $symbol;
         }
 

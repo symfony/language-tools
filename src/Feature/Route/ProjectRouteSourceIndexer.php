@@ -57,9 +57,9 @@ final class ProjectRouteSourceIndexer extends AbstractSourceIndexer
 
     protected function extract(Project $project, SourceDocument $document): RouteSourceFacts
     {
-        $uri = $document->uri();
-        $languageId = $document->languageId();
-        $text = $document->text();
+        $uri = $document->uri;
+        $languageId = $document->languageId;
+        $text = $document->text;
         $declarations = [];
         if ('php' === $languageId) {
             $declarations = $this->phpDeclarationExtractor->extract($uri, $text);
@@ -86,7 +86,7 @@ final class ProjectRouteSourceIndexer extends AbstractSourceIndexer
 
     protected function supportsOverlay(Project $project, Document $document): bool
     {
-        return 'yaml' !== $document->languageId() || $this->isRouteYaml($project, $document->uri());
+        return 'yaml' !== $document->languageId || $this->isRouteYaml($project, $document->uri);
     }
 
     private function isRouteYaml(Project $project, string $uri): bool

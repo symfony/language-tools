@@ -32,14 +32,14 @@ final class RouteCompletionHandler implements CompletionProviderInterface
     public function complete(array $params): ?array
     {
         $request = $this->documentContextResolver->resolvePositioned($params);
-        if (null === $request || !\in_array($request->document->languageId(), ['php', 'twig'], true)) {
+        if (null === $request || !\in_array($request->document->languageId, ['php', 'twig'], true)) {
             return null;
         }
 
         $routeIndex = $this->routeIndexes->forProject($request->project);
-        if ('twig' === $request->document->languageId()) {
+        if ('twig' === $request->document->languageId) {
             $parameterContext = TwigRouteParameterCompletionContext::fromTwig(
-                $request->document->text(),
+                $request->document->text,
                 $request->position,
                 $this->positionConverter,
             );
@@ -60,7 +60,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
             }
 
             $routeContext = TwigRouteCompletionContext::fromTwig(
-                $request->document->text(),
+                $request->document->text,
                 $request->position,
                 $this->positionConverter,
             );
@@ -75,7 +75,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         }
         $classIndex = $this->classIndexes->forProject($request->project);
         $isSymfonyReceiver = fn (string $source): bool => $this->phpReferenceExtractor->isSymfonyReceiver($source, $classIndex);
-        $phpText = $this->phpComments->mask($request->document->text());
+        $phpText = $this->phpComments->mask($request->document->text);
         $parameterContext = RouteParameterCompletionContext::fromPhp(
             $phpText,
             $request->position,

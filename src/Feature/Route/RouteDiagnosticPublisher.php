@@ -34,12 +34,12 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
     public function diagnostics(array $params): ?array
     {
         $request = $this->documentContextResolver->resolveDocument($params);
-        if (null === $request || !\in_array($request->document->languageId(), ['php', 'twig'], true)) {
+        if (null === $request || !\in_array($request->document->languageId, ['php', 'twig'], true)) {
             return null;
         }
 
-        if ('twig' === $request->document->languageId()
-            && !$this->templateIndexes->forProject($request->project)->isRuntimeTemplateUri($request->document->uri())
+        if ('twig' === $request->document->languageId
+            && !$this->templateIndexes->forProject($request->project)->isRuntimeTemplateUri($request->document->uri)
         ) {
             return [];
         }
@@ -49,9 +49,9 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
         }
 
         $diagnostics = [];
-        $references = 'twig' === $request->document->languageId()
-            ? $this->twigReferenceExtractor->extract($request->document->text())
-            : $this->phpReferenceExtractor->extract($request->document->text(), $this->classIndexes->forProject($request->project));
+        $references = 'twig' === $request->document->languageId
+            ? $this->twigReferenceExtractor->extract($request->document->text)
+            : $this->phpReferenceExtractor->extract($request->document->text, $this->classIndexes->forProject($request->project));
         foreach ($references as $reference) {
             $route = $routeIndex->get($reference->name());
             if (null === $route) {

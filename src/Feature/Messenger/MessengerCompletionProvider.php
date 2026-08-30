@@ -33,20 +33,20 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
         $before = substr(
-            'php' === $request->document->languageId() ? $this->phpComments->mask($request->document->text()) : $request->document->text(),
+            'php' === $request->document->languageId ? $this->phpComments->mask($request->document->text) : $request->document->text,
             0,
             $offset,
         );
         $lineOffset = (int) strrpos("\n".$before, "\n");
         $kind = null;
         $prefix = '';
-        $messengerOptionContext = 'yaml' === $request->document->languageId();
-        if ('php' === $request->document->languageId()
+        $messengerOptionContext = 'yaml' === $request->document->languageId;
+        if ('php' === $request->document->languageId
             && preg_match('/(?:#\[\s*|,\s*)([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s*\([^)]*$/s', $before, $attribute)
         ) {
-            $messengerOptionContext = self::AS_MESSAGE_HANDLER === $this->phpParser->parse($request->document->text())->resolveName($attribute[1]);
+            $messengerOptionContext = self::AS_MESSAGE_HANDLER === $this->phpParser->parse($request->document->text)->resolveName($attribute[1]);
         }
         if ($messengerOptionContext && preg_match('/(?:\bbus|default_bus)\s*:\s*["\']?([A-Za-z0-9_.-]*)$/', $before, $match)) {
             $kind = MessengerSymbolKind::Bus;
@@ -57,7 +57,7 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
         } elseif (preg_match('/BusNameStamp\s*\(\s*["\']([A-Za-z0-9_.-]*)$/', $before, $match)) {
             $kind = MessengerSymbolKind::Bus;
             $prefix = $match[1];
-        } elseif ('yaml' === $request->document->languageId() && \array_slice($this->yaml->parentPath($request->document->text(), $lineOffset), -3) === ['framework', 'messenger', 'routing'] && preg_match('/:\s*\[?\s*["\']?([A-Za-z0-9_.-]*)$/', substr($before, $lineOffset), $match)) {
+        } elseif ('yaml' === $request->document->languageId && \array_slice($this->yaml->parentPath($request->document->text, $lineOffset), -3) === ['framework', 'messenger', 'routing'] && preg_match('/:\s*\[?\s*["\']?([A-Za-z0-9_.-]*)$/', substr($before, $lineOffset), $match)) {
             $kind = MessengerSymbolKind::Transport;
             $prefix = $match[1];
         }
@@ -78,7 +78,7 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
         $items = [];
         foreach ($names as $name) {
             if (str_starts_with($name, $prefix)) {
-                $items[] = $this->completion($name, $request->document->text(), $offset - \strlen($prefix), $request->position);
+                $items[] = $this->completion($name, $request->document->text, $offset - \strlen($prefix), $request->position);
             }
         }
 

@@ -21,7 +21,7 @@ final class PublicAssetResolver implements ProjectStateInterface
 
     public function removeProject(Project $project): void
     {
-        unset($this->cache[Path::canonicalize(Path::join($project->rootPath(), 'public'))]);
+        unset($this->cache[Path::canonicalize(Path::join($project->rootPath, 'public'))]);
     }
 
     public function path(Project $project, string $logicalPath): ?string
@@ -65,7 +65,7 @@ final class PublicAssetResolver implements ProjectStateInterface
 
     private function publicRoot(Project $project): ?string
     {
-        $publicRoot = Path::canonicalize(Path::join($project->rootPath(), 'public'));
+        $publicRoot = Path::canonicalize(Path::join($project->rootPath, 'public'));
 
         return is_dir($publicRoot) ? $publicRoot : null;
     }

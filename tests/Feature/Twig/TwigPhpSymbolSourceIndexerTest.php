@@ -63,7 +63,7 @@ final class TwigPhpSymbolSourceIndexerTest extends TestCase
         self::assertCount(1, $index->references('App\Status', 'Published'));
         $published = $index->memberDeclarations('App\Status', 'Published')[0];
         self::assertSame(TwigPhpSymbolKind::EnumCase, $published->kind());
-        self::assertSame($published, $index->declarationAt($phpUri, new Position($published->range()->start()->line(), $published->range()->start()->character())));
+        self::assertSame($published, $index->declarationAt($phpUri, new Position($published->range()->start->line, $published->range()->start->character)));
 
         $codec = new SourceIndexPayloadCodec();
         $codec->validate([$indexer]);

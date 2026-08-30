@@ -38,7 +38,7 @@ final class DiagnosticCollector
         if (null === $document) {
             return null;
         }
-        if ($this->isExcluded($document->uri(), $includeExcluded)) {
+        if ($this->isExcluded($document->uri, $includeExcluded)) {
             return [];
         }
 
@@ -71,7 +71,7 @@ final class DiagnosticCollector
         if (null === $document) {
             return null;
         }
-        if ($this->isExcluded($document->uri(), $includeExcluded)) {
+        if ($this->isExcluded($document->uri, $includeExcluded)) {
             return new DetailedDiagnosticCollection(true, [], []);
         }
 

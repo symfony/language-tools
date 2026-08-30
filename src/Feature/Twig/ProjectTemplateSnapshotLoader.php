@@ -42,7 +42,7 @@ final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterf
             $path = $this->pathMapper->toHost($project, $loaderPath['path']);
             $path = Path::isAbsolute($path)
                 ? Path::canonicalize($path)
-                : Path::join($project->rootPath(), $path);
+                : Path::join($project->rootPath, $path);
             if (!is_dir($path)) {
                 continue;
             }

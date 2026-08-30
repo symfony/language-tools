@@ -19,11 +19,11 @@ final class DoctrineRelationshipCodeLensProvider implements CodeLensProviderInte
     public function codeLenses(array $params): ?array
     {
         $request = $this->resolver->resolveDocument($params);
-        if (null === $request || 'php' !== $request->document->languageId()) {
+        if (null === $request || 'php' !== $request->document->languageId) {
             return null;
         }
         $index = $this->indexes->forProject($request->project);
-        $facts = $this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text());
+        $facts = $this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text);
         $lenses = [];
         foreach ($facts->entities() as $entity) {
             $repository = null === $entity->repositoryClass() ? null : $index->repository($entity->repositoryClass());

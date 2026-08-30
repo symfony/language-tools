@@ -25,11 +25,11 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
     {
         $request = $this->documentContextResolver->resolveDocument($params);
         $context = $params['context'] ?? null;
-        if (null === $request || !\is_array($context) || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri())) {
+        if (null === $request || !\is_array($context) || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)) {
             return null;
         }
 
-        $references = $this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text());
+        $references = $this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text);
         $actions = [];
         foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
             if (!\is_array($diagnostic) || 'template.not_found' !== ($diagnostic['code'] ?? null)) {
@@ -45,7 +45,7 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
                 ) {
                     continue;
                 }
-                $path = $this->path($request->project->rootPath(), $reference->name());
+                $path = $this->path($request->project->rootPath, $reference->name());
                 if (null === $path || is_file($path)) {
                     continue;
                 }

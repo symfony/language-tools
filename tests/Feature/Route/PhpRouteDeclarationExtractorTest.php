@@ -39,8 +39,8 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
         self::assertCount(2, $declarations);
         self::assertSame('article_show', $declarations[0]->name());
         self::assertSame('file:///workspace/src/ArticleController.php', $declarations[0]->uri());
-        self::assertSame(5, $declarations[0]->range()->start()->line());
-        self::assertSame(36, $declarations[0]->range()->start()->character());
+        self::assertSame(5, $declarations[0]->range()->start->line);
+        self::assertSame(36, $declarations[0]->range()->start->character);
         self::assertSame('article_edit', $declarations[1]->name());
     }
 
@@ -138,7 +138,7 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
         );
 
         self::assertSame('draft_route', $declarations[0]->name());
-        self::assertSame(3, $declarations[0]->range()->start()->line());
+        self::assertSame(3, $declarations[0]->range()->start->line);
     }
 
     public function testExtractsRoutingConfiguratorAndRouteCollectionDeclarations(): void

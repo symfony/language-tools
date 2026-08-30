@@ -26,7 +26,7 @@ final class TwigComponentDiagnosticProvider implements DiagnosticProviderInterfa
     public function diagnostics(array $params): ?array
     {
         $request = $this->documents->resolveDocument($params);
-        if (null === $request || 'twig' !== $request->document->languageId()) {
+        if (null === $request || 'twig' !== $request->document->languageId) {
             return null;
         }
         $index = $this->indexes->forProject($request->project);
@@ -37,7 +37,7 @@ final class TwigComponentDiagnosticProvider implements DiagnosticProviderInterfa
             return null;
         }
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->project, $request->document->uri(), 'twig', $request->document->text())->references() as $reference) {
+        foreach ($this->extractor->extract($request->project, $request->document->uri, 'twig', $request->document->text)->references() as $reference) {
             $name = $reference->name();
             if (null !== $index->get($name) || $index->hasRuntimeName($name) || $this->components->anonymousTemplateExists($request->project, $name)) {
                 continue;

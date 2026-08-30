@@ -19,11 +19,11 @@ final class StimulusCodeLensProvider implements CodeLensProviderInterface
     public function codeLenses(array $params): ?array
     {
         $request = $this->documents->resolveDocument($params);
-        if (null === $request || !\in_array($request->document->languageId(), ['javascript', 'typescript'], true)) {
+        if (null === $request || !\in_array($request->document->languageId, ['javascript', 'typescript'], true)) {
             return null;
         }
         $lenses = [];
-        foreach ($this->extractor->extract($request->project, $request->document->uri(), $request->document->languageId(), $request->document->text())->declarations() as $declaration) {
+        foreach ($this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text)->declarations() as $declaration) {
             $locations = [];
             foreach ($this->sourceIndexes->forProject($request->project)->references($declaration->name()) as $reference) {
                 $locations[] = $this->protocol->location($reference->uri(), $reference->range());

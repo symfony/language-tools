@@ -13,12 +13,12 @@ final class SavedDocumentMatcher
 
     public function matches(Project $project, Document $document): bool
     {
-        $relativePath = $this->paths->relative($project, $document->uri());
-        if (null === $relativePath || !is_file($path = Path::join($project->rootPath(), $relativePath))) {
+        $relativePath = $this->paths->relative($project, $document->uri);
+        if (null === $relativePath || !is_file($path = Path::join($project->rootPath, $relativePath))) {
             return false;
         }
         $hash = @hash_file('sha256', $path);
 
-        return \is_string($hash) && hash_equals($hash, hash('sha256', $document->text()));
+        return \is_string($hash) && hash_equals($hash, hash('sha256', $document->text));
     }
 }

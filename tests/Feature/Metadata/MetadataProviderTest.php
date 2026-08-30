@@ -416,7 +416,7 @@ final class MetadataProviderTest extends TestCase
             static fn ($symbol): bool => MetadataSymbolKind::Property === $symbol->kind() && !$symbol->isDeclaration(),
         ));
         self::assertSame(['App\Dto\Article::$title'], array_map(static fn ($symbol): string => $symbol->name(), $references));
-        self::assertSame(strpos($text, "'title'") + 1, $converter->toByteOffset($text, $references[0]->range()->start()));
+        self::assertSame(strpos($text, "'title'") + 1, $converter->toByteOffset($text, $references[0]->range()->start));
     }
 
     public function testIgnoresCommentedPhpMetadataWhilePreservingActiveRanges(): void
@@ -455,11 +455,11 @@ final class MetadataProviderTest extends TestCase
 
         $formOptions = $extractor->formOptions($text);
         self::assertSame(['active_form'], array_column($formOptions, 'option'));
-        self::assertSame(strpos($text, 'active_form'), $converter->toByteOffset($text, $formOptions[0]['range']->start()));
+        self::assertSame(strpos($text, 'active_form'), $converter->toByteOffset($text, $formOptions[0]['range']->start));
 
         $constraintOptions = $extractor->constraintOptions($text);
         self::assertSame(['active_constraint'], array_column($constraintOptions, 'option'));
-        self::assertSame(strpos($text, 'active_constraint'), $converter->toByteOffset($text, $constraintOptions[0]['range']->start()));
+        self::assertSame(strpos($text, 'active_constraint'), $converter->toByteOffset($text, $constraintOptions[0]['range']->start));
 
         $uri = 'file:///workspace/src/Controller/EventController.php';
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
@@ -493,7 +493,7 @@ final class MetadataProviderTest extends TestCase
         self::assertSame(['Length', 'NotBlank'], $constraints);
         self::assertCount(1, $serializerGroups);
         self::assertSame('active_group', $serializerGroups[0]->name());
-        self::assertSame(strpos($text, 'active_group'), $converter->toByteOffset($text, $serializerGroups[0]->range()->start()));
+        self::assertSame(strpos($text, 'active_group'), $converter->toByteOffset($text, $serializerGroups[0]->range()->start));
     }
 
     /** @return list<string> */
@@ -544,7 +544,7 @@ final class MetadataProviderTest extends TestCase
     {
         $position = $converter->toPosition($text, $offset);
 
-        return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+        return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
     }
 
     #[DataProvider('serializerGroupsAttributeCompletionProvider')]

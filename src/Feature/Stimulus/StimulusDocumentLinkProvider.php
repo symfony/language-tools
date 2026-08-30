@@ -22,11 +22,11 @@ final class StimulusDocumentLinkProvider implements DocumentLinkProviderInterfac
     public function links(array $params): ?array
     {
         $request = $this->documents->resolveDocument($params);
-        if (null === $request || 'twig' !== $request->document->languageId()) {
+        if (null === $request || 'twig' !== $request->document->languageId) {
             return null;
         }
         $links = [];
-        foreach ($this->extractor->extract($request->project, $request->document->uri(), $request->document->languageId(), $request->document->text())->references() as $reference) {
+        foreach ($this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text)->references() as $reference) {
             $locations = $this->stimulus->declarationLocations($request->project, $reference);
             $target = $locations[0]['uri'] ?? null;
             if (!\is_string($target)) {

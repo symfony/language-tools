@@ -36,11 +36,11 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         }
 
         $context = TranslationCompletionContext::create(
-            $request->document->languageId(),
-            match ($request->document->languageId()) {
-                'twig' => $this->commentParser->mask($request->document->text()),
-                'php' => $this->phpComments->mask($request->document->text()),
-                default => $request->document->text(),
+            $request->document->languageId,
+            match ($request->document->languageId) {
+                'twig' => $this->commentParser->mask($request->document->text),
+                'php' => $this->phpComments->mask($request->document->text),
+                default => $request->document->text,
             },
             $request->position,
             $this->converter,
@@ -147,7 +147,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
 
         $index = $this->indexes->forProject($request->project);
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->references() as $reference) {
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->references() as $reference) {
             if ($index->isComplete() && !\in_array($reference->domain(), $index->domains(), true)) {
                 if ($this->configuration->missingKeyDiagnostics($request->project)) {
                     $diagnostics[] = $this->diagnostic(

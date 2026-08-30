@@ -14,12 +14,12 @@ abstract class AbstractSourceIndexer implements SourceIndexProviderInterface, Pr
 
     final public function begin(Project $project): void
     {
-        $this->facts[$project->rootPath()] = [];
+        $this->facts[$project->rootPath] = [];
     }
 
     public function removeProject(Project $project): void
     {
-        unset($this->facts[$project->rootPath()]);
+        unset($this->facts[$project->rootPath]);
     }
 
     /** @return TFacts|null */
@@ -27,7 +27,7 @@ abstract class AbstractSourceIndexer implements SourceIndexProviderInterface, Pr
     {
         $facts = $this->extract($project, $document);
         if (null !== $facts) {
-            $this->facts[$project->rootPath()][] = $facts;
+            $this->facts[$project->rootPath][] = $facts;
         }
 
         return $facts;
@@ -42,12 +42,12 @@ abstract class AbstractSourceIndexer implements SourceIndexProviderInterface, Pr
         if (!$data instanceof $class) {
             throw new \UnexpectedValueException(\sprintf('The cached source facts for provider "%s" are invalid.', $this->name()));
         }
-        $this->facts[$project->rootPath()][] = $data;
+        $this->facts[$project->rootPath][] = $data;
     }
 
     final public function finish(Project $project): void
     {
-        $key = $project->rootPath();
+        $key = $project->rootPath;
         $this->sourceIndex($project)->replace(...$this->facts[$key]);
         unset($this->facts[$key]);
     }
@@ -57,7 +57,7 @@ abstract class AbstractSourceIndexer implements SourceIndexProviderInterface, Pr
     {
         $facts = $this->extract($project, $document);
         if (null === $facts) {
-            $this->sourceIndex($project)->removeSource($document->uri());
+            $this->sourceIndex($project)->removeSource($document->uri);
         } else {
             $this->sourceIndex($project)->replaceSource($facts);
         }
@@ -73,7 +73,7 @@ abstract class AbstractSourceIndexer implements SourceIndexProviderInterface, Pr
     final public function overlay(Project $project, Document $document): void
     {
         if ($this->supportsOverlay($project, $document)) {
-            $facts = $this->extract($project, new SourceDocument($document->uri(), $document->languageId(), $document->text()));
+            $facts = $this->extract($project, new SourceDocument($document->uri, $document->languageId, $document->text));
             if (null !== $facts) {
                 $this->sourceIndex($project)->overlay($facts);
 
@@ -81,7 +81,7 @@ abstract class AbstractSourceIndexer implements SourceIndexProviderInterface, Pr
             }
         }
 
-        $this->sourceIndex($project)->removeOverlay($document->uri());
+        $this->sourceIndex($project)->removeOverlay($document->uri);
     }
 
     final public function removeOverlay(Project $project, string $uri): void

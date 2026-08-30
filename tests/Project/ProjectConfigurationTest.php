@@ -54,7 +54,7 @@ final class ProjectConfigurationTest extends TestCase
             'translationDiagnostics' => true,
         ], $this->configuration->settings($project));
         self::assertSame('apps/admin', $this->configuration->projectId($project));
-        self::assertSame('apps/admin/config/services.yaml', $this->configuration->workspaceRelativePath($project, $project->rootPath().'/config/services.yaml'));
+        self::assertSame('apps/admin/config/services.yaml', $this->configuration->workspaceRelativePath($project, $project->rootPath.'/config/services.yaml'));
     }
 
     public function testRejectsProjectRootsThatResolveOutsideTheWorkspace(): void

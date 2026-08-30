@@ -123,9 +123,9 @@ final class DoctrineRelationshipProvider implements DefinitionProviderInterface,
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        foreach ($this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->symbols() as $symbol) {
-            if ($this->converter->containsByteOffset($request->document->text(), $symbol->range(), $offset, inclusiveEnd: true)) {
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols() as $symbol) {
+            if ($this->converter->containsByteOffset($request->document->text, $symbol->range(), $offset, inclusiveEnd: true)) {
                 return [$symbol, $request->project];
             }
         }

@@ -71,7 +71,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
 
     public function refreshProject(Project $project, ?Cancellation $cancellation = null): void
     {
-        $root = $project->rootPath();
+        $root = $project->rootPath;
         ($this->activeScans[$root] ?? null)?->cancel();
         $scan = $this->activeScans[$root] = new DeferredCancellation();
         $cancellation = null === $cancellation
@@ -94,7 +94,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
 
     public function removeProject(Project $project): void
     {
-        $root = $project->rootPath();
+        $root = $project->rootPath;
         ($this->activeScans[$root] ?? null)?->cancel();
         unset($this->activeScans[$root], $this->entries[$root]);
     }
@@ -103,13 +103,13 @@ final class ApplicationSourceScanner implements ProjectStateInterface
     {
         $relativePath = $this->files->relativePath($project, $path);
 
-        return null === $relativePath ? null : ($this->entries[$project->rootPath()][$relativePath]['hash'] ?? null);
+        return null === $relativePath ? null : ($this->entries[$project->rootPath][$relativePath]['hash'] ?? null);
     }
 
     private function refreshProjectUnlocked(Project $project, Cancellation $cancellation): void
     {
         $this->statuses->sourceIndexing($project);
-        $progress = $this->progress->begin('Symfony source index', $project->rootPath());
+        $progress = $this->progress->begin('Symfony source index', $project->rootPath);
         $progressMessage = 'Source index ready';
 
         try {
@@ -118,10 +118,10 @@ final class ApplicationSourceScanner implements ProjectStateInterface
             } catch (InvalidSourceIndexEntry) {
                 $entries = $this->scan($project, null, $cancellation);
             }
-            $this->entries[$project->rootPath()] = $entries;
+            $this->entries[$project->rootPath] = $entries;
             foreach ($this->documents->all() as $document) {
-                if ($this->projects->forDocumentUri($document->uri())?->rootPath() === $project->rootPath()) {
-                    $this->updateOpenDocument(['textDocument' => ['uri' => $document->uri()]]);
+                if ($this->projects->forDocumentUri($document->uri)?->rootPath === $project->rootPath) {
+                    $this->updateOpenDocument(['textDocument' => ['uri' => $document->uri]]);
                 }
             }
             $this->statuses->sourceReady($project);
@@ -156,10 +156,10 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         }
         if (!$this->files->belongsToProject($project, $path)
             || (!$includeExcluded && $this->files->isExcluded($project, $path))
-            || $this->files->gitignoreExcluded($project->rootPath(), $path)
+            || $this->files->gitignoreExcluded($project->rootPath, $path)
         ) {
             foreach ($this->providers as $provider) {
-                $provider->removeOverlay($project, $document->uri());
+                $provider->removeOverlay($project, $document->uri);
             }
 
             return;
@@ -216,7 +216,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
             return SourceFileChange::untracked();
         }
 
-        $lock = $this->mutex->acquire(self::LOCK_PREFIX.$project->rootPath());
+        $lock = $this->mutex->acquire(self::LOCK_PREFIX.$project->rootPath);
         try {
             return $this->refreshUriUnlocked($project, $uri, $path, $relativePath, $deleted);
         } finally {
@@ -227,14 +227,14 @@ final class ApplicationSourceScanner implements ProjectStateInterface
     private function refreshUriUnlocked(Project $project, string $uri, string $path, string $relativePath, bool $deleted): SourceFileChange
     {
         // the project can be removed from the workspace while waiting for the lock
-        if ($this->projects->forDocumentUri($uri)?->rootPath() !== $project->rootPath()) {
+        if ($this->projects->forDocumentUri($uri)?->rootPath !== $project->rootPath) {
             return SourceFileChange::untracked();
         }
 
-        $projectKey = $project->rootPath();
+        $projectKey = $project->rootPath;
         $indexed = \array_key_exists($projectKey, $this->entries);
         $entries = $indexed ? $this->entries[$projectKey] : $this->store->loadMetadata($project);
-        if ($this->files->isExcluded($project, $path) || $this->files->gitignoreExcluded($project->rootPath(), $path)) {
+        if ($this->files->isExcluded($project, $path) || $this->files->gitignoreExcluded($project->rootPath, $path)) {
             if (isset($entries[$relativePath])) {
                 foreach ($this->providers as $provider) {
                     $provider->remove($project, $uri);
@@ -448,7 +448,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
             $cancellation->throwIfRequested();
             $uri = $this->uri($project, $path);
             $owner = $this->projects->forDocumentUri($uri);
-            if (null !== $owner && $owner->rootPath() !== $project->rootPath()) {
+            if (null !== $owner && $owner->rootPath !== $project->rootPath) {
                 continue;
             }
             $relativePath = $this->files->relativePath($project, $path);
@@ -547,7 +547,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         }
         $encodedPath = implode('/', array_map('rawurlencode', explode('/', $relativePath)));
 
-        return rtrim($project->rootUri(), '/').'/'.$encodedPath;
+        return rtrim($project->rootUri, '/').'/'.$encodedPath;
     }
 }
 

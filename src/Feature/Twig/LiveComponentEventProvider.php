@@ -28,16 +28,16 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
     public function complete(array $params): ?array
     {
         $request = $this->resolver->resolvePositioned($params);
-        if (null === $request || 'php' !== $request->document->languageId() || !str_contains($request->document->text(), 'AsLiveComponent')) {
+        if (null === $request || 'php' !== $request->document->languageId || !str_contains($request->document->text, 'AsLiveComponent')) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $before = substr($this->phpComments->mask($request->document->text()), 0, $offset);
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $before = substr($this->phpComments->mask($request->document->text), 0, $offset);
         if (!preg_match('/(?:->|\b)emit\s*\(\s*([\'"])([^\'"]*)$/s', $before, $match)) {
             return null;
         }
         $prefix = $match[2];
-        $start = $this->converter->toPosition($request->document->text(), $offset - \strlen($prefix));
+        $start = $this->converter->toPosition($request->document->text, $offset - \strlen($prefix));
         $items = [];
         foreach ($this->indexes->forProject($request->project)->eventNames() as $event) {
             if (str_starts_with($event, $prefix)) {
@@ -109,9 +109,9 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        foreach ($this->extractor->extract($request->project, $request->document->uri(), $request->document->languageId(), $request->document->text())->events() as $event) {
-            if ($this->converter->containsByteOffset($request->document->text(), $event->range(), $offset, inclusiveEnd: true)) {
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        foreach ($this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text)->events() as $event) {
+            if ($this->converter->containsByteOffset($request->document->text, $event->range(), $offset, inclusiveEnd: true)) {
                 return [$event, $request->project];
             }
         }

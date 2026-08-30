@@ -56,14 +56,14 @@ final class ProjectConfiguration
     /** @return array<string, mixed> */
     public function settings(Project $project): array
     {
-        $workspace = $this->workspaceForPath($project->rootPath());
+        $workspace = $this->workspaceForPath($project->rootPath);
         if (null === $workspace) {
             return [];
         }
 
         return [
             ...$workspace['settings'],
-            ...($workspace['projects'][Path::canonicalize($project->rootPath())] ?? []),
+            ...($workspace['projects'][Path::canonicalize($project->rootPath)] ?? []),
         ];
     }
 
@@ -72,7 +72,7 @@ final class ProjectConfiguration
     {
         $discovered = [];
         foreach ($projects as $project) {
-            $discovered[Path::canonicalize($project->rootPath())] = true;
+            $discovered[Path::canonicalize($project->rootPath)] = true;
         }
         foreach ($this->workspaces as $workspace) {
             foreach ($workspace['projectRoots'] ?? [] as $projectRoot) {
@@ -90,17 +90,17 @@ final class ProjectConfiguration
 
     public function projectId(Project $project): string
     {
-        $workspace = $this->workspaceForPath($project->rootPath());
-        if (null === $workspace || $workspace['root'] === Path::canonicalize($project->rootPath())) {
+        $workspace = $this->workspaceForPath($project->rootPath);
+        if (null === $workspace || $workspace['root'] === Path::canonicalize($project->rootPath)) {
             return '.';
         }
 
-        return Path::makeRelative($project->rootPath(), $workspace['root']);
+        return Path::makeRelative($project->rootPath, $workspace['root']);
     }
 
     public function workspaceRelativePath(Project $project, string $path): string
     {
-        $workspace = $this->workspaceForPath($project->rootPath());
+        $workspace = $this->workspaceForPath($project->rootPath);
 
         return null === $workspace ? $path : Path::makeRelative($path, $workspace['root']);
     }

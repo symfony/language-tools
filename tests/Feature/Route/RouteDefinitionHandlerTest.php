@@ -103,7 +103,7 @@ final class RouteDefinitionHandlerTest extends TestCase
             ],
         ]], $handler->definition([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]));
     }
 }

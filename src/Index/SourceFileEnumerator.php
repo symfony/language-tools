@@ -41,7 +41,7 @@ final class SourceFileEnumerator
     /** @return \Generator<int, string> */
     public function files(Project $project, bool $includeExcluded = false): \Generator
     {
-        $directory = $project->rootPath();
+        $directory = $project->rootPath;
         if (!is_dir($directory)) {
             return;
         }
@@ -128,7 +128,7 @@ final class SourceFileEnumerator
 
     public function relativePath(Project $project, string $path): ?string
     {
-        $root = Path::canonicalize($project->rootPath());
+        $root = Path::canonicalize($project->rootPath);
         $path = Path::canonicalize($path);
         if (!Path::isBasePath($root, $path) || $root === $path) {
             return null;

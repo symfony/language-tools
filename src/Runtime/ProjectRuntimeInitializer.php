@@ -40,14 +40,14 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             $result = $this->processRunner->run([
                 ...$this->configuration->phpCommand($project),
                 $this->pathMapper->toContainer($project, $bridge),
-                '--project='.$this->pathMapper->toContainer($project, $project->rootPath()),
+                '--project='.$this->pathMapper->toContainer($project, $project->rootPath),
                 '--environment='.$this->configuration->environment($project),
                 '--debug=1',
                 '--sections='.implode(',', $sections),
                 '--configuration-generation='.$this->configurationValidation->generation($project),
                 ...($plan->preservesContainer() ? ['--targeted-refresh=1'] : []),
                 ...(RuntimeRefreshMode::Clear === $mode ? ['--rebuild-container=1'] : []),
-            ], $project->rootPath(), $cancellation, $this->configuration->bridgeTimeout($project));
+            ], $project->rootPath, $cancellation, $this->configuration->bridgeTimeout($project));
 
             $cancellation?->throwIfRequested();
             if (!$this->projects->contains($project)) {
@@ -55,8 +55,8 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                 throw new CancelledException();
             }
 
-            if (0 !== $result->exitCode()) {
-                throw new BridgeExecutionException(\sprintf('The project bridge failed with status %d.', $result->exitCode()));
+            if (0 !== $result->exitCode) {
+                throw new BridgeExecutionException(\sprintf('The project bridge failed with status %d.', $result->exitCode));
             }
 
             $snapshot = $this->decodeSnapshot($result);
@@ -143,7 +143,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
      */
     private function decodeSnapshot(ProcessResult $result): array
     {
-        foreach (array_reverse(preg_split('/\R/', $result->stdout()) ?: []) as $line) {
+        foreach (array_reverse(preg_split('/\R/', $result->stdout) ?: []) as $line) {
             $line = trim($line);
             if ('' === $line) {
                 continue;

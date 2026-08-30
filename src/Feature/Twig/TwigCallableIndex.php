@@ -69,12 +69,12 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
         $this->index();
 
         foreach ($this->declarationsByUri[$uri] ?? [] as $declaration) {
-            $start = $declaration->range()->start();
-            $end = $declaration->range()->end();
-            $atOrAfterStart = $position->line() > $start->line()
-                || ($position->line() === $start->line() && $position->character() >= $start->character());
-            $atOrBeforeEnd = $position->line() < $end->line()
-                || ($position->line() === $end->line() && $position->character() <= $end->character());
+            $start = $declaration->range()->start;
+            $end = $declaration->range()->end;
+            $atOrAfterStart = $position->line > $start->line
+                || ($position->line === $start->line && $position->character >= $start->character);
+            $atOrBeforeEnd = $position->line < $end->line
+                || ($position->line === $end->line && $position->character <= $end->character);
             if ($atOrAfterStart && $atOrBeforeEnd) {
                 return $declaration;
             }
@@ -120,7 +120,7 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
             $this->names[$kind] = array_keys($kindNames);
             sort($this->names[$kind]);
         }
-        $byLocation = static fn (TwigCallableDeclaration $left, TwigCallableDeclaration $right): int => [$left->uri(), $left->range()->start()->line(), $left->range()->start()->character()] <=> [$right->uri(), $right->range()->start()->line(), $right->range()->start()->character()];
+        $byLocation = static fn (TwigCallableDeclaration $left, TwigCallableDeclaration $right): int => [$left->uri(), $left->range()->start->line, $left->range()->start->character] <=> [$right->uri(), $right->range()->start->line, $right->range()->start->character];
         foreach ($this->declarations as &$kindDeclarations) {
             foreach ($kindDeclarations as &$declarations) {
                 usort($declarations, $byLocation);
@@ -138,7 +138,7 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
         unset($declarations);
         foreach ($this->usages as &$kindUsages) {
             foreach ($kindUsages as &$usages) {
-                usort($usages, static fn (TwigCallableUsage $left, TwigCallableUsage $right): int => [$left->uri(), $left->range()->start()->line(), $left->range()->start()->character()] <=> [$right->uri(), $right->range()->start()->line(), $right->range()->start()->character()]);
+                usort($usages, static fn (TwigCallableUsage $left, TwigCallableUsage $right): int => [$left->uri(), $left->range()->start->line, $left->range()->start->character] <=> [$right->uri(), $right->range()->start->line, $right->range()->start->character]);
             }
             unset($usages);
         }

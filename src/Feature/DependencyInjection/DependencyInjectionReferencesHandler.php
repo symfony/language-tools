@@ -24,9 +24,9 @@ final class DependencyInjectionReferencesHandler implements ReferencesProviderIn
         }
 
         $symbol = $this->symbolResolver->resolve(
-            $request->document->uri(),
-            $request->document->languageId(),
-            $request->document->text(),
+            $request->document->uri,
+            $request->document->languageId,
+            $request->document->text,
             $request->position,
         );
         if (null === $symbol) {

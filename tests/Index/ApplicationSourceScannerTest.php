@@ -965,14 +965,14 @@ final class ObjectFactsSourceIndexProvider implements SourceIndexProviderInterfa
     private function extract(Project $project, SourceDocument $document): RouteSourceFacts
     {
         foreach ($this->pathsWithFacts as $path) {
-            if ($document->uri() === $project->rootUri().'/'.$path) {
+            if ($document->uri === $project->rootUri.'/'.$path) {
                 $range = new Range(new Position(0, 0), new Position(0, 1));
 
-                return new RouteSourceFacts($document->uri(), [new RouteDeclaration($path, $document->uri(), $range)], []);
+                return new RouteSourceFacts($document->uri, [new RouteDeclaration($path, $document->uri, $range)], []);
             }
         }
 
-        return new RouteSourceFacts($document->uri(), [], []);
+        return new RouteSourceFacts($document->uri, [], []);
     }
 }
 
@@ -1087,7 +1087,7 @@ final class RecordingSourceIndexProvider implements SourceIndexProviderInterface
 
     public function replace(Project $project, SourceDocument $document): RouteSourceFacts
     {
-        $this->replacements[] = $document->uri();
+        $this->replacements[] = $document->uri;
 
         return $this->record($document);
     }
@@ -1109,7 +1109,7 @@ final class RecordingSourceIndexProvider implements SourceIndexProviderInterface
 
     public function overlay(Project $project, Document $document): void
     {
-        $this->overlays[] = $document->uri();
+        $this->overlays[] = $document->uri;
     }
 
     public function removeOverlay(Project $project, string $uri): void
@@ -1118,11 +1118,11 @@ final class RecordingSourceIndexProvider implements SourceIndexProviderInterface
 
     private function record(SourceDocument $document): RouteSourceFacts
     {
-        $hash = hash('sha256', $document->text());
-        $this->sources[$document->uri()] = $hash;
+        $hash = hash('sha256', $document->text);
+        $this->sources[$document->uri] = $hash;
         $range = new Range(new Position(0, 0), new Position(0, 0));
 
-        return new RouteSourceFacts($document->uri(), [new RouteDeclaration($hash, $document->uri(), $range)], []);
+        return new RouteSourceFacts($document->uri, [new RouteDeclaration($hash, $document->uri, $range)], []);
     }
 }
 
@@ -1146,15 +1146,15 @@ final class GenerationalSourceIndexProvider implements SourceIndexProviderInterf
 
     public function begin(Project $project): void
     {
-        $this->staged[$project->rootPath()] = [];
+        $this->staged[$project->rootPath] = [];
     }
 
     public function index(Project $project, SourceDocument $document): RouteSourceFacts
     {
-        $hash = hash('sha256', $document->text());
-        $this->staged[$project->rootPath()][$document->uri()] = $hash;
+        $hash = hash('sha256', $document->text);
+        $this->staged[$project->rootPath][$document->uri] = $hash;
 
-        return $this->facts($document->uri(), $hash);
+        return $this->facts($document->uri, $hash);
     }
 
     public function restore(Project $project, mixed $data): void
@@ -1162,22 +1162,22 @@ final class GenerationalSourceIndexProvider implements SourceIndexProviderInterf
         if (!$data instanceof RouteSourceFacts || 1 !== \count($data->declarations())) {
             throw new \UnexpectedValueException();
         }
-        $this->staged[$project->rootPath()][$data->uri()] = $data->declarations()[0]->name();
+        $this->staged[$project->rootPath][$data->uri()] = $data->declarations()[0]->name();
     }
 
     public function finish(Project $project): void
     {
-        $root = $project->rootPath();
+        $root = $project->rootPath;
         $this->committed[$root] = $this->staged[$root] ?? [];
         unset($this->staged[$root]);
     }
 
     public function replace(Project $project, SourceDocument $document): RouteSourceFacts
     {
-        $hash = hash('sha256', $document->text());
-        $this->committed[$project->rootPath()][$document->uri()] = $hash;
+        $hash = hash('sha256', $document->text);
+        $this->committed[$project->rootPath][$document->uri] = $hash;
 
-        return $this->facts($document->uri(), $hash);
+        return $this->facts($document->uri, $hash);
     }
 
     public function runtimeDeclarations(mixed $data): array
@@ -1191,7 +1191,7 @@ final class GenerationalSourceIndexProvider implements SourceIndexProviderInterf
 
     public function remove(Project $project, string $uri): void
     {
-        unset($this->committed[$project->rootPath()][$uri]);
+        unset($this->committed[$project->rootPath][$uri]);
     }
 
     public function overlay(Project $project, Document $document): void

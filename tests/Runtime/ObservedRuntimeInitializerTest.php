@@ -39,6 +39,6 @@ final class CapturingRuntimeRefreshObserver implements RuntimeRefreshObserverInt
 
     public function refreshed(Project $project): void
     {
-        $this->projects[] = $project->rootPath();
+        $this->projects[] = $project->rootPath;
     }
 }

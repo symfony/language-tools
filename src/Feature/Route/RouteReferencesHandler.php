@@ -25,11 +25,11 @@ final class RouteReferencesHandler implements ReferencesProviderInterface
     public function references(array $params): ?array
     {
         $request = $this->documentContextResolver->resolvePositioned($params);
-        if (null === $request || !\in_array($request->document->languageId(), ['php', 'twig', 'yaml'], true)) {
+        if (null === $request || !\in_array($request->document->languageId, ['php', 'twig', 'yaml'], true)) {
             return null;
         }
 
-        $symbol = $this->symbolResolver->resolve($request->project, $request->document->uri(), $request->document->text(), $request->position);
+        $symbol = $this->symbolResolver->resolve($request->project, $request->document->uri, $request->document->text, $request->position);
         if (null === $symbol) {
             return null;
         }

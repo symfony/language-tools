@@ -53,7 +53,7 @@ final class RouteCompletionHandlerTest extends TestCase
 
         self::assertSame(['slug'], array_column($handler->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]) ?? [], 'label'));
     }
 
@@ -86,7 +86,7 @@ final class RouteCompletionHandlerTest extends TestCase
 
         self::assertSame(['locale_en', 'locale_fr'], array_column($handler->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]) ?? [], 'label'));
     }
 
@@ -110,7 +110,7 @@ final class RouteCompletionHandlerTest extends TestCase
 
         self::assertSame(['article_show'], array_column($handler->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]) ?? [], 'label'));
     }
 
@@ -133,7 +133,7 @@ final class RouteCompletionHandlerTest extends TestCase
 
         self::assertSame(['slug'], array_column($handler->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]) ?? [], 'label'));
     }
 
@@ -182,7 +182,7 @@ final class RouteCompletionHandlerTest extends TestCase
 
         self::assertSame(['article_show'], array_column($handler->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]) ?? [], 'label'));
     }
 
@@ -227,7 +227,7 @@ final class RouteCompletionHandlerTest extends TestCase
             ],
         ]], $handler->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]));
     }
 
@@ -257,7 +257,7 @@ final class RouteCompletionHandlerTest extends TestCase
 
         self::assertNull($handler->complete([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ]));
     }
 

@@ -34,7 +34,7 @@ final class DocumentContextResolverTest extends TestCase
     public function testResolvesDocumentContextWithoutAPosition(): void
     {
         $context = $this->resolver->resolveDocument([
-            'textDocument' => ['uri' => $this->document->uri()],
+            'textDocument' => ['uri' => $this->document->uri],
         ]);
 
         self::assertInstanceOf(DocumentContext::class, $context);
@@ -45,15 +45,15 @@ final class DocumentContextResolverTest extends TestCase
     public function testResolvesPositionedDocumentContext(): void
     {
         $context = $this->resolver->resolvePositioned([
-            'textDocument' => ['uri' => $this->document->uri()],
+            'textDocument' => ['uri' => $this->document->uri],
             'position' => ['line' => 2, 'character' => 3],
         ]);
 
         self::assertInstanceOf(PositionedDocumentContext::class, $context);
         self::assertSame($this->document, $context->document);
         self::assertSame($this->project, $context->project);
-        self::assertSame(2, $context->position->line());
-        self::assertSame(3, $context->position->character());
+        self::assertSame(2, $context->position->line);
+        self::assertSame(3, $context->position->character);
     }
 
     /** @param array<array-key, mixed> $params */
@@ -78,7 +78,7 @@ final class DocumentContextResolverTest extends TestCase
     {
         $document = new Document('file:///outside/config/services.yaml', 'yaml', 1, 'services: {}');
         $this->documents->open($document);
-        $params = ['textDocument' => ['uri' => $document->uri()]];
+        $params = ['textDocument' => ['uri' => $document->uri]];
 
         self::assertNull($this->resolver->resolveDocument($params));
         self::assertNull($this->resolver->resolvePositioned($params + ['position' => ['line' => 0, 'character' => 0]]));
@@ -89,7 +89,7 @@ final class DocumentContextResolverTest extends TestCase
     public function testRejectsInvalidPositions(array $position): void
     {
         $params = [
-            'textDocument' => ['uri' => $this->document->uri()],
+            'textDocument' => ['uri' => $this->document->uri],
             'position' => $position,
         ];
 
@@ -110,7 +110,7 @@ final class DocumentContextResolverTest extends TestCase
 
     public function testRejectsAMissingPosition(): void
     {
-        $params = ['textDocument' => ['uri' => $this->document->uri()]];
+        $params = ['textDocument' => ['uri' => $this->document->uri]];
 
         self::assertInstanceOf(DocumentContext::class, $this->resolver->resolveDocument($params));
         self::assertNull($this->resolver->resolvePositioned($params));

@@ -21,12 +21,12 @@ final class MessengerCodeLensProvider implements CodeLensProviderInterface
     public function codeLenses(array $params): ?array
     {
         $request = $this->documents->resolveDocument($params);
-        if (null === $request || 'php' !== $request->document->languageId()) {
+        if (null === $request || 'php' !== $request->document->languageId) {
             return null;
         }
         $index = $this->indexes->forProject($request->project);
         $lenses = [];
-        foreach ($this->classExtractor->extract($request->document->uri(), $request->document->text()) as $class) {
+        foreach ($this->classExtractor->extract($request->document->uri, $request->document->text) as $class) {
             $message = $index->message($class->className());
             $messageHandlers = $this->relationships->handlersForMessage($request->project, $index, $class->className());
             if (null !== $message || [] !== $messageHandlers) {

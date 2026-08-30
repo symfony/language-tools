@@ -37,10 +37,10 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
     public function complete(array $params): ?array
     {
         $request = $this->documents->resolvePositioned($params);
-        if (null === $request || 'twig' !== $request->document->languageId()) {
+        if (null === $request || 'twig' !== $request->document->languageId) {
             return null;
         }
-        $text = $request->document->text();
+        $text = $request->document->text;
         $offset = $this->converter->toByteOffset($text, $request->position);
         $masked = $this->comments->mask($text);
         $before = substr($masked, 0, $offset);
@@ -124,19 +124,19 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
         }
 
         $request = $this->documents->resolvePositioned($params);
-        if (null === $request || 'php' !== $request->document->languageId()) {
+        if (null === $request || 'php' !== $request->document->languageId) {
             return null;
         }
         $index = $this->indexes->forProject($request->project);
-        $declaration = $index->declarationAt($request->document->uri(), $request->position);
+        $declaration = $index->declarationAt($request->document->uri, $request->position);
         if (null !== $declaration) {
             return $this->referenceLocations($request->project, [$declaration]);
         }
         if (!$index->hasCallableDeclarations()) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        foreach ($this->phpParser->parse($request->document->text())->methodDeclarations as $method) {
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        foreach ($this->phpParser->parse($request->document->text)->methodDeclarations as $method) {
             if ($offset < $method->nameStartOffset || $offset > $method->nameEndOffset) {
                 continue;
             }
@@ -165,7 +165,7 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
             array_push($usages, ...$index->usages($kind, $name));
         }
         if (1 < \count($pairs)) {
-            usort($usages, static fn (TwigCallableUsage $left, TwigCallableUsage $right): int => [$left->uri(), $left->range()->start()->line(), $left->range()->start()->character()] <=> [$right->uri(), $right->range()->start()->line(), $right->range()->start()->character()]);
+            usort($usages, static fn (TwigCallableUsage $left, TwigCallableUsage $right): int => [$left->uri(), $left->range()->start->line, $left->range()->start->character] <=> [$right->uri(), $right->range()->start->line, $right->range()->start->character]);
         }
 
         return array_map(
@@ -182,10 +182,10 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
     public function diagnostics(array $params): ?array
     {
         $request = $this->documents->resolveDocument($params);
-        if (null === $request || 'twig' !== $request->document->languageId()) {
+        if (null === $request || 'twig' !== $request->document->languageId) {
             return null;
         }
-        $text = $request->document->text();
+        $text = $request->document->text;
         $masked = $this->comments->mask($text);
         $syntax = $this->maskStringContents($masked);
         $diagnostics = [];
@@ -480,11 +480,11 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
     private function resolve(array $params): ?array
     {
         $request = $this->documents->resolvePositioned($params);
-        if (null === $request || 'twig' !== $request->document->languageId()) {
+        if (null === $request || 'twig' !== $request->document->languageId) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $reference = $this->references->at($request->document->text(), $offset);
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $reference = $this->references->at($request->document->text, $offset);
         if (null === $reference) {
             return null;
         }

@@ -51,7 +51,7 @@ final class TranslationRenameHandlerTest extends TestCase
 
         $result = $handler->rename([
             'textDocument' => ['uri' => $referenceUri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
             'newName' => 'article.heading',
         ]);
         self::assertIsArray($result);

@@ -83,10 +83,10 @@ final class TwigPhpSymbolExtractorTest extends TestCase
             ['App\Model\Status', null],
             ['App\Model\Status', 'Draft'],
         ], array_map(static fn ($reference): array => [$reference->className(), $reference->memberName()], $twigFacts->references()));
-        self::assertSame(15, $twigFacts->references()[0]->range()->start()->character());
+        self::assertSame(15, $twigFacts->references()[0]->range()->start->character);
         foreach ($twigFacts->references() as $reference) {
-            $start = $converter->toByteOffset($twig, $reference->range()->start());
-            $end = $converter->toByteOffset($twig, $reference->range()->end());
+            $start = $converter->toByteOffset($twig, $reference->range()->start);
+            $end = $converter->toByteOffset($twig, $reference->range()->end);
             self::assertNotSame('', substr($twig, $start, $end - $start));
         }
     }

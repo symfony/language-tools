@@ -35,23 +35,23 @@ final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterfac
         }
 
         $this->client->notify('textDocument/publishDiagnostics', [
-            'uri' => $document->uri(),
-            'version' => $document->version(),
+            'uri' => $document->uri,
+            'version' => $document->version,
             'diagnostics' => $diagnostics,
         ]);
     }
 
     public function removeProject(Project $project): void
     {
-        $rootUri = rtrim($project->rootUri(), '/').'/';
+        $rootUri = rtrim($project->rootUri, '/').'/';
         foreach ($this->documents->all() as $document) {
-            if (!str_starts_with($document->uri(), $rootUri)) {
+            if (!str_starts_with($document->uri, $rootUri)) {
                 continue;
             }
-            if (null === $this->projects->forDocumentUri($document->uri())) {
-                $this->clear(['textDocument' => ['uri' => $document->uri()]]);
+            if (null === $this->projects->forDocumentUri($document->uri)) {
+                $this->clear(['textDocument' => ['uri' => $document->uri]]);
             } else {
-                $this->publish(['textDocument' => ['uri' => $document->uri()]]);
+                $this->publish(['textDocument' => ['uri' => $document->uri]]);
             }
         }
     }
@@ -66,9 +66,9 @@ final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterfac
     public function refreshed(Project $project): void
     {
         foreach ($this->documents->all() as $document) {
-            $documentProject = $this->projects->forDocumentUri($document->uri());
-            if (null !== $documentProject && $documentProject->rootPath() === $project->rootPath()) {
-                $this->publish(['textDocument' => ['uri' => $document->uri()]]);
+            $documentProject = $this->projects->forDocumentUri($document->uri);
+            if (null !== $documentProject && $documentProject->rootPath === $project->rootPath) {
+                $this->publish(['textDocument' => ['uri' => $document->uri]]);
             }
         }
     }

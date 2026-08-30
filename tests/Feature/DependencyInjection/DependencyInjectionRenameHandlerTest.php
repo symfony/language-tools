@@ -62,7 +62,7 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
         $position = $converter->toPosition($yaml, strpos($yaml, 'app.mailer') + 1);
         $params = [
             'textDocument' => ['uri' => $yamlUri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
         ];
 
         self::assertSame('app.mailer', $handler->prepare($params)['placeholder'] ?? null);
@@ -124,7 +124,7 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
 
         $result = $handler->rename([
             'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line(), 'character' => $position->character()],
+            'position' => ['line' => $position->line, 'character' => $position->character],
             'newName' => 'app.data_dir',
         ]);
         self::assertIsArray($result);

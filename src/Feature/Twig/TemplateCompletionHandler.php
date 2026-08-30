@@ -27,12 +27,12 @@ final class TemplateCompletionHandler implements CompletionProviderInterface
         if (null === $request) {
             return null;
         }
-        $text = match ($request->document->languageId()) {
-            'twig' => $this->commentParser->mask($request->document->text()),
-            'php' => $this->phpComments->mask($request->document->text()),
-            default => $request->document->text(),
+        $text = match ($request->document->languageId) {
+            'twig' => $this->commentParser->mask($request->document->text),
+            'php' => $this->phpComments->mask($request->document->text),
+            default => $request->document->text,
         };
-        $context = TemplateCompletionContext::create($request->document->languageId(), $text, $request->position, $this->converter);
+        $context = TemplateCompletionContext::create($request->document->languageId, $text, $request->position, $this->converter);
         if (null === $context) {
             return null;
         }

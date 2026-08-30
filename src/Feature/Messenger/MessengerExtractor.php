@@ -107,7 +107,7 @@ final class MessengerExtractor
             $path = $occurrence->path();
             $parent = \array_slice($path, 0, -1);
             $key = [] === $path ? '' : $path[\count($path) - 1];
-            $keyOffset = $this->converter->toByteOffset($text, $occurrence->keyRange()->start());
+            $keyOffset = $this->converter->toByteOffset($text, $occurrence->keyRange()->start);
             $declarationKind = match (\array_slice($parent, -3)) {
                 ['framework', 'messenger', 'buses'] => MessengerSymbolKind::Bus,
                 ['framework', 'messenger', 'transports'] => MessengerSymbolKind::Transport,
@@ -120,7 +120,7 @@ final class MessengerExtractor
                 continue;
             }
             $symbols[] = $this->symbol(MessengerSymbolKind::Message, ltrim($key, '\\'), $uri, $text, $keyOffset, false, \strlen($key));
-            $valueOffset = $this->converter->toByteOffset($text, $occurrence->valueRange()->start());
+            $valueOffset = $this->converter->toByteOffset($text, $occurrence->valueRange()->start);
             preg_match_all('/[A-Za-z_][A-Za-z0-9_.-]*/', $occurrence->value(), $names, \PREG_OFFSET_CAPTURE);
             foreach ($names[0] as [$name, $relativeOffset]) {
                 $symbols[] = $this->symbol(MessengerSymbolKind::Transport, $name, $uri, $text, $valueOffset + $relativeOffset, false);
@@ -230,7 +230,7 @@ final class MessengerExtractor
     {
         $unique = [];
         foreach ($symbols as $symbol) {
-            $key = $symbol->kind()->name.'|'.$symbol->range()->start()->line().'|'.$symbol->range()->start()->character();
+            $key = $symbol->kind()->name.'|'.$symbol->range()->start->line.'|'.$symbol->range()->start->character;
             $unique[$key] = $symbol;
         }
 

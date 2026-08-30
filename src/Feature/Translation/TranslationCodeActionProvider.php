@@ -31,11 +31,11 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
     {
         $request = $this->documentContextResolver->resolveDocument($params);
         $context = $params['context'] ?? null;
-        if (null === $request || !\is_array($context) || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri())) {
+        if (null === $request || !\is_array($context) || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)) {
             return null;
         }
 
-        $references = $this->extractor->extract($request->document->uri(), $request->document->languageId(), $request->document->text())->references();
+        $references = $this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->references();
         $actions = [];
         foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
             if (!\is_array($diagnostic) || 'translation.not_found' !== ($diagnostic['code'] ?? null)) {
@@ -51,7 +51,7 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
                 ) {
                     continue;
                 }
-                $targetPath = $this->target($request->project->rootPath(), $reference->domain());
+                $targetPath = $this->target($request->project->rootPath, $reference->domain());
                 if (null === $targetPath) {
                     continue;
                 }

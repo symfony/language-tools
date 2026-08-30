@@ -33,8 +33,8 @@ final class DocumentSynchronizerTest extends TestCase
             ]],
         ]);
 
-        self::assertSame(2, $store->get($uri)?->version());
-        self::assertSame('arouteb', $store->get($uri)->text());
+        self::assertSame(2, $store->get($uri)?->version);
+        self::assertSame('arouteb', $store->get($uri)->text);
 
         $synchronizer->close(['textDocument' => ['uri' => $uri]]);
 
@@ -61,8 +61,8 @@ final class DocumentSynchronizerTest extends TestCase
             ],
         ]);
 
-        self::assertSame(1, $store->get($uri)?->version());
-        self::assertSame('original', $store->get($uri)->text());
+        self::assertSame(1, $store->get($uri)?->version);
+        self::assertSame('original', $store->get($uri)->text);
     }
 
     public function testTreatsAnExplicitNullRangeAsAFullDocumentChange(): void
@@ -82,8 +82,8 @@ final class DocumentSynchronizerTest extends TestCase
             'contentChanges' => [['range' => null, 'text' => 'replacement']],
         ]);
 
-        self::assertSame(2, $store->get($uri)?->version());
-        self::assertSame('replacement', $store->get($uri)->text());
+        self::assertSame(2, $store->get($uri)?->version);
+        self::assertSame('replacement', $store->get($uri)->text);
     }
 
     public function testNormalizesTwigFilesReportedAsHtml(): void
@@ -99,7 +99,7 @@ final class DocumentSynchronizerTest extends TestCase
             'text' => "{{ path('home') }}",
         ]]);
 
-        self::assertSame('twig', $store->get($uri)?->languageId());
+        self::assertSame('twig', $store->get($uri)?->languageId);
     }
 
     public function testAppliesFullDocumentChanges(): void
@@ -119,7 +119,7 @@ final class DocumentSynchronizerTest extends TestCase
             'contentChanges' => [['text' => 'new']],
         ]);
 
-        self::assertSame('new', $store->get($uri)?->text());
+        self::assertSame('new', $store->get($uri)?->text);
     }
 
     private function synchronizer(DocumentStore $store): DocumentSynchronizer

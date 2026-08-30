@@ -74,20 +74,20 @@ final class StimulusResolver
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $facts = $this->extractor->extract($request->project, $request->document->uri(), $request->document->languageId(), $request->document->text());
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $facts = $this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text);
         foreach ($facts->references() as $reference) {
-            if ($this->converter->containsByteOffset($request->document->text(), $reference->range(), $offset, inclusiveEnd: true)) {
+            if ($this->converter->containsByteOffset($request->document->text, $reference->range(), $offset, inclusiveEnd: true)) {
                 return [$reference, $request->project];
             }
         }
         foreach ($facts->declarations() as $declaration) {
             foreach ($declaration->members() as $member) {
-                if ($this->converter->containsByteOffset($request->document->text(), $member->range(), $offset, inclusiveEnd: true)) {
+                if ($this->converter->containsByteOffset($request->document->text, $member->range(), $offset, inclusiveEnd: true)) {
                     return [new StimulusReference($declaration->name(), $member->kind(), $member->name(), $declaration->uri(), $member->range()), $request->project];
                 }
             }
-            if ($this->converter->containsByteOffset($request->document->text(), $declaration->range(), $offset, inclusiveEnd: true)) {
+            if ($this->converter->containsByteOffset($request->document->text, $declaration->range(), $offset, inclusiveEnd: true)) {
                 return [new StimulusReference($declaration->name(), null, null, $declaration->uri(), $declaration->range()), $request->project];
             }
         }

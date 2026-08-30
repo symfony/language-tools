@@ -34,7 +34,7 @@ final class ConfigurationPathResolver
     /** @return array{list<string>, ConfigurationNode}|null */
     public function resolvePhpNode(Document $document, ConfigurationIndex $index, int $cursor): ?array
     {
-        $text = $this->phpComments->mask($document->text());
+        $text = $this->phpComments->mask($document->text);
         preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)((?:->[A-Za-z_][A-Za-z0-9_]*\([^)]*\))+)/', $text, $chains, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($chains as $chain) {
             $path = [$this->phpRoot(substr($text, 0, $chain[1][1]), $chain[1][0])];
@@ -57,7 +57,7 @@ final class ConfigurationPathResolver
     public function resolveXmlNode(Document $document, ConfigurationIndex $index, int $cursor): ?array
     {
         $stack = [];
-        $text = $this->xmlComments->mask($document->text());
+        $text = $this->xmlComments->mask($document->text);
         preg_match_all('/<\s*(\/)?\s*([A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?)([^>]*)>/', $text, $tags, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($tags as $tag) {
             if ('' !== $tag[1][0]) {

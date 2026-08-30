@@ -26,15 +26,15 @@ final class EventCompletionProvider implements CompletionProviderInterface
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        $prefix = $this->extractor->completionPrefix($request->document->languageId(), $request->document->text(), $offset);
+        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $prefix = $this->extractor->completionPrefix($request->document->languageId, $request->document->text, $offset);
         if (null === $prefix) {
             return null;
         }
         $items = [];
         foreach ($this->indexes->forProject($request->project)->events() as $event) {
             if (str_starts_with($event->name(), $prefix)) {
-                $items[] = $this->completion($event->name(), $request->document->text(), $offset - \strlen($prefix), $request->position);
+                $items[] = $this->completion($event->name(), $request->document->text, $offset - \strlen($prefix), $request->position);
             }
         }
 

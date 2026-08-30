@@ -102,7 +102,7 @@ final class RuntimeSnapshotStore
         $payload = [
             'schemaVersion' => self::SNAPSHOT_SCHEMA_VERSION,
             'project' => [
-                'root' => $project->rootPath(),
+                'root' => $project->rootPath,
                 'environment' => $this->configuration->environment($project),
                 'debug' => $this->configuration->debug($project),
             ],
@@ -141,7 +141,7 @@ final class RuntimeSnapshotStore
 
         $metadata = $payload['project'];
         if (3 !== \count($metadata)
-            || $project->rootPath() !== ($metadata['root'] ?? null)
+            || $project->rootPath !== ($metadata['root'] ?? null)
             || $this->configuration->environment($project) !== ($metadata['environment'] ?? null)
             || $this->configuration->debug($project) !== ($metadata['debug'] ?? null)
         ) {
@@ -180,7 +180,7 @@ final class RuntimeSnapshotStore
     private function path(Project $project, string $bridge): string
     {
         $configuration = serialize([
-            'projectRoot' => $project->rootPath(),
+            'projectRoot' => $project->rootPath,
             'phpCommand' => $this->configuration->phpCommand($project),
             'containerProjectRoot' => $this->configuration->containerProjectRoot($project),
             'environment' => $this->configuration->environment($project),

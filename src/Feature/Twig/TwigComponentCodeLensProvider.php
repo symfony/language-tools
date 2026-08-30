@@ -19,11 +19,11 @@ final class TwigComponentCodeLensProvider implements CodeLensProviderInterface
     public function codeLenses(array $params): ?array
     {
         $request = $this->documents->resolveDocument($params);
-        if (null === $request || 'php' !== $request->document->languageId()) {
+        if (null === $request || 'php' !== $request->document->languageId) {
             return null;
         }
         $lenses = [];
-        foreach ($this->extractor->extract($request->project, $request->document->uri(), 'php', $request->document->text())->components() as $component) {
+        foreach ($this->extractor->extract($request->project, $request->document->uri, 'php', $request->document->text)->components() as $component) {
             $locations = [];
             foreach ($this->indexes->forProject($request->project)->references($component->name()) as $reference) {
                 $locations[] = $this->protocol->location($reference->uri(), $reference->range());

@@ -91,10 +91,10 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     {
         $this->index();
         foreach ($this->declarationsByUri[$uri] ?? [] as $declaration) {
-            $start = $declaration->range()->start();
-            $end = $declaration->range()->end();
-            if (($position->line() > $start->line() || ($position->line() === $start->line() && $position->character() >= $start->character()))
-                && ($position->line() < $end->line() || ($position->line() === $end->line() && $position->character() <= $end->character()))) {
+            $start = $declaration->range()->start;
+            $end = $declaration->range()->end;
+            if (($position->line > $start->line || ($position->line === $start->line && $position->character >= $start->character))
+                && ($position->line < $end->line || ($position->line === $end->line && $position->character <= $end->character))) {
                 return $declaration;
             }
         }
@@ -149,7 +149,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
         sort($this->enumNames);
         $this->constantTypeNames = array_keys($constantTypeNames);
         sort($this->constantTypeNames);
-        $byDeclarationLocation = static fn (TwigPhpSymbolDeclaration $left, TwigPhpSymbolDeclaration $right): int => [$left->uri(), $left->range()->start()->line(), $left->range()->start()->character()] <=> [$right->uri(), $right->range()->start()->line(), $right->range()->start()->character()];
+        $byDeclarationLocation = static fn (TwigPhpSymbolDeclaration $left, TwigPhpSymbolDeclaration $right): int => [$left->uri(), $left->range()->start->line, $left->range()->start->character] <=> [$right->uri(), $right->range()->start->line, $right->range()->start->character];
         foreach ($this->types as &$declarations) {
             usort($declarations, $byDeclarationLocation);
         }
@@ -166,7 +166,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
         }
         unset($declarations);
         foreach ($this->references as &$references) {
-            usort($references, static fn (TwigPhpSymbolReference $left, TwigPhpSymbolReference $right): int => [$left->uri(), $left->range()->start()->line(), $left->range()->start()->character()] <=> [$right->uri(), $right->range()->start()->line(), $right->range()->start()->character()]);
+            usort($references, static fn (TwigPhpSymbolReference $left, TwigPhpSymbolReference $right): int => [$left->uri(), $left->range()->start->line, $left->range()->start->character] <=> [$right->uri(), $right->range()->start->line, $right->range()->start->character]);
         }
         unset($references);
         $this->indexed = true;

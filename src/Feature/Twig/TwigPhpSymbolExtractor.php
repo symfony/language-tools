@@ -208,7 +208,7 @@ final class TwigPhpSymbolExtractor
                 $references[] = $this->reference($className, $memberName, $uri, $text, $call->endByte + $member[1][1], \strlen($memberName));
             }
         }
-        usort($references, static fn (TwigPhpSymbolReference $left, TwigPhpSymbolReference $right): int => [$left->range()->start()->line(), $left->range()->start()->character()] <=> [$right->range()->start()->line(), $right->range()->start()->character()]);
+        usort($references, static fn (TwigPhpSymbolReference $left, TwigPhpSymbolReference $right): int => [$left->range()->start->line, $left->range()->start->character] <=> [$right->range()->start->line, $right->range()->start->character]);
 
         return $references;
     }

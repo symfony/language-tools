@@ -66,7 +66,7 @@ final class WorkspaceConfigurationTest extends TestCase
         ]);
 
         self::assertCount(1, $registry->all());
-        self::assertSame('^8.0', $registry->all()[0]->frameworkBundleConstraint());
+        self::assertSame('^8.0', $registry->all()[0]->frameworkBundleConstraint);
         self::assertSame(['symfony', 'php'], $runtimeConfiguration->phpCommand());
         self::assertSame('test', $runtimeConfiguration->environment());
         self::assertFalse($runtimeConfiguration->debug());
@@ -128,7 +128,7 @@ final class WorkspaceConfigurationTest extends TestCase
         ]]);
 
         self::assertCount(1, $registry->all());
-        self::assertSame($this->temporaryDirectory.'/nested', $registry->all()[0]->rootPath());
+        self::assertSame($this->temporaryDirectory.'/nested', $registry->all()[0]->rootPath);
         self::assertSame([$this->temporaryDirectory], $state->removed);
         unlink($this->temporaryDirectory.'/nested/composer.json');
         rmdir($this->temporaryDirectory.'/nested');
@@ -198,6 +198,6 @@ final class RecordingProjectState implements ProjectStateInterface
 
     public function removeProject(Project $project): void
     {
-        $this->removed[] = $project->rootPath();
+        $this->removed[] = $project->rootPath;
     }
 }
