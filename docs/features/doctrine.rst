@@ -34,7 +34,8 @@ entity:
 
 Field completion is also available for the ``choice_label``, ``choice_value``
 and ``group_by`` options of Symfony's Doctrine ``EntityType`` when the
-``class`` option is a static ``::class`` reference.
+``class`` option is a static ``::class`` reference. The entity passed to
+``getRepository()`` and the ``EntityType`` type and options must be positional.
 
 Hover identifies regular fields and associations, including their PHP type and
 target entity when known. Go to Definition opens the mapped property. Find All

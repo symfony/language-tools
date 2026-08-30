@@ -9,8 +9,9 @@ Forms
 
 Form option completion and hover are available in literal option arrays passed
 to ``createForm()``, ``createNamed()``, and form builder ``add()`` calls when
-the form type is a static ``::class`` reference. Required options are identified
-in completion and hover details.
+the form type is a static ``::class`` reference. The form type and options must
+be passed positionally. Required options are identified in completion and hover
+details.
 
 After runtime indexing, definitely unknown literal options are diagnosed for
 known form types. Dynamic option arrays and unresolved form types are ignored.

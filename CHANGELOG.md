@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ignore unrelated named arguments in positional Doctrine and Metadata call slots
 - Ignore unrelated named arguments when indexing Event and Messenger dispatch calls
 - Rebuild persistent source index caches once after an internal format change
 - Refresh runtime metadata once after watched Composer files change
