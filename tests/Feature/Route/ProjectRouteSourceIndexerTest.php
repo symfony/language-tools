@@ -13,7 +13,9 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegist
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
 use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
@@ -132,7 +134,11 @@ final class ProjectRouteSourceIndexerTest extends TestCase
                 ),
                 new DependencyInjectionSourceIndexer(
                     $classIndexes,
-                    new YamlDependencyInjectionExtractor($positionConverter),
+                    new YamlDependencyInjectionExtractor(
+                        new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+                        new YamlDependencyInjectionDeclarationExtractor($positionConverter),
+                        new YamlDependencyInjectionReferenceExtractor($positionConverter),
+                    ),
                     new XmlDependencyInjectionExtractor($positionConverter),
                     new PhpAutowireReferenceExtractor($positionConverter, $parser),
                     new PhpClassDeclarationExtractor($positionConverter, $parser),

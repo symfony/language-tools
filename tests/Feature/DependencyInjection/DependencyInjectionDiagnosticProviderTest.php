@@ -12,8 +12,13 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDiagnosticProvide
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -47,7 +52,11 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
         $parameterIndexes = new ParameterIndexRegistry();
         $parameterIndexes->forProject($project)->replace(true);
         $converter = new PositionConverter();
-        $yamlExtractor = new YamlDependencyInjectionExtractor($converter);
+        $yamlExtractor = new YamlDependencyInjectionExtractor(
+            new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+            new YamlDependencyInjectionDeclarationExtractor($converter),
+            new YamlDependencyInjectionReferenceExtractor($converter),
+        );
         $provider = new DependencyInjectionDiagnosticProvider(
             new DocumentContextResolver($documents, $projects),
             new LspProtocolMapper(),

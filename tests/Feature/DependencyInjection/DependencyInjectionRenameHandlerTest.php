@@ -15,8 +15,13 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolResolver;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -40,7 +45,11 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $yamlExtractor = new YamlDependencyInjectionExtractor($converter);
+        $yamlExtractor = new YamlDependencyInjectionExtractor(
+            new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+            new YamlDependencyInjectionDeclarationExtractor($converter),
+            new YamlDependencyInjectionReferenceExtractor($converter),
+        );
         $autowireExtractor = new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser()));
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace(
@@ -107,7 +116,11 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $yamlExtractor = new YamlDependencyInjectionExtractor($converter);
+        $yamlExtractor = new YamlDependencyInjectionExtractor(
+            new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+            new YamlDependencyInjectionDeclarationExtractor($converter),
+            new YamlDependencyInjectionReferenceExtractor($converter),
+        );
         $autowireExtractor = new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser()));
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($yamlExtractor->extract($uri, $text));

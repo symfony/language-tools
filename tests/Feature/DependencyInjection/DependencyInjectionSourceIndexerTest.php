@@ -13,13 +13,18 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegist
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
@@ -75,7 +80,11 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
             new ServerLogger(null, new SensitiveDataRedactor()),
             [new DependencyInjectionSourceIndexer(
                 $indexes,
-                new YamlDependencyInjectionExtractor($converter),
+                new YamlDependencyInjectionExtractor(
+                    new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+                    new YamlDependencyInjectionDeclarationExtractor($converter),
+                    new YamlDependencyInjectionReferenceExtractor($converter),
+                ),
                 new XmlDependencyInjectionExtractor($converter),
                 new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser())),
                 new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser())),
