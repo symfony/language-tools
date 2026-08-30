@@ -4,11 +4,27 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
+use Symfony\Lsp\Parser\Yaml\YamlMapping;
 
 final class YamlRouteDeclarationExtractor
 {
+    private const ROUTE_KEYS = [
+        'path' => true,
+        'controller' => true,
+        'methods' => true,
+        'host' => true,
+        'schemes' => true,
+        'condition' => true,
+        'defaults' => true,
+        'requirements' => true,
+        'options' => true,
+        'alias' => true,
+    ];
+
     public function __construct(
         private readonly PositionConverter $positionConverter,
+        private readonly YamlDocumentParser $parser,
     ) {
     }
 
@@ -17,43 +33,73 @@ final class YamlRouteDeclarationExtractor
      */
     public function extract(string $uri, string $text): array
     {
-        preg_match_all(
-            '/^(?<quote>[\'\"]?)(?<name>[^\s\'\"#][^:\r\n]*?)\k<quote>\s*:\s*(?:#.*)?$/m',
-            $text,
-            $entries,
-            \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE,
-        );
-        $declarations = [];
-
-        foreach ($entries as $entry) {
-            $entryOffset = $entry[0][1];
-            if (!$this->isRouteBlock($text, $entryOffset + \strlen($entry[0][0]))) {
+        $mappings = $this->parser->parse($text);
+        $routeGroups = [];
+        foreach ($mappings as $mapping) {
+            if ('base' !== $mapping->scope || \count($mapping->path) < 2 || !$this->hasRouteKey($mapping)) {
                 continue;
             }
 
-            $name = rtrim($entry['name'][0]);
-            $offset = $entry['name'][1];
-            $declarations[] = new RouteDeclaration(
-                $name,
-                $uri,
-                new Range(
-                    $this->positionConverter->toPosition($text, $offset),
-                    $this->positionConverter->toPosition($text, $offset + \strlen($name)),
-                ),
-            );
+            $routeGroups[$mapping->path[0]] = true;
         }
 
-        return $declarations;
+        $declarations = [];
+        $environmentOffsets = [];
+        foreach ($mappings as $mapping) {
+            if ('base' === $mapping->scope) {
+                if (1 !== \count($mapping->path) || \in_array(0, $mapping->sequenceDepths, true) || !isset($routeGroups[$mapping->path[0]])) {
+                    continue;
+                }
+
+                $declarations[$mapping->keyStartByte] = $this->declaration(
+                    $mapping->path[0],
+                    $uri,
+                    $text,
+                    $mapping->keyStartByte,
+                    $mapping->keyEndByte,
+                );
+                continue;
+            }
+
+            if (!$this->hasRouteKey($mapping)) {
+                continue;
+            }
+            $offset = strrpos(substr($text, 0, $mapping->keyStartByte), $mapping->scope);
+            if (false === $offset || isset($environmentOffsets[$offset])) {
+                continue;
+            }
+            $environmentOffsets[$offset] = true;
+            $declarations[$offset] = $this->declaration(
+                $mapping->scope,
+                $uri,
+                $text,
+                $offset,
+                $offset + \strlen($mapping->scope),
+            );
+        }
+        ksort($declarations);
+
+        return array_values($declarations);
     }
 
-    private function isRouteBlock(string $text, int $blockOffset): bool
+    private function hasRouteKey(YamlMapping $mapping): bool
     {
-        $remaining = substr($text, $blockOffset);
-        $nextEntry = preg_match('/^\S[^:\r\n]*\s*:/m', $remaining, $match, \PREG_OFFSET_CAPTURE)
-            ? $match[0][1]
-            : \strlen($remaining);
-        $block = substr($remaining, 0, $nextEntry);
+        if ([] === $mapping->path) {
+            return false;
+        }
 
-        return (bool) preg_match('/^\s+(?:path|controller|methods|host|schemes|condition|defaults|requirements|options|alias)\s*:/m', $block);
+        return isset(self::ROUTE_KEYS[$mapping->path[\count($mapping->path) - 1]]);
+    }
+
+    private function declaration(string $name, string $uri, string $text, int $startByte, int $endByte): RouteDeclaration
+    {
+        return new RouteDeclaration(
+            $name,
+            $uri,
+            new Range(
+                $this->positionConverter->toPosition($text, $startByte),
+                $this->positionConverter->toPosition($text, $endByte),
+            ),
+        );
     }
 }

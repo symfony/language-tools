@@ -6,6 +6,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 
 final class YamlRouteDeclarationExtractorTest extends TestCase
 {
@@ -110,7 +113,10 @@ final class YamlRouteDeclarationExtractorTest extends TestCase
     /** @return list<RouteDeclaration> */
     private function extract(string $text): array
     {
-        return (new YamlRouteDeclarationExtractor(new PositionConverter()))->extract(
+        return (new YamlRouteDeclarationExtractor(
+            new PositionConverter(),
+            new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+        ))->extract(
             'file:///workspace/config/routes.yaml',
             $text,
         );

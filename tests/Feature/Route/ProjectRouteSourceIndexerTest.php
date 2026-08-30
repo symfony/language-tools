@@ -33,6 +33,7 @@ use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
@@ -124,7 +125,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
                     new RouteDeclarationIndexRegistry(),
                     $referenceIndexes,
                     new PhpRouteDeclarationExtractor($positionConverter, $parser),
-                    new YamlRouteDeclarationExtractor($positionConverter),
+                    new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
                     new RouteReferenceExtractor($positionConverter, $parser, new QuotedArgumentMatcher($positionConverter), new PhpCommentParser()),
                     new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
                     new ProjectPathResolver(new UriToPathConverter()),
@@ -183,7 +184,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             $indexes,
             $referenceIndexes,
             new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
-            new YamlRouteDeclarationExtractor($positionConverter),
+            new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
             new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($positionConverter), new PhpCommentParser()),
             new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
             new ProjectPathResolver(new UriToPathConverter()),
