@@ -26,7 +26,7 @@ final class YamlDocumentParserTest extends TestCase
 
         self::assertContains(
             ['services', 'App\Handler\ReportHandler', 'arguments'],
-            array_map(static fn (YamlMapping $mapping): array => $mapping->path(), $mappings),
+            array_map(static fn (YamlMapping $mapping): array => $mapping->path, $mappings),
         );
     }
 
@@ -61,7 +61,7 @@ final class YamlDocumentParserTest extends TestCase
                 [['framework', 'router'], 'when@test'],
                 [['framework', 'router', 'utf8'], 'when@test'],
             ],
-            array_map(static fn (YamlMapping $mapping): array => [$mapping->path(), $mapping->scope()], $mappings),
+            array_map(static fn (YamlMapping $mapping): array => [$mapping->path, $mapping->scope], $mappings),
         );
     }
 }

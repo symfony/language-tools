@@ -16,7 +16,7 @@ final class RoutePhpReceiver
         if (preg_match('/\$this\s*$/', $source)) {
             foreach ($types as $type) {
                 if ($type->contains($offset)) {
-                    return new self($type->name());
+                    return new self($type->name);
                 }
             }
 

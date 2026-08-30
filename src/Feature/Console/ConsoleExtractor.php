@@ -41,28 +41,28 @@ final class ConsoleExtractor
         $masked = $this->phpComments->mask($text);
         $php = $this->parser->parse($text);
         $declarations = [];
-        foreach ($php->typeDeclarations() as $type) {
-            if (!\in_array($type->kind(), [PhpTypeKind::Class_, PhpTypeKind::Trait_], true)) {
+        foreach ($php->typeDeclarations as $type) {
+            if (!\in_array($type->kind, [PhpTypeKind::Class_, PhpTypeKind::Trait_], true)) {
                 continue;
             }
             $declarations[] = $this->declaration($masked, $php, $type);
         }
 
         $references = [];
-        foreach ($php->methodCalls() as $call) {
-            if (!\in_array($call->method(), ['getArgument', 'getOption'], true) || !$this->hasInputReceiver($call, $php)) {
+        foreach ($php->methodCalls as $call) {
+            if (!\in_array($call->method, ['getArgument', 'getOption'], true) || !$this->hasInputReceiver($call, $php)) {
                 continue;
             }
-            $name = $call->argument(0)?->stringLiteral();
-            $className = $call->className();
+            $name = $call->argument(0)?->stringLiteral;
+            $className = $call->className;
             if (null === $name || null === $className) {
                 continue;
             }
             $references[] = new ConsoleInputReference(
-                'getArgument' === $call->method() ? ConsoleInputKind::Argument : ConsoleInputKind::Option,
-                $name->value(),
+                'getArgument' === $call->method ? ConsoleInputKind::Argument : ConsoleInputKind::Option,
+                $name->value,
                 $uri,
-                new Range($this->converter->toPosition($text, $name->startOffset()), $this->converter->toPosition($text, $name->endOffset())),
+                new Range($this->converter->toPosition($text, $name->startOffset), $this->converter->toPosition($text, $name->endOffset)),
                 $className,
             );
         }
@@ -86,7 +86,7 @@ final class ConsoleExtractor
         $property = \is_string($match[2][0] ?? null);
         $receiver = $property ? $match[2][0] : ($match[1][0] ?? null);
         $method = null === $type ? null : $this->containingMethod($php, $type, $methodOffset);
-        if (null === $type || !\is_string($receiver) || null === $method || !$this->hasInputVariable($php, $type->name(), $method, $receiver, $property)) {
+        if (null === $type || !\is_string($receiver) || null === $method || !$this->hasInputVariable($php, $type->name, $method, $receiver, $property)) {
             return null;
         }
         $rawPrefix = $match['prefix'][0];
@@ -104,7 +104,7 @@ final class ConsoleExtractor
             'getArgument' === $match[3][0] ? ConsoleInputKind::Argument : ConsoleInputKind::Option,
             $prefix,
             new Range($this->converter->toPosition($text, $prefixOffset), $this->converter->toPosition($text, $offset)),
-            $type->name(),
+            $type->name,
         );
     }
 
@@ -114,28 +114,28 @@ final class ConsoleExtractor
         $options = [];
         $complete = true;
         $configureRanges = $this->methodBodyRanges($text, $type, 'configure');
-        foreach ($php->methodCalls() as $call) {
-            $receiver = substr($text, $call->receiverContext()->startOffset(), $call->receiverContext()->endOffset() - $call->receiverContext()->startOffset());
-            if ($type->name() !== $call->className() || 'configure' !== $call->enclosingMethod() || !$this->isDefinitionReceiver($receiver)) {
+        foreach ($php->methodCalls as $call) {
+            $receiver = substr($text, $call->receiverContext->startOffset, $call->receiverContext->endOffset - $call->receiverContext->startOffset);
+            if ($type->name !== $call->className || 'configure' !== $call->enclosingMethod || !$this->isDefinitionReceiver($receiver)) {
                 continue;
             }
-            if ('addArgument' === $call->method() || 'addOption' === $call->method()) {
-                $name = $call->argument(0)?->stringLiteral()?->value();
+            if ('addArgument' === $call->method || 'addOption' === $call->method) {
+                $name = $call->argument(0)?->stringLiteral?->value;
                 if (null === $name) {
                     $complete = false;
                     continue;
                 }
-                if ('addArgument' === $call->method()) {
+                if ('addArgument' === $call->method) {
                     $arguments[] = $name;
                 } else {
                     $options[] = $name;
                 }
                 continue;
             }
-            if ('setDefinition' !== $call->method()) {
+            if ('setDefinition' !== $call->method) {
                 continue;
             }
-            $expression = $call->argument(0)?->expression();
+            $expression = $call->argument(0)?->expression;
             if (null === $expression) {
                 $complete = false;
                 continue;
@@ -152,7 +152,7 @@ final class ConsoleExtractor
         }
 
         $command = $this->hasTypeAttribute($php, $type, self::AS_COMMAND_ATTRIBUTE)
-            || 0 === strcasecmp(self::COMMAND, (string) $type->parentClassName());
+            || 0 === strcasecmp(self::COMMAND, (string) $type->parentClassName);
         [$attributeArguments, $attributeOptions, $attributesComplete] = $this->invokableAttributes($text, $php, $type);
         $arguments = [...$arguments, ...$attributeArguments];
         $options = [...$options, ...$attributeOptions];
@@ -164,8 +164,8 @@ final class ConsoleExtractor
         sort($options);
 
         return new ConsoleCommandDeclaration(
-            $type->name(),
-            $type->parentClassName(),
+            $type->name,
+            $type->parentClassName,
             $this->traits($text, $php, $type),
             $arguments,
             $options,
@@ -190,8 +190,8 @@ final class ConsoleExtractor
         $options = [];
         $complete = 1 !== preg_match('/\$|\.\.\./', $expression);
         $recognized = false;
-        foreach ($document->objectCreations() as $creation) {
-            $shortName = substr($creation->className(), (int) strrpos('\\'.$creation->className(), '\\'));
+        foreach ($document->objectCreations as $creation) {
+            $shortName = substr($creation->className, (int) strrpos('\\'.$creation->className, '\\'));
             if ('InputDefinition' === $shortName) {
                 $recognized = true;
                 continue;
@@ -201,7 +201,7 @@ final class ConsoleExtractor
                 continue;
             }
             $recognized = true;
-            $name = $creation->argument(0)?->stringLiteral()?->value();
+            $name = $creation->argument(0)?->stringLiteral?->value;
             if (null === $name) {
                 $complete = false;
                 continue;
@@ -325,23 +325,23 @@ final class ConsoleExtractor
 
     private function hasInputReceiver(PhpMethodCall $call, PhpDocument $php): bool
     {
-        $receiver = $call->receiverContext();
-        if (null === $receiver->name()) {
+        $receiver = $call->receiverContext;
+        if (null === $receiver->name) {
             return false;
         }
-        foreach ($php->typedVariables() as $variable) {
-            if ($receiver->name() !== $variable->name() || !\in_array(self::INPUT_INTERFACE, $variable->types(), true)) {
+        foreach ($php->typedVariables as $variable) {
+            if ($receiver->name !== $variable->name || !\in_array(self::INPUT_INTERFACE, $variable->types, true)) {
                 continue;
             }
-            if (PhpMethodReceiverKind::Variable === $receiver->kind()
-                && \in_array($variable->kind(), [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                && $call->scopeStartOffset() === $variable->scopeStartOffset()
+            if (PhpMethodReceiverKind::Variable === $receiver->kind
+                && \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                && $call->scopeStartOffset === $variable->scopeStartOffset
             ) {
                 return true;
             }
-            if (PhpMethodReceiverKind::ThisProperty === $receiver->kind()
-                && \in_array($variable->kind(), [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
-                && $call->className() === $variable->className()
+            if (PhpMethodReceiverKind::ThisProperty === $receiver->kind
+                && \in_array($variable->kind, [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
+                && $call->className === $variable->className
             ) {
                 return true;
             }
@@ -352,20 +352,20 @@ final class ConsoleExtractor
 
     private function hasInputVariable(PhpDocument $php, string $className, string $methodName, string $name, bool $property): bool
     {
-        foreach ($php->typedVariables() as $variable) {
-            if ($name !== $variable->name() || !\in_array(self::INPUT_INTERFACE, $variable->types(), true)) {
+        foreach ($php->typedVariables as $variable) {
+            if ($name !== $variable->name || !\in_array(self::INPUT_INTERFACE, $variable->types, true)) {
                 continue;
             }
             if ($property
-                && \in_array($variable->kind(), [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
-                && $className === $variable->className()
+                && \in_array($variable->kind, [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
+                && $className === $variable->className
             ) {
                 return true;
             }
             if (!$property
-                && \in_array($variable->kind(), [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                && $className === $variable->className()
-                && $methodName === $variable->methodName()
+                && \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                && $className === $variable->className
+                && $methodName === $variable->methodName
             ) {
                 return true;
             }
@@ -378,12 +378,12 @@ final class ConsoleExtractor
     {
         $name = null;
         $nameOffset = -1;
-        foreach ($php->methodDeclarations() as $method) {
-            if ($type->name() !== $method->className() || $method->nameStartOffset() > $offset || $method->nameStartOffset() <= $nameOffset) {
+        foreach ($php->methodDeclarations as $method) {
+            if ($type->name !== $method->className || $method->nameStartOffset > $offset || $method->nameStartOffset <= $nameOffset) {
                 continue;
             }
-            $name = $method->name();
-            $nameOffset = $method->nameStartOffset();
+            $name = $method->name;
+            $nameOffset = $method->nameStartOffset;
         }
 
         return $name;
@@ -391,8 +391,8 @@ final class ConsoleExtractor
 
     private function containingType(PhpDocument $php, int $offset): ?PhpTypeDeclaration
     {
-        foreach ($php->typeDeclarations() as $type) {
-            if ($offset >= $type->startOffset() && $offset <= $type->endOffset()) {
+        foreach ($php->typeDeclarations as $type) {
+            if ($offset >= $type->startOffset && $offset <= $type->endOffset) {
                 return $type;
             }
         }
@@ -402,12 +402,12 @@ final class ConsoleExtractor
 
     private function hasTypeAttribute(PhpDocument $php, PhpTypeDeclaration $type, string $attributeName): bool
     {
-        foreach ($php->attributes() as $attribute) {
-            if ($attributeName !== $attribute->name()) {
+        foreach ($php->attributes as $attribute) {
+            if ($attributeName !== $attribute->name) {
                 continue;
             }
-            foreach ($attribute->targets() as $target) {
-                if (PhpAttributeTargetKind::Type === $target->kind() && $type->name() === $target->className()) {
+            foreach ($attribute->targets as $target) {
+                if (PhpAttributeTargetKind::Type === $target->kind && $type->name === $target->className) {
                     return true;
                 }
             }
@@ -419,7 +419,7 @@ final class ConsoleExtractor
     /** @return list<string> */
     private function traits(string $text, PhpDocument $php, PhpTypeDeclaration $type): array
     {
-        $body = substr($text, $type->startOffset(), $type->endOffset() - $type->startOffset());
+        $body = substr($text, $type->startOffset, $type->endOffset - $type->startOffset);
         preg_match_all('/^\s*use\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*(?:\s*,\s*[\\\\A-Za-z_][\\\\A-Za-z0-9_]*)*)\s*;/m', $body, $matches);
         $traits = [];
         foreach ($matches[1] as $list) {
@@ -436,13 +436,13 @@ final class ConsoleExtractor
     /** @return list<array{start: int, end: int, closed: bool}> */
     private function methodBodyRanges(string $text, PhpTypeDeclaration $type, string $method): array
     {
-        $source = substr($text, $type->startOffset(), $type->endOffset() - $type->startOffset());
+        $source = substr($text, $type->startOffset, $type->endOffset - $type->startOffset);
         preg_match_all('/\bfunction\s+'.preg_quote($method, '/').'\s*\([^)]*\)\s*(?::\s*[^\{;]+)?\s*\{/s', $source, $matches, \PREG_OFFSET_CAPTURE);
         $ranges = [];
         foreach ($matches[0] as [$matched, $relativeOffset]) {
-            $open = $type->startOffset() + $relativeOffset + strrpos($matched, '{');
+            $open = $type->startOffset + $relativeOffset + strrpos($matched, '{');
             $close = $this->matchingDelimiter($text, $open, '{', '}');
-            $ranges[] = ['start' => $open, 'end' => $close ?? $type->endOffset(), 'closed' => null !== $close];
+            $ranges[] = ['start' => $open, 'end' => $close ?? $type->endOffset, 'closed' => null !== $close];
         }
 
         return $ranges;
@@ -451,11 +451,11 @@ final class ConsoleExtractor
     /** @return array{int, int}|null */
     private function methodParameterRange(string $text, PhpTypeDeclaration $type, string $method): ?array
     {
-        $source = substr($text, $type->startOffset(), $type->endOffset() - $type->startOffset());
+        $source = substr($text, $type->startOffset, $type->endOffset - $type->startOffset);
         if (!preg_match('/\bfunction\s+'.preg_quote($method, '/').'\s*\(/', $source, $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
-        $open = $type->startOffset() + $match[0][1] + strrpos($match[0][0], '(');
+        $open = $type->startOffset + $match[0][1] + strrpos($match[0][0], '(');
         $close = $this->matchingDelimiter($text, $open, '(', ')');
 
         return null === $close ? null : [$open + 1, $close];

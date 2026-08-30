@@ -18,17 +18,17 @@ final class YamlDocumentParser
         $mappings = [];
         $tree = $this->parser->parse('yaml', $source);
         $this->visit($tree, $tree->root(), $source, [], [], false, 'base', $mappings);
-        if ($tree->hasError()) {
+        if ($tree->hasError) {
             $indexedOffsets = [];
             foreach ($mappings as $mapping) {
-                $indexedOffsets[$mapping->keyStartByte()] = true;
+                $indexedOffsets[$mapping->keyStartByte] = true;
             }
             foreach ($this->fallbackMappings($source) as $mapping) {
-                if (!isset($indexedOffsets[$mapping->keyStartByte()])) {
+                if (!isset($indexedOffsets[$mapping->keyStartByte])) {
                     $mappings[] = $mapping;
                 }
             }
-            usort($mappings, static fn (YamlMapping $left, YamlMapping $right): int => $left->keyStartByte() <=> $right->keyStartByte());
+            usort($mappings, static fn (YamlMapping $left, YamlMapping $right): int => $left->keyStartByte <=> $right->keyStartByte);
         }
 
         return $mappings;
@@ -43,7 +43,7 @@ final class YamlDocumentParser
         }
         $mapping = $mappings[array_key_last($mappings)];
 
-        return '' === $mapping->value() ? $mapping->path() : \array_slice($mapping->path(), 0, -1);
+        return '' === $mapping->value ? $mapping->path : \array_slice($mapping->path, 0, -1);
     }
 
     /**
@@ -53,11 +53,11 @@ final class YamlDocumentParser
      */
     private function visit(TreeSitterTree $tree, TreeSitterNode $node, string $source, array $path, array $sequenceDepths, bool $pendingSequence, string $scope, array &$mappings): void
     {
-        if ('block_sequence_item' === $node->type()) {
+        if ('block_sequence_item' === $node->type) {
             $pendingSequence = true;
         }
 
-        if (\in_array($node->type(), ['block_mapping_pair', 'flow_pair'], true)) {
+        if (\in_array($node->type, ['block_mapping_pair', 'flow_pair'], true)) {
             $keyNode = $tree->childByField($node, 'key');
             if (null === $keyNode) {
                 return;
@@ -73,7 +73,7 @@ final class YamlDocumentParser
             $mappingDepths = $pendingSequence && !$environmentSection ? [...$sequenceDepths, \count($path)] : $sequenceDepths;
             $mappingScope = $environmentSection ? $key : $scope;
             if (!$environmentSection) {
-                [$value, $valueStart, $valueEnd] = $this->value($tree, $valueNode, $source, $node->endByte());
+                [$value, $valueStart, $valueEnd] = $this->value($tree, $valueNode, $source, $node->endByte);
                 $mappings[] = new YamlMapping($mappingPath, $value, $keyStart, $keyEnd, $valueStart, $valueEnd, $mappingDepths, $mappingScope);
             }
 
@@ -92,8 +92,8 @@ final class YamlDocumentParser
     /** @return array{string, int, int} */
     private function scalar(TreeSitterTree $tree, TreeSitterNode $node, string $source): array
     {
-        $start = $node->startByte();
-        $end = $node->endByte();
+        $start = $node->startByte;
+        $end = $node->endByte;
         $value = $tree->text($node, $source);
         if (\strlen($value) >= 2 && (("'" === $value[0] && str_ends_with($value, "'")) || ('"' === $value[0] && str_ends_with($value, '"')))) {
             ++$start;
@@ -115,7 +115,7 @@ final class YamlDocumentParser
             return ['', $fallbackOffset, $fallbackOffset];
         }
 
-        return [trim($tree->text($node, $source)), $node->startByte(), $node->endByte()];
+        return [trim($tree->text($node, $source)), $node->startByte, $node->endByte];
     }
 
     /** @return list<YamlMapping> */
@@ -221,7 +221,7 @@ final class YamlDocumentParser
 
     private function containsBlockCollection(TreeSitterTree $tree, TreeSitterNode $node): bool
     {
-        if (\in_array($node->type(), ['block_mapping', 'block_sequence'], true)) {
+        if (\in_array($node->type, ['block_mapping', 'block_sequence'], true)) {
             return true;
         }
         foreach ($tree->children($node) as $child) {

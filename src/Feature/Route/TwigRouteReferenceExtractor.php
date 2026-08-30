@@ -32,7 +32,7 @@ final class TwigRouteReferenceExtractor
             }
             $arguments = [];
             foreach ($document->children($argumentsNode) as $argument) {
-                if ('argument' === $argument->type()) {
+                if ('argument' === $argument->type) {
                     $arguments[] = $argument;
                 }
             }
@@ -78,14 +78,14 @@ final class TwigRouteReferenceExtractor
             return null;
         }
         $hash = $document->firstDescendant($argument, 'hash');
-        if (null === $hash || $hash->hasError()) {
+        if (null === $hash || $hash->hasError) {
             return null;
         }
 
         $parameters = [];
         $explicitValue = false;
         foreach ($document->children($hash) as $child) {
-            if ('hash_key' === $child->type()) {
+            if ('hash_key' === $child->type) {
                 $parameter = $this->hashKey($document, $child);
                 if ($explicitValue || null === $parameter) {
                     return null;
@@ -95,7 +95,7 @@ final class TwigRouteReferenceExtractor
 
                 continue;
             }
-            if ('hash_value' !== $child->type()) {
+            if ('hash_value' !== $child->type) {
                 return null;
             }
             if ($explicitValue) {
@@ -124,6 +124,6 @@ final class TwigRouteReferenceExtractor
             return $literal[0];
         }
 
-        return \in_array($key->type(), ['name', 'number'], true) ? $document->text($key) : null;
+        return \in_array($key->type, ['name', 'number'], true) ? $document->text($key) : null;
     }
 }

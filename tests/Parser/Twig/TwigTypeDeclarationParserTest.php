@@ -40,10 +40,10 @@ final class TwigTypeDeclarationParserTest extends TestCase
             ['title', 'string', false, null],
         ], array_map(
             static fn (TwigTypeDeclaration $declaration): array => [
-                $declaration->name(),
-                $declaration->type(),
-                $declaration->optional(),
-                $declaration->documentation(),
+                $declaration->name,
+                $declaration->type,
+                $declaration->optional,
+                $declaration->documentation,
             ],
             $declarations,
         ));
@@ -54,11 +54,11 @@ final class TwigTypeDeclarationParserTest extends TestCase
         $parser = new TwigTypeDeclarationParser(new TwigCommentParser());
 
         self::assertSame(['title'], array_map(
-            static fn (TwigTypeDeclaration $declaration): string => $declaration->name(),
+            static fn (TwigTypeDeclaration $declaration): string => $declaration->name,
             $parser->parse("{{ unfinished\n{% types title: 'string' %}"),
         ));
         self::assertSame(['title'], array_map(
-            static fn (TwigTypeDeclaration $declaration): string => $declaration->name(),
+            static fn (TwigTypeDeclaration $declaration): string => $declaration->name,
             $parser->parse("{% types { title: 'string'"),
         ));
     }

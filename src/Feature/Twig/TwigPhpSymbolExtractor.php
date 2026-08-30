@@ -110,27 +110,27 @@ final class TwigPhpSymbolExtractor
     private function phpFacts(string $uri, string $text): TwigPhpSymbolSourceFacts
     {
         $document = $this->phpParser->parse($text);
-        $types = $document->typeDeclarations();
+        $types = $document->typeDeclarations;
         $typeKinds = [];
         foreach ($types as $type) {
-            $typeKinds[strtolower(ltrim($type->name(), '\\'))] = $type->kind();
+            $typeKinds[strtolower(ltrim($type->name, '\\'))] = $type->kind;
         }
         $constants = [];
-        foreach ($document->constantDeclarations() as $constant) {
-            if (PhpTypeKind::Trait_ !== ($typeKinds[strtolower(ltrim($constant->className(), '\\'))] ?? null)) {
+        foreach ($document->constantDeclarations as $constant) {
+            if (PhpTypeKind::Trait_ !== ($typeKinds[strtolower(ltrim($constant->className, '\\'))] ?? null)) {
                 $constants[] = $constant;
             }
         }
         $constantOwners = [];
         foreach ($constants as $constant) {
-            $constantOwners[strtolower(ltrim($constant->className(), '\\'))] = true;
+            $constantOwners[strtolower(ltrim($constant->className, '\\'))] = true;
         }
         $declarations = [];
         foreach ($types as $type) {
-            if (!$type->isEnum() && !isset($constantOwners[strtolower(ltrim($type->name(), '\\'))])) {
+            if (!$type->isEnum() && !isset($constantOwners[strtolower(ltrim($type->name, '\\'))])) {
                 continue;
             }
-            $kind = match ($type->kind()) {
+            $kind = match ($type->kind) {
                 PhpTypeKind::Class_ => TwigPhpSymbolKind::Class_,
                 PhpTypeKind::Interface_ => TwigPhpSymbolKind::Interface_,
                 PhpTypeKind::Trait_ => TwigPhpSymbolKind::Trait_,
@@ -138,25 +138,25 @@ final class TwigPhpSymbolExtractor
             };
             $declarations[] = new TwigPhpSymbolDeclaration(
                 $kind,
-                $type->name(),
+                $type->name,
                 null,
                 $uri,
-                $this->converter->toRange($text, $type->nameStartOffset(), $type->nameEndOffset() - $type->nameStartOffset()),
-                $type->signature(),
-                $type->description(),
+                $this->converter->toRange($text, $type->nameStartOffset, $type->nameEndOffset - $type->nameStartOffset),
+                $type->signature,
+                $type->description,
                 true,
             );
         }
         foreach ($constants as $constant) {
             $declarations[] = new TwigPhpSymbolDeclaration(
-                PhpConstantKind::ClassConstant === $constant->kind() ? TwigPhpSymbolKind::ClassConstant : TwigPhpSymbolKind::EnumCase,
-                $constant->className(),
-                $constant->name(),
+                PhpConstantKind::ClassConstant === $constant->kind ? TwigPhpSymbolKind::ClassConstant : TwigPhpSymbolKind::EnumCase,
+                $constant->className,
+                $constant->name,
                 $uri,
-                $this->converter->toRange($text, $constant->nameStartOffset(), $constant->nameEndOffset() - $constant->nameStartOffset()),
-                $constant->signature(),
-                $constant->description(),
-                $constant->isPublic(),
+                $this->converter->toRange($text, $constant->nameStartOffset, $constant->nameEndOffset - $constant->nameStartOffset),
+                $constant->signature,
+                $constant->description,
+                $constant->public,
             );
         }
 
@@ -202,10 +202,10 @@ final class TwigPhpSymbolExtractor
             if ('enum' !== $name) {
                 continue;
             }
-            $after = substr($text, $call->endByte());
+            $after = substr($text, $call->endByte);
             if (1 === preg_match('/^\s*\.\s*([A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*)/', $after, $member, \PREG_OFFSET_CAPTURE)) {
                 $memberName = $member[1][0];
-                $references[] = $this->reference($className, $memberName, $uri, $text, $call->endByte() + $member[1][1], \strlen($memberName));
+                $references[] = $this->reference($className, $memberName, $uri, $text, $call->endByte + $member[1][1], \strlen($memberName));
             }
         }
         usort($references, static fn (TwigPhpSymbolReference $left, TwigPhpSymbolReference $right): int => [$left->range()->start()->line(), $left->range()->start()->character()] <=> [$right->range()->start()->line(), $right->range()->start()->character()]);

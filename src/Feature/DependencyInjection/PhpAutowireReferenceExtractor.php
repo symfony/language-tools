@@ -18,8 +18,8 @@ final class PhpAutowireReferenceExtractor
     public function extract(string $uri, string $text): array
     {
         $references = [];
-        foreach ($this->parser->parse($text)->attributes() as $attribute) {
-            if ('Symfony\Component\DependencyInjection\Attribute\Autowire' !== $attribute->name()) {
+        foreach ($this->parser->parse($text)->attributes as $attribute) {
+            if ('Symfony\Component\DependencyInjection\Attribute\Autowire' !== $attribute->name) {
                 continue;
             }
 
@@ -28,20 +28,20 @@ final class PhpAutowireReferenceExtractor
                 'service' => DependencyInjectionSymbolKind::Service,
                 'param' => DependencyInjectionSymbolKind::Parameter,
             ] as $argument => $kind) {
-                $literal = $attribute->argument($argument)?->stringLiteral();
+                $literal = $attribute->argument($argument)?->stringLiteral;
                 if (null === $literal) {
                     continue;
                 }
 
-                $rawName = $this->raw($text, $literal->startOffset(), $literal->endOffset());
+                $rawName = $this->raw($text, $literal->startOffset, $literal->endOffset);
                 $optional = DependencyInjectionSymbolKind::Service === $kind && str_starts_with($rawName, '?');
                 $rawTrimmed = trim($rawName, '%?');
-                $name = PhpStringLiteralDecoder::decode($text[$literal->startOffset() - 1], $rawTrimmed);
+                $name = PhpStringLiteralDecoder::decode($text[$literal->startOffset - 1], $rawTrimmed);
                 if ('' === $name) {
                     continue;
                 }
 
-                $offset = $literal->startOffset() + ($optional || str_starts_with($rawName, '%') ? 1 : 0);
+                $offset = $literal->startOffset + ($optional || str_starts_with($rawName, '%') ? 1 : 0);
                 $references[] = new DependencyInjectionReference(
                     $kind,
                     $name,
@@ -54,22 +54,22 @@ final class PhpAutowireReferenceExtractor
                 }
             }
 
-            foreach ($attribute->arguments() as $argument) {
-                $literal = $argument->stringLiteral();
+            foreach ($attribute->arguments as $argument) {
+                $literal = $argument->stringLiteral;
                 if (null === $literal) {
                     continue;
                 }
 
-                preg_match_all('/%([^%\s]+)%/', $this->raw($text, $literal->startOffset(), $literal->endOffset()), $parameters, \PREG_OFFSET_CAPTURE);
+                preg_match_all('/%([^%\s]+)%/', $this->raw($text, $literal->startOffset, $literal->endOffset), $parameters, \PREG_OFFSET_CAPTURE);
                 foreach ($parameters[1] as [$rawParameter, $offset]) {
-                    $offset += $literal->startOffset();
+                    $offset += $literal->startOffset;
                     if (str_starts_with($rawParameter, 'env(') || \in_array($offset, $namedParameterOffsets, true)) {
                         continue;
                     }
 
                     $references[] = new DependencyInjectionReference(
                         DependencyInjectionSymbolKind::Parameter,
-                        PhpStringLiteralDecoder::decode($text[$literal->startOffset() - 1], $rawParameter),
+                        PhpStringLiteralDecoder::decode($text[$literal->startOffset - 1], $rawParameter),
                         $uri,
                         $this->positionConverter->toRange($text, $offset, \strlen($rawParameter)),
                     );

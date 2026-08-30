@@ -52,26 +52,26 @@ final class MessengerExtractor
         if ('php' === $languageId) {
             $php = $this->parser->parse($text);
             $source = $this->phpComments->mask($text);
-            foreach ($php->attributes() as $attribute) {
-                if (self::AS_MESSAGE_HANDLER !== $attribute->name()
-                    || !array_any($attribute->targets(), static fn ($target): bool => \in_array($target->kind(), [PhpAttributeTargetKind::Type, PhpAttributeTargetKind::Method], true))
+            foreach ($php->attributes as $attribute) {
+                if (self::AS_MESSAGE_HANDLER !== $attribute->name
+                    || !array_any($attribute->targets, static fn ($target): bool => \in_array($target->kind, [PhpAttributeTargetKind::Type, PhpAttributeTargetKind::Method], true))
                 ) {
                     continue;
                 }
-                $handlers[] = substr($text, $attribute->startOffset(), $attribute->endOffset() - $attribute->startOffset());
+                $handlers[] = substr($text, $attribute->startOffset, $attribute->endOffset - $attribute->startOffset);
                 foreach ([
                     [MessengerSymbolKind::Bus, 'bus'],
                     [MessengerSymbolKind::Transport, 'fromTransport'],
                 ] as [$kind, $argumentName]) {
-                    $literal = $attribute->argument($argumentName)?->stringLiteral();
-                    if (null === $literal || 1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_.-]*$/D', $literal->value())) {
+                    $literal = $attribute->argument($argumentName)?->stringLiteral;
+                    if (null === $literal || 1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_.-]*$/D', $literal->value)) {
                         continue;
                     }
-                    $symbols[] = $this->symbol($kind, $literal->value(), $uri, $text, $literal->startOffset(), false, $literal->endOffset() - $literal->startOffset());
+                    $symbols[] = $this->symbol($kind, $literal->value, $uri, $text, $literal->startOffset, false, $literal->endOffset - $literal->startOffset);
                 }
                 $handles = $this->classReferenceArgument($php, $attribute->argument('handles'));
                 if (null !== $handles) {
-                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $handles->className(), $uri, $text, $handles->startOffset(), false, $handles->endOffset() - $handles->startOffset());
+                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $handles->className, $uri, $text, $handles->startOffset, false, $handles->endOffset - $handles->startOffset);
                 }
             }
             preg_match_all('/BusNameStamp\s*\(\s*["\']([A-Za-z_][A-Za-z0-9_.-]*)/', $source, $matches, \PREG_OFFSET_CAPTURE);
@@ -79,8 +79,8 @@ final class MessengerExtractor
                 $symbols[] = $this->symbol(MessengerSymbolKind::Bus, $name, $uri, $text, $offset, false);
             }
             $parents = $this->phpParents($source, $php);
-            foreach ($php->methodCalls() as $call) {
-                if ('dispatch' !== $call->method() || !$this->hasBusReceiver($call, $php)) {
+            foreach ($php->methodCalls as $call) {
+                if ('dispatch' !== $call->method || !$this->hasBusReceiver($call, $php)) {
                     continue;
                 }
                 $message = $this->newClassArgument($call->argument(0));
@@ -168,13 +168,13 @@ final class MessengerExtractor
 
     private function classReferenceArgument(PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
     {
-        $start = $argument?->expressionStartOffset();
-        $end = $argument?->expressionEndOffset();
+        $start = $argument?->expressionStartOffset;
+        $end = $argument?->expressionEndOffset;
         if (!\is_int($start) || !\is_int($end)) {
             return null;
         }
-        foreach ($php->classReferences() as $reference) {
-            if ($reference->startOffset() >= $start && $reference->endOffset() <= $end) {
+        foreach ($php->classReferences as $reference) {
+            if ($reference->startOffset >= $start && $reference->endOffset <= $end) {
                 return $reference;
             }
         }
@@ -184,23 +184,23 @@ final class MessengerExtractor
 
     private function hasBusReceiver(PhpMethodCall $call, PhpDocument $php): bool
     {
-        $receiver = $call->receiverContext();
-        if (null === $receiver->name()) {
+        $receiver = $call->receiverContext;
+        if (null === $receiver->name) {
             return false;
         }
-        foreach ($php->typedVariables() as $variable) {
-            if ($receiver->name() !== $variable->name() || [] === array_intersect(self::BUS_TYPES, $variable->types())) {
+        foreach ($php->typedVariables as $variable) {
+            if ($receiver->name !== $variable->name || [] === array_intersect(self::BUS_TYPES, $variable->types)) {
                 continue;
             }
-            if (PhpMethodReceiverKind::Variable === $receiver->kind()
-                && \in_array($variable->kind(), [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                && $call->scopeStartOffset() === $variable->scopeStartOffset()
+            if (PhpMethodReceiverKind::Variable === $receiver->kind
+                && \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                && $call->scopeStartOffset === $variable->scopeStartOffset
             ) {
                 return true;
             }
-            if (PhpMethodReceiverKind::ThisProperty === $receiver->kind()
-                && \in_array($variable->kind(), [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
-                && $call->className() === $variable->className()
+            if (PhpMethodReceiverKind::ThisProperty === $receiver->kind
+                && \in_array($variable->kind, [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
+                && $call->className === $variable->className
             ) {
                 return true;
             }
@@ -212,8 +212,8 @@ final class MessengerExtractor
     /** @return array{name: string, offset: int}|null */
     private function newClassArgument(?PhpArgument $argument): ?array
     {
-        $expression = $argument?->expression();
-        $offset = $argument?->expressionStartOffset();
+        $expression = $argument?->expression;
+        $offset = $argument?->expressionStartOffset;
         if (!\is_string($expression) || !\is_int($offset) || 1 !== preg_match('/^\s*new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)/', $expression, $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }

@@ -18,15 +18,15 @@ final class PhpClassDeclarationExtractor
     public function extract(string $uri, string $text): array
     {
         $declarations = [];
-        foreach ($this->parser->parse($text)->typeDeclarations() as $type) {
+        foreach ($this->parser->parse($text)->typeDeclarations as $type) {
             $declarations[] = new PhpClassDeclaration(
-                $type->name(),
+                $type->name,
                 $uri,
                 new Range(
-                    $this->positionConverter->toPosition($text, $type->nameStartOffset()),
-                    $this->positionConverter->toPosition($text, $type->nameEndOffset()),
+                    $this->positionConverter->toPosition($text, $type->nameStartOffset),
+                    $this->positionConverter->toPosition($text, $type->nameEndOffset),
                 ),
-                $type->parentClassName(),
+                $type->parentClassName,
             );
         }
 

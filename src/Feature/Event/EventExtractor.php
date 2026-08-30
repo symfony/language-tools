@@ -90,21 +90,21 @@ final class EventExtractor
         $php = $this->parser->parse($text);
         $source = $this->phpComments->mask($text);
         $listeners = [];
-        foreach ($php->attributes() as $attribute) {
-            if (self::AS_EVENT_LISTENER !== $attribute->name()
+        foreach ($php->attributes as $attribute) {
+            if (self::AS_EVENT_LISTENER !== $attribute->name
                 || null === $target = $this->attributeTarget($attribute)
             ) {
                 continue;
             }
-            $listeners[] = substr($text, $attribute->startOffset(), $attribute->endOffset() - $attribute->startOffset());
+            $listeners[] = substr($text, $attribute->startOffset, $attribute->endOffset - $attribute->startOffset);
             $eventArgument = $attribute->argument('event');
-            $event = $eventArgument?->stringLiteral();
-            if (null !== $event && '' !== $event->value()) {
-                $symbols[] = $this->symbol($event->value(), $uri, $text, $event->startOffset(), true, $event->endOffset() - $event->startOffset());
+            $event = $eventArgument?->stringLiteral;
+            if (null !== $event && '' !== $event->value) {
+                $symbols[] = $this->symbol($event->value, $uri, $text, $event->startOffset, true, $event->endOffset - $event->startOffset);
             } elseif (null !== $eventReference = $this->classReferenceArgument($php, $eventArgument)) {
-                $symbols[] = $this->symbol($eventReference->className(), $uri, $text, $eventReference->startOffset(), true, $eventReference->endOffset() - $eventReference->startOffset());
+                $symbols[] = $this->symbol($eventReference->className, $uri, $text, $eventReference->startOffset, true, $eventReference->endOffset - $eventReference->startOffset);
             }
-            if (PhpAttributeTargetKind::Type === $target->kind()) {
+            if (PhpAttributeTargetKind::Type === $target->kind) {
                 $invalid = $this->invalidListenerMethod($attribute, $target, $php, $source, $text);
                 if (null !== $invalid) {
                     $invalidListenerMethods[] = $invalid;
@@ -112,23 +112,23 @@ final class EventExtractor
             }
         }
 
-        foreach ($php->methodCalls() as $call) {
+        foreach ($php->methodCalls as $call) {
             if (!$this->hasDispatcherReceiver($call, $php)) {
                 continue;
             }
-            if ('dispatch' === $call->method()) {
+            if ('dispatch' === $call->method) {
                 $event = $this->newClassArgument($call->argument(0));
                 if (null !== $event) {
                     $symbols[] = $this->symbol($php->resolveName($event['name']), $uri, $text, $event['offset'], false, \strlen($event['name']));
                 }
-                $name = $call->argument(1)?->stringLiteral();
-                if (null !== $name && '' !== $name->value()) {
-                    $symbols[] = $this->symbol($name->value(), $uri, $text, $name->startOffset(), false, $name->endOffset() - $name->startOffset());
+                $name = $call->argument(1)?->stringLiteral;
+                if (null !== $name && '' !== $name->value) {
+                    $symbols[] = $this->symbol($name->value, $uri, $text, $name->startOffset, false, $name->endOffset - $name->startOffset);
                 }
-            } elseif ('addListener' === $call->method()) {
-                $name = $call->argument(0)?->stringLiteral();
-                if (null !== $name && '' !== $name->value()) {
-                    $symbols[] = $this->symbol($name->value(), $uri, $text, $name->startOffset(), false, $name->endOffset() - $name->startOffset());
+            } elseif ('addListener' === $call->method) {
+                $name = $call->argument(0)?->stringLiteral;
+                if (null !== $name && '' !== $name->value) {
+                    $symbols[] = $this->symbol($name->value, $uri, $text, $name->startOffset, false, $name->endOffset - $name->startOffset);
                 }
             }
         }
@@ -222,8 +222,8 @@ final class EventExtractor
 
     private function attributeTarget(PhpAttribute $attribute): ?PhpAttributeTarget
     {
-        foreach ($attribute->targets() as $target) {
-            if (\in_array($target->kind(), [PhpAttributeTargetKind::Type, PhpAttributeTargetKind::Method], true)) {
+        foreach ($attribute->targets as $target) {
+            if (\in_array($target->kind, [PhpAttributeTargetKind::Type, PhpAttributeTargetKind::Method], true)) {
                 return $target;
             }
         }
@@ -233,13 +233,13 @@ final class EventExtractor
 
     private function classReferenceArgument(PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
     {
-        $start = $argument?->expressionStartOffset();
-        $end = $argument?->expressionEndOffset();
+        $start = $argument?->expressionStartOffset;
+        $end = $argument?->expressionEndOffset;
         if (!\is_int($start) || !\is_int($end)) {
             return null;
         }
-        foreach ($php->classReferences() as $reference) {
-            if ($reference->startOffset() >= $start && $reference->endOffset() <= $end) {
+        foreach ($php->classReferences as $reference) {
+            if ($reference->startOffset >= $start && $reference->endOffset <= $end) {
                 return $reference;
             }
         }
@@ -249,34 +249,34 @@ final class EventExtractor
 
     private function invalidListenerMethod(PhpAttribute $attribute, PhpAttributeTarget $target, PhpDocument $php, string $source, string $text): ?InvalidEventListenerMethod
     {
-        $method = $attribute->argument('method')?->stringLiteral();
-        if (null === $method || '' === $method->value()) {
+        $method = $attribute->argument('method')?->stringLiteral;
+        if (null === $method || '' === $method->value) {
             return null;
         }
         $type = null;
-        foreach ($php->typeDeclarations() as $declaration) {
-            if ($target->className() === $declaration->name() && $declaration->isClass()) {
+        foreach ($php->typeDeclarations as $declaration) {
+            if ($target->className === $declaration->name && $declaration->isClass()) {
                 $type = $declaration;
                 break;
             }
         }
-        if (!$type instanceof PhpTypeDeclaration || null !== $type->parentClassName() || str_contains($type->signature(), 'extends')) {
+        if (!$type instanceof PhpTypeDeclaration || null !== $type->parentClassName || str_contains($type->signature, 'extends')) {
             return null;
         }
-        $body = substr($source, $type->startOffset(), $type->endOffset() - $type->startOffset());
+        $body = substr($source, $type->startOffset, $type->endOffset - $type->startOffset);
         if (preg_match('/\buse\s+[^;]+;/', $body)) {
             return null;
         }
-        foreach ($php->methodDeclarations() as $declaration) {
-            if ($type->name() === $declaration->className() && $method->value() === $declaration->name()) {
+        foreach ($php->methodDeclarations as $declaration) {
+            if ($type->name === $declaration->className && $method->value === $declaration->name) {
                 return null;
             }
         }
 
         return new InvalidEventListenerMethod(
-            $type->name(),
-            $method->value(),
-            new Range($this->converter->toPosition($text, $method->startOffset()), $this->converter->toPosition($text, $method->endOffset())),
+            $type->name,
+            $method->value,
+            new Range($this->converter->toPosition($text, $method->startOffset), $this->converter->toPosition($text, $method->endOffset)),
         );
     }
 
@@ -284,9 +284,9 @@ final class EventExtractor
     private function eventDispatcherVariables(PhpDocument $php): array
     {
         $variables = [];
-        foreach ($php->typedVariables() as $variable) {
-            if ([] !== array_intersect(self::DISPATCHER_TYPES, $variable->types())) {
-                $variables[$variable->name()] = true;
+        foreach ($php->typedVariables as $variable) {
+            if ([] !== array_intersect(self::DISPATCHER_TYPES, $variable->types)) {
+                $variables[$variable->name] = true;
             }
         }
 
@@ -295,23 +295,23 @@ final class EventExtractor
 
     private function hasDispatcherReceiver(PhpMethodCall $call, PhpDocument $php): bool
     {
-        $receiver = $call->receiverContext();
-        if (null === $receiver->name()) {
+        $receiver = $call->receiverContext;
+        if (null === $receiver->name) {
             return false;
         }
-        foreach ($php->typedVariables() as $variable) {
-            if ($receiver->name() !== $variable->name() || [] === array_intersect(self::DISPATCHER_TYPES, $variable->types())) {
+        foreach ($php->typedVariables as $variable) {
+            if ($receiver->name !== $variable->name || [] === array_intersect(self::DISPATCHER_TYPES, $variable->types)) {
                 continue;
             }
-            if (PhpMethodReceiverKind::Variable === $receiver->kind()
-                && \in_array($variable->kind(), [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                && $call->scopeStartOffset() === $variable->scopeStartOffset()
+            if (PhpMethodReceiverKind::Variable === $receiver->kind
+                && \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                && $call->scopeStartOffset === $variable->scopeStartOffset
             ) {
                 return true;
             }
-            if (PhpMethodReceiverKind::ThisProperty === $receiver->kind()
-                && \in_array($variable->kind(), [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
-                && $call->className() === $variable->className()
+            if (PhpMethodReceiverKind::ThisProperty === $receiver->kind
+                && \in_array($variable->kind, [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
+                && $call->className === $variable->className
             ) {
                 return true;
             }
@@ -323,8 +323,8 @@ final class EventExtractor
     /** @return array{name: string, offset: int}|null */
     private function newClassArgument(?PhpArgument $argument): ?array
     {
-        $expression = $argument?->expression();
-        $offset = $argument?->expressionStartOffset();
+        $expression = $argument?->expression;
+        $offset = $argument?->expressionStartOffset;
         if (!\is_string($expression) || !\is_int($offset) || 1 !== preg_match('/^\s*new\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)/', $expression, $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }

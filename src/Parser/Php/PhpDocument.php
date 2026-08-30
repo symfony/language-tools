@@ -19,79 +19,19 @@ final class PhpDocument
      * @param list<PhpClassReference>      $classReferences
      */
     public function __construct(
-        private readonly array $attributes,
-        private readonly array $methodCalls,
-        private readonly array $typeDeclarations,
-        private readonly array $diagnostics,
-        private readonly array $typedVariables = [],
+        public readonly array $attributes,
+        public readonly array $methodCalls,
+        public readonly array $typeDeclarations,
+        public readonly array $diagnostics,
+        public readonly array $typedVariables = [],
         ?PhpNameContext $names = null,
-        private readonly array $objectCreations = [],
-        private readonly array $methodDeclarations = [],
-        private readonly array $constantDeclarations = [],
-        private readonly array $propertyDeclarations = [],
-        private readonly array $classReferences = [],
+        public readonly array $objectCreations = [],
+        public readonly array $methodDeclarations = [],
+        public readonly array $constantDeclarations = [],
+        public readonly array $propertyDeclarations = [],
+        public readonly array $classReferences = [],
     ) {
         $this->names = $names ?? new PhpNameContext();
-    }
-
-    /** @return list<PhpAttribute> */
-    public function attributes(): array
-    {
-        return $this->attributes;
-    }
-
-    /** @return list<PhpMethodCall> */
-    public function methodCalls(): array
-    {
-        return $this->methodCalls;
-    }
-
-    /** @return list<PhpTypeDeclaration> */
-    public function typeDeclarations(): array
-    {
-        return $this->typeDeclarations;
-    }
-
-    /** @return list<PhpObjectCreation> */
-    public function objectCreations(): array
-    {
-        return $this->objectCreations;
-    }
-
-    /** @return list<PhpMethodDeclaration> */
-    public function methodDeclarations(): array
-    {
-        return $this->methodDeclarations;
-    }
-
-    /** @return list<PhpConstantDeclaration> */
-    public function constantDeclarations(): array
-    {
-        return $this->constantDeclarations;
-    }
-
-    /** @return list<PhpPropertyDeclaration> */
-    public function propertyDeclarations(): array
-    {
-        return $this->propertyDeclarations;
-    }
-
-    /** @return list<PhpClassReference> */
-    public function classReferences(): array
-    {
-        return $this->classReferences;
-    }
-
-    /** @return list<PhpDiagnostic> */
-    public function diagnostics(): array
-    {
-        return $this->diagnostics;
-    }
-
-    /** @return list<PhpTypedVariable> */
-    public function typedVariables(): array
-    {
-        return $this->typedVariables;
     }
 
     public function namespace(): string
@@ -102,7 +42,7 @@ final class PhpDocument
     /** @return array<string, string> */
     public function imports(): array
     {
-        return $this->names->imports();
+        return $this->names->imports;
     }
 
     public function resolveName(string $name): string

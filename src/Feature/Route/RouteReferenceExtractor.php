@@ -53,7 +53,7 @@ final class RouteReferenceExtractor
     public function isSymfonyReceiver(string $source, DependencyInjectionSourceIndex $classIndex): bool
     {
         $document = $this->parser->parse($source);
-        $receiver = RoutePhpReceiver::resolve($source, \strlen($source), $document->typeDeclarations());
+        $receiver = RoutePhpReceiver::resolve($source, \strlen($source), $document->typeDeclarations);
 
         return null !== $receiver && $this->isControllerClass($receiver->controllerClass(), $document, $classIndex);
     }
@@ -83,7 +83,7 @@ final class RouteReferenceExtractor
             $receiver = RoutePhpReceiver::resolve(
                 substr($masked, 0, $receiverOffset),
                 $receiverOffset,
-                $document->typeDeclarations(),
+                $document->typeDeclarations,
             );
             if (null === $receiver) {
                 continue;
@@ -110,8 +110,8 @@ final class RouteReferenceExtractor
         }
 
         $types = [];
-        foreach ($document->typeDeclarations() as $type) {
-            $types[strtolower(ltrim($type->name(), '\\'))] = $type;
+        foreach ($document->typeDeclarations as $type) {
+            $types[strtolower(ltrim($type->name, '\\'))] = $type;
         }
         $visited = [];
         while (!isset($visited[strtolower($className)])) {
@@ -125,7 +125,7 @@ final class RouteReferenceExtractor
                 return 0 === strcasecmp('AbstractController', $className);
             }
             $visited[$classKey] = true;
-            if (null === $className = $type->parentClassName()) {
+            if (null === $className = $type->parentClassName) {
                 return false;
             }
         }

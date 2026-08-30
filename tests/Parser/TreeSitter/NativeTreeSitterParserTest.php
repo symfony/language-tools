@@ -14,12 +14,12 @@ final class NativeTreeSitterParserTest extends TestCase
         $source = "{{ '😀'|trans }}\n{{ path('article_";
         $tree = (new NativeTreeSitterParser(new TreeSitterResultDecoder()))->parse('twig', $source);
 
-        self::assertTrue($tree->hasError());
+        self::assertTrue($tree->hasError);
         $strings = $tree->nodesOfType('string');
         self::assertCount(1, $strings);
         self::assertSame("'😀'", $tree->text($strings[0], $source));
-        self::assertSame(3, $strings[0]->startByte());
-        self::assertSame(9, $strings[0]->endByte());
+        self::assertSame(3, $strings[0]->startByte);
+        self::assertSame(9, $strings[0]->endByte);
     }
 
     public function testParsesSymfonyYamlTags(): void
@@ -34,7 +34,7 @@ final class NativeTreeSitterParserTest extends TestCase
             YAML;
         $tree = (new NativeTreeSitterParser(new TreeSitterResultDecoder()))->parse('yaml', $source);
 
-        self::assertFalse($tree->hasError());
+        self::assertFalse($tree->hasError);
         self::assertSame(
             ['!tagged_iterator', '!service', '!php/const'],
             array_map(static fn (TreeSitterNode $node): string => $tree->text($node, $source), $tree->nodesOfType('tag')),

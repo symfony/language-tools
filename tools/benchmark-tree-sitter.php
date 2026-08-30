@@ -29,7 +29,7 @@ foreach ($fixtures as [$language, $path]) {
         "%s,%d,%s,%.4f,%d\n",
         $path,
         strlen($source),
-        $tree->hasError() ? 'yes' : 'no',
+        $tree->hasError ? 'yes' : 'no',
         $elapsed / 1_000_000 / $iterations,
         memory_get_peak_usage(true),
     );

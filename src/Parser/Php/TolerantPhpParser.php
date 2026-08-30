@@ -597,8 +597,8 @@ final class TolerantPhpParser implements PhpParserInterface
         $className = (string) $owner->getNamespacedName();
         $methodAttributes = [];
         foreach ($attributes as $attribute) {
-            foreach ($attribute->targets() as $target) {
-                if (PhpAttributeTargetKind::Method === $target->kind() && $className === $target->className() && $name === $target->memberName()) {
+            foreach ($attribute->targets as $target) {
+                if (PhpAttributeTargetKind::Method === $target->kind && $className === $target->className && $name === $target->memberName) {
                     $methodAttributes[] = $attribute;
                     break;
                 }
@@ -854,7 +854,7 @@ final class TolerantPhpParser implements PhpParserInterface
 
             return $this->callable(
                 $this->classNameFromExpression($values[0], $source, $names, $owner),
-                $this->stringLiteral($values[1], $source)?->value(),
+                $this->stringLiteral($values[1], $source)?->value,
             );
         }
         if (!$expression instanceof CallExpression || !$this->isFirstClassCallable($expression)) {

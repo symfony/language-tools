@@ -136,11 +136,11 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text(), $request->position);
-        foreach ($this->phpParser->parse($request->document->text())->methodDeclarations() as $method) {
-            if ($offset < $method->nameStartOffset() || $offset > $method->nameEndOffset()) {
+        foreach ($this->phpParser->parse($request->document->text())->methodDeclarations as $method) {
+            if ($offset < $method->nameStartOffset || $offset > $method->nameEndOffset) {
                 continue;
             }
-            $declarations = $index->declarationsForCallable($method->className(), $method->name());
+            $declarations = $index->declarationsForCallable($method->className, $method->name);
 
             return [] === $declarations ? null : $this->referenceLocations($request->project, $declarations);
         }
@@ -367,12 +367,12 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
         if (!$method instanceof PhpMethodDeclaration || null === $matchedDeclaration) {
             return null;
         }
-        $open = strpos($method->signature(), '(');
-        $close = strrpos($method->signature(), ')');
+        $open = strpos($method->signature, '(');
+        $close = strrpos($method->signature, ')');
         if (false === $open || false === $close || $close < $open) {
             return null;
         }
-        $parameterList = substr($method->signature(), $open + 1, $close - $open - 1);
+        $parameterList = substr($method->signature, $open + 1, $close - $open - 1);
         preg_match_all('/(?:([\\\\\w|?]+)\s+)?(\.\.\.)?\$([A-Za-z_][A-Za-z0-9_]*)/', $parameterList, $matches, \PREG_SET_ORDER);
         $all = [];
         $types = [];
@@ -432,9 +432,9 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
             $value .= "\n\nCallable: `".$name.'`';
             $method = $this->callableMethods($project, $declaration)[0]['method'] ?? null;
             if ($method instanceof PhpMethodDeclaration) {
-                $value .= "\n\n```php\n".$method->signature()."\n```";
-                if (null !== $method->description()) {
-                    $value .= "\n\n".$method->description();
+                $value .= "\n\n```php\n".$method->signature."\n```";
+                if (null !== $method->description) {
+                    $value .= "\n\n".$method->description;
                 }
             }
         } elseif ([] !== $callables) {
@@ -462,8 +462,8 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
                 $locations[] = $this->protocol->location(
                     $method['uri'],
                     new Range(
-                        $this->converter->toPosition($method['text'], $method['method']->nameStartOffset()),
-                        $this->converter->toPosition($method['text'], $method['method']->nameEndOffset()),
+                        $this->converter->toPosition($method['text'], $method['method']->nameStartOffset),
+                        $this->converter->toPosition($method['text'], $method['method']->nameEndOffset),
                     ),
                 );
             }
@@ -505,8 +505,8 @@ final class TwigCallableProvider implements CompletionProviderInterface, Definit
             if (null === $text) {
                 continue;
             }
-            foreach ($this->phpParser->parse($text)->methodDeclarations() as $method) {
-                if (0 === strcasecmp($declaration->className(), $method->className()) && 0 === strcasecmp($declaration->method(), $method->name())) {
+            foreach ($this->phpParser->parse($text)->methodDeclarations as $method) {
+                if (0 === strcasecmp($declaration->className(), $method->className) && 0 === strcasecmp($declaration->method(), $method->name)) {
                     $methods[] = ['uri' => $class->uri(), 'text' => $text, 'method' => $method];
                 }
             }

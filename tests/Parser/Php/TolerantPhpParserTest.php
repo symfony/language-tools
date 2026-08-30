@@ -32,22 +32,22 @@ final class TolerantPhpParserTest extends TestCase
             PHP;
 
         $document = (new TolerantPhpParser(new Parser()))->parse($source);
-        $attribute = $document->attributes()[0];
+        $attribute = $document->attributes[0];
         $path = $attribute->argument('path');
-        $name = $attribute->argument('name')?->stringLiteral();
+        $name = $attribute->argument('name')?->stringLiteral;
 
-        self::assertSame('Symfony\Component\Routing\Attribute\Route', $attribute->name());
-        self::assertSame('path', substr($source, (int) $path?->nameStartOffset(), (int) $path?->nameEndOffset() - (int) $path?->nameStartOffset()));
+        self::assertSame('Symfony\Component\Routing\Attribute\Route', $attribute->name);
+        self::assertSame('path', substr($source, (int) $path?->nameStartOffset, (int) $path?->nameEndOffset - (int) $path?->nameStartOffset));
         self::assertInstanceOf(PhpStringLiteral::class, $name);
-        self::assertSame('article_list', $name->value());
-        self::assertSame('article_list', substr($source, $name->startOffset(), $name->endOffset() - $name->startOffset()));
-        self::assertSame('$routes', $document->methodCalls()[0]->receiver());
-        self::assertSame('add', $document->methodCalls()[0]->method());
-        self::assertSame('article_list', $document->methodCalls()[0]->argument(0)?->stringLiteral()?->value());
-        self::assertSame('ArticleController', $document->typeDeclarations()[0]->name());
-        self::assertSame('Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController', $document->typeDeclarations()[0]->parentClassName());
-        self::assertTrue($document->typeDeclarations()[0]->contains((int) strpos($source, 'ArticleController')));
-        self::assertSame([], $document->diagnostics());
+        self::assertSame('article_list', $name->value);
+        self::assertSame('article_list', substr($source, $name->startOffset, $name->endOffset - $name->startOffset));
+        self::assertSame('$routes', $document->methodCalls[0]->receiver);
+        self::assertSame('add', $document->methodCalls[0]->method);
+        self::assertSame('article_list', $document->methodCalls[0]->argument(0)?->stringLiteral?->value);
+        self::assertSame('ArticleController', $document->typeDeclarations[0]->name);
+        self::assertSame('Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController', $document->typeDeclarations[0]->parentClassName);
+        self::assertTrue($document->typeDeclarations[0]->contains((int) strpos($source, 'ArticleController')));
+        self::assertSame([], $document->diagnostics);
     }
 
     public function testDecodesEscapedStringLiteralsWithSourceOffsets(): void
@@ -60,16 +60,16 @@ final class TolerantPhpParserTest extends TestCase
             }
             PHP;
 
-        $attribute = (new TolerantPhpParser(new Parser()))->parse($source)->attributes()[0];
-        $service = $attribute->argument(0)?->stringLiteral();
-        $label = $attribute->argument(1)?->stringLiteral();
+        $attribute = (new TolerantPhpParser(new Parser()))->parse($source)->attributes[0];
+        $service = $attribute->argument(0)?->stringLiteral;
+        $label = $attribute->argument(1)?->stringLiteral;
 
         self::assertInstanceOf(PhpStringLiteral::class, $service);
-        self::assertSame('App\Mailer', $service->value());
-        self::assertSame('App\\\\Mailer', substr($source, $service->startOffset(), $service->endOffset() - $service->startOffset()));
+        self::assertSame('App\Mailer', $service->value);
+        self::assertSame('App\\\\Mailer', substr($source, $service->startOffset, $service->endOffset - $service->startOffset));
         self::assertInstanceOf(PhpStringLiteral::class, $label);
-        self::assertSame("tab\tbrace}end", $label->value());
-        self::assertSame('tab\\tbrace\\x7dend', substr($source, $label->startOffset(), $label->endOffset() - $label->startOffset()));
+        self::assertSame("tab\tbrace}end", $label->value);
+        self::assertSame('tab\\tbrace\\x7dend', substr($source, $label->startOffset, $label->endOffset - $label->startOffset));
     }
 
     public function testExposesAttributePlacementAndArgumentRanges(): void
@@ -91,40 +91,40 @@ final class TolerantPhpParserTest extends TestCase
             PHP;
 
         $document = (new TolerantPhpParser(new Parser()))->parse($source);
-        $attributes = $document->attributes();
+        $attributes = $document->attributes;
         [$type, $property, $method, $parameter] = $attributes;
-        $typeTarget = $type->targets()[0];
-        $propertyTarget = $property->targets()[0];
-        $methodTarget = $method->targets()[0];
+        $typeTarget = $type->targets[0];
+        $propertyTarget = $property->targets[0];
+        $methodTarget = $method->targets[0];
         $name = $type->argument('name');
         $option = $method->argument('option');
         self::assertInstanceOf(PhpArgument::class, $name);
         self::assertInstanceOf(PhpArgument::class, $option);
-        $nameExpressionStart = $name->expressionStartOffset();
-        $nameExpressionEnd = $name->expressionEndOffset();
-        $optionExpressionStart = $option->expressionStartOffset();
-        $optionExpressionEnd = $option->expressionEndOffset();
+        $nameExpressionStart = $name->expressionStartOffset;
+        $nameExpressionEnd = $name->expressionEndOffset;
+        $optionExpressionStart = $option->expressionStartOffset;
+        $optionExpressionEnd = $option->expressionEndOffset;
         self::assertIsInt($nameExpressionStart);
         self::assertIsInt($nameExpressionEnd);
         self::assertIsInt($optionExpressionStart);
         self::assertIsInt($optionExpressionEnd);
 
-        self::assertSame("#[TypeAttribute(name: 'service')]", substr($source, $type->startOffset(), $type->endOffset() - $type->startOffset()));
-        self::assertSame('TypeAttribute', substr($source, $type->nameStartOffset(), $type->nameEndOffset() - $type->nameStartOffset()));
-        self::assertSame(PhpAttributeTargetKind::Type, $typeTarget->kind());
-        self::assertSame('App\Service', $typeTarget->className());
-        self::assertNull($typeTarget->memberName());
-        self::assertSame('Service', substr($source, $typeTarget->nameStartOffset(), $typeTarget->nameEndOffset() - $typeTarget->nameStartOffset()));
-        self::assertSame(PhpAttributeTargetKind::Property, $propertyTarget->kind());
-        self::assertSame('name', $propertyTarget->memberName());
-        self::assertSame(PhpAttributeTargetKind::Method, $methodTarget->kind());
-        self::assertSame('run', $methodTarget->memberName());
-        self::assertSame([], $parameter->targets());
-        self::assertSame("name: 'service'", substr($source, $name->startOffset(), $name->endOffset() - $name->startOffset()));
+        self::assertSame("#[TypeAttribute(name: 'service')]", substr($source, $type->startOffset, $type->endOffset - $type->startOffset));
+        self::assertSame('TypeAttribute', substr($source, $type->nameStartOffset, $type->nameEndOffset - $type->nameStartOffset));
+        self::assertSame(PhpAttributeTargetKind::Type, $typeTarget->kind);
+        self::assertSame('App\Service', $typeTarget->className);
+        self::assertNull($typeTarget->memberName);
+        self::assertSame('Service', substr($source, $typeTarget->nameStartOffset, $typeTarget->nameEndOffset - $typeTarget->nameStartOffset));
+        self::assertSame(PhpAttributeTargetKind::Property, $propertyTarget->kind);
+        self::assertSame('name', $propertyTarget->memberName);
+        self::assertSame(PhpAttributeTargetKind::Method, $methodTarget->kind);
+        self::assertSame('run', $methodTarget->memberName);
+        self::assertSame([], $parameter->targets);
+        self::assertSame("name: 'service'", substr($source, $name->startOffset, $name->endOffset - $name->startOffset));
         self::assertSame("'service'", substr($source, $nameExpressionStart, $nameExpressionEnd - $nameExpressionStart));
         self::assertSame('Dependency::class', substr($source, $optionExpressionStart, $optionExpressionEnd - $optionExpressionStart));
-        self::assertSame(['App\Dependency'], array_map(static fn ($reference): string => $reference->className(), $document->classReferences()));
-        self::assertSame('Dependency', substr($source, $document->classReferences()[0]->startOffset(), $document->classReferences()[0]->endOffset() - $document->classReferences()[0]->startOffset()));
+        self::assertSame(['App\Dependency'], array_map(static fn ($reference): string => $reference->className, $document->classReferences));
+        self::assertSame('Dependency', substr($source, $document->classReferences[0]->startOffset, $document->classReferences[0]->endOffset - $document->classReferences[0]->startOffset));
     }
 
     public function testExposesNamespaceImportsAndNameResolution(): void
@@ -178,9 +178,9 @@ final class TolerantPhpParserTest extends TestCase
             }
             PHP;
 
-        $variables = (new TolerantPhpParser(new Parser()))->parse($source)->typedVariables();
+        $variables = (new TolerantPhpParser(new Parser()))->parse($source)->typedVariables;
 
-        self::assertSame(['service', 'handler', 'property', 'first', 'second', 'scalar', 'combined', 'count'], array_map(static fn ($variable): string => $variable->name(), $variables));
+        self::assertSame(['service', 'handler', 'property', 'first', 'second', 'scalar', 'combined', 'count'], array_map(static fn ($variable): string => $variable->name, $variables));
         self::assertSame([
             ['Vendor\Package\Service'],
             ['Vendor\Package\Handler', 'Vendor\Package\Other'],
@@ -190,7 +190,7 @@ final class TolerantPhpParserTest extends TestCase
             ['int'],
             ['Vendor\Package\Handler', 'Vendor\Package\Other', 'Vendor\Package\Service'],
             ['int'],
-        ], array_map(static fn ($variable): array => $variable->types(), $variables));
+        ], array_map(static fn ($variable): array => $variable->types, $variables));
     }
 
     public function testExposesScopedTypedReceiversAndCalls(): void
@@ -220,31 +220,31 @@ final class TolerantPhpParserTest extends TestCase
             PHP;
 
         $document = (new TolerantPhpParser(new Parser()))->parse($source);
-        [$promoted, $firstParameter, $secondParameter] = $document->typedVariables();
-        [$firstCall, $propertyCall, $secondCall, $otherCall] = $document->methodCalls();
+        [$promoted, $firstParameter, $secondParameter] = $document->typedVariables;
+        [$firstCall, $propertyCall, $secondCall, $otherCall] = $document->methodCalls;
         $firstArgument = $firstCall->argument(0);
         self::assertInstanceOf(PhpArgument::class, $firstArgument);
-        $firstArgumentStart = $firstArgument->expressionStartOffset();
-        $firstArgumentEnd = $firstArgument->expressionEndOffset();
+        $firstArgumentStart = $firstArgument->expressionStartOffset;
+        $firstArgumentEnd = $firstArgument->expressionEndOffset;
         self::assertIsInt($firstArgumentStart);
         self::assertIsInt($firstArgumentEnd);
 
-        self::assertSame([PhpTypedVariableKind::PromotedProperty, PhpTypedVariableKind::Parameter, PhpTypedVariableKind::Parameter], array_map(static fn ($variable): PhpTypedVariableKind => $variable->kind(), $document->typedVariables()));
-        self::assertSame(array_fill(0, 3, 'App\Handler'), array_map(static fn ($variable): ?string => $variable->className(), $document->typedVariables()));
-        self::assertSame(['__construct', 'first', 'second'], array_map(static fn ($variable): ?string => $variable->methodName(), $document->typedVariables()));
-        self::assertNotSame($firstParameter->scopeStartOffset(), $secondParameter->scopeStartOffset());
-        self::assertSame('bus', substr($source, $promoted->nameStartOffset(), $promoted->nameEndOffset() - $promoted->nameStartOffset()));
-        self::assertSame(PhpMethodReceiverKind::Variable, $firstCall->receiverContext()->kind());
-        self::assertSame('local', $firstCall->receiverContext()->name());
-        self::assertSame($firstParameter->scopeStartOffset(), $firstCall->scopeStartOffset());
-        self::assertSame('first', $firstCall->enclosingMethod());
-        self::assertSame('App\Handler', $firstCall->className());
-        self::assertSame(PhpMethodReceiverKind::ThisProperty, $propertyCall->receiverContext()->kind());
-        self::assertSame('bus', $propertyCall->receiverContext()->name());
-        self::assertSame($secondParameter->scopeStartOffset(), $secondCall->scopeStartOffset());
-        self::assertSame(PhpMethodReceiverKind::Variable, $otherCall->receiverContext()->kind());
+        self::assertSame([PhpTypedVariableKind::PromotedProperty, PhpTypedVariableKind::Parameter, PhpTypedVariableKind::Parameter], array_map(static fn ($variable): PhpTypedVariableKind => $variable->kind, $document->typedVariables));
+        self::assertSame(array_fill(0, 3, 'App\Handler'), array_map(static fn ($variable): ?string => $variable->className, $document->typedVariables));
+        self::assertSame(['__construct', 'first', 'second'], array_map(static fn ($variable): ?string => $variable->methodName, $document->typedVariables));
+        self::assertNotSame($firstParameter->scopeStartOffset, $secondParameter->scopeStartOffset);
+        self::assertSame('bus', substr($source, $promoted->nameStartOffset, $promoted->nameEndOffset - $promoted->nameStartOffset));
+        self::assertSame(PhpMethodReceiverKind::Variable, $firstCall->receiverContext->kind);
+        self::assertSame('local', $firstCall->receiverContext->name);
+        self::assertSame($firstParameter->scopeStartOffset, $firstCall->scopeStartOffset);
+        self::assertSame('first', $firstCall->enclosingMethod);
+        self::assertSame('App\Handler', $firstCall->className);
+        self::assertSame(PhpMethodReceiverKind::ThisProperty, $propertyCall->receiverContext->kind);
+        self::assertSame('bus', $propertyCall->receiverContext->name);
+        self::assertSame($secondParameter->scopeStartOffset, $secondCall->scopeStartOffset);
+        self::assertSame(PhpMethodReceiverKind::Variable, $otherCall->receiverContext->kind);
         self::assertSame("'first'", substr($source, $firstArgumentStart, $firstArgumentEnd - $firstArgumentStart));
-        self::assertSame('$local->dispatch(\'first\')', substr($source, $firstCall->startOffset(), $firstCall->endOffset() - $firstCall->startOffset()));
+        self::assertSame('$local->dispatch(\'first\')', substr($source, $firstCall->startOffset, $firstCall->endOffset - $firstCall->startOffset));
     }
 
     public function testExposesPropertyDeclarationsWithoutInitializerValues(): void
@@ -270,30 +270,30 @@ final class TolerantPhpParserTest extends TestCase
             }
             PHP;
 
-        $properties = (new TolerantPhpParser(new Parser()))->parse($source)->propertyDeclarations();
+        $properties = (new TolerantPhpParser(new Parser()))->parse($source)->propertyDeclarations;
 
-        self::assertSame(['primary', 'secondary', 'profile', 'token', 'untyped'], array_map(static fn ($property): string => $property->name(), $properties));
-        self::assertSame(array_fill(0, 5, 'App\Model\Customer'), array_map(static fn ($property): string => $property->className(), $properties));
+        self::assertSame(['primary', 'secondary', 'profile', 'token', 'untyped'], array_map(static fn ($property): string => $property->name, $properties));
+        self::assertSame(array_fill(0, 5, 'App\Model\Customer'), array_map(static fn ($property): string => $property->className, $properties));
         self::assertSame([
             'private ?Identifier $primary',
             'private ?Identifier $secondary',
             'protected UserProfile|null $profile',
             'public string $token',
             'private $untyped',
-        ], array_map(static fn ($property): string => $property->signature(), $properties));
+        ], array_map(static fn ($property): string => $property->signature, $properties));
         self::assertSame([
             ['Vendor\Identity\Identifier'],
             ['Vendor\Identity\Identifier'],
             ['Vendor\Profile'],
             ['string'],
             [],
-        ], array_map(static fn ($property): array => $property->types(), $properties));
-        self::assertSame(['private', 'private', 'protected', 'public', 'private'], array_map(static fn ($property): string => $property->visibility(), $properties));
+        ], array_map(static fn ($property): array => $property->types, $properties));
+        self::assertSame(['private', 'private', 'protected', 'public', 'private'], array_map(static fn ($property): string => $property->visibility, $properties));
         self::assertSame([false, false, false, true, false], array_map(static fn ($property): bool => $property->isPublic(), $properties));
-        self::assertSame(['Stores customer identities.', 'Stores customer identities.', null, null, null], array_map(static fn ($property): ?string => $property->description(), $properties));
-        self::assertSame(array_fill(0, 5, false), array_map(static fn ($property): bool => $property->isPromoted(), $properties));
+        self::assertSame(['Stores customer identities.', 'Stores customer identities.', null, null, null], array_map(static fn ($property): ?string => $property->description, $properties));
+        self::assertSame(array_fill(0, 5, false), array_map(static fn ($property): bool => $property->promoted, $properties));
         foreach ($properties as $property) {
-            self::assertSame($property->name(), substr($source, $property->nameStartOffset(), $property->nameEndOffset() - $property->nameStartOffset()));
+            self::assertSame($property->name, substr($source, $property->nameStartOffset, $property->nameEndOffset - $property->nameStartOffset));
         }
     }
 
@@ -318,25 +318,25 @@ final class TolerantPhpParserTest extends TestCase
             }
             PHP;
 
-        $properties = (new TolerantPhpParser(new Parser()))->parse($source)->propertyDeclarations();
+        $properties = (new TolerantPhpParser(new Parser()))->parse($source)->propertyDeclarations;
 
-        self::assertSame(['service', 'identifier', 'token'], array_map(static fn ($property): string => $property->name(), $properties));
+        self::assertSame(['service', 'identifier', 'token'], array_map(static fn ($property): string => $property->name, $properties));
         self::assertSame([
             'public Service $service',
             'protected readonly ?Identifier $identifier',
             'private $token',
-        ], array_map(static fn ($property): string => $property->signature(), $properties));
+        ], array_map(static fn ($property): string => $property->signature, $properties));
         self::assertSame([
             ['Vendor\Service'],
             ['Vendor\Identity\Identifier'],
             [],
-        ], array_map(static fn ($property): array => $property->types(), $properties));
-        self::assertSame(['public', 'protected', 'private'], array_map(static fn ($property): string => $property->visibility(), $properties));
+        ], array_map(static fn ($property): array => $property->types, $properties));
+        self::assertSame(['public', 'protected', 'private'], array_map(static fn ($property): string => $property->visibility, $properties));
         self::assertSame([true, false, false], array_map(static fn ($property): bool => $property->isPublic(), $properties));
-        self::assertSame(array_fill(0, 3, true), array_map(static fn ($property): bool => $property->isPromoted(), $properties));
+        self::assertSame(array_fill(0, 3, true), array_map(static fn ($property): bool => $property->promoted, $properties));
         foreach ($properties as $property) {
-            self::assertSame('App\Model\Customer', $property->className());
-            self::assertSame($property->name(), substr($source, $property->nameStartOffset(), $property->nameEndOffset() - $property->nameStartOffset()));
+            self::assertSame('App\Model\Customer', $property->className);
+            self::assertSame($property->name, substr($source, $property->nameStartOffset, $property->nameEndOffset - $property->nameStartOffset));
         }
     }
 
@@ -354,13 +354,13 @@ final class TolerantPhpParserTest extends TestCase
             PHP;
 
         $document = (new TolerantPhpParser(new Parser()))->parse($source);
-        $property = $document->propertyDeclarations()[0];
+        $property = $document->propertyDeclarations[0];
 
-        self::assertSame('identifier', $property->name());
-        self::assertSame('private Identifier $identifier', $property->signature());
-        self::assertSame(['Vendor\Identity\Identifier'], $property->types());
-        self::assertTrue($property->isPromoted());
-        self::assertSame('identifier', substr($source, $property->nameStartOffset(), $property->nameEndOffset() - $property->nameStartOffset()));
+        self::assertSame('identifier', $property->name);
+        self::assertSame('private Identifier $identifier', $property->signature);
+        self::assertSame(['Vendor\Identity\Identifier'], $property->types);
+        self::assertTrue($property->promoted);
+        self::assertSame('identifier', substr($source, $property->nameStartOffset, $property->nameEndOffset - $property->nameStartOffset));
     }
 
     public function testExposesObjectCreationCallablesAndMethodDeclarations(): void
@@ -397,10 +397,10 @@ final class TolerantPhpParserTest extends TestCase
             PHP;
 
         $document = (new TolerantPhpParser(new Parser()))->parse($source);
-        $creations = $document->objectCreations();
+        $creations = $document->objectCreations;
 
-        self::assertSame(['array_name', 'self_name', 'this_name', 'property_name', 'untyped_name', 'static_name', 'empty_name'], array_map(static fn ($creation): ?string => $creation->argument('name')?->stringLiteral()?->value() ?? $creation->argument(0)?->stringLiteral()?->value(), $creations));
-        self::assertSame(array_fill(0, 7, 'getFunctions'), array_map(static fn ($creation): ?string => $creation->enclosingMethod(), $creations));
+        self::assertSame(['array_name', 'self_name', 'this_name', 'property_name', 'untyped_name', 'static_name', 'empty_name'], array_map(static fn ($creation): ?string => $creation->argument('name')?->stringLiteral->value ?? $creation->argument(0)?->stringLiteral?->value, $creations));
+        self::assertSame(array_fill(0, 7, 'getFunctions'), array_map(static fn ($creation): ?string => $creation->enclosingMethod, $creations));
         self::assertSame([
             ['App\Twig\Runtime\AppRuntime', 'fromArray'],
             ['App\Twig\AppExtension', 'ownMethod'],
@@ -410,13 +410,13 @@ final class TolerantPhpParserTest extends TestCase
             ['App\Twig\Runtime\AppRuntime', 'fromStatic'],
             [null, null],
         ], array_map(static fn ($creation): array => [
-            ($creation->argument('callable') ?? $creation->argument(1))?->callable()?->className(),
-            ($creation->argument('callable') ?? $creation->argument(1))?->callable()?->method(),
+            ($creation->argument('callable') ?? $creation->argument(1))?->callable?->className,
+            ($creation->argument('callable') ?? $creation->argument(1))?->callable?->method,
         ], $creations));
-        $method = array_values(array_filter($document->methodDeclarations(), static fn ($method): bool => 'ownMethod' === $method->name()))[0];
-        self::assertSame('App\Twig\AppExtension', $method->className());
-        self::assertSame("public function ownMethod(string \$value = 'a  b'): string", $method->signature());
-        self::assertSame('Formats the value.', $method->description());
+        $method = array_values(array_filter($document->methodDeclarations, static fn ($method): bool => 'ownMethod' === $method->name))[0];
+        self::assertSame('App\Twig\AppExtension', $method->className);
+        self::assertSame("public function ownMethod(string \$value = 'a  b'): string", $method->signature);
+        self::assertSame('Formats the value.', $method->description);
     }
 
     public function testExposesMethodAttributesAndCallableShape(): void
@@ -457,21 +457,21 @@ final class TolerantPhpParserTest extends TestCase
             PHP;
 
         $document = (new TolerantPhpParser(new Parser()))->parse($source);
-        $methods = $document->methodDeclarations();
+        $methods = $document->methodDeclarations;
 
-        self::assertSame(['format', 'union', 'hidden', 'parameter', 'anonymous'], array_map(static fn (PhpMethodDeclaration $method): string => $method->name(), $methods));
-        self::assertSame($document->attributes()[0], $methods[0]->attributes()[0]);
-        self::assertSame('Twig\Attribute\AsTwigFunction', $methods[0]->attributes()[0]->name());
-        self::assertSame('format', $methods[0]->attributes()[0]->argument(0)?->stringLiteral()?->value());
-        self::assertSame('Twig\Environment', $methods[0]->firstParameterType());
-        self::assertFalse($methods[0]->isFirstParameterVariadic());
-        self::assertTrue($methods[0]->isVariadic());
-        self::assertTrue($methods[0]->isPublic());
-        self::assertStringStartsWith('public function format', $methods[0]->signature());
-        self::assertNull($methods[1]->firstParameterType());
-        self::assertFalse($methods[2]->isPublic());
-        self::assertSame([], $methods[3]->attributes());
-        self::assertSame('string', $methods[3]->firstParameterType());
+        self::assertSame(['format', 'union', 'hidden', 'parameter', 'anonymous'], array_map(static fn (PhpMethodDeclaration $method): string => $method->name, $methods));
+        self::assertSame($document->attributes[0], $methods[0]->attributes[0]);
+        self::assertSame('Twig\Attribute\AsTwigFunction', $methods[0]->attributes[0]->name);
+        self::assertSame('format', $methods[0]->attributes[0]->argument(0)?->stringLiteral?->value);
+        self::assertSame('Twig\Environment', $methods[0]->firstParameterType);
+        self::assertFalse($methods[0]->firstParameterVariadic);
+        self::assertTrue($methods[0]->variadic);
+        self::assertTrue($methods[0]->public);
+        self::assertStringStartsWith('public function format', $methods[0]->signature);
+        self::assertNull($methods[1]->firstParameterType);
+        self::assertFalse($methods[2]->public);
+        self::assertSame([], $methods[3]->attributes);
+        self::assertSame('string', $methods[3]->firstParameterType);
     }
 
     public function testExposesClassConstantsAndEnumCases(): void
@@ -508,14 +508,14 @@ final class TolerantPhpParserTest extends TestCase
             PHP;
 
         $document = (new TolerantPhpParser(new Parser()))->parse($source);
-        $status = $document->typeDeclarations()[0];
-        $constants = $document->constantDeclarations();
+        $status = $document->typeDeclarations[0];
+        $constants = $document->constantDeclarations;
 
-        self::assertSame(PhpTypeKind::Enum, $status->kind());
+        self::assertSame(PhpTypeKind::Enum, $status->kind);
         self::assertTrue($status->isEnum());
-        self::assertSame('enum Status: string', $status->signature());
-        self::assertSame('Describes the status.', $status->description());
-        self::assertNull($document->typeDeclarations()[1]->description());
+        self::assertSame('enum Status: string', $status->signature);
+        self::assertSame('Describes the status.', $status->description);
+        self::assertNull($document->typeDeclarations[1]->description);
         self::assertSame([
             [PhpConstantKind::EnumCase, 'App\Model\Status', 'Published', 'case Published;', 'The published state.', true],
             [PhpConstantKind::ClassConstant, 'App\Model\Status', 'LABEL', 'public const LABEL;', null, true],
@@ -523,15 +523,15 @@ final class TolerantPhpParserTest extends TestCase
             [PhpConstantKind::ClassConstant, 'App\Model\Options', 'FORMAT', 'public const FORMAT;', null, true],
             [PhpConstantKind::ClassConstant, 'App\Model\Options', 'EXTENSION', 'public const EXTENSION;', null, true],
         ], array_map(static fn ($constant): array => [
-            $constant->kind(),
-            $constant->className(),
-            $constant->name(),
-            $constant->signature(),
-            $constant->description(),
-            $constant->isPublic(),
+            $constant->kind,
+            $constant->className,
+            $constant->name,
+            $constant->signature,
+            $constant->description,
+            $constant->public,
         ], $constants));
         foreach ($constants as $constant) {
-            self::assertSame($constant->name(), substr($source, $constant->nameStartOffset(), $constant->nameEndOffset() - $constant->nameStartOffset()));
+            self::assertSame($constant->name, substr($source, $constant->nameStartOffset, $constant->nameEndOffset - $constant->nameStartOffset));
         }
     }
 
@@ -553,19 +553,19 @@ final class TolerantPhpParserTest extends TestCase
         }
 
         $document = (new TolerantPhpParser(new Parser()))->parse($source);
-        $creation = $document->objectCreations()[0];
-        $literal = $creation->argument('name')?->stringLiteral();
+        $creation = $document->objectCreations[0];
+        $literal = $creation->argument('name')?->stringLiteral;
 
-        self::assertSame('App\Handler', $document->typeDeclarations()[0]->name());
-        self::assertSame(['__construct', '__invoke', 'draft'], array_map(static fn ($method): string => $method->name(), $document->methodDeclarations()));
-        self::assertSame('$this->bus', $document->methodCalls()[0]->receiver());
-        self::assertSame('dispatch', $document->methodCalls()[0]->method());
-        self::assertSame('Vendor\Package\Message', $creation->className());
-        self::assertSame('__invoke', $creation->enclosingMethod());
+        self::assertSame('App\Handler', $document->typeDeclarations[0]->name);
+        self::assertSame(['__construct', '__invoke', 'draft'], array_map(static fn ($method): string => $method->name, $document->methodDeclarations));
+        self::assertSame('$this->bus', $document->methodCalls[0]->receiver);
+        self::assertSame('dispatch', $document->methodCalls[0]->method);
+        self::assertSame('Vendor\Package\Message', $creation->className);
+        self::assertSame('__invoke', $creation->enclosingMethod);
         self::assertInstanceOf(PhpStringLiteral::class, $literal);
-        self::assertSame('café', $literal->value());
-        self::assertSame('café', substr($source, $literal->startOffset(), $literal->endOffset() - $literal->startOffset()));
-        self::assertCount(6, $document->diagnostics());
+        self::assertSame('café', $literal->value);
+        self::assertSame('café', substr($source, $literal->startOffset, $literal->endOffset - $literal->startOffset));
+        self::assertCount(6, $document->diagnostics);
     }
 
     public function testRejectsInterpolatedStringsAsLiteralsAndReportsSyntaxDiagnostics(): void
@@ -579,8 +579,8 @@ final class TolerantPhpParserTest extends TestCase
 
         $document = (new TolerantPhpParser(new Parser()))->parse($source);
 
-        self::assertNull($document->attributes()[0]->argument('name')?->stringLiteral());
-        self::assertCount(1, $document->diagnostics());
-        self::assertSame("'}' expected.", $document->diagnostics()[0]->message());
+        self::assertNull($document->attributes[0]->argument('name')?->stringLiteral);
+        self::assertCount(1, $document->diagnostics);
+        self::assertSame("'}' expected.", $document->diagnostics[0]->message);
     }
 }

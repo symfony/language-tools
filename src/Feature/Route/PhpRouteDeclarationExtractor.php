@@ -21,50 +21,50 @@ final class PhpRouteDeclarationExtractor
     {
         $declarations = [];
         $document = $this->parser->parse($text);
-        foreach ($document->attributes() as $attribute) {
-            if (!\in_array($attribute->name(), [
+        foreach ($document->attributes as $attribute) {
+            if (!\in_array($attribute->name, [
                 'Symfony\Component\Routing\Annotation\Route',
                 'Symfony\Component\Routing\Attribute\Route',
             ], true)) {
                 continue;
             }
 
-            $name = ($attribute->argument('name') ?? $attribute->argument(1))?->stringLiteral();
-            if (null === $name || '' === $name->value()) {
+            $name = ($attribute->argument('name') ?? $attribute->argument(1))?->stringLiteral;
+            if (null === $name || '' === $name->value) {
                 continue;
             }
 
             $declarations[] = $this->declaration(
-                $name->value(),
+                $name->value,
                 $uri,
                 $text,
-                $name->startOffset(),
-                $name->endOffset(),
+                $name->startOffset,
+                $name->endOffset,
             );
         }
 
-        foreach ($document->methodCalls() as $call) {
-            if ('add' !== $call->method() || !preg_match('/^\$(\w+)$/', $call->receiver(), $variable)) {
+        foreach ($document->methodCalls as $call) {
+            if ('add' !== $call->method || !preg_match('/^\$(\w+)$/', $call->receiver, $variable)) {
                 continue;
             }
-            $beforeCall = substr($text, 0, $call->startOffset());
+            $beforeCall = substr($text, 0, $call->startOffset);
             if (!preg_match(
                 '/(?:RoutingConfigurator\s+\$'.preg_quote($variable[1], '/').'\b|\$'.preg_quote($variable[1], '/').'\s*=\s*new\s+(?:\\\\?RouteCollection|[^\s;(]*\\\\RouteCollection)\b)/s',
                 $beforeCall,
             )) {
                 continue;
             }
-            $name = $call->argument(0)?->stringLiteral();
-            if (null === $name || '' === $name->value()) {
+            $name = $call->argument(0)?->stringLiteral;
+            if (null === $name || '' === $name->value) {
                 continue;
             }
 
             $declarations[] = $this->declaration(
-                $name->value(),
+                $name->value,
                 $uri,
                 $text,
-                $name->startOffset(),
-                $name->endOffset(),
+                $name->startOffset,
+                $name->endOffset,
             );
         }
 

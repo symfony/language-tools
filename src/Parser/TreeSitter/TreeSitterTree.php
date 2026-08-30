@@ -8,14 +8,9 @@ final class TreeSitterTree
      * @param list<TreeSitterNode> $nodes
      */
     public function __construct(
-        private readonly bool $hasError,
+        public readonly bool $hasError,
         private readonly array $nodes,
     ) {
-    }
-
-    public function hasError(): bool
-    {
-        return $this->hasError;
     }
 
     public function root(): TreeSitterNode
@@ -27,7 +22,7 @@ final class TreeSitterTree
     public function children(TreeSitterNode $node): array
     {
         $children = [];
-        foreach ($node->children() as $index) {
+        foreach ($node->children as $index) {
             $children[] = $this->nodes[$index];
         }
 
@@ -36,9 +31,9 @@ final class TreeSitterTree
 
     public function childByField(TreeSitterNode $node, string $field): ?TreeSitterNode
     {
-        foreach ($node->children() as $index) {
+        foreach ($node->children as $index) {
             $child = $this->nodes[$index];
-            if ($field === $child->field()) {
+            if ($field === $child->field) {
                 return $child;
             }
         }
@@ -50,13 +45,13 @@ final class TreeSitterTree
     public function descendants(TreeSitterNode $node, ?string $type = null): array
     {
         $descendants = [];
-        $pending = $node->children();
+        $pending = $node->children;
         for ($cursor = 0; isset($pending[$cursor]); ++$cursor) {
             $descendant = $this->nodes[$pending[$cursor]];
-            if (null === $type || $type === $descendant->type()) {
+            if (null === $type || $type === $descendant->type) {
                 $descendants[] = $descendant;
             }
-            array_push($pending, ...$descendant->children());
+            array_push($pending, ...$descendant->children);
         }
 
         return $descendants;
@@ -67,7 +62,7 @@ final class TreeSitterTree
     {
         $matching = [];
         foreach ($this->nodes as $node) {
-            if ($type === $node->type()) {
+            if ($type === $node->type) {
                 $matching[] = $node;
             }
         }
@@ -77,6 +72,6 @@ final class TreeSitterTree
 
     public function text(TreeSitterNode $node, string $source): string
     {
-        return substr($source, $node->startByte(), $node->endByte() - $node->startByte());
+        return substr($source, $node->startByte, $node->endByte - $node->startByte);
     }
 }

@@ -5,19 +5,13 @@ namespace Symfony\Lsp\Parser\Php;
 final class PhpNameContext
 {
     /** @param array<string, string> $imports */
-    public function __construct(private readonly string $namespace = '', private readonly array $imports = [])
+    public function __construct(private readonly string $namespace = '', public readonly array $imports = [])
     {
     }
 
     public function namespace(): string
     {
         return $this->namespace;
-    }
-
-    /** @return array<string, string> */
-    public function imports(): array
-    {
-        return $this->imports;
     }
 
     public function resolve(string $name): string

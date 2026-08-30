@@ -83,18 +83,18 @@ final class TranslationExtractor
 
         $result = [];
         foreach ($this->yamlParser->parse($text) as $mapping) {
-            if ('' === $mapping->value()) {
+            if ('' === $mapping->value) {
                 continue;
             }
             $result[] = $this->declaration(
-                implode('.', $mapping->path()),
-                trim($mapping->value(), "'\""),
+                implode('.', $mapping->path),
+                trim($mapping->value, "'\""),
                 $domain,
                 $locale,
                 $uri,
                 $text,
-                $mapping->keyStartByte(),
-                $mapping->keyEndByte() - $mapping->keyStartByte(),
+                $mapping->keyStartByte,
+                $mapping->keyEndByte - $mapping->keyStartByte,
             );
         }
 

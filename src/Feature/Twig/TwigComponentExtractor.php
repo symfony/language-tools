@@ -37,15 +37,15 @@ final class TwigComponentExtractor
         $events = [];
         if ('php' === $languageId) {
             $php = $this->phpParser->parse($text);
-            $attributes = $php->attributes();
+            $attributes = $php->attributes;
             foreach ($attributes as $attribute) {
-                if (!\in_array($attribute->name(), [self::AS_TWIG_COMPONENT, self::AS_LIVE_COMPONENT], true)
+                if (!\in_array($attribute->name, [self::AS_TWIG_COMPONENT, self::AS_LIVE_COMPONENT], true)
                     || null === $target = $this->attributeTarget($attribute, PhpAttributeTargetKind::Type)
                 ) {
                     continue;
                 }
-                $className = $target->className();
-                if (!array_any($php->typeDeclarations(), static fn ($type): bool => $type->isClass() && $className === $type->name())) {
+                $className = $target->className;
+                if (!array_any($php->typeDeclarations, static fn ($type): bool => $type->isClass() && $className === $type->name)) {
                     continue;
                 }
                 $separator = strrpos($className, '\\');
@@ -57,54 +57,54 @@ final class TwigComponentExtractor
                     ?? $this->nameFromClass($className)
                     ?? $class;
                 $componentProperties = [];
-                foreach ($php->propertyDeclarations() as $property) {
-                    if ($className !== $property->className()
-                        || (!$property->isPublic() && !$this->hasAttribute($attributes, self::LIVE_PROP, PhpAttributeTargetKind::Property, $className, $property->name()))
+                foreach ($php->propertyDeclarations as $property) {
+                    if ($className !== $property->className
+                        || (!$property->isPublic() && !$this->hasAttribute($attributes, self::LIVE_PROP, PhpAttributeTargetKind::Property, $className, $property->name))
                     ) {
                         continue;
                     }
-                    $componentProperties[] = $property->name();
+                    $componentProperties[] = $property->name;
                 }
                 $componentProperties = array_values(array_unique($componentProperties));
                 sort($componentProperties);
                 $actions = [];
-                foreach ($php->methodDeclarations() as $method) {
-                    if ($className !== $method->className()) {
+                foreach ($php->methodDeclarations as $method) {
+                    if ($className !== $method->className) {
                         continue;
                     }
-                    $action = $this->hasAttribute($attributes, self::LIVE_ACTION, PhpAttributeTargetKind::Method, $className, $method->name());
-                    $listeners = $this->attributesForTarget($attributes, self::LIVE_LISTENER, PhpAttributeTargetKind::Method, $className, $method->name());
+                    $action = $this->hasAttribute($attributes, self::LIVE_ACTION, PhpAttributeTargetKind::Method, $className, $method->name);
+                    $listeners = $this->attributesForTarget($attributes, self::LIVE_LISTENER, PhpAttributeTargetKind::Method, $className, $method->name);
                     if (!$action && [] === $listeners) {
                         continue;
                     }
-                    $actions[$method->name()] = new TwigComponentAction($method->name(), $this->converter->toRange($text, $method->nameStartOffset(), $method->nameEndOffset() - $method->nameStartOffset()));
+                    $actions[$method->name] = new TwigComponentAction($method->name, $this->converter->toRange($text, $method->nameStartOffset, $method->nameEndOffset - $method->nameStartOffset));
                     foreach ($listeners as $listener) {
                         $eventArgument = $listener->argument('event');
                         if (null === $eventArgument) {
                             $eventArgument = $listener->argument(0);
-                            if (null !== $eventArgument?->name()) {
+                            if (null !== $eventArgument?->name) {
                                 $eventArgument = null;
                             }
                         }
-                        $event = $eventArgument?->stringLiteral();
-                        if (null === $event || '' === $event->value()) {
+                        $event = $eventArgument?->stringLiteral;
+                        if (null === $event || '' === $event->value) {
                             continue;
                         }
                         $events[] = new LiveComponentEvent(
-                            $event->value(),
+                            $event->value,
                             $uri,
-                            $this->converter->toRange($text, $event->startOffset(), $event->endOffset() - $event->startOffset()),
+                            $this->converter->toRange($text, $event->startOffset, $event->endOffset - $event->startOffset),
                             true,
                             $name,
-                            $method->name(),
+                            $method->name,
                         );
                     }
                 }
-                $live = self::AS_LIVE_COMPONENT === $attribute->name();
+                $live = self::AS_LIVE_COMPONENT === $attribute->name;
                 $components[] = new TwigComponent(
                     $name,
                     $uri,
-                    $this->converter->toRange($text, $target->nameStartOffset(), $target->nameEndOffset() - $target->nameStartOffset()),
+                    $this->converter->toRange($text, $target->nameStartOffset, $target->nameEndOffset - $target->nameStartOffset),
                     $className,
                     $template,
                     $componentProperties,
@@ -112,32 +112,32 @@ final class TwigComponentExtractor
                     array_values($actions),
                 );
                 if ($live) {
-                    foreach ($php->methodCalls() as $call) {
-                        if ('emit' !== $call->method()
-                            || PhpMethodReceiverKind::This !== $call->receiverContext()->kind()
-                            || $className !== $call->className()
+                    foreach ($php->methodCalls as $call) {
+                        if ('emit' !== $call->method
+                            || PhpMethodReceiverKind::This !== $call->receiverContext->kind
+                            || $className !== $call->className
                         ) {
                             continue;
                         }
                         $argument = null;
-                        foreach ($call->arguments() as $candidate) {
-                            if ('event' === $candidate->name()) {
+                        foreach ($call->arguments as $candidate) {
+                            if ('event' === $candidate->name) {
                                 $argument = $candidate;
                                 break;
                             }
                         }
                         $argument ??= $call->argument(0);
-                        if (null !== $argument?->name() && 'event' !== $argument->name()) {
+                        if (null !== $argument?->name && 'event' !== $argument->name) {
                             continue;
                         }
-                        $event = $argument?->stringLiteral();
+                        $event = $argument?->stringLiteral;
                         if (null === $event) {
                             continue;
                         }
                         $events[] = new LiveComponentEvent(
-                            $event->value(),
+                            $event->value,
                             $uri,
-                            $this->converter->toRange($text, $event->startOffset(), $event->endOffset() - $event->startOffset()),
+                            $this->converter->toRange($text, $event->startOffset, $event->endOffset - $event->startOffset),
                             false,
                             $name,
                         );
@@ -213,11 +213,11 @@ final class TwigComponentExtractor
     {
         $matches = [];
         foreach ($attributes as $attribute) {
-            if ($name !== $attribute->name()) {
+            if ($name !== $attribute->name) {
                 continue;
             }
-            foreach ($attribute->targets() as $target) {
-                if ($kind === $target->kind() && $className === $target->className() && $memberName === $target->memberName()) {
+            foreach ($attribute->targets as $target) {
+                if ($kind === $target->kind && $className === $target->className && $memberName === $target->memberName) {
                     $matches[] = $attribute;
                     break;
                 }
@@ -229,8 +229,8 @@ final class TwigComponentExtractor
 
     private function attributeTarget(PhpAttribute $attribute, PhpAttributeTargetKind $kind): ?PhpAttributeTarget
     {
-        foreach ($attribute->targets() as $target) {
-            if ($kind === $target->kind()) {
+        foreach ($attribute->targets as $target) {
+            if ($kind === $target->kind) {
                 return $target;
             }
         }
@@ -241,11 +241,11 @@ final class TwigComponentExtractor
     private function stringArgument(PhpAttribute $attribute, string|int $name): ?string
     {
         $argument = $attribute->argument($name);
-        if (\is_int($name) && null !== $argument?->name()) {
+        if (\is_int($name) && null !== $argument?->name) {
             return null;
         }
 
-        return $argument?->stringLiteral()?->value();
+        return $argument?->stringLiteral?->value;
     }
 
     private function anonymousName(Project $project, string $uri): ?string

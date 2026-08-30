@@ -59,10 +59,10 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
                 $declaration = $declarations[$variable];
                 $item['detail'] = \sprintf(
                     'Twig variable: %s (%s)',
-                    $declaration->type(),
-                    $declaration->optional() ? 'optional' : 'required',
+                    $declaration->type,
+                    $declaration->optional ? 'optional' : 'required',
                 );
-                if (null !== $documentation = $declaration->documentation()) {
+                if (null !== $documentation = $declaration->documentation) {
                     $item['documentation'] = ['kind' => 'markdown', 'value' => $documentation];
                 }
             }
@@ -88,10 +88,10 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
             $value = \sprintf(
                 "Twig variable: `%s`\n\nDeclared type: `%s`\n\n%s template variable",
                 $this->markdownCode($name),
-                $this->markdownCode($declaration->type()),
-                $declaration->optional() ? 'Optional' : 'Required',
+                $this->markdownCode($declaration->type),
+                $declaration->optional ? 'Optional' : 'Required',
             );
-            if (null !== $documentation = $declaration->documentation()) {
+            if (null !== $documentation = $declaration->documentation) {
                 $value .= "\n\n".$documentation;
             }
 
@@ -131,7 +131,7 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
     {
         $declarations = [];
         foreach ($this->typeDeclarationParser->parse($document->text()) as $declaration) {
-            $declarations[$declaration->name()] = $declaration;
+            $declarations[$declaration->name] = $declaration;
         }
 
         return $declarations;

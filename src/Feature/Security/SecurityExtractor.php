@@ -133,36 +133,36 @@ final class SecurityExtractor
     {
         $symbols = [];
         $php = $this->phpParser->parse($text);
-        foreach ($php->attributes() as $attribute) {
-            if (self::IS_GRANTED_ATTRIBUTE !== $attribute->name()) {
+        foreach ($php->attributes as $attribute) {
+            if (self::IS_GRANTED_ATTRIBUTE !== $attribute->name) {
                 continue;
             }
-            $role = ($attribute->argument('attribute') ?? $attribute->argument(0))?->stringLiteral();
-            if (null !== $role && preg_match('/^ROLE_[A-Z0-9_]+$/D', $role->value())) {
-                $symbols[] = $this->symbol(SecuritySymbolKind::Role, $role->value(), $uri, $text, $role->startOffset());
+            $role = ($attribute->argument('attribute') ?? $attribute->argument(0))?->stringLiteral;
+            if (null !== $role && preg_match('/^ROLE_[A-Z0-9_]+$/D', $role->value)) {
+                $symbols[] = $this->symbol(SecuritySymbolKind::Role, $role->value, $uri, $text, $role->startOffset);
             }
         }
-        foreach ($php->methodCalls() as $call) {
-            $argument = $call->argument(0)?->stringLiteral();
+        foreach ($php->methodCalls as $call) {
+            $argument = $call->argument(0)?->stringLiteral;
             if (null === $argument) {
                 continue;
             }
-            if ('isGranted' === $call->method()
-                && preg_match('/^ROLE_[A-Z0-9_]+$/D', $argument->value())
+            if ('isGranted' === $call->method
+                && preg_match('/^ROLE_[A-Z0-9_]+$/D', $argument->value)
                 && $this->hasTypedReceiver($call, $php, self::AUTHORIZATION_TYPES)
             ) {
-                $symbols[] = $this->symbol(SecuritySymbolKind::Role, $argument->value(), $uri, $text, $argument->startOffset());
-            } elseif ('denyAccessUnlessGranted' === $call->method()
-                && preg_match('/^ROLE_[A-Z0-9_]+$/D', $argument->value())
-                && PhpMethodReceiverKind::This === $call->receiverContext()->kind()
-                && $this->extendsAbstractController($php, $call->className())
+                $symbols[] = $this->symbol(SecuritySymbolKind::Role, $argument->value, $uri, $text, $argument->startOffset);
+            } elseif ('denyAccessUnlessGranted' === $call->method
+                && preg_match('/^ROLE_[A-Z0-9_]+$/D', $argument->value)
+                && PhpMethodReceiverKind::This === $call->receiverContext->kind
+                && $this->extendsAbstractController($php, $call->className)
             ) {
-                $symbols[] = $this->symbol(SecuritySymbolKind::Role, $argument->value(), $uri, $text, $argument->startOffset());
-            } elseif (\in_array($call->method(), ['getLogoutPath', 'getLogoutUrl'], true)
-                && preg_match('/^[A-Za-z0-9_.-]+$/D', $argument->value())
+                $symbols[] = $this->symbol(SecuritySymbolKind::Role, $argument->value, $uri, $text, $argument->startOffset);
+            } elseif (\in_array($call->method, ['getLogoutPath', 'getLogoutUrl'], true)
+                && preg_match('/^[A-Za-z0-9_.-]+$/D', $argument->value)
                 && $this->hasTypedReceiver($call, $php, [self::LOGOUT_URL_GENERATOR])
             ) {
-                $symbols[] = $this->symbol(SecuritySymbolKind::Firewall, $argument->value(), $uri, $text, $argument->startOffset());
+                $symbols[] = $this->symbol(SecuritySymbolKind::Firewall, $argument->value, $uri, $text, $argument->startOffset);
             }
         }
 
@@ -215,23 +215,23 @@ final class SecurityExtractor
     /** @param list<string> $acceptedTypes */
     private function hasTypedReceiver(PhpMethodCall $call, PhpDocument $php, array $acceptedTypes): bool
     {
-        $receiver = $call->receiverContext();
-        if (null === $receiver->name()) {
+        $receiver = $call->receiverContext;
+        if (null === $receiver->name) {
             return false;
         }
-        foreach ($php->typedVariables() as $variable) {
-            if ($receiver->name() !== $variable->name() || [] === array_intersect($acceptedTypes, $variable->types())) {
+        foreach ($php->typedVariables as $variable) {
+            if ($receiver->name !== $variable->name || [] === array_intersect($acceptedTypes, $variable->types)) {
                 continue;
             }
-            if (PhpMethodReceiverKind::Variable === $receiver->kind()
-                && \in_array($variable->kind(), [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                && $call->scopeStartOffset() === $variable->scopeStartOffset()
+            if (PhpMethodReceiverKind::Variable === $receiver->kind
+                && \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                && $call->scopeStartOffset === $variable->scopeStartOffset
             ) {
                 return true;
             }
-            if (PhpMethodReceiverKind::ThisProperty === $receiver->kind()
-                && \in_array($variable->kind(), [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
-                && $call->className() === $variable->className()
+            if (PhpMethodReceiverKind::ThisProperty === $receiver->kind
+                && \in_array($variable->kind, [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
+                && $call->className === $variable->className
             ) {
                 return true;
             }
@@ -248,20 +248,20 @@ final class SecurityExtractor
         if (null === $type || null === $method) {
             return false;
         }
-        foreach ($php->typedVariables() as $variable) {
-            if ($name !== $variable->name() || [] === array_intersect($acceptedTypes, $variable->types())) {
+        foreach ($php->typedVariables as $variable) {
+            if ($name !== $variable->name || [] === array_intersect($acceptedTypes, $variable->types)) {
                 continue;
             }
             if ($property
-                && \in_array($variable->kind(), [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
-                && $type->name() === $variable->className()
+                && \in_array($variable->kind, [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
+                && $type->name === $variable->className
             ) {
                 return true;
             }
             if (!$property
-                && \in_array($variable->kind(), [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                && $type->name() === $variable->className()
-                && $method === $variable->methodName()
+                && \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                && $type->name === $variable->className
+                && $method === $variable->methodName
             ) {
                 return true;
             }
@@ -276,13 +276,13 @@ final class SecurityExtractor
 
         return null !== $type
             && null !== $this->containingMethod($php, $type, $offset)
-            && self::ABSTRACT_CONTROLLER === $type->parentClassName();
+            && self::ABSTRACT_CONTROLLER === $type->parentClassName;
     }
 
     private function extendsAbstractController(PhpDocument $php, ?string $className): bool
     {
-        foreach ($php->typeDeclarations() as $type) {
-            if ($className === $type->name() && self::ABSTRACT_CONTROLLER === $type->parentClassName()) {
+        foreach ($php->typeDeclarations as $type) {
+            if ($className === $type->name && self::ABSTRACT_CONTROLLER === $type->parentClassName) {
                 return true;
             }
         }
@@ -294,12 +294,12 @@ final class SecurityExtractor
     {
         $name = null;
         $nameOffset = -1;
-        foreach ($php->methodDeclarations() as $method) {
-            if ($type->name() !== $method->className() || $method->nameStartOffset() > $offset || $method->nameStartOffset() <= $nameOffset) {
+        foreach ($php->methodDeclarations as $method) {
+            if ($type->name !== $method->className || $method->nameStartOffset > $offset || $method->nameStartOffset <= $nameOffset) {
                 continue;
             }
-            $name = $method->name();
-            $nameOffset = $method->nameStartOffset();
+            $name = $method->name;
+            $nameOffset = $method->nameStartOffset;
         }
 
         return $name;
@@ -307,7 +307,7 @@ final class SecurityExtractor
 
     private function containingType(PhpDocument $php, int $offset): ?PhpTypeDeclaration
     {
-        foreach ($php->typeDeclarations() as $type) {
+        foreach ($php->typeDeclarations as $type) {
             if ($type->contains($offset)) {
                 return $type;
             }

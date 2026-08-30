@@ -45,22 +45,22 @@ final class TemplateReferenceExtractor
             }
             $references[] = new TemplateReference($call->value, $uri, $call->range, $variables);
         }
-        foreach ($this->phpParser->parse($text)->attributes() as $attribute) {
-            if (self::TEMPLATE_ATTRIBUTE !== $attribute->name()) {
+        foreach ($this->phpParser->parse($text)->attributes as $attribute) {
+            if (self::TEMPLATE_ATTRIBUTE !== $attribute->name) {
                 continue;
             }
-            $template = $this->attributeArgument($attribute, 'template', 0)?->stringLiteral();
-            if (null === $template || '' === $template->value()) {
+            $template = $this->attributeArgument($attribute, 'template', 0)?->stringLiteral;
+            if (null === $template || '' === $template->value) {
                 continue;
             }
             $references[] = new TemplateReference(
-                $template->value(),
+                $template->value,
                 $uri,
                 new Range(
-                    $this->positionConverter->toPosition($text, $template->startOffset()),
-                    $this->positionConverter->toPosition($text, $template->endOffset()),
+                    $this->positionConverter->toPosition($text, $template->startOffset),
+                    $this->positionConverter->toPosition($text, $template->endOffset),
                 ),
-                $this->attributeVariables($this->attributeArgument($attribute, 'vars', 1)?->expression()),
+                $this->attributeVariables($this->attributeArgument($attribute, 'vars', 1)?->expression),
             );
         }
 
@@ -118,7 +118,7 @@ final class TemplateReferenceExtractor
         }
         $positional = $attribute->argument($position);
 
-        return null === $positional?->name() ? $positional : null;
+        return null === $positional?->name ? $positional : null;
     }
 
     /** @return list<string> */

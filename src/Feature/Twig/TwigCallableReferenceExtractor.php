@@ -27,7 +27,7 @@ final class TwigCallableReferenceExtractor
         ] as [$containerType, $identifierType, $kind]) {
             foreach ($document->nodesOfType($containerType) as $container) {
                 $identifier = $document->directChild($container, $identifierType);
-                if (null === $identifier || !$this->contains($identifier, $offset) || !$this->insideDirective($masked, $identifier->startByte())) {
+                if (null === $identifier || !$this->contains($identifier, $offset) || !$this->insideDirective($masked, $identifier->startByte)) {
                     continue;
                 }
                 $name = $document->text($identifier);
@@ -54,20 +54,20 @@ final class TwigCallableReferenceExtractor
         ] as [$containerType, $identifierType, $kind]) {
             foreach ($document->nodesOfType($containerType) as $container) {
                 $identifier = $document->directChild($container, $identifierType);
-                if (null === $identifier || !$this->insideDirective($masked, $identifier->startByte())) {
+                if (null === $identifier || !$this->insideDirective($masked, $identifier->startByte)) {
                     continue;
                 }
                 $name = $document->text($identifier);
                 if (1 !== preg_match('/^[A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*$/', $name)) {
                     continue;
                 }
-                $usages[$identifier->startByte()] = new TwigCallableUsage(
+                $usages[$identifier->startByte] = new TwigCallableUsage(
                     $kind,
                     $name,
                     $uri,
                     new Range(
-                        $this->converter->toPosition($text, $identifier->startByte()),
-                        $this->converter->toPosition($text, $identifier->endByte()),
+                        $this->converter->toPosition($text, $identifier->startByte),
+                        $this->converter->toPosition($text, $identifier->endByte),
                     ),
                 );
             }
@@ -79,7 +79,7 @@ final class TwigCallableReferenceExtractor
 
     private function contains(TreeSitterNode $node, int $offset): bool
     {
-        return $offset >= $node->startByte() && $offset <= $node->endByte();
+        return $offset >= $node->startByte && $offset <= $node->endByte;
     }
 
     public function insideDirective(string $text, int $offset): bool

@@ -22,15 +22,15 @@ final class YamlConfigurationParser
         foreach ($mappings as $mapping) {
             $literalDepths = $this->literalDepths($mapping, $siblings);
             $path = null === $index
-                ? $this->normalizePath($mapping->path(), $literalDepths)
-                : $index->normalizePath($mapping->path(), $mapping->sequenceDepths(), $literalDepths);
+                ? $this->normalizePath($mapping->path, $literalDepths)
+                : $index->normalizePath($mapping->path, $mapping->sequenceDepths, $literalDepths);
             $occurrences[] = new ConfigurationOccurrence(
                 $path,
-                $mapping->value(),
-                new Range($this->converter->toPosition($text, $mapping->keyStartByte()), $this->converter->toPosition($text, $mapping->keyEndByte())),
-                new Range($this->converter->toPosition($text, $mapping->valueStartByte()), $this->converter->toPosition($text, $mapping->valueEndByte())),
-                $mapping->sequenceDepths(),
-                $mapping->scope(),
+                $mapping->value,
+                new Range($this->converter->toPosition($text, $mapping->keyStartByte), $this->converter->toPosition($text, $mapping->keyEndByte)),
+                new Range($this->converter->toPosition($text, $mapping->valueStartByte), $this->converter->toPosition($text, $mapping->valueEndByte)),
+                $mapping->sequenceDepths,
+                $mapping->scope,
                 $literalDepths,
             );
         }
@@ -71,11 +71,11 @@ final class YamlConfigurationParser
     {
         $siblings = [];
         foreach ($mappings as $mapping) {
-            $path = $mapping->path();
+            $path = $mapping->path;
             if ([] === $path) {
                 continue;
             }
-            $group = $mapping->scope()."\x1f".implode("\x1f", \array_slice($path, 0, -1));
+            $group = $mapping->scope."\x1f".implode("\x1f", \array_slice($path, 0, -1));
             $siblings[$group][$path[\count($path) - 1]] = true;
         }
 
@@ -93,15 +93,15 @@ final class YamlConfigurationParser
     private function literalDepths(YamlMapping $mapping, array $siblings): array
     {
         $literalDepths = [];
-        $path = $mapping->path();
+        $path = $mapping->path;
         foreach ($path as $depth => $name) {
-            if (\in_array($depth, $mapping->sequenceDepths(), true)
+            if (\in_array($depth, $mapping->sequenceDepths, true)
                 || !str_contains($name, '-')
                 || str_contains($name, '_')
             ) {
                 continue;
             }
-            $group = $mapping->scope()."\x1f".implode("\x1f", \array_slice($path, 0, $depth));
+            $group = $mapping->scope."\x1f".implode("\x1f", \array_slice($path, 0, $depth));
             if (isset($siblings[$group][str_replace('-', '_', $name)])) {
                 $literalDepths[] = $depth;
             }

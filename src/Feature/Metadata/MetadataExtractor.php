@@ -67,15 +67,15 @@ final class MetadataExtractor
         $source = $this->phpComments->mask($text);
         $options = [];
         foreach ($this->formCalls($php) as $call) {
-            $typeIndex = 'createNamed' === $call->method() ? 1 : ('add' === $call->method() ? 1 : 0);
-            $optionsIndex = 'createNamed' === $call->method() ? 3 : 2;
+            $typeIndex = 'createNamed' === $call->method ? 1 : ('add' === $call->method ? 1 : 0);
+            $optionsIndex = 'createNamed' === $call->method ? 3 : 2;
             $type = $this->leadingClassReferenceArgument($source, $php, $call->argument($typeIndex));
             $argument = $call->argument($optionsIndex);
             if (null === $type || null === $argument) {
                 continue;
             }
             foreach ($this->arrayKeys($text, $argument) as $key) {
-                $options[] = ['class' => $type->className(), 'option' => $key['name'], 'range' => $key['range']];
+                $options[] = ['class' => $type->className, 'option' => $key['name'], 'range' => $key['range']];
             }
         }
 
@@ -87,15 +87,15 @@ final class MetadataExtractor
     {
         $php = $this->phpParser->parse($text);
         $options = [];
-        foreach ($php->attributes() as $attribute) {
-            foreach ($attribute->arguments() as $argument) {
-                $name = $argument->name();
-                $start = $argument->nameStartOffset();
-                $end = $argument->nameEndOffset();
+        foreach ($php->attributes as $attribute) {
+            foreach ($attribute->arguments as $argument) {
+                $name = $argument->name;
+                $start = $argument->nameStartOffset;
+                $end = $argument->nameEndOffset;
                 if (null === $name || !\is_int($start) || !\is_int($end)) {
                     continue;
                 }
-                $options[] = ['constraint' => $attribute->name(), 'option' => $name, 'range' => $this->converter->toRange($text, $start, $end - $start)];
+                $options[] = ['constraint' => $attribute->name, 'option' => $name, 'range' => $this->converter->toRange($text, $start, $end - $start)];
             }
         }
 
@@ -126,28 +126,28 @@ final class MetadataExtractor
     private function formDataClasses(string $source, PhpDocument $php): array
     {
         $classes = [];
-        foreach ($php->methodDeclarations() as $method) {
-            if ('configureOptions' !== $method->name()
-                || 'Symfony\\Component\\OptionsResolver\\OptionsResolver' !== $method->firstParameterType()
-                || null === ($resolver = $this->typedMethodParameter($php, $method->className(), $method->name(), 'Symfony\\Component\\OptionsResolver\\OptionsResolver'))
+        foreach ($php->methodDeclarations as $method) {
+            if ('configureOptions' !== $method->name
+                || 'Symfony\\Component\\OptionsResolver\\OptionsResolver' !== $method->firstParameterType
+                || null === ($resolver = $this->typedMethodParameter($php, $method->className, $method->name, 'Symfony\\Component\\OptionsResolver\\OptionsResolver'))
             ) {
                 continue;
             }
             $dataClass = null;
-            foreach ($php->methodCalls() as $call) {
-                if (!\in_array($call->method(), ['setDefaults', 'setDefault'], true)
-                    || $method->className() !== $call->className()
-                    || $method->name() !== $call->enclosingMethod()
-                    || $resolver->scopeStartOffset() !== $call->scopeStartOffset()
-                    || PhpMethodReceiverKind::Variable !== $call->receiverContext()->kind()
-                    || $resolver->name() !== $call->receiverContext()->name()
+            foreach ($php->methodCalls as $call) {
+                if (!\in_array($call->method, ['setDefaults', 'setDefault'], true)
+                    || $method->className !== $call->className
+                    || $method->name !== $call->enclosingMethod
+                    || $resolver->scopeStartOffset !== $call->scopeStartOffset
+                    || PhpMethodReceiverKind::Variable !== $call->receiverContext->kind
+                    || $resolver->name !== $call->receiverContext->name
                 ) {
                     continue;
                 }
-                if ('setDefaults' === $call->method()) {
+                if ('setDefaults' === $call->method) {
                     $argument = $call->argument(0);
-                    $expression = $argument?->expression();
-                    $offset = $argument?->expressionStartOffset();
+                    $expression = $argument?->expression;
+                    $offset = $argument?->expressionStartOffset;
                     if (!\is_string($expression) || !\is_int($offset) || null === $entries = $this->arrayEntries($expression, $offset)) {
                         $dataClass = null;
                         continue;
@@ -157,12 +157,12 @@ final class MetadataExtractor
                     }
                     $dataClassExpression = $entries['data_class'];
                 } else {
-                    if ('data_class' !== $this->quotedIdentifier($call->argument(0)?->expression() ?? '')) {
+                    if ('data_class' !== $this->quotedIdentifier($call->argument(0)->expression ?? '')) {
                         continue;
                     }
                     $argument = $call->argument(1);
-                    $expression = $argument?->expression();
-                    $offset = $argument?->expressionStartOffset();
+                    $expression = $argument?->expression;
+                    $offset = $argument?->expressionStartOffset;
                     if (!\is_string($expression) || !\is_int($offset)) {
                         $dataClass = null;
                         continue;
@@ -172,7 +172,7 @@ final class MetadataExtractor
                 $dataClass = $this->staticClassName($source, $dataClassExpression, $php);
             }
             if (null !== $dataClass) {
-                $classes[strtolower(ltrim($method->className(), '\\'))] = new FormDataClass($method->className(), $dataClass);
+                $classes[strtolower(ltrim($method->className, '\\'))] = new FormDataClass($method->className, $dataClass);
             }
         }
 
@@ -187,38 +187,38 @@ final class MetadataExtractor
     private function phpSymbols(string $uri, string $text, string $source, PhpDocument $php, array $formDataClasses): array
     {
         $symbols = [];
-        foreach ($php->typeDeclarations() as $type) {
+        foreach ($php->typeDeclarations as $type) {
             if (!$type->isClass()) {
                 continue;
             }
-            $range = $this->converter->toRange($text, $type->nameStartOffset(), $type->nameEndOffset() - $type->nameStartOffset());
+            $range = $this->converter->toRange($text, $type->nameStartOffset, $type->nameEndOffset - $type->nameStartOffset);
             $symbols[] = new MetadataSourceSymbol(
                 MetadataSymbolKind::MappedClass,
-                $type->name(),
+                $type->name,
                 $uri,
                 $range,
                 true,
             );
-            if ('Symfony\\Component\\Validator\\Constraint' === $type->parentClassName()) {
-                $separator = strrpos($type->name(), '\\');
+            if ('Symfony\\Component\\Validator\\Constraint' === $type->parentClassName) {
+                $separator = strrpos($type->name, '\\');
                 $symbols[] = new MetadataSourceSymbol(
                     MetadataSymbolKind::Constraint,
-                    false === $separator ? $type->name() : substr($type->name(), $separator + 1),
+                    false === $separator ? $type->name : substr($type->name, $separator + 1),
                     $uri,
                     $range,
                     true,
                 );
             }
         }
-        foreach ($php->propertyDeclarations() as $property) {
+        foreach ($php->propertyDeclarations as $property) {
             $symbols[] = new MetadataSourceSymbol(
                 MetadataSymbolKind::Property,
-                $property->className().'::$'.$property->name(),
+                $property->className.'::$'.$property->name,
                 $uri,
-                $this->converter->toRange($text, $property->nameStartOffset(), $property->nameEndOffset() - $property->nameStartOffset()),
+                $this->converter->toRange($text, $property->nameStartOffset, $property->nameEndOffset - $property->nameStartOffset),
                 true,
-                $property->signature(),
-                $property->description(),
+                $property->signature,
+                $property->description,
             );
         }
 
@@ -226,26 +226,26 @@ final class MetadataExtractor
         foreach ($formDataClasses as $formDataClass) {
             $dataClasses[strtolower(ltrim($formDataClass->formClass(), '\\'))] = $formDataClass->dataClass();
         }
-        foreach ($php->methodDeclarations() as $method) {
-            $dataClass = $dataClasses[strtolower(ltrim($method->className(), '\\'))] ?? null;
+        foreach ($php->methodDeclarations as $method) {
+            $dataClass = $dataClasses[strtolower(ltrim($method->className, '\\'))] ?? null;
             if (null === $dataClass
-                || 'buildForm' !== $method->name()
-                || 'Symfony\\Component\\Form\\FormBuilderInterface' !== $method->firstParameterType()
-                || null === ($builder = $this->typedMethodParameter($php, $method->className(), $method->name(), 'Symfony\\Component\\Form\\FormBuilderInterface'))
+                || 'buildForm' !== $method->name
+                || 'Symfony\\Component\\Form\\FormBuilderInterface' !== $method->firstParameterType
+                || null === ($builder = $this->typedMethodParameter($php, $method->className, $method->name, 'Symfony\\Component\\Form\\FormBuilderInterface'))
             ) {
                 continue;
             }
-            foreach ($php->methodCalls() as $call) {
-                if ('add' !== $call->method()
-                    || $method->className() !== $call->className()
-                    || $method->name() !== $call->enclosingMethod()
-                    || $builder->scopeStartOffset() !== $call->scopeStartOffset()
-                    || !$this->isDirectFormBuilderReceiver($call->receiver(), $builder->name())
+            foreach ($php->methodCalls as $call) {
+                if ('add' !== $call->method
+                    || $method->className !== $call->className
+                    || $method->name !== $call->enclosingMethod
+                    || $builder->scopeStartOffset !== $call->scopeStartOffset
+                    || !$this->isDirectFormBuilderReceiver($call->receiver, $builder->name)
                 ) {
                     continue;
                 }
                 $field = null === $call->argument(0) ? null : $this->quotedIdentifierArgument($text, $call->argument(0));
-                $property = null === $field ? null : $this->formPropertyName($call->arguments(), $field['name']);
+                $property = null === $field ? null : $this->formPropertyName($call->arguments, $field['name']);
                 if (null === $field || null === $property) {
                     continue;
                 }
@@ -259,11 +259,11 @@ final class MetadataExtractor
             }
         }
 
-        foreach ($php->attributes() as $attribute) {
-            if (\in_array($attribute->name(), self::SERIALIZER_GROUP_ATTRIBUTES, true)) {
-                foreach ($attribute->arguments() as $argument) {
-                    $expression = $argument->expression();
-                    $offset = $argument->expressionStartOffset();
+        foreach ($php->attributes as $attribute) {
+            if (\in_array($attribute->name, self::SERIALIZER_GROUP_ATTRIBUTES, true)) {
+                foreach ($attribute->arguments as $argument) {
+                    $expression = $argument->expression;
+                    $offset = $argument->expressionStartOffset;
                     if (\is_string($expression) && \is_int($offset)) {
                         array_push($symbols, ...$this->quotedSymbols(MetadataSymbolKind::SerializerGroup, $uri, $text, $expression, $offset, true));
                     }
@@ -275,9 +275,9 @@ final class MetadataExtractor
             array_push($symbols, ...$this->quotedSymbols(MetadataSymbolKind::SerializerGroup, $uri, $text, $group[1][0], $group[1][1], false));
         }
         $constraintNamespace = 'Symfony\\Component\\Validator\\Constraints\\';
-        foreach ($php->attributes() as $attribute) {
-            $className = $attribute->name();
-            $rawName = substr($text, $attribute->nameStartOffset(), $attribute->nameEndOffset() - $attribute->nameStartOffset());
+        foreach ($php->attributes as $attribute) {
+            $className = $attribute->name;
+            $rawName = substr($text, $attribute->nameStartOffset, $attribute->nameEndOffset - $attribute->nameStartOffset);
             if (str_starts_with($className, $constraintNamespace)) {
                 $name = substr($className, \strlen($constraintNamespace));
                 if (str_contains($name, '\\')) {
@@ -288,7 +288,7 @@ final class MetadataExtractor
                     MetadataSymbolKind::Constraint,
                     $name,
                     $uri,
-                    $this->converter->toRange($text, $attribute->nameStartOffset() + $segmentOffset, \strlen($rawName) - $segmentOffset),
+                    $this->converter->toRange($text, $attribute->nameStartOffset + $segmentOffset, \strlen($rawName) - $segmentOffset),
                     false,
                 );
 
@@ -307,7 +307,7 @@ final class MetadataExtractor
                 MetadataSymbolKind::Constraint,
                 $alias,
                 $uri,
-                $this->converter->toRange($text, $attribute->nameStartOffset() + $aliasOffset, \strlen($alias)),
+                $this->converter->toRange($text, $attribute->nameStartOffset + $aliasOffset, \strlen($alias)),
                 false,
             );
         }
@@ -489,11 +489,11 @@ final class MetadataExtractor
     private function formCalls(PhpDocument $php): array
     {
         $calls = [];
-        foreach ($php->methodCalls() as $call) {
-            if (!\in_array($call->method(), ['createForm', 'createNamed', 'add'], true)) {
+        foreach ($php->methodCalls as $call) {
+            if (!\in_array($call->method, ['createForm', 'createNamed', 'add'], true)) {
                 continue;
             }
-            if ('add' === $call->method() && null === $this->formBuilderVariableForCall($php, $call)) {
+            if ('add' === $call->method && null === $this->formBuilderVariableForCall($php, $call)) {
                 continue;
             }
             $calls[] = $call;
@@ -504,13 +504,13 @@ final class MetadataExtractor
 
     private function formBuilderVariableForCall(PhpDocument $php, PhpMethodCall $call): ?PhpTypedVariable
     {
-        foreach ($php->typedVariables() as $variable) {
-            if (PhpTypedVariableKind::Parameter !== $variable->kind()
-                || !\in_array('Symfony\\Component\\Form\\FormBuilderInterface', $variable->types(), true)
-                || $call->className() !== $variable->className()
-                || $call->enclosingMethod() !== $variable->methodName()
-                || $call->scopeStartOffset() !== $variable->scopeStartOffset()
-                || 1 !== preg_match('/^\s*\\$'.preg_quote($variable->name(), '/').'\b/', $call->receiver())
+        foreach ($php->typedVariables as $variable) {
+            if (PhpTypedVariableKind::Parameter !== $variable->kind
+                || !\in_array('Symfony\\Component\\Form\\FormBuilderInterface', $variable->types, true)
+                || $call->className !== $variable->className
+                || $call->enclosingMethod !== $variable->methodName
+                || $call->scopeStartOffset !== $variable->scopeStartOffset
+                || 1 !== preg_match('/^\s*\\$'.preg_quote($variable->name, '/').'\b/', $call->receiver)
             ) {
                 continue;
             }
@@ -572,24 +572,24 @@ final class MetadataExtractor
         }
         $methodName = null;
         $methodOffset = -1;
-        foreach ($php->methodDeclarations() as $method) {
-            if ($className !== $method->className() || $method->nameStartOffset() > $offset || $method->nameStartOffset() <= $methodOffset) {
+        foreach ($php->methodDeclarations as $method) {
+            if ($className !== $method->className || $method->nameStartOffset > $offset || $method->nameStartOffset <= $methodOffset) {
                 continue;
             }
-            $methodName = $method->name();
-            $methodOffset = $method->nameStartOffset();
+            $methodName = $method->name;
+            $methodOffset = $method->nameStartOffset;
         }
         if (null === $methodName) {
             return [];
         }
         $variables = [];
-        foreach ($php->typedVariables() as $variable) {
-            if (PhpTypedVariableKind::Parameter === $variable->kind()
-                && $className === $variable->className()
-                && $methodName === $variable->methodName()
-                && \in_array('Symfony\\Component\\Form\\FormBuilderInterface', $variable->types(), true)
+        foreach ($php->typedVariables as $variable) {
+            if (PhpTypedVariableKind::Parameter === $variable->kind
+                && $className === $variable->className
+                && $methodName === $variable->methodName
+                && \in_array('Symfony\\Component\\Form\\FormBuilderInterface', $variable->types, true)
             ) {
-                $variables[$variable->name()] = true;
+                $variables[$variable->name] = true;
             }
         }
 
@@ -599,16 +599,16 @@ final class MetadataExtractor
     private function typedMethodParameter(PhpDocument $php, string $className, string $methodName, string $type): ?PhpTypedVariable
     {
         $parameters = [];
-        foreach ($php->typedVariables() as $variable) {
-            if (PhpTypedVariableKind::Parameter === $variable->kind()
-                && $className === $variable->className()
-                && $methodName === $variable->methodName()
-                && \in_array($type, $variable->types(), true)
+        foreach ($php->typedVariables as $variable) {
+            if (PhpTypedVariableKind::Parameter === $variable->kind
+                && $className === $variable->className
+                && $methodName === $variable->methodName
+                && \in_array($type, $variable->types, true)
             ) {
                 $parameters[] = $variable;
             }
         }
-        usort($parameters, static fn (PhpTypedVariable $left, PhpTypedVariable $right): int => $left->nameStartOffset() <=> $right->nameStartOffset());
+        usort($parameters, static fn (PhpTypedVariable $left, PhpTypedVariable $right): int => $left->nameStartOffset <=> $right->nameStartOffset);
 
         return $parameters[0] ?? null;
     }
@@ -618,8 +618,8 @@ final class MetadataExtractor
     {
         $references = [];
         $end = $expression['offset'] + \strlen($expression['text']);
-        foreach ($php->classReferences() as $reference) {
-            if ($reference->startOffset() >= $expression['offset'] && $reference->endOffset() <= $end) {
+        foreach ($php->classReferences as $reference) {
+            if ($reference->startOffset >= $expression['offset'] && $reference->endOffset <= $end) {
                 $references[] = $reference;
             }
         }
@@ -627,26 +627,26 @@ final class MetadataExtractor
             return null;
         }
         $reference = $references[0];
-        $rawName = substr($source, $reference->startOffset(), $reference->endOffset() - $reference->startOffset());
+        $rawName = substr($source, $reference->startOffset, $reference->endOffset - $reference->startOffset);
         if (\in_array(strtolower(ltrim($rawName, '\\')), ['self', 'static', 'parent'], true)) {
             return null;
         }
-        $before = trim(substr($source, $expression['offset'], $reference->startOffset() - $expression['offset']));
-        $after = preg_replace('/\\s+/', '', substr($source, $reference->endOffset(), $end - $reference->endOffset()));
+        $before = trim(substr($source, $expression['offset'], $reference->startOffset - $expression['offset']));
+        $after = preg_replace('/\\s+/', '', substr($source, $reference->endOffset, $end - $reference->endOffset));
 
-        return '' === $before && '::class' === $after ? $reference->className() : null;
+        return '' === $before && '::class' === $after ? $reference->className : null;
     }
 
     private function classReferenceArgument(PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
     {
-        $start = $argument?->expressionStartOffset();
-        $end = $argument?->expressionEndOffset();
+        $start = $argument?->expressionStartOffset;
+        $end = $argument?->expressionEndOffset;
         if (!\is_int($start) || !\is_int($end)) {
             return null;
         }
         $references = [];
-        foreach ($php->classReferences() as $reference) {
-            if ($reference->startOffset() >= $start && $reference->endOffset() <= $end) {
+        foreach ($php->classReferences as $reference) {
+            if ($reference->startOffset >= $start && $reference->endOffset <= $end) {
                 $references[] = $reference;
             }
         }
@@ -657,13 +657,13 @@ final class MetadataExtractor
     private function leadingClassReferenceArgument(string $source, PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
     {
         $reference = $this->classReferenceArgument($php, $argument);
-        $start = $argument?->expressionStartOffset();
-        $end = $argument?->expressionEndOffset();
+        $start = $argument?->expressionStartOffset;
+        $end = $argument?->expressionEndOffset;
         if (null === $reference || !\is_int($start) || !\is_int($end)) {
             return null;
         }
-        $before = trim(substr($source, $start, $reference->startOffset() - $start));
-        $after = substr($source, $reference->endOffset(), $end - $reference->endOffset());
+        $before = trim(substr($source, $start, $reference->startOffset - $start));
+        $after = substr($source, $reference->endOffset, $end - $reference->endOffset);
 
         return '' === $before && 1 === preg_match('/^\s*::\s*class\b/', $after) ? $reference : null;
     }
@@ -702,8 +702,8 @@ final class MetadataExtractor
     /** @return array{name: string, range: Range}|null */
     private function quotedIdentifierArgument(string $document, PhpArgument $argument): ?array
     {
-        $expression = $argument->expression();
-        $offset = $argument->expressionStartOffset();
+        $expression = $argument->expression;
+        $offset = $argument->expressionStartOffset;
         if (!\is_string($expression) || !\is_int($offset) || !preg_match('/^\\s*(["\'])([A-Za-z_][A-Za-z0-9_]*)\\1\\s*$/', $expression, $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
@@ -719,15 +719,15 @@ final class MetadataExtractor
     private function formPropertyName(array $arguments, string $field): ?string
     {
         foreach (\array_slice($arguments, 1) as $argument) {
-            if (null !== $argument->name()) {
+            if (null !== $argument->name) {
                 return null;
             }
         }
         if (!isset($arguments[2])) {
             return $field;
         }
-        $expression = $arguments[2]->expression();
-        $offset = $arguments[2]->expressionStartOffset();
+        $expression = $arguments[2]->expression;
+        $offset = $arguments[2]->expressionStartOffset;
         if (!\is_string($expression) || !\is_int($offset) || null === $options = $this->arrayEntries($expression, $offset)) {
             return null;
         }
@@ -756,9 +756,9 @@ final class MetadataExtractor
 
     private function enclosingClass(PhpDocument $php, int $offset): ?string
     {
-        foreach ($php->typeDeclarations() as $type) {
+        foreach ($php->typeDeclarations as $type) {
             if ($type->contains($offset)) {
-                return $type->name();
+                return $type->name;
             }
         }
 
@@ -805,8 +805,8 @@ final class MetadataExtractor
     /** @return list<array{name: string, range: Range}> */
     private function arrayKeys(string $document, PhpArgument $argument): array
     {
-        $text = $argument->expression();
-        $offset = $argument->expressionStartOffset();
+        $text = $argument->expression;
+        $offset = $argument->expressionStartOffset;
         if (!\is_string($text) || !\is_int($offset)) {
             return [];
         }

@@ -13,7 +13,7 @@ final class TwigDocument
 
     public function hasErrors(): bool
     {
-        return $this->tree->hasError();
+        return $this->tree->hasError;
     }
 
     /** @return list<TreeSitterNode> */
@@ -37,7 +37,7 @@ final class TwigDocument
     public function directChild(TreeSitterNode $node, string $type): ?TreeSitterNode
     {
         foreach ($this->children($node) as $child) {
-            if ($type === $child->type()) {
+            if ($type === $child->type) {
                 return $child;
             }
         }
@@ -89,9 +89,9 @@ final class TwigDocument
             return null;
         }
         $text = $this->text($container);
-        $start = $container->startByte() + \strlen($text) - \strlen(ltrim($text));
-        $end = $container->endByte() - \strlen($text) + \strlen(rtrim($text));
-        if ($node->startByte() !== $start || $node->endByte() !== $end) {
+        $start = $container->startByte + \strlen($text) - \strlen(ltrim($text));
+        $end = $container->endByte - \strlen($text) + \strlen(rtrim($text));
+        if ($node->startByte !== $start || $node->endByte !== $end) {
             return null;
         }
 
@@ -101,10 +101,10 @@ final class TwigDocument
     /** @return array{string, int, int}|null */
     public function string(TreeSitterNode $node): ?array
     {
-        if (!\in_array($node->type(), ['interpolated_string', 'string'], true)) {
+        if (!\in_array($node->type, ['interpolated_string', 'string'], true)) {
             return null;
         }
-        if ('interpolated_string' === $node->type() && [] !== $node->children()) {
+        if ('interpolated_string' === $node->type && [] !== $node->children) {
             return null;
         }
         $value = $this->text($node);
@@ -112,6 +112,6 @@ final class TwigDocument
             return null;
         }
 
-        return [substr($value, 1, -1), $node->startByte() + 1, $node->endByte() - 1];
+        return [substr($value, 1, -1), $node->startByte + 1, $node->endByte - 1];
     }
 }

@@ -53,28 +53,28 @@ final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
         }
         $scalarTypes = ['array', 'bool', 'callable', 'float', 'int', 'never', 'resource', 'string', 'void'];
         $php = $this->phpParser->parse($request->document->text());
-        foreach ($php->methodDeclarations() as $method) {
-            if (!\in_array(strtolower((string) $method->firstParameterType()), $scalarTypes, true)) {
+        foreach ($php->methodDeclarations as $method) {
+            if (!\in_array(strtolower((string) $method->firstParameterType), $scalarTypes, true)) {
                 continue;
             }
             $parameters = array_values(array_filter(
-                $php->typedVariables(),
-                static fn (PhpTypedVariable $variable): bool => PhpTypedVariableKind::Parameter === $variable->kind()
-                    && $method->className() === $variable->className()
-                    && $method->name() === $variable->methodName(),
+                $php->typedVariables,
+                static fn (PhpTypedVariable $variable): bool => PhpTypedVariableKind::Parameter === $variable->kind
+                    && $method->className === $variable->className
+                    && $method->name === $variable->methodName,
             ));
-            usort($parameters, static fn (PhpTypedVariable $left, PhpTypedVariable $right): int => $left->nameStartOffset() <=> $right->nameStartOffset());
+            usort($parameters, static fn (PhpTypedVariable $left, PhpTypedVariable $right): int => $left->nameStartOffset <=> $right->nameStartOffset);
             $parameter = $parameters[0] ?? null;
             if (null === $parameter) {
                 continue;
             }
-            foreach ($index->handlersByClass($method->className()) as $handler) {
-                if ($method->name() !== $handler->method()) {
+            foreach ($index->handlersByClass($method->className) as $handler) {
+                if ($method->name !== $handler->method()) {
                     continue;
                 }
                 $range = new Range(
-                    $this->converter->toPosition($request->document->text(), $parameter->nameStartOffset()),
-                    $this->converter->toPosition($request->document->text(), $parameter->nameEndOffset()),
+                    $this->converter->toPosition($request->document->text(), $parameter->nameStartOffset),
+                    $this->converter->toPosition($request->document->text(), $parameter->nameEndOffset),
                 );
                 $diagnostics[] = $this->protocol->diagnostic($range, 1, 'messenger.invalid_handler_signature', \sprintf('Messenger handler "%s::%s" cannot accept message "%s".', $handler->className(), $handler->method(), $handler->message()));
             }

@@ -49,62 +49,62 @@ final class DoctrineRepositoryReceiverResolver
      */
     private function resolve(PhpDocument $php, PhpMethodCall $call, array $localRepositoryClasses, array $assignments): ?array
     {
-        $receiver = $call->receiverContext();
-        if (PhpMethodReceiverKind::This === $receiver->kind()) {
-            foreach ($php->typeDeclarations() as $type) {
-                if ($type->contains($call->startOffset()) && isset($localRepositoryClasses[$type->name()])) {
-                    return ['entityClass' => null, 'repositoryClass' => $type->name()];
+        $receiver = $call->receiverContext;
+        if (PhpMethodReceiverKind::This === $receiver->kind) {
+            foreach ($php->typeDeclarations as $type) {
+                if ($type->contains($call->startOffset) && isset($localRepositoryClasses[$type->name])) {
+                    return ['entityClass' => null, 'repositoryClass' => $type->name];
                 }
             }
         }
-        if (null !== $receiver->name()) {
-            foreach ($php->typedVariables() as $variable) {
-                if ($receiver->name() !== $variable->name() || 1 !== \count($variable->types()) || !str_ends_with($variable->types()[0], 'Repository')) {
+        if (null !== $receiver->name) {
+            foreach ($php->typedVariables as $variable) {
+                if ($receiver->name !== $variable->name || 1 !== \count($variable->types) || !str_ends_with($variable->types[0], 'Repository')) {
                     continue;
                 }
-                if (PhpMethodReceiverKind::Variable === $receiver->kind()
-                    && \in_array($variable->kind(), [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                    && $call->scopeStartOffset() === $variable->scopeStartOffset()
+                if (PhpMethodReceiverKind::Variable === $receiver->kind
+                    && \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                    && $call->scopeStartOffset === $variable->scopeStartOffset
                 ) {
-                    return ['entityClass' => null, 'repositoryClass' => $variable->types()[0]];
+                    return ['entityClass' => null, 'repositoryClass' => $variable->types[0]];
                 }
-                if (PhpMethodReceiverKind::ThisProperty === $receiver->kind()
-                    && \in_array($variable->kind(), [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
-                    && $call->className() === $variable->className()
+                if (PhpMethodReceiverKind::ThisProperty === $receiver->kind
+                    && \in_array($variable->kind, [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
+                    && $call->className === $variable->className
                 ) {
-                    return ['entityClass' => null, 'repositoryClass' => $variable->types()[0]];
+                    return ['entityClass' => null, 'repositoryClass' => $variable->types[0]];
                 }
             }
-            $entity = $assignments[$this->variableScopeKey($call, $receiver->name())] ?? null;
+            $entity = $assignments[$this->variableScopeKey($call, $receiver->name)] ?? null;
             if (null !== $entity) {
                 return ['entityClass' => $entity, 'repositoryClass' => null];
             }
         }
-        if (PhpMethodReceiverKind::Other !== $receiver->kind() || 1 !== preg_match('/->\s*getRepository\s*\(/', $call->receiver())) {
+        if (PhpMethodReceiverKind::Other !== $receiver->kind || 1 !== preg_match('/->\s*getRepository\s*\(/', $call->receiver)) {
             return null;
         }
         $references = [];
-        foreach ($php->classReferences() as $reference) {
-            if ($reference->startOffset() >= $receiver->startOffset() && $reference->endOffset() <= $receiver->endOffset()) {
+        foreach ($php->classReferences as $reference) {
+            if ($reference->startOffset >= $receiver->startOffset && $reference->endOffset <= $receiver->endOffset) {
                 $references[] = $reference;
             }
         }
 
-        return 1 === \count($references) ? ['entityClass' => $references[0]->className(), 'repositoryClass' => null] : null;
+        return 1 === \count($references) ? ['entityClass' => $references[0]->className, 'repositoryClass' => null] : null;
     }
 
     /** @return array<string, string> */
     private function repositoryAssignmentEntities(string $source, PhpDocument $php): array
     {
         $entities = [];
-        foreach ($php->methodCalls() as $call) {
-            if ('getRepository' !== $call->method() || null === $reference = $this->classReferenceArgument($php, $call->argument(0))) {
+        foreach ($php->methodCalls as $call) {
+            if ('getRepository' !== $call->method || null === $reference = $this->classReferenceArgument($php, $call->argument(0))) {
                 continue;
             }
-            $before = substr($source, 0, $call->startOffset());
+            $before = substr($source, 0, $call->startOffset);
             $boundary = max((int) strrpos($before, ';'), (int) strrpos($before, '{'));
             if (preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*$/', substr($before, $boundary + 1), $assignment)) {
-                $entities[$this->variableScopeKey($call, $assignment[1])] = $reference->className();
+                $entities[$this->variableScopeKey($call, $assignment[1])] = $reference->className;
             }
         }
 
@@ -113,19 +113,19 @@ final class DoctrineRepositoryReceiverResolver
 
     private function variableScopeKey(PhpMethodCall $call, string $variable): string
     {
-        return ($call->scopeStartOffset() ?? -1).'|'.$variable;
+        return ($call->scopeStartOffset ?? -1).'|'.$variable;
     }
 
     private function classReferenceArgument(PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
     {
-        $start = $argument?->expressionStartOffset();
-        $end = $argument?->expressionEndOffset();
+        $start = $argument?->expressionStartOffset;
+        $end = $argument?->expressionEndOffset;
         if (!\is_int($start) || !\is_int($end)) {
             return null;
         }
         $references = array_filter(
-            $php->classReferences(),
-            static fn (PhpClassReference $reference): bool => $reference->startOffset() >= $start && $reference->endOffset() <= $end,
+            $php->classReferences,
+            static fn (PhpClassReference $reference): bool => $reference->startOffset >= $start && $reference->endOffset <= $end,
         );
 
         return 1 === \count($references) ? array_values($references)[0] : null;

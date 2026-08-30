@@ -9,61 +9,19 @@ final class YamlMapping
      * @param list<int>    $sequenceDepths path indices entered through a sequence item
      */
     public function __construct(
-        private readonly array $path,
-        private readonly string $value,
-        private readonly int $keyStartByte,
-        private readonly int $keyEndByte,
-        private readonly int $valueStartByte,
-        private readonly int $valueEndByte,
-        private readonly array $sequenceDepths,
-        private readonly string $scope,
+        public readonly array $path,
+        public readonly string $value,
+        public readonly int $keyStartByte,
+        public readonly int $keyEndByte,
+        public readonly int $valueStartByte,
+        public readonly int $valueEndByte,
+        public readonly array $sequenceDepths,
+        public readonly string $scope,
     ) {
-    }
-
-    /** @return list<string> */
-    public function path(): array
-    {
-        return $this->path;
-    }
-
-    public function value(): string
-    {
-        return $this->value;
-    }
-
-    public function keyStartByte(): int
-    {
-        return $this->keyStartByte;
-    }
-
-    public function keyEndByte(): int
-    {
-        return $this->keyEndByte;
-    }
-
-    public function valueStartByte(): int
-    {
-        return $this->valueStartByte;
-    }
-
-    public function valueEndByte(): int
-    {
-        return $this->valueEndByte;
     }
 
     public function isSequenceItem(): bool
     {
         return [] !== $this->sequenceDepths;
-    }
-
-    /** @return list<int> */
-    public function sequenceDepths(): array
-    {
-        return $this->sequenceDepths;
-    }
-
-    public function scope(): string
-    {
-        return $this->scope;
     }
 }
