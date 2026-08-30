@@ -2,12 +2,9 @@
 
 namespace Symfony\Lsp\Feature\Doctrine;
 
-use Symfony\Lsp\Parser\Php\PhpArgument;
-use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
-use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
 final class DoctrineRepositoryReceiverResolver
 {
@@ -58,20 +55,8 @@ final class DoctrineRepositoryReceiverResolver
             }
         }
         if (null !== $receiver->name) {
-            foreach ($php->typedVariables as $variable) {
-                if ($receiver->name !== $variable->name || 1 !== \count($variable->types) || !str_ends_with($variable->types[0], 'Repository')) {
-                    continue;
-                }
-                if (PhpMethodReceiverKind::Variable === $receiver->kind
-                    && \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                    && $call->scopeStartOffset === $variable->scopeStartOffset
-                ) {
-                    return ['entityClass' => null, 'repositoryClass' => $variable->types[0]];
-                }
-                if (PhpMethodReceiverKind::ThisProperty === $receiver->kind
-                    && \in_array($variable->kind, [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
-                    && $call->className === $variable->className
-                ) {
+            foreach ($php->receiverVariables($call) as $variable) {
+                if (1 === \count($variable->types) && str_ends_with($variable->types[0], 'Repository')) {
                     return ['entityClass' => null, 'repositoryClass' => $variable->types[0]];
                 }
             }
@@ -98,7 +83,7 @@ final class DoctrineRepositoryReceiverResolver
     {
         $entities = [];
         foreach ($php->methodCalls as $call) {
-            if ('getRepository' !== $call->method || null === $reference = $this->classReferenceArgument($php, $call->positionalArgument(0))) {
+            if ('getRepository' !== $call->method || null === $reference = $php->soleClassReference($call->positionalArgument(0))) {
                 continue;
             }
             $before = substr($source, 0, $call->startOffset);
@@ -114,20 +99,5 @@ final class DoctrineRepositoryReceiverResolver
     private function variableScopeKey(PhpMethodCall $call, string $variable): string
     {
         return ($call->scopeStartOffset ?? -1).'|'.$variable;
-    }
-
-    private function classReferenceArgument(PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
-    {
-        $start = $argument?->expressionStartOffset;
-        $end = $argument?->expressionEndOffset;
-        if (!\is_int($start) || !\is_int($end)) {
-            return null;
-        }
-        $references = array_filter(
-            $php->classReferences,
-            static fn (PhpClassReference $reference): bool => $reference->startOffset >= $start && $reference->endOffset <= $end,
-        );
-
-        return 1 === \count($references) ? array_values($references)[0] : null;
     }
 }

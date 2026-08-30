@@ -145,7 +145,7 @@ final class DoctrineExtractor
     private function repositoryClassReference(PhpDocument $php, string $className): ?PhpClassReference
     {
         foreach ($this->mappingAttributes($php, PhpAttributeTargetKind::Type, $className, null, ['Entity']) as $attribute) {
-            $reference = $this->classReferenceArgument($php, $attribute->argument('repositoryClass'));
+            $reference = $php->soleClassReference($attribute->argument('repositoryClass'));
             if (null !== $reference) {
                 return $reference;
             }
@@ -208,7 +208,7 @@ final class DoctrineExtractor
             if (!\is_int($start) || !\is_int($end) || $offset < $start || $offset > $end) {
                 continue;
             }
-            $formType = $this->classReferenceArgument($php, $call->positionalArgument($typeIndex));
+            $formType = $php->soleClassReference($call->positionalArgument($typeIndex));
             if ('Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $formType?->className) {
                 continue;
             }
@@ -229,7 +229,7 @@ final class DoctrineExtractor
             }
             $typeIndex = 'createNamed' === $call->method ? 1 : ('add' === $call->method ? 1 : 0);
             $optionsIndex = 'createNamed' === $call->method ? 3 : 2;
-            $formType = $this->classReferenceArgument($php, $call->positionalArgument($typeIndex));
+            $formType = $php->soleClassReference($call->positionalArgument($typeIndex));
             $options = $call->positionalArgument($optionsIndex);
             if ('Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $formType?->className || null === $options) {
                 continue;
@@ -352,38 +352,15 @@ final class DoctrineExtractor
     private function mappingAttributes(PhpDocument $php, PhpAttributeTargetKind $kind, string $className, ?string $memberName, array $names): array
     {
         $attributes = [];
-        foreach ($php->attributes as $attribute) {
-            if (!str_starts_with($attribute->name, 'Doctrine\\ORM\\Mapping\\')
-                || !\in_array(substr($attribute->name, \strlen('Doctrine\\ORM\\Mapping\\')), $names, true)
+        foreach ($php->attributesOn($kind, $className, $memberName) as $attribute) {
+            if (str_starts_with($attribute->name, 'Doctrine\\ORM\\Mapping\\')
+                && \in_array(substr($attribute->name, \strlen('Doctrine\\ORM\\Mapping\\')), $names, true)
             ) {
-                continue;
-            }
-            foreach ($attribute->targets as $target) {
-                if ($kind === $target->kind && $className === $target->className && $memberName === $target->memberName) {
-                    $attributes[] = $attribute;
-                    break;
-                }
+                $attributes[] = $attribute;
             }
         }
 
         return $attributes;
-    }
-
-    private function classReferenceArgument(PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
-    {
-        $start = $argument?->expressionStartOffset;
-        $end = $argument?->expressionEndOffset;
-        if (!\is_int($start) || !\is_int($end)) {
-            return null;
-        }
-        $references = [];
-        foreach ($php->classReferences as $reference) {
-            if ($reference->startOffset >= $start && $reference->endOffset <= $end) {
-                $references[] = $reference;
-            }
-        }
-
-        return 1 === \count($references) ? $references[0] : null;
     }
 
     private function arrayClassReference(string $source, PhpDocument $php, PhpArgument $argument, string $key): ?PhpClassReference
@@ -411,7 +388,7 @@ final class DoctrineExtractor
     private function associationTarget(array $attributes, PhpPropertyDeclaration $property, PhpDocument $php): ?string
     {
         foreach ($attributes as $attribute) {
-            $reference = $this->classReferenceArgument($php, $attribute->argument('targetEntity'));
+            $reference = $php->soleClassReference($attribute->argument('targetEntity'));
             if (null !== $reference) {
                 return $reference->className;
             }

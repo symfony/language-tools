@@ -320,6 +320,25 @@ final class DoctrineProviderTest extends TestCase
         self::assertSame('App\\Repository\\CategoryRepository', $context?->repositoryClass);
     }
 
+    public function testIgnoresNamedArgumentsInPositionalDoctrineSlots(): void
+    {
+        $extractor = new DoctrineExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
+        $text = <<<'PHP'
+            <?php
+            use App\Entity\Product;
+            use Symfony\Bridge\Doctrine\Form\Type\EntityType;
+
+            $builder->add(unrelated: EntityType::class, ignored: null, options: [
+                'class' => Product::class,
+                'choice_label' => 'name',
+            ]);
+            $repository = $manager->getRepository(unrelated: Product::class);
+            $repository->findBy(['name' => 'Symfony']);
+            PHP;
+
+        self::assertSame([], $extractor->extract('file:///workspace/src/Usage.php', 'php', $text)->symbols);
+    }
+
     public function testIgnoresCommentedDoctrinePhpWhilePreservingActiveRanges(): void
     {
         $converter = new PositionConverter();
