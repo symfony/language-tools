@@ -87,7 +87,23 @@ final class WorkspaceTrustManagerTest extends TestCase
         self::assertSame('ready', $statuses->status($project)['runtime']['state']);
     }
 
-    public function testRestartsRuntimeAfterConfigurationAndProjectLifecycleChanges(): void
+    public function testDoesNotRestartInitializedRuntimeWhileARefreshIsPending(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $trust = new WorkspaceTrust();
+        $trust->set($project, TrustStatus::Trusted);
+        $statuses = new ProjectIndexStatusRegistry();
+        $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
+        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $this->registry($project));
+
+        $manager->requestUnknownDecisions([$project]);
+        $statuses->runtimeStale($project);
+        $manager->requestUnknownDecisions([$project]);
+
+        self::assertSame(['/workspace'], $runtimeInitializer->projects);
+    }
+
+    public function testRestartsRuntimeAfterConfigurationChangesOrProjectRemoval(): void
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $trust = new WorkspaceTrust();
@@ -102,6 +118,8 @@ final class WorkspaceTrustManagerTest extends TestCase
         $configuration->setEnvironment($project, 'test');
         $manager->requestUnknownDecisions([$project]);
         $replacement = new Project('/workspace', 'file:///workspace', '^8.0');
+        $manager->requestUnknownDecisions([$replacement]);
+        $manager->removeProject($project);
         $manager->requestUnknownDecisions([$replacement]);
 
         self::assertSame(['/workspace', '/workspace', '/workspace'], $runtimeInitializer->projects);

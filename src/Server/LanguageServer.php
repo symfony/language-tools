@@ -233,15 +233,20 @@ final class LanguageServer
         $reloadConfiguration = false;
         $refreshWatchers = false;
         $rescanSources = false;
+        $watchedChanges = [];
         foreach ($changes as $change) {
             if (!\is_array($change) || !\is_string($change['uri'] ?? null) || !\is_int($change['type'] ?? null)) {
                 continue;
             }
-            $deleted = 3 === $change['type'];
-            $sourceFileChange = $this->sourceScanner->refreshUri($change['uri'], $deleted);
-            $this->projectRuntimeRefresher->refreshUri($change['uri'], $sourceFileChange);
-            $basename = basename($this->uriToPathConverter->convert($change['uri']) ?? '');
-            if (\in_array($basename, ['composer.json', 'composer.lock'], true)) {
+            $uri = $change['uri'];
+            $basename = basename($this->uriToPathConverter->convert($uri) ?? '');
+            $composerChange = \in_array($basename, ['composer.json', 'composer.lock'], true);
+            $watchedChanges[] = [
+                'uri' => $uri,
+                'deleted' => 3 === $change['type'],
+                'composer' => $composerChange,
+            ];
+            if ($composerChange) {
                 $rediscover = true;
             }
             if (ProjectConfiguration::FILE_NAME === $basename) {
@@ -250,8 +255,15 @@ final class LanguageServer
             if ('.gitignore' === $basename) {
                 $rescanSources = true;
             }
-            if ($this->workspaceFileWatcher->requiresRefreshForChange($change['uri'], $change['type'])) {
+            if ($this->workspaceFileWatcher->requiresRefreshForChange($uri, $change['type'])) {
                 $refreshWatchers = true;
+            }
+        }
+
+        if (!$rediscover) {
+            foreach ($watchedChanges as $change) {
+                $sourceFileChange = $this->sourceScanner->refreshUri($change['uri'], $change['deleted']);
+                $this->projectRuntimeRefresher->refreshUri($change['uri'], $sourceFileChange);
             }
         }
 
@@ -259,7 +271,7 @@ final class LanguageServer
             return;
         }
 
-        async(function () use ($rediscover, $reloadConfiguration, $refreshWatchers): void {
+        async(function () use ($rediscover, $reloadConfiguration, $refreshWatchers, $watchedChanges): void {
             try {
                 if ($reloadConfiguration) {
                     $this->workspaceConfiguration->reloadProjectConfiguration();
@@ -271,9 +283,26 @@ final class LanguageServer
                 if ($rediscover || $reloadConfiguration || $refreshWatchers) {
                     $this->workspaceFileWatcher->refresh();
                 }
+                $rediscoveredChanges = [];
+                if ($rediscover) {
+                    foreach ($watchedChanges as $change) {
+                        $rediscoveredChanges[] = [
+                            'uri' => $change['uri'],
+                            'composer' => $change['composer'],
+                            'source' => $this->sourceScanner->refreshUri($change['uri'], $change['deleted']),
+                        ];
+                    }
+                }
                 $this->sourceScanner->indexAll();
                 if ($rediscover || $reloadConfiguration) {
                     $this->workspaceConfiguration->requestWorkspaceTrust();
+                }
+                foreach ($rediscoveredChanges as $change) {
+                    if ($change['composer']) {
+                        $this->projectRuntimeRefresher->refreshAfterRediscovery($change['uri']);
+                    } else {
+                        $this->projectRuntimeRefresher->refreshUri($change['uri'], $change['source']);
+                    }
                 }
                 $this->diagnosticProviders->refreshAll();
             } catch (InvalidConfigurationException $error) {

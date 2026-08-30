@@ -66,6 +66,25 @@ final class ProjectRuntimeRefresherTest extends TestCase
         self::assertTrue($scheduler->plans[0]->preservesContainer());
     }
 
+    #[DataProvider('composerFileProvider')]
+    public function testRefreshesComposerFilesAfterRediscovery(string $composerFile): void
+    {
+        [$refresher, $scheduler] = $this->refresher(TrustStatus::Trusted);
+
+        $refresher->refreshAfterRediscovery('file:///workspace/'.$composerFile);
+
+        self::assertCount(1, $scheduler->plans);
+        self::assertSame(RuntimeRefreshMode::Clear, $scheduler->plans[0]->mode());
+        self::assertNull($scheduler->plans[0]->sections());
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function composerFileProvider(): iterable
+    {
+        yield 'manifest' => ['composer.json'];
+        yield 'lock file' => ['composer.lock'];
+    }
+
     public function testDoesNotRefreshUnrelatedNewXmlFiles(): void
     {
         [$refresher, $scheduler] = $this->refresher(TrustStatus::Trusted);

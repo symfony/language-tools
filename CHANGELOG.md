@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Refresh runtime metadata once after watched Composer files change
 - Avoid rebuilding source indexes for unchanged document overlays
 - Ignore commented configuration constructs in PHP, XML and YAML files
 - Ignore commented environment expressions in YAML and XML files

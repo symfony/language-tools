@@ -38,6 +38,11 @@ final class ProjectRuntimeRefresher
         $this->refreshUri($textDocument['uri'], $sourceFileChange);
     }
 
+    public function refreshAfterRediscovery(string $uri): void
+    {
+        $this->refreshUri($uri, SourceFileChange::untracked());
+    }
+
     public function refreshUri(string $uri, SourceFileChange $sourceFileChange): void
     {
         $project = $this->projects->forDocumentUri($uri);
@@ -68,7 +73,7 @@ final class ProjectRuntimeRefresher
         }
 
         $extension = Path::getExtension($path, true);
-        if ('php' === $extension || 'composer.json' === basename($path)) {
+        if ('php' === $extension || \in_array(basename($path), ['composer.json', 'composer.lock'], true)) {
             return true;
         }
 

@@ -58,6 +58,23 @@ final class DebouncedRuntimeRefreshSchedulerTest extends TestCase
         self::assertSame(1, $initializer->maximumActive);
     }
 
+    public function testNewProjectInstanceSupersedesDelayedRefreshForTheSameRoot(): void
+    {
+        $initializer = new DebouncedRuntimeInitializer();
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $registry = self::projects($project);
+        $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, $registry, 0.001);
+
+        $scheduler->schedule($project, new RuntimeRefreshPlan(RuntimeRefreshMode::Reuse, ['routes'], true));
+        $replacement = new Project('/workspace', 'file:///workspace', '^8.1');
+        $registry->replace([$replacement]);
+        $scheduler->schedule($replacement, new RuntimeRefreshPlan(RuntimeRefreshMode::Clear));
+        EventLoop::run();
+
+        self::assertSame([$replacement], $initializer->instances);
+        self::assertSame(RuntimeRefreshMode::Clear, $initializer->plans[0]->mode());
+    }
+
     public function testRemovalCancelsDelayedRefreshes(): void
     {
         $initializer = new DebouncedRuntimeInitializer();
@@ -131,12 +148,16 @@ final class DebouncedRuntimeInitializer implements RuntimeInitializerInterface
     /** @var list<string> */
     public array $projects = [];
 
+    /** @var list<Project> */
+    public array $instances = [];
+
     /** @var list<RuntimeRefreshPlan> */
     public array $plans = [];
 
     public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
     {
         $this->projects[] = $project->rootPath();
+        $this->instances[] = $project;
         $this->plans[] = $plan ?? new RuntimeRefreshPlan();
     }
 }

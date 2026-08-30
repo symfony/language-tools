@@ -9,7 +9,7 @@ use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 
 final class WorkspaceTrustManager implements ProjectStateInterface
 {
-    /** @var array<string, array{project: Project, configuration: string}> */
+    /** @var array<string, string> */
     private array $runtimeStarted = [];
 
     public function __construct(
@@ -102,21 +102,13 @@ final class WorkspaceTrustManager implements ProjectStateInterface
             $this->configuration->debug($project),
             $this->configuration->runtimeIndexing($project),
         ]));
-        $started = $this->runtimeStarted[$project->rootPath()] ?? null;
-        if (null !== $started
-            && $started['project'] === $project
-            && $started['configuration'] === $configuration
-            && 'ready' === $this->statuses->status($project)['runtime']['state']
-        ) {
+        if (($this->runtimeStarted[$project->rootPath()] ?? null) === $configuration) {
             return;
         }
 
         $this->runtimeInitializer->initialize($project);
         if ('ready' === $this->statuses->status($project)['runtime']['state']) {
-            $this->runtimeStarted[$project->rootPath()] = [
-                'project' => $project,
-                'configuration' => $configuration,
-            ];
+            $this->runtimeStarted[$project->rootPath()] = $configuration;
         } else {
             unset($this->runtimeStarted[$project->rootPath()]);
         }

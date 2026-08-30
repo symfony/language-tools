@@ -117,7 +117,7 @@ final class LanguageServerTest extends TestCase
         }
     }
 
-    public function testWatchedComposerChangeBootsRuntimeTwice(): void
+    public function testWatchedComposerChangeBootsRuntimeOnce(): void
     {
         $root = realpath(\dirname(__DIR__).'/Fixtures/RuntimeApplication');
         self::assertIsString($root);
@@ -160,7 +160,7 @@ final class LanguageServerTest extends TestCase
         try {
             self::assertSame(0, (new LanguageServerFactory(defaultPhpCommand: [\PHP_BINARY, $countingPhpCommand, $logFile]))->create($input, $output)->run());
             self::assertSame(1, $initializationsBeforeChange);
-            self::assertSame(2, $initializationsAfterChange - $initializationsBeforeChange);
+            self::assertSame(1, $initializationsAfterChange - $initializationsBeforeChange);
         } finally {
             file_put_contents($composerFile, $composerContents);
             $this->removeDirectory($root.'/var/symfony-lsp/dev');
