@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Console\ConsoleExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleInputKind;
+use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
@@ -315,6 +316,7 @@ final class ConsoleExtractorTest extends TestCase
             $parser,
             new PhpExpressionParser($expressionParser),
             new PhpCommentParser(),
+            new BalancedDelimiterMatcher(),
         );
 
         $facts = $extractor->extract('file:///workspace/src/Command/ReportCommand.php', 'php', $text);
@@ -335,6 +337,7 @@ final class ConsoleExtractorTest extends TestCase
             new TolerantPhpParser(new Parser()),
             new PhpExpressionParser(new TolerantPhpParser(new Parser())),
             new PhpCommentParser(),
+            new BalancedDelimiterMatcher(),
         );
     }
 }

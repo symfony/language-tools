@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Console;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
@@ -13,7 +14,6 @@ use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
-use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 use Symfony\Lsp\Parser\Php\PhpTypeKind;
 
 final class ConsoleExtractor
@@ -29,6 +29,7 @@ final class ConsoleExtractor
         private readonly PhpParserInterface $parser,
         private readonly PhpExpressionParser $expressionParser,
         private readonly PhpCommentParserInterface $phpComments,
+        private readonly BalancedDelimiterMatcher $delimiters,
     ) {
     }
 
@@ -82,11 +83,11 @@ final class ConsoleExtractor
         }
         $php = $this->parser->parse($text);
         $methodOffset = $match[3][1];
-        $type = $this->containingType($php, $methodOffset);
         $property = \is_string($match[2][0] ?? null);
         $receiver = $property ? $match[2][0] : ($match[1][0] ?? null);
-        $method = null === $type ? null : $this->containingMethod($php, $type, $methodOffset);
-        if (null === $type || !\is_string($receiver) || null === $method || !$this->hasInputVariable($php, $type->name, $method, $receiver, $property)) {
+        $receiverKind = $property ? PhpMethodReceiverKind::ThisProperty : PhpMethodReceiverKind::Variable;
+        $call = \is_string($receiver) ? array_find($php->methodCalls, static fn (PhpMethodCall $call): bool => $match[3][0] === $call->method && $receiver === $call->receiverContext->name && $receiverKind === $call->receiverContext->kind && $methodOffset >= $call->startOffset && $methodOffset < $call->endOffset) : null;
+        if (null === $call || null === $call->className || !$this->hasInputReceiver($call, $php)) {
             return null;
         }
         $rawPrefix = $match['prefix'][0];
@@ -104,7 +105,7 @@ final class ConsoleExtractor
             'getArgument' === $match[3][0] ? ConsoleInputKind::Argument : ConsoleInputKind::Option,
             $prefix,
             new Range($this->converter->toPosition($text, $prefixOffset), $this->converter->toPosition($text, $offset)),
-            $type->name,
+            $call->className,
         );
     }
 
@@ -151,7 +152,7 @@ final class ConsoleExtractor
             }
         }
 
-        $command = $this->hasTypeAttribute($php, $type, self::AS_COMMAND_ATTRIBUTE)
+        $command = array_any($php->attributesOn(PhpAttributeTargetKind::Type, $type->name), static fn ($attribute): bool => self::AS_COMMAND_ATTRIBUTE === $attribute->name)
             || 0 === strcasecmp(self::COMMAND, (string) $type->parentClassName);
         [$attributeArguments, $attributeOptions, $attributesComplete] = $this->invokableAttributes($text, $php, $type);
         $arguments = [...$arguments, ...$attributeArguments];
@@ -325,95 +326,7 @@ final class ConsoleExtractor
 
     private function hasInputReceiver(PhpMethodCall $call, PhpDocument $php): bool
     {
-        $receiver = $call->receiverContext;
-        if (null === $receiver->name) {
-            return false;
-        }
-        foreach ($php->typedVariables as $variable) {
-            if ($receiver->name !== $variable->name || !\in_array(self::INPUT_INTERFACE, $variable->types, true)) {
-                continue;
-            }
-            if (PhpMethodReceiverKind::Variable === $receiver->kind
-                && \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                && $call->scopeStartOffset === $variable->scopeStartOffset
-            ) {
-                return true;
-            }
-            if (PhpMethodReceiverKind::ThisProperty === $receiver->kind
-                && \in_array($variable->kind, [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
-                && $call->className === $variable->className
-            ) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function hasInputVariable(PhpDocument $php, string $className, string $methodName, string $name, bool $property): bool
-    {
-        foreach ($php->typedVariables as $variable) {
-            if ($name !== $variable->name || !\in_array(self::INPUT_INTERFACE, $variable->types, true)) {
-                continue;
-            }
-            if ($property
-                && \in_array($variable->kind, [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
-                && $className === $variable->className
-            ) {
-                return true;
-            }
-            if (!$property
-                && \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                && $className === $variable->className
-                && $methodName === $variable->methodName
-            ) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function containingMethod(PhpDocument $php, PhpTypeDeclaration $type, int $offset): ?string
-    {
-        $name = null;
-        $nameOffset = -1;
-        foreach ($php->methodDeclarations as $method) {
-            if ($type->name !== $method->className || $method->nameStartOffset > $offset || $method->nameStartOffset <= $nameOffset) {
-                continue;
-            }
-            $name = $method->name;
-            $nameOffset = $method->nameStartOffset;
-        }
-
-        return $name;
-    }
-
-    private function containingType(PhpDocument $php, int $offset): ?PhpTypeDeclaration
-    {
-        foreach ($php->typeDeclarations as $type) {
-            if ($offset >= $type->startOffset && $offset <= $type->endOffset) {
-                return $type;
-            }
-        }
-
-        return null;
-    }
-
-    private function hasTypeAttribute(PhpDocument $php, PhpTypeDeclaration $type, string $attributeName): bool
-    {
-        foreach ($php->attributes as $attribute) {
-            if ($attributeName !== $attribute->name) {
-                continue;
-            }
-            foreach ($attribute->targets as $target) {
-                if (PhpAttributeTargetKind::Type === $target->kind && $type->name === $target->className) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return array_any($php->receiverVariables($call), static fn ($variable): bool => \in_array(self::INPUT_INTERFACE, $variable->types, true));
     }
 
     /** @return list<string> */
@@ -441,7 +354,7 @@ final class ConsoleExtractor
         $ranges = [];
         foreach ($matches[0] as [$matched, $relativeOffset]) {
             $open = $type->startOffset + $relativeOffset + strrpos($matched, '{');
-            $close = $this->matchingDelimiter($text, $open, '{', '}');
+            $close = $this->delimiters->matching($text, $open, '{', '}');
             $ranges[] = ['start' => $open, 'end' => $close ?? $type->endOffset, 'closed' => null !== $close];
         }
 
@@ -456,37 +369,8 @@ final class ConsoleExtractor
             return null;
         }
         $open = $type->startOffset + $match[0][1] + strrpos($match[0][0], '(');
-        $close = $this->matchingDelimiter($text, $open, '(', ')');
+        $close = $this->delimiters->matching($text, $open, '(', ')');
 
         return null === $close ? null : [$open + 1, $close];
-    }
-
-    private function matchingDelimiter(string $text, int $open, string $opening, string $closing): ?int
-    {
-        $depth = 1;
-        $quote = null;
-        $escaped = false;
-        for ($offset = $open + 1, $length = \strlen($text); $offset < $length; ++$offset) {
-            $character = $text[$offset];
-            if (null !== $quote) {
-                if ($escaped) {
-                    $escaped = false;
-                } elseif ('\\' === $character) {
-                    $escaped = true;
-                } elseif ($quote === $character) {
-                    $quote = null;
-                }
-                continue;
-            }
-            if (\in_array($character, ["'", '"'], true)) {
-                $quote = $character;
-            } elseif ($opening === $character) {
-                ++$depth;
-            } elseif ($closing === $character && 0 === --$depth) {
-                return $offset;
-            }
-        }
-
-        return null;
     }
 }
