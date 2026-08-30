@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Decode escaped Twig literals in template, route and PHP symbol references
 - Ignore unrelated named arguments in positional Doctrine and Metadata call slots
 - Ignore unrelated named arguments when indexing Event and Messenger dispatch calls
 - Rebuild persistent source index caches once after an internal format change

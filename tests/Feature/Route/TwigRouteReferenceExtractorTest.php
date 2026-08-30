@@ -43,6 +43,27 @@ final class TwigRouteReferenceExtractorTest extends TestCase
         self::assertSame([], $references[1]->providedParameters);
     }
 
+    public function testDecodesEscapedTwigRouteNamesAndParameterKeys(): void
+    {
+        $converter = new PositionConverter();
+        $text = <<<'TWIG'
+            {{ path("say \"hi\"", {"parameter \"hi\"": value}) }}
+            TWIG;
+
+        $references = (new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())))->extract($text);
+
+        self::assertSame('say "hi"', $references[0]->name);
+        self::assertSame(['parameter "hi"'], $references[0]->providedParameters);
+        self::assertSame(
+            'say \"hi\"',
+            substr(
+                $text,
+                $converter->toByteOffset($text, $references[0]->range->start),
+                $converter->toByteOffset($text, $references[0]->range->end) - $converter->toByteOffset($text, $references[0]->range->start),
+            ),
+        );
+    }
+
     public function testExtractsShorthandMappingParametersConservatively(): void
     {
         $references = (new TwigRouteReferenceExtractor(new PositionConverter(), new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())))->extract(<<<'TWIG'

@@ -54,93 +54,7 @@ final class TwigDocument
         return null;
     }
 
-    public function directString(TreeSitterNode $node): ?TreeSitterNode
-    {
-        foreach ($this->children($node) as $child) {
-            if (null !== $this->string($child)) {
-                return $child;
-            }
-        }
-
-        return null;
-    }
-
-    public function firstString(TreeSitterNode $node): ?TreeSitterNode
-    {
-        foreach ($this->descendants($node) as $descendant) {
-            if (null !== $this->string($descendant)) {
-                return $descendant;
-            }
-        }
-
-        return null;
-    }
-
     public function stringLiteral(TreeSitterNode $node): ?TwigStringLiteral
-    {
-        $string = $this->string($node);
-        if (null === $string) {
-            return null;
-        }
-        [$raw, $start, $end] = $string;
-
-        return new TwigStringLiteral($raw, TwigStringDecoder::decode($raw), $start, $end, $this->source[$start - 1]);
-    }
-
-    public function directStringLiteral(TreeSitterNode $node): ?TwigStringLiteral
-    {
-        $string = $this->directString($node);
-
-        return null === $string ? null : $this->stringLiteral($string);
-    }
-
-    public function firstStringLiteral(TreeSitterNode $node): ?TwigStringLiteral
-    {
-        $string = $this->firstString($node);
-
-        return null === $string ? null : $this->stringLiteral($string);
-    }
-
-    public function soleStringLiteral(TreeSitterNode $container): ?TwigStringLiteral
-    {
-        $node = $this->firstString($container);
-        if (null === $node) {
-            return null;
-        }
-        $text = $this->text($container);
-        $start = $container->startByte + \strlen($text) - \strlen(ltrim($text));
-        $end = $container->endByte - \strlen($text) + \strlen(rtrim($text));
-        if ($node->startByte !== $start || $node->endByte !== $end) {
-            return null;
-        }
-
-        return $this->stringLiteral($node);
-    }
-
-    public function text(TreeSitterNode $node): string
-    {
-        return $this->tree->text($node, $this->source);
-    }
-
-    /** @return array{string, int, int}|null */
-    public function literalString(TreeSitterNode $container): ?array
-    {
-        $node = $this->firstString($container);
-        if (null === $node) {
-            return null;
-        }
-        $text = $this->text($container);
-        $start = $container->startByte + \strlen($text) - \strlen(ltrim($text));
-        $end = $container->endByte - \strlen($text) + \strlen(rtrim($text));
-        if ($node->startByte !== $start || $node->endByte !== $end) {
-            return null;
-        }
-
-        return $this->string($node);
-    }
-
-    /** @return array{string, int, int}|null */
-    public function string(TreeSitterNode $node): ?array
     {
         if (!\in_array($node->type, ['interpolated_string', 'string'], true)) {
             return null;
@@ -152,7 +66,51 @@ final class TwigDocument
         if (\strlen($value) < 2 || !\in_array($value[0], ["'", '"'], true) || !str_ends_with($value, $value[0])) {
             return null;
         }
+        $raw = substr($value, 1, -1);
 
-        return [substr($value, 1, -1), $node->startByte + 1, $node->endByte - 1];
+        return new TwigStringLiteral($raw, TwigStringDecoder::decode($raw), $node->startByte + 1, $node->endByte - 1, $value[0]);
+    }
+
+    public function directStringLiteral(TreeSitterNode $node): ?TwigStringLiteral
+    {
+        foreach ($this->children($node) as $child) {
+            if (null !== $literal = $this->stringLiteral($child)) {
+                return $literal;
+            }
+        }
+
+        return null;
+    }
+
+    public function firstStringLiteral(TreeSitterNode $node): ?TwigStringLiteral
+    {
+        foreach ($this->descendants($node) as $descendant) {
+            if (null !== $literal = $this->stringLiteral($descendant)) {
+                return $literal;
+            }
+        }
+
+        return null;
+    }
+
+    public function soleStringLiteral(TreeSitterNode $container): ?TwigStringLiteral
+    {
+        $literal = $this->firstStringLiteral($container);
+        if (null === $literal) {
+            return null;
+        }
+        $text = $this->text($container);
+        $start = $container->startByte + \strlen($text) - \strlen(ltrim($text));
+        $end = $container->endByte - \strlen($text) + \strlen(rtrim($text));
+        if ($literal->startOffset - 1 !== $start || $literal->endOffset + 1 !== $end) {
+            return null;
+        }
+
+        return $literal;
+    }
+
+    public function text(TreeSitterNode $node): string
+    {
+        return $this->tree->text($node, $this->source);
     }
 }

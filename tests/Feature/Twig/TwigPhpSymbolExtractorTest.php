@@ -92,6 +92,21 @@ final class TwigPhpSymbolExtractorTest extends TestCase
         }
     }
 
+    public function testRejectsEscapedQuotesInDecodedTwigPhpSymbolNames(): void
+    {
+        $facts = $this->extractor(new PositionConverter())->extract(
+            'file:///workspace/templates/page.html.twig',
+            'twig',
+            <<<'TWIG'
+                {{ enum("App\\Model\\Sta\"tus") }}
+                {{ constant("App\\Model\\Status::Publi\"shed") }}
+                TWIG,
+        );
+
+        self::assertNotNull($facts);
+        self::assertSame([], $facts->references);
+    }
+
     public function testFindsCompletionContexts(): void
     {
         $extractor = $this->extractor($converter = new PositionConverter());

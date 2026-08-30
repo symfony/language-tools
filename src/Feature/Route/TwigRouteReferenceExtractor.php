@@ -36,16 +36,16 @@ final class TwigRouteReferenceExtractor
                     $arguments[] = $argument;
                 }
             }
-            $route = isset($arguments[0]) ? $document->literalString($arguments[0]) : null;
+            $route = isset($arguments[0]) ? $document->soleStringLiteral($arguments[0]) : null;
             if (null === $route) {
                 continue;
             }
 
             $references[] = new RouteReference(
-                $route[0],
+                $route->value,
                 new Range(
-                    $this->positionConverter->toPosition($text, $route[1]),
-                    $this->positionConverter->toPosition($text, $route[2]),
+                    $this->positionConverter->toPosition($text, $route->startOffset),
+                    $this->positionConverter->toPosition($text, $route->endOffset),
                 ),
                 $this->providedParameters($document, $arguments[1] ?? null),
             );
@@ -120,8 +120,8 @@ final class TwigRouteReferenceExtractor
             return null;
         }
         $key = $children[0];
-        if (null !== $literal = $document->string($key)) {
-            return $literal[0];
+        if (null !== $literal = $document->stringLiteral($key)) {
+            return $literal->value;
         }
 
         return \in_array($key->type, ['name', 'number'], true) ? $document->text($key) : null;

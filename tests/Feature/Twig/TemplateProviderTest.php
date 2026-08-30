@@ -75,6 +75,31 @@ final class TemplateProviderTest extends TestCase
         );
     }
 
+    public function testDecodesEscapedTwigTemplateNames(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()));
+        $text = <<<'TWIG'
+            {% extends "layout \"wide\".html.twig" %}
+            {{ source("fragment \"compact\".html.twig") }}
+            TWIG;
+
+        $references = $extractor->extract('file:///workspace/templates/page.html.twig', 'twig', $text);
+
+        self::assertSame(
+            ['layout "wide".html.twig', 'fragment "compact".html.twig'],
+            array_map(static fn (TemplateReference $reference): string => $reference->name, $references),
+        );
+        self::assertSame(
+            ['layout \"wide\".html.twig', 'fragment \"compact\".html.twig'],
+            array_map(static fn (TemplateReference $reference): string => substr(
+                $text,
+                $converter->toByteOffset($text, $reference->range->start),
+                $converter->toByteOffset($text, $reference->range->end) - $converter->toByteOffset($text, $reference->range->start),
+            ), $references),
+        );
+    }
+
     public function testCompletesRenderContextVariablesAndTwigGlobals(): void
     {
         $converter = new PositionConverter();

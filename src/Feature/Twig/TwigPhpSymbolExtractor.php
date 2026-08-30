@@ -177,30 +177,30 @@ final class TwigPhpSymbolExtractor
             }
             $arguments = $document->directChild($call, 'arguments');
             $argument = null === $arguments ? null : $document->directChild($arguments, 'argument');
-            $literal = null === $argument ? null : $document->literalString($argument);
+            $literal = null === $argument ? null : $document->soleStringLiteral($argument);
             if (null === $literal) {
                 continue;
             }
-            [$raw, $start, $end] = $literal;
             if ('constant' === $name) {
-                $separator = strrpos($raw, '::');
-                if (false === $separator || !$this->validIdentifier($memberName = substr($raw, $separator + 2))) {
+                $separator = strrpos($literal->value, '::');
+                $rawSeparator = strrpos($literal->raw, '::');
+                if (false === $separator || false === $rawSeparator || !$this->validIdentifier($memberName = substr($literal->value, $separator + 2))) {
                     continue;
                 }
-                $className = $this->decodeClassName(substr($raw, 0, $separator));
+                $className = $this->className(substr($literal->value, 0, $separator));
                 if (null === $className) {
                     continue;
                 }
-                $references[] = $this->reference($className, null, $uri, $text, $start, $separator);
-                $references[] = $this->reference($className, $memberName, $uri, $text, $start + $separator + 2, \strlen($memberName));
+                $references[] = $this->reference($className, null, $uri, $text, $literal->startOffset, $rawSeparator);
+                $references[] = $this->reference($className, $memberName, $uri, $text, $literal->startOffset + $rawSeparator + 2, $literal->endOffset - $literal->startOffset - $rawSeparator - 2);
 
                 continue;
             }
-            $className = $this->decodeClassName($raw);
+            $className = $this->className($literal->value);
             if (null === $className) {
                 continue;
             }
-            $references[] = $this->reference($className, null, $uri, $text, $start, $end - $start);
+            $references[] = $this->reference($className, null, $uri, $text, $literal->startOffset, $literal->endOffset - $literal->startOffset);
             if ('enum' !== $name) {
                 continue;
             }
@@ -230,6 +230,24 @@ final class TwigPhpSymbolExtractor
         $name = $this->decodeClassPrefix($raw, true);
 
         return null === $name ? null : ltrim($name, '\\');
+    }
+
+    private function className(string $value): ?string
+    {
+        if ('' === $value) {
+            return null;
+        }
+        $name = str_starts_with($value, '\\') ? substr($value, 1) : $value;
+        if ('' === $name || str_starts_with($name, '\\')) {
+            return null;
+        }
+        foreach (explode('\\', $name) as $segment) {
+            if (!$this->validIdentifier($segment)) {
+                return null;
+            }
+        }
+
+        return $name;
     }
 
     private function decodeClassPrefix(string $raw, bool $complete = false): ?string

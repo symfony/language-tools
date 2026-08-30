@@ -85,13 +85,11 @@ final class TemplateReferenceExtractor
         $references = [];
         foreach ($document->nodesOfType('tag_statement') as $statement) {
             $tag = $document->directChild($statement, 'tag');
-            $target = $document->directString($statement);
+            $target = $document->directStringLiteral($statement);
             if (null === $tag || null === $target || !\in_array($document->text($tag), ['embed', 'extends', 'from', 'import', 'include', 'use'], true)) {
                 continue;
             }
-            if (null !== $literal = $document->string($target)) {
-                $references[] = $this->reference($literal[0], $uri, $text, $literal[1]);
-            }
+            $references[] = $this->reference($target->value, $uri, $text, $target->startOffset, $target->endOffset);
         }
         foreach ($document->nodesOfType('function_call') as $call) {
             $name = $document->directChild($call, 'function_identifier');
@@ -100,9 +98,9 @@ final class TemplateReferenceExtractor
             }
             $arguments = $document->directChild($call, 'arguments');
             $argument = null === $arguments ? null : $document->directChild($arguments, 'argument');
-            $literal = null === $argument ? null : $document->literalString($argument);
+            $literal = null === $argument ? null : $document->soleStringLiteral($argument);
             if (null !== $literal) {
-                $references[] = $this->reference($literal[0], $uri, $text, $literal[1]);
+                $references[] = $this->reference($literal->value, $uri, $text, $literal->startOffset, $literal->endOffset);
             }
         }
 
@@ -156,14 +154,14 @@ final class TemplateReferenceExtractor
     }
 
     /** @param list<string> $variables */
-    private function reference(string $name, string $uri, string $text, int $offset, array $variables = []): TemplateReference
+    private function reference(string $name, string $uri, string $text, int $startOffset, int $endOffset, array $variables = []): TemplateReference
     {
         return new TemplateReference(
             $name,
             $uri,
             new Range(
-                $this->positionConverter->toPosition($text, $offset),
-                $this->positionConverter->toPosition($text, $offset + \strlen($name)),
+                $this->positionConverter->toPosition($text, $startOffset),
+                $this->positionConverter->toPosition($text, $endOffset),
             ),
             $variables,
         );
