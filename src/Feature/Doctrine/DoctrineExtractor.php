@@ -9,12 +9,9 @@ use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
-use Symfony\Lsp\Parser\Php\PhpMethodCall;
-use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpPropertyDeclaration;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
-use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
 final class DoctrineExtractor
 {
@@ -24,6 +21,7 @@ final class DoctrineExtractor
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $phpParser,
         private readonly PhpCommentParserInterface $phpComments,
+        private readonly DoctrineRepositoryReceiverResolver $repositoryReceivers,
     ) {
     }
 
@@ -93,19 +91,16 @@ final class DoctrineExtractor
         $php = $this->phpParser->parse($text);
         $source = $this->phpComments->mask($text);
         $before = substr($source, 0, $offset);
-        if (preg_match('/[\'"](?:choice_label|choice_value|group_by)[\'"]\s*=>\s*[\'"]([A-Za-z_][A-Za-z0-9_]*)$/s', $before, $field, \PREG_OFFSET_CAPTURE)) {
-            $statementStart = max((int) strrpos($before, ';'), (int) strrpos($before, '->add('), (int) strrpos($before, 'createForm('), (int) strrpos($before, 'createNamed('));
-            $statement = substr($before, $statementStart);
-            if (preg_match('/([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*,\s*\[[\s\S]*[\'"]class[\'"]\s*=>\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class/', $statement, $classes)
-                && 'Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' === $php->resolveName($classes[1])) {
-                return new DoctrineCompletionContext(
-                    DoctrineCompletionKind::EntityTypeField,
-                    $php->resolveName($classes[2]),
-                    null,
-                    $field[1][0],
-                    $this->converter->toRange($text, $field[1][1], \strlen($field[1][0])),
-                );
-            }
+        if (preg_match('/[\'"](?:choice_label|choice_value|group_by)[\'"]\s*=>\s*[\'"]([A-Za-z_][A-Za-z0-9_]*)$/s', $before, $field, \PREG_OFFSET_CAPTURE)
+            && null !== $entityClass = $this->entityTypeClassAt($source, $php, $field[1][1])
+        ) {
+            return new DoctrineCompletionContext(
+                DoctrineCompletionKind::EntityTypeField,
+                $entityClass,
+                null,
+                $field[1][0],
+                $this->converter->toRange($text, $field[1][1], \strlen($field[1][0])),
+            );
         }
 
         return $this->repositoryCompletionContext($text, $source, $offset, $php);
@@ -199,6 +194,31 @@ final class DoctrineExtractor
         return null;
     }
 
+    private function entityTypeClassAt(string $source, PhpDocument $php, int $offset): ?string
+    {
+        foreach ($php->methodCalls() as $call) {
+            if (!\in_array($call->method(), ['createForm', 'createNamed', 'add'], true)) {
+                continue;
+            }
+            $typeIndex = 'createNamed' === $call->method() ? 1 : ('add' === $call->method() ? 1 : 0);
+            $optionsIndex = 'createNamed' === $call->method() ? 3 : 2;
+            $options = $call->argument($optionsIndex);
+            $start = $options?->expressionStartOffset();
+            $end = $options?->expressionEndOffset();
+            if (!\is_int($start) || !\is_int($end) || $offset < $start || $offset > $end) {
+                continue;
+            }
+            $formType = $this->classReferenceArgument($php, $call->argument($typeIndex));
+            if ('Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $formType?->className()) {
+                continue;
+            }
+
+            return $this->arrayClassReference($source, $php, $options, 'class')?->className();
+        }
+
+        return null;
+    }
+
     /** @return list<DoctrineSourceSymbol> */
     private function formSymbols(string $uri, string $text, string $source, PhpDocument $php): array
     {
@@ -249,13 +269,14 @@ final class DoctrineExtractor
         foreach ($localRepositories as $repository) {
             $localRepositoryClasses[$repository->className()] = true;
         }
-        $entityVariables = $this->repositoryAssignmentEntities($source, $php);
+        $receivers = $this->repositoryReceivers->resolveCalls($source, $php, $php->methodCalls(), $localRepositoryClasses);
         $symbols = [];
         foreach ($php->methodCalls() as $call) {
             if (!\in_array($call->method(), ['findBy', 'findOneBy', 'count'], true) || null === $call->argument(0)) {
                 continue;
             }
-            $owner = $this->repositoryCallOwner($php, $call, $localRepositoryClasses, $entityVariables);
+            $receiver = $receivers[spl_object_id($call)] ?? null;
+            $owner = $receiver['repositoryClass'] ?? $receiver['entityClass'] ?? null;
             if (null === $owner) {
                 continue;
             }
@@ -285,145 +306,42 @@ final class DoctrineExtractor
     private function repositoryCompletionContext(string $text, string $source, int $offset, PhpDocument $php): ?DoctrineCompletionContext
     {
         $before = substr($source, 0, $offset);
-        if (!preg_match('/(?:\[|,)\s*[\'"]([A-Za-z_][A-Za-z0-9_]*)$/s', $before, $prefix, \PREG_OFFSET_CAPTURE)) {
+        if (!preg_match('/(?<receiver>(?:(?:\$this(?:\s*->\s*[A-Za-z_][A-Za-z0-9_]*)?|\$[A-Za-z_][A-Za-z0-9_]*)\s*->\s*getRepository\s*\(\s*[A-Za-z_\\\\][A-Za-z0-9_\\\\]*\s*::class\s*\)|\$this(?:\s*->\s*[A-Za-z_][A-Za-z0-9_]*)?|\$[A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:findBy|findOneBy|count)\s*\(\s*[^;]*(?:\[|,)\s*[\'"](?<prefix>[A-Za-z_][A-Za-z0-9_]*)$/s', $before, $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
-        $repositoryVariables = $this->repositoryVariables($php);
-        $entityVariables = [];
-        preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*[^;]*?->\s*getRepository\s*\(\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*\)/', $source, $assignments, \PREG_SET_ORDER);
-        foreach ($assignments as $assignment) {
-            $entityVariables[$assignment[1]] = $php->resolveName($assignment[2]);
+        $call = null;
+        foreach ($php->methodCalls() as $candidate) {
+            if ($match['receiver'][1] === $candidate->startOffset() && \in_array($candidate->method(), ['findBy', 'findOneBy', 'count'], true)) {
+                $call = $candidate;
+                break;
+            }
         }
-        $localRepositories = [];
+        if (null === $call) {
+            return null;
+        }
+        $localRepositoryClasses = [];
         foreach ($php->typeDeclarations() as $type) {
             if (!$type->isClass()) {
                 continue;
             }
             $repository = $this->repository('', $text, $source, $type, $php);
             if (null !== $repository) {
-                $localRepositories[] = $repository;
+                $localRepositoryClasses[$repository->className()] = true;
             }
         }
-        preg_match_all('/(\$this(?:->([A-Za-z_][A-Za-z0-9_]*))?|\$([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:findBy|findOneBy|count)\s*\(\s*\[/', $before, $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-        $call = [] === $calls ? null : $calls[array_key_last($calls)];
-        if (null !== $call) {
-            $owner = null;
-            $variable = '';
-            if ('$this' === $call[1][0] && isset($localRepositories[0])) {
-                $owner = $localRepositories[0]->className();
-            } else {
-                $variable = '' !== ($call[2][0] ?? '') ? $call[2][0] : ($call[3][0] ?? '');
-                $owner = $repositoryVariables[$variable] ?? null;
-            }
-            if (null !== $owner) {
-                return new DoctrineCompletionContext(DoctrineCompletionKind::RepositoryCriteria, null, $owner, $prefix[1][0], $this->converter->toRange($text, $prefix[1][1], \strlen($prefix[1][0])));
-            }
-            if (isset($entityVariables[$variable])) {
-                return new DoctrineCompletionContext(DoctrineCompletionKind::RepositoryCriteria, $entityVariables[$variable], null, $prefix[1][0], $this->converter->toRange($text, $prefix[1][1], \strlen($prefix[1][0])));
-            }
-        }
-        preg_match_all('/getRepository\s*\(\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\s*\)\s*->\s*(?:findBy|findOneBy|count)\s*\(\s*\[/', $before, $calls, \PREG_SET_ORDER);
-        if ([] !== $calls) {
-            $call = $calls[array_key_last($calls)];
-
-            return new DoctrineCompletionContext(DoctrineCompletionKind::RepositoryCriteria, $php->resolveName($call[1]), null, $prefix[1][0], $this->converter->toRange($text, $prefix[1][1], \strlen($prefix[1][0])));
-        }
-
-        return null;
-    }
-
-    /** @return array<string, string> */
-    private function repositoryVariables(PhpDocument $php): array
-    {
-        $variables = [];
-        foreach ($php->typedVariables() as $variable) {
-            $type = $this->repositoryType($variable->types());
-            if (null !== $type) {
-                $variables[$variable->name()] = $type;
-            }
-        }
-
-        return $variables;
-    }
-
-    /** @return array<string, string> */
-    private function repositoryAssignmentEntities(string $source, PhpDocument $php): array
-    {
-        $entities = [];
-        foreach ($php->methodCalls() as $call) {
-            if ('getRepository' !== $call->method() || null === $reference = $this->classReferenceArgument($php, $call->argument(0))) {
-                continue;
-            }
-            $before = substr($source, 0, $call->startOffset());
-            $boundary = max((int) strrpos($before, ';'), (int) strrpos($before, '{'));
-            if (!preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*$/', substr($before, $boundary + 1), $assignment)) {
-                continue;
-            }
-            $entities[$this->variableScopeKey($call, $assignment[1])] = $reference->className();
-        }
-
-        return $entities;
-    }
-
-    /**
-     * @param array<string, true>   $localRepositories
-     * @param array<string, string> $entityVariables
-     */
-    private function repositoryCallOwner(PhpDocument $php, PhpMethodCall $call, array $localRepositories, array $entityVariables): ?string
-    {
-        $receiver = $call->receiverContext();
-        if (PhpMethodReceiverKind::This === $receiver->kind() && null !== $call->className() && isset($localRepositories[$call->className()])) {
-            return $call->className();
-        }
-        if (null !== $receiver->name()) {
-            foreach ($php->typedVariables() as $variable) {
-                if ($receiver->name() !== $variable->name()) {
-                    continue;
-                }
-                $repositoryType = $this->repositoryType($variable->types());
-                if (null === $repositoryType) {
-                    continue;
-                }
-                if (PhpMethodReceiverKind::Variable === $receiver->kind()
-                    && \in_array($variable->kind(), [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                    && $call->scopeStartOffset() === $variable->scopeStartOffset()
-                ) {
-                    return $repositoryType;
-                }
-                if (PhpMethodReceiverKind::ThisProperty === $receiver->kind()
-                    && \in_array($variable->kind(), [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
-                    && $call->className() === $variable->className()
-                ) {
-                    return $repositoryType;
-                }
-            }
-            $assigned = $entityVariables[$this->variableScopeKey($call, $receiver->name())] ?? null;
-            if (null !== $assigned) {
-                return $assigned;
-            }
-        }
-        if (PhpMethodReceiverKind::Other !== $receiver->kind() || 1 !== preg_match('/->\s*getRepository\s*\(/', $call->receiver())) {
+        $receiver = $this->repositoryReceivers->resolveCall($source, $php, $call, $localRepositoryClasses);
+        if (null === $receiver) {
             return null;
         }
-        $references = [];
-        foreach ($php->classReferences() as $reference) {
-            if ($reference->startOffset() >= $receiver->startOffset() && $reference->endOffset() <= $receiver->endOffset()) {
-                $references[] = $reference;
-            }
-        }
+        $prefix = $match['prefix'][0];
 
-        return 1 === \count($references) ? $references[0]->className() : null;
-    }
-
-    private function variableScopeKey(PhpMethodCall $call, string $variable): string
-    {
-        return ($call->scopeStartOffset() ?? -1).'|'.$variable;
-    }
-
-    /** @param list<string> $types */
-    private function repositoryType(array $types): ?string
-    {
-        return 1 === \count($types) && str_ends_with($types[0], 'Repository') ? $types[0] : null;
+        return new DoctrineCompletionContext(
+            DoctrineCompletionKind::RepositoryCriteria,
+            $receiver['entityClass'],
+            $receiver['repositoryClass'],
+            $prefix,
+            $this->converter->toRange($text, $match['prefix'][1], \strlen($prefix)),
+        );
     }
 
     /**

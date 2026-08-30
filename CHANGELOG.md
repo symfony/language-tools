@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Scope Doctrine repository completion to the containing method and class
 - Resolve IsGranted attributes and scope Security method calls to their declarations
 - Validate constraint options when arguments contain nested constraints
 - Scope form builder completion to its declaring method

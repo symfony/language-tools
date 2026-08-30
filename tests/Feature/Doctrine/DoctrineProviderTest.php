@@ -18,6 +18,7 @@ use Symfony\Lsp\Feature\Doctrine\DoctrineFieldCompletionBuilder;
 use Symfony\Lsp\Feature\Doctrine\DoctrineIndexRegistry;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipCodeLensProvider;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipProvider;
+use Symfony\Lsp\Feature\Doctrine\DoctrineRepositoryReceiverResolver;
 use Symfony\Lsp\Feature\Doctrine\DoctrineSymbolKind;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -116,7 +117,7 @@ final class DoctrineProviderTest extends TestCase
             PHP;
 
         $converter = new PositionConverter();
-        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -183,7 +184,7 @@ final class DoctrineProviderTest extends TestCase
     public function testUsesPropertyPlacementAndScopedRepositoryReceivers(): void
     {
         $converter = new PositionConverter();
-        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
         $entityText = <<<'PHP'
             <?php
             namespace App\Entity;
@@ -249,10 +250,80 @@ final class DoctrineProviderTest extends TestCase
         self::assertSame(strpos($usageText, "'name'") + 1, $converter->toByteOffset($usageText, $fieldReferences[0]->range()->start()));
     }
 
+    public function testScopesRepositoryCompletionToTheContainingMethod(): void
+    {
+        $extractor = new DoctrineExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
+        $text = <<<'PHP'
+            <?php
+            namespace App\Service;
+
+            use App\Repository\CategoryRepository;
+            use App\Repository\ProductRepository;
+
+            final class Finder
+            {
+                public function products(ProductRepository $repository, CategoryRepository $categories): void
+                {
+                    $categories->findBy(['title' => 'Symfony']);
+                    $repository->findBy(['name' => 'Symfony']);
+                }
+
+                public function categories(CategoryRepository $repository): void
+                {
+                }
+            }
+            PHP;
+
+        $offset = strpos($text, "'name'") + \strlen("'na");
+        $context = $extractor->completionContext('php', $text, $offset);
+
+        self::assertSame('App\\Repository\\ProductRepository', $context?->repositoryClass());
+    }
+
+    public function testScopesThisRepositoryCompletionToTheContainingClass(): void
+    {
+        $extractor = new DoctrineExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
+        $text = <<<'PHP'
+            <?php
+            namespace App\Repository;
+
+            use App\Entity\Category;
+            use App\Entity\Product;
+            use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+            use Doctrine\Persistence\ManagerRegistry;
+
+            final class ProductRepository extends ServiceEntityRepository
+            {
+                public function __construct(ManagerRegistry $registry)
+                {
+                    parent::__construct($registry, Product::class);
+                }
+            }
+
+            final class CategoryRepository extends ServiceEntityRepository
+            {
+                public function __construct(ManagerRegistry $registry)
+                {
+                    parent::__construct($registry, Category::class);
+                }
+
+                public function matching(): void
+                {
+                    $this->findBy(['title' => 'Symfony']);
+                }
+            }
+            PHP;
+
+        $offset = strpos($text, "'title'") + \strlen("'ti");
+        $context = $extractor->completionContext('php', $text, $offset);
+
+        self::assertSame('App\\Repository\\CategoryRepository', $context?->repositoryClass());
+    }
+
     public function testIgnoresCommentedDoctrinePhpWhilePreservingActiveRanges(): void
     {
         $converter = new PositionConverter();
-        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
         $text = <<<'PHP'
             <?php
             namespace App\Form;
@@ -317,7 +388,7 @@ final class DoctrineProviderTest extends TestCase
     public function testNavigatesToRuntimeOnlyEntities(): void
     {
         $converter = new PositionConverter();
-        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -353,7 +424,7 @@ final class DoctrineProviderTest extends TestCase
 
     public function testOffersNoDoctrineCompletionsInsidePhpComments(): void
     {
-        $extractor = new DoctrineExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = new DoctrineExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
         $text = <<<'PHP'
             <?php
             use App\Repository\ProductRepository;
