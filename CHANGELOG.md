@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Ignore commented configuration constructs in PHP, XML and YAML files
+- Ignore commented environment expressions in YAML and XML files
 - Complete event names only in resolved event-listener attributes
 - Complete Messenger options only in resolved handler attributes
 - Complete serializer groups only in resolved Groups attributes

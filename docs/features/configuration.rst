@@ -18,7 +18,7 @@ Completion
 Configuration completion is available in YAML, XML and PHP configuration
 files. YAML suggestions follow the current indentation and mapping path. PHP
 suggestions recognize the bundle configuration DSL. XML suggestions follow the
-current element path.
+current element path. Commented configuration constructs are ignored.
 
 YAML value completion suggests allowed enum values. Suggested keys include
 type and description details when the bundle provides them.

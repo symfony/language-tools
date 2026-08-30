@@ -8,9 +8,9 @@ or displaying their values.
 Completion
 ----------
 
-Completion is available inside ``%env(...)%`` expressions in PHP, YAML and
-Twig files. It suggests environment variable names and processors installed in
-the selected Symfony environment.
+Completion is available inside ``%env(...)%`` expressions in PHP, XML, YAML
+and Twig files. It suggests environment variable names and processors installed
+in the selected Symfony environment. Expressions inside comments are ignored.
 
 For example, completion after ``json:`` suggests known variable names:
 

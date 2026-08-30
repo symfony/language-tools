@@ -7,6 +7,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
+use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -17,6 +18,7 @@ final class ConfigurationDocumentLinkProvider implements DocumentLinkProviderInt
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly UriToPathConverter $uriToPathConverter,
+        private readonly YamlCommentParser $yamlComments,
     ) {
     }
 
@@ -31,7 +33,8 @@ final class ConfigurationDocumentLinkProvider implements DocumentLinkProviderInt
             return [];
         }
         $links = [];
-        preg_match_all('/\bresource\s*:\s*(["\']?)([^"\'\s#]+)\1/', $request->document->text(), $matches, \PREG_OFFSET_CAPTURE);
+        $text = $this->yamlComments->mask($request->document->text());
+        preg_match_all('/\bresource\s*:\s*(["\']?)([^"\'\s#]+)\1/', $text, $matches, \PREG_OFFSET_CAPTURE);
         $basePath = Path::getDirectory($documentPath);
         foreach ($matches[2] as [$resource, $offset]) {
             if (str_contains($resource, '*') || str_starts_with($resource, '@')) {

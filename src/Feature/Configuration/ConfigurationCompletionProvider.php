@@ -8,6 +8,8 @@ use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -20,6 +22,8 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         private readonly ConfigurationIndexRegistry $indexes,
         private readonly ConfigurationPathResolver $paths,
         private readonly YamlConfigurationParser $yaml,
+        private readonly PhpCommentParserInterface $phpComments,
+        private readonly XmlCommentParser $xmlComments,
     ) {
     }
 
@@ -94,7 +98,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
     private function completePhp(Document $document, Project $project, Position $position): ?array
     {
         $offset = $this->converter->toByteOffset($document->text(), $position);
-        $before = substr($document->text(), 0, $offset);
+        $before = $this->phpComments->mask(substr($document->text(), 0, $offset));
         if (!preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)((?:->[A-Za-z_][A-Za-z0-9_]*\(\))*)->([A-Za-z_][A-Za-z0-9_]*)?$/', $before, $match)) {
             return null;
         }
@@ -123,7 +127,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
     private function completeXml(Document $document, Project $project, Position $position): ?array
     {
         $offset = $this->converter->toByteOffset($document->text(), $position);
-        $before = substr($document->text(), 0, $offset);
+        $before = $this->xmlComments->mask(substr($document->text(), 0, $offset));
         $index = $this->indexes->forProject($project);
         if (preg_match('/<(?<element>[A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?)\b[^<>]*\s+(?<prefix>[A-Za-z_][A-Za-z0-9_.-]*)?$/', $before, $attributeMatch, \PREG_OFFSET_CAPTURE)) {
             $tagOffset = strrpos($before, '<');

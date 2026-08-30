@@ -21,8 +21,11 @@ use Symfony\Lsp\Feature\Configuration\ProjectConfigurationSnapshotLoader;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Xml\XmlCommentParser;
+use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -435,6 +438,91 @@ final class ConfigurationProviderTest extends TestCase
         }
     }
 
+    public function testIgnoresCommentedPhpConfigurationAcrossCapabilities(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/framework.php';
+        $text = <<<'PHP'
+            <?php
+            // $framework->router()->utf8('bad');
+            // $framework->router()->ut
+            $framework->router()->utf8('bad');
+            $framework->router()->utf8(true);
+            PHP;
+        $fixture->documents->open(new Document($uri, 'php', 1, $text));
+
+        $liveDiagnosticOffset = (int) strrpos($text, "utf8('bad')");
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
+        self::assertSame($this->protocolRange($fixture->converter, $text, $liveDiagnosticOffset, \strlen('utf8')), $diagnostics[0]['range'] ?? null);
+
+        $commentHoverOffset = strpos($text, 'utf8') + 1;
+        $liveHoverOffset = strrpos($text, 'utf8') + 1;
+        self::assertNull($fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, $commentHoverOffset)));
+        self::assertIsArray($fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, $liveHoverOffset)));
+
+        $commentCompletionOffset = strpos($text, '// $framework->router()->ut') + \strlen('// $framework->router()->ut');
+        $liveCompletionStart = (int) strrpos($text, 'utf8');
+        $liveCompletionOffset = $liveCompletionStart + \strlen('ut');
+        self::assertNull($fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, $commentCompletionOffset)));
+        $completion = $fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, $liveCompletionOffset)) ?? [];
+        self::assertSame(['utf8'], array_column($completion, 'label'));
+        /** @var array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} $textEdit */
+        $textEdit = $completion[0]['textEdit'];
+        self::assertSame($this->protocolRange($fixture->converter, $text, $liveCompletionStart, \strlen('ut')), $textEdit['range']);
+    }
+
+    public function testIgnoresCommentedXmlConfigurationAcrossCapabilities(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/framework.xml';
+        $text = <<<'XML'
+            <container>
+                <framework:config>
+                    <!-- "<ignored>" <framework:router utf8="bad" unknown="x"><framework:utf8/></framework:router> -->
+                    <framework:router utf8="bad">
+                        <!-- <framework:ut -->
+                        <framework:utf8/>
+                    </framework:router>
+                </framework:config>
+            </container>
+            XML;
+        $fixture->documents->open(new Document($uri, 'xml', 1, $text));
+
+        $liveDiagnosticOffset = (int) strpos($text, 'utf8="bad"', (int) strpos($text, '-->'));
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
+        self::assertSame($this->protocolRange($fixture->converter, $text, $liveDiagnosticOffset, \strlen('utf8')), $diagnostics[0]['range'] ?? null);
+
+        $commentHoverOffset = strpos($text, 'framework:utf8') + \strlen('framework:') + 1;
+        $liveHoverOffset = strrpos($text, 'framework:utf8') + \strlen('framework:') + 1;
+        self::assertNull($fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, $commentHoverOffset)));
+        self::assertIsArray($fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, $liveHoverOffset)));
+
+        $commentCompletionOffset = strpos($text, '<framework:ut', (int) strpos($text, '-->')) + \strlen('<framework:ut');
+        $liveCompletionStart = strrpos($text, '<framework:utf8') + \strlen('<framework:');
+        $liveCompletionOffset = $liveCompletionStart + \strlen('ut');
+        self::assertNull($fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, $commentCompletionOffset)));
+        $completion = $fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, $liveCompletionOffset)) ?? [];
+        self::assertSame(['utf8'], array_column($completion, 'label'));
+        /** @var array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} $textEdit */
+        $textEdit = $completion[0]['textEdit'];
+        self::assertSame($this->protocolRange($fixture->converter, $text, $liveCompletionStart, \strlen('ut')), $textEdit['range']);
+    }
+
+    public function testIgnoresCommentedYamlResourceLinks(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = "# resource: ignored.yaml\nimports:\n    - { resource: ../shared.yaml }\n";
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        $links = $fixture->links->links(['textDocument' => ['uri' => $uri]]) ?? [];
+        $resourceOffset = (int) strpos($text, '../shared.yaml');
+        self::assertSame(['file:///workspace/config/shared.yaml'], array_column($links, 'target'));
+        self::assertSame($this->protocolRange($fixture->converter, $text, $resourceOffset, \strlen('../shared.yaml')), $links[0]['range'] ?? null);
+    }
+
     public function testUsesVendorAuthorityForSavedConfiguration(): void
     {
         $root = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
@@ -474,6 +562,26 @@ final class ConfigurationProviderTest extends TestCase
         } finally {
             (new Filesystem())->remove($root);
         }
+    }
+
+    /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
+    private function positionParams(PositionConverter $converter, string $uri, string $text, int $offset): array
+    {
+        $position = $converter->toPosition($text, $offset);
+
+        return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line(), 'character' => $position->character()]];
+    }
+
+    /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */
+    private function protocolRange(PositionConverter $converter, string $text, int $offset, int $length): array
+    {
+        $start = $converter->toPosition($text, $offset);
+        $end = $converter->toPosition($text, $offset + $length);
+
+        return [
+            'start' => ['line' => $start->line(), 'character' => $start->character()],
+            'end' => ['line' => $end->line(), 'character' => $end->character()],
+        ];
     }
 
     private function providers(string $root = '/workspace', string $environment = 'dev', ?ConfigurationValidationResult $validation = null): ConfigurationProviderFixture
@@ -579,14 +687,17 @@ final class ConfigurationProviderTest extends TestCase
         ]]]]);
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
-        $paths = new ConfigurationPathResolver();
+        $phpComments = new PhpCommentParser();
+        $xmlComments = new XmlCommentParser();
+        $yamlComments = new YamlCommentParser();
+        $paths = new ConfigurationPathResolver($phpComments, $xmlComments);
         $yaml = new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
 
         return new ConfigurationProviderFixture(
-            new ConfigurationCompletionProvider($resolver, $converter, $protocol, $indexes, $paths, $yaml),
+            new ConfigurationCompletionProvider($resolver, $converter, $protocol, $indexes, $paths, $yaml, $phpComments, $xmlComments),
             new ConfigurationHoverProvider($resolver, $converter, $protocol, $indexes, $paths, $yaml),
-            new ConfigurationDiagnosticProvider($resolver, new ProjectPathResolver($uriConverter), $converter, $protocol, $indexes, $routeIndexes, $validations, new SavedDocumentMatcher(new ProjectPathResolver($uriConverter)), $runtimeConfiguration, $paths, $yaml, new ConfigurationValueValidator($environmentIndexes)),
-            new ConfigurationDocumentLinkProvider($resolver, $converter, $protocol, $uriConverter),
+            new ConfigurationDiagnosticProvider($resolver, new ProjectPathResolver($uriConverter), $converter, $protocol, $indexes, $routeIndexes, $validations, new SavedDocumentMatcher(new ProjectPathResolver($uriConverter)), $runtimeConfiguration, $paths, $yaml, new ConfigurationValueValidator($environmentIndexes), $phpComments, $xmlComments),
+            new ConfigurationDocumentLinkProvider($resolver, $converter, $protocol, $uriConverter, $yamlComments),
             $documents,
             $converter,
         );

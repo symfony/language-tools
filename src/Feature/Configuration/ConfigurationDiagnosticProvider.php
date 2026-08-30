@@ -9,6 +9,8 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\SavedDocumentMatcher;
@@ -32,6 +34,8 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
         private readonly ConfigurationPathResolver $paths,
         private readonly YamlConfigurationParser $yaml,
         private readonly ConfigurationValueValidator $values,
+        private readonly PhpCommentParserInterface $phpComments,
+        private readonly XmlCommentParser $xmlComments,
     ) {
     }
 
@@ -195,9 +199,10 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
     private function diagnosePhp(Document $document, ConfigurationIndex $index): array
     {
         $diagnostics = [];
-        preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)((?:->[A-Za-z_][A-Za-z0-9_]*\([^)]*\))+)/', $document->text(), $chains, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        $text = $this->phpComments->mask($document->text());
+        preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)((?:->[A-Za-z_][A-Za-z0-9_]*\([^)]*\))+)/', $text, $chains, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($chains as $chain) {
-            $path = [$this->paths->phpRoot(substr($document->text(), 0, $chain[1][1]), $chain[1][0])];
+            $path = [$this->paths->phpRoot(substr($text, 0, $chain[1][1]), $chain[1][0])];
             if (!isset($index->roots()[$path[0]])) {
                 continue;
             }
@@ -232,7 +237,8 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
         $diagnostics = [];
         $stack = [];
         $elements = [];
-        preg_match_all('/<\s*(\/)?\s*([A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?)([^>]*)>/', $document->text(), $tags, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        $text = $this->xmlComments->mask($document->text());
+        preg_match_all('/<\s*(\/)?\s*([A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?)([^>]*)>/', $text, $tags, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($tags as $tag) {
             if ('' !== $tag[1][0]) {
                 $open = array_pop($elements);

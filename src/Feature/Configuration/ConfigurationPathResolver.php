@@ -3,9 +3,17 @@
 namespace Symfony\Lsp\Feature\Configuration;
 
 use Symfony\Lsp\Document\Document;
+use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 
 final class ConfigurationPathResolver
 {
+    public function __construct(
+        private readonly PhpCommentParserInterface $phpComments,
+        private readonly XmlCommentParser $xmlComments,
+    ) {
+    }
+
     public function phpRoot(string $before, string $variable): string
     {
         preg_match_all('/([A-Za-z_\\\\][A-Za-z0-9_\\\\]*Config)\s+\$'.preg_quote($variable, '/').'\b/', $before, $matches);
@@ -26,9 +34,10 @@ final class ConfigurationPathResolver
     /** @return array{list<string>, ConfigurationNode}|null */
     public function resolvePhpNode(Document $document, ConfigurationIndex $index, int $cursor): ?array
     {
-        preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)((?:->[A-Za-z_][A-Za-z0-9_]*\([^)]*\))+)/', $document->text(), $chains, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        $text = $this->phpComments->mask($document->text());
+        preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)((?:->[A-Za-z_][A-Za-z0-9_]*\([^)]*\))+)/', $text, $chains, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($chains as $chain) {
-            $path = [$this->phpRoot(substr($document->text(), 0, $chain[1][1]), $chain[1][0])];
+            $path = [$this->phpRoot(substr($text, 0, $chain[1][1]), $chain[1][0])];
             preg_match_all('/->([A-Za-z_][A-Za-z0-9_]*)\(([^)]*)\)/', $chain[2][0], $methods, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
             foreach ($methods as $method) {
                 $path[] = $this->phpMethodName($method[1][0]);
@@ -48,7 +57,8 @@ final class ConfigurationPathResolver
     public function resolveXmlNode(Document $document, ConfigurationIndex $index, int $cursor): ?array
     {
         $stack = [];
-        preg_match_all('/<\s*(\/)?\s*([A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?)([^>]*)>/', $document->text(), $tags, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        $text = $this->xmlComments->mask($document->text());
+        preg_match_all('/<\s*(\/)?\s*([A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?)([^>]*)>/', $text, $tags, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($tags as $tag) {
             if ('' !== $tag[1][0]) {
                 if ([] !== $stack) {
@@ -75,6 +85,7 @@ final class ConfigurationPathResolver
     public function xmlPath(string $text, ConfigurationIndex $index): array
     {
         $stack = [];
+        $text = $this->xmlComments->mask($text);
         preg_match_all('/<\s*(\/)?\s*([A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?)[^>]*>/', $text, $matches, \PREG_SET_ORDER);
         foreach ($matches as $match) {
             if ('' !== $match[1]) {

@@ -7,12 +7,14 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Feature\Configuration\ConfigurationIndex;
 use Symfony\Lsp\Feature\Configuration\ConfigurationNode;
 use Symfony\Lsp\Feature\Configuration\ConfigurationPathResolver;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 
 final class ConfigurationPathResolverTest extends TestCase
 {
     public function testResolvesPhpDslPaths(): void
     {
-        $resolver = new ConfigurationPathResolver();
+        $resolver = new ConfigurationPathResolver(new PhpCommentParser(), new XmlCommentParser());
         $index = $this->index();
         $text = '<?php function configure(FrameworkConfig $options) { $options->router()->utf8(true); }';
         $document = new Document('file:///workspace/config/framework.php', 'php', 1, $text);
@@ -24,7 +26,7 @@ final class ConfigurationPathResolverTest extends TestCase
 
     public function testResolvesXmlDslPaths(): void
     {
-        $resolver = new ConfigurationPathResolver();
+        $resolver = new ConfigurationPathResolver(new PhpCommentParser(), new XmlCommentParser());
         $index = $this->index();
         $text = '<container><framework:config><framework:router><framework:utf8/></framework:router></framework:config></container>';
         $document = new Document('file:///workspace/config/framework.xml', 'xml', 1, $text);
