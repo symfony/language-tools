@@ -143,7 +143,7 @@ final class TwigCallableDeclarationExtractor
             return $this->attributeOption($attribute, 'needsIsSandboxed', 4, false);
         }
         $positional = $attribute->positionalArgument(4);
-        if (null === $positional || null !== $positional->name) {
+        if (null === $positional) {
             return [false, true];
         }
         $expression = trim((string) $positional->expression);
@@ -157,11 +157,7 @@ final class TwigCallableDeclarationExtractor
     /** @return array{bool, bool} */
     private function attributeOption(PhpAttribute $attribute, string $name, int $position, bool $default): array
     {
-        $argument = $attribute->argument($name);
-        if (null === $argument) {
-            $positional = $attribute->positionalArgument($position);
-            $argument = null === $positional?->name ? $positional : null;
-        }
+        $argument = $attribute->argument($name) ?? $attribute->positionalArgument($position);
         if (null === $argument) {
             return [$default, true];
         }

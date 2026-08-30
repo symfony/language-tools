@@ -4,8 +4,6 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Parser\Php\PhpArgument;
-use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
@@ -49,7 +47,7 @@ final class TemplateReferenceExtractor
             if (self::TEMPLATE_ATTRIBUTE !== $attribute->name) {
                 continue;
             }
-            $template = $this->attributeArgument($attribute, 'template', 0)?->stringLiteral;
+            $template = ($attribute->argument('template') ?? $attribute->positionalArgument(0))?->stringLiteral;
             if (null === $template || '' === $template->value) {
                 continue;
             }
@@ -60,7 +58,7 @@ final class TemplateReferenceExtractor
                     $this->positionConverter->toPosition($text, $template->startOffset),
                     $this->positionConverter->toPosition($text, $template->endOffset),
                 ),
-                $this->attributeVariables($this->attributeArgument($attribute, 'vars', 1)?->expression),
+                $this->attributeVariables(($attribute->argument('vars') ?? $attribute->positionalArgument(1))?->expression),
             );
         }
 
@@ -109,16 +107,6 @@ final class TemplateReferenceExtractor
         }
 
         return $this->sorted($references);
-    }
-
-    private function attributeArgument(PhpAttribute $attribute, string $name, int $position): ?PhpArgument
-    {
-        if (null !== $argument = $attribute->argument($name)) {
-            return $argument;
-        }
-        $positional = $attribute->positionalArgument($position);
-
-        return null === $positional?->name ? $positional : null;
     }
 
     /** @return list<string> */

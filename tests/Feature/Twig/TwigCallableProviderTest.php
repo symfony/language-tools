@@ -139,6 +139,30 @@ final class TwigCallableProviderTest extends TestCase
         self::assertSame($converter->toPosition($source, $functionOffset)->character, $declarations[2]->range->start->character);
     }
 
+    public function testIgnoresUnknownNamedFirstArgumentsAsCallableNames(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            use Twig\Attribute\AsTwigFunction;
+            use Twig\TwigFunction;
+
+            final class AppExtension
+            {
+                public function getFunctions(): array
+                {
+                    return [new TwigFunction(unknown: 'not_a_function')];
+                }
+
+                #[AsTwigFunction(unknown: 'not_an_attribute')]
+                public function attributed(): string { return ''; }
+            }
+            PHP;
+
+        $declarations = $this->declarationExtractor(new PositionConverter())->extract('file:///workspace/src/Twig/AppExtension.php', $source)->declarations;
+
+        self::assertSame([], $declarations);
+    }
+
     public function testIgnoresIncompleteAttributedDeclarations(): void
     {
         $source = <<<'PHP'

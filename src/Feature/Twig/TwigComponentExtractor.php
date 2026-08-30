@@ -50,10 +50,9 @@ final class TwigComponentExtractor
                 }
                 $separator = strrpos($className, '\\');
                 $class = false === $separator ? $className : substr($className, $separator + 1);
-                $template = $this->stringArgument($attribute, 'template');
-                $name = $this->stringArgument($attribute, 'name')
-                    ?? $this->stringArgument($attribute, 0)
-                    ?? $this->nameFromTemplate($template)
+                $template = $attribute->argument('template')?->stringLiteral?->value;
+                $name = ($attribute->argument('name') ?? $attribute->positionalArgument(0))?->stringLiteral?->value;
+                $name ??= $this->nameFromTemplate($template)
                     ?? $this->nameFromClass($className)
                     ?? $class;
                 $componentProperties = [];
@@ -79,14 +78,7 @@ final class TwigComponentExtractor
                     }
                     $actions[$method->name] = new TwigComponentAction($method->name, $this->converter->toRange($text, $method->nameStartOffset, $method->nameEndOffset - $method->nameStartOffset));
                     foreach ($listeners as $listener) {
-                        $eventArgument = $listener->argument('event');
-                        if (null === $eventArgument) {
-                            $eventArgument = $listener->positionalArgument(0);
-                            if (null !== $eventArgument?->name) {
-                                $eventArgument = null;
-                            }
-                        }
-                        $event = $eventArgument?->stringLiteral;
+                        $event = ($listener->argument('event') ?? $listener->positionalArgument(0))?->stringLiteral;
                         if (null === $event || '' === $event->value) {
                             continue;
                         }
@@ -119,18 +111,7 @@ final class TwigComponentExtractor
                         ) {
                             continue;
                         }
-                        $argument = null;
-                        foreach ($call->arguments as $candidate) {
-                            if ('event' === $candidate->name) {
-                                $argument = $candidate;
-                                break;
-                            }
-                        }
-                        $argument ??= $call->positionalArgument(0);
-                        if (null !== $argument?->name && 'event' !== $argument->name) {
-                            continue;
-                        }
-                        $event = $argument?->stringLiteral;
+                        $event = ($call->argument('event') ?? $call->positionalArgument(0))?->stringLiteral;
                         if (null === $event) {
                             continue;
                         }
@@ -236,13 +217,6 @@ final class TwigComponentExtractor
         }
 
         return null;
-    }
-
-    private function stringArgument(PhpAttribute $attribute, string|int $name): ?string
-    {
-        $argument = \is_int($name) ? $attribute->positionalArgument($name) : $attribute->argument($name);
-
-        return $argument?->stringLiteral?->value;
     }
 
     private function anonymousName(Project $project, string $uri): ?string
