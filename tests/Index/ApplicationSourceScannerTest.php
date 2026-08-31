@@ -31,6 +31,7 @@ use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Index\SourceFileEnumerator;
+use Symfony\Lsp\Index\SourceIndexJsonLinesCodec;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Index\SourceIndexReaderInterface;
@@ -811,7 +812,7 @@ PHP;
 
     private function scannerWithMutex(LocalKeyedMutex $mutex, DocumentStore $documents, SourceIndexProviderInterface ...$providers): ApplicationSourceScanner
     {
-        return $this->scannerWithStore(new PersistentSourceIndexStore('test', new Filesystem()), array_values($providers), $mutex, $documents);
+        return $this->scannerWithStore(new PersistentSourceIndexStore('test', new Filesystem(), new SourceIndexJsonLinesCodec('test')), array_values($providers), $mutex, $documents);
     }
 
     /** @param list<SourceIndexProviderInterface> $providers */

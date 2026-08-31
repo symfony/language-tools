@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Index;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
+use Symfony\Lsp\Index\SourceIndexJsonLinesCodec;
 use Symfony\Lsp\Index\SourceIndexStoreInterface;
 use Symfony\Lsp\Project\Project;
 
@@ -134,7 +135,7 @@ final class PersistentSourceIndexStoreTest extends TestCase
         $path = $store->path($this->project);
         $contents = (string) file_get_contents($path);
         /** @var array{schemaVersion: int, serverVersion: string} $header */
-        $header = json_decode($store->header(), true, 512, \JSON_THROW_ON_ERROR);
+        $header = json_decode((new SourceIndexJsonLinesCodec('test'))->encodeHeader(), true, 512, \JSON_THROW_ON_ERROR);
         --$header['schemaVersion'];
         file_put_contents(
             $path,
@@ -151,7 +152,7 @@ final class PersistentSourceIndexStoreTest extends TestCase
         $writer->add('src/A.php', $this->metadata(1), ['routes' => 'payload']);
         $writer->commit();
 
-        $other = new PersistentSourceIndexStore('other', new Filesystem());
+        $other = new PersistentSourceIndexStore('other', new Filesystem(), new SourceIndexJsonLinesCodec('other'));
         (new Filesystem())->mkdir(\dirname($other->path($this->project)));
         copy($store->path($this->project), $other->path($this->project));
 
@@ -190,7 +191,7 @@ final class PersistentSourceIndexStoreTest extends TestCase
 
     private function store(): PersistentSourceIndexStore
     {
-        return new PersistentSourceIndexStore('test', new Filesystem());
+        return new PersistentSourceIndexStore('test', new Filesystem(), new SourceIndexJsonLinesCodec('test'));
     }
 
     /**
