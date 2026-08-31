@@ -14,8 +14,11 @@ use Symfony\Lsp\Feature\Twig\TemplateNameResolver;
 use Symfony\Lsp\Feature\Twig\TwigComponentCompletionProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentExtractor;
 use Symfony\Lsp\Feature\Twig\TwigComponentIndexRegistry;
+use Symfony\Lsp\Feature\Twig\TwigComponentNameResolver;
+use Symfony\Lsp\Feature\Twig\TwigComponentPhpExtractor;
 use Symfony\Lsp\Feature\Twig\TwigComponentRelationshipProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentResolver;
+use Symfony\Lsp\Feature\Twig\TwigComponentTemplateExtractor;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -33,7 +36,7 @@ final class LiveComponentProviderTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), $commentParser, new TwigQuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
+        $extractor = $this->extractor($converter, $commentParser);
         $classUri = 'file:///workspace/src/Twig/Components/Search.php';
         $classText = <<<'PHP'
             <?php
@@ -123,7 +126,7 @@ final class LiveComponentProviderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
-        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new TwigQuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
+        $extractor = $this->extractor($converter);
         $facts = $extractor->extract($project, 'file:///workspace/src/Twig/Components/Card.php', 'php', <<<'PHP'
             <?php
             use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
@@ -136,6 +139,18 @@ final class LiveComponentProviderTest extends TestCase
 
         self::assertSame(['Card'], array_map(static fn ($component): string => $component->name, $facts->components));
         self::assertSame(['title'], $facts->components[0]->properties);
+    }
+
+    private function extractor(PositionConverter $converter, ?TwigCommentParser $comments = null): TwigComponentExtractor
+    {
+        $comments ??= new TwigCommentParser();
+        $names = new TwigComponentNameResolver(new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())));
+
+        return new TwigComponentExtractor(
+            new TolerantPhpParser(new Parser()),
+            new TwigComponentPhpExtractor($converter, $names),
+            new TwigComponentTemplateExtractor($converter, $names, $comments, new TwigQuotedArgumentMatcher($converter)),
+        );
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
@@ -152,7 +167,7 @@ final class LiveComponentProviderTest extends TestCase
     public function testOffersNoEmitCompletionsInsidePhpComments(): void
     {
         $converter = new PositionConverter();
-        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new TwigQuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
+        $extractor = $this->extractor($converter);
         $uri = 'file:///workspace/src/Twig/Components/Search.php';
         $text = <<<'PHP'
             <?php
@@ -181,7 +196,7 @@ final class LiveComponentProviderTest extends TestCase
     public function testAttributesEmitCallsToTheirOwningLiveComponents(): void
     {
         $converter = new PositionConverter();
-        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new TwigQuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
+        $extractor = $this->extractor($converter);
 
         $facts = $extractor->extract(new Project('/workspace', 'file:///workspace', '^8.0'), 'file:///workspace/src/Twig/Components/Events.php', 'php', <<<'PHP'
             <?php
@@ -231,7 +246,7 @@ final class LiveComponentProviderTest extends TestCase
     public function testIgnoresEmitCallsInPhpComments(): void
     {
         $converter = new PositionConverter();
-        $extractor = new TwigComponentExtractor($converter, new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())), new TwigCommentParser(), new TwigQuotedArgumentMatcher($converter), new TolerantPhpParser(new Parser()));
+        $extractor = $this->extractor($converter);
 
         $facts = $extractor->extract(new Project('/workspace', 'file:///workspace', '^8.0'), 'file:///workspace/src/Twig/Components/Search.php', 'php', <<<'PHP'
             <?php

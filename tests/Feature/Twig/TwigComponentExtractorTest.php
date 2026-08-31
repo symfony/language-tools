@@ -7,6 +7,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Twig\TemplateNameResolver;
 use Symfony\Lsp\Feature\Twig\TwigComponentExtractor;
+use Symfony\Lsp\Feature\Twig\TwigComponentNameResolver;
+use Symfony\Lsp\Feature\Twig\TwigComponentPhpExtractor;
+use Symfony\Lsp\Feature\Twig\TwigComponentTemplateExtractor;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigQuotedArgumentMatcher;
@@ -44,12 +47,12 @@ final class TwigComponentExtractorTest extends TestCase
     {
         $converter = new PositionConverter();
 
+        $names = new TwigComponentNameResolver(new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())));
+
         return new TwigComponentExtractor(
-            $converter,
-            new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())),
-            new TwigCommentParser(),
-            new TwigQuotedArgumentMatcher($converter),
             new TolerantPhpParser(new Parser()),
+            new TwigComponentPhpExtractor($converter, $names),
+            new TwigComponentTemplateExtractor($converter, $names, new TwigCommentParser(), new TwigQuotedArgumentMatcher($converter)),
         );
     }
 }
