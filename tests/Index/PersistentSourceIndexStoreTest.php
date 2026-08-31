@@ -44,6 +44,20 @@ final class PersistentSourceIndexStoreTest extends TestCase
         self::assertSame([], $fresh->loadPayloads($this->project, 'src/Missing.php'));
     }
 
+    public function testRewritePreservesOffsetsAcrossBufferedWrites(): void
+    {
+        $store = $this->store();
+        $writer = $store->beginRewrite($this->project);
+        $largePayload = str_repeat('x', 1048576);
+        $writer->add('src/Large.php', $this->metadata(1), ['routes' => $largePayload]);
+        $writer->add('src/After.php', $this->metadata(2), ['routes' => 'after']);
+        $writer->commit();
+
+        $fresh = $this->store();
+        self::assertSame(['routes' => $largePayload], $fresh->loadPayloads($this->project, 'src/Large.php'));
+        self::assertSame(['routes' => 'after'], $fresh->loadPayloads($this->project, 'src/After.php'));
+    }
+
     public function testSequentialReaderReturnsOnlyLatestRecords(): void
     {
         $store = $this->store();

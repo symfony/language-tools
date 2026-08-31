@@ -6,9 +6,12 @@ use Symfony\Lsp\Project\Project;
 
 final class PersistentSourceIndexWriter implements SourceIndexWriterInterface
 {
+    private const WRITE_BUFFER_BYTES = 1048576;
+
     /** @var array<string, array{int, int}> */
     private array $offsets = [];
     private bool $finished = false;
+    private string $buffer = '';
 
     /**
      * @param ?resource $handle
@@ -29,14 +32,13 @@ final class PersistentSourceIndexWriter implements SourceIndexWriterInterface
             return;
         }
         $line = $this->codec->encodeRecord($relativePath, $metadata, $payloads);
-        if (false === @fwrite($this->handle, $line)) {
-            fclose($this->handle);
-            $this->handle = null;
-
-            return;
+        $length = \strlen($line);
+        $this->offsets[$relativePath] = [$this->position, $length];
+        $this->position += $length;
+        $this->buffer .= $line;
+        if (\strlen($this->buffer) >= self::WRITE_BUFFER_BYTES) {
+            $this->flush();
         }
-        $this->offsets[$relativePath] = [$this->position, \strlen($line)];
-        $this->position += \strlen($line);
     }
 
     public function commit(): void
@@ -45,7 +47,7 @@ final class PersistentSourceIndexWriter implements SourceIndexWriterInterface
             return;
         }
         $this->finished = true;
-        if (null === $this->handle) {
+        if (!$this->flush() || null === $this->handle) {
             return;
         }
         fclose($this->handle);
@@ -59,10 +61,31 @@ final class PersistentSourceIndexWriter implements SourceIndexWriterInterface
             return;
         }
         $this->finished = true;
+        $this->buffer = '';
         if (null !== $this->handle) {
             fclose($this->handle);
             $this->handle = null;
         }
         @unlink($this->temporaryPath);
+    }
+
+    private function flush(): bool
+    {
+        if (null === $this->handle) {
+            return false;
+        }
+        while ('' !== $this->buffer) {
+            $written = @fwrite($this->handle, $this->buffer);
+            if (false === $written || 0 === $written) {
+                fclose($this->handle);
+                $this->handle = null;
+                $this->buffer = '';
+
+                return false;
+            }
+            $this->buffer = substr($this->buffer, $written);
+        }
+
+        return true;
     }
 }
