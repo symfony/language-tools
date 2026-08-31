@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Prevent interactive subprocesses from blocking dogfood setup
 - Adopt the upstream Twig grammar with the string escape fix and its new MIT license
 - Restrict Stimulus member declarations to the exported controller class
 - Speed up source indexing by analyzing PHP runtime structure once

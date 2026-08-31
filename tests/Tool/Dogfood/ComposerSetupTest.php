@@ -35,7 +35,7 @@ final class ComposerSetupTest extends TestCase
         self::assertCount(1, $processes->calls);
         self::assertSame(['composer', 'install', '--no-interaction', '--no-progress'], $processes->calls[0]['command']);
         self::assertSame($this->directory, $processes->calls[0]['directory']);
-        self::assertSame([], $processes->calls[0]['environment']);
+        self::assertSame(['COMPOSER_NO_INTERACTION' => '1'], $processes->calls[0]['environment']);
     }
 
     public function testPassesConfiguredEnvironmentVariablesToComposer(): void
@@ -45,7 +45,10 @@ final class ComposerSetupTest extends TestCase
 
         (new ComposerSetup($processes))->setUp($this->configuration(environmentVariables: ['DATABASE_URL' => 'mysql://root@127.0.0.1:9/app']), $this->directory);
 
-        self::assertSame(['DATABASE_URL' => 'mysql://root@127.0.0.1:9/app'], $processes->calls[0]['environment']);
+        self::assertSame([
+            'DATABASE_URL' => 'mysql://root@127.0.0.1:9/app',
+            'COMPOSER_NO_INTERACTION' => '1',
+        ], $processes->calls[0]['environment']);
     }
 
     public function testSkipsScriptsWhenDisabled(): void

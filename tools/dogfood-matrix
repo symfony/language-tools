@@ -11,6 +11,7 @@ use Symfony\Lsp\Tools\Dogfood\ConfigurationLoader;
 use Symfony\Lsp\Tools\Dogfood\GitProvisioner;
 use Symfony\Lsp\Tools\Dogfood\MatrixCommand;
 use Symfony\Lsp\Tools\Dogfood\NativeProcessRunner;
+use Symfony\Lsp\Tools\Dogfood\ProcessInterruptedException;
 use Symfony\Lsp\Tools\Dogfood\RunClassifier;
 use Symfony\Lsp\Tools\Dogfood\ServerHarness;
 use Symfony\Lsp\Tools\Dogfood\SetupInterface;
@@ -83,7 +84,10 @@ if ([] === $configurationDirectories) {
 }
 
 $processes = new NativeProcessRunner();
-$setups = ['composer' => new ComposerSetup($processes)];
+$setups = [
+    'composer' => new ComposerSetup($processes),
+    'composer-no-scripts' => new ComposerSetup($processes, scripts: false),
+];
 if (null !== $setupFile) {
     if (!is_file($setupFile)) {
         fwrite(\STDERR, sprintf("Setup file \"%s\" does not exist.\n", $setupFile));
@@ -155,4 +159,11 @@ $command = new MatrixCommand(
     SupportScorer::withExclusionsFile($root.'/.gerard/dogfood/support/exclusions.json'),
 );
 
-exit($command->run($configurations, Path::join($root, 'var/dogfood/matrix', gmdate('Ymd-His'))));
+try {
+    $exitCode = $command->run($configurations, Path::join($root, 'var/dogfood/matrix', gmdate('Ymd-His')));
+} catch (ProcessInterruptedException $e) {
+    fwrite(\STDERR, "Interrupted.\n");
+    exit(128 + $e->signal);
+}
+
+exit($exitCode);
