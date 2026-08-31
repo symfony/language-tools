@@ -49,6 +49,26 @@ function symfonyLspBridgeSupportedVersions(string $url, string $cache): ?array
     return is_string($cached) ? symfonyLspBridgeDecodeSupportedVersions($cached) : null;
 }
 
+/** @param list<string> $supportedVersions */
+function symfonyLspBridgeSupportsBranch(string $branch, array $supportedVersions): bool
+{
+    if ([] === $supportedVersions) {
+        return false;
+    }
+
+    $oldest = $newest = $supportedVersions[0];
+    foreach ($supportedVersions as $version) {
+        if (version_compare($version, $oldest, '<')) {
+            $oldest = $version;
+        }
+        if (version_compare($version, $newest, '>')) {
+            $newest = $version;
+        }
+    }
+
+    return version_compare($branch, $oldest, '>=') && version_compare($branch, $newest, '<=');
+}
+
 /** @return list<string>|null */
 function symfonyLspBridgeDecodeSupportedVersions(string $metadata): ?array
 {

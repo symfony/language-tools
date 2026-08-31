@@ -42,9 +42,10 @@ final class BridgeTest extends TestCase
         self::assertFalse($result['project']['debug']);
     }
 
-    public function testReportsBranchesMissingFromReleaseMetadataWithoutBootingTheApplication(): void
+    #[DataProvider('unsupportedBranchProvider')]
+    public function testReportsBranchesOutsideTheReleaseMetadataRangeWithoutBootingTheApplication(string $version, string $branch): void
     {
-        (new AutoloaderFixtureBuilder($this->workspace))->writeAutoloader('5.4.45');
+        (new AutoloaderFixtureBuilder($this->workspace))->writeAutoloader($version);
         $metadata = $this->workspace->write('releases.json', json_encode([
             'supported_versions' => ['6.4', '7.4', '8.1'],
         ], \JSON_THROW_ON_ERROR));
@@ -60,9 +61,26 @@ final class BridgeTest extends TestCase
         self::assertTrue($process->snapshot['unsupportedSymfonyVersion'] ?? false);
         $project = $process->snapshot['project'] ?? null;
         self::assertIsArray($project);
-        self::assertSame('5.4', $project['symfonyBranch'] ?? null);
+        self::assertSame($branch, $project['symfonyBranch'] ?? null);
         self::assertArrayNotHasKey('configurationValidation', $process->snapshot);
         self::assertSame((string) file_get_contents($metadata), (string) file_get_contents($cache));
+    }
+
+    public function testAcceptsIntermediateBranchesWithinTheReleaseMetadataRange(): void
+    {
+        (new AutoloaderFixtureBuilder($this->workspace))->writeAutoloader('8.0.13');
+        $metadata = $this->workspace->write('releases.json', json_encode([
+            'supported_versions' => ['8.1', '6.4', '7.4'],
+        ], \JSON_THROW_ON_ERROR));
+
+        $process = $this->bridge->run([
+            '--release-metadata-url='.$metadata,
+            '--release-metadata-cache='.$this->workspace->path.'/release-metadata-cache.json',
+        ]);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        self::assertIsArray($process->snapshot);
+        self::assertArrayNotHasKey('unsupportedSymfonyVersion', $process->snapshot);
     }
 
     public function testUsesStaleReleaseMetadataWhenRefreshFails(): void
@@ -129,6 +147,13 @@ final class BridgeTest extends TestCase
         yield 'release' => ['42.7.3'];
         yield 'prefixed release' => ['v42.7.3'];
         yield 'prerelease' => ['42.7.0-RC1'];
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function unsupportedBranchProvider(): iterable
+    {
+        yield 'older' => ['5.4.45', '5.4'];
+        yield 'newer' => ['8.2.0-BETA1', '8.2'];
     }
 
     public function testKeepsStrayProjectOutputOffTheStdoutPayload(): void

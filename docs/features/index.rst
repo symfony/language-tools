@@ -174,14 +174,15 @@ Symfony Version Support
 -----------------------
 
 During runtime indexing, Symfony Language Tools checks the installed branch
-against Symfony's `release metadata`_. Each project's metadata cache is
-refreshed at most once per hour under ``var/symfony-lsp/``. If a refresh fails,
-the last cached metadata is used. Without a cache, runtime indexing continues
-without the support check.
+against the range between the oldest and newest branches in Symfony's `release
+metadata`_. Intermediate branches are accepted. Each project's metadata cache
+is refreshed at most once per hour under ``var/symfony-lsp/``. If a refresh
+fails, the last cached metadata is used. Without a cache, runtime indexing
+continues without the support check.
 
-If the installed branch isn't supported, the application isn't booted. The
-editor or diagnostics checker reports the detected version and static-only
-features remain active.
+If the installed branch falls outside the supported range, the application
+isn't booted. The editor or diagnostics checker reports the detected version
+and static-only features remain active.
 
 Unsaved Files and Refreshes
 ---------------------------

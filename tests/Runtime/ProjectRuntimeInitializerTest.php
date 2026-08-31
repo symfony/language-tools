@@ -245,16 +245,16 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $initializer->initialize($project);
     }
 
-    public function testAcceptsFutureSymfonyBranchesWithoutAStaticBranchList(): void
+    public function testAcceptsIntermediateSymfonyBranchesWithoutAnUnsupportedMarker(): void
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
         $processRunner = new CapturingProcessRunner(new ProcessResult(0, json_encode([
             'schemaVersion' => 1,
-            'project' => ['symfonyBranch' => '42.7'],
+            'project' => ['symfonyBranch' => '8.0'],
             'sections' => [],
         ], \JSON_THROW_ON_ERROR), ''));
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^42.7');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
             new RuntimeSnapshotLoaderRegistry([]),

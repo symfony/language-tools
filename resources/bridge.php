@@ -108,7 +108,7 @@ if (is_string($releaseMetadataUrl) && '' !== $releaseMetadataUrl
     && is_string($releaseMetadataCache) && '' !== $releaseMetadataCache
 ) {
     $supportedVersions = symfonyLspBridgeSupportedVersions($releaseMetadataUrl, $releaseMetadataCache);
-    if (is_array($supportedVersions) && !in_array($matches[1], $supportedVersions, true)) {
+    if (is_array($supportedVersions) && !symfonyLspBridgeSupportsBranch($matches[1], $supportedVersions)) {
         fwrite(STDOUT, json_encode([
             'schemaVersion' => 1,
             'project' => $projectMetadata,
