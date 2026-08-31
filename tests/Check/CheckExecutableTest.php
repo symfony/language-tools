@@ -25,7 +25,7 @@ use function Amp\Future\await;
  *     projects: list<array{environment: string, analysis: array{mode: string, reason: string|null}}>,
  *     diagnostics: list<array{code: string, path: string}>,
  *     summary: array{blocking: int, stale: int},
- *     errors: list<array{category: string, cause?: array{class: string, message: string}}>
+ *     errors: list<array{category: string, message: string, cause?: array{class: string, message: string}}>
  * }
  */
 final class CheckExecutableTest extends TestCase
