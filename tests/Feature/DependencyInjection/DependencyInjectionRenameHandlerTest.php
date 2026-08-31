@@ -13,9 +13,11 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionRenameHandler;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolResolver;
+use Symfony\Lsp\Feature\DependencyInjection\Parameter;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\Service;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
@@ -151,6 +153,62 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
             ['app.data_dir', 'app.data_dir'],
             array_column($result['documentChanges'][0]['edits'], 'newText'),
         );
+    }
+
+    public function testRejectsNamesCollidingWithRuntimeOrSourceSymbols(): void
+    {
+        $uri = 'file:///workspace/config/services.yaml';
+        $text = <<<'YAML'
+            parameters:
+                current.parameter: value
+                source.parameter: value
+            services:
+                current.service: ~
+                source.service: ~
+            YAML;
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'yaml', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $converter = new PositionConverter();
+        $yamlExtractor = new YamlDependencyInjectionExtractor(
+            new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+            new YamlDependencyInjectionDeclarationExtractor($converter),
+            new YamlDependencyInjectionReferenceExtractor($converter),
+        );
+        $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
+        $sourceIndexes->forProject($project)->replace($yamlExtractor->extract($uri, $text));
+        $serviceIndexes = new ServiceIndexRegistry();
+        $serviceIndexes->forProject($project)->replace(
+            true,
+            new Service('runtime.service', null, null, false, false, null, [], null, []),
+        );
+        $parameterIndexes = new ParameterIndexRegistry();
+        $parameterIndexes->forProject($project)->replace(true, new Parameter('runtime.parameter', null));
+        $handler = new DependencyInjectionRenameHandler(
+            new DocumentContextResolver($documents, $projects),
+            new LspProtocolMapper(),
+            new DependencyInjectionSymbolResolver($converter, $this->extractor($converter, $yamlExtractor)),
+            $sourceIndexes,
+            $serviceIndexes,
+            $parameterIndexes,
+            new ProjectPathResolver(new UriToPathConverter()),
+        );
+        $servicePosition = $converter->toPosition($text, strpos($text, 'current.service') + 1);
+        $parameterPosition = $converter->toPosition($text, strpos($text, 'current.parameter') + 1);
+        $serviceParams = [
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $servicePosition->line, 'character' => $servicePosition->character],
+        ];
+        $parameterParams = [
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $parameterPosition->line, 'character' => $parameterPosition->character],
+        ];
+
+        self::assertNull($handler->rename([...$serviceParams, 'newName' => 'runtime.service']));
+        self::assertNull($handler->rename([...$serviceParams, 'newName' => 'source.service']));
+        self::assertNull($handler->rename([...$parameterParams, 'newName' => 'runtime.parameter']));
+        self::assertNull($handler->rename([...$parameterParams, 'newName' => 'source.parameter']));
     }
 
     private function extractor(PositionConverter $converter, YamlDependencyInjectionExtractor $yamlExtractor): DependencyInjectionDocumentExtractor

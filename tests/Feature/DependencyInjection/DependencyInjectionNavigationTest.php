@@ -7,7 +7,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDefinitionHandler;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionReferencesHandler;
@@ -15,7 +17,10 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolResolver;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\Service;
+use Symfony\Lsp\Feature\DependencyInjection\ServiceDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
@@ -39,7 +44,10 @@ final class DependencyInjectionNavigationTest extends TestCase
 
         self::assertSame([
             'file:///workspace/config/services.yaml',
+            'file:///workspace/config/decorator.yaml',
+            'file:///workspace/src/RuntimeMailer.php',
             'file:///workspace/src/Mailer.php',
+            'file:///workspace/src/RuntimeAlias.php',
         ], array_column($locations ?? [], 'uri'));
     }
 
@@ -93,6 +101,7 @@ final class DependencyInjectionNavigationTest extends TestCase
             $classExtractor,
         );
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
+        $range = new Range(new Position(0, 0), new Position(0, 1));
         $sourceIndexes->forProject($project)->replace(
             $yamlExtractor->extract($yamlUri, $yaml),
             new DependencyInjectionSourceFacts(
@@ -104,6 +113,36 @@ final class DependencyInjectionNavigationTest extends TestCase
                 references: $autowireExtractor->extract($consumerUri, $consumer),
                 classes: $classExtractor->extract($consumerUri, $consumer),
             ),
+            new DependencyInjectionSourceFacts(
+                'file:///workspace/config/decorator.yaml',
+                services: [new ServiceDeclaration(
+                    'app.decorator',
+                    'file:///workspace/config/decorator.yaml',
+                    $range,
+                    decorates: 'app.mailer',
+                )],
+            ),
+            new DependencyInjectionSourceFacts(
+                'file:///workspace/src/runtime-classes',
+                classes: [
+                    new PhpClassDeclaration(
+                        'App\\RuntimeMailer',
+                        'file:///workspace/src/RuntimeMailer.php',
+                        $range,
+                    ),
+                    new PhpClassDeclaration(
+                        'App\\RuntimeAlias',
+                        'file:///workspace/src/RuntimeAlias.php',
+                        $range,
+                    ),
+                ],
+            ),
+        );
+        $serviceIndexes = new ServiceIndexRegistry();
+        $serviceIndexes->forProject($project)->replace(
+            true,
+            new Service('app.mailer', 'App\\RuntimeMailer', 'runtime.alias', false, false, null, [], null, []),
+            new Service('runtime.alias', 'App\\RuntimeAlias', null, false, false, null, [], null, []),
         );
         $resolver = new DependencyInjectionSymbolResolver($converter, $extractor);
         $contextResolver = new DocumentContextResolver($documents, $projects);
@@ -119,7 +158,7 @@ final class DependencyInjectionNavigationTest extends TestCase
                 new LspProtocolMapper(),
                 $resolver,
                 $sourceIndexes,
-                new ServiceIndexRegistry(),
+                $serviceIndexes,
             ),
             new DependencyInjectionReferencesHandler($contextResolver, new LspProtocolMapper(), $resolver, $sourceIndexes),
             $params,

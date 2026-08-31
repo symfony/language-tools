@@ -6,13 +6,18 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\Parameter;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\ProjectServiceSnapshotLoader;
 use Symfony\Lsp\Feature\DependencyInjection\Service;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceCompletionHandler;
+use Symfony\Lsp\Feature\DependencyInjection\ServiceDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Project\Project;
@@ -92,6 +97,70 @@ final class ServiceCompletionHandlerTest extends TestCase
         self::assertStringNotContainsString(
             'CANARY_SECRET_VALUE',
             json_encode($result, \JSON_THROW_ON_ERROR),
+        );
+    }
+
+    public function testMergesRuntimeAndSourceCompletionsWithStableOrderingAndRuntimePrecedence(): void
+    {
+        $documents = new DocumentStore();
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $serviceIndexes = new ServiceIndexRegistry();
+        $serviceIndexes->forProject($project)->replace(
+            true,
+            new Service('app.beta', 'App\\Beta', null, false, false, null, [], null, []),
+            new Service('app.shared', 'App\\RuntimeShared', 'runtime.alias', false, false, null, [], null, []),
+        );
+        $parameterIndexes = new ParameterIndexRegistry();
+        $parameterIndexes->forProject($project)->replace(
+            true,
+            new Parameter('app.beta', null),
+            new Parameter('app.shared', 'Use app.replacement.'),
+        );
+        $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
+        $range = new Range(new Position(0, 0), new Position(0, 1));
+        $sourceIndexes->forProject($project)->replace(new DependencyInjectionSourceFacts(
+            'file:///workspace/config/source.yaml',
+            [
+                new ServiceDeclaration('app.alpha', 'file:///workspace/config/source.yaml', $range, 'App\\Alpha'),
+                new ServiceDeclaration('app.shared', 'file:///workspace/config/source.yaml', $range, 'App\\SourceShared', 'source.alias'),
+            ],
+            [
+                new ParameterDeclaration('app.alpha', 'file:///workspace/config/source.yaml', $range),
+                new ParameterDeclaration('app.shared', 'file:///workspace/config/source.yaml', $range),
+            ],
+        ));
+        $converter = new PositionConverter();
+        $handler = new ServiceCompletionHandler(
+            new DocumentContextResolver($documents, $projects),
+            $converter,
+            new LspProtocolMapper(),
+            $serviceIndexes,
+            $parameterIndexes,
+            $sourceIndexes,
+            new PhpCommentParser(),
+        );
+
+        $serviceUri = 'file:///workspace/config/services.yaml';
+        $serviceText = "arguments: ['@app.']";
+        $documents->open(new Document($serviceUri, 'yaml', 1, $serviceText));
+        $serviceResult = $handler->complete($this->params($serviceUri, $serviceText, $converter));
+
+        self::assertSame(['app.alpha', 'app.beta', 'app.shared'], array_column($serviceResult ?? [], 'label'));
+        self::assertSame(
+            ['App\\Alpha', 'App\\Beta', 'Alias of runtime.alias'],
+            array_column($serviceResult ?? [], 'detail'),
+        );
+
+        $parameterUri = 'file:///workspace/config/parameters.yaml';
+        $parameterText = "arguments: ['%app.']";
+        $documents->open(new Document($parameterUri, 'yaml', 1, $parameterText));
+        $parameterResult = $handler->complete($this->params($parameterUri, $parameterText, $converter));
+
+        self::assertSame(['app.alpha', 'app.beta', 'app.shared'], array_column($parameterResult ?? [], 'label'));
+        self::assertSame(
+            ['Symfony parameter', 'Symfony parameter', 'Deprecated Symfony parameter'],
+            array_column($parameterResult ?? [], 'detail'),
         );
     }
 
@@ -201,5 +270,16 @@ final class ServiceCompletionHandlerTest extends TestCase
         ]);
 
         self::assertSame('app.mailer', $servicePhpResult[0]['label'] ?? null);
+    }
+
+    /** @return array<string, mixed> */
+    private function params(string $uri, string $text, PositionConverter $converter): array
+    {
+        $position = $converter->toPosition($text, \strlen($text) - 2);
+
+        return [
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ];
     }
 }

@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionHoverHandler;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolResolver;
 use Symfony\Lsp\Feature\DependencyInjection\Parameter;
@@ -17,6 +18,7 @@ use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\Service;
+use Symfony\Lsp\Feature\DependencyInjection\ServiceDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
@@ -123,6 +125,83 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
             'CANARY_SECRET_VALUE',
             json_encode([$serviceHover, $parameterHover], \JSON_THROW_ON_ERROR),
         );
+    }
+
+    public function testUsesRuntimeServiceMetadataWithSourceFallbacks(): void
+    {
+        $uri = 'file:///workspace/config/services.yaml';
+        $text = "services:\n    app.shared: ~\n";
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'yaml', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $converter = new PositionConverter();
+        $yamlExtractor = new YamlDependencyInjectionExtractor(
+            new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+            new YamlDependencyInjectionDeclarationExtractor($converter),
+            new YamlDependencyInjectionReferenceExtractor($converter),
+        );
+        $phpParser = new TolerantPhpParser(new Parser());
+        $extractor = new DependencyInjectionDocumentExtractor(
+            $yamlExtractor,
+            new XmlDependencyInjectionExtractor($converter),
+            new PhpAutowireReferenceExtractor($converter, $phpParser),
+            new PhpClassDeclarationExtractor($converter, $phpParser),
+        );
+        $parsedDeclaration = $yamlExtractor->extract($uri, $text)->services[0];
+        $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
+        $sourceIndexes->forProject($project)->replace(new DependencyInjectionSourceFacts($uri, [new ServiceDeclaration(
+            'app.shared',
+            $uri,
+            $parsedDeclaration->range,
+            'App\\SourceShared',
+            'source.alias',
+            'source.decorated',
+            ['source.tag'],
+        )]));
+        $serviceIndexes = new ServiceIndexRegistry();
+        $serviceIndexes->forProject($project)->replace(true, new Service(
+            'app.shared',
+            'App\\RuntimeShared',
+            null,
+            false,
+            true,
+            'Use app.replacement.',
+            [],
+            'runtime.decorated',
+            ['App\\SharedInterface'],
+            ['app.shared', 'app.inner'],
+        ));
+        $handler = new DependencyInjectionHoverHandler(
+            new DocumentContextResolver($documents, $projects),
+            new LspProtocolMapper(),
+            new DependencyInjectionSymbolResolver($converter, $extractor),
+            $serviceIndexes,
+            new ParameterIndexRegistry(),
+            $sourceIndexes,
+        );
+
+        $hover = $handler->hover($this->params($uri, $text, 'app.shared', $converter));
+
+        self::assertSame(<<<'MARKDOWN'
+            Service: `app.shared`
+
+            Alias of: `source.alias`
+
+            Class: `App\RuntimeShared`
+
+            Visibility: private
+
+            Lazy: yes
+
+            Deprecated: Use app.replacement.
+
+            Decorates: `runtime.decorated`
+
+            Autowiring types: `App\SharedInterface`
+
+            Decoration stack: `app.shared` → `app.inner`
+            MARKDOWN, $hover['contents']['value'] ?? null);
     }
 
     /** @return array<string, mixed> */
