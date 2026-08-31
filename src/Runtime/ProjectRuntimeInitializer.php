@@ -107,6 +107,15 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             $loadedSections = array_values(array_intersect($sections, array_keys($snapshotSections)));
 
             if (\is_array($errors) && [] !== $errors) {
+                $validation = $snapshot['configurationValidation'] ?? null;
+                $applicationBooted = \is_array($validation) && 'valid' === ($validation['status'] ?? null);
+                if ([] !== $failedSections
+                    && !isset($failedSections['runtime'])
+                    && $applicationBooted
+                    && [] !== $loadedSections
+                ) {
+                    throw new PartialRuntimeMetadataException(array_keys($failedSections));
+                }
                 $detail = [] === $failedSections ? '' : ': '.implode(', ', array_keys($failedSections));
 
                 throw new \RuntimeException('The project bridge could not load runtime metadata'.$detail.'.');

@@ -21,6 +21,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Runtime\BridgeExecutionException;
 use Symfony\Lsp\Runtime\BridgeInstaller;
+use Symfony\Lsp\Runtime\PartialRuntimeMetadataException;
 use Symfony\Lsp\Runtime\ProcessResult;
 use Symfony\Lsp\Runtime\ProcessRunnerInterface;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
@@ -328,6 +329,8 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(0, json_encode([
                 'schemaVersion' => 1,
+                'project' => ['environment' => 'dev'],
+                'configurationValidation' => ['status' => 'valid'],
                 'errors' => [['section' => 'routes', 'message' => 'CANARY_RUNTIME_SECTION_ERROR']],
                 'sections' => [
                     'routes' => ['complete' => true, 'items' => [['name' => 'replacement', 'path' => '/replacement']]],
@@ -348,7 +351,8 @@ final class ProjectRuntimeInitializerTest extends TestCase
         try {
             $initializer->initialize($project);
             self::fail('The section error was not reported.');
-        } catch (\RuntimeException $error) {
+        } catch (PartialRuntimeMetadataException $error) {
+            self::assertSame(['routes'], $error->sections);
             self::assertSame('The project bridge could not load runtime metadata: routes.', $error->getMessage());
         }
         self::assertSame('app.mailer', $serviceIndexes->forProject($project)->get('app.mailer')?->id);
@@ -382,6 +386,8 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source, $bridgeInstaller))->build(
             new CapturingProcessRunner(new ProcessResult(0, json_encode([
                 'schemaVersion' => 1,
+                'project' => ['environment' => 'dev'],
+                'configurationValidation' => ['status' => 'valid'],
                 'errors' => [['section' => 'container', 'message' => 'CANARY_RUNTIME_SECTION_ERROR']],
                 'sections' => [
                     'routes' => ['complete' => true, 'items' => [['name' => 'new_route', 'path' => '/new']]],
@@ -405,7 +411,8 @@ final class ProjectRuntimeInitializerTest extends TestCase
         try {
             $initializer->initialize($project);
             self::fail('The section error was not reported.');
-        } catch (\RuntimeException $error) {
+        } catch (PartialRuntimeMetadataException $error) {
+            self::assertSame(['container'], $error->sections);
             self::assertSame('The project bridge could not load runtime metadata: container.', $error->getMessage());
         }
 

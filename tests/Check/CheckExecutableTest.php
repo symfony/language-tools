@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Check\CheckCommand;
+use Symfony\Lsp\Runtime\PartialRuntimeMetadataException;
 use Symfony\Lsp\Runtime\UnsupportedSymfonyVersionException;
 use Symfony\Lsp\Server\ServerVersion;
 
@@ -25,7 +26,7 @@ use function Amp\Future\await;
  * @phpstan-type SarifReport array{version: string, runs: list<SarifRun>}
  * @phpstan-type CheckReport array{
  *     complete: bool,
- *     projects: list<array{environment: string, analysis: array{mode: string, reason: string|null}}>,
+ *     projects: list<array{environment: string, analysis: array{mode: string, reason: string|null}, runtime: array{state: string}, complete: bool}>,
  *     diagnostics: list<array{code: string, path: string}>,
  *     summary: array{blocking: int, stale: int},
  *     errors: list<array{category: string, message: string, cause?: array{class: string, message: string}}>
@@ -309,6 +310,65 @@ final class CheckExecutableTest extends TestCase
         self::assertFalse($report['complete']);
         self::assertSame('Symfony 5.4 is not supported by Symfony Language Tools.', $report['errors'][0]['message']);
         self::assertSame(UnsupportedSymfonyVersionException::class, $report['errors'][0]['cause']['class'] ?? null);
+    }
+
+    public function testKeepsDiagnosticsBackedByHealthyRuntimeSections(): void
+    {
+        if ('Windows' === \PHP_OS_FAMILY) {
+            self::markTestSkipped('The source executable integration requires Unix executable scripts.');
+        }
+
+        mkdir($this->directory.'/src');
+        file_put_contents($this->directory.'/src/ArticleController.php', <<<'PHP'
+            <?php
+            namespace App\Controller;
+
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+
+            final class ArticleController extends AbstractController
+            {
+                public function show(): void
+                {
+                    $this->generateUrl('article_show');
+                }
+            }
+            PHP);
+        $snapshot = [
+            'schemaVersion' => 1,
+            'project' => ['environment' => 'dev'],
+            'configurationValidation' => ['status' => 'valid'],
+            'sections' => [
+                'routes' => [
+                    'complete' => true,
+                    'items' => [[
+                        'name' => 'article_show',
+                        'path' => '/article/{id}',
+                    ]],
+                ],
+            ],
+            'errors' => [[
+                'section' => 'twig',
+                'message' => 'CANARY_RUNTIME_SECTION_ERROR',
+            ]],
+        ];
+        $symfonyCli = $this->directory.'/partial-runtime';
+        file_put_contents($symfonyCli, "#!/usr/bin/env php\n<?php\nfwrite(STDOUT, json_encode(".var_export($snapshot, true).", JSON_THROW_ON_ERROR).\"\\n\");\n");
+        chmod($symfonyCli, 0700);
+
+        $result = $this->execute(
+            ['check', '--format=json', '--workspace='.$this->directory, 'src/ArticleController.php'],
+            ['SYMFONY_LSP_SYMFONY_CLI' => $symfonyCli],
+        );
+        $report = $this->decodeReport($result['stdout']);
+
+        self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode'], $result['stderr']);
+        self::assertFalse($report['complete']);
+        self::assertFalse($report['projects'][0]['complete']);
+        self::assertSame('failed', $report['projects'][0]['runtime']['state']);
+        self::assertSame('route.missing_parameters', $report['diagnostics'][0]['code']);
+        self::assertSame('The project bridge could not load runtime metadata: twig.', $report['errors'][0]['message']);
+        self::assertSame(PartialRuntimeMetadataException::class, $report['errors'][0]['cause']['class'] ?? null);
+        self::assertSame(1, $report['summary']['blocking']);
     }
 
     public function testDoesNotReportACleanResultWhenRuntimeIndexingFails(): void

@@ -6,6 +6,7 @@ use Amp\CancelledException;
 use Symfony\Lsp\Feature\Configuration\ConfigurationValidationException;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Runtime\PartialRuntimeMetadataException;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 
@@ -102,7 +103,7 @@ final class CheckProjectAnalyzer
                             $status['runtime']['error'] ?? 'Runtime indexing did not complete.',
                         );
                         $complete[$root] = false;
-                        if ($runtimeError instanceof ConfigurationValidationException) {
+                        if ($runtimeError instanceof ConfigurationValidationException || $runtimeError instanceof PartialRuntimeMetadataException) {
                             $diagnosable[$root] = true;
                         }
 

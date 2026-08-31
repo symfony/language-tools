@@ -29,7 +29,15 @@ final class ReportingRuntimeInitializer implements RuntimeInitializerInterface
             $this->logger->error($error);
             $runtimeStatus = $this->statuses->status($project)['runtime'];
             $stale = 'stale' === $runtimeStatus['state'];
-            if ($error instanceof UnsupportedSymfonyVersionException) {
+            if ($error instanceof PartialRuntimeMetadataException) {
+                $message = \sprintf(
+                    'Symfony Language Tools could not load %d runtime metadata section%s for "%s": %s. Other runtime-backed features remain active.',
+                    \count($error->sections),
+                    1 === \count($error->sections) ? '' : 's',
+                    $project->rootPath,
+                    implode(', ', $error->sections),
+                );
+            } elseif ($error instanceof UnsupportedSymfonyVersionException) {
                 $message = \sprintf(
                     $stale
                         ? 'The project "%s" uses Symfony %s, which is not supported by Symfony Language Tools. The last valid runtime metadata remains active.'

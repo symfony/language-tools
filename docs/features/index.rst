@@ -168,7 +168,9 @@ enable it for a project whose code you would not run from the command line.
 Without runtime indexing, Symfony Language Tools continues to provide features
 from project files. Features that need the application's current routes,
 services or other runtime information may be incomplete. Diagnostics that need
-this information are omitted.
+this information are omitted. If one runtime metadata section fails while other
+sections load, features backed by the healthy sections remain available and the
+editor reports the partial failure.
 
 Symfony Version Support
 -----------------------

@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Runtime\PartialRuntimeMetadataException;
 use Symfony\Lsp\Runtime\ReportingRuntimeInitializer;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
@@ -35,6 +36,27 @@ final class ReportingRuntimeInitializerTest extends TestCase
                 'message' => 'Symfony Language Tools could not refresh runtime metadata for "/workspace". The last valid metadata remains active.',
             ],
         ]], $client->notifications);
+    }
+
+    public function testReportsPartialRuntimeMetadataWithoutHidingAvailableFeatures(): void
+    {
+        $client = new ReportingClient();
+        $statuses = new ProjectIndexStatusRegistry();
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $statuses->runtimeFailed($project);
+        $initializer = new ReportingRuntimeInitializer(
+            $this->failingInitializer(new PartialRuntimeMetadataException(['twig'])),
+            $client,
+            $statuses,
+            new ServerLogger(null, new SensitiveDataRedactor()),
+        );
+
+        $initializer->initialize($project);
+
+        self::assertSame(
+            'Symfony Language Tools could not load 1 runtime metadata section for "/workspace": twig. Other runtime-backed features remain active.',
+            $client->notifications[0]['params']['message'],
+        );
     }
 
     public function testReportsInitialFailureAsStaticOnly(): void
