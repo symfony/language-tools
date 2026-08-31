@@ -12,7 +12,22 @@ namespace Symfony\Lsp\Parser\Twig;
  */
 final class TwigCommentParser
 {
+    private ?string $lastSource = null;
+    private ?string $lastMasked = null;
+
     public function mask(string $source): string
+    {
+        if ($source === $this->lastSource && null !== $this->lastMasked) {
+            return $this->lastMasked;
+        }
+        $masked = $this->scan($source);
+        $this->lastSource = $source;
+        $this->lastMasked = $masked;
+
+        return $masked;
+    }
+
+    private function scan(string $source): string
     {
         $masked = $source;
         $length = \strlen($source);
