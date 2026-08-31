@@ -7,125 +7,174 @@ use Symfony\Lsp\Project\InvalidConfigurationException;
 
 final class CheckOptionsParser
 {
+    private const FORMATS = ['human', 'json', 'github', 'sarif'];
+
+    private const FLAG_OPTIONS = [
+        '--help' => ['help', true],
+        '-h' => ['help', true],
+        '--verbose' => ['verbose', true],
+        '--list-codes' => ['listCodes', true],
+        '--source-only' => ['overrides.runtimeIndexing', false],
+        '--no-runtime-indexing' => ['overrides.runtimeIndexing', false],
+        '--runtime-indexing' => ['overrides.runtimeIndexing', true],
+        '--debug' => ['overrides.debug', true],
+        '--no-debug' => ['overrides.debug', false],
+        '--no-container-project-root' => ['overrides.containerProjectRoot', null],
+        '--translation-diagnostics' => ['overrides.translationDiagnostics', true],
+        '--no-translation-diagnostics' => ['overrides.translationDiagnostics', false],
+        '--generate-baseline' => ['baselineMode', 'create'],
+        '--refresh-baseline' => ['baselineMode', 'refresh'],
+        '--strict-baseline' => ['strictBaseline', true],
+    ];
+
+    private const VALUE_OPTIONS = [
+        'format' => ['format', 'format'],
+        'workspace' => ['workspace', 'string'],
+        'config' => ['configurationPath', 'string'],
+        'project-root' => ['projectRoots', 'append'],
+        'container-project-root' => ['overrides.containerProjectRoot', 'string'],
+        'environment' => ['overrides.environment', 'string'],
+        'bridge-timeout' => ['overrides.bridgeTimeout', 'positive-number'],
+        'timeout' => ['timeout', 'positive-number'],
+        'php-command' => ['overrides.phpCommand', 'php-command'],
+        'fail-on' => ['blockingCodes', 'blocking-codes'],
+        'baseline' => ['baselinePath', 'string'],
+    ];
+
     public function __construct(
         private readonly DiagnosticCodeRegistry $diagnosticCodes,
         private readonly AnalysisSettings $analysisSettings,
+        private readonly CheckArgumentsTokenizer $tokenizer,
     ) {
     }
 
     /** @param list<string> $arguments */
-    public function parse(array $arguments): CheckOptions
+    public function parse(array $arguments): CheckOptionsParseResult
     {
-        $format = $this->selectedFormat($arguments);
+        $tokenized = $this->tokenizer->tokenize($arguments);
+        try {
+            return new CheckOptionsParseResult($tokenized->format, $this->apply($tokenized));
+        } catch (InvalidConfigurationException $error) {
+            return new CheckOptionsParseResult($tokenized->format, $error);
+        }
+    }
+
+    private function apply(TokenizedCheckArguments $arguments): CheckOptions
+    {
         $workspace = getcwd();
         if (false === $workspace) {
             throw new InvalidConfigurationException('Unable to determine the current working directory.');
         }
 
-        $configurationPath = null;
+        $values = [
+            'format' => 'human',
+            'workspace' => $workspace,
+            'configurationPath' => null,
+            'blockingCodes' => null,
+            'baselinePath' => null,
+            'strictBaseline' => false,
+            'timeout' => 600.0,
+            'verbose' => false,
+            'listCodes' => false,
+            'help' => false,
+        ];
+        $overrides = [];
         $selectors = [];
         $projectRoots = [];
-        $overrides = [];
-        $blockingCodes = null;
-        $baselinePath = null;
         $baselineMode = 'none';
-        $strictBaseline = false;
-        $timeout = 600.0;
-        $verbose = false;
-        $listCodes = false;
-        $help = false;
-        $positionals = false;
+        $selectedFormat = null;
 
-        foreach ($arguments as $argument) {
-            if ($positionals) {
-                $selectors[] = $argument;
+        foreach ($arguments->tokens as $token) {
+            if ('separator' === $token->kind) {
                 continue;
             }
-            if ('--' === $argument) {
-                $positionals = true;
+            if ('positional' === $token->kind) {
+                $selectors[] = $token->raw;
                 continue;
             }
-            if (!str_starts_with($argument, '-')) {
-                $selectors[] = $argument;
-                continue;
-            }
-            if (\in_array($argument, ['--help', '-h'], true)) {
-                $help = true;
-                continue;
-            }
-            if ('--verbose' === $argument) {
-                $verbose = true;
-                continue;
-            }
-            if ('--list-codes' === $argument) {
-                $listCodes = true;
-                continue;
-            }
-            if ('--source-only' === $argument || '--no-runtime-indexing' === $argument) {
-                $overrides['runtimeIndexing'] = false;
-                continue;
-            }
-            if ('--runtime-indexing' === $argument) {
-                $overrides['runtimeIndexing'] = true;
-                continue;
-            }
-            if ('--debug' === $argument) {
-                $overrides['debug'] = true;
-                continue;
-            }
-            if ('--no-debug' === $argument) {
-                $overrides['debug'] = false;
-                continue;
-            }
-            if ('--no-container-project-root' === $argument) {
-                $overrides['containerProjectRoot'] = null;
-                continue;
-            }
-            if ('--translation-diagnostics' === $argument) {
-                $overrides['translationDiagnostics'] = true;
-                continue;
-            }
-            if ('--no-translation-diagnostics' === $argument) {
-                $overrides['translationDiagnostics'] = false;
-                continue;
-            }
-            if ('--generate-baseline' === $argument) {
-                $baselineMode = $this->baselineMode($baselineMode, 'create');
-                continue;
-            }
-            if ('--refresh-baseline' === $argument) {
-                $baselineMode = $this->baselineMode($baselineMode, 'refresh');
-                continue;
-            }
-            if ('--strict-baseline' === $argument) {
-                $strictBaseline = true;
+            if ('flag' === $token->kind) {
+                $specification = self::FLAG_OPTIONS[$token->raw] ?? null;
+                if (null === $specification) {
+                    throw new InvalidConfigurationException(\sprintf('The check option "%s" requires a value.', $token->raw));
+                }
+                [$target, $value] = $specification;
+                if ('baselineMode' === $target) {
+                    if (!\in_array($value, ['create', 'refresh'], true)) {
+                        throw new \LogicException('The baseline mode specification must request create or refresh.');
+                    }
+                    $baselineMode = $this->baselineMode($baselineMode, $value);
+                } elseif (str_starts_with($target, 'overrides.')) {
+                    $overrides[substr($target, \strlen('overrides.'))] = $value;
+                } else {
+                    $values[$target] = $value;
+                }
                 continue;
             }
 
-            [$name, $value] = $this->option($argument);
-            match ($name) {
-                'format' => null,
-                'workspace' => $workspace = $value,
-                'config' => $configurationPath = $value,
-                'project-root' => $projectRoots[] = $value,
-                'container-project-root' => $overrides['containerProjectRoot'] = $value,
-                'environment' => $overrides['environment'] = $value,
-                'bridge-timeout' => $overrides['bridgeTimeout'] = $this->positiveNumber($name, $value),
-                'timeout' => $timeout = $this->positiveNumber($name, $value),
-                'php-command' => $overrides['phpCommand'] = $this->phpCommand($value),
-                'fail-on' => $blockingCodes = $this->blockingCodes($value),
-                'baseline' => $baselinePath = $value,
-                default => throw new InvalidConfigurationException(\sprintf('Unknown check option "--%s".', $name)),
-            };
+            $name = $token->name;
+            $value = $token->value;
+            if (null === $name || null === $value) {
+                throw new \LogicException('A value option token must have a name and value.');
+            }
+            if ('' === $value && !\in_array($name, ['fail-on', 'format'], true)) {
+                throw new InvalidConfigurationException(\sprintf('The check option "%s" requires a value.', $token->raw));
+            }
+            $specification = self::VALUE_OPTIONS[$name] ?? null;
+            if (null === $specification) {
+                throw new InvalidConfigurationException(\sprintf('Unknown check option "--%s".', $name));
+            }
+            [$target, $normalizer] = $specification;
+            if ('format' === $normalizer) {
+                $selectedFormat = $this->format($selectedFormat, $value);
+                $normalized = $selectedFormat;
+            } else {
+                $normalized = match ($normalizer) {
+                    'positive-number' => $this->positiveNumber($name, $value),
+                    'php-command' => $this->phpCommand($value),
+                    'blocking-codes' => $this->blockingCodes($value),
+                    default => $value,
+                };
+            }
+            if (str_starts_with($target, 'overrides.')) {
+                $overrides[substr($target, \strlen('overrides.'))] = $normalized;
+            } elseif ('append' === $normalizer) {
+                if ('projectRoots' !== $target) {
+                    throw new \LogicException('An appended option must target the project root list.');
+                }
+                $projectRoots[] = $normalized;
+            } else {
+                $values[$target] = $normalized;
+            }
         }
 
         $overrides = $this->analysisSettings->normalizeProject($overrides, context: 'command-line');
-        if ('none' !== $baselineMode && null === $baselinePath) {
-            $baselinePath = '.symfony-lsp-baseline.json';
+        if ('none' !== $baselineMode && null === $values['baselinePath']) {
+            $values['baselinePath'] = '.symfony-lsp-baseline.json';
         }
-        if ($strictBaseline && null === $baselinePath) {
+        if ($values['strictBaseline'] && null === $values['baselinePath']) {
             throw new InvalidConfigurationException('The --strict-baseline option requires --baseline.');
         }
+
+        /** @var string $format */
+        $format = $values['format'];
+        /** @var string $workspace */
+        $workspace = $values['workspace'];
+        /** @var string|null $configurationPath */
+        $configurationPath = $values['configurationPath'];
+        /** @var list<string>|null $blockingCodes */
+        $blockingCodes = $values['blockingCodes'];
+        /** @var string|null $baselinePath */
+        $baselinePath = $values['baselinePath'];
+        /** @var bool $strictBaseline */
+        $strictBaseline = $values['strictBaseline'];
+        /** @var float $timeout */
+        $timeout = $values['timeout'];
+        /** @var bool $verbose */
+        $verbose = $values['verbose'];
+        /** @var bool $listCodes */
+        $listCodes = $values['listCodes'];
+        /** @var bool $help */
+        $help = $values['help'];
 
         return new CheckOptions(
             $format,
@@ -143,43 +192,6 @@ final class CheckOptionsParser
             $listCodes,
             $help,
         );
-    }
-
-    /** @param list<string> $arguments */
-    public function selectedFormat(array $arguments): string
-    {
-        $selected = null;
-        foreach ($arguments as $argument) {
-            if ('--' === $argument) {
-                break;
-            }
-            if (!str_starts_with($argument, '--format=')) {
-                continue;
-            }
-
-            $format = substr($argument, \strlen('--format='));
-            if (!\in_array($format, ['human', 'json', 'github', 'sarif'], true)) {
-                throw new InvalidConfigurationException('The --format option must be human, json, github or sarif.');
-            }
-            if (null !== $selected && $selected !== $format) {
-                throw new InvalidConfigurationException('The --format option cannot select more than one format.');
-            }
-            $selected = $format;
-        }
-
-        return $selected ?? 'human';
-    }
-
-    /** @return array{string, string} */
-    private function option(string $argument): array
-    {
-        if (1 !== preg_match('/^--([a-z][a-z0-9-]*)=(.*)$/D', $argument, $match)
-            || ('' === $match[2] && 'fail-on' !== $match[1])
-        ) {
-            throw new InvalidConfigurationException(\sprintf('The check option "%s" requires a value.', $argument));
-        }
-
-        return [$match[1], $match[2]];
     }
 
     /** @return non-empty-list<string> */
@@ -218,6 +230,18 @@ final class CheckOptionsParser
         }
 
         return (float) $value;
+    }
+
+    private function format(?string $current, string $requested): string
+    {
+        if (!\in_array($requested, self::FORMATS, true)) {
+            throw new InvalidConfigurationException('The --format option must be human, json, github or sarif.');
+        }
+        if (null !== $current && $current !== $requested) {
+            throw new InvalidConfigurationException('The --format option cannot select more than one format.');
+        }
+
+        return $requested;
     }
 
     private function baselineMode(string $current, string $requested): string

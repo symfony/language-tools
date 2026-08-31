@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Check;
 
 use Amp\Process\Process;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
@@ -515,6 +516,30 @@ final class CheckExecutableTest extends TestCase
         self::assertFalse($report['complete']);
         self::assertSame('invocation', $report['errors'][0]['category']);
         self::assertStringContainsString('does not exist', $result['stderr']);
+    }
+
+    #[DataProvider('machineFormats')]
+    public function testRendersOptionParseFailuresInTheRequestedMachineFormat(string $format): void
+    {
+        $result = $this->execute(['check', '--unknown=value', '--format='.$format]);
+
+        self::assertSame(CheckCommand::EXIT_INVOCATION, $result['exitCode']);
+        self::assertSame('Unknown check option "--unknown".'.\PHP_EOL, $result['stderr']);
+        if ('json' === $format) {
+            $report = $this->decodeReport($result['stdout']);
+            self::assertSame('invocation', $report['errors'][0]['category'] ?? null);
+        } else {
+            /** @var SarifReport $report */
+            $report = json_decode($result['stdout'], true, flags: \JSON_THROW_ON_ERROR);
+            self::assertSame('symfony.check.invocation', $report['runs'][0]['invocations'][0]['toolConfigurationNotifications'][0]['descriptor']['id'] ?? null);
+        }
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function machineFormats(): iterable
+    {
+        yield 'JSON' => ['json'];
+        yield 'SARIF' => ['sarif'];
     }
 
     /** @return CheckReport */

@@ -28,8 +28,12 @@ final class CheckCommand
         $format = 'human';
         $verbose = \in_array('--verbose', $arguments, true);
         try {
-            $format = $this->optionsParser->selectedFormat($arguments);
-            $options = $this->optionsParser->parse($arguments);
+            $parsed = $this->optionsParser->parse($arguments);
+            $format = $parsed->format;
+            if ($parsed->value instanceof InvalidConfigurationException) {
+                throw $parsed->value;
+            }
+            $options = $parsed->value;
             if ($options->help) {
                 return new CheckExecution(self::EXIT_SUCCESS, $this->reporter->help());
             }
