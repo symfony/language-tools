@@ -6,9 +6,12 @@ use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Twig\TwigPhpSymbolCompletionContextResolver;
+use Symfony\Lsp\Feature\Twig\TwigPhpSymbolDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolExtractor;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolKind;
+use Symfony\Lsp\Feature\Twig\TwigPhpSymbolReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolSourceFacts;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
@@ -104,7 +107,16 @@ final class TwigPhpSymbolSourceIndexerTest extends TestCase
 
     private function indexer(TwigPhpSymbolIndexRegistry $indexes): TwigPhpSymbolSourceIndexer
     {
-        return new TwigPhpSymbolSourceIndexer($indexes, $this->extractor(new PositionConverter()));
+        $converter = new PositionConverter();
+        $comments = new TwigCommentParser();
+
+        return new TwigPhpSymbolSourceIndexer(
+            $indexes,
+            new TolerantPhpParser(new Parser()),
+            new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
+            new TwigPhpSymbolDeclarationExtractor($converter),
+            new TwigPhpSymbolReferenceExtractor($converter),
+        );
     }
 
     private function extractor(PositionConverter $converter): TwigPhpSymbolExtractor
@@ -115,8 +127,9 @@ final class TwigPhpSymbolSourceIndexerTest extends TestCase
             $converter,
             new TolerantPhpParser(new Parser()),
             new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
-            $comments,
-            new TwigDirectiveLocator(),
+            new TwigPhpSymbolDeclarationExtractor($converter),
+            new TwigPhpSymbolReferenceExtractor($converter),
+            new TwigPhpSymbolCompletionContextResolver($converter, $comments, new TwigDirectiveLocator()),
         );
     }
 }

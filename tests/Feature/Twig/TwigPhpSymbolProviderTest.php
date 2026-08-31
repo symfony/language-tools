@@ -9,9 +9,12 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Twig\TwigPhpSymbolCompletionContextResolver;
+use Symfony\Lsp\Feature\Twig\TwigPhpSymbolDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolExtractor;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolProvider;
+use Symfony\Lsp\Feature\Twig\TwigPhpSymbolReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolSourceFacts;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -167,8 +170,9 @@ final class TwigPhpSymbolProviderTest extends TestCase
             $converter,
             new TolerantPhpParser(new Parser()),
             new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
-            $comments,
-            new TwigDirectiveLocator(),
+            new TwigPhpSymbolDeclarationExtractor($converter),
+            new TwigPhpSymbolReferenceExtractor($converter),
+            new TwigPhpSymbolCompletionContextResolver($converter, $comments, new TwigDirectiveLocator()),
         );
     }
 

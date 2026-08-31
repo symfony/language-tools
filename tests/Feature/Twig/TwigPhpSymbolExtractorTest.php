@@ -5,9 +5,12 @@ namespace Symfony\Lsp\Tests\Feature\Twig;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Twig\TwigPhpSymbolCompletionContextResolver;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolCompletionKind;
+use Symfony\Lsp\Feature\Twig\TwigPhpSymbolDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolExtractor;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolKind;
+use Symfony\Lsp\Feature\Twig\TwigPhpSymbolReferenceExtractor;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -150,8 +153,9 @@ final class TwigPhpSymbolExtractorTest extends TestCase
             $converter,
             new TolerantPhpParser(new Parser()),
             new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
-            $comments,
-            new TwigDirectiveLocator(),
+            new TwigPhpSymbolDeclarationExtractor($converter),
+            new TwigPhpSymbolReferenceExtractor($converter),
+            new TwigPhpSymbolCompletionContextResolver($converter, $comments, new TwigDirectiveLocator()),
         );
     }
 }
