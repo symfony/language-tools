@@ -45,14 +45,26 @@ final class RouteFixtureBuilder
             {
                 public function getRouteCollection(): RouteCollection;
             }
+            interface RequestContextAwareInterface
+            {
+                public function getContext(): RequestContext;
+            }
+            final class RequestContext
+            {
+                public function getParameters(): array { return ['tenant' => 'acme']; }
+            }
             final class RouteCollection
             {
                 public function __construct(private array $resources) {}
                 public function getResources(): array { return $this->resources; }
             }
             namespace App;
-            final class Router implements \Symfony\Component\Routing\RouterInterface
+            final class Router implements \Symfony\Component\Routing\RouterInterface, \Symfony\Component\Routing\RequestContextAwareInterface
             {
+                public function getContext(): \Symfony\Component\Routing\RequestContext
+                {
+                    return new \Symfony\Component\Routing\RequestContext();
+                }
                 public function getRouteCollection(): \Symfony\Component\Routing\RouteCollection
                 {
                     $root = dirname(__DIR__);
@@ -71,6 +83,7 @@ final class RouteFixtureBuilder
             final class Container
             {
                 public function has(string $id): bool { return 'router' === $id; }
+                public function hasParameter(string $name): bool { return 'kernel.default_locale' === $name; }
                 public function get(string $id): object { return new Router(); }
             }
             final class Kernel

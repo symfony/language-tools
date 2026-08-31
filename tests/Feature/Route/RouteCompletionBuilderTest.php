@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Feature\Route;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteCompletionBuilder;
 use Symfony\Lsp\Feature\Route\RouteIndex;
 use Symfony\Lsp\Feature\Route\RouteSnapshotLoader;
@@ -54,6 +55,26 @@ final class RouteCompletionBuilderTest extends TestCase
         ], (new RouteCompletionBuilder())->complete($index, 'app_'));
     }
 
+    public function testLoadsRouterRequestContextParameters(): void
+    {
+        $index = new RouteIndex();
+        (new RouteSnapshotLoader($index))->load([
+            'sections' => [
+                'routes' => [
+                    'complete' => true,
+                    'contextParameters' => ['_locale', null],
+                    'items' => [
+                        ['name' => 'localized_article', 'path' => '/{_locale}/article/{id}'],
+                    ],
+                ],
+            ],
+        ]);
+
+        $route = $index->get('localized_article');
+        self::assertInstanceOf(Route::class, $route);
+        self::assertSame(['id'], $index->missingParameters($route, []));
+    }
+
     public function testIgnoresMalformedSnapshotEntries(): void
     {
         $index = new RouteIndex();
@@ -72,7 +93,7 @@ final class RouteCompletionBuilderTest extends TestCase
     public function testReplacesRouteResourcesFromCompleteSnapshots(): void
     {
         $index = new RouteIndex();
-        $index->replaceRuntime(['config/old_routes.yaml']);
+        $index->replaceRuntime(['config/old_routes.yaml'], []);
         (new RouteSnapshotLoader($index))->load([
             'sections' => ['routes' => [
                 'complete' => true,

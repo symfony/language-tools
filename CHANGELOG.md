@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Honor router request context parameters in route diagnostics
 - Report Symfony branches outside the live supported range
 - Ignore Twig macro declarations that share a name with custom functions
 - Recognize PHP heredoc translation messages and global parameters

@@ -64,10 +64,7 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
                 continue;
             }
 
-            $missingParameters = array_values(array_diff(
-                $route->requiredParameters(),
-                $reference->providedParameters,
-            ));
+            $missingParameters = $routeIndex->missingParameters($route, $reference->providedParameters);
             if ([] !== $missingParameters) {
                 $diagnostics[] = $this->protocol->diagnostic(
                     $reference->range,

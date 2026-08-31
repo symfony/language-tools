@@ -67,11 +67,13 @@ function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
             }
 
             usort($items, static fn (array $a, array $b): int => $a['name'] <=> $b['name']);
+            $contextParameters = symfonyLspBridgeRouteContextParameterNames($context);
             $resources = symfonyLspBridgeRouteResourcePaths($context);
             $section = [
                 'complete' => true,
-                'generation' => hash('sha256', json_encode([$items, $resources], JSON_THROW_ON_ERROR)),
+                'generation' => hash('sha256', json_encode([$items, $contextParameters, $resources], JSON_THROW_ON_ERROR)),
                 'items' => $items,
+                'contextParameters' => $contextParameters,
                 'resources' => $resources,
                 'warnings' => [],
             ];
@@ -81,6 +83,35 @@ function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
     }
 
     return $section ?? null;
+}
+
+/** @return list<string> */
+function symfonyLspBridgeRouteContextParameterNames(SymfonyLspBridgeContext $context): array
+{
+    try {
+        $container = $context->kernel()->getContainer();
+        $router = $container->get('router');
+        if (!$router instanceof Symfony\Component\Routing\RequestContextAwareInterface) {
+            return [];
+        }
+        $parameters = $router->getContext()->getParameters();
+        $hasDefaultLocale = method_exists($container, 'hasParameter') && $container->hasParameter('kernel.default_locale');
+    } catch (Throwable) {
+        return [];
+    }
+
+    $names = [];
+    foreach (array_keys($parameters) as $name) {
+        if (is_string($name)) {
+            $names[$name] = true;
+        }
+    }
+    if ($hasDefaultLocale) {
+        $names['_locale'] = true;
+    }
+    ksort($names);
+
+    return array_keys($names);
 }
 
 /** @return list<string> */

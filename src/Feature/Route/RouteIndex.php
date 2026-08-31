@@ -13,19 +13,26 @@ final class RouteIndex
     /** @var array<string, true> */
     private array $resources = [];
 
+    /** @var array<string, true> */
+    private array $contextParameters = [];
+
     private bool $complete = false;
 
     public function replace(Route ...$routes): void
     {
-        $this->replaceRuntime([], ...$routes);
+        $this->replaceRuntime([], [], ...$routes);
     }
 
-    /** @param list<string> $resources */
-    public function replaceRuntime(array $resources, Route ...$routes): void
+    /**
+     * @param list<string> $resources
+     * @param list<string> $contextParameters
+     */
+    public function replaceRuntime(array $resources, array $contextParameters, Route ...$routes): void
     {
         $this->routes = [];
         $this->completionRoutes = [];
         $this->resources = array_fill_keys($resources, true);
+        $this->contextParameters = array_fill_keys($contextParameters, true);
         $localizedRoutes = [];
         foreach ($routes as $route) {
             $this->routes[$route->name] = $route;
@@ -68,6 +75,20 @@ final class RouteIndex
     public function get(string $name): ?Route
     {
         return $this->routes[$name] ?? null;
+    }
+
+    /**
+     * @param list<string> $providedParameters
+     *
+     * @return list<string>
+     */
+    public function missingParameters(Route $route, array $providedParameters): array
+    {
+        return array_values(array_diff(
+            $route->requiredParameters(),
+            $providedParameters,
+            array_keys($this->contextParameters),
+        ));
     }
 
     public function isResource(string $relativePath): bool

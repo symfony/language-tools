@@ -600,7 +600,7 @@ final class ConfigurationProviderTest extends TestCase
         $converter = new PositionConverter();
         $indexes = new ConfigurationIndexRegistry();
         $routeIndexes = new RouteIndexRegistry();
-        $routeIndexes->forProject($project)->replaceRuntime(['config/http_endpoints.yaml', 'config/routes/framework.yaml']);
+        $routeIndexes->forProject($project)->replaceRuntime(['config/http_endpoints.yaml', 'config/routes/framework.yaml'], []);
         $environmentIndexes = new EnvironmentIndexRegistry();
         $environmentIndexes->forProject($project)->replaceProcessors(['bool' => 'bool', 'json' => 'array']);
         $validations = new ConfigurationValidationRegistry();

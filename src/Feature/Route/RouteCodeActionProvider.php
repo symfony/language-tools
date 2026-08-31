@@ -52,11 +52,12 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
                 if (!$this->protocol->sameRange($reference->range, $range)) {
                     continue;
                 }
-                $route = $this->indexes->forProject($request->project)->get($reference->name);
+                $routeIndex = $this->indexes->forProject($request->project);
+                $route = $routeIndex->get($reference->name);
                 if (null === $route || null === $reference->providedParameters) {
                     continue;
                 }
-                $missing = array_values(array_diff($route->requiredParameters(), $reference->providedParameters));
+                $missing = $routeIndex->missingParameters($route, $reference->providedParameters);
                 $edit = $this->edit($request->document, $reference, $missing);
                 if (null === $edit) {
                     continue;

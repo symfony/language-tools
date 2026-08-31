@@ -56,6 +56,8 @@ final class BridgeCompatibilityTest extends TestCase
         $routeResources = \is_array($routes['resources'] ?? null) ? $routes['resources'] : [];
         self::assertContains('config/routes.yaml', $routeResources);
         self::assertContains('config/http_endpoints.yaml', $routeResources);
+        $routeContextParameters = \is_array($routes['contextParameters'] ?? null) ? $routes['contextParameters'] : [];
+        self::assertContains('_locale', $routeContextParameters);
         $localizedRoutes = array_values(array_filter(
             $routeItems,
             static fn (mixed $route): bool => \is_array($route)

@@ -170,6 +170,27 @@ final class RouteDiagnosticPublisherTest extends TestCase
         self::assertSame('Route "incomplete" requires parameter "month".', $diagnostics[0]['message'] ?? null);
     }
 
+    public function testAcceptsRouteParametersProvidedByTheRequestContext(): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        [$publisher, $client] = $this->publisher($uri, <<<'TWIG'
+            {{ path('complete', { id: article.id }) }}
+            {{ path('incomplete') }}
+            TWIG, [
+            new Route('complete', '/{_locale}/article/{id}', [], [], null, null),
+            new Route('incomplete', '/{_locale}/article/{id}', [], [], null, null),
+        ], 'twig', contextParameters: ['_locale']);
+
+        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+
+        $diagnostics = $client->notifications[0]['params']['diagnostics'];
+        self::assertIsArray($diagnostics);
+        self::assertCount(1, $diagnostics);
+        self::assertIsArray($diagnostics[0]);
+        self::assertSame('route.missing_parameters', $diagnostics[0]['code'] ?? null);
+        self::assertSame('Route "incomplete" requires parameter "id".', $diagnostics[0]['message'] ?? null);
+    }
+
     public function testAddsMissingRouteParameters(): void
     {
         $cases = [
@@ -191,7 +212,11 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $projects = new ProjectRegistry();
             $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
             $indexes = new RouteIndexRegistry();
-            $indexes->forProject($project)->replace(new Route('article_show', '/article/{id}', ['GET'], [], null, null));
+            $indexes->forProject($project)->replaceRuntime(
+                [],
+                ['_locale'],
+                new Route('article_show', '/{_locale}/article/{id}', ['GET'], [], null, null),
+            );
             $converter = new PositionConverter();
             $classIndexes = new DependencyInjectionSourceIndexRegistry();
             $phpExtractor = RouteReferenceExtractorFactory::create($converter);
@@ -331,6 +356,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
 
     /**
      * @param Route|list<Route>|null $route
+     * @param list<string>           $contextParameters
      *
      * @return array{DiagnosticProviderRegistry, DiagnosticClient, Project}
      */
@@ -340,6 +366,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
         Route|array|null $route = null,
         string $languageId = 'php',
         bool $runtimeTemplate = true,
+        array $contextParameters = [],
     ): array {
         $client = new DiagnosticClient();
         $documents = new DocumentStore();
@@ -347,7 +374,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $routeIndexes = new RouteIndexRegistry();
-        $routeIndexes->forProject($project)->replace(...(\is_array($route) ? $route : [
+        $routeIndexes->forProject($project)->replaceRuntime([], $contextParameters, ...(\is_array($route) ? $route : [
             $route ?? new Route('article_show', '/article', ['GET'], [], null, null),
         ]));
         $positionConverter = new PositionConverter();

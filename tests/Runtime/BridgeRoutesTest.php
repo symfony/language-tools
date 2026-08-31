@@ -100,6 +100,7 @@ final class BridgeRoutesTest extends TestCase
                 'alias' => null,
             ],
         ], $result['sections']['routes']['items']);
+        self::assertSame(['_locale', 'tenant'], $result['sections']['routes']['contextParameters']);
         self::assertSame(['config/endpoints/LegacyEndpoints.php', 'config/http_endpoints.yaml'], $result['sections']['routes']['resources']);
         self::assertTrue($result['sections']['routes']['complete']);
     }
