@@ -30,6 +30,14 @@ final class BaselineManagerTest extends TestCase
         (new Filesystem())->remove($this->directory);
     }
 
+    public function testGeneratedBaselineMatchesGoldenFile(): void
+    {
+        $diagnostic = $this->diagnostic('same-fingerprint');
+        $this->manager->apply($this->directory, $this->options('create'), [$diagnostic, $diagnostic]);
+
+        self::assertFileEquals(__DIR__.'/Fixtures/baseline-v1.json', $this->directory.'/baseline.json');
+    }
+
     public function testMatchesDuplicateOccurrencesByMultiplicityAndReportsStaleEntries(): void
     {
         $diagnostic = $this->diagnostic('same-fingerprint');

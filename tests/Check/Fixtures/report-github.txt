@@ -1,0 +1,7 @@
+::notice title=Symfony diagnostics::Project apps/api analyzed in source-only mode: runtime indexing is disabled.
+::notice title=Symfony diagnostics::Project . analysis is incomplete.
+::error file=apps/api/config/services.yaml,line=2,col=3,endLine=2,endColumn=9,title=service.not_found (baseline)::Missing 100%25%0Aservice
+::warning file=apps/api/config/services.yaml,line=4,endLine=5,title=service.not_found::Duplicate missing service.
+::warning file=config/removed.yaml,title=Stale Symfony diagnostic baseline::[service.not_found] Removed service. (occurrence 1)
+::error title=Symfony diagnostics check::Template diagnostics failed.
+::notice title=Symfony diagnostics summary::2 diagnostics, 1 stale baseline entries, 2 blocking.

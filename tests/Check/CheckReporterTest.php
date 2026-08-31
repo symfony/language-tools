@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Check;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Check\BaselineEntry;
 use Symfony\Lsp\Check\CheckDiagnostic;
@@ -19,6 +20,24 @@ use Symfony\Lsp\Check\SarifCheckReporter;
  */
 final class CheckReporterTest extends TestCase
 {
+    #[DataProvider('reportFormats')]
+    public function testReportFormatsMatchGoldenFiles(string $format, int $exitCode): void
+    {
+        self::assertStringEqualsFile(
+            __DIR__.'/Fixtures/report-'.$format.'.'.('json' === $format || 'sarif' === $format ? 'json' : 'txt'),
+            $this->reporter()->render($this->goldenResult(), $format, true, $exitCode),
+        );
+    }
+
+    /** @return iterable<string, array{string, int}> */
+    public static function reportFormats(): iterable
+    {
+        yield 'human' => ['human', 12];
+        yield 'json' => ['json', 12];
+        yield 'GitHub' => ['github', 12];
+        yield 'SARIF' => ['sarif', 12];
+    }
+
     public function testRendersDeterministicJsonCoordinatesAndBaselineState(): void
     {
         $json = $this->reporter()->render($this->fixtureResult(), 'json');
@@ -160,6 +179,94 @@ final class CheckReporterTest extends TestCase
     private function reporter(): CheckReporter
     {
         return new CheckReporter(new SarifCheckReporter(new DiagnosticCodeRegistry(), '1.2.3'));
+    }
+
+    private function goldenResult(): CheckResult
+    {
+        $fingerprint = hash('sha256', 'duplicate');
+
+        return new CheckResult(
+            '1.2.3',
+            false,
+            [
+                new CheckProjectResult(
+                    'apps/api',
+                    'test',
+                    'source-only',
+                    'runtime-indexing-disabled',
+                    ['state' => 'ready'],
+                    ['state' => 'disabled', 'reason' => 'runtime-indexing-disabled'],
+                    true,
+                ),
+                new CheckProjectResult(
+                    '.',
+                    'prod',
+                    'runtime',
+                    null,
+                    ['state' => 'ready'],
+                    ['state' => 'ready', 'stage' => 'container'],
+                    false,
+                ),
+            ],
+            [
+                new CheckDiagnostic(
+                    'apps/api',
+                    'config/services.yaml',
+                    'apps/api/config/services.yaml',
+                    1,
+                    2,
+                    1,
+                    9,
+                    1,
+                    'service.not_found',
+                    'symfony',
+                    "Missing 100%\nservice",
+                    $fingerprint,
+                    'matched',
+                    'dependency-injection',
+                ),
+                new CheckDiagnostic(
+                    'apps/api',
+                    'config/services.yaml',
+                    'apps/api/config/services.yaml',
+                    3,
+                    4,
+                    4,
+                    7,
+                    2,
+                    'service.not_found',
+                    'symfony',
+                    'Duplicate missing service.',
+                    $fingerprint,
+                    provider: 'dependency-injection',
+                ),
+            ],
+            [
+                new BaselineEntry(
+                    '.',
+                    'config/removed.yaml',
+                    'service.not_found',
+                    'error',
+                    'symfony',
+                    'Removed service.',
+                    hash('sha256', 'stale'),
+                    1,
+                ),
+            ],
+            '.symfony-lsp-baseline.json',
+            'none',
+            true,
+            [[
+                'category' => 'operational',
+                'message' => 'Template diagnostics failed.',
+                'project' => 'apps/api',
+                'environment' => 'test',
+                'workspacePath' => 'apps/api/templates/a file.html.twig',
+                'provider' => 'template',
+                'cause' => ['class' => \UnexpectedValueException::class, 'message' => 'Invalid diagnostic.'],
+            ]],
+            2,
+        );
     }
 
     /** @param list<array{category: string, message: string, project?: string, provider?: string, cause?: array{class: string, message: string}}> $errors */

@@ -1,0 +1,140 @@
+{
+    "schemaVersion": 1,
+    "tool": {
+        "name": "Symfony Language Tools",
+        "version": "1.2.3"
+    },
+    "complete": false,
+    "coordinates": {
+        "lineBase": 0,
+        "characterBase": 0,
+        "characterEncoding": "utf-16",
+        "endExclusive": true
+    },
+    "projects": [
+        {
+            "id": "apps/api",
+            "environment": "test",
+            "analysis": {
+                "mode": "source-only",
+                "reason": "runtime-indexing-disabled"
+            },
+            "source": {
+                "state": "ready"
+            },
+            "runtime": {
+                "state": "disabled",
+                "reason": "runtime-indexing-disabled"
+            },
+            "complete": true
+        },
+        {
+            "id": ".",
+            "environment": "prod",
+            "analysis": {
+                "mode": "runtime",
+                "reason": null
+            },
+            "source": {
+                "state": "ready"
+            },
+            "runtime": {
+                "state": "ready",
+                "stage": "container"
+            },
+            "complete": false
+        }
+    ],
+    "diagnostics": [
+        {
+            "project": "apps/api",
+            "path": "config/services.yaml",
+            "workspacePath": "apps/api/config/services.yaml",
+            "range": {
+                "start": {
+                    "line": 1,
+                    "character": 2
+                },
+                "end": {
+                    "line": 1,
+                    "character": 9
+                }
+            },
+            "severity": "error",
+            "code": "service.not_found",
+            "source": "symfony",
+            "message": "Missing 100%\nservice",
+            "baseline": "matched",
+            "provenance": {
+                "feature": "service",
+                "provider": "dependency-injection",
+                "environment": "test",
+                "analysisMode": "source-only"
+            }
+        },
+        {
+            "project": "apps/api",
+            "path": "config/services.yaml",
+            "workspacePath": "apps/api/config/services.yaml",
+            "range": {
+                "start": {
+                    "line": 3,
+                    "character": 4
+                },
+                "end": {
+                    "line": 4,
+                    "character": 7
+                }
+            },
+            "severity": "warning",
+            "code": "service.not_found",
+            "source": "symfony",
+            "message": "Duplicate missing service.",
+            "baseline": "active",
+            "provenance": {
+                "feature": "service",
+                "provider": "dependency-injection",
+                "environment": "test",
+                "analysisMode": "source-only"
+            }
+        }
+    ],
+    "baseline": {
+        "path": ".symfony-lsp-baseline.json",
+        "mode": "none",
+        "strict": true,
+        "stale": [
+            {
+                "project": ".",
+                "path": "config/removed.yaml",
+                "code": "service.not_found",
+                "severity": "error",
+                "source": "symfony",
+                "message": "Removed service.",
+                "fingerprint": "a03f2386ae06b21109577020844df367857b72c2fcce384c1896fed98a89c82b",
+                "occurrence": 1
+            }
+        ]
+    },
+    "summary": {
+        "diagnostics": 2,
+        "active": 1,
+        "matched": 1,
+        "stale": 1,
+        "blocking": 2
+    },
+    "errors": [
+        {
+            "category": "operational",
+            "message": "Template diagnostics failed.",
+            "project": "apps/api",
+            "environment": "test",
+            "workspacePath": "apps/api/templates/a file.html.twig",
+            "provider": "template",
+            "cause": {
+                "class": "UnexpectedValueException",
+                "message": "Invalid diagnostic."
+            }
+        }
+    ]
+}

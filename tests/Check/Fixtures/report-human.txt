@@ -1,0 +1,9 @@
+Project apps/api: source-only (runtime indexing is disabled), environment test, complete
+Project .: runtime metadata, environment prod, incomplete
+apps/api:config/services.yaml:2:3: error [service.not_found] Missing 100%
+service (baseline)
+apps/api:config/services.yaml:4:5: warning [service.not_found] Duplicate missing service.
+.:config/removed.yaml: stale baseline [service.not_found] Removed service. (occurrence 1)
+ERROR [apps/api]: Template diagnostics failed.
+  Cause: UnexpectedValueException: Invalid diagnostic.
+Summary: 2 diagnostics, 1 active, 1 baseline matches, 1 stale baseline entries, 2 blocking

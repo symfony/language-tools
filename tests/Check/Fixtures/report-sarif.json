@@ -1,0 +1,598 @@
+{
+    "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+    "version": "2.1.0",
+    "runs": [
+        {
+            "tool": {
+                "driver": {
+                    "name": "Symfony Language Tools",
+                    "version": "1.2.3",
+                    "rules": [
+                        {
+                            "id": "config.deprecated_key",
+                            "name": "config.deprecated_key",
+                            "shortDescription": {
+                                "text": "Config: deprecated key"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "config"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "config.duplicate_key",
+                            "name": "config.duplicate_key",
+                            "shortDescription": {
+                                "text": "Config: duplicate key"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "config"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "config.invalid_type",
+                            "name": "config.invalid_type",
+                            "shortDescription": {
+                                "text": "Config: invalid type"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "config"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "config.malformed_structure",
+                            "name": "config.malformed_structure",
+                            "shortDescription": {
+                                "text": "Config: malformed structure"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "config"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "config.unknown_key",
+                            "name": "config.unknown_key",
+                            "shortDescription": {
+                                "text": "Config: unknown key"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "config"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "console.unknown_argument",
+                            "name": "console.unknown_argument",
+                            "shortDescription": {
+                                "text": "Console: unknown argument"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "console"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "console.unknown_option",
+                            "name": "console.unknown_option",
+                            "shortDescription": {
+                                "text": "Console: unknown option"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "console"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "env.incompatible_type",
+                            "name": "env.incompatible_type",
+                            "shortDescription": {
+                                "text": "Env: incompatible type"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "env"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "env.malformed_chain",
+                            "name": "env.malformed_chain",
+                            "shortDescription": {
+                                "text": "Env: malformed chain"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "env"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "env.unknown_processor",
+                            "name": "env.unknown_processor",
+                            "shortDescription": {
+                                "text": "Env: unknown processor"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "env"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "event.invalid_listener_method",
+                            "name": "event.invalid_listener_method",
+                            "shortDescription": {
+                                "text": "Event: invalid listener method"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "event"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "form.unknown_option",
+                            "name": "form.unknown_option",
+                            "shortDescription": {
+                                "text": "Form: unknown option"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "form"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "importmap.unknown_entrypoint",
+                            "name": "importmap.unknown_entrypoint",
+                            "shortDescription": {
+                                "text": "Importmap: unknown entrypoint"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "importmap"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "messenger.invalid_handler_signature",
+                            "name": "messenger.invalid_handler_signature",
+                            "shortDescription": {
+                                "text": "Messenger: invalid handler signature"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "messenger"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "messenger.unknown_bus",
+                            "name": "messenger.unknown_bus",
+                            "shortDescription": {
+                                "text": "Messenger: unknown bus"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "messenger"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "messenger.unknown_transport",
+                            "name": "messenger.unknown_transport",
+                            "shortDescription": {
+                                "text": "Messenger: unknown transport"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "messenger"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "parameter.not_found",
+                            "name": "parameter.not_found",
+                            "shortDescription": {
+                                "text": "Parameter: not found"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "parameter"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "route.missing_parameters",
+                            "name": "route.missing_parameters",
+                            "shortDescription": {
+                                "text": "Route: missing parameters"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "route"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "route.not_found",
+                            "name": "route.not_found",
+                            "shortDescription": {
+                                "text": "Route: not found"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "route"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "security.unknown_firewall",
+                            "name": "security.unknown_firewall",
+                            "shortDescription": {
+                                "text": "Security: unknown firewall"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "security"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "security.unknown_provider",
+                            "name": "security.unknown_provider",
+                            "shortDescription": {
+                                "text": "Security: unknown provider"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "security"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "service.not_found",
+                            "name": "service.not_found",
+                            "shortDescription": {
+                                "text": "Service: not found"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "service"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "stimulus.unknown_controller",
+                            "name": "stimulus.unknown_controller",
+                            "shortDescription": {
+                                "text": "Stimulus: unknown controller"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "stimulus"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "template.not_found",
+                            "name": "template.not_found",
+                            "shortDescription": {
+                                "text": "Template: not found"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "template"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "translation.domain_not_found",
+                            "name": "translation.domain_not_found",
+                            "shortDescription": {
+                                "text": "Translation: domain not found"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "translation"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "translation.not_found",
+                            "name": "translation.not_found",
+                            "shortDescription": {
+                                "text": "Translation: not found"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "translation"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "translation.placeholders",
+                            "name": "translation.placeholders",
+                            "shortDescription": {
+                                "text": "Translation: placeholders"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "translation"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "twig_callable.unknown_argument",
+                            "name": "twig_callable.unknown_argument",
+                            "shortDescription": {
+                                "text": "Twig callable: unknown argument"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "twig_callable"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "twig_component.not_found",
+                            "name": "twig_component.not_found",
+                            "shortDescription": {
+                                "text": "Twig component: not found"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "twig_component"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "validation.unknown_constraint_option",
+                            "name": "validation.unknown_constraint_option",
+                            "shortDescription": {
+                                "text": "Validation: unknown constraint option"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "validation"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            },
+            "columnKind": "utf16CodeUnits",
+            "invocations": [
+                {
+                    "executionSuccessful": false,
+                    "exitCode": 12,
+                    "toolConfigurationNotifications": [
+                        {
+                            "descriptor": {
+                                "id": "symfony.check.stale_baseline"
+                            },
+                            "level": "error",
+                            "message": {
+                                "text": "Stale baseline entry [service.not_found] Removed service. (occurrence 1)."
+                            },
+                            "locations": [
+                                {
+                                    "physicalLocation": {
+                                        "artifactLocation": {
+                                            "uri": "config/removed.yaml"
+                                        }
+                                    }
+                                }
+                            ],
+                            "properties": {
+                                "symfonyLsp.project": ".",
+                                "symfonyLsp.ruleId": "service.not_found",
+                                "symfonyLsp.fingerprint": "a03f2386ae06b21109577020844df367857b72c2fcce384c1896fed98a89c82b",
+                                "symfonyLsp.occurrence": 1
+                            }
+                        }
+                    ],
+                    "toolExecutionNotifications": [
+                        {
+                            "descriptor": {
+                                "id": "symfony.check.operational"
+                            },
+                            "level": "error",
+                            "message": {
+                                "text": "Template diagnostics failed."
+                            },
+                            "properties": {
+                                "symfonyLsp.category": "operational",
+                                "symfonyLsp.project": "apps/api",
+                                "symfonyLsp.environment": "test",
+                                "symfonyLsp.provider": "template"
+                            },
+                            "locations": [
+                                {
+                                    "physicalLocation": {
+                                        "artifactLocation": {
+                                            "uri": "apps/api/templates/a%20file.html.twig"
+                                        }
+                                    }
+                                }
+                            ],
+                            "exception": {
+                                "kind": "UnexpectedValueException",
+                                "message": "Invalid diagnostic."
+                            }
+                        }
+                    ]
+                }
+            ],
+            "results": [
+                {
+                    "ruleId": "service.not_found",
+                    "ruleIndex": 21,
+                    "level": "error",
+                    "message": {
+                        "text": "Missing 100%\nservice"
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uri": "apps/api/config/services.yaml"
+                                },
+                                "region": {
+                                    "startLine": 2,
+                                    "startColumn": 3,
+                                    "endLine": 2,
+                                    "endColumn": 10
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "symfonyLsp/v1": "18b038519c38aa70d5513201b4a0d9ff1f2d5197c3645de0faf74192b8ff0c17"
+                    },
+                    "properties": {
+                        "symfonyLsp.project": "apps/api",
+                        "symfonyLsp.projectPath": "config/services.yaml",
+                        "symfonyLsp.source": "symfony",
+                        "symfonyLsp.feature": "service",
+                        "symfonyLsp.provider": "dependency-injection",
+                        "symfonyLsp.environment": "test",
+                        "symfonyLsp.analysisMode": "source-only",
+                        "symfonyLsp.baselineState": "matched"
+                    },
+                    "suppressions": [
+                        {
+                            "kind": "external",
+                            "status": "accepted",
+                            "justification": "Matched the configured Symfony diagnostics baseline."
+                        }
+                    ]
+                },
+                {
+                    "ruleId": "service.not_found",
+                    "ruleIndex": 21,
+                    "level": "warning",
+                    "message": {
+                        "text": "Duplicate missing service."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uri": "apps/api/config/services.yaml"
+                                },
+                                "region": {
+                                    "startLine": 4,
+                                    "startColumn": 5,
+                                    "endLine": 5,
+                                    "endColumn": 8
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "symfonyLsp/v1": "86edefeed2092c1f9554ff748f59692c96ff7b5345710358b5042829a7785c89"
+                    },
+                    "properties": {
+                        "symfonyLsp.project": "apps/api",
+                        "symfonyLsp.projectPath": "config/services.yaml",
+                        "symfonyLsp.source": "symfony",
+                        "symfonyLsp.feature": "service",
+                        "symfonyLsp.provider": "dependency-injection",
+                        "symfonyLsp.environment": "test",
+                        "symfonyLsp.analysisMode": "source-only",
+                        "symfonyLsp.baselineState": "active"
+                    }
+                }
+            ],
+            "properties": {
+                "symfonyLsp.complete": false,
+                "symfonyLsp.projects": [
+                    {
+                        "id": "apps/api",
+                        "environment": "test",
+                        "analysis": {
+                            "mode": "source-only",
+                            "reason": "runtime-indexing-disabled"
+                        },
+                        "source": {
+                            "state": "ready"
+                        },
+                        "runtime": {
+                            "state": "disabled"
+                        },
+                        "complete": true
+                    },
+                    {
+                        "id": ".",
+                        "environment": "prod",
+                        "analysis": {
+                            "mode": "runtime",
+                            "reason": null
+                        },
+                        "source": {
+                            "state": "ready"
+                        },
+                        "runtime": {
+                            "state": "ready",
+                            "stage": "container"
+                        },
+                        "complete": false
+                    }
+                ],
+                "symfonyLsp.baseline": {
+                    "path": ".symfony-lsp-baseline.json",
+                    "mode": "none",
+                    "strict": true
+                },
+                "symfonyLsp.summary": {
+                    "diagnostics": 2,
+                    "active": 1,
+                    "matched": 1,
+                    "stale": 1,
+                    "blocking": 2
+                }
+            }
+        }
+    ]
+}

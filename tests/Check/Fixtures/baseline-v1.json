@@ -1,0 +1,25 @@
+{
+    "version": 1,
+    "diagnostics": [
+        {
+            "project": ".",
+            "path": "config/services.yaml",
+            "code": "service.not_found",
+            "severity": "error",
+            "source": "symfony",
+            "message": "Service \"app.mailer\" does not exist.",
+            "fingerprint": "b29df25a23de2b614b9a30166fd6bb9caf63bc1343aa8d76c4372b2effe3416b",
+            "occurrence": 1
+        },
+        {
+            "project": ".",
+            "path": "config/services.yaml",
+            "code": "service.not_found",
+            "severity": "error",
+            "source": "symfony",
+            "message": "Service \"app.mailer\" does not exist.",
+            "fingerprint": "b29df25a23de2b614b9a30166fd6bb9caf63bc1343aa8d76c4372b2effe3416b",
+            "occurrence": 2
+        }
+    ]
+}
