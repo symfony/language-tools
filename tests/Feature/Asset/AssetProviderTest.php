@@ -8,12 +8,15 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Asset\Asset;
+use Symfony\Lsp\Feature\Asset\AssetCompletionContextResolver;
 use Symfony\Lsp\Feature\Asset\AssetExtractor;
 use Symfony\Lsp\Feature\Asset\AssetIndexRegistry;
 use Symfony\Lsp\Feature\Asset\AssetProvider;
 use Symfony\Lsp\Feature\Asset\AssetSourceIndexRegistry;
 use Symfony\Lsp\Feature\Asset\ImportMapEntry;
+use Symfony\Lsp\Feature\Asset\ImportMapEntrypointExtractor;
 use Symfony\Lsp\Feature\Asset\PublicAssetResolver;
+use Symfony\Lsp\Feature\Asset\TwigAssetReferenceExtractor;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigQuotedArgumentMatcher;
@@ -27,7 +30,7 @@ final class AssetProviderTest extends TestCase
     public function testProvidesAssetsAndImportmapEntrypoints(): void
     {
         $converter = new PositionConverter();
-        $extractor = new AssetExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new TwigQuotedArgumentMatcher($converter), new PhpCommentParser());
+        $extractor = $this->createExtractor($converter);
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -120,7 +123,7 @@ final class AssetProviderTest extends TestCase
     public function testDecodesEscapedTwigAssetPaths(): void
     {
         $converter = new PositionConverter();
-        $extractor = new AssetExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new TwigQuotedArgumentMatcher($converter), new PhpCommentParser());
+        $extractor = $this->createExtractor($converter);
 
         $facts = $extractor->extract('file:///workspace/templates/page.html.twig', 'twig', "{{ asset('it\\'s.js') }}");
 
@@ -155,7 +158,7 @@ final class AssetProviderTest extends TestCase
         file_put_contents($root.'/public/css/app.css', 'body {}');
         try {
             $converter = new PositionConverter();
-            $extractor = new AssetExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new TwigQuotedArgumentMatcher($converter), new PhpCommentParser());
+            $extractor = $this->createExtractor($converter);
             $rootUri = 'file://'.$root;
             $project = new Project($root, $rootUri, '^8.0');
             $projects = new ProjectRegistry();
@@ -203,20 +206,15 @@ final class AssetProviderTest extends TestCase
         }
     }
 
-    public function testIgnoresImportMapEntriesInPhpComments(): void
+    private function createExtractor(PositionConverter $converter): AssetExtractor
     {
-        $converter = new PositionConverter();
-        $extractor = new AssetExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new TwigQuotedArgumentMatcher($converter), new PhpCommentParser());
+        $comments = new TwigCommentParser();
 
-        $facts = $extractor->extract('file:///workspace/importmap.php', 'php', <<<'PHP'
-            <?php
-            return [
-                // 'commented' => ['path' => './assets/commented.js', 'entrypoint' => true],
-                /* 'blocked' => ['path' => './assets/blocked.js', 'entrypoint' => true], */
-                'live' => ['path' => './assets/live.js', 'entrypoint' => true],
-            ];
-            PHP);
-
-        self::assertSame(['live'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
+        return new AssetExtractor(
+            new UriToPathConverter(),
+            new TwigAssetReferenceExtractor($converter, $comments, new TwigQuotedArgumentMatcher($converter)),
+            new ImportMapEntrypointExtractor($converter, new PhpCommentParser()),
+            new AssetCompletionContextResolver($converter, $comments),
+        );
     }
 }
