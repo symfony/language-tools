@@ -11,10 +11,12 @@ use Symfony\Lsp\Check\CheckProjectResult;
 use Symfony\Lsp\Check\CheckReporter;
 use Symfony\Lsp\Check\CheckReportViewBuilder;
 use Symfony\Lsp\Check\CheckResult;
+use Symfony\Lsp\Check\GitLabCheckReporter;
 use Symfony\Lsp\Check\SarifCheckReporter;
 use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 
 /**
+ * @phpstan-type GitLabIssue array{description: string, check_name: string, fingerprint: string, severity: string, location: array{path: string, lines: array{begin: int}}}
  * @phpstan-type SarifNotification array{descriptor: array{id: string}, properties: array<string, mixed>, exception?: array{kind: string, message: string}, locations?: list<array{physicalLocation: array{artifactLocation: array{uri: string}}}>}
  * @phpstan-type SarifResult array{ruleId: string, ruleIndex: int, level: string, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, startColumn: int, endLine: int, endColumn: int}}}>, suppressions?: list<array{status: string}>, partialFingerprints: array{'symfonyLsp/v1': string}, properties: array<string, mixed>}
  * @phpstan-type SarifRun array{tool: array{driver: array{rules: list<array{id: string}>}}, columnKind: string, invocations: list<array{executionSuccessful: bool, exitCode: int, toolConfigurationNotifications?: list<SarifNotification>, toolExecutionNotifications?: list<SarifNotification>}>, results: list<SarifResult>}
@@ -26,7 +28,7 @@ final class CheckReporterTest extends TestCase
     public function testReportFormatsMatchGoldenFiles(string $format, int $exitCode): void
     {
         self::assertStringEqualsFile(
-            __DIR__.'/Fixtures/report-'.$format.'.'.('json' === $format || 'sarif' === $format ? 'json' : 'txt'),
+            __DIR__.'/Fixtures/report-'.$format.'.'.(\in_array($format, ['json', 'gitlab', 'sarif'], true) ? 'json' : 'txt'),
             $this->reporter()->render($this->goldenResult(), $format, true, $exitCode),
         );
     }
@@ -37,6 +39,7 @@ final class CheckReporterTest extends TestCase
         yield 'human' => ['human', 12];
         yield 'json' => ['json', 12];
         yield 'GitHub' => ['github', 12];
+        yield 'GitLab' => ['gitlab', 12];
         yield 'SARIF' => ['sarif', 12];
     }
 
@@ -63,6 +66,54 @@ final class CheckReporterTest extends TestCase
             'analysisMode' => 'source-only',
         ], $diagnostics[0]['provenance'] ?? null);
         self::assertSame(1, $summary['stale'] ?? null);
+    }
+
+    public function testRendersGitLabCodeQualityFields(): void
+    {
+        /** @var list<GitLabIssue> $report */
+        $report = json_decode($this->reporter()->render($this->goldenResult(), 'gitlab', false, 12), true, flags: \JSON_THROW_ON_ERROR);
+
+        self::assertSame("Missing 100%\nservice", $report[0]['description']);
+        self::assertSame('service.not_found', $report[0]['check_name']);
+        self::assertSame('18b038519c38aa70d5513201b4a0d9ff1f2d5197c3645de0faf74192b8ff0c17', $report[0]['fingerprint']);
+        self::assertSame('major', $report[0]['severity']);
+        self::assertSame([
+            'path' => 'apps/api/config/services.yaml',
+            'lines' => ['begin' => 2],
+        ], $report[0]['location']);
+        self::assertSame('minor', $report[1]['severity']);
+        self::assertNotSame($report[0]['fingerprint'], $report[1]['fingerprint']);
+        self::assertSame("[]\n", $this->reporter()->codes(['service.not_found'], 'gitlab'));
+    }
+
+    #[DataProvider('gitLabInformationSeverities')]
+    public function testMapsInformationAndHintDiagnosticsToGitLabInfo(int $severity): void
+    {
+        $diagnostic = new CheckDiagnostic(
+            'apps/api',
+            'config/services.yaml',
+            'apps/api/config/services.yaml',
+            1,
+            2,
+            1,
+            9,
+            $severity,
+            'service.not_found',
+            'symfony',
+            'Missing service.',
+            hash('sha256', 'diagnostic'),
+        );
+        /** @var list<GitLabIssue> $report */
+        $report = json_decode($this->reporter()->render($this->fixtureResult(diagnostic: $diagnostic), 'gitlab', false, 0), true, flags: \JSON_THROW_ON_ERROR);
+
+        self::assertSame('info', $report[0]['severity']);
+    }
+
+    /** @return iterable<string, array{int}> */
+    public static function gitLabInformationSeverities(): iterable
+    {
+        yield 'information' => [3];
+        yield 'hint' => [4];
     }
 
     public function testRendersSarifRulesLocationsFingerprintsAndBaselines(): void
@@ -181,6 +232,7 @@ final class CheckReporterTest extends TestCase
     private function reporter(): CheckReporter
     {
         return new CheckReporter(
+            new GitLabCheckReporter(),
             new SarifCheckReporter(new DiagnosticCodeRegistry(), '1.2.3'),
             new CheckReportViewBuilder(new CheckDiagnosticOccurrenceNumberer()),
         );

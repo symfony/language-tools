@@ -112,7 +112,7 @@ final class SarifCheckReporter
                     ],
                 ]],
                 'partialFingerprints' => [
-                    'symfonyLsp/v1' => hash('sha256', $diagnostic->fingerprint."\0".$diagnosticView->occurrence),
+                    'symfonyLsp/v1' => $diagnosticView->occurrenceFingerprint,
                 ],
                 'properties' => $properties,
             ];

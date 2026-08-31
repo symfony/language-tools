@@ -135,6 +135,25 @@ Use GitHub Actions annotations for pull request feedback:
 
     $ symfony-lsp check --format=github
 
+Publish diagnostics as a GitLab Code Quality report:
+
+.. code-block:: yaml
+
+    symfony-lsp:
+      stage: test
+      script:
+        - symfony lsp:check --format=gitlab > gl-code-quality-report.json
+      artifacts:
+        when: always
+        reports:
+          codequality: gl-code-quality-report.json
+
+GitLab reports map errors to ``major``, warnings to ``minor`` and information
+and hints to ``info``. They use repository-relative paths, one-based lines and
+occurrence-specific fingerprints. Invocation and operational failures still
+produce a valid JSON array, while the nonzero exit status and standard error
+identify the failed check.
+
 Generate a SARIF 2.1.0 report for code-scanning systems:
 
 .. code-block:: terminal
@@ -149,12 +168,13 @@ because their result set may be incomplete.
 
 Standard output contains only the selected report format. Operational details
 go to standard error. The Symfony CLI wrapper also keeps release-management
-and cache messages on standard error, so JSON, GitHub Actions and SARIF output
-remain safe to pipe from standard output. Add ``--verbose`` to human output to
-show sanitized exception classes and messages. GitHub annotations remain
-generic.
-Once JSON or SARIF is selected successfully, later invocation, configuration,
-indexing and internal failures still produce a valid structured report.
+and cache messages on standard error, so JSON, GitHub Actions, GitLab and SARIF
+output remain safe to pipe from standard output. Add ``--verbose`` to human
+output to show sanitized exception classes and messages. GitHub annotations
+remain generic.
+Once JSON, GitLab or SARIF is selected successfully, later invocation,
+configuration, indexing and internal failures still produce a valid structured
+report.
 
 Selecting Blocking Diagnostics
 ------------------------------

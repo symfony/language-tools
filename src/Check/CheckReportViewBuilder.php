@@ -23,6 +23,7 @@ final class CheckReportViewBuilder
             $diagnostics[] = new CheckReportDiagnosticView(
                 $diagnostic,
                 $occurrence->number,
+                hash('sha256', $diagnostic->fingerprint."\0".$occurrence->number),
                 strstr($diagnostic->code, '.', true) ?: $diagnostic->code,
                 $project?->environment,
                 $project?->mode,

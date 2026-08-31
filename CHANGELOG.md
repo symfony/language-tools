@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add GitLab Code Quality reports to the diagnostics checker
 - Suppress code-qualified diagnostics with source comments
 - Honor router request context parameters in route diagnostics
 - Report Symfony branches outside the live supported range

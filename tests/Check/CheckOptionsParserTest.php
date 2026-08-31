@@ -99,6 +99,11 @@ final class CheckOptionsParserTest extends TestCase
         self::assertSame([], $this->options(['--fail-on='])->blockingCodes);
     }
 
+    public function testAcceptsGitLabFormat(): void
+    {
+        self::assertSame('gitlab', $this->options(['--format=gitlab'])->format);
+    }
+
     /** @param list<string> $arguments */
     #[DataProvider('invalidArguments')]
     public function testReportsExactErrorsWithTheDetectedFormat(array $arguments, string $format, string $message): void
@@ -126,12 +131,12 @@ final class CheckOptionsParserTest extends TestCase
         yield 'invalid format' => [
             ['--format=xml'],
             'xml',
-            'The --format option must be human, json, github or sarif.',
+            'The --format option must be human, json, github, gitlab or sarif.',
         ];
         yield 'empty format' => [
             ['--format='],
             '',
-            'The --format option must be human, json, github or sarif.',
+            'The --format option must be human, json, github, gitlab or sarif.',
         ];
         yield 'conflicting formats' => [
             ['--format=json', '--format=github'],

@@ -8,7 +8,7 @@ use Symfony\Lsp\Project\InvalidConfigurationException;
 
 final class CheckOptionsParser
 {
-    private const FORMATS = ['human', 'json', 'github', 'sarif'];
+    private const FORMATS = ['human', 'json', 'github', 'gitlab', 'sarif'];
 
     private const FLAG_OPTIONS = [
         '--help' => ['help', true],
@@ -236,7 +236,7 @@ final class CheckOptionsParser
     private function format(?string $current, string $requested): string
     {
         if (!\in_array($requested, self::FORMATS, true)) {
-            throw new InvalidConfigurationException('The --format option must be human, json, github or sarif.');
+            throw new InvalidConfigurationException('The --format option must be human, json, github, gitlab or sarif.');
         }
         if (null !== $current && $current !== $requested) {
             throw new InvalidConfigurationException('The --format option cannot select more than one format.');

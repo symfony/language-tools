@@ -16,6 +16,7 @@ use function Amp\ByteStream\buffer;
 use function Amp\Future\await;
 
 /**
+ * @phpstan-type GitLabIssue array{description: string, check_name: string, fingerprint: string, severity: string, location: array{path: string, lines: array{begin: int}}}
  * @phpstan-type SarifNotification array{descriptor: array{id: string}}
  * @phpstan-type SarifInvocation array{executionSuccessful: bool, exitCode: int, toolConfigurationNotifications?: list<SarifNotification>}
  * @phpstan-type SarifLocation array{physicalLocation: array{artifactLocation: array{uri: string}}}
@@ -137,6 +138,23 @@ final class CheckExecutableTest extends TestCase
         self::assertContains('env.malformed_chain', $listedCodes);
         self::assertContains('console.unknown_argument', $listedCodes);
         self::assertContains('console.unknown_option', $listedCodes);
+    }
+
+    public function testRendersGitLabCodeQualityReports(): void
+    {
+        $result = $this->execute(['check', '--source-only', '--format=gitlab', '--workspace='.$this->directory, 'config/services.yaml']);
+        /** @var list<GitLabIssue> $report */
+        $report = json_decode($result['stdout'], true, flags: \JSON_THROW_ON_ERROR);
+
+        self::assertSame(CheckCommand::EXIT_DIAGNOSTICS, $result['exitCode'], $result['stderr']);
+        self::assertSame('', $result['stderr']);
+        self::assertSame('env.malformed_chain', $report[0]['check_name']);
+        self::assertSame('major', $report[0]['severity']);
+        self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/D', $report[0]['fingerprint']);
+        self::assertSame([
+            'path' => 'config/services.yaml',
+            'lines' => ['begin' => 2],
+        ], $report[0]['location']);
     }
 
     public function testExcludesConfiguredPathsUnlessTheyAreExplicitlySelected(): void
@@ -558,6 +576,8 @@ final class CheckExecutableTest extends TestCase
         if ('json' === $format) {
             $report = $this->decodeReport($result['stdout']);
             self::assertSame('invocation', $report['errors'][0]['category'] ?? null);
+        } elseif ('gitlab' === $format) {
+            self::assertSame([], json_decode($result['stdout'], true, flags: \JSON_THROW_ON_ERROR));
         } else {
             /** @var SarifReport $report */
             $report = json_decode($result['stdout'], true, flags: \JSON_THROW_ON_ERROR);
@@ -569,6 +589,7 @@ final class CheckExecutableTest extends TestCase
     public static function machineFormats(): iterable
     {
         yield 'JSON' => ['json'];
+        yield 'GitLab' => ['gitlab'];
         yield 'SARIF' => ['sarif'];
     }
 
