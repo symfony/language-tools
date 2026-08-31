@@ -2,30 +2,52 @@
 
 namespace Symfony\Lsp\Tests\Runtime;
 
-final class BridgeSectionsTest extends AbstractBridgeTestCase
+use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Tests\Support\Bridge\AutoloaderFixtureBuilder;
+use Symfony\Lsp\Tests\Support\Bridge\BridgeFixtureWorkspace;
+use Symfony\Lsp\Tests\Support\Bridge\BridgeProcessFixture;
+use Symfony\Lsp\Tests\Support\Bridge\DoctrineFixtureBuilder;
+use Symfony\Lsp\Tests\Support\Bridge\EnvironmentFixtureBuilder;
+use Symfony\Lsp\Tests\Support\Bridge\EventFixtureBuilder;
+use Symfony\Lsp\Tests\Support\Bridge\MetadataFixtureBuilder;
+use Symfony\Lsp\Tests\Support\Bridge\RuntimeFrontControllerFixtureBuilder;
+use Symfony\Lsp\Tests\Support\Bridge\SecurityFixtureBuilder;
+use Symfony\Lsp\Tests\Support\Bridge\StimulusFixtureBuilder;
+use Symfony\Lsp\Tests\Support\Bridge\TwigFixtureBuilder;
+
+final class BridgeSectionsTest extends TestCase
 {
+    private BridgeFixtureWorkspace $workspace;
+    private BridgeProcessFixture $bridge;
+
+    protected function setUp(): void
+    {
+        $this->workspace = new BridgeFixtureWorkspace();
+        $this->bridge = new BridgeProcessFixture($this->workspace->path);
+    }
+
+    protected function tearDown(): void
+    {
+        $this->workspace->cleanup();
+    }
+
     public function testExportsEnvironmentProcessorMetadataWithoutValues(): void
     {
-        $this->writeEnvironmentApplication();
+        (new EnvironmentFixtureBuilder($this->workspace))->writeEnvironmentApplication();
         $previousSecret = getenv('APP_SECRET');
         putenv('APP_SECRET=CANARY_SECRET_ENVIRONMENT_VALUE');
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=environment 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=environment']);
         if (false === $previousSecret) {
             putenv('APP_SECRET');
         } else {
             putenv('APP_SECRET='.$previousSecret);
         }
 
-        $snapshot = implode("\n", $output);
-        self::assertSame(0, $exitCode, $snapshot);
+        $snapshot = $process->stdout;
+        self::assertSame(0, $process->exitCode, $snapshot);
         self::assertStringNotContainsString('CANARY_SECRET_', $snapshot);
-        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        $result = $process->snapshot;
         self::assertIsArray($result);
         self::assertIsArray($result['sections'] ?? null);
         self::assertIsArray($result['sections']['environment'] ?? null);
@@ -37,18 +59,13 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
 
     public function testNormalizesEventDispatcherMetadata(): void
     {
-        $this->writeEventApplication();
+        (new EventFixtureBuilder($this->workspace))->writeEventApplication();
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=events 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=events']);
 
-        $snapshot = implode("\n", $output);
-        self::assertSame(0, $exitCode, $snapshot);
-        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        $snapshot = $process->stdout;
+        self::assertSame(0, $process->exitCode, $snapshot);
+        $result = $process->snapshot;
         self::assertIsArray($result);
         self::assertSame([], $result['errors'] ?? null);
         self::assertIsArray($result['sections'] ?? null);
@@ -67,25 +84,20 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
 
     public function testResolvesTheKernelThroughARuntimeFrontController(): void
     {
-        $this->writeRuntimeFrontControllerApplication();
+        (new RuntimeFrontControllerFixtureBuilder($this->workspace))->writeRuntimeFrontControllerApplication();
         $previousOptions = getenv('APP_RUNTIME_OPTIONS');
         putenv('APP_RUNTIME_OPTIONS={"environment_option":"environment"}');
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=events 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=events']);
         if (false === $previousOptions) {
             putenv('APP_RUNTIME_OPTIONS');
         } else {
             putenv('APP_RUNTIME_OPTIONS='.$previousOptions);
         }
 
-        $snapshot = implode("\n", $output);
-        self::assertSame(0, $exitCode, $snapshot);
-        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        $snapshot = $process->stdout;
+        self::assertSame(0, $process->exitCode, $snapshot);
+        $result = $process->snapshot;
         self::assertIsArray($result);
         self::assertSame([], $result['errors'] ?? null, $snapshot);
         self::assertIsArray($result['sections'] ?? null);
@@ -97,19 +109,14 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
 
     public function testNormalizesSecurityMetadataWithoutExportingProviderValues(): void
     {
-        $this->writeSecurityApplication();
+        (new SecurityFixtureBuilder($this->workspace))->writeSecurityApplication();
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=security 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=security']);
 
-        $snapshot = implode("\n", $output);
-        self::assertSame(0, $exitCode, $snapshot);
+        $snapshot = $process->stdout;
+        self::assertSame(0, $process->exitCode, $snapshot);
         self::assertStringNotContainsString('CANARY_SECRET_', $snapshot);
-        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        $result = $process->snapshot;
         self::assertIsArray($result);
         self::assertSame([], $result['errors'] ?? null);
         self::assertIsArray($result['sections'] ?? null);
@@ -127,17 +134,12 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
 
     public function testReportsUnavailableOptionalAssetMapper(): void
     {
-        $this->writeAutoloader('8.0.6');
+        (new AutoloaderFixtureBuilder($this->workspace))->writeAutoloader('8.0.6');
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=assets 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=assets']);
 
-        $result = json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame(0, $exitCode);
+        $result = $process->snapshot;
+        self::assertSame(0, $process->exitCode);
         self::assertIsArray($result);
         self::assertSame([], $result['errors'] ?? null);
         self::assertIsArray($result['sections'] ?? null);
@@ -150,18 +152,13 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
 
     public function testCollectsBundleControllersAndStaysIncompleteWithoutTheConfiguredRegistry(): void
     {
-        $this->writeThemedStimulusApplication();
+        (new StimulusFixtureBuilder($this->workspace))->writeThemedStimulusApplication();
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=stimulus 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=stimulus']);
 
-        $snapshot = implode("\n", $output);
-        self::assertSame(0, $exitCode, $snapshot);
-        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        $snapshot = $process->stdout;
+        self::assertSame(0, $process->exitCode, $snapshot);
+        $result = $process->snapshot;
         self::assertIsArray($result);
         self::assertSame([], $result['errors'] ?? null, $snapshot);
         self::assertIsArray($result['sections'] ?? null);
@@ -174,18 +171,13 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
 
     public function testExportsDoctrineMetadataFromTheMetadataFactory(): void
     {
-        $this->writeDoctrineApplication();
+        (new DoctrineFixtureBuilder($this->workspace))->writeDoctrineApplication();
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=doctrine 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=doctrine']);
 
-        $snapshot = implode("\n", $output);
-        self::assertSame(0, $exitCode, $snapshot);
-        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        $snapshot = $process->stdout;
+        self::assertSame(0, $process->exitCode, $snapshot);
+        $result = $process->snapshot;
         self::assertIsArray($result);
         self::assertSame([], $result['errors'] ?? null, $snapshot);
         self::assertIsArray($result['sections'] ?? null);
@@ -196,7 +188,7 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
         $entity = $doctrine['entities'][0] ?? null;
         self::assertIsArray($entity);
         self::assertSame('App\Entity\Book', $entity['className'] ?? null);
-        self::assertSame(realpath($this->temporaryDirectory).'/src/Entity/Book.php', $entity['file'] ?? null);
+        self::assertSame(realpath($this->workspace->path).'/src/Entity/Book.php', $entity['file'] ?? null);
         self::assertSame('App\Repository\BookRepository', $entity['repositoryClass'] ?? null);
         self::assertSame([
             ['name' => 'title', 'type' => 'string', 'association' => false, 'targetEntity' => null],
@@ -206,17 +198,12 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
 
     public function testReportsUnavailableOptionalStimulusBundle(): void
     {
-        $this->writeAutoloader('8.0.6');
+        (new AutoloaderFixtureBuilder($this->workspace))->writeAutoloader('8.0.6');
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=stimulus 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=stimulus']);
 
-        $result = json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame(0, $exitCode);
+        $result = $process->snapshot;
+        self::assertSame(0, $process->exitCode);
         self::assertIsArray($result);
         self::assertSame([], $result['errors'] ?? null);
         self::assertIsArray($result['sections'] ?? null);
@@ -227,17 +214,12 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
 
     public function testReportsUnavailableOptionalMetadataComponents(): void
     {
-        $this->writeAutoloader('8.0.6');
+        (new AutoloaderFixtureBuilder($this->workspace))->writeAutoloader('8.0.6');
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=metadata 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=metadata']);
 
-        $result = json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame(0, $exitCode);
+        $result = $process->snapshot;
+        self::assertSame(0, $process->exitCode);
         self::assertIsArray($result);
         self::assertSame([], $result['errors'] ?? null);
         self::assertIsArray($result['sections'] ?? null);
@@ -250,18 +232,13 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
 
     public function testKeepsConstraintMetadataWithoutOptionalDependencies(): void
     {
-        $this->writeConstraintMetadataApplication();
+        (new MetadataFixtureBuilder($this->workspace))->writeConstraintApplication();
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=metadata 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=metadata']);
 
-        $snapshot = implode("\n", $output);
-        self::assertSame(0, $exitCode, $snapshot);
-        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        $snapshot = $process->stdout;
+        self::assertSame(0, $process->exitCode, $snapshot);
+        $result = $process->snapshot;
         self::assertIsArray($result);
         self::assertSame([], $result['errors'] ?? null, $snapshot);
         self::assertIsArray($result['sections'] ?? null);
@@ -276,18 +253,13 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
 
     public function testDerivesLoaderPathsWhenAThemeLoaderHidesThem(): void
     {
-        $this->writeThemedTwigApplication();
+        (new TwigFixtureBuilder($this->workspace))->writeThemedTwigApplication();
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=twig 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=twig']);
 
-        $snapshot = implode("\n", $output);
-        self::assertSame(0, $exitCode, $snapshot);
-        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        $snapshot = $process->stdout;
+        self::assertSame(0, $process->exitCode, $snapshot);
+        $result = $process->snapshot;
         self::assertIsArray($result);
         self::assertSame([], $result['errors'] ?? null, $snapshot);
         self::assertIsArray($result['sections'] ?? null);
@@ -300,23 +272,18 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
             self::assertIsString($path['namespace'] ?? null);
             $byNamespace[$path['namespace']][] = $path['path'];
         }
-        self::assertSame([realpath($this->temporaryDirectory).'/src/ShopBundle/templates'], $byNamespace['@Shop'] ?? null);
-        self::assertSame([realpath($this->temporaryDirectory).'/templates'], $byNamespace['(None)'] ?? null);
+        self::assertSame([realpath($this->workspace->path).'/src/ShopBundle/templates'], $byNamespace['@Shop'] ?? null);
+        self::assertSame([realpath($this->workspace->path).'/templates'], $byNamespace['(None)'] ?? null);
     }
 
     public function testReportsUnavailableTwigDebugCommandAsAWarning(): void
     {
-        $this->writeTwigApplicationWithoutDebugCommand();
+        (new TwigFixtureBuilder($this->workspace))->writeTwigApplicationWithoutDebugCommand();
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=twig 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=twig']);
 
-        $result = json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame(0, $exitCode);
+        $result = $process->snapshot;
+        self::assertSame(0, $process->exitCode);
         self::assertIsArray($result);
         self::assertSame([], $result['errors'] ?? null);
         self::assertIsArray($result['sections'] ?? null);
@@ -332,17 +299,12 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
 
     public function testIgnoresAnUnregisteredSecurityBundle(): void
     {
-        $this->writeUnregisteredSecurityApplication();
+        (new SecurityFixtureBuilder($this->workspace))->writeUnregisteredSecurityApplication();
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=security 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=security']);
 
-        $result = json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame(0, $exitCode);
+        $result = $process->snapshot;
+        self::assertSame(0, $process->exitCode);
         self::assertIsArray($result);
         self::assertSame([], $result['errors'] ?? null);
         self::assertIsArray($result['sections'] ?? null);
@@ -369,61 +331,5 @@ final class BridgeSectionsTest extends AbstractBridgeTestCase
             'App\\Message\\Configured' => ['class' => 'App\\Message\\Configured', 'transports' => ['async']],
             'App\\Message\\HandlerOnly' => ['class' => 'App\\Message\\HandlerOnly', 'transports' => []],
         ], json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR));
-    }
-
-    private function writeConstraintMetadataApplication(): void
-    {
-        $directory = $this->temporaryDirectory.'/vendor/symfony/validator/Constraints';
-        mkdir($directory, 0777, true);
-        file_put_contents($directory.'/Alpha.php', <<<'PHP'
-            <?php
-            namespace Symfony\Component\Validator\Constraints;
-            final class Alpha extends \Symfony\Component\Validator\Constraint
-            {
-                public function __construct(public ?int $min = null) {}
-            }
-            PHP);
-        file_put_contents($directory.'/ExpressionLanguageProvider.php', <<<'PHP'
-            <?php
-            namespace Symfony\Component\Validator\Constraints;
-            final class ExpressionLanguageProvider implements \Missing\OptionalInterface
-            {
-            }
-            PHP);
-        file_put_contents($directory.'/Zulu.php', <<<'PHP'
-            <?php
-            namespace Symfony\Component\Validator\Constraints;
-            final class Zulu extends \Symfony\Component\Validator\Constraint
-            {
-                public function __construct(public ?int $max = null) {}
-            }
-            PHP);
-        file_put_contents($this->temporaryDirectory.'/vendor/autoload.php', <<<'PHP'
-            <?php
-            namespace Composer;
-            final class InstalledVersions
-            {
-                public static function getPrettyVersion(string $package): ?string { return '8.0.6'; }
-            }
-            namespace Symfony\Component\Filesystem;
-            final class Path
-            {
-                public static function join(string $root, string $path): string { return rtrim($root, '/\\').'/'.ltrim($path, '/\\'); }
-            }
-            namespace Symfony\Component\Validator;
-            abstract class Constraint
-            {
-            }
-            \spl_autoload_register(static function (string $class): void {
-                $prefix = 'Symfony\\Component\\Validator\\Constraints\\';
-                if (!str_starts_with($class, $prefix)) {
-                    return;
-                }
-                $path = __DIR__.'/symfony/validator/Constraints/'.substr($class, strlen($prefix)).'.php';
-                if (is_file($path)) {
-                    require $path;
-                }
-            });
-            PHP);
     }
 }

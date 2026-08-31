@@ -3,12 +3,32 @@
 namespace Symfony\Lsp\Tests\Runtime;
 
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Tests\Support\Bridge\BridgeFixtureWorkspace;
+use Symfony\Lsp\Tests\Support\Bridge\BridgeProcessFixture;
+use Symfony\Lsp\Tests\Support\Bridge\ValidationFixtureBuilder;
 
-final class BridgeValidationTest extends AbstractBridgeTestCase
+final class BridgeValidationTest extends TestCase
 {
+    private BridgeFixtureWorkspace $workspace;
+    private BridgeProcessFixture $bridge;
+    private ValidationFixtureBuilder $fixtures;
+
+    protected function setUp(): void
+    {
+        $this->workspace = new BridgeFixtureWorkspace();
+        $this->bridge = new BridgeProcessFixture($this->workspace->path);
+        $this->fixtures = new ValidationFixtureBuilder($this->workspace);
+    }
+
+    protected function tearDown(): void
+    {
+        $this->workspace->cleanup();
+    }
+
     public function testForcesKernelValidationWithoutRequestedSections(): void
     {
-        $this->writeValidationApplication('');
+        $this->fixtures->writeApplication('');
 
         $result = $this->runBridge();
 
@@ -20,7 +40,7 @@ final class BridgeValidationTest extends AbstractBridgeTestCase
     #[DataProvider('configurationExceptionProvider')]
     public function testReportsInvalidSymfonyConfigurationWithoutRawDetails(string $exception): void
     {
-        $this->writeValidationApplication(\sprintf(<<<'PHP'
+        $this->fixtures->writeApplication(\sprintf(<<<'PHP'
             throw new \RuntimeException(
                 'CANARY_UNKNOWN_WRAPPER',
                 0,
@@ -48,7 +68,7 @@ final class BridgeValidationTest extends AbstractBridgeTestCase
 
     public function testReportsYamlSyntaxLocationWithoutRawDetails(): void
     {
-        $this->writeValidationApplication(<<<'PHP'
+        $this->fixtures->writeApplication(<<<'PHP'
             throw new \RuntimeException(
                 'CANARY_UNKNOWN_WRAPPER',
                 0,
@@ -68,7 +88,7 @@ final class BridgeValidationTest extends AbstractBridgeTestCase
 
     public function testKeepsYamlLineWhenTheParserDoesNotExposeAFile(): void
     {
-        $this->writeValidationApplication(<<<'PHP'
+        $this->fixtures->writeApplication(<<<'PHP'
             throw new \Symfony\Component\Yaml\Exception\ParseException('CANARY_SECRET_YAML_SNIPPET', false);
             PHP);
 
@@ -83,7 +103,7 @@ final class BridgeValidationTest extends AbstractBridgeTestCase
 
     public function testReportsXmlSyntaxWithoutParsingRawDetails(): void
     {
-        $this->writeValidationApplication(<<<'PHP'
+        $this->fixtures->writeApplication(<<<'PHP'
             throw new \RuntimeException(
                 'CANARY_UNKNOWN_WRAPPER',
                 0,
@@ -101,8 +121,8 @@ final class BridgeValidationTest extends AbstractBridgeTestCase
 
     public function testDoesNotClassifyProjectPhpParseErrorsAsConfigurationFailures(): void
     {
-        $this->writeValidationApplication("require dirname(__DIR__).'/config/broken.php';");
-        file_put_contents($this->temporaryDirectory.'/config/broken.php', "<?php\n\nfunction broken( {\n    CANARY_SECRET_PHP_VALUE\n");
+        $this->fixtures->writeApplication("require dirname(__DIR__).'/config/broken.php';");
+        $this->workspace->write('config/broken.php', "<?php\n\nfunction broken( {\n    CANARY_SECRET_PHP_VALUE\n");
 
         $result = $this->runBridge();
 
@@ -111,7 +131,7 @@ final class BridgeValidationTest extends AbstractBridgeTestCase
 
     public function testReportsUnrelatedApplicationExceptionsAsUnavailable(): void
     {
-        $this->writeValidationApplication("throw new \\RuntimeException('CANARY_UNKNOWN_APPLICATION_EXCEPTION');");
+        $this->fixtures->writeApplication("throw new \\RuntimeException('CANARY_UNKNOWN_APPLICATION_EXCEPTION');");
 
         $result = $this->runBridge();
 
@@ -120,7 +140,7 @@ final class BridgeValidationTest extends AbstractBridgeTestCase
 
     public function testDoesNotClassifyApplicationDefinedConfigurationExceptions(): void
     {
-        $this->writeValidationApplication("throw new ApplicationConfigurationException('CANARY_APPLICATION_CONFIGURATION_EXCEPTION');");
+        $this->fixtures->writeApplication("throw new ApplicationConfigurationException('CANARY_APPLICATION_CONFIGURATION_EXCEPTION');");
 
         $result = $this->runBridge();
 
@@ -130,62 +150,12 @@ final class BridgeValidationTest extends AbstractBridgeTestCase
     /** @return array<array-key, mixed> */
     private function runBridge(): array
     {
-        exec(\sprintf(
-            '%s %s --project=%s 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run();
 
-        $snapshot = implode("\n", $output);
-        self::assertSame(0, $exitCode, $snapshot);
-        self::assertStringNotContainsString('CANARY_', $snapshot);
-        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertIsArray($result);
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        self::assertStringNotContainsString('CANARY_', $process->stdout);
+        self::assertIsArray($process->snapshot);
 
-        return $result;
-    }
-
-    private function writeValidationApplication(string $boot): void
-    {
-        mkdir($this->temporaryDirectory.'/config');
-        file_put_contents($this->temporaryDirectory.'/config/framework.yaml', "framework:\n    secret: CANARY_SECRET_YAML_VALUE\n");
-        file_put_contents($this->temporaryDirectory.'/vendor/autoload.php', str_replace('__BOOT__', $boot, <<<'PHP'
-            <?php
-            namespace Composer;
-            final class InstalledVersions
-            {
-                public static function getPrettyVersion(string $package): ?string { return '8.0.6'; }
-            }
-            namespace Symfony\Component\Config\Definition\Exception;
-            class InvalidConfigurationException extends \RuntimeException
-            {
-                public function getPath(): ?string { return '.framework..cache.'; }
-            }
-            class InvalidTypeException extends InvalidConfigurationException {}
-            class DuplicateKeyException extends InvalidConfigurationException {}
-            class ForbiddenOverwriteException extends InvalidConfigurationException {}
-            namespace Symfony\Component\Yaml\Exception;
-            class ParseException extends \RuntimeException
-            {
-                public function __construct(string $message, private bool $withFile = true) { parent::__construct($message); }
-                public function getParsedFile(): string { return $this->withFile ? \dirname(__DIR__).'/config/framework.yaml' : null; }
-                public function getParsedLine(): int { return 7; }
-                public function getSnippet(): string { return 'CANARY_SECRET_YAML_SNIPPET'; }
-            }
-            namespace Symfony\Component\Config\Util\Exception;
-            class XmlParsingException extends \InvalidArgumentException {}
-            namespace App;
-            class ApplicationConfigurationException extends \Symfony\Component\Config\Definition\Exception\InvalidConfigurationException {}
-            final class Kernel
-            {
-                public function __construct(string $environment, bool $debug) {}
-                public function boot(): void
-                {
-                    __BOOT__
-                }
-                public function shutdown(): void {}
-            }
-            PHP));
+        return $process->snapshot;
     }
 }

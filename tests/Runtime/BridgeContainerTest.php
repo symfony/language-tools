@@ -2,23 +2,36 @@
 
 namespace Symfony\Lsp\Tests\Runtime;
 
-final class BridgeContainerTest extends AbstractBridgeTestCase
+use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Tests\Support\Bridge\BridgeFixtureWorkspace;
+use Symfony\Lsp\Tests\Support\Bridge\BridgeProcessFixture;
+use Symfony\Lsp\Tests\Support\Bridge\ContainerFixtureBuilder;
+
+final class BridgeContainerTest extends TestCase
 {
+    private BridgeFixtureWorkspace $workspace;
+    private BridgeProcessFixture $bridge;
+
+    protected function setUp(): void
+    {
+        $this->workspace = new BridgeFixtureWorkspace();
+        $this->bridge = new BridgeProcessFixture($this->workspace->path);
+    }
+
+    protected function tearDown(): void
+    {
+        $this->workspace->cleanup();
+    }
+
     public function testNormalizesContainerMetadataWithoutExportingParameterValues(): void
     {
-        $this->writeContainerApplication();
+        (new ContainerFixtureBuilder($this->workspace))->writeContainerApplication();
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=container 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=container']);
 
-        $snapshot = implode("\n", $output);
-        self::assertSame(0, $exitCode, $snapshot);
-        self::assertStringNotContainsString('CANARY_SECRET_', $snapshot);
-        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        self::assertStringNotContainsString('CANARY_SECRET_', $process->stdout);
+        $result = $process->snapshot;
         self::assertIsArray($result);
         self::assertSame([], $result['errors']);
         self::assertIsArray($result['sections']);

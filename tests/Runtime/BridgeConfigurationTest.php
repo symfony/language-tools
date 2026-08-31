@@ -2,23 +2,36 @@
 
 namespace Symfony\Lsp\Tests\Runtime;
 
-final class BridgeConfigurationTest extends AbstractBridgeTestCase
+use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Tests\Support\Bridge\BridgeFixtureWorkspace;
+use Symfony\Lsp\Tests\Support\Bridge\BridgeProcessFixture;
+use Symfony\Lsp\Tests\Support\Bridge\ConfigurationFixtureBuilder;
+
+final class BridgeConfigurationTest extends TestCase
 {
+    private BridgeFixtureWorkspace $workspace;
+    private BridgeProcessFixture $bridge;
+
+    protected function setUp(): void
+    {
+        $this->workspace = new BridgeFixtureWorkspace();
+        $this->bridge = new BridgeProcessFixture($this->workspace->path);
+    }
+
+    protected function tearDown(): void
+    {
+        $this->workspace->cleanup();
+    }
+
     public function testExportsPublicBundleConfigurationTrees(): void
     {
-        $this->writeConfigurationApplication();
+        (new ConfigurationFixtureBuilder($this->workspace))->writeConfigurationApplication();
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=configuration 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=configuration']);
 
-        $snapshot = implode("\n", $output);
-        self::assertSame(0, $exitCode, $snapshot);
-        self::assertStringNotContainsString('CANARY_SECRET_', $snapshot);
-        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        self::assertStringNotContainsString('CANARY_SECRET_', $process->stdout);
+        $result = $process->snapshot;
         self::assertIsArray($result);
         self::assertIsArray($result['sections'] ?? null);
         self::assertIsArray($result['sections']['configuration'] ?? null);
@@ -44,28 +57,18 @@ final class BridgeConfigurationTest extends AbstractBridgeTestCase
 
     public function testDoesNotExposeApplicationExceptionsInSectionWarnings(): void
     {
-        $this->writeConfigurationApplication();
-        $autoload = $this->temporaryDirectory.'/vendor/autoload.php';
-        $contents = str_replace(
+        (new ConfigurationFixtureBuilder($this->workspace))->writeConfigurationApplication();
+        self::assertSame(1, $this->workspace->replace(
+            'vendor/autoload.php',
             'return [new Bundle()];',
             'return [new Bundle(), new BrokenBundle()];',
-            (string) file_get_contents($autoload),
-            $count,
-        );
-        self::assertSame(1, $count);
-        file_put_contents($autoload, $contents);
+        ));
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=configuration 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=configuration']);
 
-        $snapshot = implode("\n", $output);
-        self::assertSame(0, $exitCode, $snapshot);
-        self::assertStringNotContainsString('CANARY_CONFIGURATION_EXCEPTION', $snapshot);
-        $result = json_decode($snapshot, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        self::assertStringNotContainsString('CANARY_CONFIGURATION_EXCEPTION', $process->stdout);
+        $result = $process->snapshot;
         self::assertIsArray($result);
         self::assertSame([], $result['errors']);
         self::assertIsArray($result['sections'] ?? null);

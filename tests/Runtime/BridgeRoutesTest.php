@@ -2,26 +2,38 @@
 
 namespace Symfony\Lsp\Tests\Runtime;
 
-final class BridgeRoutesTest extends AbstractBridgeTestCase
+use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Tests\Support\Bridge\BridgeFixtureWorkspace;
+use Symfony\Lsp\Tests\Support\Bridge\BridgeProcessFixture;
+use Symfony\Lsp\Tests\Support\Bridge\RouteFixtureBuilder;
+
+final class BridgeRoutesTest extends TestCase
 {
+    private BridgeFixtureWorkspace $workspace;
+    private BridgeProcessFixture $bridge;
+
+    protected function setUp(): void
+    {
+        $this->workspace = new BridgeFixtureWorkspace();
+        $this->bridge = new BridgeProcessFixture($this->workspace->path);
+    }
+
+    protected function tearDown(): void
+    {
+        $this->workspace->cleanup();
+    }
+
     public function testNormalizesStructuredRouteOutput(): void
     {
-        $this->writeRouteApplication();
-        mkdir($this->temporaryDirectory.'/config/endpoints', 0777, true);
-        mkdir($this->temporaryDirectory.'/var/cache', 0777, true);
-        file_put_contents($this->temporaryDirectory.'/config/http_endpoints.yaml', 'routes');
-        file_put_contents($this->temporaryDirectory.'/config/endpoints/LegacyEndpoints.php', "<?php\nnamespace App\\Endpoint;\nfinal class LegacyEndpoints {}\n");
-        file_put_contents($this->temporaryDirectory.'/var/cache/container.php', '<?php');
+        (new RouteFixtureBuilder($this->workspace))->writeRouteApplication();
+        $this->workspace->write('config/http_endpoints.yaml', 'routes');
+        $this->workspace->write('config/endpoints/LegacyEndpoints.php', "<?php\nnamespace App\\Endpoint;\nfinal class LegacyEndpoints {}\n");
+        $this->workspace->write('var/cache/container.php', '<?php');
 
-        exec(\sprintf(
-            '%s %s --project=%s --sections=routes --targeted-refresh=1 2>&1',
-            escapeshellarg(\PHP_BINARY),
-            escapeshellarg(\dirname(__DIR__, 2).'/resources/bridge.php'),
-            escapeshellarg($this->temporaryDirectory),
-        ), $output, $exitCode);
+        $process = $this->bridge->run(['--sections=routes', '--targeted-refresh=1']);
 
-        self::assertSame(0, $exitCode, implode("\n", $output));
-        $result = json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        $result = $process->snapshot;
         self::assertIsArray($result);
         self::assertSame([], $result['errors']);
         self::assertIsArray($result['sections'] ?? null);
