@@ -16,16 +16,13 @@ use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
 use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
-use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceLocation;
 use Symfony\Lsp\Feature\Route\RouteReferencesHandler;
 use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -80,7 +77,7 @@ final class RouteReferencesHandlerTest extends TestCase
             new LspProtocolMapper(),
             new RouteSymbolResolver(
                 $positionConverter,
-                new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($positionConverter), new PhpCommentParser()),
+                RouteReferenceExtractorFactory::create($positionConverter),
                 new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
                 new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
                 new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),

@@ -19,7 +19,6 @@ use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtr
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
 use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
-use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
@@ -34,7 +33,6 @@ use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -123,7 +121,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
                     $referenceIndexes,
                     new PhpRouteDeclarationExtractor($positionConverter, $parser),
                     new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-                    new RouteReferenceExtractor($positionConverter, $parser, new QuotedArgumentMatcher($positionConverter), new PhpCommentParser()),
+                    RouteReferenceExtractorFactory::create($positionConverter, $parser),
                     new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
                     new ProjectPathResolver(new UriToPathConverter()),
                 ),
@@ -186,7 +184,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             $referenceIndexes,
             new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
             new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-            new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($positionConverter), new PhpCommentParser()),
+            RouteReferenceExtractorFactory::create($positionConverter),
             new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
             new ProjectPathResolver(new UriToPathConverter()),
         );

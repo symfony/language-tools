@@ -14,11 +14,8 @@ use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteHoverHandler;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
-use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -85,7 +82,7 @@ final class RouteHoverHandlerTest extends TestCase
             new LspProtocolMapper(),
             $indexes,
             $classIndexes,
-            new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter), new PhpCommentParser()),
+            RouteReferenceExtractorFactory::create($converter),
             new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
         );
 

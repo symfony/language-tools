@@ -11,12 +11,9 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\RouteReference;
-use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceLocation;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Project\Project;
 
 final class RouteReferenceExtractorTest extends TestCase
@@ -53,7 +50,7 @@ final class RouteReferenceExtractorTest extends TestCase
             classes: $classExtractor->extract($uri, $source),
         ));
 
-        self::assertSame([], (new RouteReferenceExtractor($converter, $parser, new QuotedArgumentMatcher($converter), new PhpCommentParser()))->extract($source, $classIndex));
+        self::assertSame([], RouteReferenceExtractorFactory::create($converter, $parser)->extract($source, $classIndex));
     }
 
     public function testRecognizesControllerReferencesThroughProjectBaseClasses(): void
@@ -100,7 +97,7 @@ final class RouteReferenceExtractorTest extends TestCase
             new DependencyInjectionSourceFacts($baseUri, classes: $classExtractor->extract($baseUri, $base)),
             new DependencyInjectionSourceFacts($controllerUri, classes: $classExtractor->extract($controllerUri, $controller)),
         );
-        $references = (new RouteReferenceExtractor($converter, $parser, new QuotedArgumentMatcher($converter), new PhpCommentParser()))->extract($controller, $classIndex);
+        $references = RouteReferenceExtractorFactory::create($converter, $parser)->extract($controller, $classIndex);
 
         self::assertSame(['article_show'], array_map(static fn ($reference): string => $reference->name, $references));
         self::assertSame('App\\Controller\\DemoController', $references[0]->controllerClass);
@@ -147,7 +144,7 @@ final class RouteReferenceExtractorTest extends TestCase
             }
             PHP;
         $converter = new PositionConverter();
-        $extractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+        $extractor = RouteReferenceExtractorFactory::create($converter);
 
         $references = $extractor->extract($source);
 
@@ -170,7 +167,7 @@ final class RouteReferenceExtractorTest extends TestCase
             }
             PHP;
         $converter = new PositionConverter();
-        $extractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+        $extractor = RouteReferenceExtractorFactory::create($converter);
 
         self::assertSame(['live_route'], array_map(static fn (RouteReference $reference): string => $reference->name, $extractor->extract($source)));
     }

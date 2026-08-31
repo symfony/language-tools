@@ -25,7 +25,7 @@ final class RouteParameterCompletionContext
         $cursor = $positionConverter->toByteOffset($text, $position);
         $beforeCursor = substr($text, 0, $cursor);
         if (!preg_match(
-            '/(?:->|::)(generate|generateUrl|redirectToRoute)\s*\(\s*([\'\"])([^\'\"]+)\2\s*,\s*\[([^\]]*?)([\'\"])([^\'\"]*)$/s',
+            '/(?:->|::)('.implode('|', RoutePhpMethods::ALL).')\s*\(\s*([\'\"])([^\'\"]+)\2\s*,\s*\[([^\]]*?)([\'\"])([^\'\"]*)$/s',
             $beforeCursor,
             $matches,
             \PREG_OFFSET_CAPTURE,

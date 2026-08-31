@@ -17,13 +17,10 @@ use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
 use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteDefinitionHandler;
-use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -86,7 +83,7 @@ final class RouteDefinitionHandlerTest extends TestCase
             new LspProtocolMapper(),
             new RouteSymbolResolver(
                 $converter,
-                new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter), new PhpCommentParser()),
+                RouteReferenceExtractorFactory::create($converter),
                 new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
                 new PhpRouteDeclarationExtractor($converter, new TolerantPhpParser(new Parser())),
                 new YamlRouteDeclarationExtractor($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),

@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
-use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -14,11 +13,7 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegist
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
 use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteDocumentLinkHandler;
-use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -48,7 +43,7 @@ final class RouteDocumentLinkHandlerTest extends TestCase
             new LspProtocolMapper(),
             $declarations,
             new DependencyInjectionSourceIndexRegistry(),
-            new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($positionConverter), new PhpCommentParser()),
+            RouteReferenceExtractorFactory::create($positionConverter),
             new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
         );
 

@@ -8,12 +8,6 @@ use Symfony\Lsp\Document\Range;
 
 final class RouteCompletionContext
 {
-    private const METHODS = [
-        'generate',
-        'generateUrl',
-        'redirectToRoute',
-    ];
-
     public function __construct(
         public readonly string $prefix,
         public readonly Range $replacementRange,
@@ -26,7 +20,7 @@ final class RouteCompletionContext
         $cursor = $positionConverter->toByteOffset($text, $position);
         $beforeCursor = substr($text, 0, $cursor);
         if (!preg_match(
-            '/(?:->|::)('.implode('|', self::METHODS).')\s*\(\s*([\'\"])([^\'\"]*)$/s',
+            '/(?:->|::)('.implode('|', RoutePhpMethods::ALL).')\s*\(\s*([\'\"])([^\'\"]*)$/s',
             $beforeCursor,
             $matches,
             \PREG_OFFSET_CAPTURE,

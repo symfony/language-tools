@@ -2,16 +2,11 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
-use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
 use Symfony\Lsp\Feature\Route\RouteCompletionContext;
-use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 
 final class RouteCompletionContextTest extends TestCase
 {
@@ -23,7 +18,7 @@ final class RouteCompletionContextTest extends TestCase
         $php = str_replace('|', '', $php);
         $converter = new PositionConverter();
 
-        $extractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+        $extractor = RouteReferenceExtractorFactory::create($converter);
         $context = RouteCompletionContext::fromPhp(
             $php,
             $converter->toPosition($php, $cursor),
@@ -100,7 +95,7 @@ final class RouteCompletionContextTest extends TestCase
         $cursor = strpos($php, "')");
         self::assertIsInt($cursor);
 
-        $extractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+        $extractor = RouteReferenceExtractorFactory::create($converter);
         self::assertNull(RouteCompletionContext::fromPhp(
             $php,
             $converter->toPosition($php, $cursor),

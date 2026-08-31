@@ -2,8 +2,6 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
-use Microsoft\PhpParser\Parser;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\Document;
@@ -19,13 +17,9 @@ use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteCodeActionProvider;
 use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
-use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -200,7 +194,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $indexes->forProject($project)->replace(new Route('article_show', '/article/{id}', ['GET'], [], null, null));
             $converter = new PositionConverter();
             $classIndexes = new DependencyInjectionSourceIndexRegistry();
-            $phpExtractor = new RouteReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($converter), new PhpCommentParser());
+            $phpExtractor = RouteReferenceExtractorFactory::create($converter);
             $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()));
             $templateIndexes = new TemplateIndexRegistry();
             $templateIndexes->forProject($project)->replaceRuntime(true, new TemplateDeclaration('page.html.twig', $uri, new Range(new Position(0, 0), new Position(0, 0))));
@@ -226,160 +220,6 @@ final class RouteDiagnosticPublisherTest extends TestCase
             self::assertIsArray($action['edit']['documentChanges'][0]['edits'][0]);
             self::assertSame($expectedText, $action['edit']['documentChanges'][0]['edits'][0]['newText'] ?? null);
         }
-    }
-
-    public function testDoesNotDiagnoseDynamicRouteParameters(): void
-    {
-        $uri = 'file:///workspace/src/Controller.php';
-        $text = <<<'PHP'
-            <?php
-            class ArticleController extends AbstractController
-            {
-                public function show(array $parameters): void
-                {
-                    $this->generateUrl('article_show', $parameters);
-                    $this->generateUrl('article_show', [...$parameters]);
-                    $this->generateUrl('article_show', ['locale' => 'en', ...$parameters]);
-                }
-            }
-            PHP;
-        [$publisher, $client] = $this->publisher($uri, $text, new Route(
-            'article_show',
-            '/{locale}/article/{id}',
-            ['GET'],
-            [],
-            null,
-            null,
-        ));
-
-        $publisher->publish(['textDocument' => ['uri' => $uri]]);
-
-        self::assertSame([], $client->notifications[0]['params']['diagnostics']);
-    }
-
-    public function testTreatsOnlyTopLevelRouteParameterKeysAsDynamic(): void
-    {
-        $uri = 'file:///workspace/src/Controller.php';
-        $text = <<<'PHP'
-            <?php
-            class ArticleController extends AbstractController
-            {
-                public function show(string $key, string $prefix): void
-                {
-                    $this->generateUrl('variable_key', [$key => 1]);
-                    $this->generateUrl('constant_key', [PARAMETER => 1]);
-                    $this->generateUrl('concatenated_key', ['i'.'d' => 1]);
-                    $this->generateUrl('interpolated_key', ["{$prefix}id" => 1]);
-                    $this->generateUrl('called_key', [parameter() => 1]);
-                    $this->generateUrl('nested_dynamic_key', ['query' => [$key => 1]]);
-                    $this->generateUrl('list_entry', [parameter()]);
-                }
-            }
-            PHP;
-        $routes = [];
-        foreach (['variable_key', 'constant_key', 'concatenated_key', 'interpolated_key', 'called_key', 'nested_dynamic_key', 'list_entry'] as $name) {
-            $routes[] = new Route($name, '/{id}', ['GET'], [], null, null);
-        }
-        [$publisher, $client] = $this->publisher($uri, $text, $routes);
-
-        $publisher->publish(['textDocument' => ['uri' => $uri]]);
-
-        $diagnostics = $client->notifications[0]['params']['diagnostics'];
-        self::assertIsArray($diagnostics);
-        self::assertSame([
-            'Route "nested_dynamic_key" requires parameter "id".',
-            'Route "list_entry" requires parameter "id".',
-        ], array_column($diagnostics, 'message'));
-    }
-
-    #[DataProvider('doubleQuotedParameterKeyProvider')]
-    public function testDecodesDoubleQuotedRouteParameterKeysLikePhp(string $literal, string $expected): void
-    {
-        $uri = 'file:///workspace/src/Controller.php';
-        $text = str_replace('PARAMETER_KEY', $literal, <<<'PHP'
-            <?php
-            class ArticleController extends AbstractController
-            {
-                public function show(): void
-                {
-                    $this->generateUrl('escaped_key', [PARAMETER_KEY => 1]);
-                }
-            }
-            PHP);
-        [$publisher, $client] = $this->publisher($uri, $text, new Route(
-            'escaped_key',
-            null,
-            ['GET'],
-            [],
-            null,
-            null,
-            requiredParameters: [$expected],
-        ));
-
-        $publisher->publish(['textDocument' => ['uri' => $uri]]);
-
-        self::assertSame([], $client->notifications[0]['params']['diagnostics']);
-    }
-
-    /** @return iterable<string, array{string, string}> */
-    public static function doubleQuotedParameterKeyProvider(): iterable
-    {
-        foreach ([
-            'escaped backslash' => '"\\\\"',
-            'escaped quote' => '"\""',
-            'escaped dollar' => '"\$"',
-            'newline' => '"\n"',
-            'carriage return' => '"\r"',
-            'tab' => '"\t"',
-            'vertical tab' => '"\v"',
-            'escape' => '"\e"',
-            'form feed' => '"\f"',
-            'octal' => '"\101"',
-            'two-digit hexadecimal' => '"\x64"',
-            'one-digit hexadecimal' => '"\x4"',
-            'ASCII Unicode' => '"i\u{64}"',
-            'two-byte Unicode' => '"\u{80}"',
-            'three-byte Unicode' => '"\u{800}"',
-            'four-byte Unicode' => '"\u{1F600}"',
-            'maximum Unicode codepoint' => '"\u{10FFFF}"',
-            'unrecognized escape' => '"\d"',
-            'hexadecimal without digits' => '"\xG"',
-        ] as $name => $literal) {
-            yield $name => [$literal, self::evaluatePhpStringLiteral($literal)];
-        }
-    }
-
-    public function testDiagnosesMissingParametersWithNestedArgumentUnpacking(): void
-    {
-        $uri = 'file:///workspace/src/Controller.php';
-        $text = <<<'PHP'
-            <?php
-            class ArticleController extends AbstractController
-            {
-                public function show(array $parts): void
-                {
-                    $this->generateUrl('article_show', ['id' => sprintf(...$parts)]);
-                    $this->generateUrl('article_show', ['id' => '1', 'query' => ['locale' => 'fr', ...$parts]]);
-                }
-            }
-            PHP;
-        [$publisher, $client] = $this->publisher($uri, $text, new Route(
-            'article_show',
-            '/{locale}/article/{id}',
-            ['GET'],
-            [],
-            null,
-            null,
-        ));
-
-        $publisher->publish(['textDocument' => ['uri' => $uri]]);
-
-        $diagnostics = $client->notifications[0]['params']['diagnostics'];
-        self::assertIsArray($diagnostics);
-        self::assertSame([
-            'Route "article_show" requires parameter "locale".',
-            'Route "article_show" requires parameter "locale".',
-        ], array_column($diagnostics, 'message'));
     }
 
     public function testDiagnosesUnknownRoutesInTwig(): void
@@ -444,7 +284,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 new LspProtocolMapper(),
                 new RouteIndexRegistry(),
                 new DependencyInjectionSourceIndexRegistry(),
-                new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($positionConverter), new PhpCommentParser()),
+                RouteReferenceExtractorFactory::create($positionConverter),
                 new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
                 new TemplateIndexRegistry(),
             )],
@@ -489,16 +329,6 @@ final class RouteDiagnosticPublisherTest extends TestCase
         ], $client->notifications[0]['params']);
     }
 
-    private static function evaluatePhpStringLiteral(string $literal): string
-    {
-        $value = @eval('return '.$literal.';');
-        if (!\is_string($value)) {
-            throw new \LogicException(\sprintf('Expected PHP to evaluate %s as a string.', $literal));
-        }
-
-        return $value;
-    }
-
     /**
      * @param Route|list<Route>|null $route
      *
@@ -539,7 +369,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 new LspProtocolMapper(),
                 $routeIndexes,
                 new DependencyInjectionSourceIndexRegistry(),
-                new RouteReferenceExtractor($positionConverter, new TolerantPhpParser(new Parser()), new QuotedArgumentMatcher($positionConverter), new PhpCommentParser()),
+                RouteReferenceExtractorFactory::create($positionConverter),
                 new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
                 $templateIndexes,
             )],
