@@ -2,34 +2,28 @@
 
 namespace Symfony\Lsp\Tests\Tool;
 
-use Amp\Process\Process;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
-
-use function Amp\async;
-use function Amp\ByteStream\buffer;
-use function Amp\Future\await;
+use Symfony\Lsp\Tests\Support\ExecutableRunner;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class ReleaseNotesExecutableTest extends TestCase
 {
-    private string $directory;
+    private TestWorkspace $workspace;
 
     protected function setUp(): void
     {
-        $this->directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-'.bin2hex(random_bytes(8)));
-        (new Filesystem())->mkdir($this->directory);
+        $this->workspace = new TestWorkspace();
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     public function testPrintsOnlyTheRequestedChangelogSection(): void
     {
-        $changelog = Path::join($this->directory, 'CHANGELOG.md');
-        file_put_contents($changelog, <<<'CHANGELOG'
+        $changelog = $this->workspace->write('CHANGELOG.md', <<<'CHANGELOG'
             # Changelog
 
             ## Unreleased
@@ -46,23 +40,13 @@ final class ReleaseNotesExecutableTest extends TestCase
             - Add previous behavior
             CHANGELOG);
 
-        $process = Process::start(
+        $result = (new ExecutableRunner())->run(
             [Path::join(\dirname(__DIR__, 2), 'tools/release-notes'), 'v0.2.0', $changelog],
-            workingDirectory: $this->directory,
-            options: ['bypass_shell' => true],
+            $this->workspace->rootPath,
         );
-        $futures = [
-            'stdout' => async(static fn (): string => buffer($process->getStdout())),
-            'stderr' => async(static fn (): string => buffer($process->getStderr())),
-            'exitCode' => async(static fn (): int => $process->join()),
-        ];
-        $process->getStdin()->close();
 
-        /** @var array{stdout: string, stderr: string, exitCode: int} $result */
-        $result = await($futures);
-
-        self::assertSame(0, $result['exitCode'], $result['stderr']);
-        self::assertSame("## 0.2.0 (2026-08-24)\n\n- Add current behavior\n- Fix the release notes\n", $result['stdout']);
-        self::assertSame('', $result['stderr']);
+        self::assertSame(0, $result->exitCode, $result->stderr);
+        self::assertSame("## 0.2.0 (2026-08-24)\n\n- Add current behavior\n- Fix the release notes\n", $result->stdout);
+        self::assertSame('', $result->stderr);
     }
 }

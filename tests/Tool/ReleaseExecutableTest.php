@@ -2,15 +2,12 @@
 
 namespace Symfony\Lsp\Tests\Tool;
 
-use Amp\Process\Process;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
-
-use function Amp\async;
-use function Amp\ByteStream\buffer;
-use function Amp\Future\await;
+use Symfony\Lsp\Tests\Support\ExecutableRunner;
+use Symfony\Lsp\Tests\Support\ProcessResult;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class ReleaseExecutableTest extends TestCase
 {
@@ -22,34 +19,28 @@ final class ReleaseExecutableTest extends TestCase
             [...getenv(), 'PATH' => '/missing'],
         );
 
-        self::assertSame(1, $result['exitCode']);
-        self::assertSame('', $result['stdout']);
-        self::assertSame("Required command not found: git.\n", $result['stderr']);
+        self::assertSame(1, $result->exitCode);
+        self::assertSame('', $result->stdout);
+        self::assertSame("Required command not found: git.\n", $result->stderr);
     }
 
     public function testAcceptsCargoFromRustupWithoutPythonOrStandaloneCargo(): void
     {
         $root = \dirname(__DIR__, 2);
-        $directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-'.bin2hex(random_bytes(8)));
-        $bin = Path::join($directory, 'bin');
-        (new Filesystem())->mkdir($bin);
+        $workspace = new TestWorkspace();
+        $workspace->mkdir('bin');
+        $bin = $workspace->path('bin');
         foreach (['gh', 'composer', 'npm', 'nvim', 'stylua'] as $command) {
-            $path = Path::join($bin, $command);
-            file_put_contents($path, "#!/bin/bash\nexit 0\n");
-            chmod($path, 0755);
+            $workspace->executable('bin/'.$command, "#!/bin/bash\nexit 0\n");
         }
-        $git = Path::join($bin, 'git');
-        file_put_contents($git, <<<'BASH'
+        $workspace->executable('bin/git', <<<'BASH'
             #!/bin/bash
             if [[ "$*" == "branch --show-current" ]]; then echo feature; fi
             BASH);
-        chmod($git, 0755);
-        $rustup = Path::join($bin, 'rustup');
-        file_put_contents($rustup, <<<'BASH'
+        $workspace->executable('bin/rustup', <<<'BASH'
             #!/bin/bash
             if [[ "$*" == "which cargo" ]]; then echo /toolchain/bin/cargo; fi
             BASH);
-        chmod($rustup, 0755);
 
         try {
             $result = $this->runProcess(
@@ -57,11 +48,11 @@ final class ReleaseExecutableTest extends TestCase
                 [...getenv(), 'PATH' => $bin],
             );
 
-            self::assertSame(1, $result['exitCode']);
-            self::assertSame('', $result['stdout']);
-            self::assertSame("Releases must run from main.\n", $result['stderr']);
+            self::assertSame(1, $result->exitCode);
+            self::assertSame('', $result->stdout);
+            self::assertSame("Releases must run from main.\n", $result->stderr);
         } finally {
-            (new Filesystem())->remove($directory);
+            $workspace->cleanup();
         }
     }
 
@@ -70,13 +61,12 @@ final class ReleaseExecutableTest extends TestCase
     public function testRetriesFailedWorkflowOnce(int $watchFailures, ?string $expectedError, array $expectedCalls): void
     {
         $root = \dirname(__DIR__, 2);
-        $directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-'.bin2hex(random_bytes(8)));
-        $bin = Path::join($directory, 'bin');
-        (new Filesystem())->mkdir($bin);
-        $calls = Path::join($directory, 'calls');
-        $watches = Path::join($directory, 'watches');
-        $gh = Path::join($bin, 'gh');
-        file_put_contents($gh, <<<'BASH'
+        $workspace = new TestWorkspace();
+        $workspace->mkdir('bin');
+        $bin = $workspace->path('bin');
+        $calls = $workspace->path('calls');
+        $watches = $workspace->path('watches');
+        $workspace->executable('bin/gh', <<<'BASH'
             #!/usr/bin/env bash
             set -euo pipefail
             echo "$*" >> "$GH_CALLS"
@@ -92,7 +82,6 @@ final class ReleaseExecutableTest extends TestCase
                 "run view") echo "The workflow failed because the remote service timed out." ;;
             esac
             BASH);
-        chmod($gh, 0755);
         $php = <<<'PHP'
             $root = $argv[1];
             require $root.'/vendor/autoload.php';
@@ -129,31 +118,30 @@ final class ReleaseExecutableTest extends TestCase
             $environment['GH_WATCH_FAILURES'] = (string) $watchFailures;
             $result = $this->runProcess([\PHP_BINARY, '-r', $php, $root], $environment);
 
-            self::assertSame(0, $result['exitCode'], $result['stderr']);
-            self::assertStringContainsString('The workflow failed because the remote service timed out.', $result['stdout']);
-            self::assertStringContainsString("Failed workflow logs:\n", $result['stderr']);
-            self::assertStringContainsString("Rerunning failed workflow jobs once...\n", $result['stderr']);
+            self::assertSame(0, $result->exitCode, $result->stderr);
+            self::assertStringContainsString('The workflow failed because the remote service timed out.', $result->stdout);
+            self::assertStringContainsString("Failed workflow logs:\n", $result->stderr);
+            self::assertStringContainsString("Rerunning failed workflow jobs once...\n", $result->stderr);
             if (null === $expectedError) {
-                self::assertStringNotContainsString('Workflow release.yaml failed after one automatic rerun.', $result['stderr']);
+                self::assertStringNotContainsString('Workflow release.yaml failed after one automatic rerun.', $result->stderr);
             } else {
-                self::assertStringContainsString($expectedError, $result['stderr']);
+                self::assertStringContainsString($expectedError, $result->stderr);
             }
             self::assertSame($expectedCalls, file($calls, \FILE_IGNORE_NEW_LINES | \FILE_SKIP_EMPTY_LINES));
         } finally {
-            (new Filesystem())->remove($directory);
+            $workspace->cleanup();
         }
     }
 
     public function testDispatchesARegularWorkflowOmittedByPathFiltering(): void
     {
         $root = \dirname(__DIR__, 2);
-        $directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-'.bin2hex(random_bytes(8)));
-        $bin = Path::join($directory, 'bin');
-        (new Filesystem())->mkdir($bin);
-        $calls = Path::join($directory, 'calls');
-        $dispatched = Path::join($directory, 'dispatched');
-        $gh = Path::join($bin, 'gh');
-        file_put_contents($gh, <<<'BASH'
+        $workspace = new TestWorkspace();
+        $workspace->mkdir('bin');
+        $bin = $workspace->path('bin');
+        $calls = $workspace->path('calls');
+        $dispatched = $workspace->path('dispatched');
+        $workspace->executable('bin/gh', <<<'BASH'
             #!/usr/bin/env bash
             set -euo pipefail
             echo "$*" >> "$GH_CALLS"
@@ -164,7 +152,6 @@ final class ReleaseExecutableTest extends TestCase
                 "workflow run") touch "$GH_DISPATCHED" ;;
             esac
             BASH);
-        chmod($gh, 0755);
         $php = <<<'PHP'
             $root = $argv[1];
             require $root.'/vendor/autoload.php';
@@ -198,8 +185,8 @@ final class ReleaseExecutableTest extends TestCase
             $environment['GH_DISPATCHED'] = $dispatched;
             $result = $this->runProcess([\PHP_BINARY, '-r', $php, $root], $environment);
 
-            self::assertSame(0, $result['exitCode'], $result['stderr']);
-            self::assertStringContainsString("Dispatching quality.yaml for commit...\n", $result['stdout']);
+            self::assertSame(0, $result->exitCode, $result->stderr);
+            self::assertStringContainsString("Dispatching quality.yaml for commit...\n", $result->stdout);
             self::assertSame([
                 ...array_fill(0, 6, 'run list --workflow=quality.yaml --commit=commit --limit=1 --json=databaseId --jq=.[0].databaseId // empty'),
                 'workflow run quality.yaml --ref main',
@@ -207,7 +194,7 @@ final class ReleaseExecutableTest extends TestCase
                 'run watch 456 --exit-status',
             ], file($calls, \FILE_IGNORE_NEW_LINES | \FILE_SKIP_EMPTY_LINES));
         } finally {
-            (new Filesystem())->remove($directory);
+            $workspace->cleanup();
         }
     }
 
@@ -242,28 +229,9 @@ final class ReleaseExecutableTest extends TestCase
     /**
      * @param list<string>          $command
      * @param array<string, string> $environment
-     *
-     * @return array{stdout: string, stderr: string, exitCode: int}
      */
-    private function runProcess(array $command, array $environment): array
+    private function runProcess(array $command, array $environment): ProcessResult
     {
-        $root = \dirname(__DIR__, 2);
-        $process = Process::start(
-            $command,
-            workingDirectory: $root,
-            environment: $environment,
-            options: ['bypass_shell' => true],
-        );
-        $futures = [
-            'stdout' => async(static fn (): string => buffer($process->getStdout())),
-            'stderr' => async(static fn (): string => buffer($process->getStderr())),
-            'exitCode' => async(static fn (): int => $process->join()),
-        ];
-        $process->getStdin()->close();
-
-        /** @var array{stdout: string, stderr: string, exitCode: int} $result */
-        $result = await($futures);
-
-        return $result;
+        return (new ExecutableRunner())->run($command, \dirname(__DIR__, 2), $environment);
     }
 }
