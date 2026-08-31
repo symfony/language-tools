@@ -10,12 +10,15 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
+use Symfony\Lsp\Feature\Security\SecurityCompletionProvider;
+use Symfony\Lsp\Feature\Security\SecurityDiagnosticProvider;
 use Symfony\Lsp\Feature\Security\SecurityExtractor;
 use Symfony\Lsp\Feature\Security\SecurityFirewall;
 use Symfony\Lsp\Feature\Security\SecurityIndexRegistry;
-use Symfony\Lsp\Feature\Security\SecurityProvider;
+use Symfony\Lsp\Feature\Security\SecurityRelationshipProvider;
 use Symfony\Lsp\Feature\Security\SecurityRole;
 use Symfony\Lsp\Feature\Security\SecuritySourceIndexRegistry;
+use Symfony\Lsp\Feature\Security\SecuritySymbolResolver;
 use Symfony\Lsp\Feature\Security\SecurityUserProvider;
 use Symfony\Lsp\Feature\Security\SecurityVoter;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
@@ -305,26 +308,62 @@ PHP;
             $extractor->extract($phpUri, 'php', $php),
             $extractor->extract($twigUri, 'twig', $twig),
         );
-        $provider = new SecurityProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $sourceIndexes, $extractor);
+        $documentResolver = new DocumentContextResolver($documents, $projects);
+        $protocol = new LspProtocolMapper();
+        $completionProvider = new SecurityCompletionProvider($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
+        $relationshipProvider = new SecurityRelationshipProvider($protocol, $indexes, $sourceIndexes, new SecuritySymbolResolver($documentResolver, $converter, $extractor));
+        $diagnosticProvider = new SecurityDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $extractor);
 
         $completionPosition = $converter->toPosition($completion, strpos($completion, "ROLE_A')") + \strlen('ROLE_A'));
-        self::assertSame(['ROLE_ADMIN'], array_column($provider->complete($this->params($completionUri, $completionPosition)) ?? [], 'label'));
+        self::assertSame(['ROLE_ADMIN'], array_column($completionProvider->complete($this->params($completionUri, $completionPosition)) ?? [], 'label'));
         $rolePosition = $converter->toPosition($php, (int) strpos($php, 'ROLE_ADMIN') + 2);
-        $hover = $provider->hover($this->params($phpUri, $rolePosition));
+        $hover = $relationshipProvider->hover($this->params($phpUri, $rolePosition));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertIsString($hover['contents']['value'] ?? null);
         self::assertStringContainsString('App\\Security\\PostVoter', $hover['contents']['value']);
         $providerPosition = $converter->toPosition($yaml, (int) strpos($yaml, 'provider: users') + \strlen('provider: us'));
-        self::assertSame([$yamlUri], array_column($provider->definition($this->params($yamlUri, $providerPosition)) ?? [], 'uri'));
-        self::assertContains($twigUri, array_column($provider->references($this->params($phpUri, $rolePosition)) ?? [], 'uri'));
-        self::assertSame(['security.unknown_provider'], array_column($provider->diagnostics(['textDocument' => ['uri' => $yamlUri]]) ?? [], 'code'));
-        self::assertSame(['security.unknown_firewall'], array_column($provider->diagnostics(['textDocument' => ['uri' => $twigUri]]) ?? [], 'code'));
+        self::assertSame([$yamlUri], array_column($relationshipProvider->definition($this->params($yamlUri, $providerPosition)) ?? [], 'uri'));
+        self::assertContains($twigUri, array_column($relationshipProvider->references($this->params($phpUri, $rolePosition)) ?? [], 'uri'));
+        self::assertSame(['security.unknown_provider'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $yamlUri]]) ?? [], 'code'));
+        self::assertSame(['security.unknown_firewall'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $twigUri]]) ?? [], 'code'));
     }
 
-    private function extractor(): SecurityExtractor
+    public function testResolvesSymbolAtRangeEnd(): void
     {
+        $uri = 'file:///workspace/config/packages/security.yaml';
+        $text = <<<'YAML'
+            security:
+              providers:
+                users:
+                  memory: ~
+              firewalls:
+                main:
+                  provider: users
+            YAML;
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'yaml', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
+        $extractor = $this->extractor($converter);
+        $sourceIndexes = new SecuritySourceIndexRegistry();
+        $sourceIndexes->forProject($project)->replace($extractor->extract($uri, 'yaml', $text));
+        $documentResolver = new DocumentContextResolver($documents, $projects);
+        $provider = new SecurityRelationshipProvider(
+            new LspProtocolMapper(),
+            new SecurityIndexRegistry(),
+            $sourceIndexes,
+            new SecuritySymbolResolver($documentResolver, $converter, $extractor),
+        );
+        $rangeEnd = $converter->toPosition($text, (int) strpos($text, 'provider: users') + \strlen('provider: users'));
+
+        self::assertSame([$uri], array_column($provider->definition($this->params($uri, $rangeEnd)) ?? [], 'uri'));
+    }
+
+    private function extractor(?PositionConverter $converter = null): SecurityExtractor
+    {
+        $converter ??= new PositionConverter();
 
         return new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TwigCommentParser(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
     }
