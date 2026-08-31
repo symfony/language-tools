@@ -6,12 +6,6 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Translation\TranslationExtractor;
 use Symfony\Lsp\Feature\Translation\TranslationPlaceholders;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
-use Symfony\Lsp\Project\UriToPathConverter;
 
 final class TranslationExtractorTest extends TestCase
 {
@@ -235,6 +229,45 @@ final class TranslationExtractorTest extends TestCase
         );
     }
 
+    public function testExtractsPhpReferencesFromParserFacts(): void
+    {
+        $references = $this->extractor()->extract('file:///workspace/src/Controller.php', 'php', <<<'PHP'
+            <?php
+            use Symfony\Component\Translation\TranslatableMessage as Message;
+
+            $example = '$translator->trans("ignored.key")';
+            $translator->trans('article.title', ['%name%' => $name]);
+            new Message('panel.title', ['%id%' => 1], 'admin');
+            PHP)->references;
+
+        self::assertSame(
+            [
+                ['article.title', 'messages', ['name']],
+                ['panel.title', 'admin', ['id']],
+            ],
+            array_map(static fn ($reference): array => [$reference->key, $reference->domain, $reference->placeholders], $references),
+        );
+    }
+
+    public function testPreservesTwigDefaultDomainsAndTranslationTags(): void
+    {
+        $references = $this->extractor()->extract('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+            {% trans_default_domain 'admin' %}
+            {{ 'filter.key'|trans }}
+            {{ t('function.key') }}
+            {% trans from 'tags' %} tag.key {% endtrans %}
+            TWIG)->references;
+
+        self::assertSame(
+            [
+                ['filter.key', 'admin'],
+                ['function.key', 'admin'],
+                ['tag.key', 'tags'],
+            ],
+            array_map(static fn ($reference): array => [$reference->key, $reference->domain], $references),
+        );
+    }
+
     private function lexedTwigString(string $literal): string
     {
         $script = <<<'PHP'
@@ -265,7 +298,7 @@ final class TranslationExtractorTest extends TestCase
     {
         $converter = new PositionConverter();
 
-        return new TranslationExtractor($converter, new UriToPathConverter(), new TwigCommentParser(), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new PhpCommentParser());
+        return TranslationExtractorTestFactory::create($converter);
     }
 
     public function testMeasuresTwigRangesCorrectlyAfterMultibyteComments(): void

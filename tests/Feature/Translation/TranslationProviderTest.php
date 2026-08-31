@@ -11,16 +11,12 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\ProjectDocumentReader;
 use Symfony\Lsp\Feature\Translation\TranslationCodeActionProvider;
 use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
-use Symfony\Lsp\Feature\Translation\TranslationExtractor;
 use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationMessage;
 use Symfony\Lsp\Feature\Translation\TranslationProvider;
 use Symfony\Lsp\Feature\Translation\TranslationReferenceResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -162,7 +158,7 @@ final class TranslationProviderTest extends TestCase
         $projects->replace([$project = new Project($root, 'file://'.$root, '^8.0')]);
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TranslationExtractor($converter, new UriToPathConverter(), $commentParser, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new PhpCommentParser());
+        $extractor = TranslationExtractorTestFactory::create($converter, $commentParser);
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true);
         $indexes->forProject($project)->replaceSources($extractor->extract('file://'.$translationPath, 'yaml', "existing: Existing\n"));
@@ -219,7 +215,7 @@ final class TranslationProviderTest extends TestCase
         $projects->replace([$project = new Project($root, 'file://'.$root, '^8.0')]);
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TranslationExtractor($converter, new UriToPathConverter(), $commentParser, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new PhpCommentParser());
+        $extractor = TranslationExtractorTestFactory::create($converter, $commentParser);
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true);
         $indexes->forProject($project)->replaceSources($extractor->extract('file://'.$translationPath, 'yaml', "existing: Existing\n"));
@@ -346,7 +342,7 @@ final class TranslationProviderTest extends TestCase
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TranslationExtractor($converter, new UriToPathConverter(), $commentParser, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new PhpCommentParser());
+        $extractor = TranslationExtractorTestFactory::create($converter, $commentParser);
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(
             true,
