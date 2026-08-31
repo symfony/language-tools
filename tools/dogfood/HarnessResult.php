@@ -13,6 +13,8 @@ final class HarnessResult
         public readonly ?array $result,
         public readonly string $rawOutput,
         public readonly string $errorOutput,
+        public readonly float $probeDiscoveryMilliseconds = 0.0,
+        public readonly float $processMilliseconds = 0.0,
     ) {
     }
 }

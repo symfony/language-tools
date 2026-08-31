@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Record dogfood phase timings in matrix artifacts
 - Speed up dogfood form property probe discovery
 - Prevent interactive subprocesses from blocking dogfood setup
 - Adopt the upstream Twig grammar with the string escape fix and its new MIT license

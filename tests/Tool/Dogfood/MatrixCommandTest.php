@@ -61,6 +61,10 @@ final class MatrixCommandTest extends TestCase
         self::assertSame(['modified' => [], 'untracked' => 1], $report['workingTree']);
         self::assertSame([], $report['cold']['layers'] ?? null);
         self::assertSame([], $report['warm']['layers'] ?? null);
+        self::assertSame(['provisionMilliseconds', 'setupMilliseconds', 'releaseMilliseconds', 'totalMilliseconds'], array_keys($report['timings']));
+        self::assertSame(8.0, (float) ($report['cold']['timings']['budgetProbeDiscoveryMilliseconds'] ?? -1));
+        self::assertSame(30.0, (float) ($report['cold']['timings']['processMilliseconds'] ?? -1));
+        self::assertSame(4.0, (float) ($report['cold']['timings']['runtimeIndexMilliseconds'] ?? -1));
         $summary = $this->readSummary();
         self::assertTrue($summary['ok']);
         self::assertSame(\PHP_VERSION, $summary['tools']['php']);
@@ -195,18 +199,18 @@ final class MatrixCommandTest extends TestCase
         /** @var array<string, mixed> $report */
         $report = json_decode((string) file_get_contents(Path::join($this->output, 'acme/project.json')), true, flags: \JSON_THROW_ON_ERROR);
         self::assertSame(
-            ['name', 'repository', 'revision', 'directory', 'environment', 'setup', 'ci', 'ok', 'failure', 'workingTree', 'dependencies', 'frameworkBundle', 'cold', 'warm'],
+            ['name', 'repository', 'revision', 'directory', 'environment', 'setup', 'ci', 'ok', 'failure', 'workingTree', 'dependencies', 'frameworkBundle', 'timings', 'cold', 'warm'],
             array_keys($report),
         );
         /** @var array<string, mixed> $cold */
         $cold = $report['cold'];
         self::assertSame(
-            ['layers', 'source', 'runtime', 'probes', 'requestErrors', 'violations', 'maxMilliseconds', 'serverVersion', 'supportScore'],
+            ['layers', 'source', 'runtime', 'probes', 'requestErrors', 'violations', 'maxMilliseconds', 'serverVersion', 'supportScore', 'timings'],
             array_keys($cold),
         );
         /** @var array<string, mixed> $summary */
         $summary = json_decode((string) file_get_contents(Path::join($this->output, 'summary.json')), true, flags: \JSON_THROW_ON_ERROR);
-        self::assertSame(['generatedAt', 'tools', 'projects', 'ok'], array_keys($summary));
+        self::assertSame(['generatedAt', 'tools', 'projects', 'timings', 'ok'], array_keys($summary));
     }
 
     public function testReportsProvisioningFailures(): void
@@ -220,6 +224,7 @@ final class MatrixCommandTest extends TestCase
         self::assertSame([], $harness->applicationRoots);
         $report = $this->readReport();
         self::assertSame('provisioning', $report['failure']['layer'] ?? null);
+        self::assertSame(['provisionMilliseconds', 'totalMilliseconds'], array_keys($report['timings']));
         self::assertStringContainsString('provisioning', $this->lines[0]);
     }
 
@@ -236,6 +241,7 @@ final class MatrixCommandTest extends TestCase
         self::assertSame(['acme'], $provisioner->released);
         $report = $this->readReport();
         self::assertSame('setup', $report['failure']['layer'] ?? null);
+        self::assertSame(['provisionMilliseconds', 'setupMilliseconds', 'releaseMilliseconds', 'totalMilliseconds'], array_keys($report['timings']));
     }
 
     public function testRejectsSetupsThatModifyTrackedFiles(): void
@@ -317,17 +323,28 @@ final class MatrixCommandTest extends TestCase
             'diagnostics' => [],
             'serverError' => null,
             'exitCode' => 0,
+            'timings' => [
+                'startupMilliseconds' => 1.0,
+                'initializeMilliseconds' => 2.0,
+                'sourceIndexMilliseconds' => 3.0,
+                'runtimeIndexMilliseconds' => 4.0,
+                'indexWaitMilliseconds' => 4.0,
+                'probeDiscoveryMilliseconds' => 5.0,
+                'requestsMilliseconds' => 6.0,
+                'shutdownMilliseconds' => 7.0,
+                'totalMilliseconds' => 27.0,
+            ],
         ], $overrides);
 
-        return new HarnessResult(0, false, $result, json_encode($result, \JSON_THROW_ON_ERROR), '');
+        return new HarnessResult(0, false, $result, json_encode($result, \JSON_THROW_ON_ERROR), '', 8.0, 30.0);
     }
 
     /**
-     * @return array{ok: bool, frameworkBundle: ?string, dependencies: array{composerLockSha256: ?string}, workingTree: array{modified: list<string>, untracked: int}|null, cold: array{layers: list<string>}|null, warm: array{layers: list<string>}|null, failure: array{layer: string, message: string}|null}
+     * @return array{ok: bool, frameworkBundle: ?string, dependencies: array{composerLockSha256: ?string}, workingTree: array{modified: list<string>, untracked: int}|null, timings: array<string, int|float>, cold: array{layers: list<string>, timings: array<string, int|float|null>}|null, warm: array{layers: list<string>, timings: array<string, int|float|null>}|null, failure: array{layer: string, message: string}|null}
      */
     private function readReport(): array
     {
-        /** @var array{ok: bool, frameworkBundle: ?string, dependencies: array{composerLockSha256: ?string}, workingTree: array{modified: list<string>, untracked: int}|null, cold: array{layers: list<string>}|null, warm: array{layers: list<string>}|null, failure: array{layer: string, message: string}|null} $report */
+        /** @var array{ok: bool, frameworkBundle: ?string, dependencies: array{composerLockSha256: ?string}, workingTree: array{modified: list<string>, untracked: int}|null, timings: array<string, int|float>, cold: array{layers: list<string>, timings: array<string, int|float|null>}|null, warm: array{layers: list<string>, timings: array<string, int|float|null>}|null, failure: array{layer: string, message: string}|null} $report */
         $report = $this->readJson(Path::join($this->output, 'acme/project.json'));
 
         return $report;

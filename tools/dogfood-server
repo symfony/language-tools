@@ -64,9 +64,14 @@ if (false === $project) {
     throw new RuntimeException('Project does not exist.');
 }
 
+$totalStartedAt = hrtime(true);
+$elapsedMilliseconds = static fn (int $startedAt): float => round((hrtime(true) - $startedAt) / 1_000_000, 1);
+$startupStartedAt = hrtime(true);
 $client = new ContentLengthProcessClient([$server], max(10.0, $requestTimeout), getenv());
+$startupMilliseconds = $elapsedMilliseconds($startupStartedAt);
 try {
     $id = 1;
+    $initializeStartedAt = hrtime(true);
     $initialize = $client->request($id, 'initialize', [
         'processId' => null,
         'rootUri' => uri($project),
@@ -74,29 +79,42 @@ try {
         'capabilities' => new stdClass(),
         'initializationOptions' => ['workspaceTrust' => true, 'runtimeIndexing' => true, 'environment' => $environment],
     ], 10.0);
+    $initializeMilliseconds = $elapsedMilliseconds($initializeStartedAt);
     $client->notify('initialized');
 
     $status = null;
     $terminal = false;
+    $sourceIndexMilliseconds = null;
+    $runtimeIndexMilliseconds = null;
+    $indexStartedAt = hrtime(true);
     $deadline = microtime(true) + $indexTimeout;
     while (microtime(true) < $deadline) {
         $response = $client->request(++$id, 'workspace/executeCommand', ['command' => 'symfony.indexStatus'], $requestTimeout);
         $status = $response['result'][0] ?? null;
-        if (is_array($status)
-            && in_array($status['source']['state'] ?? null, ['ready', 'failed'], true)
-            && in_array($status['runtime']['state'] ?? null, ['ready', 'failed', 'stale'], true)
-        ) {
-            $terminal = true;
-            break;
+        if (is_array($status)) {
+            if (null === $sourceIndexMilliseconds && in_array($status['source']['state'] ?? null, ['ready', 'failed'], true)) {
+                $sourceIndexMilliseconds = $elapsedMilliseconds($indexStartedAt);
+            }
+            if (null === $runtimeIndexMilliseconds && in_array($status['runtime']['state'] ?? null, ['ready', 'failed', 'stale'], true)) {
+                $runtimeIndexMilliseconds = $elapsedMilliseconds($indexStartedAt);
+            }
+            if (null !== $sourceIndexMilliseconds && null !== $runtimeIndexMilliseconds) {
+                $terminal = true;
+                break;
+            }
         }
         usleep(250_000);
     }
+    $indexWaitMilliseconds = $elapsedMilliseconds($indexStartedAt);
 
+    $probeDiscoveryStartedAt = hrtime(true);
     $probes = (new ProbeFinder($probeRoots, $probesPerCategory))->find($project);
+    $probeDiscoveryMilliseconds = $elapsedMilliseconds($probeDiscoveryStartedAt);
     $validator = new ProtocolValidator();
     $opened = [];
     $results = [];
     $violations = [];
+    $requestsStartedAt = hrtime(true);
     foreach ($probes as $probe) {
         $documentUri = uri($probe->path);
         if (!isset($opened[$documentUri])) {
@@ -147,9 +165,12 @@ try {
     foreach (array_keys($opened) as $documentUri) {
         $client->notify('textDocument/didClose', ['textDocument' => ['uri' => $documentUri]]);
     }
+    $requestsMilliseconds = $elapsedMilliseconds($requestsStartedAt);
+    $shutdownStartedAt = hrtime(true);
     $client->request(++$id, 'shutdown', timeout: $requestTimeout);
     $client->notify('exit');
     $exitCode = $client->close(ServerHarness::PROCESS_EXIT_TIMEOUT);
+    $shutdownMilliseconds = $elapsedMilliseconds($shutdownStartedAt);
     $stderr = $client->errorOutput();
     $diagnostics = [];
     foreach ($client->notifications() as $notification) {
@@ -161,6 +182,7 @@ try {
         }
     }
 
+    $totalMilliseconds = $elapsedMilliseconds($totalStartedAt);
     echo json_encode([
         'project' => $project,
         'environment' => $environment,
@@ -173,6 +195,17 @@ try {
         'diagnostics' => $diagnostics,
         'serverError' => '' === trim($stderr) ? null : trim($stderr),
         'exitCode' => $exitCode,
+        'timings' => [
+            'startupMilliseconds' => $startupMilliseconds,
+            'initializeMilliseconds' => $initializeMilliseconds,
+            'sourceIndexMilliseconds' => $sourceIndexMilliseconds,
+            'runtimeIndexMilliseconds' => $runtimeIndexMilliseconds,
+            'indexWaitMilliseconds' => $indexWaitMilliseconds,
+            'probeDiscoveryMilliseconds' => $probeDiscoveryMilliseconds,
+            'requestsMilliseconds' => $requestsMilliseconds,
+            'shutdownMilliseconds' => $shutdownMilliseconds,
+            'totalMilliseconds' => $totalMilliseconds,
+        ],
     ], \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR)."\n";
 } finally {
     $client->terminate();

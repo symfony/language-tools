@@ -8,6 +8,17 @@ use Symfony\Component\Filesystem\Path;
 final class MatrixCommand
 {
     private const WORKING_TREE_LIMIT = 50;
+    private const RUN_TIMING_KEYS = [
+        'startupMilliseconds',
+        'initializeMilliseconds',
+        'sourceIndexMilliseconds',
+        'runtimeIndexMilliseconds',
+        'indexWaitMilliseconds',
+        'probeDiscoveryMilliseconds',
+        'requestsMilliseconds',
+        'shutdownMilliseconds',
+        'totalMilliseconds',
+    ];
 
     /**
      * @param \Closure(string): void $output
@@ -29,6 +40,7 @@ final class MatrixCommand
      */
     public function run(array $configurations, string $outputDirectory): int
     {
+        $startedAt = hrtime(true);
         $this->filesystem->mkdir($outputDirectory);
         $failed = false;
         $reports = [];
@@ -38,12 +50,16 @@ final class MatrixCommand
             $failed = $failed || !$report->ok();
             ($this->output)($this->formatLine($report));
         }
+        $tools = $this->toolVersions();
+        $totalMilliseconds = $this->elapsedMilliseconds($startedAt);
         $this->writeJson(Path::join($outputDirectory, 'summary.json'), [
             'generatedAt' => gmdate('Y-m-d\TH:i:s\Z'),
-            'tools' => $this->toolVersions(),
+            'tools' => $tools,
             'projects' => $reports,
+            'timings' => ['totalMilliseconds' => $totalMilliseconds],
             'ok' => !$failed,
         ]);
+        ($this->output)(\sprintf('Total: %.1fs', $totalMilliseconds / 1000));
         ($this->output)(\sprintf('Artifacts: %s', $outputDirectory));
 
         return $failed ? 1 : 0;
@@ -51,20 +67,26 @@ final class MatrixCommand
 
     private function runProject(ProjectConfiguration $configuration, string $artifactDirectory): ProjectReport
     {
+        $startedAt = hrtime(true);
         $this->filesystem->mkdir($artifactDirectory);
         $report = new ProjectReport($configuration);
 
+        $provisionStartedAt = hrtime(true);
         try {
             $checkout = $this->provisioner->provision($configuration);
         } catch (ProvisioningException $e) {
+            $report->timings['provisionMilliseconds'] = $this->elapsedMilliseconds($provisionStartedAt);
+            $report->timings['totalMilliseconds'] = $this->elapsedMilliseconds($startedAt);
             $report->failure = new ProjectFailure('provisioning', $e->getMessage());
             $this->writeJson(Path::join($artifactDirectory, 'project.json'), $report->toArray());
 
             return $report;
         }
+        $report->timings['provisionMilliseconds'] = $this->elapsedMilliseconds($provisionStartedAt);
 
         try {
             $applicationRoot = null === $configuration->directory ? $checkout : Path::join($checkout, $configuration->directory);
+            $setupStartedAt = hrtime(true);
             try {
                 if (!is_file(Path::join($applicationRoot, 'composer.json'))) {
                     throw new SetupException(\sprintf('No composer.json in "%s".', $applicationRoot));
@@ -77,32 +99,36 @@ final class MatrixCommand
                 }
             } catch (SetupException $e) {
                 $report->failure = new ProjectFailure('setup', $e->getMessage());
-                $this->writeJson(Path::join($artifactDirectory, 'project.json'), $report->toArray());
-
-                return $report;
             }
-            $report->composerLockSha256 = hash_file('sha256', Path::join($applicationRoot, 'composer.lock')) ?: null;
-            $report->frameworkBundle = $this->frameworkBundleVersion($applicationRoot);
+            $report->timings['setupMilliseconds'] = $this->elapsedMilliseconds($setupStartedAt);
 
-            // dev caches are not invalidated by extractor changes, so a stale
-            // cache would report the previous build's behavior
-            $this->filesystem->remove(Path::join($applicationRoot, 'var/symfony-lsp/dev'));
-            $cold = $this->harness->run($configuration, $applicationRoot);
-            $this->filesystem->dumpFile(Path::join($artifactDirectory, 'cold.json'), '' !== $cold->rawOutput ? $cold->rawOutput : $cold->errorOutput);
-            $report->cold = $this->summarize($cold, $configuration->name);
+            if (null === $report->failure) {
+                $report->composerLockSha256 = hash_file('sha256', Path::join($applicationRoot, 'composer.lock')) ?: null;
+                $report->frameworkBundle = $this->frameworkBundleVersion($applicationRoot);
 
-            $warm = $this->harness->run($configuration, $applicationRoot);
-            $this->filesystem->dumpFile(Path::join($artifactDirectory, 'warm.json'), '' !== $warm->rawOutput ? $warm->rawOutput : $warm->errorOutput);
-            $report->warm = $this->summarize($warm, $configuration->name);
-            if ([] === $report->cold->layers
-                && [] === $report->warm->layers
-                && $this->diagnostics($cold) !== $this->diagnostics($warm)
-            ) {
-                $report->failure = new ProjectFailure('cache-parity', 'Cold and warm diagnostic publications differ.');
+                // dev caches are not invalidated by extractor changes, so a stale
+                // cache would report the previous build's behavior
+                $this->filesystem->remove(Path::join($applicationRoot, 'var/symfony-lsp/dev'));
+                $cold = $this->harness->run($configuration, $applicationRoot);
+                $this->filesystem->dumpFile(Path::join($artifactDirectory, 'cold.json'), '' !== $cold->rawOutput ? $cold->rawOutput : $cold->errorOutput);
+                $report->cold = $this->summarize($cold, $configuration->name);
+
+                $warm = $this->harness->run($configuration, $applicationRoot);
+                $this->filesystem->dumpFile(Path::join($artifactDirectory, 'warm.json'), '' !== $warm->rawOutput ? $warm->rawOutput : $warm->errorOutput);
+                $report->warm = $this->summarize($warm, $configuration->name);
+                if ([] === $report->cold->layers
+                    && [] === $report->warm->layers
+                    && $this->diagnostics($cold) !== $this->diagnostics($warm)
+                ) {
+                    $report->failure = new ProjectFailure('cache-parity', 'Cold and warm diagnostic publications differ.');
+                }
             }
         } finally {
+            $releaseStartedAt = hrtime(true);
             $this->provisioner->release($configuration);
+            $report->timings['releaseMilliseconds'] = $this->elapsedMilliseconds($releaseStartedAt);
         }
+        $report->timings['totalMilliseconds'] = $this->elapsedMilliseconds($startedAt);
         $this->writeJson(Path::join($artifactDirectory, 'project.json'), $report->toArray());
 
         return $report;
@@ -202,7 +228,35 @@ final class MatrixCommand
             $maxMilliseconds,
             \is_string($serverVersion) ? $serverVersion : null,
             $this->scorer->score($result, $project)['score'] ?? null,
+            $this->runTimings($run, $result),
         );
+    }
+
+    /**
+     * @param array<mixed> $result
+     *
+     * @return array<string, float|null>
+     */
+    private function runTimings(HarnessResult $run, array $result): array
+    {
+        $timings = [
+            'budgetProbeDiscoveryMilliseconds' => $run->probeDiscoveryMilliseconds,
+            'processMilliseconds' => $run->processMilliseconds,
+        ];
+        $reported = $result['timings'] ?? null;
+        if (!\is_array($reported)) {
+            return $timings;
+        }
+        foreach (self::RUN_TIMING_KEYS as $key) {
+            $value = $reported[$key] ?? null;
+            if (\is_int($value) || \is_float($value)) {
+                $timings[$key] = (float) $value;
+            } elseif (\array_key_exists($key, $reported) && null === $value) {
+                $timings[$key] = null;
+            }
+        }
+
+        return $timings;
     }
 
     /**
@@ -273,13 +327,13 @@ final class MatrixCommand
     private function formatLine(ProjectReport $report): string
     {
         if (null !== $report->failure) {
-            return \sprintf('%-28s %s: %s', $report->configuration->name, $report->failure->layer, $report->failure->message);
+            return \sprintf('%-28s %s: %s time=%.1fs', $report->configuration->name, $report->failure->layer, $report->failure->message, ($report->timings['totalMilliseconds'] ?? 0.0) / 1000);
         }
         $cold = $report->cold ?? throw new \LogicException('Missing cold run.');
         $warm = $report->warm ?? throw new \LogicException('Missing warm run.');
 
         return \sprintf(
-            '%-28s cold=%-12s warm=%-12s probes=%2d max=%6.1fms errors=%d%s',
+            '%-28s cold=%-12s warm=%-12s probes=%2d max=%6.1fms errors=%d%s time=%.1fs',
             $report->configuration->name,
             [] === $cold->layers ? 'ok' : implode(',', $cold->layers),
             [] === $warm->layers ? 'ok' : implode(',', $warm->layers),
@@ -287,7 +341,13 @@ final class MatrixCommand
             max($cold->maxMilliseconds, $warm->maxMilliseconds),
             $cold->requestErrors + $warm->requestErrors,
             null === $warm->supportScore ? '' : \sprintf(' support=%5.1f%%', 100 * $warm->supportScore),
+            ($report->timings['totalMilliseconds'] ?? 0.0) / 1000,
         );
+    }
+
+    private function elapsedMilliseconds(int $startedAt): float
+    {
+        return round((hrtime(true) - $startedAt) / 1_000_000, 1);
     }
 
     /**

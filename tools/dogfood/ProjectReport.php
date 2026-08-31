@@ -14,6 +14,9 @@ final class ProjectReport
     public ?RunSummary $cold = null;
     public ?RunSummary $warm = null;
 
+    /** @var array<string, float> */
+    public array $timings = [];
+
     public function __construct(
         public readonly ProjectConfiguration $configuration,
     ) {
@@ -44,6 +47,7 @@ final class ProjectReport
             'workingTree' => $this->workingTree,
             'dependencies' => ['composerLockSha256' => $this->composerLockSha256],
             'frameworkBundle' => $this->frameworkBundle,
+            'timings' => $this->timings,
             'cold' => $this->cold?->toArray(),
             'warm' => $this->warm?->toArray(),
         ];

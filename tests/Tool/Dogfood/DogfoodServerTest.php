@@ -135,5 +135,22 @@ final class DogfoodServerTest extends TestCase
         self::assertSame(0, $report['exitCode'] ?? null);
         self::assertIsString($report['serverError'] ?? null);
         self::assertSame(1000000, \strlen($report['serverError']));
+        $timings = $report['timings'] ?? null;
+        self::assertIsArray($timings);
+        self::assertSame([
+            'startupMilliseconds',
+            'initializeMilliseconds',
+            'sourceIndexMilliseconds',
+            'runtimeIndexMilliseconds',
+            'indexWaitMilliseconds',
+            'probeDiscoveryMilliseconds',
+            'requestsMilliseconds',
+            'shutdownMilliseconds',
+            'totalMilliseconds',
+        ], array_keys($timings));
+        foreach ($timings as $milliseconds) {
+            self::assertTrue(\is_int($milliseconds) || \is_float($milliseconds));
+            self::assertGreaterThanOrEqual(0.0, (float) $milliseconds);
+        }
     }
 }

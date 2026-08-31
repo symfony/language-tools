@@ -5,7 +5,8 @@ namespace Symfony\Lsp\Tools\Dogfood;
 final class RunSummary
 {
     /**
-     * @param list<string> $layers
+     * @param list<string>              $layers
+     * @param array<string, float|null> $timings
      */
     public function __construct(
         public readonly array $layers,
@@ -17,6 +18,7 @@ final class RunSummary
         public readonly float $maxMilliseconds,
         public readonly ?string $serverVersion,
         public readonly ?float $supportScore = null,
+        public readonly array $timings = [],
     ) {
     }
 
@@ -35,6 +37,7 @@ final class RunSummary
             'maxMilliseconds' => $this->maxMilliseconds,
             'serverVersion' => $this->serverVersion,
             'supportScore' => $this->supportScore,
+            'timings' => $this->timings,
         ];
     }
 }
