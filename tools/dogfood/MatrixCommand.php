@@ -2,8 +2,12 @@
 
 namespace Symfony\Lsp\Tools\Dogfood;
 
+use Amp\Sync\LocalSemaphore;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+
+use function Amp\async;
+use function Amp\Future\await;
 
 final class MatrixCommand
 {
@@ -38,23 +42,44 @@ final class MatrixCommand
     /**
      * @param list<ProjectConfiguration> $configurations
      */
-    public function run(array $configurations, string $outputDirectory): int
+    public function run(array $configurations, string $outputDirectory, int $jobs = 2): int
     {
+        if ($jobs < 1) {
+            throw new \InvalidArgumentException('The dogfood job count must be positive.');
+        }
+
         $startedAt = hrtime(true);
         $this->filesystem->mkdir($outputDirectory);
+        $semaphore = new LocalSemaphore($jobs);
+        /** @var array<int, \Amp\Future<ProjectReport>> $futures */
+        $futures = [];
+        foreach ($configurations as $index => $configuration) {
+            $futures[$index] = async(function () use ($configuration, $outputDirectory, $semaphore): ProjectReport {
+                $lock = $semaphore->acquire();
+                try {
+                    $report = $this->runProject($configuration, Path::join($outputDirectory, $configuration->name));
+                    ($this->output)($this->formatLine($report));
+
+                    return $report;
+                } finally {
+                    $lock->release();
+                }
+            });
+        }
+        $projectReports = await($futures);
+        ksort($projectReports);
         $failed = false;
         $reports = [];
-        foreach ($configurations as $configuration) {
-            $report = $this->runProject($configuration, Path::join($outputDirectory, $configuration->name));
+        foreach ($projectReports as $report) {
             $reports[] = $report->toArray();
             $failed = $failed || !$report->ok();
-            ($this->output)($this->formatLine($report));
         }
         $tools = $this->toolVersions();
         $totalMilliseconds = $this->elapsedMilliseconds($startedAt);
         $this->writeJson(Path::join($outputDirectory, 'summary.json'), [
             'generatedAt' => gmdate('Y-m-d\TH:i:s\Z'),
             'tools' => $tools,
+            'jobs' => $jobs,
             'projects' => $reports,
             'timings' => ['totalMilliseconds' => $totalMilliseconds],
             'ok' => !$failed,

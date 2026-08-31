@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Run dogfood projects concurrently by default
 - Record dogfood phase timings in matrix artifacts
 - Speed up dogfood form property probe discovery
 - Prevent interactive subprocesses from blocking dogfood setup

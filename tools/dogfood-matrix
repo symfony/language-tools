@@ -27,6 +27,7 @@ const USAGE = <<<'USAGE'
         --config-dir DIR        Add a project configuration directory
         --server PATH           Language server executable (default: bin/symfony-lsp)
         --setup FILE            PHP file returning extra setup implementations
+        --jobs N                Maximum concurrent projects (default: 2)
         --ci                    Only run CI-eligible projects
         --list                  List configured projects and exit
 
@@ -38,6 +39,7 @@ const USAGE = <<<'USAGE'
 $configurationDirectories = [];
 $server = null;
 $setupFile = null;
+$jobs = 2;
 $ciOnly = false;
 $list = false;
 $selection = [];
@@ -61,6 +63,13 @@ while (null !== $argument = array_shift($arguments)) {
         $server = $value();
     } elseif ('--setup' === $argument || str_starts_with($argument, '--setup=')) {
         $setupFile = $value();
+    } elseif ('--jobs' === $argument || str_starts_with($argument, '--jobs=')) {
+        $jobsValue = $value();
+        if (!ctype_digit($jobsValue) || 1 > (int) $jobsValue || 8 < (int) $jobsValue) {
+            fwrite(\STDERR, "The --jobs option must be an integer between 1 and 8.\n");
+            exit(2);
+        }
+        $jobs = (int) $jobsValue;
     } elseif ('--ci' === $argument) {
         $ciOnly = true;
     } elseif ('--list' === $argument) {
@@ -160,7 +169,7 @@ $command = new MatrixCommand(
 );
 
 try {
-    $exitCode = $command->run($configurations, Path::join($root, 'var/dogfood/matrix', gmdate('Ymd-His')));
+    $exitCode = $command->run($configurations, Path::join($root, 'var/dogfood/matrix', gmdate('Ymd-His')), $jobs);
 } catch (ProcessInterruptedException $e) {
     fwrite(\STDERR, "Interrupted.\n");
     exit(128 + $e->signal);

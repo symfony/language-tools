@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Tools\Dogfood\ComposerSetup;
+use Symfony\Lsp\Tools\Dogfood\HarnessInterface;
 use Symfony\Lsp\Tools\Dogfood\HarnessResult;
 use Symfony\Lsp\Tools\Dogfood\MatrixCommand;
 use Symfony\Lsp\Tools\Dogfood\ProcessResult;
@@ -14,6 +15,8 @@ use Symfony\Lsp\Tools\Dogfood\ProjectConfiguration;
 use Symfony\Lsp\Tools\Dogfood\ProvisioningException;
 use Symfony\Lsp\Tools\Dogfood\RunClassifier;
 use Symfony\Lsp\Tools\Dogfood\SetupRegistry;
+
+use function Amp\delay;
 
 final class MatrixCommandTest extends TestCase
 {
@@ -71,6 +74,37 @@ final class MatrixCommandTest extends TestCase
         self::assertCount(1, $summary['projects']);
         self::assertStringContainsString('cold=ok', $this->lines[0]);
         self::assertStringContainsString('warm=ok', $this->lines[0]);
+    }
+
+    public function testRejectsInvalidJobCount(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('job count must be positive');
+
+        $this->command(new FakeProvisioner($this->checkout), new FakeHarness())->run([], $this->output, 0);
+    }
+
+    #[DataProvider('jobCountProvider')]
+    public function testLimitsConcurrentProjects(int $jobs, int $expectedConcurrency): void
+    {
+        $harness = new TrackingHarness($this->successfulRun());
+        $configurations = [
+            $this->configuration(name: 'alpha'),
+            $this->configuration(name: 'bravo'),
+            $this->configuration(name: 'charlie'),
+        ];
+
+        $exitCode = $this->command(new FakeProvisioner($this->checkout), $harness)->run($configurations, $this->output, $jobs);
+
+        self::assertSame(0, $exitCode);
+        self::assertSame($expectedConcurrency, $harness->maximumConcurrency);
+    }
+
+    /** @return iterable<string, array{int, int}> */
+    public static function jobCountProvider(): iterable
+    {
+        yield 'serial' => [1, 1];
+        yield 'two workers' => [2, 2];
     }
 
     public function testIgnoresDiagnosticAndFieldOrderingForCacheParity(): void
@@ -210,7 +244,7 @@ final class MatrixCommandTest extends TestCase
         );
         /** @var array<string, mixed> $summary */
         $summary = json_decode((string) file_get_contents(Path::join($this->output, 'summary.json')), true, flags: \JSON_THROW_ON_ERROR);
-        self::assertSame(['generatedAt', 'tools', 'projects', 'timings', 'ok'], array_keys($summary));
+        self::assertSame(['generatedAt', 'tools', 'jobs', 'projects', 'timings', 'ok'], array_keys($summary));
     }
 
     public function testReportsProvisioningFailures(): void
@@ -271,7 +305,7 @@ final class MatrixCommandTest extends TestCase
         self::assertSame(['modified' => ['.env.local.demo'], 'untracked' => 0], $report['workingTree']);
     }
 
-    private function command(FakeProvisioner $provisioner, FakeHarness $harness, string $workingTree = '?? vendor/'): MatrixCommand
+    private function command(FakeProvisioner $provisioner, HarnessInterface $harness, string $workingTree = '?? vendor/'): MatrixCommand
     {
         $processes = new FakeProcessRunner(static function (array $command) use ($workingTree): ProcessResult {
             return match (true) {
@@ -295,9 +329,9 @@ final class MatrixCommandTest extends TestCase
         );
     }
 
-    private function configuration(?string $directory = null): ProjectConfiguration
+    private function configuration(?string $directory = null, string $name = 'acme'): ProjectConfiguration
     {
-        return new ProjectConfiguration('acme', 'https://github.com/acme/app.git', str_repeat('a', 40), $directory, 'dev', 'composer', false, 120);
+        return new ProjectConfiguration($name, 'https://github.com/acme/app.git', str_repeat('a', 40), $directory, 'dev', 'composer', false, 120);
     }
 
     private function successfulRun(): HarnessResult
@@ -370,5 +404,30 @@ final class MatrixCommandTest extends TestCase
         $decoded = json_decode((string) file_get_contents($path), true, flags: \JSON_THROW_ON_ERROR);
 
         return $decoded;
+    }
+}
+
+final class TrackingHarness implements HarnessInterface
+{
+    public int $maximumConcurrency = 0;
+
+    private int $concurrency = 0;
+
+    public function __construct(
+        private HarnessResult $result,
+    ) {
+    }
+
+    public function run(ProjectConfiguration $configuration, string $applicationRoot): HarnessResult
+    {
+        ++$this->concurrency;
+        $this->maximumConcurrency = max($this->maximumConcurrency, $this->concurrency);
+        try {
+            delay(0.01);
+
+            return $this->result;
+        } finally {
+            --$this->concurrency;
+        }
     }
 }
