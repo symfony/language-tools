@@ -42,7 +42,7 @@ final class MatrixCommand
     /**
      * @param list<ProjectConfiguration> $configurations
      */
-    public function run(array $configurations, string $outputDirectory, int $jobs = 2): int
+    public function run(array $configurations, string $outputDirectory, int $jobs = 4): int
     {
         if ($jobs < 1) {
             throw new \InvalidArgumentException('The dogfood job count must be positive.');

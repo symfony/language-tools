@@ -4,7 +4,7 @@
 
 - Buffer persistent source index rewrites
 - Record runtime bridge phase timings in dogfood reports
-- Run dogfood projects concurrently by default
+- Run up to four dogfood projects concurrently by default
 - Record dogfood phase timings in matrix artifacts
 - Speed up dogfood form property probe discovery
 - Prevent interactive subprocesses from blocking dogfood setup

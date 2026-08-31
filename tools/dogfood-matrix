@@ -27,7 +27,7 @@ const USAGE = <<<'USAGE'
         --config-dir DIR        Add a project configuration directory
         --server PATH           Language server executable (default: bin/symfony-lsp)
         --setup FILE            PHP file returning extra setup implementations
-        --jobs N                Maximum concurrent projects (default: 2)
+        --jobs N                Maximum concurrent projects (default: 4)
         --ci                    Only run CI-eligible projects
         --list                  List configured projects and exit
 
@@ -39,7 +39,7 @@ const USAGE = <<<'USAGE'
 $configurationDirectories = [];
 $server = null;
 $setupFile = null;
-$jobs = 2;
+$jobs = 4;
 $ciOnly = false;
 $list = false;
 $selection = [];

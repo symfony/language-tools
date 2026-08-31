@@ -74,6 +74,7 @@ final class MatrixCommandTest extends TestCase
         $summary = $this->readSummary();
         self::assertTrue($summary['ok']);
         self::assertSame(\PHP_VERSION, $summary['tools']['php']);
+        self::assertSame(4, $summary['jobs']);
         self::assertCount(1, $summary['projects']);
         self::assertStringContainsString('cold=ok', $this->lines[0]);
         self::assertStringContainsString('warm=ok', $this->lines[0]);
@@ -95,6 +96,7 @@ final class MatrixCommandTest extends TestCase
             $this->configuration(name: 'alpha'),
             $this->configuration(name: 'bravo'),
             $this->configuration(name: 'charlie'),
+            $this->configuration(name: 'delta'),
         ];
 
         $exitCode = $this->command(new FakeProvisioner($this->checkout), $harness)->run($configurations, $this->output, $jobs);
@@ -108,6 +110,7 @@ final class MatrixCommandTest extends TestCase
     {
         yield 'serial' => [1, 1];
         yield 'two workers' => [2, 2];
+        yield 'four workers' => [4, 4];
     }
 
     public function testIgnoresDiagnosticAndFieldOrderingForCacheParity(): void
@@ -395,11 +398,11 @@ final class MatrixCommandTest extends TestCase
     }
 
     /**
-     * @return array{ok: bool, tools: array{php: string}, projects: list<mixed>}
+     * @return array{ok: bool, tools: array{php: string}, jobs: int, projects: list<mixed>}
      */
     private function readSummary(): array
     {
-        /** @var array{ok: bool, tools: array{php: string}, projects: list<mixed>} $summary */
+        /** @var array{ok: bool, tools: array{php: string}, jobs: int, projects: list<mixed>} $summary */
         $summary = $this->readJson(Path::join($this->output, 'summary.json'));
 
         return $summary;
