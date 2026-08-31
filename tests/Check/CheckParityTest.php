@@ -143,9 +143,9 @@ final class CheckParityTest extends TestCase
         self::assertCount(1, $publications);
         $params = $publications[0]['params'] ?? null;
         self::assertIsArray($params);
+        /** @var list<ProtocolDiagnostic>|null $diagnostics */
         $diagnostics = $params['diagnostics'] ?? null;
         self::assertIsArray($diagnostics);
-        /** @var list<ProtocolDiagnostic> $diagnostics */
 
         return $diagnostics;
     }
