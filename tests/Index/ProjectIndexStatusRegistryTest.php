@@ -37,6 +37,29 @@ final class ProjectIndexStatusRegistryTest extends TestCase
         );
     }
 
+    public function testPreservesRuntimeTimingsUntilTheNextIndexingStarts(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $statuses = new ProjectIndexStatusRegistry();
+        $timings = [
+            'bootstrapMilliseconds' => 1.0,
+            'kernelMilliseconds' => 2.0,
+            'sectionsMilliseconds' => ['routes' => 3.0],
+            'shutdownMilliseconds' => 4.0,
+            'totalMilliseconds' => 10.0,
+        ];
+
+        $statuses->runtimeIndexing($project);
+        $statuses->runtimeTimings($project, $timings);
+        $statuses->runtimeReady($project);
+
+        self::assertSame(['state' => 'ready', 'timings' => $timings], $statuses->status($project)['runtime']);
+
+        $statuses->runtimeIndexing($project);
+
+        self::assertSame(['state' => 'indexing'], $statuses->status($project)['runtime']);
+    }
+
     public function testReportsRestoredRuntimeMetadataAsStale(): void
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');

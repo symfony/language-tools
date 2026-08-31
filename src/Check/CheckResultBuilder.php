@@ -107,7 +107,7 @@ final class CheckResultBuilder
     }
 
     /**
-     * @param array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string}} $status
+     * @param array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string, timings?: array<string, mixed>}} $status
      */
     private function projectResult(Project $project, array $status, bool $complete): CheckProjectResult
     {

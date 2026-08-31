@@ -8,7 +8,7 @@ use Symfony\Lsp\Runtime\RuntimeSnapshotState;
 
 final class ProjectIndexStatusRegistry implements ProjectStateInterface
 {
-    /** @var array<string, array{source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string}}> */
+    /** @var array<string, array{source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string, timings?: array{bootstrapMilliseconds: float, kernelMilliseconds: float, sectionsMilliseconds: array<string, float>, shutdownMilliseconds: float, totalMilliseconds: float}}}> */
     private array $statuses = [];
 
     private readonly RuntimeSnapshotState $runtimeSnapshots;
@@ -50,6 +50,17 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
     }
 
     /**
+     * @param array{bootstrapMilliseconds: float, kernelMilliseconds: float, sectionsMilliseconds: array<string, float>, shutdownMilliseconds: float, totalMilliseconds: float} $timings
+     */
+    public function runtimeTimings(Project $project, array $timings): void
+    {
+        $status = $this->status($project);
+        unset($status['root']);
+        $status['runtime']['timings'] = $timings;
+        $this->statuses[$project->rootPath] = $status;
+    }
+
+    /**
      * @param 'bootstrap'|'configuration'|null $stage
      */
     public function runtimeFailed(Project $project, ?string $stage = null): void
@@ -70,7 +81,7 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
     }
 
     /**
-     * @return array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string}}
+     * @return array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string, timings?: array{bootstrapMilliseconds: float, kernelMilliseconds: float, sectionsMilliseconds: array<string, float>, shutdownMilliseconds: float, totalMilliseconds: float}}}
      */
     public function status(Project $project): array
     {
@@ -89,7 +100,11 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
     {
         $status = $this->status($project);
         unset($status['root']);
+        $timings = 'runtime' === $section ? ($status[$section]['timings'] ?? null) : null;
         $status[$section] = ['state' => $state];
+        if ('indexing' !== $state && \is_array($timings)) {
+            $status[$section]['timings'] = $timings;
+        }
         if ('runtime' === $section && 'stale' === $state && null !== ($lastSuccessfulAt = $this->runtimeSnapshots->lastSuccessfulAt($project))) {
             $status[$section]['lastSuccessfulAt'] = $lastSuccessfulAt;
         }

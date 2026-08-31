@@ -7,6 +7,7 @@ final class RunSummary
     /**
      * @param list<string>              $layers
      * @param array<string, float|null> $timings
+     * @param array<string, mixed>|null $runtimeBridgeTimings
      */
     public function __construct(
         public readonly array $layers,
@@ -19,6 +20,7 @@ final class RunSummary
         public readonly ?string $serverVersion,
         public readonly ?float $supportScore = null,
         public readonly array $timings = [],
+        public readonly ?array $runtimeBridgeTimings = null,
     ) {
     }
 
@@ -38,6 +40,7 @@ final class RunSummary
             'serverVersion' => $this->serverVersion,
             'supportScore' => $this->supportScore,
             'timings' => $this->timings,
+            'runtimeBridgeTimings' => $this->runtimeBridgeTimings,
         ];
     }
 }

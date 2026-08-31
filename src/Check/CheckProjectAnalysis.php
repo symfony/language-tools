@@ -5,7 +5,7 @@ namespace Symfony\Lsp\Check;
 /**
  * @phpstan-import-type CheckError from CheckResult
  *
- * @phpstan-type ProjectStatus array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string}}
+ * @phpstan-type ProjectStatus array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string, timings?: array<string, mixed>}}
  */
 final class CheckProjectAnalysis
 {

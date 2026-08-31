@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Support\Bridge;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Feature\Configuration\ConfigurationValidationRegistry;
 use Symfony\Lsp\Feature\Configuration\ProjectConfigurationValidationSnapshotLoader;
+use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Runtime\BridgeInstaller;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
@@ -32,6 +33,7 @@ final class ProjectRuntimeInitializerFixtureBuilder
         ?ProjectConfigurationValidationSnapshotLoader $configurationValidationLoader = null,
         ?RuntimeSnapshotStore $snapshotStore = null,
         ?RuntimeSnapshotState $snapshotState = null,
+        ?ProjectIndexStatusRegistry $statuses = null,
     ): ProjectRuntimeInitializer {
         $configuration ??= new RuntimeConfiguration();
 
@@ -43,6 +45,7 @@ final class ProjectRuntimeInitializerFixtureBuilder
             new ContainerPathMapper($configuration),
             $projects,
             $configurationValidationLoader ?? new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
+            $statuses ?? new ProjectIndexStatusRegistry(),
             $snapshotStore,
             $snapshotState,
         );

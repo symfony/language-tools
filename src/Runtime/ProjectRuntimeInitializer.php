@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Runtime;
 use Amp\Cancellation;
 use Amp\CancelledException;
 use Symfony\Lsp\Feature\Configuration\ProjectConfigurationValidationSnapshotLoader;
+use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -18,6 +19,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         private readonly ContainerPathMapper $pathMapper,
         private readonly ProjectRegistry $projects,
         private readonly ProjectConfigurationValidationSnapshotLoader $configurationValidation,
+        private readonly ProjectIndexStatusRegistry $statuses,
         private readonly ?RuntimeSnapshotStore $snapshotStore = null,
         private readonly ?RuntimeSnapshotState $snapshotState = null,
     ) {
@@ -62,6 +64,10 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             $snapshot = $this->decodeSnapshot($result);
             if (1 !== ($snapshot['schemaVersion'] ?? null)) {
                 throw new \RuntimeException('The project bridge returned an unsupported snapshot.');
+            }
+            $timings = $this->bridgeTimings($snapshot['timings'] ?? null, $sections);
+            if (null !== $timings) {
+                $this->statuses->runtimeTimings($project, $timings);
             }
             $this->configurationValidation->load($project, $snapshot);
 
@@ -133,6 +139,49 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             return;
         }
         $this->snapshotState->restore($project, $snapshot->lastSuccessfulAt);
+    }
+
+    /**
+     * @param list<string> $sections
+     *
+     * @return array{bootstrapMilliseconds: float, kernelMilliseconds: float, sectionsMilliseconds: array<string, float>, shutdownMilliseconds: float, totalMilliseconds: float}|null
+     */
+    private function bridgeTimings(mixed $timings, array $sections): ?array
+    {
+        if (!\is_array($timings) || !\is_array($timings['sectionsMilliseconds'] ?? null)) {
+            return null;
+        }
+        $bootstrap = $this->milliseconds($timings['bootstrapMilliseconds'] ?? null);
+        $kernel = $this->milliseconds($timings['kernelMilliseconds'] ?? null);
+        $shutdown = $this->milliseconds($timings['shutdownMilliseconds'] ?? null);
+        $total = $this->milliseconds($timings['totalMilliseconds'] ?? null);
+        if (null === $bootstrap || null === $kernel || null === $shutdown || null === $total) {
+            return null;
+        }
+        $sectionTimings = [];
+        foreach ($sections as $section) {
+            $milliseconds = $this->milliseconds($timings['sectionsMilliseconds'][$section] ?? null);
+            if (null !== $milliseconds) {
+                $sectionTimings[$section] = $milliseconds;
+            }
+        }
+
+        return [
+            'bootstrapMilliseconds' => $bootstrap,
+            'kernelMilliseconds' => $kernel,
+            'sectionsMilliseconds' => $sectionTimings,
+            'shutdownMilliseconds' => $shutdown,
+            'totalMilliseconds' => $total,
+        ];
+    }
+
+    private function milliseconds(mixed $value): ?float
+    {
+        if ((!\is_int($value) && !\is_float($value)) || $value < 0 || !is_finite((float) $value)) {
+            return null;
+        }
+
+        return (float) $value;
     }
 
     /**

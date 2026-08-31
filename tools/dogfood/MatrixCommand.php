@@ -254,6 +254,7 @@ final class MatrixCommand
             \is_string($serverVersion) ? $serverVersion : null,
             $this->scorer->score($result, $project)['score'] ?? null,
             $this->runTimings($run, $result),
+            $this->runtimeBridgeTimings($result),
         );
     }
 
@@ -282,6 +283,41 @@ final class MatrixCommand
         }
 
         return $timings;
+    }
+
+    /**
+     * @param array<mixed> $result
+     *
+     * @return array{bootstrapMilliseconds: float, kernelMilliseconds: float, sectionsMilliseconds: array<string, float>, shutdownMilliseconds: float, totalMilliseconds: float}|null
+     */
+    private function runtimeBridgeTimings(array $result): ?array
+    {
+        $reported = $result['runtimeBridgeTimings'] ?? null;
+        if (!\is_array($reported) || !\is_array($reported['sectionsMilliseconds'] ?? null)) {
+            return null;
+        }
+        $timings = [];
+        foreach (['bootstrapMilliseconds', 'kernelMilliseconds', 'shutdownMilliseconds', 'totalMilliseconds'] as $key) {
+            $value = $reported[$key] ?? null;
+            if (!\is_int($value) && !\is_float($value)) {
+                return null;
+            }
+            $timings[$key] = (float) $value;
+        }
+        $sections = [];
+        foreach ($reported['sectionsMilliseconds'] as $section => $value) {
+            if (\is_string($section) && (\is_int($value) || \is_float($value))) {
+                $sections[$section] = (float) $value;
+            }
+        }
+
+        return [
+            'bootstrapMilliseconds' => $timings['bootstrapMilliseconds'],
+            'kernelMilliseconds' => $timings['kernelMilliseconds'],
+            'sectionsMilliseconds' => $sections,
+            'shutdownMilliseconds' => $timings['shutdownMilliseconds'],
+            'totalMilliseconds' => $timings['totalMilliseconds'],
+        ];
     }
 
     /**

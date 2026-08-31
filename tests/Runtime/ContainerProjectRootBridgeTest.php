@@ -12,6 +12,7 @@ use Symfony\Lsp\Feature\Stimulus\ProjectStimulusSnapshotLoader;
 use Symfony\Lsp\Feature\Stimulus\StimulusIndexRegistry;
 use Symfony\Lsp\Feature\Twig\ProjectTemplateSnapshotLoader;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
+use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -72,6 +73,7 @@ final class ContainerProjectRootBridgeTest extends TestCase
             $pathMapper,
             self::projects($project),
             new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
+            new ProjectIndexStatusRegistry(),
         );
 
         try {

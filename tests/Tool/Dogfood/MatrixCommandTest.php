@@ -68,6 +68,9 @@ final class MatrixCommandTest extends TestCase
         self::assertSame(8.0, (float) ($report['cold']['timings']['budgetProbeDiscoveryMilliseconds'] ?? -1));
         self::assertSame(30.0, (float) ($report['cold']['timings']['processMilliseconds'] ?? -1));
         self::assertSame(4.0, (float) ($report['cold']['timings']['runtimeIndexMilliseconds'] ?? -1));
+        $runtimeBridgeTotal = $report['cold']['runtimeBridgeTimings']['totalMilliseconds'] ?? null;
+        self::assertTrue(\is_int($runtimeBridgeTotal) || \is_float($runtimeBridgeTotal));
+        self::assertSame(11.0, (float) $runtimeBridgeTotal);
         $summary = $this->readSummary();
         self::assertTrue($summary['ok']);
         self::assertSame(\PHP_VERSION, $summary['tools']['php']);
@@ -239,7 +242,7 @@ final class MatrixCommandTest extends TestCase
         /** @var array<string, mixed> $cold */
         $cold = $report['cold'];
         self::assertSame(
-            ['layers', 'source', 'runtime', 'probes', 'requestErrors', 'violations', 'maxMilliseconds', 'serverVersion', 'supportScore', 'timings'],
+            ['layers', 'source', 'runtime', 'probes', 'requestErrors', 'violations', 'maxMilliseconds', 'serverVersion', 'supportScore', 'timings', 'runtimeBridgeTimings'],
             array_keys($cold),
         );
         /** @var array<string, mixed> $summary */
@@ -357,6 +360,13 @@ final class MatrixCommandTest extends TestCase
             'diagnostics' => [],
             'serverError' => null,
             'exitCode' => 0,
+            'runtimeBridgeTimings' => [
+                'bootstrapMilliseconds' => 1.0,
+                'kernelMilliseconds' => 2.0,
+                'sectionsMilliseconds' => ['routes' => 3.0],
+                'shutdownMilliseconds' => 5.0,
+                'totalMilliseconds' => 11.0,
+            ],
             'timings' => [
                 'startupMilliseconds' => 1.0,
                 'initializeMilliseconds' => 2.0,
@@ -374,11 +384,11 @@ final class MatrixCommandTest extends TestCase
     }
 
     /**
-     * @return array{ok: bool, frameworkBundle: ?string, dependencies: array{composerLockSha256: ?string}, workingTree: array{modified: list<string>, untracked: int}|null, timings: array<string, int|float>, cold: array{layers: list<string>, timings: array<string, int|float|null>}|null, warm: array{layers: list<string>, timings: array<string, int|float|null>}|null, failure: array{layer: string, message: string}|null}
+     * @return array{ok: bool, frameworkBundle: ?string, dependencies: array{composerLockSha256: ?string}, workingTree: array{modified: list<string>, untracked: int}|null, timings: array<string, int|float>, cold: array{layers: list<string>, timings: array<string, int|float|null>, runtimeBridgeTimings: array<string, mixed>|null}|null, warm: array{layers: list<string>, timings: array<string, int|float|null>, runtimeBridgeTimings: array<string, mixed>|null}|null, failure: array{layer: string, message: string}|null}
      */
     private function readReport(): array
     {
-        /** @var array{ok: bool, frameworkBundle: ?string, dependencies: array{composerLockSha256: ?string}, workingTree: array{modified: list<string>, untracked: int}|null, timings: array<string, int|float>, cold: array{layers: list<string>, timings: array<string, int|float|null>}|null, warm: array{layers: list<string>, timings: array<string, int|float|null>}|null, failure: array{layer: string, message: string}|null} $report */
+        /** @var array{ok: bool, frameworkBundle: ?string, dependencies: array{composerLockSha256: ?string}, workingTree: array{modified: list<string>, untracked: int}|null, timings: array<string, int|float>, cold: array{layers: list<string>, timings: array<string, int|float|null>, runtimeBridgeTimings: array<string, mixed>|null}|null, warm: array{layers: list<string>, timings: array<string, int|float|null>, runtimeBridgeTimings: array<string, mixed>|null}|null, failure: array{layer: string, message: string}|null} $report */
         $report = $this->readJson(Path::join($this->output, 'acme/project.json'));
 
         return $report;

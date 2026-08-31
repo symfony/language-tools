@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Record runtime bridge phase timings in dogfood reports
 - Run dogfood projects concurrently by default
 - Record dogfood phase timings in matrix artifacts
 - Speed up dogfood form property probe discovery

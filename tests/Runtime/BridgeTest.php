@@ -56,6 +56,13 @@ final class BridgeTest extends TestCase
         self::assertSame('42.7.3', $result['project']['symfonyVersion'] ?? null);
         self::assertSame([], $result['sections'] ?? null);
         self::assertSame([], $result['errors'] ?? null);
+        $timings = $result['timings'] ?? null;
+        self::assertIsArray($timings);
+        self::assertSame([], $timings['sectionsMilliseconds'] ?? null);
+        foreach (['bootstrapMilliseconds', 'kernelMilliseconds', 'shutdownMilliseconds', 'totalMilliseconds'] as $key) {
+            self::assertTrue(\is_int($timings[$key] ?? null) || \is_float($timings[$key] ?? null));
+            self::assertGreaterThanOrEqual(0.0, (float) $timings[$key]);
+        }
     }
 
     /** @return iterable<string, array{string}> */

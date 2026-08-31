@@ -78,6 +78,13 @@ final class ProjectRuntimeInitializerTest extends TestCase
                     ],
                 ],
             ],
+            'timings' => [
+                'bootstrapMilliseconds' => 1.0,
+                'kernelMilliseconds' => 2.0,
+                'sectionsMilliseconds' => ['routes' => 3.0, 'container' => 4.0, 'unknown' => 5.0],
+                'shutdownMilliseconds' => 6.0,
+                'totalMilliseconds' => 16.0,
+            ],
         ], \JSON_THROW_ON_ERROR), ''));
         $indexes = new RouteIndexRegistry();
         $serviceIndexes = new ServiceIndexRegistry();
@@ -89,6 +96,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'environment' => 'test',
             'bridgeTimeout' => 90,
         ]);
+        $statuses = new ProjectIndexStatusRegistry();
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
             new RuntimeSnapshotLoaderRegistry([
@@ -97,6 +105,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             ]),
             self::projects($project),
             configuration: $configuration,
+            statuses: $statuses,
         );
 
         $initializer->initialize($project);
@@ -112,6 +121,13 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame('--configuration-generation=0', $processRunner->command[7]);
         self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
         self::assertSame(90.0, $processRunner->timeout);
+        self::assertSame([
+            'bootstrapMilliseconds' => 1.0,
+            'kernelMilliseconds' => 2.0,
+            'sectionsMilliseconds' => ['routes' => 3.0, 'container' => 4.0],
+            'shutdownMilliseconds' => 6.0,
+            'totalMilliseconds' => 16.0,
+        ], $statuses->status($project)['runtime']['timings'] ?? null);
     }
 
     public function testNeverLoadsMetadataForAProjectRemovedWhileTheBridgeRan(): void

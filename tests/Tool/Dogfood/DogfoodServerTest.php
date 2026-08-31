@@ -133,6 +133,7 @@ final class DogfoodServerTest extends TestCase
         $report = json_decode($result->standardOutput, true, flags: \JSON_THROW_ON_ERROR);
         self::assertIsArray($report);
         self::assertSame(0, $report['exitCode'] ?? null);
+        self::assertNull($report['runtimeBridgeTimings'] ?? null);
         self::assertIsString($report['serverError'] ?? null);
         self::assertSame(1000000, \strlen($report['serverError']));
         $timings = $report['timings'] ?? null;

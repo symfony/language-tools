@@ -5,6 +5,9 @@ if (PHP_VERSION_ID < 80100) {
     exit(1);
 }
 
+$bridgeStartedAt = hrtime(true);
+$elapsedMilliseconds = static fn (int $startedAt): float => round((hrtime(true) - $startedAt) / 1_000_000, 1);
+
 // Stdout must stay payload-only; display_errors=stderr is not honored by every SAPI, so log errors to stderr instead.
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
@@ -110,9 +113,14 @@ if (class_exists(Symfony\Component\Runtime\SymfonyRuntime::class)) {
 }
 
 $context = new SymfonyLspBridgeContext($project, $environment, $debug, $targetedRefresh, $rebuildContainer);
+$bootstrapMilliseconds = $elapsedMilliseconds($bridgeStartedAt);
+$kernelStartedAt = hrtime(true);
 $configurationValidation = $context->configurationValidation();
+$kernelMilliseconds = $elapsedMilliseconds($kernelStartedAt);
 $sections = [];
+$sectionMilliseconds = [];
 foreach ($requestedSections as $sectionName) {
+    $sectionStartedAt = hrtime(true);
     try {
         $section = match ($sectionName) {
             'routes' => symfonyLspBridgeRoutesSection($context),
@@ -137,13 +145,18 @@ foreach ($requestedSections as $sectionName) {
         }
     } catch (Throwable) {
         $context->addError($sectionName);
+    } finally {
+        $sectionMilliseconds[$sectionName] = $elapsedMilliseconds($sectionStartedAt);
     }
 }
 
+$shutdownStartedAt = hrtime(true);
 try {
     $context->shutdown();
 } catch (Throwable) {
 }
+$shutdownMilliseconds = $elapsedMilliseconds($shutdownStartedAt);
+$totalMilliseconds = $elapsedMilliseconds($bridgeStartedAt);
 
 $result = [
     'schemaVersion' => 1,
@@ -160,6 +173,13 @@ $result = [
     'configurationGeneration' => $configurationGeneration,
     'sections' => $sections,
     'errors' => $context->errors(),
+    'timings' => [
+        'bootstrapMilliseconds' => $bootstrapMilliseconds,
+        'kernelMilliseconds' => $kernelMilliseconds,
+        'sectionsMilliseconds' => $sectionMilliseconds,
+        'shutdownMilliseconds' => $shutdownMilliseconds,
+        'totalMilliseconds' => $totalMilliseconds,
+    ],
 ];
 
 fwrite(STDOUT, json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n");
