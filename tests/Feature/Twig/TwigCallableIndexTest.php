@@ -2,14 +2,18 @@
 
 namespace Symfony\Lsp\Tests\Feature\Twig;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Position;
+use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Twig\TwigCallableDeclaration;
+use Symfony\Lsp\Feature\Twig\TwigCallableDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableIndex;
 use Symfony\Lsp\Feature\Twig\TwigCallableKind;
 use Symfony\Lsp\Feature\Twig\TwigCallableSourceFacts;
 use Symfony\Lsp\Feature\Twig\TwigCallableUsage;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 
 final class TwigCallableIndexTest extends TestCase
 {
@@ -53,6 +57,26 @@ final class TwigCallableIndexTest extends TestCase
 
         self::assertSame([$earlierDeclaration, $laterDeclaration], $index->declarations(TwigCallableKind::Filter, 'format'));
         self::assertSame([$earlierUsage, $laterUsage], $index->usages(TwigCallableKind::Filter, 'format'));
+    }
+
+    public function testKeepsUnsavedTwigCallableDeclarationsAuthoritative(): void
+    {
+        $extractor = new TwigCallableDeclarationExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()));
+        $index = new TwigCallableIndex();
+        $uri = 'file:///workspace/src/Twig/AppExtension.php';
+        $saved = "<?php class Extension { public function getFunctions(): array { return [new \\Twig\\TwigFunction('saved_name', null)]; } }";
+        $unsaved = "<?php class Extension { public function getFunctions(): array { return [new \\Twig\\TwigFunction('unsaved_name', null)]; } }";
+
+        $index->replace($extractor->extract($uri, $saved));
+        $index->overlay($extractor->extract($uri, $unsaved));
+
+        self::assertSame([], $index->declarations(TwigCallableKind::Function, 'saved_name'));
+        self::assertCount(1, $index->declarations(TwigCallableKind::Function, 'unsaved_name'));
+
+        $index->removeOverlay($uri);
+
+        self::assertCount(1, $index->declarations(TwigCallableKind::Function, 'saved_name'));
+        self::assertSame([], $index->declarations(TwigCallableKind::Function, 'unsaved_name'));
     }
 
     /** @return array{TwigCallableSourceFacts, TwigCallableDeclaration, TwigCallableUsage} */
