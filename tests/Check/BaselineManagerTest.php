@@ -4,7 +4,10 @@ namespace Symfony\Lsp\Tests\Check;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Lsp\Check\BaselineCodec;
 use Symfony\Lsp\Check\BaselineManager;
+use Symfony\Lsp\Check\BaselineMatcher;
+use Symfony\Lsp\Check\BaselineRepository;
 use Symfony\Lsp\Check\CheckDiagnostic;
 use Symfony\Lsp\Check\CheckFile;
 use Symfony\Lsp\Check\CheckOptions;
@@ -22,7 +25,7 @@ final class BaselineManagerTest extends TestCase
     {
         $this->directory = sys_get_temp_dir().'/symfony-lsp-baseline-'.bin2hex(random_bytes(6));
         mkdir($this->directory);
-        $this->manager = new BaselineManager(new Filesystem(), new DiagnosticCodeRegistry());
+        $this->manager = $this->manager(new Filesystem());
     }
 
     protected function tearDown(): void
@@ -157,7 +160,7 @@ final class BaselineManagerTest extends TestCase
 
     private function createBaselineInChild(int $worker, string $barrier): never
     {
-        $manager = new BaselineManager(new SynchronizingBaselineFilesystem($barrier), new DiagnosticCodeRegistry());
+        $manager = $this->manager(new SynchronizingBaselineFilesystem($barrier));
         try {
             $manager->apply($this->directory, $this->options('create'), []);
             $result = 'created';
@@ -169,6 +172,14 @@ final class BaselineManagerTest extends TestCase
         file_put_contents($barrier.'/result-'.$worker, $result);
 
         exit(0);
+    }
+
+    private function manager(Filesystem $filesystem): BaselineManager
+    {
+        return new BaselineManager(
+            new BaselineRepository($filesystem, new BaselineCodec(new DiagnosticCodeRegistry())),
+            new BaselineMatcher(),
+        );
     }
 
     private function diagnostic(string $fingerprint): CheckDiagnostic
