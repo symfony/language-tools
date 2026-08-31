@@ -60,6 +60,7 @@ final class TwigCallableCompletionProviderTest extends TwigCallableProviderTestC
         self::assertSame(['filter_name'], $completions('{{ item|fil'));
         self::assertSame(['attribute_filter'], $completions('{{ item|attribute_f'));
         self::assertSame(['function_name'], $completions('{% if f'));
+        self::assertNull($completions('{% macro function_n'));
         self::assertSame(['function_name'], $completions('{{ "}}" ~ func'));
         self::assertNull($completions('{{ "say func'));
         self::assertNull($completions('{{ item.func'));
@@ -185,6 +186,7 @@ final class TwigCallableCompletionProviderTest extends TwigCallableProviderTestC
         self::assertSame(['length'], $completions('{{ text|attribute_shorten('));
         self::assertSame(['name'], $completions('{{ attribute_variadic('));
         self::assertSame(['name', 'width'], $completions('{{ legacy_safe('));
+        self::assertNull($completions('{% macro image(name, '));
         self::assertNull($completions("{{ image(name: 'a"));
     }
 }

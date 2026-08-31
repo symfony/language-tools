@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ignore Twig macro declarations that share a name with custom functions
 - Recognize PHP heredoc translation messages and global parameters
 - Buffer persistent source index rewrites
 - Record runtime bridge phase timings in dogfood reports

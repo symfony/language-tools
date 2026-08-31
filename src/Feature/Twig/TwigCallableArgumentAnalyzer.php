@@ -11,8 +11,12 @@ final class TwigCallableArgumentAnalyzer
         if (1 === preg_match('/\|\s*([A-Za-z_][A-Za-z0-9_]*)?$/', $syntax, $matches)) {
             return ['kind' => TwigCallableKind::Filter, 'prefix' => $matches[1] ?? ''];
         }
-        if (1 === preg_match('/(?<![\w.\'"|])([A-Za-z_][A-Za-z0-9_]*)$/', $syntax, $matches)) {
-            return ['kind' => TwigCallableKind::Function, 'prefix' => $matches[1]];
+        if (1 === preg_match('/(?<![\w.\'"|])([A-Za-z_][A-Za-z0-9_]*)$/', $syntax, $matches, \PREG_OFFSET_CAPTURE)) {
+            if ($this->isMacroDeclaration($syntax, $matches[1][1])) {
+                return null;
+            }
+
+            return ['kind' => TwigCallableKind::Function, 'prefix' => $matches[1][0]];
         }
 
         return null;
@@ -134,7 +138,8 @@ final class TwigCallableArgumentAnalyzer
                 'hasNestedParentheses' => false,
             ];
         }
-        if (1 !== preg_match('/(?<![\w.|])([A-Za-z_][A-Za-z0-9_]*)\s*$/', $head, $match, \PREG_OFFSET_CAPTURE)) {
+        if (1 !== preg_match('/(?<![\w.|])([A-Za-z_][A-Za-z0-9_]*)\s*$/', $head, $match, \PREG_OFFSET_CAPTURE)
+            || $this->isMacroDeclaration($head, $match[1][1])) {
             return null;
         }
 
@@ -144,6 +149,11 @@ final class TwigCallableArgumentAnalyzer
             'calleeOffset' => $match[1][1],
             'hasNestedParentheses' => false,
         ];
+    }
+
+    private function isMacroDeclaration(string $text, int $nameOffset): bool
+    {
+        return 1 === preg_match('/\{%\s*[-~]?\s*macro\s+$/', substr($text, 0, $nameOffset));
     }
 
     /** @return list<TwigCallableArgument> */
