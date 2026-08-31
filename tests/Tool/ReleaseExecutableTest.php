@@ -85,14 +85,6 @@ final class ReleaseExecutableTest extends TestCase
         $php = <<<'PHP'
             $root = $argv[1];
             require $root.'/vendor/autoload.php';
-            require $root.'/tools/InteractiveProcessRunner.php';
-            require $root.'/tools/ReleaseProcessRunner.php';
-            require $root.'/tools/ReleaseGit.php';
-            require $root.'/tools/ReleaseGitHub.php';
-            require $root.'/tools/ReleaseSleeperInterface.php';
-            require $root.'/tools/NativeReleaseSleeper.php';
-            require $root.'/tools/ReleaseMetadataUpdater.php';
-            require $root.'/tools/ReleaseCommand.php';
             $processes = new Symfony\Lsp\Tools\ReleaseProcessRunner(new Symfony\Lsp\Tools\InteractiveProcessRunner());
             $command = new Symfony\Lsp\Tools\ReleaseCommand(
                 $root,
@@ -155,13 +147,6 @@ final class ReleaseExecutableTest extends TestCase
         $php = <<<'PHP'
             $root = $argv[1];
             require $root.'/vendor/autoload.php';
-            require $root.'/tools/InteractiveProcessRunner.php';
-            require $root.'/tools/ReleaseProcessRunner.php';
-            require $root.'/tools/ReleaseGit.php';
-            require $root.'/tools/ReleaseGitHub.php';
-            require $root.'/tools/ReleaseSleeperInterface.php';
-            require $root.'/tools/ReleaseMetadataUpdater.php';
-            require $root.'/tools/ReleaseCommand.php';
             $processes = new Symfony\Lsp\Tools\ReleaseProcessRunner(new Symfony\Lsp\Tools\InteractiveProcessRunner());
             $sleeper = new class implements Symfony\Lsp\Tools\ReleaseSleeperInterface {
                 public function sleep(int $seconds): void {}

@@ -3,16 +3,15 @@
 namespace Symfony\Lsp\Tests\Tool;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\InteractiveProcessRunner;
-
-require_once \dirname(__DIR__, 2).'/tools/InteractiveProcessRunner.php';
 
 final class InteractiveProcessRunnerTest extends TestCase
 {
     public function testInheritsTerminalStreams(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'symfony-lsp-');
-        self::assertIsString($path);
+        $workspace = new TestWorkspace();
+        $path = $workspace->path('stdout-stat.json');
         $parent = fstat(\STDOUT);
         self::assertIsArray($parent);
 
@@ -30,7 +29,7 @@ final class InteractiveProcessRunnerTest extends TestCase
             self::assertSame($parent['dev'], $child['dev']);
             self::assertSame($parent['ino'], $child['ino']);
         } finally {
-            @unlink($path);
+            $workspace->cleanup();
         }
     }
 }

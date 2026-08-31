@@ -30,7 +30,7 @@
     "autoload-dev": {
         "psr-4": {
             "Symfony\\Lsp\\Tests\\": "tests/",
-            "Symfony\\Lsp\\Tools\\Dogfood\\": "tools/dogfood/"
+            "Symfony\\Lsp\\Tools\\": "tools/"
         }
     },
     "bin": [

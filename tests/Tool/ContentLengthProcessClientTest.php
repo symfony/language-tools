@@ -4,25 +4,21 @@ namespace Symfony\Lsp\Tests\Tool;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\ContentLengthProcessClient;
-
-require_once \dirname(__DIR__, 2).'/tools/ContentLengthProcessClient.php';
 
 final class ContentLengthProcessClientTest extends TestCase
 {
-    private string $directory;
+    private TestWorkspace $workspace;
 
     protected function setUp(): void
     {
-        $this->directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-content-length-client-'.bin2hex(random_bytes(8)));
-        (new Filesystem())->mkdir($this->directory);
+        $this->workspace = new TestWorkspace('symfony-lsp-content-length-client-');
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     public function testReadsFragmentedHeadersAndBodies(): void
@@ -100,8 +96,8 @@ final class ContentLengthProcessClientTest extends TestCase
 
     public function testParsingFailuresAllowFinallyCleanupToTerminateTheChild(): void
     {
-        $lockPath = Path::join($this->directory, 'server.lock');
-        $readyPath = Path::join($this->directory, 'server.ready');
+        $lockPath = $this->workspace->path('server.lock');
+        $readyPath = $this->workspace->path('server.ready');
         $server = $this->server(<<<'PHP'
             $lock = fopen($argv[1], 'c+');
             flock($lock, LOCK_EX);
@@ -137,10 +133,9 @@ final class ContentLengthProcessClientTest extends TestCase
 
     private function server(string $body): string
     {
-        $path = Path::join($this->directory, 'server-'.bin2hex(random_bytes(4)));
-        file_put_contents($path, "#!/usr/bin/env php\n<?php\n".$body."\n");
-        chmod($path, 0755);
-
-        return $path;
+        return $this->workspace->executable(
+            'server-'.bin2hex(random_bytes(4)),
+            "#!/usr/bin/env php\n<?php\n".$body."\n",
+        );
     }
 }

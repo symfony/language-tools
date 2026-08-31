@@ -2,8 +2,6 @@
 
 namespace Symfony\Lsp\Tests\Tool;
 
-require_once \dirname(__DIR__, 2).'/tools/ReleaseVersion.php';
-
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Tools\ReleaseVersion;
