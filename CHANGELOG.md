@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Restrict Stimulus member declarations to the exported controller class
 - Speed up source indexing by analyzing PHP runtime structure once
 - Parse Twig string literals with escaped quotes and backslash escapes
 - Decode static Twig helper arguments with Twig string semantics

@@ -8,12 +8,15 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Stimulus\StimulusCodeLensProvider;
+use Symfony\Lsp\Feature\Stimulus\StimulusCompletionContextResolver;
 use Symfony\Lsp\Feature\Stimulus\StimulusCompletionProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusController;
+use Symfony\Lsp\Feature\Stimulus\StimulusControllerExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusDiagnosticProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusDocumentLinkProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusIndexRegistry;
+use Symfony\Lsp\Feature\Stimulus\StimulusReferenceExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusRelationshipProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusResolver;
 use Symfony\Lsp\Feature\Stimulus\StimulusSourceIndexRegistry;
@@ -30,7 +33,12 @@ final class StimulusProviderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
-        $extractor = new StimulusExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), new TwigCommentParser());
+        $comments = new TwigCommentParser();
+        $extractor = new StimulusExtractor(
+            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter())),
+            new StimulusReferenceExtractor($converter, $comments),
+            new StimulusCompletionContextResolver($converter, $comments),
+        );
         $controllerUri = 'file:///workspace/assets/controllers/search_controller.js';
         $controllerText = <<<'JS'
             import { Controller } from '@hotwired/stimulus';
