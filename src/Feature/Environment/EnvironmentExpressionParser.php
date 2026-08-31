@@ -24,7 +24,7 @@ final class EnvironmentExpressionParser
         }
 
         $variable = array_pop($segments);
-        if (null === $variable || 1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $variable->value)) {
+        if (1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $variable->value)) {
             return null;
         }
 
