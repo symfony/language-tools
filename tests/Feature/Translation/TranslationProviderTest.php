@@ -315,6 +315,83 @@ final class TranslationProviderTest extends TestCase
         self::assertSame([], $phpProvider->diagnostics(['textDocument' => ['uri' => 'file:///workspace/src/Controller.php']]));
     }
 
+    public function testAccountsForGlobalTranslationParameters(): void
+    {
+        $uri = 'file:///workspace/templates/product.html.twig';
+        $text = <<<'TWIG'
+            {{ 'product.meta_description'|trans({
+                '{{ name }}': product.name,
+                '{{ category }}': product.category,
+            }) }}
+            TWIG;
+        $globals = <<<'PHP'
+            <?php
+
+            use Symfony\Component\Translation\Translator;
+
+            function configure(Translator $translator): void
+            {
+                $translator->addGlobalParameter('%current_domain_name%', 'example.com');
+            }
+            PHP;
+        [$provider] = $this->provider($uri, $text, 'twig', [[
+            'file:///workspace/src/TranslationSubscriber.php',
+            'php',
+            $globals,
+        ]]);
+
+        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+
+        $dynamicGlobals = <<<'PHP'
+            <?php
+
+            use Symfony\Component\Translation\Translator;
+
+            function configure(Translator $translator, string $parameter): void
+            {
+                $translator->addGlobalParameter($parameter, 'dynamic');
+            }
+            PHP;
+        [$dynamicProvider] = $this->provider(
+            'file:///workspace/templates/article.html.twig',
+            "{{ 'article.title'|trans({extra: 1}) }}",
+            'twig',
+            [[
+                'file:///workspace/src/TranslationSubscriber.php',
+                'php',
+                $dynamicGlobals,
+            ]],
+        );
+
+        self::assertSame([], $dynamicProvider->diagnostics(['textDocument' => ['uri' => 'file:///workspace/templates/article.html.twig']]));
+    }
+
+    public function testFindsTranslationsWithPhpHeredocMessages(): void
+    {
+        $uri = 'file:///workspace/templates/purchase_order.html.twig';
+        $text = "{{ 'purchase_order.pdf.document.billing_address_detail'|trans({}, 'purchase_order', locale ~ '_' ~ country) }}";
+        $catalog = <<<'PHP'
+            <?php
+
+            return [
+                'purchase_order.pdf.document.billing_address_detail' => <<<EOT
+                    SAS Agriconomie
+                    35-39 Avenue de Paris
+                    94800 Villejuif
+                    France
+                    EOT,
+            ];
+            PHP;
+        [$provider, , $configuration, $project] = $this->provider($uri, $text, 'twig', [[
+            'file:///workspace/translations/purchase_order.fr_FR.php',
+            'php',
+            $catalog,
+        ]]);
+        $configuration->configure($project, true);
+
+        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
     public function testOffersNoTranslationCompletionsInsidePhpComments(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
@@ -333,8 +410,12 @@ final class TranslationProviderTest extends TestCase
         yield 'translatable message' => ["new TranslatableMessage(message: 'article.ti"];
     }
 
-    /** @return array{TranslationProvider, PositionConverter, TranslationConfigurationRegistry, Project} */
-    private function provider(string $uri, string $text, string $languageId = 'php'): array
+    /**
+     * @param list<array{string, string, string}> $sources
+     *
+     * @return array{TranslationProvider, PositionConverter, TranslationConfigurationRegistry, Project}
+     */
+    private function provider(string $uri, string $text, string $languageId = 'php', array $sources = []): array
     {
         $documents = new DocumentStore();
         $documents->open(new Document($uri, $languageId, 1, $text));
@@ -347,11 +428,17 @@ final class TranslationProviderTest extends TestCase
         $indexes->forProject($project)->replaceRuntime(
             true,
             new TranslationMessage('article.title', 'messages', 'en', 'Article %name%'),
+            new TranslationMessage('product.meta_description', 'messages', 'en', 'Discover {{ name }} from {{ category }} on %current_domain_name%.'),
             new TranslationMessage("don't panic", 'messages', 'en', "Don't panic"),
             new TranslationMessage('foo', 'messages', 'en', 'Foo'),
             new TranslationMessage("line\nkey", 'messages', 'en', 'Line key'),
             new TranslationMessage('panel.title', 'admin', 'en', 'Panel title'),
         );
+        $sourceFacts = [];
+        foreach ($sources as [$sourceUri, $sourceLanguageId, $source]) {
+            $sourceFacts[] = $extractor->extract($sourceUri, $sourceLanguageId, $source);
+        }
+        $indexes->forProject($project)->replaceSources(...$sourceFacts);
         $configuration = new TranslationConfigurationRegistry();
         $documentResolver = new DocumentContextResolver($documents, $projects);
 

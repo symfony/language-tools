@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Feature\Translation;
 
 use Microsoft\PhpParser\Parser;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Translation\PhpTranslationCatalogParser;
 use Symfony\Lsp\Feature\Translation\PhpTranslationReferenceExtractor;
 use Symfony\Lsp\Feature\Translation\TranslationCatalogExtractor;
 use Symfony\Lsp\Feature\Translation\TranslationExtractor;
@@ -28,7 +29,7 @@ final class TranslationExtractorTestFactory
         $parameters = new TranslationParameterAnalyzer();
 
         return new TranslationExtractor(
-            new TranslationCatalogExtractor($converter, new UriToPathConverter(), new YamlDocumentParser($treeSitter)),
+            new TranslationCatalogExtractor($converter, new UriToPathConverter(), new YamlDocumentParser($treeSitter), new PhpTranslationCatalogParser()),
             new PhpTranslationReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser(), $parameters),
             new TwigTranslationReferenceExtractor($converter, new TwigDocumentParser($treeSitter, $twigComments), $twigComments, $parameters),
         );

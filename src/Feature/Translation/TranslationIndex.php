@@ -30,6 +30,10 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     /** @var list<string> */
     private array $locales = [];
 
+    /** @var list<string> */
+    private array $globalParameters = [];
+    private bool $dynamicGlobalParameters = false;
+
     public function replaceRuntime(bool $complete, TranslationMessage ...$messages): void
     {
         $this->runtime = array_values($messages);
@@ -98,6 +102,14 @@ final class TranslationIndex extends AbstractSourceFactsIndex
         return $this->complete;
     }
 
+    /** @return list<string>|null */
+    public function globalParameters(): ?array
+    {
+        $this->index();
+
+        return $this->dynamicGlobalParameters ? null : $this->globalParameters;
+    }
+
     protected function factsChanged(): void
     {
         $this->indexed = false;
@@ -115,6 +127,8 @@ final class TranslationIndex extends AbstractSourceFactsIndex
         $keys = [];
         $domains = [];
         $locales = [];
+        $globalParameters = [];
+        $dynamicGlobalParameters = false;
         foreach ($this->runtime as $message) {
             $domain = $message->domain;
             $key = $message->key;
@@ -135,6 +149,10 @@ final class TranslationIndex extends AbstractSourceFactsIndex
             foreach ($facts->references as $reference) {
                 $this->references[$reference->domain][$reference->key][] = $reference;
             }
+            foreach ($facts->globalParameters as $parameter) {
+                $globalParameters[trim($parameter, '%')] = true;
+            }
+            $dynamicGlobalParameters = $dynamicGlobalParameters || $facts->dynamicGlobalParameters;
         }
 
         $this->keys = [];
@@ -146,6 +164,9 @@ final class TranslationIndex extends AbstractSourceFactsIndex
         sort($this->domains);
         $this->locales = array_keys($locales);
         sort($this->locales);
+        $this->globalParameters = array_keys($globalParameters);
+        sort($this->globalParameters);
+        $this->dynamicGlobalParameters = $dynamicGlobalParameters;
         $this->indexed = true;
     }
 }

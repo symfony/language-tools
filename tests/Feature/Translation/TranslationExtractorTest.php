@@ -228,6 +228,67 @@ final class TranslationExtractorTest extends TestCase
         self::assertSame('hello', $php->declarations[0]->key);
     }
 
+    public function testExtractsPhpHeredocAndNowdocResources(): void
+    {
+        $facts = $this->extractor()->extract('file:///workspace/translations/purchase_order.fr_FR.php', 'php', <<<'PHP'
+            <?php
+
+            return [
+                'purchase_order.pdf.document.billing_address_detail' => <<<EOT
+                    SAS Agriconomie
+                    35-39 Avenue de Paris
+                    94800 Villejuif
+                    France
+                    EOT,
+                'purchase_order.pdf.document.footer' => <<<'TEXT'
+                    Contact %company%
+                    TEXT,
+                'dynamic.message' => 'Hello '.$name,
+            ];
+            PHP);
+
+        self::assertSame(
+            [
+                ['purchase_order.pdf.document.billing_address_detail', "SAS Agriconomie\n35-39 Avenue de Paris\n94800 Villejuif\nFrance", []],
+                ['purchase_order.pdf.document.footer', 'Contact %company%', ['company']],
+                ['dynamic.message', '', []],
+            ],
+            array_map(
+                static fn ($item): array => [$item->key, $item->message, $item->placeholders()],
+                $facts->declarations,
+            ),
+        );
+    }
+
+    public function testExtractsGlobalTranslationParameters(): void
+    {
+        $facts = $this->extractor()->extract('file:///workspace/src/TranslationSubscriber.php', 'php', <<<'PHP'
+            <?php
+
+            use Symfony\Component\Translation\Translator;
+
+            final class TranslationSubscriber
+            {
+                public function configure(Translator $translator, string $parameter): void
+                {
+                    $translator->addGlobalParameter('%current_domain_name%', 'example.com');
+                    $translator->addGlobalParameter(id: $parameter, value: 'dynamic');
+                }
+            }
+
+            final class UnrelatedParameterBag
+            {
+                public function configure(UnrelatedParameterBag $parameters): void
+                {
+                    $parameters->addGlobalParameter('%unrelated%', 'value');
+                }
+            }
+            PHP);
+
+        self::assertSame(['%current_domain_name%'], $facts->globalParameters);
+        self::assertTrue($facts->dynamicGlobalParameters);
+    }
+
     public function testDecodesTwigTranslationKeysLikeTheVendoredLexer(): void
     {
         $literals = ['"\\x66oo"', '"\\146oo"', '"line\\nkey"'];

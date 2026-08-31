@@ -12,6 +12,7 @@ final class TranslationCatalogExtractor
         private readonly PositionConverter $converter,
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly YamlDocumentParser $yamlParser,
+        private readonly PhpTranslationCatalogParser $phpParser,
     ) {
     }
 
@@ -62,13 +63,19 @@ final class TranslationCatalogExtractor
             return $this->xliffDeclarations($uri, $text, $domain, $locale);
         }
         if ('php' === $format) {
-            preg_match_all('/([\'\"])([^\'\"]+)\1\s*=>\s*([\'\"])(.*?)\3/s', $text, $matches, \PREG_OFFSET_CAPTURE);
-            $result = [];
-            foreach ($matches[2] as $i => [$key, $offset]) {
-                $result[] = $this->declaration($key, $matches[4][$i][0], $domain, $locale, $uri, $text, $offset);
-            }
-
-            return $result;
+            return array_map(
+                fn (array $item): TranslationDeclaration => $this->declaration(
+                    $item['key'],
+                    $item['message'],
+                    $domain,
+                    $locale,
+                    $uri,
+                    $text,
+                    $item['keyOffset'],
+                    $item['keyLength'],
+                ),
+                $this->phpParser->parse($text),
+            );
         }
 
         $result = [];

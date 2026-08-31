@@ -179,7 +179,8 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
             // list does not provide are proven mistakes
             $expected = ($messages[0] ?? $declarations[0])->placeholders();
             $provided = $reference->placeholders;
-            if (null !== $provided && [] !== array_diff($expected, $provided)) {
+            $global = $index->globalParameters();
+            if (null !== $provided && null !== $global && [] !== array_diff($expected, $provided, $global)) {
                 $diagnostics[] = $this->diagnostic(
                     $reference,
                     'translation.placeholders',

@@ -5,6 +5,8 @@ namespace Symfony\Lsp\Feature\Translation;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpObjectCreation;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
@@ -12,6 +14,13 @@ use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 
 final class PhpTranslationReferenceExtractor
 {
+    private const GLOBAL_PARAMETER_TRANSLATORS = [
+        'Symfony\\Bundle\\FrameworkBundle\\Translation\\Translator',
+        'Symfony\\Component\\Translation\\DataCollectorTranslator',
+        'Symfony\\Component\\Translation\\LoggingTranslator',
+        'Symfony\\Component\\Translation\\Translator',
+    ];
+
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $parser,
@@ -20,12 +29,23 @@ final class PhpTranslationReferenceExtractor
     ) {
     }
 
-    /** @return list<TranslationReference> */
-    public function extract(string $uri, string $text): array
+    public function extract(string $uri, string $text): PhpTranslationFacts
     {
         $document = $this->parser->parse($text);
         $references = [];
+        $globalParameters = [];
+        $dynamicGlobalParameters = false;
         foreach ($document->methodCalls as $call) {
+            if ('addGlobalParameter' === $call->method && $this->hasGlobalParameterReceiver($call, $document)) {
+                $parameter = $call->argument('id') ?? $call->positionalArgument(0);
+                if (null === $parameter?->stringLiteral) {
+                    $dynamicGlobalParameters = true;
+                } else {
+                    $globalParameters[] = $parameter->stringLiteral->value;
+                }
+
+                continue;
+            }
             if ('trans' !== $call->method) {
                 continue;
             }
@@ -65,8 +85,22 @@ final class PhpTranslationReferenceExtractor
         }
         array_push($references, ...$this->helperReferences($uri, $text));
         usort($references, static fn (array $left, array $right): int => $left['offset'] <=> $right['offset']);
+        $globalParameters = array_values(array_unique($globalParameters));
+        sort($globalParameters);
 
-        return array_column($references, 'reference');
+        return new PhpTranslationFacts(
+            array_column($references, 'reference'),
+            $globalParameters,
+            $dynamicGlobalParameters,
+        );
+    }
+
+    private function hasGlobalParameterReceiver(PhpMethodCall $call, PhpDocument $document): bool
+    {
+        return array_any(
+            $document->receiverVariables($call),
+            static fn ($variable): bool => [] !== array_intersect(self::GLOBAL_PARAMETER_TRANSLATORS, $variable->types),
+        );
     }
 
     private function domain(?PhpArgument $argument): ?string
