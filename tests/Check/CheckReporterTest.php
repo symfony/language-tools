@@ -6,6 +6,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Check\BaselineEntry;
 use Symfony\Lsp\Check\CheckDiagnostic;
+use Symfony\Lsp\Check\CheckDiagnosticOccurrenceNumberer;
 use Symfony\Lsp\Check\CheckProjectResult;
 use Symfony\Lsp\Check\CheckReporter;
 use Symfony\Lsp\Check\CheckReportViewBuilder;
@@ -181,7 +182,7 @@ final class CheckReporterTest extends TestCase
     {
         return new CheckReporter(
             new SarifCheckReporter(new DiagnosticCodeRegistry(), '1.2.3'),
-            new CheckReportViewBuilder(),
+            new CheckReportViewBuilder(new CheckDiagnosticOccurrenceNumberer()),
         );
     }
 

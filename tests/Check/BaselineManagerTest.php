@@ -9,6 +9,7 @@ use Symfony\Lsp\Check\BaselineManager;
 use Symfony\Lsp\Check\BaselineMatcher;
 use Symfony\Lsp\Check\BaselineRepository;
 use Symfony\Lsp\Check\CheckDiagnostic;
+use Symfony\Lsp\Check\CheckDiagnosticOccurrenceNumberer;
 use Symfony\Lsp\Check\CheckFile;
 use Symfony\Lsp\Check\CheckOptions;
 use Symfony\Lsp\Check\DiagnosticCodeRegistry;
@@ -178,7 +179,7 @@ final class BaselineManagerTest extends TestCase
     {
         return new BaselineManager(
             new BaselineRepository($filesystem, new BaselineCodec(new DiagnosticCodeRegistry())),
-            new BaselineMatcher(),
+            new BaselineMatcher(new CheckDiagnosticOccurrenceNumberer()),
         );
     }
 

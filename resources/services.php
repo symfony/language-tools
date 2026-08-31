@@ -182,7 +182,7 @@ return static function (ContainerConfigurator $container): void {
         $services->remove($class);
     }
 
-    $services->load('Symfony\\Lsp\\Check\\', '../src/Check/*{Manager,Registry,Parser,Selector,Runner,Reporter,Command,Client,Factory,Analyzer,Executor,Builder,Codec,Repository,Matcher,Tokenizer}.php');
+    $services->load('Symfony\\Lsp\\Check\\', '../src/Check/*{Manager,Registry,Parser,Selector,Runner,Reporter,Command,Client,Factory,Analyzer,Executor,Builder,Codec,Repository,Matcher,Tokenizer,Numberer}.php');
     $services->load('Symfony\\Lsp\\Client\\', '../src/Client/*Client.php');
     $services->load('Symfony\\Lsp\\Document\\', '../src/Document/*{Resolver,Store,Synchronizer,Converter,Reader}.php');
     $services->load('Symfony\\Lsp\\Index\\', '../src/Index/*{Scanner,Handler,Store,Registry,Codec,Hasher,Enumerator,Pipeline,Processor,Manager}.php');

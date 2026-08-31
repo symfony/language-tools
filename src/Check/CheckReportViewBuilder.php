@@ -4,6 +4,10 @@ namespace Symfony\Lsp\Check;
 
 final class CheckReportViewBuilder
 {
+    public function __construct(private readonly CheckDiagnosticOccurrenceNumberer $occurrences)
+    {
+    }
+
     public function build(CheckResult $result, int $exitCode): CheckReportView
     {
         $projectsById = [];
@@ -11,16 +15,14 @@ final class CheckReportViewBuilder
             $projectsById[$project->id] = $project;
         }
 
-        $occurrences = [];
         $diagnostics = [];
         $active = 0;
-        foreach ($result->diagnostics as $diagnostic) {
-            $occurrence = ($occurrences[$diagnostic->fingerprint] ?? 0) + 1;
-            $occurrences[$diagnostic->fingerprint] = $occurrence;
+        foreach ($this->occurrences->number($result->diagnostics) as $occurrence) {
+            $diagnostic = $occurrence->diagnostic;
             $project = $projectsById[$diagnostic->project] ?? null;
             $diagnostics[] = new CheckReportDiagnosticView(
                 $diagnostic,
-                $occurrence,
+                $occurrence->number,
                 strstr($diagnostic->code, '.', true) ?: $diagnostic->code,
                 $project?->environment,
                 $project?->mode,

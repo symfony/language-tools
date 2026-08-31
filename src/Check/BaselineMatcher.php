@@ -4,6 +4,10 @@ namespace Symfony\Lsp\Check;
 
 final class BaselineMatcher
 {
+    public function __construct(private readonly CheckDiagnosticOccurrenceNumberer $occurrences)
+    {
+    }
+
     /**
      * @param list<CheckDiagnostic> $diagnostics
      *
@@ -11,11 +15,9 @@ final class BaselineMatcher
      */
     public function entries(array $diagnostics): array
     {
-        $occurrences = [];
         $entries = [];
-        foreach ($diagnostics as $diagnostic) {
-            $occurrence = ($occurrences[$diagnostic->fingerprint] ?? 0) + 1;
-            $occurrences[$diagnostic->fingerprint] = $occurrence;
+        foreach ($this->occurrences->number($diagnostics) as $occurrence) {
+            $diagnostic = $occurrence->diagnostic;
             $entries[] = new BaselineEntry(
                 $diagnostic->project,
                 $diagnostic->path,
@@ -24,7 +26,7 @@ final class BaselineMatcher
                 $diagnostic->source,
                 $diagnostic->message,
                 $diagnostic->fingerprint,
-                $occurrence,
+                $occurrence->number,
             );
         }
 
