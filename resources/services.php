@@ -22,6 +22,9 @@ use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipCodeLensProvider;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\DocumentLinkProviderRegistry;
+use Symfony\Lsp\Feature\Environment\EnvironmentCompletionProvider;
+use Symfony\Lsp\Feature\Environment\EnvironmentDiagnosticProvider;
+use Symfony\Lsp\Feature\Environment\EnvironmentRelationshipProvider;
 use Symfony\Lsp\Feature\Event\EventCodeLensProvider;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderRegistry;
@@ -147,7 +150,11 @@ return static function (ContainerConfigurator $container): void {
             LiveComponentEventProvider::class,
         ],
         'Translation' => [],
-        'Environment' => [],
+        'Environment' => [
+            EnvironmentCompletionProvider::class,
+            EnvironmentRelationshipProvider::class,
+            EnvironmentDiagnosticProvider::class,
+        ],
         'Configuration' => [],
         'Messenger' => [],
         'Event' => [],

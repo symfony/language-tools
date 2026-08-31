@@ -9,9 +9,13 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\Environment\EnvironmentCompletionProvider;
+use Symfony\Lsp\Feature\Environment\EnvironmentDiagnosticProvider;
 use Symfony\Lsp\Feature\Environment\EnvironmentExtractor;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
-use Symfony\Lsp\Feature\Environment\EnvironmentProvider;
+use Symfony\Lsp\Feature\Environment\EnvironmentProcessorChainValidator;
+use Symfony\Lsp\Feature\Environment\EnvironmentRelationshipProvider;
+use Symfony\Lsp\Feature\Environment\EnvironmentSymbolResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -58,7 +62,7 @@ final class EnvironmentProviderTest extends TestCase
             $extractor->extract('file:///workspace/.env', 'dotenv', "PARTIAL_ENV=value\n"),
             $extractor->extract($uri, 'yaml', $text),
         );
-        $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $twigComments, $phpComments, $yamlParser, $xmlComments);
+        [$completionProvider, , $diagnosticProvider] = $this->providers($documents, $projects, $converter, $indexes, $extractor, $twigComments, $phpComments, $yamlParser, $xmlComments);
 
         $facts = $extractor->extract($uri, 'yaml', $text);
         self::assertSame(['COMPLETE_ENV'], array_map(static fn ($reference): string => $reference->name, $facts->references));
@@ -66,7 +70,7 @@ final class EnvironmentProviderTest extends TestCase
 
         $completionStart = (int) strpos($text, 'PARTIAL_EN');
         $completionOffset = $completionStart + \strlen('PARTIAL_EN');
-        $completion = $provider->complete($this->positionParams($converter, $uri, $text, $completionOffset)) ?? [];
+        $completion = $completionProvider->complete($this->positionParams($converter, $uri, $text, $completionOffset)) ?? [];
         self::assertSame(['PARTIAL_ENV'], array_column($completion, 'label'));
         /** @var array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} $textEdit */
         $textEdit = $completion[0]['textEdit'];
@@ -74,7 +78,7 @@ final class EnvironmentProviderTest extends TestCase
 
         $malformed = '%env(MALFORMED_ENV%';
         $malformedOffset = (int) strpos($text, $malformed);
-        $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
         self::assertSame(['env.malformed_chain'], array_column($diagnostics, 'code'));
         self::assertSame($this->protocolRange($converter, $text, $malformedOffset, \strlen($malformed)), $diagnostics[0]['range'] ?? null);
     }
@@ -126,29 +130,29 @@ final class EnvironmentProviderTest extends TestCase
         $indexes = new EnvironmentIndexRegistry();
         $indexes->forProject($project)->replaceSources($extractor->extract('file:///workspace/.env', 'dotenv', "APP_URL=CANARY_SECRET_VALUE\n"), $extractor->extract($uri, 'yaml', $text));
         $indexes->forProject($project)->replaceProcessors(['custom' => 'string', 'json' => 'array']);
-        $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $commentParser, $phpComments, $yamlParser, $xmlComments);
+        [$completionProvider, $relationshipProvider, $diagnosticProvider] = $this->providers($documents, $projects, $converter, $indexes, $extractor, $commentParser, $phpComments, $yamlParser, $xmlComments);
         $position = $converter->toPosition($text, strpos($text, 'APP_UR') + \strlen('APP_UR'));
         $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
 
-        $completion = $provider->complete($params) ?? [];
+        $completion = $completionProvider->complete($params) ?? [];
         self::assertSame(['APP_URL'], array_column($completion, 'label'));
         self::assertSame([
             'range' => ['start' => ['line' => 0, 'character' => 16], 'end' => ['line' => 0, 'character' => 23]],
             'newText' => 'APP_URL',
         ], $completion[0]['textEdit'] ?? null);
-        $hover = $provider->hover($params);
+        $hover = $relationshipProvider->hover($params);
         self::assertIsArray($hover);
         self::assertStringNotContainsString('CANARY_SECRET_VALUE', json_encode($hover, \JSON_THROW_ON_ERROR));
-        self::assertSame(['file:///workspace/.env'], array_column($provider->definition($params) ?? [], 'uri'));
-        self::assertSame(['env.unknown_processor'], array_column($provider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+        self::assertSame(['file:///workspace/.env'], array_column($relationshipProvider->definition($params) ?? [], 'uri'));
+        self::assertSame(['env.unknown_processor'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
 
         $commentUri = 'file:///workspace/templates/comment.html.twig';
         $commentText = "{## %env(APP_UR) %env(APP_URL% #}\n{{ '%env(APP_URL%' }}";
         $documents->open(new Document($commentUri, 'twig', 1, $commentText));
         $commentPosition = $converter->toPosition($commentText, strpos($commentText, 'APP_UR') + \strlen('APP_UR'));
-        self::assertNull($provider->complete(['textDocument' => ['uri' => $commentUri], 'position' => ['line' => $commentPosition->line, 'character' => $commentPosition->character]]));
+        self::assertNull($completionProvider->complete(['textDocument' => ['uri' => $commentUri], 'position' => ['line' => $commentPosition->line, 'character' => $commentPosition->character]]));
         $malformedOffset = (int) strrpos($commentText, '%env(APP_URL%');
-        $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $commentUri]]) ?? [];
+        $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $commentUri]]) ?? [];
         self::assertSame(['env.malformed_chain'], array_column($diagnostics, 'code'));
         self::assertSame($this->protocolRange($converter, $commentText, $malformedOffset, \strlen('%env(APP_URL%')), $diagnostics[0]['range'] ?? null);
     }
@@ -173,33 +177,33 @@ final class EnvironmentProviderTest extends TestCase
             $extractor->extract($uri, $languageId, $text),
         );
         $indexes->forProject($project)->replaceProcessors(['json' => 'array']);
-        $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $twigComments, $phpComments, $yamlParser, $xmlComments);
+        [$completionProvider, $relationshipProvider, $diagnosticProvider] = $this->providers($documents, $projects, $converter, $indexes, $extractor, $twigComments, $phpComments, $yamlParser, $xmlComments);
 
         $commentCompletionOffset = strpos($text, 'APP_UR') + \strlen('APP_UR');
-        self::assertNull($provider->complete($this->positionParams($converter, $uri, $text, $commentCompletionOffset)));
+        self::assertNull($completionProvider->complete($this->positionParams($converter, $uri, $text, $commentCompletionOffset)));
         $liveNameStart = (int) strrpos($text, 'APP_URL');
         $liveCompletionOffset = $liveNameStart + \strlen('APP_UR');
-        $completion = $provider->complete($this->positionParams($converter, $uri, $text, $liveCompletionOffset)) ?? [];
+        $completion = $completionProvider->complete($this->positionParams($converter, $uri, $text, $liveCompletionOffset)) ?? [];
         self::assertSame(['APP_URL'], array_column($completion, 'label'));
         /** @var array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} $textEdit */
         $textEdit = $completion[0]['textEdit'];
         self::assertSame($this->protocolRange($converter, $text, $liveNameStart, \strlen('APP_URL')), $textEdit['range']);
 
         $commentHoverOffset = strpos($text, 'unknown:APP_URL') + \strlen('unknown:') + 1;
-        self::assertNull($provider->hover($this->positionParams($converter, $uri, $text, $commentHoverOffset)));
-        self::assertNull($provider->definition($this->positionParams($converter, $uri, $text, $commentHoverOffset)));
+        self::assertNull($relationshipProvider->hover($this->positionParams($converter, $uri, $text, $commentHoverOffset)));
+        self::assertNull($relationshipProvider->definition($this->positionParams($converter, $uri, $text, $commentHoverOffset)));
         $liveOffset = $liveNameStart + 1;
         $liveParams = $this->positionParams($converter, $uri, $text, $liveOffset);
-        self::assertIsArray($provider->hover($liveParams));
-        self::assertSame(['file:///workspace/.env'], array_column($provider->definition($liveParams) ?? [], 'uri'));
-        $references = $provider->references($liveParams) ?? [];
+        self::assertIsArray($relationshipProvider->hover($liveParams));
+        self::assertSame(['file:///workspace/.env'], array_column($relationshipProvider->definition($liveParams) ?? [], 'uri'));
+        $references = $relationshipProvider->references($liveParams) ?? [];
         self::assertSame([$uri], array_column($references, 'uri'));
         /** @var array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} $reference */
         $reference = $references[0];
         self::assertSame($this->protocolRange($converter, $text, $liveNameStart, \strlen('APP_URL')), $reference['range']);
 
         $realMalformedOffset = (int) strrpos($text, '%env(APP_URL%');
-        $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
         self::assertSame(['env.malformed_chain'], array_column($diagnostics, 'code'));
         self::assertSame($this->protocolRange($converter, $text, $realMalformedOffset, \strlen('%env(APP_URL%')), $diagnostics[0]['range'] ?? null);
     }
@@ -240,13 +244,13 @@ final class EnvironmentProviderTest extends TestCase
         $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $commentParser, $phpComments, $yamlParser, $xmlComments);
         $indexes = new EnvironmentIndexRegistry();
         $indexes->forProject($project)->replaceSources($extractor->extract('file:///workspace/.env', 'dotenv', "APP_URL=value\n"));
-        $provider = new EnvironmentProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, $commentParser, $phpComments, $yamlParser, $xmlComments);
+        [$completionProvider, , $diagnosticProvider] = $this->providers($documents, $projects, $converter, $indexes, $extractor, $commentParser, $phpComments, $yamlParser, $xmlComments);
         $completionOffset = strpos($text, 'APP_U') + \strlen('APP_U');
         $position = $converter->toPosition($text, $completionOffset);
 
-        self::assertNull($provider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]));
+        self::assertNull($completionProvider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]));
         $malformedOffset = (int) strrpos($text, '%env(APP_URL%');
-        $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
         self::assertSame(['env.malformed_chain'], array_column($diagnostics, 'code'));
         self::assertSame($this->protocolRange($converter, $text, $malformedOffset, \strlen('%env(APP_URL%')), $diagnostics[0]['range'] ?? null);
     }
@@ -263,6 +267,19 @@ final class EnvironmentProviderTest extends TestCase
             PHP);
 
         self::assertSame(['LIVE_ENV'], array_map(static fn ($reference): string => $reference->name, $facts->references));
+    }
+
+    /** @return array{EnvironmentCompletionProvider, EnvironmentRelationshipProvider, EnvironmentDiagnosticProvider} */
+    private function providers(DocumentStore $documents, ProjectRegistry $projects, PositionConverter $converter, EnvironmentIndexRegistry $indexes, EnvironmentExtractor $extractor, TwigCommentParser $twigComments, PhpCommentParser $phpComments, YamlDocumentParser $yamlParser, XmlCommentParser $xmlComments): array
+    {
+        $resolver = new DocumentContextResolver($documents, $projects);
+        $protocol = new LspProtocolMapper();
+
+        return [
+            new EnvironmentCompletionProvider($resolver, $converter, $protocol, $indexes, $twigComments, $phpComments, $yamlParser, $xmlComments),
+            new EnvironmentRelationshipProvider($protocol, $indexes, new EnvironmentSymbolResolver($resolver, $converter, $extractor)),
+            new EnvironmentDiagnosticProvider($resolver, $converter, $protocol, $indexes, $extractor, new EnvironmentProcessorChainValidator(), $twigComments, $phpComments, $yamlParser, $xmlComments),
+        ];
     }
 
     private function yamlParser(): YamlDocumentParser
