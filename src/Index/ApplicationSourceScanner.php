@@ -284,9 +284,8 @@ final class ApplicationSourceScanner implements ProjectStateInterface
             $payloads = [];
             $factsChanged = false;
             $changedProviders = [];
-            $requiresFullRuntimeTracking = $this->runtimeStructureHasher->requiresFullRuntimeTracking($relativePath, $text);
-            $runtimeStructure = $this->runtimeStructureHasher->hash($relativePath, $text);
-            if (null !== $runtimeStructure && $runtimeStructure === ($cachedEntry['runtimeStructure'] ?? null)) {
+            $runtimeStructure = $this->runtimeStructureHasher->analyze($relativePath, $text);
+            if (null !== $runtimeStructure->hash && $runtimeStructure->hash === ($cachedEntry['runtimeStructure'] ?? null)) {
                 $sourceFileChange = SourceFileChange::contentOnly();
             }
             foreach ($this->providers as $provider) {
@@ -316,11 +315,11 @@ final class ApplicationSourceScanner implements ProjectStateInterface
                 $changedProviders[] = $name;
             }
             if (null !== $cachedEntry && $sourceFileChange->requiresRuntimeRefresh()) {
-                $sourceFileChange = 'php' === $languageId && !$requiresFullRuntimeTracking && $factsChanged && [] === $changedProviders
+                $sourceFileChange = 'php' === $languageId && !$runtimeStructure->requiresFullTracking && $factsChanged && [] === $changedProviders
                     ? SourceFileChange::contentOnly()
                     : SourceFileChange::factsChanged($changedProviders);
             }
-            $entries[$relativePath] = $this->entry($path, $languageId, $hash, $runtimeStructure);
+            $entries[$relativePath] = $this->entry($path, $languageId, $hash, $runtimeStructure->hash);
             $this->store->append($project, $relativePath, $entries[$relativePath], $payloads);
         }
 
@@ -496,8 +495,8 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         foreach ($this->providers as $provider) {
             $payloads[$provider->name()] = $this->encodePayload($provider, $provider->index($project, $document));
         }
-        $runtimeStructure = $this->runtimeStructureHasher->hash($relativePath, $text);
-        $entry = $this->entry($path, $languageId, $hash, $runtimeStructure);
+        $runtimeStructure = $this->runtimeStructureHasher->analyze($relativePath, $text);
+        $entry = $this->entry($path, $languageId, $hash, $runtimeStructure->hash);
         $writer->add($relativePath, $entry, $payloads);
 
         return [$entry, true];

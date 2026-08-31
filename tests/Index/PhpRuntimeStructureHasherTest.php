@@ -12,10 +12,11 @@ final class PhpRuntimeStructureHasherTest extends TestCase
     public function testIgnoresOrdinaryMethodBodies(string $path): void
     {
         $hasher = new PhpRuntimeStructureHasher();
-        $original = '<?php final class Service { public function value(): int { return 1; } }';
-        $changed = '<?php final class Service { public function value(): int { return 2; } }';
+        $original = $hasher->analyze($path, '<?php final class Service { public function value(): int { return 1; } }');
+        $changed = $hasher->analyze($path, '<?php final class Service { public function value(): int { return 2; } }');
 
-        self::assertSame($hasher->hash($path, $original), $hasher->hash($path, $changed));
+        self::assertFalse($original->requiresFullTracking);
+        self::assertSame($original->hash, $changed->hash);
     }
 
     /** @return iterable<string, array{string}> */
@@ -32,20 +33,21 @@ final class PhpRuntimeStructureHasherTest extends TestCase
     public function testDetectsDeclarationChanges(): void
     {
         $hasher = new PhpRuntimeStructureHasher();
-        $original = '<?php final class Service { public function value(): int { return 1; } }';
-        $changed = '<?php final class Service { #[AutowireMethodOf] public function value(string $name): int { return 1; } }';
+        $original = $hasher->analyze('src/Service.php', '<?php final class Service { public function value(): int { return 1; } }');
+        $changed = $hasher->analyze('src/Service.php', '<?php final class Service { #[AutowireMethodOf] public function value(string $name): int { return 1; } }');
 
-        self::assertNotSame($hasher->hash('src/Service.php', $original), $hasher->hash('src/Service.php', $changed));
+        self::assertNotSame($original->hash, $changed->hash);
     }
 
     #[DataProvider('executedSourceProvider')]
     public function testPreservesBodiesThatCanRunWhileBuildingRuntimeMetadata(string $path, string $declaration): void
     {
         $hasher = new PhpRuntimeStructureHasher();
-        $original = '<?php '.$declaration.' { public function configure(): int { return 1; } }';
-        $changed = str_replace('return 1;', 'return 2;', $original);
+        $original = $hasher->analyze($path, '<?php '.$declaration.' { public function configure(): int { return 1; } }');
+        $changed = $hasher->analyze($path, '<?php '.$declaration.' { public function configure(): int { return 2; } }');
 
-        self::assertNotSame($hasher->hash($path, $original), $hasher->hash($path, $changed));
+        self::assertTrue($original->requiresFullTracking);
+        self::assertNotSame($original->hash, $changed->hash);
     }
 
     /** @return iterable<string, array{string, string}> */
@@ -66,6 +68,9 @@ final class PhpRuntimeStructureHasherTest extends TestCase
 
     public function testIgnoresNonPhpFiles(): void
     {
-        self::assertNull((new PhpRuntimeStructureHasher())->hash('templates/index.html.twig', '{{ value }}'));
+        $analysis = (new PhpRuntimeStructureHasher())->analyze('templates/index.html.twig', '{{ value }}');
+
+        self::assertNull($analysis->hash);
+        self::assertFalse($analysis->requiresFullTracking);
     }
 }
