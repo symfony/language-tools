@@ -255,7 +255,9 @@ final class LanguageServerTest extends TestCase
         $quiescentSince = null;
         while (microtime(true) < $deadline) {
             $contents = file_get_contents($logFile);
-            self::assertIsString($contents);
+            if (false === $contents) {
+                throw new \RuntimeException('The runtime bridge log is unavailable.');
+            }
             $initializations = substr_count($contents, "start\n");
             $completed = substr_count($contents, "finish\n");
             if ($initializations >= $minimum && $initializations === $completed) {
@@ -280,7 +282,9 @@ final class LanguageServerTest extends TestCase
     private function bridgeInitializationCount(string $logFile): int
     {
         $contents = file_get_contents($logFile);
-        self::assertIsString($contents);
+        if (false === $contents) {
+            throw new \RuntimeException('The runtime bridge log is unavailable.');
+        }
 
         return substr_count($contents, "start\n");
     }
