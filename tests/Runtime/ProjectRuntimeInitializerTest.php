@@ -21,10 +21,8 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Runtime\BridgeExecutionException;
 use Symfony\Lsp\Runtime\BridgeInstaller;
-use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\ProcessResult;
 use Symfony\Lsp\Runtime\ProcessRunnerInterface;
-use Symfony\Lsp\Runtime\ProjectRuntimeInitializer;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeRefreshMode;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
@@ -32,6 +30,7 @@ use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 use Symfony\Lsp\Runtime\RuntimeSnapshotState;
 use Symfony\Lsp\Runtime\RuntimeSnapshotStore;
 use Symfony\Lsp\Runtime\StatusRuntimeInitializer;
+use Symfony\Lsp\Tests\Support\Bridge\ProjectRuntimeInitializerFixtureBuilder;
 
 final class ProjectRuntimeInitializerTest extends TestCase
 {
@@ -90,17 +89,14 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'environment' => 'test',
             'bridgeTimeout' => 90,
         ]);
-        $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test', new Filesystem()),
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
             new RuntimeSnapshotLoaderRegistry([
                 new ProjectRouteSnapshotLoader($indexes),
                 new ProjectServiceSnapshotLoader($serviceIndexes, $parameterIndexes),
             ]),
-            $configuration,
-            new ContainerPathMapper($configuration),
             self::projects($project),
-            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
+            configuration: $configuration,
         );
 
         $initializer->initialize($project);
@@ -137,14 +133,11 @@ final class ProjectRuntimeInitializerTest extends TestCase
         ], \JSON_THROW_ON_ERROR), ''));
         $indexes = new RouteIndexRegistry();
         $configuration = new RuntimeConfiguration();
-        $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test', new Filesystem()),
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
             new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($indexes)]),
-            $configuration,
-            new ContainerPathMapper($configuration),
             $registry,
-            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
+            configuration: $configuration,
         );
 
         try {
@@ -170,14 +163,11 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'phpCommand' => ['docker', 'compose', 'exec', '-T', 'php', 'php'],
             'containerProjectRoot' => '/app',
         ]);
-        $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test', new Filesystem()),
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
             new RuntimeSnapshotLoaderRegistry([]),
-            $configuration,
-            new ContainerPathMapper($configuration),
             self::projects($project),
-            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
+            configuration: $configuration,
         );
 
         $initializer->initialize($project);
@@ -197,14 +187,11 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['debug' => false]);
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
-        $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test', new Filesystem()),
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(0, '', '')),
             new RuntimeSnapshotLoaderRegistry([]),
-            $configuration,
-            new ContainerPathMapper($configuration),
             self::projects($project),
-            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
+            configuration: $configuration,
         );
 
         $this->expectException(\RuntimeException::class);
@@ -221,14 +208,11 @@ final class ProjectRuntimeInitializerTest extends TestCase
             new ProcessResult(0, json_encode(['schemaVersion' => 1, 'sections' => []], \JSON_THROW_ON_ERROR), ''),
         );
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
-        $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test', new Filesystem()),
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
             new RuntimeSnapshotLoaderRegistry([]),
-            new RuntimeConfiguration(),
-            new ContainerPathMapper(new RuntimeConfiguration()),
             self::projects($project),
-            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
+            configuration: new RuntimeConfiguration(),
         );
 
         $initializer->initialize(
@@ -250,14 +234,11 @@ final class ProjectRuntimeInitializerTest extends TestCase
             new ProcessResult(0, json_encode(['schemaVersion' => 1, 'sections' => []], \JSON_THROW_ON_ERROR), ''),
         );
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
-        $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test', new Filesystem()),
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
             new RuntimeSnapshotLoaderRegistry([]),
-            new RuntimeConfiguration(),
-            new ContainerPathMapper(new RuntimeConfiguration()),
             self::projects($project),
-            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
+            configuration: new RuntimeConfiguration(),
         );
 
         $initializer->initialize(
@@ -277,8 +258,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $serviceIndexes = new ServiceIndexRegistry();
         $routeIndexes = new RouteIndexRegistry();
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
-        $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test', new Filesystem()),
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(0, json_encode([
                 'schemaVersion' => 1,
                 'errors' => [['section' => 'routes', 'message' => 'CANARY_RUNTIME_SECTION_ERROR']],
@@ -293,10 +273,8 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 new ProjectRouteSnapshotLoader($routeIndexes),
                 new ProjectServiceSnapshotLoader($serviceIndexes, new ParameterIndexRegistry()),
             ]),
-            new RuntimeConfiguration(),
-            new ContainerPathMapper(new RuntimeConfiguration()),
             self::projects($project),
-            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
+            configuration: new RuntimeConfiguration(),
         );
 
         $routeIndexes->forProject($project)->replace(new Route('existing', '/existing', [], [], null, null));
@@ -334,8 +312,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $routeIndexes = new RouteIndexRegistry();
         $serviceIndexes = new ServiceIndexRegistry();
         $state = new RuntimeSnapshotState();
-        $initializer = new ProjectRuntimeInitializer(
-            $bridgeInstaller,
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source, $bridgeInstaller))->build(
             new CapturingProcessRunner(new ProcessResult(0, json_encode([
                 'schemaVersion' => 1,
                 'errors' => [['section' => 'container', 'message' => 'CANARY_RUNTIME_SECTION_ERROR']],
@@ -352,12 +329,10 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 new ProjectRouteSnapshotLoader($routeIndexes),
                 new ProjectServiceSnapshotLoader($serviceIndexes, new ParameterIndexRegistry()),
             ]),
-            $configuration,
-            new ContainerPathMapper($configuration),
             $projects,
-            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
-            $store,
-            $state,
+            configuration: $configuration,
+            snapshotStore: $store,
+            snapshotState: $state,
         );
 
         try {
@@ -398,16 +373,14 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'configurationValidation' => ['status' => 'valid'],
             'sections' => ['routes' => ['complete' => true, 'items' => [['name' => 'stale', 'path' => '/stale']]]],
         ], \JSON_THROW_ON_ERROR), ''));
-        $initializer = new ProjectRuntimeInitializer(
-            $bridgeInstaller,
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source, $bridgeInstaller))->build(
             $processRunner,
             new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($routeIndexes)]),
-            $configuration,
-            new ContainerPathMapper($configuration),
             $projects,
-            new ProjectConfigurationValidationSnapshotLoader($validations),
-            $store,
-            $state,
+            configuration: $configuration,
+            configurationValidationLoader: new ProjectConfigurationValidationSnapshotLoader($validations),
+            snapshotStore: $store,
+            snapshotState: $state,
         );
 
         try {
@@ -429,8 +402,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         file_put_contents($source, '<?php');
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
         $validations = new ConfigurationValidationRegistry();
-        $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test', new Filesystem()),
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(0, json_encode([
                 'schemaVersion' => 1,
                 'project' => ['environment' => 'dev'],
@@ -443,10 +415,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 'errors' => [['section' => 'runtime', 'message' => 'CANARY_RUNTIME_SECTION_ERROR']],
             ], \JSON_THROW_ON_ERROR), '')),
             new RuntimeSnapshotLoaderRegistry([]),
-            new RuntimeConfiguration(),
-            new ContainerPathMapper(new RuntimeConfiguration()),
             self::projects($project),
-            new ProjectConfigurationValidationSnapshotLoader($validations),
+            configuration: new RuntimeConfiguration(),
+            configurationValidationLoader: new ProjectConfigurationValidationSnapshotLoader($validations),
         );
 
         try {
@@ -469,8 +440,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $firstState = new RuntimeSnapshotState();
         $firstStatuses = new ProjectIndexStatusRegistry($firstState);
         $first = new StatusRuntimeInitializer(
-            new ProjectRuntimeInitializer(
-                new BridgeInstaller($source, 'test', new Filesystem()),
+            (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
                 new CapturingProcessRunner(new ProcessResult(0, json_encode([
                     'schemaVersion' => 1,
                     'sections' => [
@@ -478,12 +448,10 @@ final class ProjectRuntimeInitializerTest extends TestCase
                     ],
                 ], \JSON_THROW_ON_ERROR), '')),
                 new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($firstIndexes)]),
-                $configuration,
-                new ContainerPathMapper($configuration),
                 $projects,
-                new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
-                new RuntimeSnapshotStore($configuration, new Filesystem()),
-                $firstState,
+                configuration: $configuration,
+                snapshotStore: new RuntimeSnapshotStore($configuration, new Filesystem()),
+                snapshotState: $firstState,
             ),
             $firstStatuses,
             $projects,
@@ -495,16 +463,13 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $restoredState = new RuntimeSnapshotState();
         $restoredStatuses = new ProjectIndexStatusRegistry($restoredState);
         $restored = new StatusRuntimeInitializer(
-            new ProjectRuntimeInitializer(
-                new BridgeInstaller($source, 'test', new Filesystem()),
+            (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
                 new CapturingProcessRunner(new ProcessResult(1, '', '')),
                 new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($restoredIndexes)]),
-                $configuration,
-                new ContainerPathMapper($configuration),
                 $projects,
-                new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
-                new RuntimeSnapshotStore($configuration, new Filesystem()),
-                $restoredState,
+                configuration: $configuration,
+                snapshotStore: new RuntimeSnapshotStore($configuration, new Filesystem()),
+                snapshotState: $restoredState,
             ),
             $restoredStatuses,
             $projects,
@@ -543,16 +508,13 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $indexes->forProject($project)->replace(new Route('current', '/current', [], [], null, null));
         $state = new RuntimeSnapshotState();
         $state->markReady($project);
-        $initializer = new ProjectRuntimeInitializer(
-            $bridgeInstaller,
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source, $bridgeInstaller))->build(
             new CapturingProcessRunner(new ProcessResult(1, '', '')),
             new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($indexes)]),
-            $configuration,
-            new ContainerPathMapper($configuration),
             $projects,
-            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
-            $store,
-            $state,
+            configuration: $configuration,
+            snapshotStore: $store,
+            snapshotState: $state,
         );
 
         try {
@@ -585,8 +547,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $state = new RuntimeSnapshotState();
         $statuses = new ProjectIndexStatusRegistry($state);
         $initializer = new StatusRuntimeInitializer(
-            new ProjectRuntimeInitializer(
-                $bridgeInstaller,
+            (new ProjectRuntimeInitializerFixtureBuilder($source, $bridgeInstaller))->build(
                 new CapturingProcessRunner(new ProcessResult(0, json_encode([
                     'schemaVersion' => 1,
                     'project' => ['environment' => 'dev'],
@@ -599,12 +560,11 @@ final class ProjectRuntimeInitializerTest extends TestCase
                     'errors' => [['section' => 'runtime', 'message' => 'CANARY_RUNTIME_SECTION_ERROR']],
                 ], \JSON_THROW_ON_ERROR), '')),
                 new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($indexes)]),
-                $configuration,
-                new ContainerPathMapper($configuration),
                 $projects,
-                new ProjectConfigurationValidationSnapshotLoader($validations),
-                $store,
-                $state,
+                configuration: $configuration,
+                configurationValidationLoader: new ProjectConfigurationValidationSnapshotLoader($validations),
+                snapshotStore: $store,
+                snapshotState: $state,
             ),
             $statuses,
             $projects,
@@ -628,16 +588,13 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
-        $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test', new Filesystem()),
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(1, '', "CANARY_SECRET_RUNTIME_OUTPUT\n")),
             new RuntimeSnapshotLoaderRegistry([
                 new ProjectRouteSnapshotLoader(new RouteIndexRegistry()),
             ]),
-            new RuntimeConfiguration(),
-            new ContainerPathMapper(new RuntimeConfiguration()),
             self::projects($project),
-            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
+            configuration: new RuntimeConfiguration(),
         );
 
         try {
@@ -660,18 +617,15 @@ final class ProjectRuntimeInitializerTest extends TestCase
         ], \JSON_THROW_ON_ERROR);
         $indexes = new RouteIndexRegistry();
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
-        $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test', new Filesystem()),
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(
                 0,
                 "Deprecated: something is deprecated in vendor/lib.php on line 1\n".$payload."\nstray shutdown output\n",
                 '',
             )),
             new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($indexes)]),
-            new RuntimeConfiguration(),
-            new ContainerPathMapper(new RuntimeConfiguration()),
             self::projects($project),
-            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
+            configuration: new RuntimeConfiguration(),
         );
 
         $initializer->initialize($project);
@@ -684,18 +638,15 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
-        $initializer = new ProjectRuntimeInitializer(
-            new BridgeInstaller($source, 'test', new Filesystem()),
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(
                 0,
                 "Deprecated: something is deprecated in vendor/lib.php on line 1\n",
                 "CANARY_SECRET_RUNTIME_OUTPUT\n",
             )),
             new RuntimeSnapshotLoaderRegistry([]),
-            new RuntimeConfiguration(),
-            new ContainerPathMapper(new RuntimeConfiguration()),
             self::projects($project),
-            new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
+            configuration: new RuntimeConfiguration(),
         );
 
         try {
