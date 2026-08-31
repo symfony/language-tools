@@ -136,6 +136,13 @@ final class ProbeFinderTest extends TestCase
         $this->assertPositionInsideValue($probes[0]);
     }
 
+    public function testIgnoresLargeFormTypesWithoutADataClass(): void
+    {
+        $this->write('src/Form/UnmappedType.php', "<?php\n".str_repeat("\$builder->add('unmapped', TextType::class);\n", 1000));
+
+        self::assertSame([], $this->probes(new ProbeFinder(), 'form.property.php'));
+    }
+
     public function testFindsAttributedTwigCallables(): void
     {
         $this->write('src/AppExtension.php', "<?php\nuse Twig\\Attribute\\AsTwigFunction;\nfinal class AppExtension\n{\n    #[AsTwigFunction('app_widget')]\n    public function widget() {}\n    #[\\Twig\\Attribute\\AsTwigFilter(name: 'app_short')]\n    public function shorten() {}\n}\n");

@@ -25,7 +25,7 @@ final class ProbeFinder
         ['category' => 'doctrine.field.repository.php', 'files' => '{\.php$}', 'pattern' => '{\b(?:findBy|findOneBy|count)\s*\(\s*\[\s*[\'\"]([A-Za-z_][A-Za-z0-9_]*)[\'\"]\s*=>}'],
         ['category' => 'doctrine.field.form.php', 'files' => '{\.php$}', 'pattern' => '{EntityType::class\s*,\s*\[[^;]+?[\'\"](?:choice_label|choice_value|group_by)[\'\"]\s*=>\s*[\'\"]([A-Za-z_][A-Za-z0-9_]*)}s'],
         ['category' => 'form.option.php', 'files' => '{\.php$}', 'pattern' => '{createForm\s*\([^,);]+,\s*[^,);]+,\s*\[[^;]+?[\'\"]([A-Za-z_][A-Za-z0-9_]*)[\'\"]\s*=>}s'],
-        ['category' => 'form.property.php', 'files' => '{\.php$}', 'pattern' => '{(?=.*[\'\"]data_class[\'\"]\s*=>\s*[\\\\A-Za-z_][A-Za-z0-9_\\\\]*::class).*?^[ \t]*(?:\$builder\s*)?->\s*add\s*\(\s*[\'\"]([A-Za-z_][A-Za-z0-9_]*)[\'\"](?!(?:(?!->\s*add\s*\(|;).)*[\'\"]mapped[\'\"]\s*=>\s*false)}sm'],
+        ['category' => 'form.property.php', 'files' => '{\.php$}', 'requiredText' => 'data_class', 'pattern' => '{(?=.*[\'\"]data_class[\'\"]\s*=>\s*[\\\\A-Za-z_][A-Za-z0-9_\\\\]*::class).*?^[ \t]*(?:\$builder\s*)?->\s*add\s*\(\s*[\'\"]([A-Za-z_][A-Za-z0-9_]*)[\'\"](?!(?:(?!->\s*add\s*\(|;).)*[\'\"]mapped[\'\"]\s*=>\s*false)}sm'],
         ['category' => 'constraint.option.php', 'files' => '{\.php$}', 'pattern' => '{Assert\\\\[A-Za-z_][A-Za-z0-9_]*\s*\([^\)]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)}s'],
         ['category' => 'translation.php', 'files' => '{\.php$}', 'pattern' => '{(?:->trans|\bt)\(\s*[\'\"]([^\'\"]+)}'],
         ['category' => 'translation.twig', 'files' => '{\.twig$}', 'pattern' => '{[\'\"]([^\'\"]+)[\'\"]\s*\|\s*trans\b}'],
@@ -57,6 +57,9 @@ final class ProbeFinder
                     break;
                 }
                 if (1 !== preg_match($definition['files'], $path)) {
+                    continue;
+                }
+                if (isset($definition['requiredText']) && !str_contains($contents, $definition['requiredText'])) {
                     continue;
                 }
                 $probe = $this->match($definition['category'], $definition['pattern'], $path, $contents);
