@@ -27,7 +27,11 @@ use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceFileEnumerator;
+use Symfony\Lsp\Index\SourceIndexFileProcessor;
+use Symfony\Lsp\Index\SourceIndexOverlayManager;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
+use Symfony\Lsp\Index\SourceIndexProviderInterface;
+use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
@@ -110,18 +114,9 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         $referenceIndexes = new RouteReferenceIndexRegistry($classIndexes);
         $positionConverter = new PositionConverter();
         $parser = new TolerantPhpParser(new Parser());
-        $scanner = new ApplicationSourceScanner(
+        $scanner = $this->scanner(
             $projects,
             new DocumentStore(),
-            new ProjectIndexStatusRegistry(),
-            new NullProgressReporter(),
-            new InMemorySourceIndexStore(),
-            new SourceIndexPayloadCodec(),
-            new PhpRuntimeStructureHasher(),
-            new UriToPathConverter(),
-            new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry()),
-            new LocalKeyedMutex(),
-            new ServerLogger(null, new SensitiveDataRedactor()),
             [
                 new ProjectRouteSourceIndexer(
                     new RouteDeclarationIndexRegistry(),
@@ -195,20 +190,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
             new ProjectPathResolver(new UriToPathConverter()),
         );
-        $scanner = new ApplicationSourceScanner(
-            $projects,
-            $documents,
-            new ProjectIndexStatusRegistry(),
-            new NullProgressReporter(),
-            new InMemorySourceIndexStore(),
-            new SourceIndexPayloadCodec(),
-            new PhpRuntimeStructureHasher(),
-            new UriToPathConverter(),
-            new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry()),
-            new LocalKeyedMutex(),
-            new ServerLogger(null, new SensitiveDataRedactor()),
-            [$indexer],
-        );
+        $scanner = $this->scanner($projects, $documents, [$indexer]);
 
         $scanner->indexAll();
 
@@ -247,5 +229,26 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         $scanner->updateOpenDocument(['textDocument' => ['uri' => $packageUri]]);
 
         self::assertSame([], $indexes->forProject($project)->find('fake_route'));
+    }
+
+    /** @param list<SourceIndexProviderInterface> $providers */
+    private function scanner(ProjectRegistry $projects, DocumentStore $documents, array $providers): ApplicationSourceScanner
+    {
+        $store = new InMemorySourceIndexStore();
+        $files = new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry());
+        $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), $providers);
+
+        return new ApplicationSourceScanner(
+            $projects,
+            new ProjectIndexStatusRegistry(),
+            new NullProgressReporter(),
+            $store,
+            $files,
+            new LocalKeyedMutex(),
+            new ServerLogger(null, new SensitiveDataRedactor()),
+            $pipeline,
+            new SourceIndexFileProcessor($store, $pipeline, new PhpRuntimeStructureHasher()),
+            new SourceIndexOverlayManager($projects, $documents, new UriToPathConverter(), $files, $pipeline),
+        );
     }
 }

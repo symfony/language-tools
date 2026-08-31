@@ -20,7 +20,10 @@ use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceFileEnumerator;
+use Symfony\Lsp\Index\SourceIndexFileProcessor;
+use Symfony\Lsp\Index\SourceIndexOverlayManager;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
+use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -66,29 +69,30 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
         $documents = new DocumentStore();
         $indexes = new DependencyInjectionSourceIndexRegistry();
         $converter = new PositionConverter();
+        $store = new InMemorySourceIndexStore();
+        $files = new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry());
+        $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), [new DependencyInjectionSourceIndexer(
+            $indexes,
+            new YamlDependencyInjectionExtractor(
+                new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+                new YamlDependencyInjectionDeclarationExtractor($converter),
+                new YamlDependencyInjectionReferenceExtractor($converter),
+            ),
+            new XmlDependencyInjectionExtractor($converter),
+            new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser())),
+            new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser())),
+        )]);
         $scanner = new ApplicationSourceScanner(
             $projects,
-            $documents,
             new ProjectIndexStatusRegistry(),
             new NullProgressReporter(),
-            new InMemorySourceIndexStore(),
-            new SourceIndexPayloadCodec(),
-            new PhpRuntimeStructureHasher(),
-            new UriToPathConverter(),
-            new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry()),
+            $store,
+            $files,
             new LocalKeyedMutex(),
             new ServerLogger(null, new SensitiveDataRedactor()),
-            [new DependencyInjectionSourceIndexer(
-                $indexes,
-                new YamlDependencyInjectionExtractor(
-                    new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
-                    new YamlDependencyInjectionDeclarationExtractor($converter),
-                    new YamlDependencyInjectionReferenceExtractor($converter),
-                ),
-                new XmlDependencyInjectionExtractor($converter),
-                new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser())),
-                new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser())),
-            )],
+            $pipeline,
+            new SourceIndexFileProcessor($store, $pipeline, new PhpRuntimeStructureHasher()),
+            new SourceIndexOverlayManager($projects, $documents, new UriToPathConverter(), $files, $pipeline),
         );
 
         $scanner->indexAll();

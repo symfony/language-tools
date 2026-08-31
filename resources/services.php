@@ -48,6 +48,7 @@ use Symfony\Lsp\Feature\Twig\TwigVariableProvider;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
+use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Index\SourceIndexStoreInterface;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\LastResultPhpCommentParser;
@@ -165,7 +166,7 @@ return static function (ContainerConfigurator $container): void {
     $services->load('Symfony\\Lsp\\Check\\', '../src/Check/*{Manager,Registry,Parser,Selector,Runner,Reporter,Command,Client}.php');
     $services->load('Symfony\\Lsp\\Client\\', '../src/Client/*Client.php');
     $services->load('Symfony\\Lsp\\Document\\', '../src/Document/*{Resolver,Store,Synchronizer,Converter,Reader}.php');
-    $services->load('Symfony\\Lsp\\Index\\', '../src/Index/*{Scanner,Handler,Store,Registry,Codec,Hasher,Enumerator}.php');
+    $services->load('Symfony\\Lsp\\Index\\', '../src/Index/*{Scanner,Handler,Store,Registry,Codec,Hasher,Enumerator,Pipeline,Processor,Manager}.php');
     $services->load('Symfony\\Lsp\\Parser\\', '../src/Parser/**/*{Parser,Decoder,Locator}.php');
     $services->set(BalancedDelimiterMatcher::class);
     $services->set(QuotedArgumentMatcher::class);
@@ -227,7 +228,7 @@ return static function (ContainerConfigurator $container): void {
         DocumentLinkProviderRegistry::class => 'lsp.provider.document_link',
         ReferencesProviderRegistry::class => 'lsp.provider.references',
         RenameProviderRegistry::class => 'lsp.provider.rename',
-        ApplicationSourceScanner::class => 'lsp.source_index_provider',
+        SourceIndexProviderPipeline::class => 'lsp.source_index_provider',
     ];
     foreach ($registries as $registry => $tag) {
         $services->get($registry)->arg('$providers', tagged_iterator($tag));

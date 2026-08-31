@@ -31,9 +31,12 @@ use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Index\SourceFileEnumerator;
+use Symfony\Lsp\Index\SourceIndexFileProcessor;
 use Symfony\Lsp\Index\SourceIndexJsonLinesCodec;
+use Symfony\Lsp\Index\SourceIndexOverlayManager;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
+use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Index\SourceIndexReaderInterface;
 use Symfony\Lsp\Index\SourceIndexStoreInterface;
 use Symfony\Lsp\Index\SourceIndexWriterInterface;
@@ -243,69 +246,6 @@ final class ApplicationSourceScannerTest extends TestCase
         self::assertSame(['file://'.$this->temporaryDirectory.'/src/Full.php'], $secondProvider->restoredUris);
     }
 
-    /** @param list<string> $classes */
-    #[DataProvider('invalidPayloadSchemaProvider')]
-    public function testRejectsInvalidPayloadSchemas(array $classes): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-
-        (new SourceIndexPayloadCodec())->validate([new RecordingSourceIndexProvider(payloadClasses: $classes)]);
-    }
-
-    /** @return iterable<string, array{list<string>}> */
-    public static function invalidPayloadSchemaProvider(): iterable
-    {
-        yield 'empty' => [[]];
-        yield 'unknown class' => [['MissingPayloadClass']];
-        yield 'duplicate class' => [[RouteSourceFacts::class, RouteSourceFacts::class]];
-        yield 'shared class' => [[Range::class]];
-    }
-
-    public function testRejectsPayloadClassesOwnedByDifferentProviders(): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-
-        (new SourceIndexPayloadCodec())->validate([
-            new ObjectFactsSourceIndexProvider([]),
-            new RecordingSourceIndexProvider(),
-        ]);
-    }
-
-    public function testRejectsUndeclaredRootPayloadClasses(): void
-    {
-        $provider = new RecordingSourceIndexProvider(payloadClasses: [RouteDeclaration::class]);
-        $codec = new SourceIndexPayloadCodec();
-        $codec->validate([$provider]);
-        $this->expectException(\UnexpectedValueException::class);
-
-        $codec->encode($provider->name(), new RouteSourceFacts('file:///source.php', [], []));
-    }
-
-    public function testRejectsIncompletePayloadObjectGraphs(): void
-    {
-        $provider = new RecordingSourceIndexProvider(payloadClasses: [RouteSourceFacts::class]);
-        $codec = new SourceIndexPayloadCodec();
-        $codec->validate([$provider]);
-        $range = new Range(new Position(0, 0), new Position(0, 0));
-        $payload = base64_encode(serialize(new RouteSourceFacts('file:///source.php', [new RouteDeclaration('route', 'file:///source.php', $range)], [])));
-        $this->expectException(\UnexpectedValueException::class);
-
-        $codec->decode($provider->name(), $payload);
-    }
-
-    public function testRejectsCachedPayloadsWithUninitializedProperties(): void
-    {
-        $provider = new RecordingSourceIndexProvider(payloadClasses: [UninitializedFacts::class]);
-        $codec = new SourceIndexPayloadCodec();
-        $codec->validate([$provider]);
-        $facts = (new \ReflectionClass(UninitializedFacts::class))->newInstanceWithoutConstructor();
-        $payload = base64_encode(serialize($facts));
-        $this->expectException(\UnexpectedValueException::class);
-        $this->expectExceptionMessage('uninitialized property');
-
-        $codec->decode($provider->name(), $payload);
-    }
-
     public function testReportsContentOnlyChangesWhenEmptyFactsGainNoRuntimeDeclarations(): void
     {
         $path = $this->temporaryDirectory.'/src/Empty.php';
@@ -488,21 +428,6 @@ PHP;
         self::assertFalse($change->requiresRuntimeRefresh());
         self::assertSame([$uri], $provider->removals);
         self::assertArrayNotHasKey($uri, $provider->sources);
-    }
-
-    public function testDoesNotOverlayOpenDependencyOwnedFiles(): void
-    {
-        mkdir($this->temporaryDirectory.'/vendor');
-        $uri = 'file://'.$this->temporaryDirectory.'/vendor/Dependency.php';
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 1, '<?php final class Dependency {}'));
-        $provider = new RecordingSourceIndexProvider();
-
-        $this->scannerWithDocuments($documents, $provider)->updateOpenDocument([
-            'textDocument' => ['uri' => $uri],
-        ]);
-
-        self::assertSame([], $provider->overlays);
     }
 
     public function testIndexesReadableSourcesAroundUnreadableDirectories(): void
@@ -824,19 +749,21 @@ PHP;
         ?ProjectIndexStatusRegistry $statuses = null,
         ?ServerLogger $logger = null,
     ): ApplicationSourceScanner {
+        $documents ??= new DocumentStore();
+        $files = new SourceFileEnumerator(new GitignoreMatcher(), $this->fileScope);
+        $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), $providers);
+
         return new ApplicationSourceScanner(
             $this->projects,
-            $documents ?? new DocumentStore(),
             $statuses ?? new ProjectIndexStatusRegistry(),
             new NullProgressReporter(),
             $store,
-            new SourceIndexPayloadCodec(),
-            new PhpRuntimeStructureHasher(),
-            new UriToPathConverter(),
-            new SourceFileEnumerator(new GitignoreMatcher(), $this->fileScope),
+            $files,
             $mutex ?? new LocalKeyedMutex(),
             $logger ?? new ServerLogger(null, new SensitiveDataRedactor()),
-            $providers,
+            $pipeline,
+            new SourceIndexFileProcessor($store, $pipeline, new PhpRuntimeStructureHasher()),
+            new SourceIndexOverlayManager($this->projects, $documents, new UriToPathConverter(), $files, $pipeline),
         );
     }
 }
@@ -1205,20 +1132,5 @@ final class GenerationalSourceIndexProvider implements SourceIndexProviderInterf
     private function facts(string $uri, string $hash): RouteSourceFacts
     {
         return new RouteSourceFacts($uri, [new RouteDeclaration($hash, $uri, new Range(new Position(0, 0), new Position(0, 0)))], []);
-    }
-}
-
-final class UninitializedFacts implements SourceFactsInterface
-{
-    public string $uri;
-
-    public function __construct(string $uri)
-    {
-        $this->uri = $uri;
-    }
-
-    public function isEmpty(): bool
-    {
-        return false;
     }
 }

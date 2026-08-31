@@ -12,7 +12,10 @@ use Symfony\Lsp\Index\IndexCommandHandler;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceFileEnumerator;
+use Symfony\Lsp\Index\SourceIndexFileProcessor;
+use Symfony\Lsp\Index\SourceIndexOverlayManager;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
+use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
@@ -54,20 +57,7 @@ final class IndexCommandHandlerTest extends TestCase
             '^8.0',
         )]);
         $statuses = new ProjectIndexStatusRegistry();
-        $sourceScanner = new ApplicationSourceScanner(
-            $projects,
-            new DocumentStore(),
-            $statuses,
-            new NullProgressReporter(),
-            new InMemorySourceIndexStore(),
-            new SourceIndexPayloadCodec(),
-            new PhpRuntimeStructureHasher(),
-            new UriToPathConverter(),
-            new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry()),
-            new LocalKeyedMutex(),
-            new ServerLogger(null, new SensitiveDataRedactor()),
-            [],
-        );
+        $sourceScanner = $this->scanner($projects, $statuses);
         $runtime = new RecordingRuntimeInitializer();
         $workspaceTrust = new WorkspaceTrust();
         $workspaceTrust->set($project, TrustStatus::Trusted);
@@ -124,20 +114,7 @@ final class IndexCommandHandlerTest extends TestCase
             '^8.0',
         )]);
         $statuses = new ProjectIndexStatusRegistry();
-        $sourceScanner = new ApplicationSourceScanner(
-            $projects,
-            new DocumentStore(),
-            $statuses,
-            new NullProgressReporter(),
-            new InMemorySourceIndexStore(),
-            new SourceIndexPayloadCodec(),
-            new PhpRuntimeStructureHasher(),
-            new UriToPathConverter(),
-            new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry()),
-            new LocalKeyedMutex(),
-            new ServerLogger(null, new SensitiveDataRedactor()),
-            [],
-        );
+        $sourceScanner = $this->scanner($projects, $statuses);
         $runtime = new RecordingRuntimeInitializer(1);
         $workspaceTrust = new WorkspaceTrust();
         $workspaceTrust->set($project, TrustStatus::Trusted);
@@ -157,6 +134,27 @@ final class IndexCommandHandlerTest extends TestCase
 
         self::assertSame([$this->temporaryDirectory, $this->temporaryDirectory], $runtime->projects);
         self::assertSame('ready', $result[0]['runtime']['state'] ?? null);
+    }
+
+    private function scanner(ProjectRegistry $projects, ProjectIndexStatusRegistry $statuses): ApplicationSourceScanner
+    {
+        $documents = new DocumentStore();
+        $store = new InMemorySourceIndexStore();
+        $files = new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry());
+        $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), []);
+
+        return new ApplicationSourceScanner(
+            $projects,
+            $statuses,
+            new NullProgressReporter(),
+            $store,
+            $files,
+            new LocalKeyedMutex(),
+            new ServerLogger(null, new SensitiveDataRedactor()),
+            $pipeline,
+            new SourceIndexFileProcessor($store, $pipeline, new PhpRuntimeStructureHasher()),
+            new SourceIndexOverlayManager($projects, $documents, new UriToPathConverter(), $files, $pipeline),
+        );
     }
 }
 
