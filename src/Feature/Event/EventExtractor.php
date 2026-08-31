@@ -24,6 +24,8 @@ final class EventExtractor
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $parser,
         private readonly PhpCommentParserInterface $phpComments,
+        private readonly EventYamlListenerAnalyzer $yamlListenerAnalyzer,
+        private readonly EventSubscriberMapAnalyzer $subscriberMapAnalyzer,
     ) {
     }
 
@@ -33,7 +35,7 @@ final class EventExtractor
             return $this->extractPhp($uri, $text);
         }
         if ('yaml' === $languageId) {
-            return new EventSourceFacts($uri, $this->yamlSymbols($uri, $text));
+            return new EventSourceFacts($uri, $this->yamlListenerAnalyzer->symbols($uri, $text));
         }
 
         return new EventSourceFacts($uri, []);
@@ -51,16 +53,8 @@ final class EventExtractor
             ) {
                 return $match[2];
             }
-            preg_match_all('/function\s+getSubscribedEvents\s*\([^)]*\)[^{]*\{/', $masked, $subscriberMethods, \PREG_OFFSET_CAPTURE);
-            foreach ($subscriberMethods[0] as [$declaration, $declarationOffset]) {
-                $open = $declarationOffset + \strlen($declaration) - 1;
-                if ($offset <= $open || $offset > $this->matchingBrace($masked, $open)) {
-                    continue;
-                }
-                $bodyBefore = substr($masked, $open + 1, $offset - $open - 1);
-                if (preg_match('/(?:\[|,)\s*["\']([^"\']*)$/s', $bodyBefore, $match)) {
-                    return $match[1];
-                }
+            if (null !== $prefix = $this->subscriberMapAnalyzer->completionPrefix($masked, $offset)) {
+                return $prefix;
             }
             $dispatchers = $this->eventDispatcherVariables($php);
             if (preg_match('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:addListener\s*\(\s*|dispatch\s*\([^,\r\n]+,\s*)["\']([^"\']*)$/', $before, $match)) {
@@ -71,7 +65,7 @@ final class EventExtractor
             }
         }
         if ('yaml' === $languageId) {
-            return $this->yamlCompletionPrefix($before);
+            return $this->yamlListenerAnalyzer->completionPrefix($before);
         }
 
         return null;
@@ -140,86 +134,9 @@ final class EventExtractor
             }
         }
 
-        preg_match_all('/function\s+getSubscribedEvents\s*\([^)]*\)[^{]*\{/', $source, $subscriberMethods, \PREG_OFFSET_CAPTURE);
-        foreach ($subscriberMethods[0] as [$declaration, $declarationOffset]) {
-            $open = $declarationOffset + \strlen($declaration) - 1;
-            $close = $this->matchingBrace($source, $open);
-            $body = substr($source, $open + 1, $close - $open - 1);
-            preg_match_all('/["\']([^"\']+)["\']\s*=>/', $body, $stringEvents, \PREG_OFFSET_CAPTURE);
-            foreach ($stringEvents[1] as [$name, $offset]) {
-                $symbols[] = $this->symbol($name, $uri, $text, $open + 1 + $offset, true);
-            }
-            preg_match_all('/([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)::class\s*=>/', $body, $classEvents, \PREG_OFFSET_CAPTURE);
-            foreach ($classEvents[1] as [$name, $offset]) {
-                $symbols[] = $this->symbol($php->resolveName($name), $uri, $text, $open + 1 + $offset, true, \strlen($name));
-            }
-        }
+        array_push($symbols, ...$this->subscriberMapAnalyzer->symbols($uri, $text, $source, $php));
 
         return new EventSourceFacts($uri, $this->unique($symbols), $invalidListenerMethods, $listeners);
-    }
-
-    private function yamlCompletionPrefix(string $text): ?string
-    {
-        $listenerIndent = null;
-        $lines = preg_split('/\R/', $text);
-        if (false === $lines) {
-            return null;
-        }
-        $lastLine = array_key_last($lines);
-        foreach ($lines as $index => $line) {
-            if (preg_match('/^(\s*)-\s*(?:\{\s*)?name\s*:\s*["\']?kernel\.event_listener["\']?(.*)$/', $line, $tag)) {
-                $listenerIndent = \strlen($tag[1]);
-                if ($index === $lastLine && preg_match('/\bevent\s*:\s*["\']?([A-Za-z0-9_.\\\\-]*)$/', $tag[2], $event)) {
-                    return $event[1];
-                }
-                continue;
-            }
-            if (null === $listenerIndent || !preg_match('/^(\s*)/', $line, $indentMatch)) {
-                continue;
-            }
-            $indent = \strlen($indentMatch[1]);
-            if ('' !== trim($line) && $indent <= $listenerIndent) {
-                $listenerIndent = null;
-                continue;
-            }
-            if ($index === $lastLine && preg_match('/^\s*event\s*:\s*["\']?([A-Za-z0-9_.\\\\-]*)$/', $line, $event)) {
-                return $event[1];
-            }
-        }
-
-        return null;
-    }
-
-    /** @return list<EventSourceSymbol> */
-    private function yamlSymbols(string $uri, string $text): array
-    {
-        $symbols = [];
-        $listenerIndent = null;
-        preg_match_all('/^.*(?:\R|$)/m', $text, $lines, \PREG_OFFSET_CAPTURE);
-        foreach ($lines[0] as [$line, $lineOffset]) {
-            $line = rtrim($line, "\r\n");
-            if (preg_match('/^(\s*)-\s*(?:\{\s*)?name\s*:\s*["\']?kernel\.event_listener["\']?(.*)$/', $line, $tag)) {
-                $listenerIndent = \strlen($tag[1]);
-                if (preg_match('/\bevent\s*:\s*["\']?([A-Za-z0-9_.\\\\-]+)/', $tag[2], $event, \PREG_OFFSET_CAPTURE)) {
-                    $offset = $lineOffset + (int) strpos($line, $tag[2]) + $event[1][1];
-                    $symbols[] = $this->symbol($event[1][0], $uri, $text, $offset, true);
-                }
-                continue;
-            }
-            if (null === $listenerIndent || !preg_match('/^(\s*)/', $line, $indentMatch)) {
-                continue;
-            }
-            $indent = \strlen($indentMatch[1]);
-            if ('' !== trim($line) && $indent <= $listenerIndent) {
-                $listenerIndent = null;
-                continue;
-            }
-            if (preg_match('/^\s*event\s*:\s*["\']?([A-Za-z0-9_.\\\\-]+)/', $line, $event, \PREG_OFFSET_CAPTURE)) {
-                $symbols[] = $this->symbol($event[1][0], $uri, $text, $lineOffset + $event[1][1], true);
-            }
-        }
-
-        return $symbols;
     }
 
     private function symbol(string $name, string $uri, string $text, int $offset, bool $declaration, ?int $length = null): EventSourceSymbol
@@ -264,20 +181,6 @@ final class EventExtractor
         }
 
         return $variables;
-    }
-
-    private function matchingBrace(string $text, int $open): int
-    {
-        $depth = 0;
-        for ($offset = $open, $length = \strlen($text); $offset < $length; ++$offset) {
-            if ('{' === $text[$offset]) {
-                ++$depth;
-            } elseif ('}' === $text[$offset] && 0 === --$depth) {
-                return $offset;
-            }
-        }
-
-        return \strlen($text);
     }
 
     /**

@@ -26,6 +26,8 @@ use Symfony\Lsp\Feature\Environment\EnvironmentCompletionProvider;
 use Symfony\Lsp\Feature\Environment\EnvironmentDiagnosticProvider;
 use Symfony\Lsp\Feature\Environment\EnvironmentRelationshipProvider;
 use Symfony\Lsp\Feature\Event\EventCodeLensProvider;
+use Symfony\Lsp\Feature\Event\EventSubscriberMapAnalyzer;
+use Symfony\Lsp\Feature\Event\EventYamlListenerAnalyzer;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderRegistry;
 use Symfony\Lsp\Feature\Messenger\MessengerCodeLensProvider;
@@ -157,7 +159,10 @@ return static function (ContainerConfigurator $container): void {
         ],
         'Configuration' => [],
         'Messenger' => [],
-        'Event' => [],
+        'Event' => [
+            EventYamlListenerAnalyzer::class,
+            EventSubscriberMapAnalyzer::class,
+        ],
         'Security' => [],
         'Metadata' => [],
         'Asset' => [],

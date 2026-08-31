@@ -23,6 +23,8 @@ use Symfony\Lsp\Feature\Event\EventListener;
 use Symfony\Lsp\Feature\Event\EventRelationshipProvider;
 use Symfony\Lsp\Feature\Event\EventRelationshipResolver;
 use Symfony\Lsp\Feature\Event\EventSourceIndexRegistry;
+use Symfony\Lsp\Feature\Event\EventSubscriberMapAnalyzer;
+use Symfony\Lsp\Feature\Event\EventYamlListenerAnalyzer;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
@@ -34,7 +36,7 @@ final class EventProviderTest extends TestCase
     public function testExtractsHighConfidenceEventReferences(): void
     {
         $converter = new PositionConverter();
-        $extractor = new EventExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = $this->extractor($converter);
         $php = <<<'PHP'
 <?php
 namespace App;
@@ -78,9 +80,42 @@ YAML;
         self::assertSame('legacy.order_placed', $extractor->extract('file:///workspace/config/services.yaml', 'yaml', $yaml)->symbols[0]->name);
     }
 
+    public function testExtractsAndCompletesYamlListenerEventsWithByteExactRanges(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = $this->extractor($converter);
+        $text = <<<'YAML'
+            services:
+              App\InlineListener:
+                tags:
+                  - { name: kernel.event_listener, event: 'legacy.order_placed' }
+              App\BlockListener:
+                tags:
+                  - name: kernel.event_listener
+                    event: App\Event\OrderPlaced
+            YAML;
+        $facts = $extractor->extract('file:///workspace/config/services.yaml', 'yaml', $text);
+
+        self::assertSame(['legacy.order_placed', 'App\Event\OrderPlaced'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
+        self::assertSame(
+            ['legacy.order_placed', 'App\Event\OrderPlaced'],
+            array_map(static function ($symbol) use ($converter, $text): string {
+                $start = $converter->toByteOffset($text, $symbol->range->start);
+                $end = $converter->toByteOffset($text, $symbol->range->end);
+
+                return substr($text, $start, $end - $start);
+            }, $facts->symbols),
+        );
+
+        $inline = "services:\n  App\\Listener:\n    tags:\n      - { name: kernel.event_listener, event: 'legacy.or";
+        $block = "services:\n  App\\Listener:\n    tags:\n      - name: kernel.event_listener\n        event: App\\Event\\Ord";
+        self::assertSame('legacy.or', $extractor->completionPrefix('yaml', $inline, \strlen($inline)));
+        self::assertSame('App\Event\Ord', $extractor->completionPrefix('yaml', $block, \strlen($block)));
+    }
+
     public function testScopesEventDispatcherParametersToTheirMethod(): void
     {
-        $extractor = new EventExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = $this->extractor();
         $facts = $extractor->extract('file:///workspace/src/Dispatch.php', 'php', <<<'PHP'
             <?php
             namespace App;
@@ -107,7 +142,7 @@ YAML;
     public function testIndexesOnlyDirectPositionalEventCreations(): void
     {
         $converter = new PositionConverter();
-        $extractor = new EventExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = $this->extractor($converter);
         $text = <<<'PHP'
             <?php
             namespace App;
@@ -189,7 +224,7 @@ PHP;
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new EventExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = $this->extractor($converter);
         $indexes = new EventIndexRegistry();
         $indexes->forProject($project)->replace(
             [new Event('App\\Event\\OrderPlaced', 'App\\Event\\OrderPlaced')],
@@ -237,7 +272,7 @@ PHP;
 
     public function testIgnoresCommentedPhpEventConstructs(): void
     {
-        $extractor = new EventExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App;
@@ -263,6 +298,19 @@ PHP;
         self::assertSame([], $facts->listeners);
     }
 
+    private function extractor(?PositionConverter $converter = null): EventExtractor
+    {
+        $converter ??= new PositionConverter();
+
+        return new EventExtractor(
+            $converter,
+            new TolerantPhpParser(new Parser()),
+            new PhpCommentParser(),
+            new EventYamlListenerAnalyzer($converter),
+            new EventSubscriberMapAnalyzer($converter),
+        );
+    }
+
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
     private function params(string $uri, Position $position): array
     {
@@ -272,7 +320,7 @@ PHP;
     #[DataProvider('eventListenerAttributeCompletionProvider')]
     public function testCompletesEventNamesOnlyInResolvedEventListenerAttributes(string $text, ?string $expectedPrefix): void
     {
-        $extractor = new EventExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = $this->extractor();
 
         self::assertSame($expectedPrefix, $extractor->completionPrefix('php', $text, \strlen($text)));
     }
@@ -300,7 +348,7 @@ PHP;
 
     public function testOffersNoEventCompletionsInsidePhpComments(): void
     {
-        $extractor = new EventExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = $this->extractor();
         $text = "<?php\n// #[AsEventListener(event: 'app.or";
 
         self::assertNull($extractor->completionPrefix('php', $text, \strlen($text)));
