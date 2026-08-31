@@ -152,6 +152,17 @@ final class TranslationExtractorTest extends TestCase
         self::assertSame(['page.title'], array_map(static fn ($item): string => $item->key, $references));
     }
 
+    public function testExtractsTwigFiltersSeparatedByComments(): void
+    {
+        $references = $this->extractor()->extract('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+            {{ 'page.title'
+                # keep the key literal
+                | trans }}
+            TWIG)->references;
+
+        self::assertSame(['page.title'], array_map(static fn ($reference): string => $reference->key, $references));
+    }
+
     public function testToleratesIncompleteJsonAndXliffResources(): void
     {
         $extractor = $this->extractor();

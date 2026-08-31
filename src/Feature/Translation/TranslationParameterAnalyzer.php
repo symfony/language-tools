@@ -68,7 +68,7 @@ final class TranslationParameterAnalyzer
         $keyParsed = false;
         foreach (token_get_all('<?php '.$parameters) as $token) {
             if (\is_array($token)) {
-                if (\T_ELLIPSIS === $token[0] && 0 === $depth) {
+                if (\T_ELLIPSIS === $token[0]) {
                     return null;
                 }
                 if (\in_array($token[0], [\T_CURLY_OPEN, \T_DOLLAR_OPEN_CURLY_BRACES], true)) {

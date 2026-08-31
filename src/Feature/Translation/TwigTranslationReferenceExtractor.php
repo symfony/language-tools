@@ -24,12 +24,13 @@ final class TwigTranslationReferenceExtractor
     public function extract(string $uri, string $text): array
     {
         $document = $this->parser->parse($text);
+        $masked = $this->comments->mask($text);
         $defaultDomain = $this->defaultDomain($document);
 
         return [
-            ...$this->filterReferences($uri, $text, $document, $defaultDomain),
+            ...$this->filterReferences($uri, $text, $masked, $document, $defaultDomain),
             ...$this->functionReferences($uri, $text, $document, $defaultDomain),
-            ...$this->tagReferences($uri, $text, $defaultDomain),
+            ...$this->tagReferences($uri, $text, $masked, $defaultDomain),
         ];
     }
 
@@ -41,16 +42,16 @@ final class TwigTranslationReferenceExtractor
                 continue;
             }
 
-            $domain = $document->directStringLiteral($statement);
-
-            return null === $domain ? 'messages' : $domain->value;
+            if (null !== $domain = $document->directStringLiteral($statement)) {
+                return $domain->value;
+            }
         }
 
         return 'messages';
     }
 
     /** @return list<TranslationReference> */
-    private function filterReferences(string $uri, string $text, TwigDocument $document, string $defaultDomain): array
+    private function filterReferences(string $uri, string $text, string $masked, TwigDocument $document, string $defaultDomain): array
     {
         $literals = [];
         foreach (['string', 'interpolated_string'] as $type) {
@@ -67,7 +68,7 @@ final class TwigTranslationReferenceExtractor
             if (null === $identifier || 'trans' !== $document->text($identifier)) {
                 continue;
             }
-            $key = $this->filteredLiteral($text, $filter, $literals);
+            $key = $this->filteredLiteral($masked, $filter, $literals);
             if (null === $key) {
                 continue;
             }
@@ -91,7 +92,7 @@ final class TwigTranslationReferenceExtractor
     /**
      * @param list<array{parent: int|null, literal: TwigStringLiteral}> $literals
      */
-    private function filteredLiteral(string $text, TreeSitterNode $filter, array $literals): ?TwigStringLiteral
+    private function filteredLiteral(string $source, TreeSitterNode $filter, array $literals): ?TwigStringLiteral
     {
         $candidate = null;
         foreach ($literals as $literal) {
@@ -105,7 +106,7 @@ final class TwigTranslationReferenceExtractor
         if (null === $candidate) {
             return null;
         }
-        $separator = substr($text, $candidate->endOffset + 1, $filter->startByte - $candidate->endOffset - 1);
+        $separator = substr($source, $candidate->endOffset + 1, $filter->startByte - $candidate->endOffset - 1);
 
         return 1 === preg_match('/^\s*\|\s*$/D', $separator) ? $candidate : null;
     }
@@ -168,11 +169,11 @@ final class TwigTranslationReferenceExtractor
     }
 
     /** @return list<TranslationReference> */
-    private function tagReferences(string $uri, string $text, string $defaultDomain): array
+    private function tagReferences(string $uri, string $text, string $masked, string $defaultDomain): array
     {
         preg_match_all(
             '/{%\s*trans(?:\s+from\s+(?|(\')((?:\\\\.|[^\'\\\\])+)\'|(\")((?:\\\\.|[^\"#\\\\])+)\"))?\s*%}(.+?){%\s*endtrans\s*%}/s',
-            $this->comments->mask($text),
+            $masked,
             $matches,
             \PREG_OFFSET_CAPTURE,
         );
