@@ -18,6 +18,7 @@ final class EnvironmentExtractor
         private readonly PhpCommentParserInterface $phpComments,
         private readonly YamlDocumentParser $yamlParser,
         private readonly XmlCommentParser $xmlComments,
+        private readonly EnvironmentExpressionParser $expressionParser = new EnvironmentExpressionParser(),
     ) {
     }
 
@@ -63,20 +64,13 @@ final class EnvironmentExtractor
     /** @return list<EnvironmentReference> */
     private function references(string $uri, string $text, string $referenceText, int $baseOffset = 0): array
     {
-        preg_match_all('/%env\(([^)%]+)\)%/', $referenceText, $matches, \PREG_OFFSET_CAPTURE);
         $references = [];
-        foreach ($matches[1] as [$expression, $offset]) {
-            $parts = explode(':', $expression);
-            $name = array_pop($parts);
-            if (1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name)) {
-                continue;
-            }
-            $nameOffset = $baseOffset + $offset + \strlen($expression) - \strlen($name);
+        foreach ($this->expressionParser->parseAll($referenceText, $baseOffset) as $expression) {
             $references[] = new EnvironmentReference(
-                $name,
+                $expression->variableName,
                 $uri,
-                $this->converter->toRange($text, $nameOffset, \strlen($name)),
-                $parts,
+                $this->converter->toRange($text, $expression->variableRange->startByte, $expression->variableRange->endByte - $expression->variableRange->startByte),
+                $expression->processorChain,
             );
         }
 
