@@ -17,16 +17,26 @@ final class InProcessLanguageServerHarness
     }
 
     /**
-     * @param list<array<string, mixed>|ProtocolMessageExpectation> $steps
+     * @param list<array<string, mixed>|LanguageServerTranscriptAction|ProtocolMessageExpectation> $steps
      */
     public function run(array $steps): LanguageServerTranscript
     {
         $output = new CapturingWritableStream();
         $input = new ReadableIterableStream((function () use ($steps, $output): \Generator {
             $messageOffset = 0;
+            $pendingFrames = '';
             foreach ($steps as $step) {
                 if (\is_array($step)) {
-                    yield $this->codec->encode($step);
+                    $pendingFrames .= $this->codec->encode($step);
+
+                    continue;
+                }
+                if ('' !== $pendingFrames) {
+                    yield $pendingFrames;
+                    $pendingFrames = '';
+                }
+                if ($step instanceof LanguageServerTranscriptAction) {
+                    $step->run();
 
                     continue;
                 }
@@ -45,6 +55,9 @@ final class InProcessLanguageServerHarness
                 } while (microtime(true) < $deadline);
 
                 throw new \RuntimeException(\sprintf("Timed out waiting for %s.\nRaw transcript:\n%s\nDecoded transcript:\n%s", $step->description, $output->contents(), json_encode($this->codec->decodeAvailable($output->contents()), \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR)));
+            }
+            if ('' !== $pendingFrames) {
+                yield $pendingFrames;
             }
         })());
 

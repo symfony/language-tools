@@ -2,15 +2,14 @@
 
 namespace Symfony\Lsp\Tests\Server;
 
-use Amp\ByteStream\ReadableBuffer;
-use Amp\ByteStream\ReadableIterableStream;
-use Fabpot\JsonRpc\ContentLengthJsonRpcTransport;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Server\LanguageServerFactory;
-use Symfony\Lsp\Server\ServerVersion;
-use Symfony\Lsp\Tests\Support\CapturingWritableStream;
+use Symfony\Lsp\Tests\Support\InProcessLanguageServerHarness;
+use Symfony\Lsp\Tests\Support\LanguageServerTranscriptAction;
+use Symfony\Lsp\Tests\Support\ProtocolMessageExpectation;
+use Symfony\Lsp\Tests\Support\RuntimeApplicationFixture;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 use function Amp\delay;
 
@@ -18,17 +17,16 @@ final class LanguageServerTest extends TestCase
 {
     public function testLifecycleTranscript(): void
     {
-        $input = new ReadableBuffer(
-            $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => new \stdClass()]).
-            $this->frame(['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => new \stdClass()]).
-            $this->frame(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'shutdown']).
-            $this->frame(['jsonrpc' => '2.0', 'method' => 'exit'])
-        );
-        $output = new CapturingWritableStream();
+        $transcript = (new InProcessLanguageServerHarness())->run([
+            ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => new \stdClass()],
+            new ProtocolMessageExpectation('the initialize response', static fn (array $message): bool => 1 === ($message['id'] ?? null)),
+            ['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => new \stdClass()],
+            ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'shutdown'],
+            new ProtocolMessageExpectation('the shutdown response', static fn (array $message): bool => 2 === ($message['id'] ?? null)),
+            ['jsonrpc' => '2.0', 'method' => 'exit'],
+        ]);
 
-        $exitCode = (new LanguageServerFactory())->create($input, $output)->run();
-
-        self::assertSame(0, $exitCode);
+        self::assertSame(0, $transcript->exitCode, $transcript->raw);
         self::assertSame([
             [
                 'jsonrpc' => '2.0',
@@ -78,127 +76,116 @@ final class LanguageServerTest extends TestCase
                 'id' => 2,
                 'result' => null,
             ],
-        ], $this->decodeFrames($output->contents()));
+        ], $transcript->messages);
     }
 
     public function testUsesServerVersionForSourceAndRuntimeIndexes(): void
     {
-        $version = '9.8.7-test';
-        $root = realpath(\dirname(__DIR__).'/Fixtures/RuntimeApplication');
-        self::assertIsString($root);
-        $input = new ReadableBuffer(
-            $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => [
-                'rootUri' => 'file://'.$root,
-                'capabilities' => new \stdClass(),
-                'initializationOptions' => ['workspaceTrust' => true],
-            ]]).
-            $this->frame(['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []]).
-            $this->frame(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'workspace/executeCommand', 'params' => [
-                'command' => 'symfony.refreshIndex',
-            ]]).
-            $this->frame(['jsonrpc' => '2.0', 'id' => 3, 'method' => 'shutdown', 'params' => []]).
-            $this->frame(['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []])
-        );
-        $output = new CapturingWritableStream();
-
+        $fixture = new RuntimeApplicationFixture('9.8.7-test');
+        $version = $fixture->serverVersion->value();
         try {
-            $exitCode = (new LanguageServerFactory(new ServerVersion($version)))->create($input, $output)->run();
-            $messages = $this->decodeFrames($output->contents());
+            $transcript = (new InProcessLanguageServerHarness(new LanguageServerFactory($fixture->serverVersion)))->run([
+                ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => [
+                    'rootUri' => 'file://'.$fixture->rootPath,
+                    'capabilities' => new \stdClass(),
+                    'initializationOptions' => ['workspaceTrust' => true],
+                ]],
+                new ProtocolMessageExpectation('the initialize response', static fn (array $message): bool => 1 === ($message['id'] ?? null)),
+                ['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []],
+                ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'workspace/executeCommand', 'params' => [
+                    'command' => 'symfony.refreshIndex',
+                ]],
+                new ProtocolMessageExpectation('the refresh response', static fn (array $message): bool => 2 === ($message['id'] ?? null)),
+                ['jsonrpc' => '2.0', 'id' => 3, 'method' => 'shutdown', 'params' => []],
+                new ProtocolMessageExpectation('the shutdown response', static fn (array $message): bool => 3 === ($message['id'] ?? null)),
+                ['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []],
+            ]);
 
-            self::assertSame(0, $exitCode);
-            self::assertIsArray($messages[0]['result'] ?? null);
-            self::assertIsArray($messages[0]['result']['serverInfo'] ?? null);
-            self::assertSame($version, $messages[0]['result']['serverInfo']['version'] ?? null);
-            self::assertFileExists($root.'/var/symfony-lsp/'.$version.'/index/source.jsonl');
-            self::assertCount(1, glob($root.'/var/symfony-lsp/'.$version.'/*/bridge.php') ?: []);
-            self::assertCount(1, glob($root.'/var/symfony-lsp/'.$version.'/*/runtime/*.json') ?: []);
+            self::assertSame(0, $transcript->exitCode, $transcript->raw);
+            self::assertIsArray($transcript->messages[0]['result'] ?? null);
+            self::assertIsArray($transcript->messages[0]['result']['serverInfo'] ?? null);
+            self::assertSame($version, $transcript->messages[0]['result']['serverInfo']['version'] ?? null);
+            self::assertFileExists($fixture->cachePath.'/index/source.jsonl');
+            self::assertCount(1, glob($fixture->cachePath.'/*/bridge.php') ?: []);
+            self::assertCount(1, glob($fixture->cachePath.'/*/runtime/*.json') ?: []);
         } finally {
-            $this->removeDirectory($root.'/var/symfony-lsp/'.$version);
+            $fixture->cleanup();
         }
     }
 
     public function testWatchedComposerChangeBootsRuntimeOnce(): void
     {
-        $root = realpath(\dirname(__DIR__).'/Fixtures/RuntimeApplication');
-        self::assertIsString($root);
-        $logFile = tempnam(sys_get_temp_dir(), 'symfony-lsp-runtime-');
-        self::assertIsString($logFile);
+        $fixture = new RuntimeApplicationFixture();
+        $workspace = new TestWorkspace('symfony-lsp-runtime-');
+        $logFile = $workspace->write('runtime.log', '');
         $initializationsBeforeChange = 0;
         $initializationsAfterChange = 0;
-        $composerFile = $root.'/composer.json';
-        $composerContents = file_get_contents($composerFile);
-        self::assertIsString($composerContents);
-        $frames = [
-            $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => [
-                'rootUri' => 'file://'.$root,
-                'capabilities' => new \stdClass(),
-                'initializationOptions' => ['runtimeIndexing' => true, 'workspaceTrust' => true],
-            ]]),
-            $this->frame(['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []]),
-            $this->frame(['jsonrpc' => '2.0', 'method' => 'workspace/didChangeWatchedFiles', 'params' => [
-                'changes' => [['uri' => 'file://'.$root.'/composer.json', 'type' => 2]],
-            ]]),
-            $this->frame(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'shutdown']),
-            $this->frame(['jsonrpc' => '2.0', 'method' => 'exit']),
-        ];
-        $input = new ReadableIterableStream((function () use ($frames, $logFile, $composerFile, $composerContents, &$initializationsBeforeChange, &$initializationsAfterChange): \Generator {
-            yield $frames[0];
-            yield $frames[1];
-            $this->waitForBridgeInitializations($logFile, 1);
-            $initializationsBeforeChange = $this->bridgeInitializationCount($logFile);
-            file_put_contents($composerFile, $composerContents."\n");
-            yield $frames[2];
-            $this->waitForBridgeInitializations($logFile, 2);
-            $initializationsAfterChange = $this->bridgeInitializationCount($logFile);
-            yield $frames[3];
-            yield $frames[4];
-        })());
-        $output = new CapturingWritableStream();
         $countingPhpCommand = realpath(\dirname(__DIR__).'/Fixtures/counting-php-command.php');
         self::assertIsString($countingPhpCommand);
 
         try {
-            self::assertSame(0, (new LanguageServerFactory(defaultPhpCommand: [\PHP_BINARY, $countingPhpCommand, $logFile]))->create($input, $output)->run());
+            $transcript = (new InProcessLanguageServerHarness(new LanguageServerFactory(
+                $fixture->serverVersion,
+                [\PHP_BINARY, $countingPhpCommand, $logFile],
+            )))->run([
+                ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => [
+                    'rootUri' => 'file://'.$fixture->rootPath,
+                    'capabilities' => new \stdClass(),
+                    'initializationOptions' => ['runtimeIndexing' => true, 'workspaceTrust' => true],
+                ]],
+                new ProtocolMessageExpectation('the initialize response', static fn (array $message): bool => 1 === ($message['id'] ?? null)),
+                ['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []],
+                new LanguageServerTranscriptAction(function () use ($logFile, &$initializationsBeforeChange): void {
+                    $this->waitForBridgeInitializations($logFile, 1);
+                    $initializationsBeforeChange = $this->bridgeInitializationCount($logFile);
+                }),
+                ['jsonrpc' => '2.0', 'method' => 'workspace/didChangeWatchedFiles', 'params' => [
+                    'changes' => [['uri' => 'file://'.$fixture->rootPath.'/composer.json', 'type' => 2]],
+                ]],
+                new LanguageServerTranscriptAction(function () use ($logFile, &$initializationsAfterChange): void {
+                    $this->waitForBridgeInitializations($logFile, 2);
+                    $initializationsAfterChange = $this->bridgeInitializationCount($logFile);
+                }),
+                ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'shutdown'],
+                new ProtocolMessageExpectation('the shutdown response', static fn (array $message): bool => 2 === ($message['id'] ?? null)),
+                ['jsonrpc' => '2.0', 'method' => 'exit'],
+            ]);
+
+            self::assertSame(0, $transcript->exitCode, $transcript->raw);
             self::assertSame(1, $initializationsBeforeChange);
             self::assertSame(1, $initializationsAfterChange - $initializationsBeforeChange);
         } finally {
-            file_put_contents($composerFile, $composerContents);
-            $this->removeDirectory($root.'/var/symfony-lsp/dev');
-            @unlink($logFile);
+            $fixture->cleanup();
+            $workspace->cleanup();
         }
     }
 
     #[DataProvider('composerFileProvider')]
     public function testWatchedComposerChangesCanCreateProgressWithoutDeadlockingListener(string $composerFile): void
     {
-        $root = realpath(\dirname(__DIR__).'/Fixtures/RuntimeApplication');
-        self::assertIsString($root);
-        $frames = [
-            $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => [
-                'rootUri' => 'file://'.$root,
-                'capabilities' => ['window' => ['workDoneProgress' => true]],
-                'initializationOptions' => ['runtimeIndexing' => false],
-            ]]),
-            $this->frame(['jsonrpc' => '2.0', 'method' => 'workspace/didChangeWatchedFiles', 'params' => [
-                'changes' => [['uri' => 'file://'.$root.'/'.$composerFile, 'type' => 2]],
-            ]]),
-            $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'result' => null]),
-            $this->frame(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'shutdown']),
-            $this->frame(['jsonrpc' => '2.0', 'method' => 'exit']),
-        ];
-        $input = new ReadableIterableStream((static function () use ($frames): \Generator {
-            foreach ($frames as $frame) {
-                yield $frame;
-                delay(0);
-            }
-        })());
-        $output = new CapturingWritableStream();
-
+        $fixture = new RuntimeApplicationFixture();
         try {
-            self::assertSame(0, (new LanguageServerFactory())->create($input, $output)->run());
-            self::assertContains('window/workDoneProgress/create', array_column($this->decodeFrames($output->contents()), 'method'));
+            $transcript = (new InProcessLanguageServerHarness(new LanguageServerFactory($fixture->serverVersion)))->run([
+                ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => [
+                    'rootUri' => 'file://'.$fixture->rootPath,
+                    'capabilities' => ['window' => ['workDoneProgress' => true]],
+                    'initializationOptions' => ['runtimeIndexing' => false],
+                ]],
+                new ProtocolMessageExpectation('the initialize response', static fn (array $message): bool => 1 === ($message['id'] ?? null) && !isset($message['method'])),
+                ['jsonrpc' => '2.0', 'method' => 'workspace/didChangeWatchedFiles', 'params' => [
+                    'changes' => [['uri' => 'file://'.$fixture->rootPath.'/'.$composerFile, 'type' => 2]],
+                ]],
+                new ProtocolMessageExpectation('the progress creation request', static fn (array $message): bool => 'window/workDoneProgress/create' === ($message['method'] ?? null)),
+                ['jsonrpc' => '2.0', 'id' => 1, 'result' => null],
+                ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'shutdown'],
+                new ProtocolMessageExpectation('the shutdown response', static fn (array $message): bool => 2 === ($message['id'] ?? null) && !isset($message['method'])),
+                ['jsonrpc' => '2.0', 'method' => 'exit'],
+            ]);
+
+            self::assertSame(0, $transcript->exitCode, $transcript->raw);
+            self::assertContains('window/workDoneProgress/create', array_column($transcript->messages, 'method'));
         } finally {
-            $this->removeDirectory($root.'/var/symfony-lsp/dev');
+            $fixture->cleanup();
         }
     }
 
@@ -211,34 +198,35 @@ final class LanguageServerTest extends TestCase
 
     public function testReportsCancelledFeatureRequestsWithoutAnInternalError(): void
     {
-        $input = new ReadableBuffer(
-            $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => []]).
-            $this->frame(['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []]).
-            $this->frame(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'textDocument/completion', 'params' => []]).
-            $this->frame(['jsonrpc' => '2.0', 'method' => '$/cancelRequest', 'params' => ['id' => 2]]).
-            $this->frame(['jsonrpc' => '2.0', 'id' => 3, 'method' => 'shutdown', 'params' => []]).
-            $this->frame(['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []])
-        );
-        $output = new CapturingWritableStream();
+        $transcript = (new InProcessLanguageServerHarness())->run([
+            ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => []],
+            new ProtocolMessageExpectation('the initialize response', static fn (array $message): bool => 1 === ($message['id'] ?? null)),
+            ['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []],
+            ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'textDocument/completion', 'params' => []],
+            ['jsonrpc' => '2.0', 'method' => '$/cancelRequest', 'params' => ['id' => 2]],
+            new ProtocolMessageExpectation('the cancellation response', static fn (array $message): bool => 2 === ($message['id'] ?? null)),
+            ['jsonrpc' => '2.0', 'id' => 3, 'method' => 'shutdown', 'params' => []],
+            new ProtocolMessageExpectation('the shutdown response', static fn (array $message): bool => 3 === ($message['id'] ?? null)),
+            ['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []],
+        ]);
 
-        self::assertSame(0, (new LanguageServerFactory())->create($input, $output)->run());
-        $responses = $this->decodeFrames($output->contents());
+        self::assertSame(0, $transcript->exitCode, $transcript->raw);
         self::assertSame([
             'jsonrpc' => '2.0',
             'id' => 2,
             'error' => ['code' => -32800, 'message' => 'Request cancelled.'],
-        ], $responses[1]);
+        ], $transcript->messages[1]);
     }
 
     public function testRejectsFeatureRequestsBeforeInitialization(): void
     {
-        $input = new ReadableBuffer(
-            $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'textDocument/completion', 'params' => []]).
-            $this->frame(['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []])
-        );
-        $output = new CapturingWritableStream();
+        $transcript = (new InProcessLanguageServerHarness())->run([
+            ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'textDocument/completion', 'params' => []],
+            new ProtocolMessageExpectation('the rejection response', static fn (array $message): bool => 1 === ($message['id'] ?? null)),
+            ['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []],
+        ]);
 
-        self::assertSame(1, (new LanguageServerFactory())->create($input, $output)->run());
+        self::assertSame(1, $transcript->exitCode, $transcript->raw);
         self::assertSame([[
             'jsonrpc' => '2.0',
             'id' => 1,
@@ -246,49 +234,18 @@ final class LanguageServerTest extends TestCase
                 'code' => -32002,
                 'message' => 'The server has not been initialized.',
             ],
-        ]], $this->decodeFrames($output->contents()));
+        ]], $transcript->messages);
     }
 
     public function testExitWithoutShutdownIsUnsuccessful(): void
     {
-        $input = new ReadableBuffer(
-            $this->frame(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => []]).
-            $this->frame(['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []])
-        );
+        $transcript = (new InProcessLanguageServerHarness())->run([
+            ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => []],
+            new ProtocolMessageExpectation('the initialize response', static fn (array $message): bool => 1 === ($message['id'] ?? null)),
+            ['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []],
+        ]);
 
-        self::assertSame(1, (new LanguageServerFactory())
-            ->create($input, new CapturingWritableStream())
-            ->run());
-    }
-
-    /**
-     * @param array<array-key, mixed> $message
-     */
-    private function frame(array $message): string
-    {
-        $json = json_encode($message, \JSON_THROW_ON_ERROR);
-
-        return 'Content-Length: '.\strlen($json)."\r\n\r\n".$json;
-    }
-
-    /**
-     * @return list<array<array-key, mixed>>
-     */
-    private function decodeFrames(string $frames): array
-    {
-        $transport = new ContentLengthJsonRpcTransport(
-            new ReadableBuffer($frames),
-            new CapturingWritableStream(),
-        );
-        $messages = [];
-
-        while (null !== $message = $transport->receive()) {
-            $decoded = json_decode($message, true, 512, \JSON_THROW_ON_ERROR);
-            self::assertIsArray($decoded);
-            $messages[] = $decoded;
-        }
-
-        return $messages;
+        self::assertSame(1, $transcript->exitCode, $transcript->raw);
     }
 
     private function waitForBridgeInitializations(string $logFile, int $minimum): void
@@ -326,10 +283,5 @@ final class LanguageServerTest extends TestCase
         self::assertIsString($contents);
 
         return substr_count($contents, "start\n");
-    }
-
-    private function removeDirectory(string $directory): void
-    {
-        (new Filesystem())->remove($directory);
     }
 }
