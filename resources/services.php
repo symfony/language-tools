@@ -34,6 +34,7 @@ use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Feature\Route\RouteSnapshotLoader;
 use Symfony\Lsp\Feature\Security\SecurityUserProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusCodeLensProvider;
+use Symfony\Lsp\Feature\Translation\TranslationParameterAnalyzer;
 use Symfony\Lsp\Feature\Twig\LiveComponentEventProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCodeActionProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCompletionHandler;
@@ -171,6 +172,7 @@ return static function (ContainerConfigurator $container): void {
     $services->set(BalancedDelimiterMatcher::class);
     $services->set(QuotedArgumentMatcher::class);
     $services->set(TwigQuotedArgumentMatcher::class);
+    $services->set(TranslationParameterAnalyzer::class);
     $services->set(XmlCommentParser::class);
     $services->set(YamlCommentParser::class);
     $services->load('Symfony\\Lsp\\Project\\', '../src/Project/*{Discovery,Registry,Resolver,Settings,Converter,Configuration,Trust,Manager,Matcher,Cleaner}.php');
