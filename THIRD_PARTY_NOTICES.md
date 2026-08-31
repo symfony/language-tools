@@ -37,7 +37,7 @@ The Tree-sitter parser ships compiled into the server binaries.
 | Component | Revision | License |
 | --- | --- | --- |
 | tree-sitter | `64402de2857cc197ecc4ca3bc144ea91fda7e72e` | MIT License |
-| tree-sitter-twig | `0afd9a6d808944e65a7be393e31868b85345735f` with a local string-escape fix | WTFPL |
+| tree-sitter-twig | `2208d2a3c3ee7ef378e97df2e51c18feb7ee9dfc` | MIT License |
 | tree-sitter-yaml | `a1c4812a73ec5e089de8e441fdea3a921e8d5079` | MIT License |
 | Unicode data used by tree-sitter | Unicode License V3 |
 
