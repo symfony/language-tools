@@ -275,6 +275,40 @@ final class CheckExecutableTest extends TestCase
         self::assertStringNotContainsString('APP_SECRET', $result['stdout'].$result['stderr']);
     }
 
+    public function testDoesNotOverlayExplicitExcludedFilesAfterOperationalRuntimeFailure(): void
+    {
+        file_put_contents($this->directory.'/.symfony-lsp.json', json_encode([
+            'version' => 1,
+            'excludePaths' => ['config/**'],
+        ], \JSON_THROW_ON_ERROR));
+        mkdir($this->directory.'/vendor');
+        file_put_contents($this->directory.'/vendor/autoload.php', <<<'PHP'
+            <?php
+            namespace Composer;
+            final class InstalledVersions
+            {
+                public static function getPrettyVersion(string $package): ?string { return '8.0.6'; }
+            }
+            namespace App;
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function boot(): void { throw new \RuntimeException('token=CANARY_RUNTIME_SECRET'); }
+                public function shutdown(): void {}
+            }
+            PHP);
+
+        $result = $this->execute(['check', '--format=json', '--workspace='.$this->directory, 'config/services.yaml']);
+        $report = $this->decodeReport($result['stdout']);
+
+        self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode']);
+        self::assertFalse($report['complete']);
+        self::assertSame([], $report['diagnostics']);
+        self::assertSame('operational', $report['errors'][0]['category']);
+        self::assertIsArray($report['errors'][0]['cause'] ?? null);
+        self::assertStringNotContainsString('CANARY_RUNTIME_SECRET', $result['stdout'].$result['stderr']);
+    }
+
     public function testBaselineCreationMatchingAndStrictStaleEnforcement(): void
     {
         $baseline = $this->directory.'/baseline.json';
@@ -398,6 +432,36 @@ final class CheckExecutableTest extends TestCase
         self::assertStringContainsString('timed out', $result['stderr']);
     }
 
+    public function testCancelsDuringSourceRefreshBeforeDiagnostics(): void
+    {
+        if ('Windows' === \PHP_OS_FAMILY || !\function_exists('pcntl_signal')) {
+            self::markTestSkipped('The source executable integration requires Unix signals.');
+        }
+        for ($index = 0; $index < 256; ++$index) {
+            file_put_contents(\sprintf('%s/config/service_%03d.yaml', $this->directory, $index), "parameters:\n    value: '%env(APP_SECRET%\'\n");
+        }
+
+        $process = $this->start(['check', '--source-only', '--format=json', '--workspace='.$this->directory]);
+        $deadline = microtime(true) + 10;
+        do {
+            $indexFiles = glob($this->directory.'/var/symfony-lsp/*/index/source.jsonl.tmp') ?: [];
+            if ([] !== $indexFiles) {
+                break;
+            }
+            usleep(1_000);
+        } while ($process->isRunning() && microtime(true) < $deadline);
+        self::assertNotSame([], $indexFiles, 'The source refresh did not start before the deadline.');
+        $process->signal(\SIGINT);
+        $result = $this->awaitProcess($process);
+        $report = $this->decodeReport($result['stdout']);
+
+        self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode'], $result['stderr']);
+        self::assertFalse($report['complete']);
+        self::assertSame([], $report['diagnostics']);
+        self::assertStringContainsString('was canceled', $report['errors'][0]['message'] ?? '');
+        self::assertStringNotContainsString('timed out', $result['stderr']);
+    }
+
     public function testRejectsMissingExplicitConfigurationFiles(): void
     {
         $result = $this->execute([
@@ -475,14 +539,29 @@ final class CheckExecutableTest extends TestCase
      */
     private function execute(array $arguments, array $environment = []): array
     {
+        return $this->awaitProcess($this->start($arguments, $environment));
+    }
+
+    /**
+     * @param list<string>          $arguments
+     * @param array<string, string> $environment
+     */
+    private function start(array $arguments, array $environment = []): Process
+    {
         $root = \dirname(__DIR__, 2);
         $inheritedEnvironment = getenv();
-        $process = Process::start(
+
+        return Process::start(
             [Path::join($root, 'bin/symfony-lsp'), ...$arguments],
             workingDirectory: $root,
             environment: [...$inheritedEnvironment, ...$environment],
             options: ['bypass_shell' => true],
         );
+    }
+
+    /** @return array{stdout: string, stderr: string, exitCode: int} */
+    private function awaitProcess(Process $process): array
+    {
         $futures = [
             'stdout' => async(static fn (): string => buffer($process->getStdout())),
             'stderr' => async(static fn (): string => buffer($process->getStderr())),
