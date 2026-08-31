@@ -12,10 +12,12 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDefinitionHandler;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionProjectLookup;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionReferencesHandler;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolResolver;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
@@ -157,8 +159,7 @@ final class DependencyInjectionNavigationTest extends TestCase
                 $contextResolver,
                 new LspProtocolMapper(),
                 $resolver,
-                $sourceIndexes,
-                $serviceIndexes,
+                new DependencyInjectionProjectLookup($serviceIndexes, new ParameterIndexRegistry(), $sourceIndexes),
             ),
             new DependencyInjectionReferencesHandler($contextResolver, new LspProtocolMapper(), $resolver, $sourceIndexes),
             $params,

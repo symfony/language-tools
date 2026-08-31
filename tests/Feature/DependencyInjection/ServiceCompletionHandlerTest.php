@@ -9,6 +9,7 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionProjectLookup;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\Parameter;
@@ -71,9 +72,7 @@ final class ServiceCompletionHandlerTest extends TestCase
             new DocumentContextResolver($documents, $projects),
             $converter,
             new LspProtocolMapper(),
-            $indexes,
-            $parameterIndexes,
-            $sourceIndexes,
+            new DependencyInjectionProjectLookup($indexes, $parameterIndexes, $sourceIndexes),
             new PhpCommentParser(),
         );
 
@@ -135,9 +134,7 @@ final class ServiceCompletionHandlerTest extends TestCase
             new DocumentContextResolver($documents, $projects),
             $converter,
             new LspProtocolMapper(),
-            $serviceIndexes,
-            $parameterIndexes,
-            $sourceIndexes,
+            new DependencyInjectionProjectLookup($serviceIndexes, $parameterIndexes, $sourceIndexes),
             new PhpCommentParser(),
         );
 
@@ -176,9 +173,11 @@ final class ServiceCompletionHandlerTest extends TestCase
             new DocumentContextResolver($documents, $projects),
             $converter,
             new LspProtocolMapper(),
-            new ServiceIndexRegistry(),
-            $parameterIndexes,
-            new DependencyInjectionSourceIndexRegistry(),
+            new DependencyInjectionProjectLookup(
+                new ServiceIndexRegistry(),
+                $parameterIndexes,
+                new DependencyInjectionSourceIndexRegistry(),
+            ),
             new PhpCommentParser(),
         );
         $uri = 'file:///workspace/src/Service.php';
@@ -220,9 +219,11 @@ final class ServiceCompletionHandlerTest extends TestCase
             new DocumentContextResolver($documents, $projects),
             $converter,
             new LspProtocolMapper(),
-            $serviceIndexes,
-            $parameterIndexes,
-            new DependencyInjectionSourceIndexRegistry(),
+            new DependencyInjectionProjectLookup(
+                $serviceIndexes,
+                $parameterIndexes,
+                new DependencyInjectionSourceIndexRegistry(),
+            ),
             new PhpCommentParser(),
         );
 

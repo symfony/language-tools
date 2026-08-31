@@ -15,9 +15,7 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
         private readonly DocumentContextResolver $documentContextResolver,
         private readonly PositionConverter $positionConverter,
         private readonly LspProtocolMapper $protocol,
-        private readonly ServiceIndexRegistry $serviceIndexes,
-        private readonly ParameterIndexRegistry $parameterIndexes,
-        private readonly DependencyInjectionSourceIndexRegistry $sourceIndexes,
+        private readonly DependencyInjectionProjectLookup $lookup,
         private readonly PhpCommentParserInterface $phpComments,
     ) {
     }
@@ -52,8 +50,8 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
     private function completeServices(Project $project, ServiceCompletionContext $context): array
     {
         $items = [];
-        foreach ($this->serviceIndexes->forProject($project)->matching($context->prefix) as $service) {
-            $items[$service->id] = [
+        foreach ($this->lookup->matchingServices($project, $context->prefix) as $service) {
+            $items[] = [
                 'label' => $service->id,
                 'kind' => 18,
                 'detail' => $this->serviceDetail($service),
@@ -61,35 +59,15 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
             ];
         }
 
-        $sourceIndex = $this->sourceIndexes->forProject($project);
-        foreach ($sourceIndex->serviceIds() as $id) {
-            if (isset($items[$id]) || !str_starts_with($id, $context->prefix)) {
-                continue;
-            }
-
-            $declaration = $sourceIndex->serviceDeclarations($id)[0] ?? null;
-            $detail = $declaration?->className;
-            if (null !== $declaration?->alias) {
-                $detail = 'Alias of '.$declaration->alias;
-            }
-            $items[$id] = [
-                'label' => $id,
-                'kind' => 18,
-                'detail' => $detail ?? 'Symfony service',
-                'textEdit' => $this->protocol->textEdit($context->replacementRange, $id),
-            ];
-        }
-        ksort($items);
-
-        return array_values($items);
+        return $items;
     }
 
     /** @return list<array<array-key, mixed>> */
     private function completeParameters(Project $project, ParameterCompletionContext $context): array
     {
         $items = [];
-        foreach ($this->parameterIndexes->forProject($project)->matching($context->prefix) as $parameter) {
-            $items[$parameter->name] = [
+        foreach ($this->lookup->matchingParameters($project, $context->prefix) as $parameter) {
+            $items[] = [
                 'label' => $parameter->name,
                 'kind' => 12,
                 'detail' => null !== $parameter->deprecation ? 'Deprecated Symfony parameter' : 'Symfony parameter',
@@ -100,21 +78,7 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
             ];
         }
 
-        foreach ($this->sourceIndexes->forProject($project)->parameterNames() as $name) {
-            if (isset($items[$name]) || !str_starts_with($name, $context->prefix)) {
-                continue;
-            }
-
-            $items[$name] = [
-                'label' => $name,
-                'kind' => 12,
-                'detail' => 'Symfony parameter',
-                'textEdit' => $this->protocol->textEdit($context->replacementRange, $context->completionText($name)),
-            ];
-        }
-        ksort($items);
-
-        return array_values($items);
+        return $items;
     }
 
     private function serviceDetail(Service $service): string

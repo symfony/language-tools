@@ -9,6 +9,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionProjectLookup;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionRenameHandler;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
@@ -69,8 +70,11 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
             new LspProtocolMapper(),
             new DependencyInjectionSymbolResolver($converter, $this->extractor($converter, $yamlExtractor)),
             $sourceIndexes,
-            new ServiceIndexRegistry(),
-            new ParameterIndexRegistry(),
+            new DependencyInjectionProjectLookup(
+                new ServiceIndexRegistry(),
+                new ParameterIndexRegistry(),
+                $sourceIndexes,
+            ),
             new ProjectPathResolver(new UriToPathConverter()),
         );
         $position = $converter->toPosition($yaml, strpos($yaml, 'app.mailer') + 1);
@@ -133,8 +137,11 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
             new LspProtocolMapper(),
             new DependencyInjectionSymbolResolver($converter, $this->extractor($converter, $yamlExtractor)),
             $sourceIndexes,
-            new ServiceIndexRegistry(),
-            new ParameterIndexRegistry(),
+            new DependencyInjectionProjectLookup(
+                new ServiceIndexRegistry(),
+                new ParameterIndexRegistry(),
+                $sourceIndexes,
+            ),
             new ProjectPathResolver(new UriToPathConverter()),
         );
         $position = $converter->toPosition($text, strpos($text, 'app.storage_dir') + 1);
@@ -190,8 +197,7 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
             new LspProtocolMapper(),
             new DependencyInjectionSymbolResolver($converter, $this->extractor($converter, $yamlExtractor)),
             $sourceIndexes,
-            $serviceIndexes,
-            $parameterIndexes,
+            new DependencyInjectionProjectLookup($serviceIndexes, $parameterIndexes, $sourceIndexes),
             new ProjectPathResolver(new UriToPathConverter()),
         );
         $servicePosition = $converter->toPosition($text, strpos($text, 'current.service') + 1);

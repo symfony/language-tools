@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionHoverHandler;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionProjectLookup;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolResolver;
@@ -85,9 +86,7 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
             new DocumentContextResolver($documents, $projects),
             new LspProtocolMapper(),
             new DependencyInjectionSymbolResolver($converter, $extractor),
-            $serviceIndexes,
-            $parameterIndexes,
-            $sourceIndexes,
+            new DependencyInjectionProjectLookup($serviceIndexes, $parameterIndexes, $sourceIndexes),
         );
 
         $serviceHover = $handler->hover($this->params($uri, $text, 'app.mailer', $converter));
@@ -176,12 +175,12 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
             new DocumentContextResolver($documents, $projects),
             new LspProtocolMapper(),
             new DependencyInjectionSymbolResolver($converter, $extractor),
-            $serviceIndexes,
-            new ParameterIndexRegistry(),
-            $sourceIndexes,
+            new DependencyInjectionProjectLookup($serviceIndexes, new ParameterIndexRegistry(), $sourceIndexes),
         );
 
         $hover = $handler->hover($this->params($uri, $text, 'app.shared', $converter));
+        self::assertIsArray($hover);
+        self::assertIsArray($hover['contents']);
 
         self::assertSame(<<<'MARKDOWN'
             Service: `app.shared`

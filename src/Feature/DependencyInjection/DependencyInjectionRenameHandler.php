@@ -15,8 +15,7 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
         private readonly LspProtocolMapper $protocol,
         private readonly DependencyInjectionSymbolResolver $symbolResolver,
         private readonly DependencyInjectionSourceIndexRegistry $sourceIndexes,
-        private readonly ServiceIndexRegistry $serviceIndexes,
-        private readonly ParameterIndexRegistry $parameterIndexes,
+        private readonly DependencyInjectionProjectLookup $lookup,
         private readonly ProjectPathResolver $pathResolver,
     ) {
     }
@@ -62,10 +61,7 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
                 $locations[] = [$reference->uri, $reference->range];
             }
         }
-        $declarations = DependencyInjectionSymbolKind::Service === $symbol->kind
-            ? $index->serviceDeclarations($symbol->name)
-            : $index->parameterDeclarations($symbol->name);
-        foreach ($declarations as $declaration) {
+        foreach ($this->lookup->declarations($project, $symbol->kind, $symbol->name) as $declaration) {
             if ($this->pathResolver->isApplicationOwned($project, $declaration->uri)) {
                 $locations[] = [$declaration->uri, $declaration->range];
             }
@@ -126,14 +122,8 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
 
     private function isApplicationOwned(Project $project, DependencyInjectionSymbol $symbol): bool
     {
-        $index = $this->sourceIndexes->forProject($project);
-
-        $declarations = DependencyInjectionSymbolKind::Service === $symbol->kind
-            ? $index->serviceDeclarations($symbol->name)
-            : $index->parameterDeclarations($symbol->name);
-
         return [] !== array_filter(
-            $declarations,
+            $this->lookup->declarations($project, $symbol->kind, $symbol->name),
             fn (ServiceDeclaration|ParameterDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri),
         );
     }
@@ -153,13 +143,6 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
             return false;
         }
 
-        $index = $this->sourceIndexes->forProject($project);
-        if (DependencyInjectionSymbolKind::Service === $symbol->kind) {
-            return null !== $this->serviceIndexes->forProject($project)->get($newName)
-                || [] !== $index->serviceDeclarations($newName);
-        }
-
-        return null !== $this->parameterIndexes->forProject($project)->get($newName)
-            || [] !== $index->parameterDeclarations($newName);
+        return $this->lookup->hasNameCollision($project, $symbol->kind, $newName);
     }
 }
