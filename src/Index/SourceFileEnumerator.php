@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Index;
 
 use Symfony\Component\Filesystem\Path;
-use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
@@ -41,33 +40,111 @@ final class SourceFileEnumerator
     /** @return \Generator<int, string> */
     public function files(Project $project, bool $includeExcluded = false): \Generator
     {
-        $directory = $project->rootPath;
-        if (!is_dir($directory)) {
+        foreach ($this->entries($project, $includeExcluded) as $entry) {
+            if (isset($entry['path'])) {
+                yield $entry['path'];
+            }
+        }
+    }
+
+    /** @return \Generator<int, array{path: string}|array{directory: string, error: 'outside'|'unreadable'}> */
+    public function entries(Project $project, bool $includeExcluded = false): \Generator
+    {
+        $root = Path::canonicalize($project->rootPath);
+        if (!is_dir($root)) {
             return;
         }
 
-        $dotenvPaths = [];
-        $files = (new Finder())
-            ->files()
-            ->in($directory)
-            ->exclude(ProjectPathPolicy::EXCLUDED_DIRECTORIES)
-            ->ignoreDotFiles(false)
-            ->ignoreVCS(false)
-            ->ignoreUnreadableDirs()
-            ->filter(fn (\SplFileInfo $file): bool => null !== $this->languageId($file->getPathname()));
-        foreach ($this->gitignore->filter($files, $directory) as $path) {
-            if (!$includeExcluded && $this->fileScope->isExcluded($project, $path)) {
+        $issues = [];
+        $rootDotenvPaths = [];
+        $rawFiles = (function () use ($project, $includeExcluded, $root, &$issues, &$rootDotenvPaths): \Generator {
+            foreach ($this->traverse($project, $includeExcluded, $root) as $entry) {
+                if (isset($entry['directory'])) {
+                    $issues[] = $entry;
+
+                    continue;
+                }
+                if ('dotenv' === $this->languageId($entry['path']) && $root === \dirname($entry['path'])) {
+                    $rootDotenvPaths[$entry['path']] = true;
+                }
+                yield $entry['path'];
+            }
+        })();
+
+        $yielded = [];
+        $issueOffset = 0;
+        foreach ($this->gitignore->filter($rawFiles, $root) as $path) {
+            while (isset($issues[$issueOffset])) {
+                $issue = $issues[$issueOffset++];
+                if (!$this->gitignore->isIgnored($root, $issue['directory'])) {
+                    yield $issue;
+                }
+            }
+            $path = Path::canonicalize($path);
+            $yielded[$path] = true;
+            yield ['path' => $path];
+        }
+        while (isset($issues[$issueOffset])) {
+            $issue = $issues[$issueOffset++];
+            if (!$this->gitignore->isIgnored($root, $issue['directory'])) {
+                yield $issue;
+            }
+        }
+        foreach (array_keys($rootDotenvPaths) as $path) {
+            if (!isset($yielded[$path])) {
+                yield ['path' => $path];
+            }
+        }
+    }
+
+    /** @return \Generator<int, array{path: string}|array{directory: string, error: 'outside'|'unreadable'}> */
+    private function traverse(Project $project, bool $includeExcluded, string $root): \Generator
+    {
+        $directories = [$root];
+        while ([] !== $directories) {
+            $directory = array_pop($directories);
+            $entries = @scandir($directory);
+            if (false === $entries) {
+                yield ['directory' => $directory, 'error' => 'unreadable'];
+
                 continue;
             }
-            if ('dotenv' === $this->languageId($path)) {
-                $dotenvPaths[$path] = true;
-            }
-            yield $path;
-        }
+            foreach ($entries as $entry) {
+                if ('.' === $entry || '..' === $entry) {
+                    continue;
+                }
+                $path = Path::join($directory, $entry);
+                if (is_dir($path)) {
+                    if (\in_array($entry, ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)) {
+                        continue;
+                    }
+                    if (is_link($path)) {
+                        if (!$this->realPathBelongsToProject($root, $path)) {
+                            yield ['directory' => $path, 'error' => 'outside'];
+                        }
 
-        foreach (glob($directory.'/.env*') ?: [] as $path) {
-            if (is_file($path) && !isset($dotenvPaths[$path]) && ($includeExcluded || !$this->fileScope->isExcluded($project, $path))) {
-                yield $path;
+                        continue;
+                    }
+                    if (!$includeExcluded && $this->fileScope->isDirectoryExcluded($project, $path)) {
+                        continue;
+                    }
+                    if (!is_readable($path)) {
+                        yield ['directory' => $path, 'error' => 'unreadable'];
+
+                        continue;
+                    }
+                    $directories[] = $path;
+
+                    continue;
+                }
+                if (!is_file($path) || null === $this->languageId($path)) {
+                    continue;
+                }
+                if (!$includeExcluded && $this->fileScope->isExcluded($project, $path)) {
+                    continue;
+                }
+
+                yield ['path' => Path::canonicalize($path)];
             }
         }
     }
@@ -92,7 +169,6 @@ final class SourceFileEnumerator
 
     public function gitignoreExcluded(string $rootPath, string $path): bool
     {
-        // Symfony reads project-root dotenv files even when they are gitignored
         if ('dotenv' === $this->languageId($path) && Path::canonicalize($rootPath) === \dirname(Path::canonicalize($path))) {
             return false;
         }
@@ -135,5 +211,18 @@ final class SourceFileEnumerator
         }
 
         return Path::makeRelative($path, $root);
+    }
+
+    private function realPathBelongsToProject(string $projectRoot, string $path): bool
+    {
+        $realRoot = realpath($projectRoot);
+        $realPath = realpath($path);
+        if (false === $realRoot || false === $realPath) {
+            return false;
+        }
+        $realRoot = Path::canonicalize($realRoot);
+        $realPath = Path::canonicalize($realPath);
+
+        return $realRoot !== $realPath && Path::isBasePath($realRoot, $realPath);
     }
 }
