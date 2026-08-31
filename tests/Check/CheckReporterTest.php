@@ -8,6 +8,7 @@ use Symfony\Lsp\Check\BaselineEntry;
 use Symfony\Lsp\Check\CheckDiagnostic;
 use Symfony\Lsp\Check\CheckProjectResult;
 use Symfony\Lsp\Check\CheckReporter;
+use Symfony\Lsp\Check\CheckReportViewBuilder;
 use Symfony\Lsp\Check\CheckResult;
 use Symfony\Lsp\Check\DiagnosticCodeRegistry;
 use Symfony\Lsp\Check\SarifCheckReporter;
@@ -40,7 +41,7 @@ final class CheckReporterTest extends TestCase
 
     public function testRendersDeterministicJsonCoordinatesAndBaselineState(): void
     {
-        $json = $this->reporter()->render($this->fixtureResult(), 'json');
+        $json = $this->reporter()->render($this->fixtureResult(), 'json', false, 0);
         $report = json_decode($json, true, flags: \JSON_THROW_ON_ERROR);
         self::assertIsArray($report);
 
@@ -66,7 +67,7 @@ final class CheckReporterTest extends TestCase
     public function testRendersSarifRulesLocationsFingerprintsAndBaselines(): void
     {
         /** @var SarifReport $sarif */
-        $sarif = json_decode($this->reporter()->render($this->fixtureResult(), 'sarif', exitCode: 10), true, flags: \JSON_THROW_ON_ERROR);
+        $sarif = json_decode($this->reporter()->render($this->fixtureResult(), 'sarif', false, 10), true, flags: \JSON_THROW_ON_ERROR);
         $run = $sarif['runs'][0];
         $rules = $run['tool']['driver']['rules'];
         $result = $run['results'][0];
@@ -107,7 +108,7 @@ final class CheckReporterTest extends TestCase
         ]], false);
 
         /** @var SarifReport $sarif */
-        $sarif = json_decode($this->reporter()->render($result, 'sarif', exitCode: 12), true, flags: \JSON_THROW_ON_ERROR);
+        $sarif = json_decode($this->reporter()->render($result, 'sarif', false, 12), true, flags: \JSON_THROW_ON_ERROR);
         /** @var SarifReport $codes */
         $codes = json_decode($this->reporter()->codes((new DiagnosticCodeRegistry())->all(), 'sarif'), true, flags: \JSON_THROW_ON_ERROR);
         $notification = $sarif['runs'][0]['invocations'][0]['toolExecutionNotifications'][0] ?? null;
@@ -133,10 +134,10 @@ final class CheckReporterTest extends TestCase
         ]]);
 
         /** @var array{errors: list<array{provider?: string, cause?: array{message: string}}>} $json */
-        $json = json_decode($this->reporter()->render($result, 'json'), true, flags: \JSON_THROW_ON_ERROR);
-        $human = $this->reporter()->render($result, 'human');
-        $verbose = $this->reporter()->render($result, 'human', true);
-        $github = $this->reporter()->render($result, 'github');
+        $json = json_decode($this->reporter()->render($result, 'json', false, 0), true, flags: \JSON_THROW_ON_ERROR);
+        $human = $this->reporter()->render($result, 'human', false, 0);
+        $verbose = $this->reporter()->render($result, 'human', true, 0);
+        $github = $this->reporter()->render($result, 'github', false, 0);
 
         self::assertSame('template', $json['errors'][0]['provider'] ?? null);
         self::assertSame('Invalid diagnostic.', $json['errors'][0]['cause']['message'] ?? null);
@@ -147,7 +148,7 @@ final class CheckReporterTest extends TestCase
 
     public function testEscapesGitHubWorkflowCommands(): void
     {
-        $output = $this->reporter()->render($this->fixtureResult(), 'github');
+        $output = $this->reporter()->render($this->fixtureResult(), 'github', false, 0);
 
         self::assertStringContainsString('file=apps/api/config/services.yaml,line=2,col=3,endLine=2,endColumn=9', $output);
         self::assertStringContainsString('title=service.not_found (baseline)', $output);
@@ -171,14 +172,17 @@ final class CheckReporterTest extends TestCase
             hash('sha256', 'empty-range'),
         );
 
-        $output = $this->reporter()->render($this->fixtureResult(diagnostic: $diagnostic), 'github');
+        $output = $this->reporter()->render($this->fixtureResult(diagnostic: $diagnostic), 'github', false, 0);
 
         self::assertStringContainsString('line=2,col=6,endLine=2,endColumn=6', $output);
     }
 
     private function reporter(): CheckReporter
     {
-        return new CheckReporter(new SarifCheckReporter(new DiagnosticCodeRegistry(), '1.2.3'));
+        return new CheckReporter(
+            new SarifCheckReporter(new DiagnosticCodeRegistry(), '1.2.3'),
+            new CheckReportViewBuilder(),
+        );
     }
 
     private function goldenResult(): CheckResult

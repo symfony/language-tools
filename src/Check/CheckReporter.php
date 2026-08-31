@@ -4,17 +4,21 @@ namespace Symfony\Lsp\Check;
 
 final class CheckReporter
 {
-    public function __construct(private readonly SarifCheckReporter $sarif)
-    {
+    public function __construct(
+        private readonly SarifCheckReporter $sarif,
+        private readonly CheckReportViewBuilder $viewBuilder,
+    ) {
     }
 
-    public function render(CheckResult $result, string $format, bool $verbose = false, ?int $exitCode = null): string
+    public function render(CheckResult $result, string $format, bool $verbose, int $exitCode): string
     {
+        $view = $this->viewBuilder->build($result, $exitCode);
+
         return match ($format) {
-            'json' => $this->json($result),
-            'github' => $this->github($result),
-            'sarif' => $this->sarif->render($result, $exitCode ?? $this->exitCode($result)),
-            default => $this->human($result, $verbose),
+            'json' => $this->json($view),
+            'github' => $this->github($view),
+            'sarif' => $this->sarif->render($view),
+            default => $this->human($view, $verbose),
         };
     }
 
@@ -70,10 +74,10 @@ Runtime analysis executes application code. Use --source-only for untrusted code
 HELP;
     }
 
-    private function human(CheckResult $result, bool $verbose): string
+    private function human(CheckReportView $view, bool $verbose): string
     {
         $lines = [];
-        foreach ($result->projects as $project) {
+        foreach ($view->projects as $project) {
             $mode = 'runtime' === $project->mode
                 ? 'runtime metadata'
                 : 'source-only ('.$this->reason($project->modeReason).')';
@@ -85,7 +89,8 @@ HELP;
                 $project->complete ? 'complete' : 'incomplete',
             );
         }
-        foreach ($result->diagnostics as $diagnostic) {
+        foreach ($view->diagnostics as $diagnosticView) {
+            $diagnostic = $diagnosticView->diagnostic;
             $lines[] = \sprintf(
                 '%s:%s:%d:%d: %s [%s] %s%s',
                 $diagnostic->project,
@@ -98,7 +103,8 @@ HELP;
                 'matched' === $diagnostic->baselineState ? ' (baseline)' : '',
             );
         }
-        foreach ($result->staleBaseline as $entry) {
+        foreach ($view->staleBaseline as $entryView) {
+            $entry = $entryView->entry;
             $lines[] = \sprintf(
                 '%s:%s: stale baseline [%s] %s (occurrence %d)',
                 $entry->project,
@@ -108,7 +114,7 @@ HELP;
                 $entry->occurrence,
             );
         }
-        foreach ($result->errors as $error) {
+        foreach ($view->errors as $error) {
             $lines[] = \sprintf(
                 'ERROR%s: %s',
                 isset($error['project']) ? ' ['.$error['project'].']' : '',
@@ -119,36 +125,27 @@ HELP;
             }
         }
 
-        $active = \count(array_filter($result->diagnostics, static fn (CheckDiagnostic $diagnostic): bool => 'active' === $diagnostic->baselineState));
-        $matched = \count($result->diagnostics) - $active;
         $lines[] = \sprintf(
             'Summary: %d diagnostics, %d active, %d baseline matches, %d stale baseline entries, %d blocking',
-            \count($result->diagnostics),
-            $active,
-            $matched,
-            \count($result->staleBaseline),
-            $result->blockingCount,
+            $view->summary->diagnostics,
+            $view->summary->active,
+            $view->summary->matched,
+            $view->summary->stale,
+            $view->summary->blocking,
         );
 
         return implode("\n", $lines)."\n";
     }
 
-    private function json(CheckResult $result): string
+    private function json(CheckReportView $view): string
     {
-        $active = \count(array_filter($result->diagnostics, static fn (CheckDiagnostic $diagnostic): bool => 'active' === $diagnostic->baselineState));
-
-        $projects = [];
-        foreach ($result->projects as $project) {
-            $projects[$project->id] = $project;
-        }
-
         return json_encode([
             'schemaVersion' => 1,
             'tool' => [
                 'name' => 'Symfony Language Tools',
-                'version' => $result->version,
+                'version' => $view->version,
             ],
-            'complete' => $result->complete,
+            'complete' => $view->complete,
             'coordinates' => [
                 'lineBase' => 0,
                 'characterBase' => 0,
@@ -165,48 +162,42 @@ HELP;
                 'source' => $project->source,
                 'runtime' => $project->runtime,
                 'complete' => $project->complete,
-            ], $result->projects),
-            'diagnostics' => array_map(static fn (CheckDiagnostic $diagnostic): array => [
-                'project' => $diagnostic->project,
-                'path' => $diagnostic->path,
-                'workspacePath' => $diagnostic->workspacePath,
+            ], $view->projects),
+            'diagnostics' => array_map(static fn (CheckReportDiagnosticView $diagnosticView): array => [
+                'project' => $diagnosticView->diagnostic->project,
+                'path' => $diagnosticView->diagnostic->path,
+                'workspacePath' => $diagnosticView->diagnostic->workspacePath,
                 'range' => [
-                    'start' => ['line' => $diagnostic->startLine, 'character' => $diagnostic->startCharacter],
-                    'end' => ['line' => $diagnostic->endLine, 'character' => $diagnostic->endCharacter],
+                    'start' => ['line' => $diagnosticView->diagnostic->startLine, 'character' => $diagnosticView->diagnostic->startCharacter],
+                    'end' => ['line' => $diagnosticView->diagnostic->endLine, 'character' => $diagnosticView->diagnostic->endCharacter],
                 ],
-                'severity' => $diagnostic->severityName(),
-                'code' => $diagnostic->code,
-                'source' => $diagnostic->source,
-                'message' => $diagnostic->message,
-                'baseline' => $diagnostic->baselineState,
+                'severity' => $diagnosticView->diagnostic->severityName(),
+                'code' => $diagnosticView->diagnostic->code,
+                'source' => $diagnosticView->diagnostic->source,
+                'message' => $diagnosticView->diagnostic->message,
+                'baseline' => $diagnosticView->diagnostic->baselineState,
                 'provenance' => [
-                    'feature' => strstr($diagnostic->code, '.', true) ?: $diagnostic->code,
-                    'provider' => $diagnostic->provider,
-                    'environment' => $projects[$diagnostic->project]->environment ?? null,
-                    'analysisMode' => $projects[$diagnostic->project]->mode ?? null,
+                    'feature' => $diagnosticView->feature,
+                    'provider' => $diagnosticView->diagnostic->provider,
+                    'environment' => $diagnosticView->environment,
+                    'analysisMode' => $diagnosticView->analysisMode,
                 ],
-            ], $result->diagnostics),
+            ], $view->diagnostics),
             'baseline' => [
-                'path' => $result->baselinePath,
-                'mode' => $result->baselineMode,
-                'strict' => $result->strictBaseline,
-                'stale' => array_map(static fn (BaselineEntry $entry): array => $entry->toArray(), $result->staleBaseline),
+                'path' => $view->baselinePath,
+                'mode' => $view->baselineMode,
+                'strict' => $view->strictBaseline,
+                'stale' => array_map(static fn (CheckReportBaselineEntryView $entryView): array => $entryView->entry->toArray(), $view->staleBaseline),
             ],
-            'summary' => [
-                'diagnostics' => \count($result->diagnostics),
-                'active' => $active,
-                'matched' => \count($result->diagnostics) - $active,
-                'stale' => \count($result->staleBaseline),
-                'blocking' => $result->blockingCount,
-            ],
-            'errors' => $result->errors,
+            'summary' => $view->summary->toArray(),
+            'errors' => $view->errors,
         ], \JSON_THROW_ON_ERROR | \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_INVALID_UTF8_SUBSTITUTE)."\n";
     }
 
-    private function github(CheckResult $result): string
+    private function github(CheckReportView $view): string
     {
         $lines = [];
-        foreach ($result->projects as $project) {
+        foreach ($view->projects as $project) {
             $message = !$project->complete
                 ? \sprintf('Project %s analysis is incomplete.', $project->id)
                 : ('runtime' === $project->mode
@@ -214,7 +205,8 @@ HELP;
                     : \sprintf('Project %s analyzed in source-only mode: %s.', $project->id, $this->reason($project->modeReason)));
             $lines[] = '::notice title=Symfony diagnostics::'.$this->escapeData($message);
         }
-        foreach ($result->diagnostics as $diagnostic) {
+        foreach ($view->diagnostics as $diagnosticView) {
+            $diagnostic = $diagnosticView->diagnostic;
             $level = match ($diagnostic->severity) {
                 1 => 'error',
                 2 => 'warning',
@@ -244,29 +236,24 @@ HELP;
                 $this->escapeData($diagnostic->message),
             );
         }
-        foreach ($result->staleBaseline as $entry) {
+        foreach ($view->staleBaseline as $entryView) {
             $lines[] = \sprintf(
                 '::warning file=%s,title=Stale Symfony diagnostic baseline::%s',
-                $this->escapeProperty($this->entryWorkspacePath($entry)),
-                $this->escapeData(\sprintf('[%s] %s (occurrence %d)', $entry->code, $entry->message, $entry->occurrence)),
+                $this->escapeProperty($entryView->workspacePath),
+                $this->escapeData(\sprintf('[%s] %s (occurrence %d)', $entryView->entry->code, $entryView->entry->message, $entryView->entry->occurrence)),
             );
         }
-        foreach ($result->errors as $error) {
+        foreach ($view->errors as $error) {
             $lines[] = '::error title=Symfony diagnostics check::'.$this->escapeData($error['message']);
         }
         $lines[] = \sprintf(
             '::notice title=Symfony diagnostics summary::%d diagnostics, %d stale baseline entries, %d blocking.',
-            \count($result->diagnostics),
-            \count($result->staleBaseline),
-            $result->blockingCount,
+            $view->summary->diagnostics,
+            $view->summary->stale,
+            $view->summary->blocking,
         );
 
         return implode("\n", $lines)."\n";
-    }
-
-    private function exitCode(CheckResult $result): int
-    {
-        return !$result->complete ? CheckCommand::EXIT_OPERATIONAL : (0 === $result->blockingCount ? CheckCommand::EXIT_SUCCESS : CheckCommand::EXIT_DIAGNOSTICS);
     }
 
     private function reason(?string $reason): string
@@ -276,11 +263,6 @@ HELP;
             'runtime-indexing-disabled' => 'runtime indexing is disabled',
             default => 'runtime analysis is unavailable',
         };
-    }
-
-    private function entryWorkspacePath(BaselineEntry $entry): string
-    {
-        return '.' === $entry->project ? $entry->path : $entry->project.'/'.$entry->path;
     }
 
     private function escapeData(string $value): string

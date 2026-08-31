@@ -12,19 +12,14 @@ final class SarifCheckReporter
     ) {
     }
 
-    public function render(CheckResult $result, int $exitCode): string
+    public function render(CheckReportView $view): string
     {
-        $projects = [];
-        foreach ($result->projects as $project) {
-            $projects[$project->id] = $project;
-        }
-
         $configurationNotifications = array_map(
-            fn (BaselineEntry $entry): array => $this->staleBaselineNotification($entry, $result->strictBaseline),
-            $result->staleBaseline,
+            fn (CheckReportBaselineEntryView $entryView): array => $this->staleBaselineNotification($entryView, $view->strictBaseline),
+            $view->staleBaseline,
         );
         $executionNotifications = [];
-        foreach ($result->errors as $error) {
+        foreach ($view->errors as $error) {
             $notification = $this->errorNotification($error);
             if ('invocation' === $error['category']) {
                 $configurationNotifications[] = $notification;
@@ -34,8 +29,8 @@ final class SarifCheckReporter
         }
 
         $invocation = [
-            'executionSuccessful' => $result->complete,
-            'exitCode' => $exitCode,
+            'executionSuccessful' => $view->complete,
+            'exitCode' => $view->exitCode,
         ];
         if ([] !== $configurationNotifications) {
             $invocation['toolConfigurationNotifications'] = $configurationNotifications;
@@ -48,16 +43,16 @@ final class SarifCheckReporter
             'tool' => ['driver' => $this->driver()],
             'columnKind' => 'utf16CodeUnits',
             'invocations' => [$invocation],
-            'results' => $this->results($result->diagnostics, $projects),
+            'results' => $this->results($view->diagnostics),
             'properties' => [
-                'symfonyLsp.complete' => $result->complete,
-                'symfonyLsp.projects' => array_map($this->project(...), $result->projects),
+                'symfonyLsp.complete' => $view->complete,
+                'symfonyLsp.projects' => array_map($this->project(...), $view->projects),
                 'symfonyLsp.baseline' => [
-                    'path' => $result->baselinePath,
-                    'mode' => $result->baselineMode,
-                    'strict' => $result->strictBaseline,
+                    'path' => $view->baselinePath,
+                    'mode' => $view->baselineMode,
+                    'strict' => $view->strictBaseline,
                 ],
-                'symfonyLsp.summary' => $this->summary($result),
+                'symfonyLsp.summary' => $view->summary->toArray(),
             ],
         ]]);
     }
@@ -77,28 +72,24 @@ final class SarifCheckReporter
     }
 
     /**
-     * @param list<CheckDiagnostic>             $diagnostics
-     * @param array<string, CheckProjectResult> $projects
+     * @param list<CheckReportDiagnosticView> $diagnostics
      *
      * @return list<array<string, mixed>>
      */
-    private function results(array $diagnostics, array $projects): array
+    private function results(array $diagnostics): array
     {
         $rules = array_flip($this->codesList());
-        $occurrences = [];
         $results = [];
-        foreach ($diagnostics as $diagnostic) {
-            $occurrence = ($occurrences[$diagnostic->fingerprint] ?? 0) + 1;
-            $occurrences[$diagnostic->fingerprint] = $occurrence;
-            $project = $projects[$diagnostic->project] ?? null;
+        foreach ($diagnostics as $diagnosticView) {
+            $diagnostic = $diagnosticView->diagnostic;
             $properties = [
                 'symfonyLsp.project' => $diagnostic->project,
                 'symfonyLsp.projectPath' => $diagnostic->path,
                 'symfonyLsp.source' => $diagnostic->source,
-                'symfonyLsp.feature' => strstr($diagnostic->code, '.', true) ?: $diagnostic->code,
+                'symfonyLsp.feature' => $diagnosticView->feature,
                 'symfonyLsp.provider' => $diagnostic->provider,
-                'symfonyLsp.environment' => $project?->environment,
-                'symfonyLsp.analysisMode' => $project?->mode,
+                'symfonyLsp.environment' => $diagnosticView->environment,
+                'symfonyLsp.analysisMode' => $diagnosticView->analysisMode,
                 'symfonyLsp.baselineState' => $diagnostic->baselineState,
             ];
             $properties = array_filter($properties, static fn (mixed $value): bool => null !== $value);
@@ -119,7 +110,7 @@ final class SarifCheckReporter
                     ],
                 ]],
                 'partialFingerprints' => [
-                    'symfonyLsp/v1' => hash('sha256', $diagnostic->fingerprint."\0".$occurrence),
+                    'symfonyLsp/v1' => hash('sha256', $diagnostic->fingerprint."\0".$diagnosticView->occurrence),
                 ],
                 'properties' => $properties,
             ];
@@ -168,15 +159,17 @@ final class SarifCheckReporter
     }
 
     /** @return array<string, mixed> */
-    private function staleBaselineNotification(BaselineEntry $entry, bool $strict): array
+    private function staleBaselineNotification(CheckReportBaselineEntryView $entryView, bool $strict): array
     {
+        $entry = $entryView->entry;
+
         return [
             'descriptor' => ['id' => 'symfony.check.stale_baseline'],
             'level' => $strict ? 'error' : 'warning',
             'message' => ['text' => \sprintf('Stale baseline entry [%s] %s (occurrence %d).', $entry->code, $entry->message, $entry->occurrence)],
             'locations' => [[
                 'physicalLocation' => [
-                    'artifactLocation' => ['uri' => $this->uri($this->workspacePath($entry->project, $entry->path))],
+                    'artifactLocation' => ['uri' => $this->uri($entryView->workspacePath)],
                 ],
             ]],
             'properties' => [
@@ -241,20 +234,6 @@ final class SarifCheckReporter
         ];
     }
 
-    /** @return array{diagnostics: int, active: int, matched: int, stale: int, blocking: int} */
-    private function summary(CheckResult $result): array
-    {
-        $active = \count(array_filter($result->diagnostics, static fn (CheckDiagnostic $diagnostic): bool => 'active' === $diagnostic->baselineState));
-
-        return [
-            'diagnostics' => \count($result->diagnostics),
-            'active' => $active,
-            'matched' => \count($result->diagnostics) - $active,
-            'stale' => \count($result->staleBaseline),
-            'blocking' => $result->blockingCount,
-        ];
-    }
-
     /** @return list<string> */
     private function codesList(): array
     {
@@ -276,11 +255,6 @@ final class SarifCheckReporter
     private function uri(string $path): string
     {
         return implode('/', array_map('rawurlencode', explode('/', str_replace('\\', '/', $path))));
-    }
-
-    private function workspacePath(string $project, string $path): string
-    {
-        return '.' === $project ? $path : $project.'/'.$path;
     }
 
     /** @param list<array<string, mixed>> $runs */
