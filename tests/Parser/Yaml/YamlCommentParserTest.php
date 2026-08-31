@@ -3,6 +3,8 @@
 namespace Symfony\Lsp\Tests\Parser\Yaml;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 
 final class YamlCommentParserTest extends TestCase
@@ -28,14 +30,14 @@ final class YamlCommentParserTest extends TestCase
             'quoted: "escaped \\" # kept"'.$comment."\n".
             "plain: it's useful".$comment."\n".
             'url: https://example.test/#fragment',
-            (new YamlCommentParser())->mask($source),
+            $this->parser()->mask($source),
         );
     }
 
     public function testPreservesByteOffsetsAndUtf16PositionsForMultibyteComments(): void
     {
         $source = "key: value # vérifié ✓\nnext: '%env(APP_URL)%'\n";
-        $masked = (new YamlCommentParser())->mask($source);
+        $masked = $this->parser()->mask($source);
 
         self::assertStringEndsWith("\nnext: '%env(APP_URL)%'\n", $masked);
         self::assertSame(\strlen($source), \strlen($masked));
@@ -43,5 +45,17 @@ final class YamlCommentParserTest extends TestCase
             \strlen(mb_convert_encoding($source, 'UTF-16LE', 'UTF-8')),
             \strlen(mb_convert_encoding($masked, 'UTF-16LE', 'UTF-8')),
         );
+    }
+
+    public function testLeavesHashesInsideBlockScalarsUnmasked(): void
+    {
+        $source = "content: |\n    # kept\n# gone\n";
+
+        self::assertSame("content: |\n    # kept\n      \n", $this->parser()->mask($source));
+    }
+
+    private function parser(): YamlCommentParser
+    {
+        return new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()));
     }
 }

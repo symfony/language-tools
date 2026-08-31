@@ -11,8 +11,8 @@ use Symfony\Lsp\Check\CheckProjectResult;
 use Symfony\Lsp\Check\CheckReporter;
 use Symfony\Lsp\Check\CheckReportViewBuilder;
 use Symfony\Lsp\Check\CheckResult;
-use Symfony\Lsp\Check\DiagnosticCodeRegistry;
 use Symfony\Lsp\Check\SarifCheckReporter;
+use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 
 /**
  * @phpstan-type SarifNotification array{descriptor: array{id: string}, properties: array<string, mixed>, exception?: array{kind: string, message: string}, locations?: list<array{physicalLocation: array{artifactLocation: array{uri: string}}}>}

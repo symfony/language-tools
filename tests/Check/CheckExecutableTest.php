@@ -365,7 +365,7 @@ final class CheckExecutableTest extends TestCase
         self::assertSame(0, $matched['exitCode'], $matched['stderr']);
         self::assertSame($baselineHash, hash_file('sha256', $baseline));
 
-        file_put_contents($this->directory.'/config/services.yaml', "parameters:\n    valid: '%env(APP_SECRET)%'\n");
+        file_put_contents($this->directory.'/config/services.yaml', "parameters:\n    # @symfony-lsp-ignore env.malformed_chain (intentional malformed expression)\n    broken: '%env(APP_SECRET%'\n");
         $strict = $this->execute([
             'check',
             '--source-only',
@@ -377,6 +377,7 @@ final class CheckExecutableTest extends TestCase
         $report = $this->decodeReport($strict['stdout']);
 
         self::assertSame(CheckCommand::EXIT_DIAGNOSTICS, $strict['exitCode'], $strict['stderr']);
+        self::assertSame([], $report['diagnostics']);
         self::assertSame(1, $report['summary']['stale']);
         self::assertSame(1, $report['summary']['blocking']);
     }

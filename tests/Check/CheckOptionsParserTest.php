@@ -7,7 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Check\CheckArgumentsTokenizer;
 use Symfony\Lsp\Check\CheckOptions;
 use Symfony\Lsp\Check\CheckOptionsParser;
-use Symfony\Lsp\Check\DiagnosticCodeRegistry;
+use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Project\AnalysisSettings;
 use Symfony\Lsp\Project\InvalidConfigurationException;
 

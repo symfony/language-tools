@@ -11,8 +11,10 @@ use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
+use Symfony\Lsp\Feature\DiagnosticSuppressor;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteCodeActionProvider;
 use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
@@ -20,10 +22,13 @@ use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
+use Symfony\Lsp\Parser\Xml\XmlCommentParser;
+use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -304,6 +309,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             new ProjectPathResolver($uriConverter),
             new ProjectFileScopeRegistry(),
             $uriConverter,
+            $this->suppressor($positionConverter),
             [new RouteDiagnosticPublisher(
                 new DocumentContextResolver($documents, $projects),
                 new LspProtocolMapper(),
@@ -354,6 +360,19 @@ final class RouteDiagnosticPublisherTest extends TestCase
         ], $client->notifications[0]['params']);
     }
 
+    private function suppressor(PositionConverter $positions): DiagnosticSuppressor
+    {
+        return new DiagnosticSuppressor(
+            $positions,
+            new LspProtocolMapper(),
+            new DiagnosticCodeRegistry(),
+            new PhpCommentParser(),
+            new TwigCommentParser(),
+            new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+            new XmlCommentParser(),
+        );
+    }
+
     /**
      * @param Route|list<Route>|null $route
      * @param list<string>           $contextParameters
@@ -391,6 +410,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             new ProjectPathResolver($uriConverter),
             new ProjectFileScopeRegistry(),
             $uriConverter,
+            $this->suppressor($positionConverter),
             [new RouteDiagnosticPublisher(
                 new DocumentContextResolver($documents, $projects),
                 new LspProtocolMapper(),

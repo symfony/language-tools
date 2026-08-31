@@ -695,10 +695,11 @@ final class ConfigurationProviderTest extends TestCase
         $protocol = new LspProtocolMapper();
         $phpComments = new PhpCommentParser();
         $xmlComments = new XmlCommentParser();
-        $yamlComments = new YamlCommentParser();
+        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
+        $yamlComments = new YamlCommentParser($treeSitter);
         $php = new PhpConfigurationAnalyzer(new TolerantPhpParser(new Parser()), $phpComments);
         $xml = new XmlConfigurationAnalyzer($xmlComments);
-        $yaml = new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
+        $yaml = new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter));
         $values = new ConfigurationValueValidator($environmentIndexes, new EnvironmentExpressionParser());
         $validationReconciler = new ConfigurationValidationReconciler(
             $validations,

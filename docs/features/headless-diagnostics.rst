@@ -180,6 +180,50 @@ with:
     $ symfony-lsp check --list-codes
     $ symfony-lsp check --format=json --list-codes
 
+Suppressing Intentional Diagnostics
+-----------------------------------
+
+When source code intentionally triggers a diagnostic, add a code-qualified
+suppression in a native PHP, Twig, YAML or XML comment. The editor and
+``symfony-lsp check`` apply the same suppressions:
+
+.. code-block:: php
+
+    /* @symfony-lsp-ignore template.not_found (intentional missing template) */
+    $this->render('test/does_not_exist.html.twig');
+
+.. code-block:: twig
+
+    {# @symfony-lsp-ignore template.not_found (intentional missing template) #}
+    {{ include('test/does_not_exist.html.twig') }}
+
+.. code-block:: yaml
+
+    # @symfony-lsp-ignore config.unknown_key (compatibility fixture)
+    framework:
+        unsupported_option: true
+
+.. code-block:: xml
+
+    <!-- @symfony-lsp-ignore config.unknown_key (compatibility fixture) -->
+    <framework:unsupported-option>true</framework:unsupported-option>
+
+A standalone comment targets diagnostics whose ranges start on the next
+physical line. A comment that shares a line with source code targets that line.
+Blank lines aren't skipped.
+
+The directive accepts a comma-separated list of exact diagnostic codes. Each
+listed code suppresses one occurrence, so repeat a code to suppress several
+matching diagnostics on the same line. An optional parenthesized reason can
+follow the codes. Bare directives, malformed directives and unknown codes
+produce a ``suppression.invalid`` warning instead of suppressing diagnostics.
+
+Only native comments are recognized. Directive-shaped text in strings, Twig
+verbatim content, YAML block scalars and XML CDATA sections has no effect.
+Suppressed diagnostics are omitted from editor publications and checker
+reports, and they aren't written to new baselines. A matching entry in an
+existing baseline becomes stale.
+
 Using a Baseline
 ----------------
 

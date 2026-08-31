@@ -1,6 +1,6 @@
 <?php
 
-namespace Symfony\Lsp\Check;
+namespace Symfony\Lsp\Feature;
 
 final class DiagnosticCodeRegistry
 {
@@ -28,6 +28,7 @@ final class DiagnosticCodeRegistry
         'security.unknown_provider',
         'service.not_found',
         'stimulus.unknown_controller',
+        'suppression.invalid',
         'template.not_found',
         'translation.domain_not_found',
         'translation.not_found',

@@ -308,6 +308,19 @@
                             }
                         },
                         {
+                            "id": "suppression.invalid",
+                            "name": "suppression.invalid",
+                            "shortDescription": {
+                                "text": "Suppression: invalid"
+                            },
+                            "properties": {
+                                "tags": [
+                                    "symfony",
+                                    "suppression"
+                                ]
+                            }
+                        },
+                        {
                             "id": "template.not_found",
                             "name": "template.not_found",
                             "shortDescription": {

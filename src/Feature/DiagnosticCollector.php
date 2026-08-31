@@ -18,6 +18,7 @@ final class DiagnosticCollector
         private readonly ProjectPathResolver $pathResolver,
         private readonly ProjectFileScopeRegistry $fileScope,
         private readonly UriToPathConverter $uriToPathConverter,
+        private readonly DiagnosticSuppressor $suppressor,
         private readonly iterable $providers,
     ) {
     }
@@ -54,7 +55,9 @@ final class DiagnosticCollector
             array_push($diagnostics, ...$providedDiagnostics);
         }
 
-        return $matched ? $diagnostics : null;
+        $diagnostics = $this->suppressor->suppress($document, $diagnostics);
+
+        return $matched || [] !== $diagnostics ? $diagnostics : null;
     }
 
     /**
@@ -105,7 +108,9 @@ final class DiagnosticCollector
             array_push($diagnostics, ...$provided);
         }
 
-        return new DetailedDiagnosticCollection($matched, $diagnostics, $failures);
+        $diagnostics = $this->suppressor->suppressCollected($document, $diagnostics);
+
+        return new DetailedDiagnosticCollection($matched || [] !== $diagnostics, $diagnostics, $failures);
     }
 
     private function collectedDiagnostic(string $provider, mixed $diagnostic): CollectedDiagnostic

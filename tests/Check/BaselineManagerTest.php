@@ -12,8 +12,8 @@ use Symfony\Lsp\Check\CheckDiagnostic;
 use Symfony\Lsp\Check\CheckDiagnosticOccurrenceNumberer;
 use Symfony\Lsp\Check\CheckFile;
 use Symfony\Lsp\Check\CheckOptions;
-use Symfony\Lsp\Check\DiagnosticCodeRegistry;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Project\Project;
 

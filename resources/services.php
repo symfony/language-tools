@@ -19,6 +19,7 @@ use Symfony\Lsp\Feature\DefinitionProviderRegistry;
 use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
+use Symfony\Lsp\Feature\DiagnosticSuppressor;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipCodeLensProvider;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\DocumentLinkProviderRegistry;
@@ -135,6 +136,7 @@ return static function (ContainerConfigurator $container): void {
 
     $services->load('Symfony\\Lsp\\Feature\\', '../src/Feature/*Registry.php');
     $services->set(DiagnosticCollector::class);
+    $services->set(DiagnosticSuppressor::class);
     $featureGroups = [
         'Route' => [],
         'DependencyInjection' => [],

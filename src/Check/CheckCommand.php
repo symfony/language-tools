@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Check;
 
+use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Suppress code-qualified diagnostics with source comments
 - Honor router request context parameters in route diagnostics
 - Report Symfony branches outside the live supported range
 - Ignore Twig macro declarations that share a name with custom functions

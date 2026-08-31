@@ -2,7 +2,8 @@
 
 namespace Symfony\Lsp\Parser\Php;
 
-interface PhpCommentParserInterface
+use Symfony\Lsp\Parser\CommentParserInterface;
+
+interface PhpCommentParserInterface extends CommentParserInterface
 {
-    public function mask(string $source): string;
 }

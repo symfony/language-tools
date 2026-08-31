@@ -2,6 +2,10 @@
 
 namespace Symfony\Lsp\Parser\Twig;
 
+use Symfony\Lsp\Parser\CommentParseResult;
+use Symfony\Lsp\Parser\CommentParserInterface;
+use Symfony\Lsp\Parser\SourceComment;
+
 /**
  * Blanks Twig comments and verbatim content while preserving byte offsets
  * and UTF-16 positions.
@@ -10,26 +14,37 @@ namespace Symfony\Lsp\Parser\Twig;
  * byte length and UTF-16 unit count, so positions measured on the masked
  * text always match the original document.
  */
-final class TwigCommentParser
+final class TwigCommentParser implements CommentParserInterface
 {
     private ?string $lastSource = null;
-    private ?string $lastMasked = null;
+    private ?CommentParseResult $lastResult = null;
+
+    public function parse(string $source): CommentParseResult
+    {
+        if ($source === $this->lastSource && null !== $this->lastResult) {
+            return $this->lastResult;
+        }
+
+        $result = $this->scan($source);
+        $this->lastSource = $source;
+
+        return $this->lastResult = $result;
+    }
 
     public function mask(string $source): string
     {
-        if ($source === $this->lastSource && null !== $this->lastMasked) {
-            return $this->lastMasked;
-        }
-        $masked = $this->scan($source);
-        $this->lastSource = $source;
-        $this->lastMasked = $masked;
-
-        return $masked;
+        return $this->parse($source)->masked;
     }
 
-    private function scan(string $source): string
+    public function comments(string $source): array
+    {
+        return $this->parse($source)->comments;
+    }
+
+    private function scan(string $source): CommentParseResult
     {
         $masked = $source;
+        $comments = [];
         $length = \strlen($source);
         $state = 'data';
         $brackets = [];
@@ -37,12 +52,14 @@ final class TwigCommentParser
         for ($offset = 0; $offset < $length;) {
             if ('data' === $state) {
                 if ('{#' === substr($source, $offset, 2)) {
-                    $end = strpos($source, '#}', $offset + 2);
-                    if (false === $end) {
-                        $this->maskRange($masked, $source, $offset + 2, $length);
+                    $closing = strpos($source, '#}', $offset + 2);
+                    $end = false === $closing ? $length : $closing + 2;
+                    $contentEnd = false === $closing ? $length : $closing;
+                    $this->comment($comments, $source, $offset, $end, $offset + 2, $contentEnd);
+                    if (false === $closing) {
+                        $this->maskRange($masked, $source, $offset + 2, $end);
                         break;
                     }
-                    $end += 2;
                     $this->maskRange($masked, $source, $offset, $end);
                     $offset = $end;
                     continue;
@@ -76,11 +93,12 @@ final class TwigCommentParser
                 continue;
             }
             if ('\'' === $character || '"' === $character) {
-                $offset = $this->stringEnd($masked, $source, $offset, $length);
+                $offset = $this->stringEnd($masked, $comments, $source, $offset, $length);
                 continue;
             }
             if ('#' === $character) {
                 $end = $offset + strcspn($source, "\r\n", $offset);
+                $this->comment($comments, $source, $offset, $end, $offset + 1, $end);
                 $this->maskRange($masked, $source, $offset, $end);
                 $offset = $end;
                 continue;
@@ -97,7 +115,7 @@ final class TwigCommentParser
             ++$offset;
         }
 
-        return $masked;
+        return new CommentParseResult($masked, $comments);
     }
 
     /** @return array{int, int, int}|null */
@@ -115,7 +133,8 @@ final class TwigCommentParser
         return [$contentStart, $contentEnd, $contentEnd + \strlen($closing[0][0])];
     }
 
-    private function stringEnd(string &$masked, string $source, int $offset, int $end): int
+    /** @param list<SourceComment> $comments */
+    private function stringEnd(string &$masked, array &$comments, string $source, int $offset, int $end): int
     {
         $quote = $source[$offset++];
         while ($offset < $end) {
@@ -127,7 +146,7 @@ final class TwigCommentParser
                 return $offset + 1;
             }
             if ('"' === $quote && '#{' === substr($source, $offset, 2)) {
-                $offset = $this->interpolationEnd($masked, $source, $offset + 2, $end);
+                $offset = $this->interpolationEnd($masked, $comments, $source, $offset + 2, $end);
                 continue;
             }
             ++$offset;
@@ -136,17 +155,19 @@ final class TwigCommentParser
         return $end;
     }
 
-    private function interpolationEnd(string &$masked, string $source, int $offset, int $end): int
+    /** @param list<SourceComment> $comments */
+    private function interpolationEnd(string &$masked, array &$comments, string $source, int $offset, int $end): int
     {
         $brackets = ['}'];
         while ($offset < $end) {
             $character = $source[$offset];
             if ('\'' === $character || '"' === $character) {
-                $offset = $this->stringEnd($masked, $source, $offset, $end);
+                $offset = $this->stringEnd($masked, $comments, $source, $offset, $end);
                 continue;
             }
             if ('#' === $character) {
                 $lineEnd = $offset + strcspn($source, "\r\n", $offset);
+                $this->comment($comments, $source, $offset, $lineEnd, $offset + 1, $lineEnd);
                 $this->maskRange($masked, $source, $offset, $lineEnd);
                 $offset = $lineEnd;
                 continue;
@@ -169,6 +190,18 @@ final class TwigCommentParser
         }
 
         return $end;
+    }
+
+    /** @param list<SourceComment> $comments */
+    private function comment(array &$comments, string $source, int $start, int $end, int $contentStart, int $contentEnd): void
+    {
+        $comments[] = new SourceComment(
+            $start,
+            $end,
+            $contentStart,
+            $contentEnd,
+            substr($source, $contentStart, $contentEnd - $contentStart),
+        );
     }
 
     private function maskRange(string &$masked, string $source, int $start, int $end): void

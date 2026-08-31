@@ -66,6 +66,32 @@ final class CheckParityTest extends TestCase
         self::assertSame(15, $headlessDiagnostics[0]['range']['start']['character']);
     }
 
+    public function testSourceSuppressionsMatchBetweenTheEditorAndChecker(): void
+    {
+        $text = "parameters:\n    # @symfony-lsp-ignore env.malformed_chain (intentional malformed expression)\n    broken: '😀%env(APP_SECRET%'\n";
+        $this->workspace->write('config/services.yaml', $text);
+        $factory = new LanguageServerFactory();
+
+        $lspDiagnostics = $this->publishedDiagnostics(
+            $factory,
+            $this->workspace->rootPath,
+            $this->uri,
+            'yaml',
+            $text,
+            ['runtimeIndexing' => false],
+        );
+        $headlessDiagnostics = $this->headlessDiagnostics(
+            $factory,
+            $this->workspace->rootPath,
+            'config/services.yaml',
+            true,
+            CheckCommand::EXIT_SUCCESS,
+        );
+
+        self::assertSame([], $lspDiagnostics);
+        self::assertSame([], $headlessDiagnostics);
+    }
+
     public function testRuntimeReadySavedDiagnosticsMatchTheFinalLspPublicationAfterRefresh(): void
     {
         $fixture = new RuntimeApplicationFixture();
@@ -151,7 +177,7 @@ final class CheckParityTest extends TestCase
     }
 
     /** @return list<HeadlessDiagnostic> */
-    private function headlessDiagnostics(LanguageServerFactory $factory, string $root, string $path, bool $sourceOnly): array
+    private function headlessDiagnostics(LanguageServerFactory $factory, string $root, string $path, bool $sourceOnly, int $expectedExitCode = CheckCommand::EXIT_DIAGNOSTICS): array
     {
         $arguments = [
             '--format=json',
@@ -162,7 +188,7 @@ final class CheckParityTest extends TestCase
             array_unshift($arguments, '--source-only');
         }
         $execution = $factory->createCheck()->run($arguments);
-        self::assertSame(CheckCommand::EXIT_DIAGNOSTICS, $execution->exitCode, $execution->stderr);
+        self::assertSame($expectedExitCode, $execution->exitCode, $execution->stderr);
         $report = json_decode($execution->stdout, true, flags: \JSON_THROW_ON_ERROR);
         self::assertIsArray($report);
         $items = $report['diagnostics'] ?? null;

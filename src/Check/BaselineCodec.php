@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Check;
 
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Project\InvalidConfigurationException;
 
 final class BaselineCodec

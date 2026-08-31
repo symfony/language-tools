@@ -6,6 +6,7 @@ use Amp\CancelledException;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Project\ProjectConfiguration;

@@ -6,14 +6,25 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DetailedDiagnosticCollection;
+use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
+use Symfony\Lsp\Feature\DiagnosticSuppressor;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Xml\XmlCommentParser;
+use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class DiagnosticProviderRegistryTest extends TestCase
 {
@@ -76,6 +87,28 @@ final class DiagnosticProviderRegistryTest extends TestCase
         self::assertSame(['broken-provider', 'malformed-provider'], array_map(static fn ($failure): string => $failure->provider, $collection->failures));
         self::assertSame('Provider failed.', $collection->failures[0]->error->getMessage());
         self::assertSame('A diagnostic provider returned a non-array diagnostic.', $collection->failures[1]->error->getMessage());
+    }
+
+    public function testSuppressesDiagnosticsInSimpleAndDetailedCollection(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $source = "<?php\n// @symfony-lsp-ignore template.not_found\nrender('missing');\n";
+        [$registry, $client, $collector] = $this->registryForDocument(
+            $uri,
+            'php',
+            $source,
+            [],
+            new StubDiagnosticProvider([$this->diagnostic('template.not_found', 2)], 'template'),
+        );
+        $params = ['textDocument' => ['uri' => $uri]];
+
+        $registry->publish($params);
+        $detailed = $collector->collectDetailed($params);
+
+        self::assertSame([], $client->notifications[0]['params']['diagnostics']);
+        self::assertInstanceOf(DetailedDiagnosticCollection::class, $detailed);
+        self::assertSame([], $detailed->diagnostics);
+        self::assertTrue($detailed->matched);
     }
 
     public function testMergesProviderDiagnosticsInOrder(): void
@@ -145,21 +178,41 @@ final class DiagnosticProviderRegistryTest extends TestCase
      */
     private function registryWithScope(string $uri, array $excludePaths, DiagnosticProviderInterface ...$providers): array
     {
+        return $this->registryForDocument($uri, 'twig', '', $excludePaths, ...$providers);
+    }
+
+    /**
+     * @param list<string> $excludePaths
+     *
+     * @return array{DiagnosticProviderRegistry, CollectingClient, DiagnosticCollector}
+     */
+    private function registryForDocument(string $uri, string $languageId, string $text, array $excludePaths, DiagnosticProviderInterface ...$providers): array
+    {
         $client = new CollectingClient();
         $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'twig', 1, ''));
+        $documents->open(new Document($uri, $languageId, 1, $text));
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $fileScope = new ProjectFileScopeRegistry();
         $fileScope->configure($project, $excludePaths);
 
         $converter = new UriToPathConverter();
+        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
         $collector = new DiagnosticCollector(
             $documents,
             $projects,
             new ProjectPathResolver($converter),
             $fileScope,
             $converter,
+            new DiagnosticSuppressor(
+                new PositionConverter(),
+                new LspProtocolMapper(),
+                new DiagnosticCodeRegistry(),
+                new PhpCommentParser(),
+                new TwigCommentParser(),
+                new YamlCommentParser($treeSitter),
+                new XmlCommentParser(),
+            ),
             $providers,
         );
 
@@ -172,10 +225,10 @@ final class DiagnosticProviderRegistryTest extends TestCase
     }
 
     /** @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, severity: int, source: string, code: string, message: string} */
-    private function diagnostic(string $code): array
+    private function diagnostic(string $code, int $line = 0): array
     {
         return [
-            'range' => ['start' => ['line' => 0, 'character' => 0], 'end' => ['line' => 0, 'character' => 0]],
+            'range' => ['start' => ['line' => $line, 'character' => 0], 'end' => ['line' => $line, 'character' => 0]],
             'severity' => 1,
             'source' => 'symfony',
             'code' => $code,

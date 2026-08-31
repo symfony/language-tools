@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Check;
 
+use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
+
 final class SarifCheckReporter
 {
     private const SCHEMA = 'https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json';
