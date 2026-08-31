@@ -5,7 +5,9 @@ namespace Symfony\Lsp\Tests\Feature\Console;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Console\ConsoleDefinitionExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleExtractor;
+use Symfony\Lsp\Feature\Console\ConsoleInvokableParameterExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleSourceFacts;
 use Symfony\Lsp\Feature\Console\ConsoleSourceIndexer;
 use Symfony\Lsp\Feature\Console\ConsoleSourceIndexRegistry;
@@ -66,12 +68,14 @@ final class ConsoleSourceIndexerTest extends TestCase
     {
         $converter = new PositionConverter();
 
+        $delimiters = new BalancedDelimiterMatcher();
+
         return new ConsoleSourceIndexer($indexes, new ConsoleExtractor(
             $converter,
             new TolerantPhpParser(new Parser()),
-            new PhpExpressionParser(new TolerantPhpParser(new Parser())),
             new PhpCommentParser(),
-            new BalancedDelimiterMatcher(),
+            new ConsoleDefinitionExtractor(new PhpExpressionParser(new TolerantPhpParser(new Parser())), $delimiters),
+            new ConsoleInvokableParameterExtractor($delimiters),
         ));
     }
 }

@@ -10,8 +10,10 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Console\ConsoleCommandMetadata;
+use Symfony\Lsp\Feature\Console\ConsoleDefinitionExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleIndexRegistry;
+use Symfony\Lsp\Feature\Console\ConsoleInvokableParameterExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleProvider;
 use Symfony\Lsp\Feature\Console\ConsoleSourceIndexRegistry;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
@@ -156,7 +158,14 @@ final class ConsoleProviderTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new ConsoleExtractor($converter, new TolerantPhpParser(new Parser()), new PhpExpressionParser(new TolerantPhpParser(new Parser())), new PhpCommentParser(), new BalancedDelimiterMatcher());
+        $delimiters = new BalancedDelimiterMatcher();
+        $extractor = new ConsoleExtractor(
+            $converter,
+            new TolerantPhpParser(new Parser()),
+            new PhpCommentParser(),
+            new ConsoleDefinitionExtractor(new PhpExpressionParser(new TolerantPhpParser(new Parser())), $delimiters),
+            new ConsoleInvokableParameterExtractor($delimiters),
+        );
         $sourceIndexes = new ConsoleSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($extractor->extract($uri, 'php', $text));
         $indexes = new ConsoleIndexRegistry();

@@ -5,8 +5,10 @@ namespace Symfony\Lsp\Tests\Feature\Console;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Console\ConsoleDefinitionExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleInputKind;
+use Symfony\Lsp\Feature\Console\ConsoleInvokableParameterExtractor;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
@@ -311,12 +313,13 @@ final class ConsoleExtractorTest extends TestCase
         $parser = new LastResultPhpParser($inner);
         $expressionParser = new CountingConsolePhpParser(new TolerantPhpParser(new Parser()));
         $converter = new PositionConverter();
+        $delimiters = new BalancedDelimiterMatcher();
         $extractor = new ConsoleExtractor(
             $converter,
             $parser,
-            new PhpExpressionParser($expressionParser),
             new PhpCommentParser(),
-            new BalancedDelimiterMatcher(),
+            new ConsoleDefinitionExtractor(new PhpExpressionParser($expressionParser), $delimiters),
+            new ConsoleInvokableParameterExtractor($delimiters),
         );
 
         $facts = $extractor->extract('file:///workspace/src/Command/ReportCommand.php', 'php', $text);
@@ -332,12 +335,14 @@ final class ConsoleExtractorTest extends TestCase
     {
         $converter = new PositionConverter();
 
+        $delimiters = new BalancedDelimiterMatcher();
+
         return new ConsoleExtractor(
             $converter,
             new TolerantPhpParser(new Parser()),
-            new PhpExpressionParser(new TolerantPhpParser(new Parser())),
             new PhpCommentParser(),
-            new BalancedDelimiterMatcher(),
+            new ConsoleDefinitionExtractor(new PhpExpressionParser(new TolerantPhpParser(new Parser())), $delimiters),
+            new ConsoleInvokableParameterExtractor($delimiters),
         );
     }
 }
