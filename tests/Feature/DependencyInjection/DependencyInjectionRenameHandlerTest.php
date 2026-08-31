@@ -8,13 +8,16 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionRenameHandler;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolResolver;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
@@ -62,7 +65,7 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
         $handler = new DependencyInjectionRenameHandler(
             new DocumentContextResolver($documents, $projects),
             new LspProtocolMapper(),
-            new DependencyInjectionSymbolResolver($converter, $yamlExtractor, $autowireExtractor),
+            new DependencyInjectionSymbolResolver($converter, $this->extractor($converter, $yamlExtractor)),
             $sourceIndexes,
             new ServiceIndexRegistry(),
             new ParameterIndexRegistry(),
@@ -121,13 +124,12 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
             new YamlDependencyInjectionDeclarationExtractor($converter),
             new YamlDependencyInjectionReferenceExtractor($converter),
         );
-        $autowireExtractor = new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser()));
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($yamlExtractor->extract($uri, $text));
         $handler = new DependencyInjectionRenameHandler(
             new DocumentContextResolver($documents, $projects),
             new LspProtocolMapper(),
-            new DependencyInjectionSymbolResolver($converter, $yamlExtractor, $autowireExtractor),
+            new DependencyInjectionSymbolResolver($converter, $this->extractor($converter, $yamlExtractor)),
             $sourceIndexes,
             new ServiceIndexRegistry(),
             new ParameterIndexRegistry(),
@@ -148,6 +150,18 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
         self::assertSame(
             ['app.data_dir', 'app.data_dir'],
             array_column($result['documentChanges'][0]['edits'], 'newText'),
+        );
+    }
+
+    private function extractor(PositionConverter $converter, YamlDependencyInjectionExtractor $yamlExtractor): DependencyInjectionDocumentExtractor
+    {
+        $parser = new TolerantPhpParser(new Parser());
+
+        return new DependencyInjectionDocumentExtractor(
+            $yamlExtractor,
+            new XmlDependencyInjectionExtractor($converter),
+            new PhpAutowireReferenceExtractor($converter, $parser),
+            new PhpClassDeclarationExtractor($converter, $parser),
         );
     }
 }

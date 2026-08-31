@@ -8,14 +8,17 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionHoverHandler;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolResolver;
 use Symfony\Lsp\Feature\DependencyInjection\Parameter;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\Service;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
@@ -49,7 +52,13 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
             new YamlDependencyInjectionDeclarationExtractor($converter),
             new YamlDependencyInjectionReferenceExtractor($converter),
         );
-        $autowireExtractor = new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser()));
+        $phpParser = new TolerantPhpParser(new Parser());
+        $extractor = new DependencyInjectionDocumentExtractor(
+            $yamlExtractor,
+            new XmlDependencyInjectionExtractor($converter),
+            new PhpAutowireReferenceExtractor($converter, $phpParser),
+            new PhpClassDeclarationExtractor($converter, $phpParser),
+        );
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($yamlExtractor->extract($uri, $text));
         $serviceIndexes = new ServiceIndexRegistry();
@@ -73,7 +82,7 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
         $handler = new DependencyInjectionHoverHandler(
             new DocumentContextResolver($documents, $projects),
             new LspProtocolMapper(),
-            new DependencyInjectionSymbolResolver($converter, $yamlExtractor, $autowireExtractor),
+            new DependencyInjectionSymbolResolver($converter, $extractor),
             $serviceIndexes,
             $parameterIndexes,
             $sourceIndexes,

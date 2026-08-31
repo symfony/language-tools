@@ -9,13 +9,21 @@ use Symfony\Lsp\Project\Project;
 /** @extends AbstractSourceIndexer<DependencyInjectionSourceFacts> */
 final class DependencyInjectionSourceIndexer extends AbstractSourceIndexer
 {
+    private readonly DependencyInjectionDocumentExtractor $extractor;
+
     public function __construct(
         private readonly DependencyInjectionSourceIndexRegistry $indexes,
-        private readonly YamlDependencyInjectionExtractor $yamlExtractor,
-        private readonly XmlDependencyInjectionExtractor $xmlExtractor,
-        private readonly PhpAutowireReferenceExtractor $autowireExtractor,
-        private readonly PhpClassDeclarationExtractor $classExtractor,
+        YamlDependencyInjectionExtractor $yamlExtractor,
+        XmlDependencyInjectionExtractor $xmlExtractor,
+        PhpAutowireReferenceExtractor $autowireExtractor,
+        PhpClassDeclarationExtractor $classExtractor,
     ) {
+        $this->extractor = new DependencyInjectionDocumentExtractor(
+            $yamlExtractor,
+            $xmlExtractor,
+            $autowireExtractor,
+            $classExtractor,
+        );
     }
 
     public function name(): string
@@ -65,20 +73,6 @@ final class DependencyInjectionSourceIndexer extends AbstractSourceIndexer
 
     protected function extract(Project $project, SourceDocument $document): ?DependencyInjectionSourceFacts
     {
-        if ('yaml' === $document->languageId) {
-            return $this->yamlExtractor->extract($document->uri, $document->text);
-        }
-        if ('xml' === $document->languageId) {
-            return $this->xmlExtractor->extract($document->uri, $document->text);
-        }
-        if ('php' !== $document->languageId) {
-            return null;
-        }
-
-        return new DependencyInjectionSourceFacts(
-            $document->uri,
-            references: $this->autowireExtractor->extract($document->uri, $document->text),
-            classes: $this->classExtractor->extract($document->uri, $document->text),
-        );
+        return $this->extractor->extractForIndexing($document->uri, $document->languageId, $document->text);
     }
 }

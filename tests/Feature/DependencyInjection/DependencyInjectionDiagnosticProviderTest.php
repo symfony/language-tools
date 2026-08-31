@@ -9,9 +9,12 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDiagnosticProvider;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
@@ -57,13 +60,18 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
             new YamlDependencyInjectionDeclarationExtractor($converter),
             new YamlDependencyInjectionReferenceExtractor($converter),
         );
+        $phpParser = new TolerantPhpParser(new Parser());
         $provider = new DependencyInjectionDiagnosticProvider(
             new DocumentContextResolver($documents, $projects),
             new LspProtocolMapper(),
             $serviceIndexes,
             $parameterIndexes,
-            $yamlExtractor,
-            new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser())),
+            new DependencyInjectionDocumentExtractor(
+                $yamlExtractor,
+                new XmlDependencyInjectionExtractor($converter),
+                new PhpAutowireReferenceExtractor($converter, $phpParser),
+                new PhpClassDeclarationExtractor($converter, $phpParser),
+            ),
             new RuntimeConfiguration(),
         );
 

@@ -111,6 +111,12 @@ references are reported as errors. Optional service
 references such as ``@?app.mailer`` aren't diagnosed. Unknown tags are accepted
 because applications and compiler passes can define their own tags.
 
+Limitations
+-----------
+
+XML service definitions are indexed for navigation, but in-file diagnostics
+and cursor features aren't available in XML files.
+
 Privacy
 -------
 

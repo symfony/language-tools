@@ -9,6 +9,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDefinitionHandler;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionReferencesHandler;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
@@ -16,6 +17,7 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolResolver;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
@@ -81,8 +83,15 @@ final class DependencyInjectionNavigationTest extends TestCase
             new YamlDependencyInjectionDeclarationExtractor($converter),
             new YamlDependencyInjectionReferenceExtractor($converter),
         );
-        $autowireExtractor = new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser()));
-        $classExtractor = new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser()));
+        $phpParser = new TolerantPhpParser(new Parser());
+        $autowireExtractor = new PhpAutowireReferenceExtractor($converter, $phpParser);
+        $classExtractor = new PhpClassDeclarationExtractor($converter, $phpParser);
+        $extractor = new DependencyInjectionDocumentExtractor(
+            $yamlExtractor,
+            new XmlDependencyInjectionExtractor($converter),
+            $autowireExtractor,
+            $classExtractor,
+        );
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace(
             $yamlExtractor->extract($yamlUri, $yaml),
@@ -96,7 +105,7 @@ final class DependencyInjectionNavigationTest extends TestCase
                 classes: $classExtractor->extract($consumerUri, $consumer),
             ),
         );
-        $resolver = new DependencyInjectionSymbolResolver($converter, $yamlExtractor, $autowireExtractor);
+        $resolver = new DependencyInjectionSymbolResolver($converter, $extractor);
         $contextResolver = new DocumentContextResolver($documents, $projects);
         $position = $converter->toPosition($consumer, strpos($consumer, 'app.mailer') + 1);
         $params = [
