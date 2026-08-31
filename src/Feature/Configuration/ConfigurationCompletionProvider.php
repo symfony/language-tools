@@ -8,8 +8,6 @@ use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
-use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -20,10 +18,9 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly ConfigurationIndexRegistry $indexes,
-        private readonly ConfigurationPathResolver $paths,
         private readonly YamlConfigurationParser $yaml,
-        private readonly PhpCommentParserInterface $phpComments,
-        private readonly XmlCommentParser $xmlComments,
+        private readonly PhpConfigurationAnalyzer $php,
+        private readonly XmlConfigurationAnalyzer $xml,
     ) {
     }
 
@@ -98,25 +95,19 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
     private function completePhp(Document $document, Project $project, Position $position): ?array
     {
         $offset = $this->converter->toByteOffset($document->text, $position);
-        $before = $this->phpComments->mask(substr($document->text, 0, $offset));
-        if (!preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)((?:->[A-Za-z_][A-Za-z0-9_]*\(\))*)->([A-Za-z_][A-Za-z0-9_]*)?$/', $before, $match)) {
+        $context = $this->php->completionContext($document->text, $offset);
+        if (null === $context) {
             return null;
         }
-        $path = [$this->paths->phpRoot($before, $match[1])];
-        preg_match_all('/->([A-Za-z_][A-Za-z0-9_]*)\(\)/', $match[2], $methods);
-        foreach ($methods[1] as $method) {
-            $path[] = $this->paths->phpMethodName($method);
-        }
-        $prefix = $match[3] ?? '';
-        $parent = $this->indexes->forProject($project)->find($path);
+        $parent = $this->indexes->forProject($project)->find($context['path']);
         if (null === $parent) {
             return null;
         }
         $items = [];
         foreach ($this->completionChildren($parent) as $node) {
             $method = lcfirst(str_replace(' ', '', ucwords(str_replace('_', ' ', $node->name))));
-            if (str_starts_with($method, $prefix)) {
-                $items[] = $this->completion($method, $method.'('.$this->phpSnippet($node).')', $this->shortDescription($node), $document->text, $offset - \strlen($prefix), $position);
+            if (str_starts_with($method, $context['prefix'])) {
+                $items[] = $this->completion($method, $method.'('.$this->phpSnippet($node).')', $this->shortDescription($node), $document->text, $context['start'], $position);
             }
         }
 
@@ -127,41 +118,32 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
     private function completeXml(Document $document, Project $project, Position $position): ?array
     {
         $offset = $this->converter->toByteOffset($document->text, $position);
-        $before = $this->xmlComments->mask(substr($document->text, 0, $offset));
         $index = $this->indexes->forProject($project);
-        if (preg_match('/<(?<element>[A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?)\b[^<>]*\s+(?<prefix>[A-Za-z_][A-Za-z0-9_.-]*)?$/', $before, $attributeMatch, \PREG_OFFSET_CAPTURE)) {
-            $tagOffset = strrpos($before, '<');
-            if (false !== $tagOffset) {
-                $parentPath = $this->paths->xmlPath(substr($before, 0, $tagOffset), $index);
-                $path = $this->paths->xmlElementPath($parentPath, $attributeMatch['element'][0], $index);
-                $prefix = $attributeMatch['prefix'][0] ?? '';
-                $items = [];
-                foreach ($this->completionChildren(null === $path ? null : $index->find($path)) as $node) {
-                    $xmlName = str_replace('_', '-', $node->name);
-                    if (str_starts_with($xmlName, $prefix)) {
-                        $items[] = $this->completion($xmlName, $xmlName.'="${1}"', $this->shortDescription($node), $document->text, $offset - \strlen($prefix), $position);
-                    }
-                }
-
-                return $items;
-            }
-        }
-        if (!preg_match('/<(?:(?<alias>[A-Za-z_][A-Za-z0-9_.-]*):)?(?<prefix>[A-Za-z_][A-Za-z0-9_.-]*)?$/', $before, $match)) {
+        $context = $this->xml->completionContext($document->text, $index, $offset);
+        if (null === $context) {
             return null;
         }
-        $alias = $match['alias'] ?? '';
-        $prefix = $match['prefix'] ?? '';
-        $path = $this->paths->xmlPath(substr($before, 0, -\strlen($match[0])), $index);
-        if ('' !== $alias && [] === $path && isset($index->roots()[$alias])) {
-            return str_starts_with('config', $prefix) ? [$this->completion('config', $alias.':config>', 'Bundle configuration root', $document->text, $offset - \strlen($prefix), $position)] : [];
+        if ($context['attribute']) {
+            $items = [];
+            foreach ($this->completionChildren(null === $context['path'] ? null : $index->find($context['path'])) as $node) {
+                $xmlName = str_replace('_', '-', $node->name);
+                if (str_starts_with($xmlName, $context['prefix'])) {
+                    $items[] = $this->completion($xmlName, $xmlName.'="${1}"', $this->shortDescription($node), $document->text, $context['start'], $position);
+                }
+            }
+
+            return $items;
         }
-        $nodes = [] === $path ? array_values($index->roots()) : $this->completionChildren($index->find($path));
+        if ('' !== $context['alias'] && [] === $context['path'] && isset($index->roots()[$context['alias']])) {
+            return str_starts_with('config', $context['prefix']) ? [$this->completion('config', $context['alias'].':config>', 'Bundle configuration root', $document->text, $context['start'], $position)] : [];
+        }
+        $nodes = [] === $context['path'] ? array_values($index->roots()) : $this->completionChildren(null === $context['path'] ? null : $index->find($context['path']));
         $items = [];
         foreach ($nodes as $node) {
             $xmlName = str_replace('_', '-', $node->name);
-            if (str_starts_with($xmlName, $prefix)) {
-                $newText = ('' !== $alias ? $alias.':' : '').$xmlName.'>';
-                $items[] = $this->completion($xmlName, $newText, $this->shortDescription($node), $document->text, $offset - \strlen($prefix), $position);
+            if (str_starts_with($xmlName, $context['prefix'])) {
+                $newText = ('' !== $context['alias'] ? $context['alias'].':' : '').$xmlName.'>';
+                $items[] = $this->completion($xmlName, $newText, $this->shortDescription($node), $document->text, $context['start'], $position);
             }
         }
 

@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\Configuration;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Document\Document;
@@ -13,15 +14,19 @@ use Symfony\Lsp\Feature\Configuration\ConfigurationDiagnosticProvider;
 use Symfony\Lsp\Feature\Configuration\ConfigurationDocumentLinkProvider;
 use Symfony\Lsp\Feature\Configuration\ConfigurationHoverProvider;
 use Symfony\Lsp\Feature\Configuration\ConfigurationIndexRegistry;
-use Symfony\Lsp\Feature\Configuration\ConfigurationPathResolver;
+use Symfony\Lsp\Feature\Configuration\ConfigurationValidationReconciler;
 use Symfony\Lsp\Feature\Configuration\ConfigurationValidationRegistry;
 use Symfony\Lsp\Feature\Configuration\ConfigurationValidationResult;
 use Symfony\Lsp\Feature\Configuration\ConfigurationValueValidator;
+use Symfony\Lsp\Feature\Configuration\PhpConfigurationAnalyzer;
 use Symfony\Lsp\Feature\Configuration\ProjectConfigurationSnapshotLoader;
+use Symfony\Lsp\Feature\Configuration\XmlConfigurationAnalyzer;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
+use Symfony\Lsp\Feature\Environment\EnvironmentExpressionParser;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
@@ -448,6 +453,7 @@ final class ConfigurationProviderTest extends TestCase
             // $framework->router()->ut
             $framework->router()->utf8('bad');
             $framework->router()->utf8(true);
+            $framework->router()->utf8(/* selected */ true);
             PHP;
         $fixture->documents->open(new Document($uri, 'php', 1, $text));
 
@@ -690,13 +696,22 @@ final class ConfigurationProviderTest extends TestCase
         $phpComments = new PhpCommentParser();
         $xmlComments = new XmlCommentParser();
         $yamlComments = new YamlCommentParser();
-        $paths = new ConfigurationPathResolver($phpComments, $xmlComments);
+        $php = new PhpConfigurationAnalyzer(new TolerantPhpParser(new Parser()), $phpComments);
+        $xml = new XmlConfigurationAnalyzer($xmlComments);
         $yaml = new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
+        $values = new ConfigurationValueValidator($environmentIndexes, new EnvironmentExpressionParser());
+        $validationReconciler = new ConfigurationValidationReconciler(
+            $validations,
+            new SavedDocumentMatcher(new ProjectPathResolver($uriConverter)),
+            $runtimeConfiguration,
+            $converter,
+            $protocol,
+        );
 
         return new ConfigurationProviderFixture(
-            new ConfigurationCompletionProvider($resolver, $converter, $protocol, $indexes, $paths, $yaml, $phpComments, $xmlComments),
-            new ConfigurationHoverProvider($resolver, $converter, $protocol, $indexes, $paths, $yaml),
-            new ConfigurationDiagnosticProvider($resolver, new ProjectPathResolver($uriConverter), $converter, $protocol, $indexes, $routeIndexes, $validations, new SavedDocumentMatcher(new ProjectPathResolver($uriConverter)), $runtimeConfiguration, $paths, $yaml, new ConfigurationValueValidator($environmentIndexes), $phpComments, $xmlComments),
+            new ConfigurationCompletionProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
+            new ConfigurationHoverProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
+            new ConfigurationDiagnosticProvider($resolver, new ProjectPathResolver($uriConverter), $converter, $protocol, $indexes, $routeIndexes, $runtimeConfiguration, $yaml, $values, $php, $xml, $validationReconciler),
             new ConfigurationDocumentLinkProvider($resolver, $converter, $protocol, $uriConverter, $yamlComments),
             $documents,
             $converter,

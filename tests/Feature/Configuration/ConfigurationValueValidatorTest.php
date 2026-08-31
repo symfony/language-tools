@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Feature\Configuration;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\Configuration\ConfigurationNode;
 use Symfony\Lsp\Feature\Configuration\ConfigurationValueValidator;
+use Symfony\Lsp\Feature\Environment\EnvironmentExpressionParser;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Project\Project;
 
@@ -12,7 +13,7 @@ final class ConfigurationValueValidatorTest extends TestCase
 {
     public function testValidatesLiteralAndDynamicValues(): void
     {
-        $validator = new ConfigurationValueValidator(new EnvironmentIndexRegistry());
+        $validator = new ConfigurationValueValidator(new EnvironmentIndexRegistry(), new EnvironmentExpressionParser());
 
         self::assertTrue($validator->acceptsValue($this->node('boolean'), 'true'));
         self::assertFalse($validator->acceptsValue($this->node('boolean'), 'maybe'));
@@ -32,7 +33,7 @@ final class ConfigurationValueValidatorTest extends TestCase
 
     public function testHonorsProbedArrayNormalization(): void
     {
-        $validator = new ConfigurationValueValidator(new EnvironmentIndexRegistry());
+        $validator = new ConfigurationValueValidator(new EnvironmentIndexRegistry(), new EnvironmentExpressionParser());
         $strict = $this->node('array');
         $enableable = $this->node('array', accepts: ['null' => true, 'true' => true, 'false' => true]);
         $shorthand = $this->node('array', accepts: ['scalar' => true]);
@@ -55,7 +56,7 @@ final class ConfigurationValueValidatorTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $environmentIndexes = new EnvironmentIndexRegistry();
         $environmentIndexes->forProject($project)->replaceProcessors(['bool' => 'bool', 'json' => 'array', 'number' => 'int|float']);
-        $validator = new ConfigurationValueValidator($environmentIndexes);
+        $validator = new ConfigurationValueValidator($environmentIndexes, new EnvironmentExpressionParser());
 
         self::assertSame('string', $validator->environmentType($project, '%env(APP_NAME)%'));
         self::assertSame('array', $validator->environmentType($project, "'%env(json:APP_CONFIG)%'"));

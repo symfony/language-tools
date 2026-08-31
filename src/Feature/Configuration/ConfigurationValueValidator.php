@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Configuration;
 
+use Symfony\Lsp\Feature\Environment\EnvironmentExpressionParser;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Project\Project;
 
@@ -9,21 +10,21 @@ final class ConfigurationValueValidator
 {
     public function __construct(
         private readonly EnvironmentIndexRegistry $environmentIndexes,
+        private readonly EnvironmentExpressionParser $environmentExpressions,
     ) {
     }
 
     public function environmentType(Project $project, string $value): ?string
     {
-        $value = trim($value, " \t\"'");
-        if (1 !== preg_match('/^%env\(([^)]+)\)%$/', $value, $match)) {
+        $expression = $this->environmentExpressions->parse(trim($value, " \t\"'"));
+        if (null === $expression) {
             return null;
         }
-        $separator = strpos($match[1], ':');
-        if (false === $separator) {
+        if ([] === $expression->processorChain) {
             return 'string';
         }
 
-        return $this->environmentIndexes->forProject($project)->processors()[substr($match[1], 0, $separator)] ?? null;
+        return $this->environmentIndexes->forProject($project)->processors()[$expression->processorChain[0]] ?? null;
     }
 
     public function acceptsType(ConfigurationNode $node, string $actual): bool

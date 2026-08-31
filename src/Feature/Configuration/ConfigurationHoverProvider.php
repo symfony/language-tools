@@ -14,8 +14,9 @@ final class ConfigurationHoverProvider implements HoverProviderInterface
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly ConfigurationIndexRegistry $indexes,
-        private readonly ConfigurationPathResolver $paths,
         private readonly YamlConfigurationParser $yaml,
+        private readonly PhpConfigurationAnalyzer $php,
+        private readonly XmlConfigurationAnalyzer $xml,
     ) {
     }
 
@@ -28,12 +29,12 @@ final class ConfigurationHoverProvider implements HoverProviderInterface
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
         $index = $this->indexes->forProject($request->project);
         if ('php' === $request->document->languageId) {
-            $resolved = $this->paths->resolvePhpNode($request->document, $index, $offset);
+            $resolved = $this->php->resolveNode($request->document->text, $index, $offset);
 
             return null === $resolved ? null : $this->protocol->markdownHover($this->description($resolved[0], $resolved[1]));
         }
         if ('xml' === $request->document->languageId) {
-            $resolved = $this->paths->resolveXmlNode($request->document, $index, $offset);
+            $resolved = $this->xml->resolveNode($request->document->text, $index, $offset);
 
             return null === $resolved ? null : $this->protocol->markdownHover($this->description($resolved[0], $resolved[1]));
         }
