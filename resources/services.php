@@ -100,7 +100,10 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_iterator;
 
 return static function (ContainerConfigurator $container): void {
-    $container->parameters()->set('runtime.default_php_command', ['php']);
+    $container->parameters()
+        ->set('runtime.default_php_command', ['php'])
+        ->set('runtime.release_metadata_url', '')
+    ;
 
     $services = $container->services();
     $services->defaults()
@@ -110,6 +113,7 @@ return static function (ContainerConfigurator $container): void {
         ->bind('$version', param('server.version'))
         ->bind('$bridgeSource', param('bridge.source'))
         ->bind('$defaultPhpCommand', param('runtime.default_php_command'))
+        ->bind('$releaseMetadataUrl', param('runtime.release_metadata_url'))
     ;
 
     $providerTags = [

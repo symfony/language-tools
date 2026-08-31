@@ -47,7 +47,7 @@ require __DIR__.'/bridge/sections/doctrine.php';
 require __DIR__.'/bridge/sections/environment.php';
 require __DIR__.'/bridge/sections/console.php';
 
-$options = getopt('', ['project:', 'environment::', 'debug::', 'sections::', 'targeted-refresh::', 'rebuild-container::', 'configuration-generation::']);
+$options = getopt('', ['project:', 'environment::', 'debug::', 'sections::', 'targeted-refresh::', 'rebuild-container::', 'configuration-generation::', 'release-metadata-url:', 'release-metadata-cache:']);
 $project = $options['project'] ?? null;
 if (!is_string($project) || '' === $project) {
     fwrite(STDERR, "The --project option is required.\n");
@@ -94,6 +94,29 @@ $configurationGenerationOption = $options['configuration-generation'] ?? '0';
 $configurationGeneration = is_string($configurationGenerationOption) && ctype_digit($configurationGenerationOption)
     ? (int) $configurationGenerationOption
     : 0;
+$projectMetadata = [
+    'root' => realpath($project) ?: $project,
+    'symfonyVersion' => $version,
+    'symfonyBranch' => $matches[1],
+    'phpVersion' => PHP_VERSION,
+    'environment' => $environment,
+    'debug' => $debug,
+];
+$releaseMetadataUrl = $options['release-metadata-url'] ?? null;
+$releaseMetadataCache = $options['release-metadata-cache'] ?? null;
+if (is_string($releaseMetadataUrl) && '' !== $releaseMetadataUrl
+    && is_string($releaseMetadataCache) && '' !== $releaseMetadataCache
+) {
+    $supportedVersions = symfonyLspBridgeSupportedVersions($releaseMetadataUrl, $releaseMetadataCache);
+    if (is_array($supportedVersions) && !in_array($matches[1], $supportedVersions, true)) {
+        fwrite(STDOUT, json_encode([
+            'schemaVersion' => 1,
+            'project' => $projectMetadata,
+            'unsupportedSymfonyVersion' => true,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n");
+        exit(0);
+    }
+}
 
 $projectRoot = rtrim($project, '/\\');
 $hasEnvFile = is_file($projectRoot.'/.env') || is_file($projectRoot.'/.env.dist') || is_file($projectRoot.'/.env.local.php');
@@ -161,14 +184,7 @@ $totalMilliseconds = $elapsedMilliseconds($bridgeStartedAt);
 $result = [
     'schemaVersion' => 1,
     'generation' => hash('sha256', json_encode([$configurationGeneration, $configurationValidation, $sections], JSON_THROW_ON_ERROR)),
-    'project' => [
-        'root' => realpath($project) ?: $project,
-        'symfonyVersion' => $version,
-        'symfonyBranch' => $matches[1],
-        'phpVersion' => PHP_VERSION,
-        'environment' => $environment,
-        'debug' => $debug,
-    ],
+    'project' => $projectMetadata,
     'configurationValidation' => $configurationValidation,
     'configurationGeneration' => $configurationGeneration,
     'sections' => $sections,

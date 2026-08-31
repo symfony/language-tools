@@ -42,6 +42,64 @@ final class BridgeTest extends TestCase
         self::assertFalse($result['project']['debug']);
     }
 
+    public function testReportsBranchesMissingFromReleaseMetadataWithoutBootingTheApplication(): void
+    {
+        (new AutoloaderFixtureBuilder($this->workspace))->writeAutoloader('5.4.45');
+        $metadata = $this->workspace->write('releases.json', json_encode([
+            'supported_versions' => ['6.4', '7.4', '8.1'],
+        ], \JSON_THROW_ON_ERROR));
+        $cache = $this->workspace->path.'/release-metadata-cache.json';
+
+        $process = $this->bridge->run([
+            '--release-metadata-url='.$metadata,
+            '--release-metadata-cache='.$cache,
+        ]);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        self::assertIsArray($process->snapshot);
+        self::assertTrue($process->snapshot['unsupportedSymfonyVersion'] ?? false);
+        $project = $process->snapshot['project'] ?? null;
+        self::assertIsArray($project);
+        self::assertSame('5.4', $project['symfonyBranch'] ?? null);
+        self::assertArrayNotHasKey('configurationValidation', $process->snapshot);
+        self::assertSame((string) file_get_contents($metadata), (string) file_get_contents($cache));
+    }
+
+    public function testUsesStaleReleaseMetadataWhenRefreshFails(): void
+    {
+        (new AutoloaderFixtureBuilder($this->workspace))->writeAutoloader('5.4.45');
+        $cache = $this->workspace->write('release-metadata-cache.json', json_encode([
+            'supported_versions' => ['6.4', '7.4', '8.1'],
+        ], \JSON_THROW_ON_ERROR));
+        touch($cache, time() - 7200);
+
+        $process = $this->bridge->run([
+            '--release-metadata-url='.$this->workspace->path.'/missing-releases.json',
+            '--release-metadata-cache='.$cache,
+        ]);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        self::assertIsArray($process->snapshot);
+        self::assertTrue($process->snapshot['unsupportedSymfonyVersion'] ?? false);
+    }
+
+    public function testContinuesWhenReleaseMetadataIsInvalid(): void
+    {
+        (new AutoloaderFixtureBuilder($this->workspace))->writeAutoloader('5.4.45');
+        $metadata = $this->workspace->write('releases.json', json_encode([
+            'supported_versions' => ['invalid'],
+        ], \JSON_THROW_ON_ERROR));
+
+        $process = $this->bridge->run([
+            '--release-metadata-url='.$metadata,
+            '--release-metadata-cache='.$this->workspace->path.'/missing-cache.json',
+        ]);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        self::assertIsArray($process->snapshot);
+        self::assertArrayNotHasKey('unsupportedSymfonyVersion', $process->snapshot);
+    }
+
     public function testApplicationGlobalFunctionsDoNotCollideWithBridgeSymbols(): void
     {
         (new AutoloaderFixtureBuilder($this->workspace))->writeApplicationGlobalFunctions();

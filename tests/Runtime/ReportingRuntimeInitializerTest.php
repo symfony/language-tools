@@ -11,6 +11,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\ReportingRuntimeInitializer;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
+use Symfony\Lsp\Runtime\UnsupportedSymfonyVersionException;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 
@@ -48,6 +49,27 @@ final class ReportingRuntimeInitializerTest extends TestCase
 
         self::assertSame(
             'Symfony Language Tools could not initialize runtime metadata for "/workspace". Static-only features remain active.',
+            $client->notifications[0]['params']['message'],
+        );
+    }
+
+    public function testReportsUnsupportedSymfonyVersionAsStaticOnly(): void
+    {
+        $client = new ReportingClient();
+        $statuses = new ProjectIndexStatusRegistry();
+        $project = new Project('/workspace', 'file:///workspace', '^5.4');
+        $statuses->runtimeFailed($project);
+        $initializer = new ReportingRuntimeInitializer(
+            $this->failingInitializer(new UnsupportedSymfonyVersionException('5.4')),
+            $client,
+            $statuses,
+            new ServerLogger(null, new SensitiveDataRedactor()),
+        );
+
+        $initializer->initialize($project);
+
+        self::assertSame(
+            'The project "/workspace" uses Symfony 5.4, which is not supported by Symfony Language Tools. Static-only features remain active.',
             $client->notifications[0]['params']['message'],
         );
     }
@@ -101,12 +123,16 @@ final class ReportingRuntimeInitializerTest extends TestCase
         self::assertSame(['window/showMessage'], array_column($client->notifications, 'method'));
     }
 
-    private function failingInitializer(): RuntimeInitializerInterface
+    private function failingInitializer(?\Throwable $error = null): RuntimeInitializerInterface
     {
-        return new class implements RuntimeInitializerInterface {
+        return new class($error ?? new \RuntimeException('secret=value')) implements RuntimeInitializerInterface {
+            public function __construct(private readonly \Throwable $error)
+            {
+            }
+
             public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
             {
-                throw new \RuntimeException('secret=value');
+                throw $this->error;
             }
         };
     }

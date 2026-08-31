@@ -22,6 +22,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         private readonly ProjectIndexStatusRegistry $statuses,
         private readonly ?RuntimeSnapshotStore $snapshotStore = null,
         private readonly ?RuntimeSnapshotState $snapshotState = null,
+        private readonly string $releaseMetadataUrl = '',
     ) {
     }
 
@@ -47,6 +48,10 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                 '--debug=1',
                 '--sections='.implode(',', $sections),
                 '--configuration-generation='.$this->configurationValidation->generation($project),
+                ...('' === $this->releaseMetadataUrl ? [] : [
+                    '--release-metadata-url='.$this->releaseMetadataUrl,
+                    '--release-metadata-cache='.$this->pathMapper->toContainer($project, \dirname($bridge).'/release-metadata.json'),
+                ]),
                 ...($plan->preservesContainer() ? ['--targeted-refresh=1'] : []),
                 ...(RuntimeRefreshMode::Clear === $mode ? ['--rebuild-container=1'] : []),
             ], $project->rootPath, $cancellation, $this->configuration->bridgeTimeout($project));
@@ -64,6 +69,14 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             $snapshot = $this->decodeSnapshot($result);
             if (1 !== ($snapshot['schemaVersion'] ?? null)) {
                 throw new \RuntimeException('The project bridge returned an unsupported snapshot.');
+            }
+            if (true === ($snapshot['unsupportedSymfonyVersion'] ?? null)) {
+                $symfonyBranch = $this->symfonyBranch($snapshot);
+                if (null === $symfonyBranch) {
+                    throw new \RuntimeException('The project bridge returned an unsupported snapshot.');
+                }
+
+                throw new UnsupportedSymfonyVersionException($symfonyBranch);
             }
             $timings = $this->bridgeTimings($snapshot['timings'] ?? null, $sections);
             if (null !== $timings) {
@@ -182,6 +195,15 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         }
 
         return (float) $value;
+    }
+
+    /** @param array<array-key, mixed> $snapshot */
+    private function symfonyBranch(array $snapshot): ?string
+    {
+        $project = $snapshot['project'] ?? null;
+        $branch = \is_array($project) ? ($project['symfonyBranch'] ?? null) : null;
+
+        return \is_string($branch) && 1 === preg_match('/^[0-9]+\.[0-9]+$/D', $branch) ? $branch : null;
     }
 
     /**

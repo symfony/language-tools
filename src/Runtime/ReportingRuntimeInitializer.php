@@ -29,19 +29,29 @@ final class ReportingRuntimeInitializer implements RuntimeInitializerInterface
             $this->logger->error($error);
             $runtimeStatus = $this->statuses->status($project)['runtime'];
             $stale = 'stale' === $runtimeStatus['state'];
-            $message = 'configuration' === ($runtimeStatus['stage'] ?? null)
-                ? \sprintf(
+            if ($error instanceof UnsupportedSymfonyVersionException) {
+                $message = \sprintf(
+                    $stale
+                        ? 'The project "%s" uses Symfony %s, which is not supported by Symfony Language Tools. The last valid runtime metadata remains active.'
+                        : 'The project "%s" uses Symfony %s, which is not supported by Symfony Language Tools. Static-only features remain active.',
+                    $project->rootPath,
+                    $error->symfonyBranch,
+                );
+            } elseif ('configuration' === ($runtimeStatus['stage'] ?? null)) {
+                $message = \sprintf(
                     $stale
                         ? 'Symfony Language Tools found invalid application configuration for "%s". The last valid runtime metadata remains active.'
                         : 'Symfony Language Tools found invalid application configuration for "%s".',
                     $project->rootPath,
-                )
-                : \sprintf(
+                );
+            } else {
+                $message = \sprintf(
                     $stale
                         ? 'Symfony Language Tools could not refresh runtime metadata for "%s". The last valid metadata remains active.'
                         : 'Symfony Language Tools could not initialize runtime metadata for "%s". Static-only features remain active.',
                     $project->rootPath,
                 );
+            }
             $this->client->notify('window/showMessage', [
                 'type' => 1,
                 'message' => $message,

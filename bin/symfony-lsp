@@ -61,7 +61,14 @@ $symfonyCli = getenv('SYMFONY_LSP_SYMFONY_CLI');
 if (false !== $symfonyCli && '' !== $symfonyCli && Path::isAbsolute($symfonyCli)) {
     $defaultPhpCommand = [$symfonyCli, 'php'];
 }
-$factory = new LanguageServerFactory(defaultPhpCommand: $defaultPhpCommand);
+$releaseMetadataUrl = getenv('SYMFONY_LSP_RELEASE_METADATA_URL');
+if (false === $releaseMetadataUrl || '' === $releaseMetadataUrl) {
+    $releaseMetadataUrl = 'https://symfony.com/releases.json';
+}
+$factory = new LanguageServerFactory(
+    defaultPhpCommand: $defaultPhpCommand,
+    releaseMetadataUrl: $releaseMetadataUrl,
+);
 if ('check' === $command) {
     $execution = $factory->createCheck($errorOutput)->run(array_values(array_slice($argv, 2)));
     $writer = new CheckOutputWriter();

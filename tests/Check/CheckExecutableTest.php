@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Check\CheckCommand;
+use Symfony\Lsp\Runtime\UnsupportedSymfonyVersionException;
 use Symfony\Lsp\Server\ServerVersion;
 
 use function Amp\async;
@@ -42,6 +43,9 @@ final class CheckExecutableTest extends TestCase
             'require' => ['symfony/framework-bundle' => '^8.0'],
         ], \JSON_THROW_ON_ERROR));
         file_put_contents($this->directory.'/config/services.yaml', "parameters:\n    broken: '%env(APP_SECRET%'\n");
+        file_put_contents($this->directory.'/releases.json', json_encode([
+            'supported_versions' => ['8.0'],
+        ], \JSON_THROW_ON_ERROR));
     }
 
     protected function tearDown(): void
@@ -262,6 +266,31 @@ final class CheckExecutableTest extends TestCase
         self::assertSame([], $report['diagnostics']);
         self::assertSame(0, $report['summary']['blocking']);
         self::assertStringNotContainsString('CANARY_SECRET', $result['stdout'].$result['stderr']);
+    }
+
+    public function testReportsUnsupportedSymfonyVersions(): void
+    {
+        file_put_contents($this->directory.'/composer.json', json_encode([
+            'type' => 'project',
+            'require' => ['symfony/framework-bundle' => '^5.4'],
+        ], \JSON_THROW_ON_ERROR));
+        mkdir($this->directory.'/vendor');
+        file_put_contents($this->directory.'/vendor/autoload.php', <<<'PHP'
+            <?php
+            namespace Composer;
+            final class InstalledVersions
+            {
+                public static function getPrettyVersion(string $package): ?string { return '5.4.45'; }
+            }
+            PHP);
+
+        $result = $this->execute(['check', '--format=json', '--workspace='.$this->directory]);
+        $report = $this->decodeReport($result['stdout']);
+
+        self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode']);
+        self::assertFalse($report['complete']);
+        self::assertSame('Symfony 5.4 is not supported by Symfony Language Tools.', $report['errors'][0]['message']);
+        self::assertSame(UnsupportedSymfonyVersionException::class, $report['errors'][0]['cause']['class'] ?? null);
     }
 
     public function testDoesNotReportACleanResultWhenRuntimeIndexingFails(): void
@@ -579,7 +608,11 @@ final class CheckExecutableTest extends TestCase
         return Process::start(
             [Path::join($root, 'bin/symfony-lsp'), ...$arguments],
             workingDirectory: $root,
-            environment: [...$inheritedEnvironment, ...$environment],
+            environment: [
+                ...$inheritedEnvironment,
+                'SYMFONY_LSP_RELEASE_METADATA_URL' => $this->directory.'/releases.json',
+                ...$environment,
+            ],
             options: ['bypass_shell' => true],
         );
     }

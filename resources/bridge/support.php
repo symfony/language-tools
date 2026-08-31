@@ -13,6 +13,66 @@ function symfonyLspBridgeFinalizeSection(array $section): array
     return $section;
 }
 
+/** @return list<string>|null */
+function symfonyLspBridgeSupportedVersions(string $url, string $cache): ?array
+{
+    $cached = is_file($cache) ? @file_get_contents($cache) : false;
+    $attempt = $cache.'.last-attempt';
+    $attemptedAt = is_file($attempt) ? @filemtime($attempt) : false;
+    if (is_int($attemptedAt) && $attemptedAt >= time() - 3600) {
+        return is_string($cached) ? symfonyLspBridgeDecodeSupportedVersions($cached) : null;
+    }
+    @touch($attempt);
+
+    $context = stream_context_create(['http' => [
+        'timeout' => 2.0,
+        'follow_location' => true,
+        'max_redirects' => 3,
+        'ignore_errors' => true,
+        'header' => "Accept: application/json\r\nUser-Agent: Symfony-Language-Tools\r\n",
+    ]]);
+    $metadata = @file_get_contents($url, false, $context);
+    if (is_string($metadata)) {
+        $versions = symfonyLspBridgeDecodeSupportedVersions($metadata);
+        if (null !== $versions) {
+            $temporary = $cache.'.'.getmypid().'.tmp';
+            if (false !== @file_put_contents($temporary, $metadata, LOCK_EX)) {
+                if (!@rename($temporary, $cache)) {
+                    @unlink($temporary);
+                }
+            }
+
+            return $versions;
+        }
+    }
+
+    return is_string($cached) ? symfonyLspBridgeDecodeSupportedVersions($cached) : null;
+}
+
+/** @return list<string>|null */
+function symfonyLspBridgeDecodeSupportedVersions(string $metadata): ?array
+{
+    try {
+        $decoded = json_decode($metadata, true, 512, JSON_THROW_ON_ERROR);
+    } catch (JsonException) {
+        return null;
+    }
+    $supported = is_array($decoded) ? ($decoded['supported_versions'] ?? null) : null;
+    if (!is_array($supported) || [] === $supported) {
+        return null;
+    }
+
+    $versions = [];
+    foreach ($supported as $version) {
+        if (!is_string($version) || 1 !== preg_match('/^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/D', $version)) {
+            return null;
+        }
+        $versions[$version] = true;
+    }
+
+    return array_keys($versions);
+}
+
 function symfonyLspBridgeRunJsonCommand(object $application, array $arguments): array
 {
     static $cache = [];

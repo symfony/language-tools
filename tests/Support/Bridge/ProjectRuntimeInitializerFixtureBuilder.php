@@ -34,6 +34,7 @@ final class ProjectRuntimeInitializerFixtureBuilder
         ?RuntimeSnapshotStore $snapshotStore = null,
         ?RuntimeSnapshotState $snapshotState = null,
         ?ProjectIndexStatusRegistry $statuses = null,
+        string $releaseMetadataUrl = '',
     ): ProjectRuntimeInitializer {
         $configuration ??= new RuntimeConfiguration();
 
@@ -48,6 +49,7 @@ final class ProjectRuntimeInitializerFixtureBuilder
             $statuses ?? new ProjectIndexStatusRegistry(),
             $snapshotStore,
             $snapshotState,
+            $releaseMetadataUrl,
         );
     }
 }

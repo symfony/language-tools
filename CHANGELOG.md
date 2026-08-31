@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Report unsupported Symfony branches from live release metadata
 - Ignore Twig macro declarations that share a name with custom functions
 - Recognize PHP heredoc translation messages and global parameters
 - Buffer persistent source index rewrites

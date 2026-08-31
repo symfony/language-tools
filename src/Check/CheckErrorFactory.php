@@ -6,6 +6,7 @@ use Symfony\Lsp\Feature\Configuration\ConfigurationValidationException;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectConfiguration;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Runtime\UnsupportedSymfonyVersionException;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 
 /** @phpstan-import-type CheckError from CheckResult */
@@ -183,6 +184,9 @@ final class CheckErrorFactory
     {
         if (null === $cause) {
             return $fallback;
+        }
+        if ($cause instanceof UnsupportedSymfonyVersionException) {
+            return $cause->getMessage();
         }
         $message = $cause->getMessage();
         if (preg_match('/^(?:The project bridge |Unable to (?:start|install) the project bridge)/', $message)) {

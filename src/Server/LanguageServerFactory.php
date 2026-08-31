@@ -29,8 +29,11 @@ final class LanguageServerFactory
     private readonly array $defaultPhpCommand;
 
     /** @param array<array-key, mixed> $defaultPhpCommand */
-    public function __construct(?ServerVersion $serverVersion = null, array $defaultPhpCommand = ['php'])
-    {
+    public function __construct(
+        ?ServerVersion $serverVersion = null,
+        array $defaultPhpCommand = ['php'],
+        private readonly string $releaseMetadataUrl = '',
+    ) {
         $this->serverVersion = $serverVersion ?? new ServerVersion();
         $this->defaultPhpCommand = $defaultPhpCommand;
     }
@@ -85,6 +88,7 @@ final class LanguageServerFactory
         $loader = new PhpFileLoader($container, new FileLocator($resources));
         $loader->load('services.php');
         $container->setParameter('runtime.default_php_command', $this->defaultPhpCommand);
+        $container->setParameter('runtime.release_metadata_url', $this->releaseMetadataUrl);
 
         return $container;
     }
