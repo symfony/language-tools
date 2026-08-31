@@ -2,14 +2,14 @@
 
 namespace Symfony\Lsp\Tests\Server;
 
-use Amp\ByteStream\ClosedException;
 use Amp\Process\Process;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Tests\Support\ContentLengthMessageCodec;
+use Symfony\Lsp\Tests\Support\ExecutableRunner;
 
 use function Amp\async;
 use function Amp\ByteStream\buffer;
-use function Amp\Future\await;
 
 final class ServerExecutableTest extends TestCase
 {
@@ -17,65 +17,41 @@ final class ServerExecutableTest extends TestCase
     {
         $environment = getenv();
         $root = \dirname(__DIR__, 2);
-        $process = Process::start(
+        $result = (new ExecutableRunner())->run(
             [Path::join($root, 'bin/symfony-lsp')],
-            workingDirectory: $root,
-            environment: $environment,
-            options: ['bypass_shell' => true],
+            $root,
+            $environment,
+            "Broken\r\n\r\n",
         );
-        $futures = [
-            'stdout' => async(static fn (): string => buffer($process->getStdout())),
-            'stderr' => async(static fn (): string => buffer($process->getStderr())),
-            'exitCode' => async(static fn (): int => $process->join()),
-        ];
 
-        $process->getStdin()->write("Broken\r\n\r\n");
-        $process->getStdin()->end();
-        /** @var array{stdout: string, stderr: string, exitCode: int} $result */
-        $result = await($futures);
-
-        self::assertSame(1, $result['exitCode']);
-        self::assertSame('', $result['stdout']);
+        self::assertSame(1, $result->exitCode);
+        self::assertSame('', $result->stdout);
         self::assertMatchesRegularExpression(
             '{^Symfony Language Tools failed: .+ at (?:src|vendor)/.+:\d+: .+\n$}',
-            $result['stderr'],
+            $result->stderr,
         );
-        self::assertStringContainsString('A JSON-RPC message header is malformed.', $result['stderr']);
+        self::assertStringContainsString('A JSON-RPC message header is malformed.', $result->stderr);
     }
 
     public function testReportsFatalErrorsToStandardError(): void
     {
         $environment = getenv();
         $root = \dirname(__DIR__, 2);
-        $process = Process::start(
-            [Path::join($root, 'bin/symfony-lsp')],
-            workingDirectory: $root,
-            environment: [...$environment, 'SYMFONY_LSP_MEMORY_LIMIT' => '24M'],
-            options: ['bypass_shell' => true],
-        );
-        $futures = [
-            'stdout' => async(static fn (): string => buffer($process->getStdout())),
-            'stderr' => async(static fn (): string => buffer($process->getStderr())),
-            'exitCode' => async(static fn (): int => $process->join()),
-        ];
-
-        $body = json_encode([
+        $input = (new ContentLengthMessageCodec())->encode([
             'jsonrpc' => '2.0',
             'method' => 'initialized',
             'params' => ['junk' => array_fill(0, 6_000_000, 1)],
-        ], \JSON_THROW_ON_ERROR);
-        try {
-            $process->getStdin()->write('Content-Length: '.\strlen($body)."\r\n\r\n".$body);
-            $process->getStdin()->end();
-        } catch (ClosedException) {
-            // The server may die of memory exhaustion before consuming all of stdin
-        }
-        /** @var array{stdout: string, stderr: string, exitCode: int} $result */
-        $result = await($futures);
+        ]);
+        $result = (new ExecutableRunner())->run(
+            [Path::join($root, 'bin/symfony-lsp')],
+            $root,
+            [...$environment, 'SYMFONY_LSP_MEMORY_LIMIT' => '24M'],
+            $input,
+        );
 
-        self::assertSame(255, $result['exitCode']);
-        self::assertSame('', $result['stdout']);
-        self::assertStringContainsString('Allowed memory size', $result['stderr']);
+        self::assertSame(255, $result->exitCode);
+        self::assertSame('', $result->stdout);
+        self::assertStringContainsString('Allowed memory size', $result->stderr);
     }
 
     public function testServesTheProtocolOverASocket(): void
@@ -97,14 +73,15 @@ final class ServerExecutableTest extends TestCase
         self::assertIsNotBool($connection);
         stream_set_timeout($connection, 10);
 
-        $initialize = $this->request($connection, ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => [
+        $codec = new ContentLengthMessageCodec();
+        $initialize = $this->request($codec, $connection, ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => [
             'processId' => null,
             'rootUri' => null,
             'capabilities' => new \stdClass(),
             'initializationOptions' => ['workspaceTrust' => false],
         ]]);
-        $shutdown = $this->request($connection, ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'shutdown', 'params' => []]);
-        $this->send($connection, ['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []]);
+        $shutdown = $this->request($codec, $connection, ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'shutdown', 'params' => []]);
+        fwrite($connection, $codec->encode(['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []]));
         fclose($connection);
         fclose($listener);
 
@@ -122,42 +99,13 @@ final class ServerExecutableTest extends TestCase
     /**
      * @param resource             $connection
      * @param array<string, mixed> $message
-     */
-    private function send($connection, array $message): void
-    {
-        $json = json_encode($message, \JSON_THROW_ON_ERROR);
-        fwrite($connection, 'Content-Length: '.\strlen($json)."\r\n\r\n".$json);
-    }
-
-    /**
-     * @param resource             $connection
-     * @param array<string, mixed> $message
      *
-     * @return array<mixed>
+     * @return array<string, mixed>
      */
-    private function request($connection, array $message): array
+    private function request(ContentLengthMessageCodec $codec, $connection, array $message): array
     {
-        $this->send($connection, $message);
-        $length = null;
-        while (false !== ($line = fgets($connection))) {
-            if ("\r\n" === $line) {
-                break;
-            }
-            if (1 === preg_match('/^Content-Length: (\d+)\r\n$/i', $line, $match)) {
-                $length = (int) $match[1];
-            }
-        }
-        self::assertIsInt($length, 'The server sent an invalid response header.');
-        $json = '';
-        while (($missing = $length - \strlen($json)) > 0 && !feof($connection)) {
-            $chunk = fread($connection, $missing);
-            self::assertIsString($chunk);
-            $json .= $chunk;
-        }
+        fwrite($connection, $codec->encode($message));
 
-        $decoded = json_decode($json, true, flags: \JSON_THROW_ON_ERROR);
-        self::assertIsArray($decoded);
-
-        return $decoded;
+        return $codec->read($connection);
     }
 }
