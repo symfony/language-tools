@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
+use Symfony\Lsp\Runtime\RuntimeSnapshotNormalizer;
 
 final class ProjectServiceSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -18,11 +19,9 @@ final class ProjectServiceSnapshotLoader implements RuntimeSnapshotLoaderInterfa
         return 'container';
     }
 
-    public function load(Project $project, array $snapshot): void
+    public function load(Project $project, array $section): void
     {
-        $sections = $snapshot['sections'] ?? null;
-        $container = \is_array($sections) ? ($sections['container'] ?? null) : null;
-        $items = \is_array($container) ? ($container['items'] ?? null) : null;
+        $items = $section['items'] ?? null;
         if (!\is_array($items)) {
             return;
         }
@@ -40,18 +39,18 @@ final class ProjectServiceSnapshotLoader implements RuntimeSnapshotLoaderInterfa
                 \is_bool($item['public'] ?? null) ? $item['public'] : null,
                 \is_bool($item['lazy'] ?? null) ? $item['lazy'] : null,
                 \is_string($item['deprecation'] ?? null) ? $item['deprecation'] : null,
-                $this->strings($item['tags'] ?? null),
+                RuntimeSnapshotNormalizer::stringList($item['tags'] ?? null),
                 \is_string($item['decorates'] ?? null) ? $item['decorates'] : null,
-                $this->strings($item['autowiringTypes'] ?? null),
-                $this->strings($item['decorationStack'] ?? null),
+                RuntimeSnapshotNormalizer::stringList($item['autowiringTypes'] ?? null),
+                RuntimeSnapshotNormalizer::stringList($item['decorationStack'] ?? null),
             );
         }
 
-        $servicesComplete = true === ($container['servicesComplete'] ?? null);
+        $servicesComplete = true === ($section['servicesComplete'] ?? null);
         $this->serviceIndexes->forProject($project)->replace($servicesComplete, ...$services);
 
         $parameters = [];
-        foreach (\is_array($container['parameters'] ?? null) ? $container['parameters'] : [] as $item) {
+        foreach (\is_array($section['parameters'] ?? null) ? $section['parameters'] : [] as $item) {
             if (!\is_array($item) || !\is_string($item['name'] ?? null)) {
                 continue;
             }
@@ -61,13 +60,7 @@ final class ProjectServiceSnapshotLoader implements RuntimeSnapshotLoaderInterfa
                 \is_string($item['deprecation'] ?? null) ? $item['deprecation'] : null,
             );
         }
-        $parametersComplete = true === ($container['parametersComplete'] ?? $container['complete'] ?? null);
+        $parametersComplete = true === ($section['parametersComplete'] ?? $section['complete'] ?? null);
         $this->parameterIndexes->forProject($project)->replace($parametersComplete, ...$parameters);
-    }
-
-    /** @return list<string> */
-    private function strings(mixed $values): array
-    {
-        return \is_array($values) ? array_values(array_filter($values, 'is_string')) : [];
     }
 }

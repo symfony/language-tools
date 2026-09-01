@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Security;
 
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
+use Symfony\Lsp\Runtime\RuntimeSnapshotNormalizer;
 
 final class ProjectSecuritySnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -16,13 +17,8 @@ final class ProjectSecuritySnapshotLoader implements RuntimeSnapshotLoaderInterf
         return 'security';
     }
 
-    public function load(Project $project, array $snapshot): void
+    public function load(Project $project, array $section): void
     {
-        $sections = $snapshot['sections'] ?? null;
-        $section = \is_array($sections) ? ($sections['security'] ?? null) : null;
-        if (!\is_array($section)) {
-            return;
-        }
         $firewalls = [];
         foreach (\is_array($section['firewalls'] ?? null) ? $section['firewalls'] : [] as $item) {
             if (!\is_array($item) || !\is_string($item['name'] ?? null)) {
@@ -34,7 +30,7 @@ final class ProjectSecuritySnapshotLoader implements RuntimeSnapshotLoaderInterf
                 true === ($item['enabled'] ?? false),
                 true === ($item['stateless'] ?? false),
                 true === ($item['lazy'] ?? false),
-                array_values(array_filter(\is_array($item['authenticators'] ?? null) ? $item['authenticators'] : [], 'is_string')),
+                RuntimeSnapshotNormalizer::stringList($item['authenticators'] ?? null),
             );
         }
         $providers = [];
@@ -46,7 +42,7 @@ final class ProjectSecuritySnapshotLoader implements RuntimeSnapshotLoaderInterf
         $roles = [];
         foreach (\is_array($section['roles'] ?? null) ? $section['roles'] : [] as $item) {
             if (\is_array($item) && \is_string($item['name'] ?? null)) {
-                $roles[] = new SecurityRole($item['name'], array_values(array_filter(\is_array($item['inheritedRoles'] ?? null) ? $item['inheritedRoles'] : [], 'is_string')));
+                $roles[] = new SecurityRole($item['name'], RuntimeSnapshotNormalizer::stringList($item['inheritedRoles'] ?? null));
             }
         }
         $voters = [];

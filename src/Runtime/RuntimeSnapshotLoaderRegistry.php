@@ -29,8 +29,17 @@ final class RuntimeSnapshotLoaderRegistry
      */
     public function load(Project $project, array $snapshot): void
     {
+        $sections = $snapshot['sections'] ?? null;
+        if (!\is_array($sections)) {
+            return;
+        }
+
         foreach ($this->loaders as $loader) {
-            $loader->load($project, $snapshot);
+            $section = $sections[$loader->section()] ?? null;
+            if (!\is_array($section)) {
+                continue;
+            }
+            $loader->load($project, $section);
         }
     }
 }

@@ -16,11 +16,9 @@ final class ProjectTranslationSnapshotLoader implements RuntimeSnapshotLoaderInt
         return 'translations';
     }
 
-    public function load(Project $project, array $snapshot): void
+    public function load(Project $project, array $section): void
     {
-        $sections = $snapshot['sections'] ?? null;
-        $section = \is_array($sections) ? ($sections['translations'] ?? null) : null;
-        if (!\is_array($section) || !\is_array($section['items'] ?? null)) {
+        if (!\is_array($section['items'] ?? null)) {
             return;
         }
         $messages = [];

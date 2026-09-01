@@ -18,7 +18,7 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
 
-        $loader->load($project, ['sections' => ['twig_components' => [
+        $loader->load($project, [
             'complete' => true,
             'names' => ['ux:icon', 'Alert', 42, ['nested']],
             'caseInsensitiveNames' => ['ux:icon', 42, ['nested']],
@@ -33,7 +33,7 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
                 ],
                 ['name' => 'broken', 'class' => 'App\Broken', 'file' => null],
             ],
-        ]]]);
+        ]);
 
         $index = $indexes->forProject($project);
         // UX Icons registers UX:Icon with a case-insensitive renderer alias
@@ -61,11 +61,11 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
         $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
         $indexes->forProject($project)->replaceRuntime(true, ['stale_component'], 'ui', ['stale_component']);
 
-        $loader->load($project, ['sections' => ['twig_components' => [
+        $loader->load($project, [
             'complete' => true,
             'names' => [],
             'anonymousTemplateDirectory' => 'components',
-        ]]]);
+        ]);
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->isRuntimeComplete());
@@ -80,11 +80,11 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
 
-        $loader->load($project, ['sections' => ['twig_components' => [
+        $loader->load($project, [
             'complete' => false,
             'names' => ['ux:icon'],
             'anonymousTemplateDirectory' => '',
-        ]]]);
+        ]);
 
         $index = $indexes->forProject($project);
         self::assertFalse($index->isRuntimeComplete());
@@ -92,15 +92,13 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
         self::assertSame('components', $index->anonymousTemplateDirectory());
     }
 
-    public function testIgnoresMalformedSections(): void
+    public function testIgnoresMalformedNames(): void
     {
         $indexes = new TwigComponentIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
 
-        $loader->load($project, ['sections' => ['twig_components' => ['names' => 'invalid']]]);
-        $loader->load($project, ['sections' => 'invalid']);
-        $loader->load($project, []);
+        $loader->load($project, ['names' => 'invalid']);
 
         self::assertFalse($indexes->forProject($project)->isRuntimeComplete());
     }

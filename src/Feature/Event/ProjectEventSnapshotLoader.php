@@ -16,13 +16,8 @@ final class ProjectEventSnapshotLoader implements RuntimeSnapshotLoaderInterface
         return 'events';
     }
 
-    public function load(Project $project, array $snapshot): void
+    public function load(Project $project, array $section): void
     {
-        $sections = $snapshot['sections'] ?? null;
-        $section = \is_array($sections) ? ($sections['events'] ?? null) : null;
-        if (!\is_array($section)) {
-            return;
-        }
         $events = [];
         foreach (\is_array($section['events'] ?? null) ? $section['events'] : [] as $item) {
             if (\is_array($item) && \is_string($item['name'] ?? null)) {

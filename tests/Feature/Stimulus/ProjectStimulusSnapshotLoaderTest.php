@@ -16,7 +16,7 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $indexes = new StimulusIndexRegistry();
-        (new ProjectStimulusSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration())))->load($project, ['sections' => ['stimulus' => [
+        (new ProjectStimulusSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration())))->load($project, [
             'complete' => true,
             'controllers' => [[
                 'name' => 'search',
@@ -29,7 +29,7 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
                 'outlets' => ['dialog'],
                 'classes' => ['loading'],
             ]],
-        ]]]);
+        ]);
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->isComplete());
@@ -50,7 +50,7 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['containerProjectRoot' => '/app']);
         $indexes = new StimulusIndexRegistry();
-        (new ProjectStimulusSnapshotLoader($indexes, new ContainerPathMapper($configuration)))->load($project, ['sections' => ['stimulus' => [
+        (new ProjectStimulusSnapshotLoader($indexes, new ContainerPathMapper($configuration)))->load($project, [
             'complete' => true,
             'controllers' => [[
                 'name' => 'search',
@@ -58,7 +58,7 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
                 'lazy' => false,
                 'vendor' => false,
             ]],
-        ]]]);
+        ]);
 
         self::assertSame(
             '/workspace/assets/controllers/search_controller.js',

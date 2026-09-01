@@ -13,7 +13,7 @@ final class ProjectMessengerSnapshotLoaderTest extends TestCase
     {
         $indexes = new MessengerIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
-        (new ProjectMessengerSnapshotLoader($indexes))->load($project, ['sections' => ['messenger' => [
+        (new ProjectMessengerSnapshotLoader($indexes))->load($project, [
             'complete' => true,
             'buses' => [['name' => 'command.bus', 'default' => true]],
             'transports' => [['name' => 'async', 'failure' => false]],
@@ -27,7 +27,7 @@ final class ProjectMessengerSnapshotLoaderTest extends TestCase
                 'priority' => 10,
                 'fromTransport' => 'async',
             ]],
-        ]]]);
+        ]);
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->isComplete());

@@ -13,7 +13,7 @@ final class ProjectEventSnapshotLoaderTest extends TestCase
     {
         $indexes = new EventIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
-        (new ProjectEventSnapshotLoader($indexes))->load($project, ['sections' => ['events' => [
+        (new ProjectEventSnapshotLoader($indexes))->load($project, [
             'complete' => true,
             'events' => [['name' => 'App\\Event\\OrderPlaced', 'class' => 'App\\Event\\OrderPlaced']],
             'listeners' => [[
@@ -22,7 +22,7 @@ final class ProjectEventSnapshotLoaderTest extends TestCase
                 'method' => 'onOrderPlaced',
                 'priority' => 10,
             ]],
-        ]]]);
+        ]);
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->isComplete());

@@ -10,6 +10,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
+use Symfony\Lsp\Runtime\RuntimeSnapshotNormalizer;
 
 final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -25,14 +26,12 @@ final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterf
         return 'twig';
     }
 
-    public function load(Project $project, array $snapshot): void
+    public function load(Project $project, array $section): void
     {
-        $sections = $snapshot['sections'] ?? null;
-        $section = \is_array($sections) ? ($sections['twig'] ?? null) : null;
-        if (!\is_array($section) || !\is_array($section['paths'] ?? null)) {
+        if (!\is_array($section['paths'] ?? null)) {
             return;
         }
-        $globals = \is_array($section['globals'] ?? null) ? array_values(array_filter($section['globals'], 'is_string')) : [];
+        $globals = RuntimeSnapshotNormalizer::stringList($section['globals'] ?? null);
         $this->indexes->forProject($project)->replaceGlobals($globals);
         $templates = [];
         foreach ($section['paths'] as $loaderPath) {

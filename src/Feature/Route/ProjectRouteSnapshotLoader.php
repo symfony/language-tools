@@ -17,8 +17,8 @@ final class ProjectRouteSnapshotLoader implements RuntimeSnapshotLoaderInterface
         return 'routes';
     }
 
-    public function load(Project $project, array $snapshot): void
+    public function load(Project $project, array $section): void
     {
-        (new RouteSnapshotLoader($this->indexes->forProject($project)))->load($snapshot);
+        (new RouteSnapshotLoader($this->indexes->forProject($project)))->load($section);
     }
 }

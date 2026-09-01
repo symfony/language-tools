@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Messenger;
 
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
+use Symfony\Lsp\Runtime\RuntimeSnapshotNormalizer;
 
 final class ProjectMessengerSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -16,13 +17,8 @@ final class ProjectMessengerSnapshotLoader implements RuntimeSnapshotLoaderInter
         return 'messenger';
     }
 
-    public function load(Project $project, array $snapshot): void
+    public function load(Project $project, array $section): void
     {
-        $sections = $snapshot['sections'] ?? null;
-        $section = \is_array($sections) ? ($sections['messenger'] ?? null) : null;
-        if (!\is_array($section)) {
-            return;
-        }
         $buses = [];
         foreach (\is_array($section['buses'] ?? null) ? $section['buses'] : [] as $item) {
             if (\is_array($item) && \is_string($item['name'] ?? null)) {
@@ -40,7 +36,7 @@ final class ProjectMessengerSnapshotLoader implements RuntimeSnapshotLoaderInter
             if (!\is_array($item) || !\is_string($item['class'] ?? null)) {
                 continue;
             }
-            $messages[] = new MessengerMessage($item['class'], array_values(array_filter(\is_array($item['transports'] ?? null) ? $item['transports'] : [], 'is_string')));
+            $messages[] = new MessengerMessage($item['class'], RuntimeSnapshotNormalizer::stringList($item['transports'] ?? null));
         }
         $handlers = [];
         foreach (\is_array($section['handlers'] ?? null) ? $section['handlers'] : [] as $item) {

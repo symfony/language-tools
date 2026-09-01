@@ -13,7 +13,7 @@ final class ProjectMetadataSnapshotLoaderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $indexes = new MetadataIndexRegistry();
-        (new ProjectMetadataSnapshotLoader($indexes))->load($project, ['sections' => ['metadata' => [
+        (new ProjectMetadataSnapshotLoader($indexes))->load($project, [
             'formsComplete' => true,
             'constraintsComplete' => true,
             'forms' => [[
@@ -27,7 +27,7 @@ final class ProjectMetadataSnapshotLoaderTest extends TestCase
                 'class' => 'Symfony\\Component\\Validator\\Constraints\\Length',
                 'options' => ['max', 'min'],
             ]],
-        ]]]);
+        ]);
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->formsComplete());

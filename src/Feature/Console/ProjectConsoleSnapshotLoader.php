@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Console;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
+use Symfony\Lsp\Runtime\RuntimeSnapshotNormalizer;
 
 final class ProjectConsoleSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -19,13 +20,8 @@ final class ProjectConsoleSnapshotLoader implements RuntimeSnapshotLoaderInterfa
         return 'console';
     }
 
-    public function load(Project $project, array $snapshot): void
+    public function load(Project $project, array $section): void
     {
-        $sections = $snapshot['sections'] ?? null;
-        $section = \is_array($sections) ? ($sections['console'] ?? null) : null;
-        if (!\is_array($section)) {
-            return;
-        }
         $commands = [];
         foreach (\is_array($section['commands'] ?? null) ? $section['commands'] : [] as $item) {
             if (!\is_array($item) || !\is_string($item['class'] ?? null)) {
@@ -46,10 +42,7 @@ final class ProjectConsoleSnapshotLoader implements RuntimeSnapshotLoaderInterfa
     /** @return list<string> */
     private function strings(mixed $values): array
     {
-        if (!\is_array($values)) {
-            return [];
-        }
-        $values = array_values(array_unique(array_filter($values, 'is_string')));
+        $values = array_values(array_unique(RuntimeSnapshotNormalizer::stringList($values)));
         sort($values);
 
         return $values;

@@ -16,11 +16,9 @@ final class ProjectEnvironmentSnapshotLoader implements RuntimeSnapshotLoaderInt
         return 'environment';
     }
 
-    public function load(Project $project, array $snapshot): void
+    public function load(Project $project, array $section): void
     {
-        $sections = $snapshot['sections'] ?? null;
-        $section = \is_array($sections) ? ($sections['environment'] ?? null) : null;
-        if (!\is_array($section) || !\is_array($section['processors'] ?? null)) {
+        if (!\is_array($section['processors'] ?? null)) {
             return;
         }
         $processors = [];

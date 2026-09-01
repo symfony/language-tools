@@ -19,7 +19,7 @@ final class ProjectConsoleSnapshotLoaderTest extends TestCase
         $configuration->configureProject($project, ['containerProjectRoot' => '/app']);
         $indexes = new ConsoleIndexRegistry();
         $loader = new ProjectConsoleSnapshotLoader($indexes, new ContainerPathMapper($configuration));
-        $loader->load($project, ['sections' => ['console' => [
+        $loader->load($project, [
             'complete' => true,
             'commands' => [
                 [
@@ -32,7 +32,7 @@ final class ProjectConsoleSnapshotLoaderTest extends TestCase
                 ['class' => 42, 'arguments' => ['invalid']],
                 'malformed',
             ],
-        ]]]);
+        ]);
 
         $index = $indexes->forProject($project);
         $command = $index->command('App\Command\ReportCommand');
@@ -45,12 +45,12 @@ final class ProjectConsoleSnapshotLoaderTest extends TestCase
         self::assertCount(1, $index->commands());
     }
 
-    public function testIgnoresMalformedSections(): void
+    public function testIgnoresMalformedCommands(): void
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $indexes = new ConsoleIndexRegistry();
         $loader = new ProjectConsoleSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()));
-        $loader->load($project, ['sections' => ['console' => 'invalid']]);
+        $loader->load($project, ['commands' => 'invalid']);
 
         self::assertSame([], $indexes->forProject($project)->commands());
         self::assertFalse($indexes->forProject($project)->isComplete());

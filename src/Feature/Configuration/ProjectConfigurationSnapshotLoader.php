@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Configuration;
 
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
+use Symfony\Lsp\Runtime\RuntimeSnapshotNormalizer;
 
 final class ProjectConfigurationSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -16,11 +17,9 @@ final class ProjectConfigurationSnapshotLoader implements RuntimeSnapshotLoaderI
         return 'configuration';
     }
 
-    public function load(Project $project, array $snapshot): void
+    public function load(Project $project, array $section): void
     {
-        $sections = $snapshot['sections'] ?? null;
-        $section = \is_array($sections) ? ($sections['configuration'] ?? null) : null;
-        if (!\is_array($section) || !\is_array($section['bundles'] ?? null)) {
+        if (!\is_array($section['bundles'] ?? null)) {
             return;
         }
         $roots = [];
@@ -50,12 +49,7 @@ final class ProjectConfigurationSnapshotLoader implements RuntimeSnapshotLoaderI
                 $allowed[] = $value;
             }
         }
-        $allowedEnumCases = [];
-        foreach (\is_array($data['allowedEnumCases'] ?? null) ? $data['allowedEnumCases'] : [] as $case) {
-            if (\is_string($case)) {
-                $allowedEnumCases[] = $case;
-            }
-        }
+        $allowedEnumCases = RuntimeSnapshotNormalizer::stringList($data['allowedEnumCases'] ?? null);
         $accepts = [];
         foreach (\is_array($data['accepts'] ?? null) ? $data['accepts'] : [] as $kind => $accepted) {
             if (\is_string($kind) && \is_bool($accepted)) {

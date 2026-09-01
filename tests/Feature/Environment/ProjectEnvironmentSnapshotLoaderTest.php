@@ -13,10 +13,10 @@ final class ProjectEnvironmentSnapshotLoaderTest extends TestCase
     {
         $indexes = new EnvironmentIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
-        (new ProjectEnvironmentSnapshotLoader($indexes))->load($project, ['sections' => ['environment' => ['complete' => true, 'processors' => [
+        (new ProjectEnvironmentSnapshotLoader($indexes))->load($project, ['complete' => true, 'processors' => [
             ['name' => 'json', 'type' => 'array'],
             ['name' => 'int', 'type' => 'int'],
-        ]]]]);
+        ]]);
 
         self::assertSame(['int' => 'int', 'json' => 'array'], $indexes->forProject($project)->processors());
         self::assertTrue($indexes->forProject($project)->processorsComplete());

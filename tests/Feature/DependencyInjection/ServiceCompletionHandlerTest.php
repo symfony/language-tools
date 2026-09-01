@@ -43,24 +43,20 @@ final class ServiceCompletionHandlerTest extends TestCase
         $parameterIndexes = new ParameterIndexRegistry();
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
         (new ProjectServiceSnapshotLoader($indexes, $parameterIndexes))->load($project, [
-            'sections' => [
-                'container' => [
-                    'complete' => true,
-                    'items' => [
-                        [
-                            'id' => 'app.mailer',
-                            'class' => 'App\\Mailer',
-                            'tags' => ['kernel.reset'],
-                        ],
-                        [
-                            'id' => 'app.storage',
-                            'class' => 'App\\Storage',
-                        ],
-                    ],
-                    'parameters' => [
-                        ['name' => 'app.api_key', 'value' => 'CANARY_SECRET_VALUE'],
-                    ],
+            'complete' => true,
+            'items' => [
+                [
+                    'id' => 'app.mailer',
+                    'class' => 'App\\Mailer',
+                    'tags' => ['kernel.reset'],
                 ],
+                [
+                    'id' => 'app.storage',
+                    'class' => 'App\\Storage',
+                ],
+            ],
+            'parameters' => [
+                ['name' => 'app.api_key', 'value' => 'CANARY_SECRET_VALUE'],
             ],
         ]);
         self::assertFalse($indexes->forProject($project)->isComplete());

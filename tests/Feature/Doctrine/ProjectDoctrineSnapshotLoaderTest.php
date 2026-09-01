@@ -17,7 +17,7 @@ final class ProjectDoctrineSnapshotLoaderTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $indexes = new DoctrineIndexRegistry();
         $loader = new ProjectDoctrineSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
-        $loader->load($project, ['sections' => ['doctrine' => [
+        $loader->load($project, [
             'complete' => true,
             'entities' => [
                 [
@@ -31,7 +31,7 @@ final class ProjectDoctrineSnapshotLoaderTest extends TestCase
                 ],
                 ['className' => 'App\Entity\Broken', 'file' => null, 'fields' => []],
             ],
-        ]]]);
+        ]);
 
         $index = $indexes->forProject($project);
         $entity = $index->entity('App\Entity\Book');

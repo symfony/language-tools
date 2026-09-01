@@ -13,13 +13,13 @@ final class ProjectSecuritySnapshotLoaderTest extends TestCase
     {
         $indexes = new SecurityIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
-        (new ProjectSecuritySnapshotLoader($indexes))->load($project, ['sections' => ['security' => [
+        (new ProjectSecuritySnapshotLoader($indexes))->load($project, [
             'complete' => true,
             'firewalls' => [['name' => 'main', 'provider' => 'users', 'enabled' => true, 'stateless' => false, 'lazy' => true, 'authenticators' => ['App\\Security\\Authenticator']]],
             'providers' => [['name' => 'users', 'type' => 'entity']],
             'roles' => [['name' => 'ROLE_ADMIN', 'inheritedRoles' => ['ROLE_USER']]],
             'voters' => [['class' => 'App\\Security\\PostVoter']],
-        ]]]);
+        ]);
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->isComplete());

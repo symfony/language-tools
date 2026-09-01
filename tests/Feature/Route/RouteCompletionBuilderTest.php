@@ -14,16 +14,12 @@ final class RouteCompletionBuilderTest extends TestCase
     {
         $index = new RouteIndex();
         (new RouteSnapshotLoader($index))->load([
-            'sections' => [
-                'routes' => [
-                    'complete' => true,
-                    'resources' => ['config/routes.yaml', 'config/http_endpoints.yaml'],
-                    'items' => [
-                        ['name' => 'admin_user', 'path' => '/admin/user'],
-                        ['name' => 'article_show', 'path' => '/article/{id}', 'methods' => ['GET']],
-                        ['name' => 'article_edit', 'path' => '/article/{id}/edit'],
-                    ],
-                ],
+            'complete' => true,
+            'resources' => ['config/routes.yaml', 'config/http_endpoints.yaml'],
+            'items' => [
+                ['name' => 'admin_user', 'path' => '/admin/user'],
+                ['name' => 'article_show', 'path' => '/article/{id}', 'methods' => ['GET']],
+                ['name' => 'article_edit', 'path' => '/article/{id}/edit'],
             ],
         ]);
 
@@ -39,14 +35,10 @@ final class RouteCompletionBuilderTest extends TestCase
     {
         $index = new RouteIndex();
         (new RouteSnapshotLoader($index))->load([
-            'sections' => [
-                'routes' => [
-                    'complete' => true,
-                    'items' => [
-                        ['name' => 'app_home.en', 'canonical' => 'app_home', 'path' => '/en/{english}'],
-                        ['name' => 'app_home.fr', 'canonical' => 'app_home', 'path' => '/fr/{french}'],
-                    ],
-                ],
+            'complete' => true,
+            'items' => [
+                ['name' => 'app_home.en', 'canonical' => 'app_home', 'path' => '/en/{english}'],
+                ['name' => 'app_home.fr', 'canonical' => 'app_home', 'path' => '/fr/{french}'],
             ],
         ]);
 
@@ -59,14 +51,10 @@ final class RouteCompletionBuilderTest extends TestCase
     {
         $index = new RouteIndex();
         (new RouteSnapshotLoader($index))->load([
-            'sections' => [
-                'routes' => [
-                    'complete' => true,
-                    'contextParameters' => ['_locale', null],
-                    'items' => [
-                        ['name' => 'localized_article', 'path' => '/{_locale}/article/{id}'],
-                    ],
-                ],
+            'complete' => true,
+            'contextParameters' => ['_locale', null],
+            'items' => [
+                ['name' => 'localized_article', 'path' => '/{_locale}/article/{id}'],
             ],
         ]);
 
@@ -79,11 +67,9 @@ final class RouteCompletionBuilderTest extends TestCase
     {
         $index = new RouteIndex();
         (new RouteSnapshotLoader($index))->load([
-            'sections' => ['routes' => [
-                'complete' => true,
-                'resources' => [null, 'config/routes.yaml'],
-                'items' => [null, ['path' => '/']],
-            ]],
+            'complete' => true,
+            'resources' => [null, 'config/routes.yaml'],
+            'items' => [null, ['path' => '/']],
         ]);
 
         self::assertSame([], (new RouteCompletionBuilder())->complete($index, ''));
@@ -95,11 +81,9 @@ final class RouteCompletionBuilderTest extends TestCase
         $index = new RouteIndex();
         $index->replaceRuntime(['config/old_routes.yaml'], []);
         (new RouteSnapshotLoader($index))->load([
-            'sections' => ['routes' => [
-                'complete' => true,
-                'resources' => ['config/new_routes.yaml'],
-                'items' => [],
-            ]],
+            'complete' => true,
+            'resources' => ['config/new_routes.yaml'],
+            'items' => [],
         ]);
 
         self::assertFalse($index->isResource('config/old_routes.yaml'));

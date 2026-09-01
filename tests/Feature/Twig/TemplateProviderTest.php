@@ -504,10 +504,10 @@ final class TemplateProviderTest extends TestCase
         $indexes = new TemplateIndexRegistry();
 
         try {
-            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper(new RuntimeConfiguration())))->load($project, ['sections' => ['twig' => [
+            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper(new RuntimeConfiguration())))->load($project, [
                 'complete' => true,
                 'paths' => [['namespace' => '(None)', 'path' => $root.'/templates']],
-            ]]]);
+            ]);
 
             self::assertSame('file://'.$root.'/templates/index.html', $indexes->forProject($project)->get('index.html')?->uri);
         } finally {
@@ -528,10 +528,10 @@ final class TemplateProviderTest extends TestCase
         $indexes = new TemplateIndexRegistry();
 
         try {
-            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper($configuration)))->load($project, ['sections' => ['twig' => [
+            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper($configuration)))->load($project, [
                 'complete' => true,
                 'paths' => [['namespace' => '(None)', 'path' => '/app/templates']],
-            ]]]);
+            ]);
 
             self::assertSame('file://'.$root.'/templates/index.html.twig', $indexes->forProject($project)->get('index.html.twig')?->uri);
         } finally {
@@ -555,10 +555,10 @@ final class TemplateProviderTest extends TestCase
         $indexes = new TemplateIndexRegistry();
 
         try {
-            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper(new RuntimeConfiguration())))->load($project, ['sections' => ['twig' => [
+            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper(new RuntimeConfiguration())))->load($project, [
                 'complete' => true,
                 'paths' => [['namespace' => '(None)', 'path' => $root.'/templates']],
-            ]]]);
+            ]);
 
             self::assertSame('file://'.$root.'/templates/index.html.twig', $indexes->forProject($project)->get('index.html.twig')?->uri);
         } finally {

@@ -821,7 +821,7 @@ final class ConfigurationProviderTest extends TestCase
         }
         $runtimeConfiguration = new RuntimeConfiguration();
         $runtimeConfiguration->configure(['environment' => $environment]);
-        (new ProjectConfigurationSnapshotLoader($indexes))->load($project, ['sections' => ['configuration' => ['bundles' => [
+        (new ProjectConfigurationSnapshotLoader($indexes))->load($project, ['bundles' => [
             [
                 'alias' => 'framework',
                 'tree' => $this->node('framework', 'array', children: [
@@ -912,7 +912,7 @@ final class ConfigurationProviderTest extends TestCase
                 'alias' => 'services',
                 'tree' => $this->node('services', 'array'),
             ],
-        ]]]]);
+        ]]);
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $phpComments = new PhpCommentParser();

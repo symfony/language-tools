@@ -19,13 +19,8 @@ final class ProjectAssetSnapshotLoader implements RuntimeSnapshotLoaderInterface
         return 'assets';
     }
 
-    public function load(Project $project, array $snapshot): void
+    public function load(Project $project, array $section): void
     {
-        $sections = $snapshot['sections'] ?? null;
-        $section = \is_array($sections) ? ($sections['assets'] ?? null) : null;
-        if (!\is_array($section)) {
-            return;
-        }
         $assets = [];
         foreach (\is_array($section['assets'] ?? null) ? $section['assets'] : [] as $item) {
             if (!\is_array($item) || !\is_string($item['logicalPath'] ?? null) || !\is_string($item['sourcePath'] ?? null)) {

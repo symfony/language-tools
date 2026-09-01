@@ -15,7 +15,7 @@ final class ProjectAssetSnapshotLoaderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $indexes = new AssetIndexRegistry();
-        (new ProjectAssetSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration())))->load($project, ['sections' => ['assets' => [
+        (new ProjectAssetSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration())))->load($project, [
             'assetsComplete' => true,
             'importMapComplete' => true,
             'assets' => [[
@@ -29,7 +29,7 @@ final class ProjectAssetSnapshotLoaderTest extends TestCase
                 'entrypoint' => true,
                 'version' => null,
             ]],
-        ]]]);
+        ]);
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->assetsComplete());
@@ -44,7 +44,7 @@ final class ProjectAssetSnapshotLoaderTest extends TestCase
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['containerProjectRoot' => '/app']);
         $indexes = new AssetIndexRegistry();
-        (new ProjectAssetSnapshotLoader($indexes, new ContainerPathMapper($configuration)))->load($project, ['sections' => ['assets' => [
+        (new ProjectAssetSnapshotLoader($indexes, new ContainerPathMapper($configuration)))->load($project, [
             'assetsComplete' => true,
             'importMapComplete' => true,
             'assets' => [[
@@ -58,7 +58,7 @@ final class ProjectAssetSnapshotLoaderTest extends TestCase
                 'entrypoint' => true,
                 'version' => null,
             ]],
-        ]]]);
+        ]);
 
         $index = $indexes->forProject($project);
         self::assertSame('/workspace/assets/app.js', $index->asset('app.js')?->sourcePath);

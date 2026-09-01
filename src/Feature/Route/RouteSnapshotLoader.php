@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
+use Symfony\Lsp\Runtime\RuntimeSnapshotNormalizer;
+
 final class RouteSnapshotLoader
 {
     public function __construct(
@@ -10,14 +12,12 @@ final class RouteSnapshotLoader
     }
 
     /**
-     * @param array<array-key, mixed> $snapshot
+     * @param array<array-key, mixed> $section
      */
-    public function load(array $snapshot): void
+    public function load(array $section): void
     {
-        $sections = $snapshot['sections'] ?? null;
-        $routesSection = \is_array($sections) ? ($sections['routes'] ?? null) : null;
-        $items = \is_array($routesSection) ? ($routesSection['items'] ?? null) : null;
-        if (!\is_array($items) || true !== ($routesSection['complete'] ?? null)) {
+        $items = $section['items'] ?? null;
+        if (!\is_array($items) || true !== ($section['complete'] ?? null)) {
             return;
         }
 
@@ -30,11 +30,11 @@ final class RouteSnapshotLoader
             $routes[] = new Route(
                 $item['name'],
                 \is_string($item['path'] ?? null) ? $item['path'] : null,
-                $this->strings($item['methods'] ?? null),
-                $this->strings($item['schemes'] ?? null),
+                RuntimeSnapshotNormalizer::stringList($item['methods'] ?? null),
+                RuntimeSnapshotNormalizer::stringList($item['schemes'] ?? null),
                 \is_string($item['host'] ?? null) ? $item['host'] : null,
                 \is_string($item['controller'] ?? null) ? $item['controller'] : null,
-                $this->strings($item['defaults'] ?? null),
+                RuntimeSnapshotNormalizer::stringList($item['defaults'] ?? null),
                 $this->stringMap($item['requirements'] ?? null),
                 \is_string($item['alias'] ?? null) ? $item['alias'] : null,
                 \is_string($item['canonical'] ?? null) ? $item['canonical'] : null,
@@ -42,20 +42,10 @@ final class RouteSnapshotLoader
         }
 
         $this->routeIndex->replaceRuntime(
-            $this->strings($routesSection['resources'] ?? null),
-            $this->strings($routesSection['contextParameters'] ?? null),
+            RuntimeSnapshotNormalizer::stringList($section['resources'] ?? null),
+            RuntimeSnapshotNormalizer::stringList($section['contextParameters'] ?? null),
             ...$routes,
         );
-    }
-
-    /** @return list<string> */
-    private function strings(mixed $values): array
-    {
-        if (!\is_array($values)) {
-            return [];
-        }
-
-        return array_values(array_filter($values, 'is_string'));
     }
 
     /**

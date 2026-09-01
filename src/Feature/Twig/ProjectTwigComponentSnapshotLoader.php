@@ -8,6 +8,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
+use Symfony\Lsp\Runtime\RuntimeSnapshotNormalizer;
 
 final class ProjectTwigComponentSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -23,18 +24,13 @@ final class ProjectTwigComponentSnapshotLoader implements RuntimeSnapshotLoaderI
         return 'twig_components';
     }
 
-    public function load(Project $project, array $snapshot): void
+    public function load(Project $project, array $section): void
     {
-        $sections = $snapshot['sections'] ?? null;
-        $section = \is_array($sections) ? ($sections['twig_components'] ?? null) : null;
-        if (!\is_array($section) || !\is_array($section['names'] ?? null)) {
+        if (!\is_array($section['names'] ?? null)) {
             return;
         }
-        $names = array_values(array_filter($section['names'], 'is_string'));
-        $caseInsensitiveNames = array_values(array_filter(
-            \is_array($section['caseInsensitiveNames'] ?? null) ? $section['caseInsensitiveNames'] : [],
-            'is_string',
-        ));
+        $names = RuntimeSnapshotNormalizer::stringList($section['names']);
+        $caseInsensitiveNames = RuntimeSnapshotNormalizer::stringList($section['caseInsensitiveNames'] ?? null);
         $directory = \is_string($section['anonymousTemplateDirectory'] ?? null) && '' !== $section['anonymousTemplateDirectory']
             ? $section['anonymousTemplateDirectory']
             : 'components';

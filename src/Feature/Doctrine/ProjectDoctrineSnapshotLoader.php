@@ -23,13 +23,8 @@ final class ProjectDoctrineSnapshotLoader implements RuntimeSnapshotLoaderInterf
         return 'doctrine';
     }
 
-    public function load(Project $project, array $snapshot): void
+    public function load(Project $project, array $section): void
     {
-        $sections = $snapshot['sections'] ?? null;
-        $section = \is_array($sections) ? ($sections['doctrine'] ?? null) : null;
-        if (!\is_array($section)) {
-            return;
-        }
         $range = new Range(new Position(0, 0), new Position(0, 0));
         $entities = [];
         foreach (\is_array($section['entities'] ?? null) ? $section['entities'] : [] as $item) {
