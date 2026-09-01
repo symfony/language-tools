@@ -360,21 +360,131 @@ final class ConfigurationProviderTest extends TestCase
         ], array_column($diagnostics, 'message'));
     }
 
-    public function testAcceptsYamlMergeKeys(): void
+    public function testAcceptsYamlAliasesAndMergeKeys(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/security.yaml';
+        $fixture->documents->open(new Document($uri, 'yaml', 1, <<<'YAML'
+            security:
+                firewalls:
+                    a:
+                        pattern: ^/a
+                        remember_me: &remember_me
+                            secret: '%kernel.secret%'
+                            name: auth_token
+                    b:
+                        pattern: ^/b
+                        remember_me: *remember_me
+                    c:
+                        pattern: ^/c
+                        remember_me:
+                            <<: *remember_me
+                            always_remember_me: true
+            YAML));
+
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
+    public function testValidatesResolvedYamlAliasValues(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = <<<'YAML'
+            quoted: &quoted 'true'
+            framework:
+                router:
+                    utf8: &enabled true
+                    strict: *enabled
+                required_parent:
+                    known: *quoted
+                    token: present
+            YAML;
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
+        self::assertSame(
+            [$this->protocolRange($fixture->converter, $text, (int) strpos($text, '*quoted'), \strlen('*quoted'))],
+            array_column($diagnostics, 'range'),
+        );
+    }
+
+    public function testValidatesYamlEnumTagsInheritedFromAliases(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = <<<'YAML'
+            valid: &valid
+                reset_mode: !php/enum App\ResetMode::SCHEMA
+            invalid: &invalid
+                reset_mode: !php/enum App\ResetMode::UNKNOWN
+            framework:
+                router:
+                    <<: *invalid
+            when@dev:
+                framework:
+                    router: *valid
+            YAML;
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
+        self::assertSame(
+            [$this->protocolRange($fixture->converter, $text, (int) strpos($text, '<<'), 2)],
+            array_column($diagnostics, 'range'),
+        );
+    }
+
+    public function testKeepsPhpConstantsOpaqueWhileResolvingAliases(): void
     {
         $fixture = $this->providers();
         $uri = 'file:///workspace/config/packages/framework.yaml';
         $fixture->documents->open(new Document($uri, 'yaml', 1, <<<'YAML'
+            defaults: &defaults
+                strict: !php/const PHP_VERSION_ID
             framework:
-                items:
-                    default: &defaults
-                        name: true
-                        handlers:
-                            - type: stream
-                              nested: true
-                    readonly:
-                        <<: *defaults
-                        name: false
+                router:
+                    <<: *defaults
+            YAML));
+
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
+    public function testDirectAliasDiagnosticsKeepTheAliasRangeAlongsideMergeKeys(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = <<<'YAML'
+            base: &base
+                assets:
+                    enabled: true
+            inner: &inner
+                mystery: true
+            framework:
+                <<: *base
+                router: *inner
+            YAML;
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.unknown_key'], array_column($diagnostics, 'code'));
+        self::assertSame(
+            [$this->protocolRange($fixture->converter, $text, (int) strpos($text, '*inner'), \strlen('*inner'))],
+            array_column($diagnostics, 'range'),
+        );
+    }
+
+    public function testExplicitYamlKeysOverrideMergedValues(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $fixture->documents->open(new Document($uri, 'yaml', 1, <<<'YAML'
+            defaults: &defaults
+                strict: invalid
+            framework:
+                router:
+                    <<: *defaults
+                    strict: true
             YAML));
 
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
@@ -387,19 +497,25 @@ final class ConfigurationProviderTest extends TestCase
         $text = <<<'YAML'
             defaults: &defaults
                 mystery: true
+                strict: invalid
             framework:
                 router:
                     <<: *defaults
+                assets: *defaults
             YAML;
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
         $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
-        self::assertSame(['config.unknown_key'], array_column($diagnostics, 'code'));
-        self::assertSame(['Unknown configuration key "framework.router.mystery".'], array_column($diagnostics, 'message'));
-        self::assertSame(
-            [$this->protocolRange($fixture->converter, $text, (int) strpos($text, '<<'), 2)],
-            array_column($diagnostics, 'range'),
-        );
+        self::assertSame(['config.unknown_key', 'config.invalid_type', 'config.unknown_key', 'config.unknown_key'], array_column($diagnostics, 'code'));
+        self::assertSame([
+            'Unknown configuration key "framework.router.mystery".',
+            'Expected boolean for "framework.router.strict".',
+            'Unknown configuration key "framework.assets.mystery".',
+            'Unknown configuration key "framework.assets.strict".',
+        ], array_column($diagnostics, 'message'));
+        $mergeRange = $this->protocolRange($fixture->converter, $text, (int) strpos($text, '<<'), 2);
+        $aliasRange = $this->protocolRange($fixture->converter, $text, (int) strrpos($text, '*defaults'), \strlen('*defaults'));
+        self::assertSame([$mergeRange, $mergeRange, $aliasRange, $aliasRange], array_column($diagnostics, 'range'));
 
         $fixture->documents->update($uri, 2, $text."\nbroken: [");
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
@@ -781,6 +897,14 @@ final class ConfigurationProviderTest extends TestCase
                         $this->node('algorithm', 'scalar'),
                         $this->node('migrate_from', 'array'),
                     ]), keyAttribute: 'class'),
+                    $this->node('firewalls', 'array', prototype: $this->node('firewall', 'array', children: [
+                        $this->node('pattern', 'scalar'),
+                        $this->node('remember_me', 'array', children: [
+                            $this->node('secret', 'scalar'),
+                            $this->node('name', 'scalar'),
+                            $this->node('always_remember_me', 'boolean'),
+                        ]),
+                    ]), keyAttribute: 'name'),
                 ]),
             ],
             [

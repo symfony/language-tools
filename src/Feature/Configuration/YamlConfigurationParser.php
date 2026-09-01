@@ -9,6 +9,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Parser\Yaml\YamlMapping;
+use Symfony\Lsp\Parser\Yaml\YamlScalar;
 
 final class YamlConfigurationParser
 {
@@ -20,28 +21,55 @@ final class YamlConfigurationParser
     }
 
     /** @return list<ConfigurationOccurrence> */
-    public function parse(string $text, ?ConfigurationIndex $index = null, bool $resolveMerges = false): array
+    public function parse(string $text, ?ConfigurationIndex $index = null, bool $resolveAliasesAndMerges = false): array
     {
-        $occurrences = [];
+        $document = $resolveAliasesAndMerges && null !== $index ? $this->parser->parseDocument($text) : null;
+        $mappings = null === $document ? $this->parser->parse($text) : $document->mappings;
         $merges = [];
-        $known = [];
-        $mappings = $this->parser->parse($text);
-        $siblings = $this->siblingKeys($mappings);
+        $aliases = [];
+        $anchors = [];
         foreach ($mappings as $mapping) {
             if ([] !== $mapping->path && '<<' === $mapping->path[\count($mapping->path) - 1]) {
                 $merges[] = $mapping;
+            } elseif ($this->isAlias($mapping->value)) {
+                $aliases[] = $mapping;
+            } elseif ($this->isAnchor($mapping->value)) {
+                $anchors[] = $mapping;
+            }
+        }
+
+        $resolved = null;
+        if (null !== $document && ([] !== $merges || [] !== $aliases || [] !== $anchors)) {
+            $resolved = $this->resolvedDocument($text, $document->scalars);
+        }
+
+        $occurrences = [];
+        $known = [];
+        $siblings = $this->siblingKeys($mappings);
+        foreach ($mappings as $mapping) {
+            if ([] !== $mapping->path && '<<' === $mapping->path[\count($mapping->path) - 1]) {
                 continue;
             }
             $literalDepths = $this->literalDepths($mapping, $siblings);
             $path = null === $index
                 ? $this->normalizePath($mapping->path, $literalDepths)
                 : $index->normalizePath($mapping->path, $mapping->sequenceDepths, $literalDepths);
-            $occurrence = $this->occurrence($text, $mapping, $path, $literalDepths);
+            $value = $mapping->value;
+            $hasResolvedValue = false;
+            $resolvedValue = null;
+            if ($resolveAliasesAndMerges && null !== $index && ($this->isAlias($value) || $this->isAnchor($value))) {
+                $value = '';
+                if (null !== $resolved) {
+                    [$hasResolvedValue, $resolvedValue] = $this->resolvedSubtree($resolved, $mapping->scope, $mapping->path);
+                }
+            }
+            $occurrence = $this->occurrence($text, $mapping, $path, $literalDepths, $value, $hasResolvedValue, $resolvedValue);
             $occurrences[] = $occurrence;
             $known[$this->identity($occurrence->scope, $occurrence->path)] = true;
         }
-        if ($resolveMerges && null !== $index && [] !== $merges) {
-            array_push($occurrences, ...$this->resolvedMergeOccurrences($text, $index, $merges, $known));
+        if (null !== $index && null !== $resolved) {
+            array_push($occurrences, ...$this->resolvedMergeOccurrences($text, $index, $resolved, $merges, $known));
+            array_push($occurrences, ...$this->resolvedAliasOccurrences($text, $index, $resolved, $aliases, $known));
         }
 
         return $occurrences;
@@ -51,36 +79,67 @@ final class YamlConfigurationParser
      * @param list<string> $path
      * @param list<int>    $literalDepths
      */
-    private function occurrence(string $text, YamlMapping $mapping, array $path, array $literalDepths): ConfigurationOccurrence
+    private function occurrence(string $text, YamlMapping $mapping, array $path, array $literalDepths, string $value, bool $hasResolvedValue, mixed $resolvedValue): ConfigurationOccurrence
     {
         return new ConfigurationOccurrence(
             $path,
-            $mapping->value,
+            $value,
             new Range($this->converter->toPosition($text, $mapping->keyStartByte), $this->converter->toPosition($text, $mapping->keyEndByte)),
             new Range($this->converter->toPosition($text, $mapping->valueStartByte), $this->converter->toPosition($text, $mapping->valueEndByte)),
             $mapping->sequenceDepths,
             $mapping->scope,
             $literalDepths,
+            $hasResolvedValue,
+            $resolvedValue,
         );
     }
 
     /**
-     * @param list<YamlMapping>   $merges
-     * @param array<string, true> $known
+     * @param list<YamlScalar> $scalars
      *
-     * @return list<ConfigurationOccurrence>
+     * @return array<array-key, mixed>|null
      */
-    private function resolvedMergeOccurrences(string $text, ConfigurationIndex $index, array $merges, array $known): array
+    private function resolvedDocument(string $text, array $scalars): ?array
     {
+        $replacements = [];
+        foreach ($scalars as $scalar) {
+            $replacement = match ($scalar->tag) {
+                '!php/enum' => '!symfony-lsp/php-enum',
+                '!php/const' => '!symfony-lsp/php-const',
+                '!php/object' => '!symfony-lsp/php-object',
+                default => null,
+            };
+            if (null === $replacement) {
+                continue;
+            }
+            if (null === $scalar->tagStartByte || null === $scalar->tagEndByte) {
+                return null;
+            }
+            $replacements[$scalar->tagStartByte] = [$scalar->tagEndByte, $replacement];
+        }
+        krsort($replacements, \SORT_NUMERIC);
+        foreach ($replacements as $start => [$end, $replacement]) {
+            $text = substr_replace($text, $replacement, $start, $end - $start);
+        }
+
         try {
             $resolved = $this->semanticParser->parse($text, Yaml::PARSE_CUSTOM_TAGS);
         } catch (ParseException) {
-            return [];
-        }
-        if (!\is_array($resolved)) {
-            return [];
+            return null;
         }
 
+        return \is_array($resolved) ? $resolved : null;
+    }
+
+    /**
+     * @param array<array-key, mixed> $resolved
+     * @param list<YamlMapping>       $merges
+     * @param array<string, true>     $known
+     *
+     * @return list<ConfigurationOccurrence>
+     */
+    private function resolvedMergeOccurrences(string $text, ConfigurationIndex $index, array $resolved, array $merges, array &$known): array
+    {
         $occurrences = [];
         $processed = [];
         foreach ($merges as $merge) {
@@ -88,8 +147,8 @@ final class YamlConfigurationParser
                 continue;
             }
             $targetPath = \array_slice($merge->path, 0, -1);
-            $target = $this->resolvedSubtree($resolved, $merge->scope, $targetPath);
-            if (!\is_array($target)) {
+            [$found, $target] = $this->resolvedSubtree($resolved, $merge->scope, $targetPath);
+            if (!$found || !\is_array($target)) {
                 continue;
             }
             $targetIdentity = $this->identity($merge->scope, $targetPath);
@@ -99,6 +158,37 @@ final class YamlConfigurationParser
             $processed[$targetIdentity] = true;
             $range = new Range($this->converter->toPosition($text, $merge->keyStartByte), $this->converter->toPosition($text, $merge->keyEndByte));
             $this->appendResolvedOccurrences($index, $target, $targetPath, $merge->sequenceDepths, $merge->scope, $range, $known, $occurrences);
+        }
+
+        return $occurrences;
+    }
+
+    /**
+     * @param array<array-key, mixed> $resolved
+     * @param list<YamlMapping>       $aliases
+     * @param array<string, true>     $known
+     *
+     * @return list<ConfigurationOccurrence>
+     */
+    private function resolvedAliasOccurrences(string $text, ConfigurationIndex $index, array $resolved, array $aliases, array &$known): array
+    {
+        $occurrences = [];
+        $processed = [];
+        foreach ($aliases as $alias) {
+            if ($alias->isSequenceItem()) {
+                continue;
+            }
+            [$found, $target] = $this->resolvedSubtree($resolved, $alias->scope, $alias->path);
+            if (!$found || !\is_array($target) || array_is_list($target)) {
+                continue;
+            }
+            $targetIdentity = $this->identity($alias->scope, $alias->path);
+            if (isset($processed[$targetIdentity])) {
+                continue;
+            }
+            $processed[$targetIdentity] = true;
+            $range = new Range($this->converter->toPosition($text, $alias->valueStartByte), $this->converter->toPosition($text, $alias->valueEndByte));
+            $this->appendResolvedOccurrences($index, $target, $alias->path, $alias->sequenceDepths, $alias->scope, $range, $known, $occurrences);
         }
 
         return $occurrences;
@@ -117,39 +207,54 @@ final class YamlConfigurationParser
             $childPath = [...$path, (string) $name];
             $normalizedPath = $index->normalizePath($childPath, $sequenceDepths);
             $identity = $this->identity($scope, $normalizedPath);
-            if (!isset($known[$identity])) {
-                $known[$identity] = true;
-                $occurrences[] = new ConfigurationOccurrence(
-                    $normalizedPath,
-                    '',
-                    $range,
-                    $range,
-                    $sequenceDepths,
-                    $scope,
-                );
+            if (isset($known[$identity])) {
+                continue;
             }
+            $known[$identity] = true;
+            $occurrences[] = new ConfigurationOccurrence(
+                $normalizedPath,
+                '',
+                $range,
+                $range,
+                $sequenceDepths,
+                $scope,
+                hasResolvedValue: true,
+                resolvedValue: $value,
+            );
             if (\is_array($value) && !array_is_list($value) && null !== $index->find($normalizedPath, $sequenceDepths)) {
                 $this->appendResolvedOccurrences($index, $value, $childPath, $sequenceDepths, $scope, $range, $known, $occurrences);
             }
         }
     }
 
+    private function isAlias(string $value): bool
+    {
+        return str_starts_with(ltrim($value), '*');
+    }
+
+    private function isAnchor(string $value): bool
+    {
+        return str_starts_with(ltrim($value), '&');
+    }
+
     /**
      * @param array<array-key, mixed> $resolved
      * @param list<string>            $path
+     *
+     * @return array{bool, mixed}
      */
-    private function resolvedSubtree(array $resolved, string $scope, array $path): mixed
+    private function resolvedSubtree(array $resolved, string $scope, array $path): array
     {
         $current = $resolved;
         $path = 'base' === $scope ? $path : [$scope, ...$path];
         foreach ($path as $part) {
             if (!\is_array($current) || !\array_key_exists($part, $current)) {
-                return null;
+                return [false, null];
             }
             $current = $current[$part];
         }
 
-        return $current;
+        return [true, $current];
     }
 
     /** @param list<string> $path */

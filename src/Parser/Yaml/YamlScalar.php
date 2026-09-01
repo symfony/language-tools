@@ -20,6 +20,8 @@ final class YamlScalar
         public readonly array $sequence,
         public readonly ?string $environment,
         public readonly ?string $tag,
+        public readonly ?int $tagStartByte = null,
+        public readonly ?int $tagEndByte = null,
     ) {
     }
 

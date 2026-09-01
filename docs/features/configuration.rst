@@ -37,13 +37,13 @@ Diagnostics report statically provable configuration errors, including unknown
 or duplicate keys, invalid scalar types, invalid enum values, deprecated nodes
 and malformed structures. When a bundle accepts the scalar value of a backed
 PHP enum case, diagnostics recognize that value. YAML values that use the
-``!php/enum`` tag are matched to the declared cases. YAML merge keys are
-treated as structural syntax rather than bundle options. Inherited mapping keys
-are checked at their effective configuration paths, with diagnostics pointing
-to the corresponding ``<<`` key. Symfony Language Tools suppresses diagnostics
-when a root key
-doesn't belong to an installed bundle, so application service and import
-sections aren't mistaken for bundle configuration. Files in
+``!php/enum`` tag are matched to the declared cases. YAML aliases and merge keys
+are resolved before validation. Direct alias diagnostics point to the alias
+reference. Inherited mapping keys and values are checked at their effective
+configuration paths, with diagnostics pointing to the corresponding ``<<`` key.
+Symfony Language Tools suppresses diagnostics when a root key doesn't belong to
+an installed bundle, so application service and import sections aren't mistaken
+for bundle configuration. Files in
 conventional routing locations, including ``config/routes/`` and
 ``config/routes.yaml``, are analyzed as routes instead. Files loaded by the
 selected environment's router receive the same treatment, including files in
@@ -72,6 +72,5 @@ Limitations
 -----------
 
 Custom validation callbacks and options built dynamically by application code
-may not be diagnosed. YAML merge diagnostics are deferred for incomplete
-documents and don't validate inherited scalar values or merges inside sequence
-items.
+may not be diagnosed. YAML alias and merge diagnostics are deferred for
+incomplete documents; aliases and merges inside sequence items aren't resolved.

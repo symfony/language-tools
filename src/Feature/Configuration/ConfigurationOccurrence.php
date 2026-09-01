@@ -19,6 +19,8 @@ final class ConfigurationOccurrence
         public readonly array $sequenceDepths,
         public readonly string $scope,
         public readonly array $literalDepths = [],
+        public readonly bool $hasResolvedValue = false,
+        public readonly mixed $resolvedValue = null,
     ) {
     }
 

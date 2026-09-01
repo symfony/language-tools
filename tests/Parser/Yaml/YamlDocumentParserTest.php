@@ -98,6 +98,17 @@ final class YamlDocumentParserTest extends TestCase
         self::assertSame('quoted:key', substr($source, $document->mappings[0]->keyStartByte, $document->mappings[0]->keyEndByte - $document->mappings[0]->keyStartByte));
     }
 
+    public function testProvidesYamlTagOffsets(): void
+    {
+        $source = 'value: !php/enum App\\ResetMode::SCHEMA';
+        $scalar = (new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))->parseDocument($source)->scalars[0];
+        $tagStart = (int) strpos($source, '!php/enum');
+
+        self::assertSame('!php/enum', $scalar->tag);
+        self::assertSame($tagStart, $scalar->tagStartByte);
+        self::assertSame($tagStart + \strlen('!php/enum'), $scalar->tagEndByte);
+    }
+
     public function testRecoveryProducesCompatibleScalarFacts(): void
     {
         $source = self::scalarSource();

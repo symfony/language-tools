@@ -188,9 +188,13 @@ final class YamlDocumentParser
         $baseIndent = $this->lineIndent($source, $node->startByte);
         [$contentStart, $contentEnd] = $this->scalarDecoder->contentOffsets($raw, $node->startByte, $node->endByte, $style, $baseIndent);
         $tag = null;
+        $tagStartByte = null;
+        $tagEndByte = null;
         foreach ($tree->children($container) as $child) {
             if ('tag' === $child->type) {
                 $tag = $tree->text($child, $source);
+                $tagStartByte = $child->startByte;
+                $tagEndByte = $child->endByte;
                 break;
             }
         }
@@ -207,6 +211,8 @@ final class YamlDocumentParser
             $sequence,
             'base' === $scope ? null : substr($scope, \strlen('when@')),
             $tag,
+            $tagStartByte,
+            $tagEndByte,
         );
     }
 

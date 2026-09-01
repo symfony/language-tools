@@ -67,7 +67,7 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
     private function diagnoseYaml(Document $document, Project $project, ConfigurationIndex $index): array
     {
         $environmentScope = 'when@'.$this->runtimeConfiguration->environment($project);
-        $occurrences = $this->yaml->parse($document->text, $index, resolveMerges: true);
+        $occurrences = $this->yaml->parse($document->text, $index, resolveAliasesAndMerges: true);
         $diagnostics = [];
         $seen = [];
         foreach ($occurrences as $occurrence) {
@@ -95,9 +95,14 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
             if ($node->deprecated) {
                 $diagnostics[] = $this->diagnostic($occurrence->keyRange, 2, 'config.deprecated_key', \sprintf('Configuration key "%s" is deprecated.', $key));
             }
-            $environmentType = $this->values->environmentType($project, $occurrence->value);
+            $environmentValue = $occurrence->hasResolvedValue
+                ? (\is_string($occurrence->resolvedValue) ? $occurrence->resolvedValue : null)
+                : $occurrence->value;
+            $environmentType = null === $environmentValue ? null : $this->values->environmentType($project, $environmentValue);
             if (null !== $environmentType && !$this->values->acceptsType($node, $environmentType)) {
                 $diagnostics[] = $this->diagnostic($occurrence->valueRange, 1, 'env.incompatible_type', \sprintf('Environment expression returns %s, but "%s" expects %s.', $environmentType, $key, $node->type));
+            } elseif ($occurrence->hasResolvedValue && !$this->values->acceptsResolvedValue($node, $occurrence->resolvedValue)) {
+                $diagnostics[] = $this->diagnostic($occurrence->valueRange, 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $node->type, $key));
             } elseif ('' !== $occurrence->value && !$this->values->acceptsValue($node, $occurrence->value)) {
                 $diagnostics[] = $this->diagnostic($occurrence->valueRange, 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $node->type, $key));
             }

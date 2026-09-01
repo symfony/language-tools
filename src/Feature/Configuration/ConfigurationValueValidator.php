@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Configuration;
 
+use Symfony\Component\Yaml\Tag\TaggedValue;
 use Symfony\Lsp\Feature\Environment\EnvironmentExpressionParser;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Project\Project;
@@ -74,6 +75,39 @@ final class ConfigurationValueValidator
         };
     }
 
+    public function acceptsResolvedValue(ConfigurationNode $node, mixed $value): bool
+    {
+        if ($value instanceof TaggedValue) {
+            if (!\in_array($value->getTag(), ['php/enum', 'symfony-lsp/php-enum'], true) || !\is_string($value->getValue()) || [] === $node->allowedEnumCases) {
+                return true;
+            }
+
+            return $node->allowedValuesTruncated || \in_array(ltrim($value->getValue(), '\\'), $node->allowedEnumCases, true);
+        }
+        if (\is_string($value) && (str_contains($value, '%') || str_starts_with($value, '$'))) {
+            return true;
+        }
+        if (null === $value && $node->acceptsNull()) {
+            return true;
+        }
+        if (!$node->allowedValuesTruncated) {
+            if ([] !== $node->allowedValues && !\in_array($value, $node->allowedValues, true)) {
+                return false;
+            }
+            if ([] === $node->allowedValues && [] !== $node->allowedEnumCases) {
+                return false;
+            }
+        }
+
+        return match ($node->type) {
+            'boolean' => \is_bool($value) || \in_array($value, [0, 1], true),
+            'integer' => \is_int($value),
+            'float' => \is_int($value) || \is_float($value),
+            'array' => $this->acceptsResolvedArrayValue($node, $value),
+            default => true,
+        };
+    }
+
     private function enumCase(string $source): ?string
     {
         if (1 !== preg_match('/^!php\/enum\s+(.+)$/', $source, $match)) {
@@ -117,6 +151,20 @@ final class ConfigurationValueValidator
             'true' => $node->acceptsTrue(),
             'false' => $node->acceptsFalse(),
             default => $node->acceptsScalar(),
+        };
+    }
+
+    private function acceptsResolvedArrayValue(ConfigurationNode $node, mixed $value): bool
+    {
+        if (\is_array($value)) {
+            return true;
+        }
+
+        return match ($value) {
+            null => $node->acceptsNull(),
+            true => $node->acceptsTrue(),
+            false => $node->acceptsFalse(),
+            default => \is_scalar($value) ? $node->acceptsScalar() : true,
         };
     }
 }
