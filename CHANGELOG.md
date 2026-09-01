@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Expose sanitized runtime section failure causes in verbose output
 - Keep diagnostics from healthy runtime metadata sections after a partial bridge failure
 - Add GitLab Code Quality reports to the diagnostics checker
 - Suppress code-qualified diagnostics with source comments

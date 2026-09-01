@@ -110,8 +110,9 @@ on ``PATH``, the buffer has one ``symfony_lsp`` client and the project contains
 a FrameworkBundle requirement.
 
 Set ``trace`` to ``messages`` or ``verbose`` temporarily to add redacted
-protocol traffic to Neovim's LSP log. Restore it to ``off`` after
-troubleshooting.
+protocol traffic to Neovim's LSP log. The ``verbose`` level also records
+sanitized runtime section failure causes with relative code locations and
+argument-free frames. Restore it to ``off`` after troubleshooting.
 
 .. _`standalone guide`: ../index.rst#installing-a-standalone-release
 .. _`project configuration`: ../project-configuration.rst

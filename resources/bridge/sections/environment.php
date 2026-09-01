@@ -21,9 +21,9 @@ function symfonyLspBridgeEnvironmentSection(SymfonyLspBridgeContext $context): ?
                     $classes[] = $definition['class'];
                 }
             }
-        } catch (Throwable) {
+        } catch (Throwable $error) {
             $complete = false;
-            $context->addError('environment');
+            $context->addError('environment', $error);
         }
         foreach (array_values(array_unique($classes)) as $class) {
             if (is_a($class, Symfony\Component\DependencyInjection\EnvVarProcessorInterface::class, true)) {

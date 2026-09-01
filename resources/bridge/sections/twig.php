@@ -36,8 +36,8 @@ function symfonyLspBridgeTwigSection(SymfonyLspBridgeContext $context): ?array
                 // filesystem loader and hide every path from debug:twig
                 $paths = symfonyLspBridgeTwigConventionPaths($context, $application);
             }
-        } catch (Throwable) {
-            $context->addError('twig');
+        } catch (Throwable $error) {
+            $context->addError('twig', $error);
         }
     }
     $paths = array_values(array_unique($paths, SORT_REGULAR));

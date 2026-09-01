@@ -2,11 +2,15 @@
 
 namespace Symfony\Lsp\Runtime;
 
-final class PartialRuntimeMetadataException extends \RuntimeException
+/** @phpstan-import-type RuntimeMetadataSectionError from RuntimeMetadataException */
+final class PartialRuntimeMetadataException extends RuntimeMetadataException
 {
-    /** @param non-empty-list<string> $sections */
-    public function __construct(public readonly array $sections)
+    /**
+     * @param non-empty-list<string>            $sections
+     * @param list<RuntimeMetadataSectionError> $sectionErrors
+     */
+    public function __construct(array $sections, array $sectionErrors = [])
     {
-        parent::__construct('The project bridge could not load runtime metadata: '.implode(', ', $sections).'.');
+        parent::__construct($sections, $sectionErrors);
     }
 }

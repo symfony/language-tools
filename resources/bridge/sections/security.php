@@ -18,9 +18,9 @@ function symfonyLspBridgeSecuritySection(SymfonyLspBridgeContext $context): ?arr
                     break;
                 }
             }
-        } catch (Throwable) {
+        } catch (Throwable $error) {
             $complete = false;
-            $context->addError('security');
+            $context->addError('security', $error);
         }
     }
     if ($securityEnabled) {
@@ -97,9 +97,9 @@ function symfonyLspBridgeSecuritySection(SymfonyLspBridgeContext $context): ?arr
             } catch (Throwable) {
                 $warnings[] = 'The security voters are unavailable.';
             }
-        } catch (Throwable) {
+        } catch (Throwable $error) {
             $complete = false;
-            $context->addError('security');
+            $context->addError('security', $error);
         }
     }
     ksort($firewalls);

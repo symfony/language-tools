@@ -8,6 +8,7 @@ use Symfony\Lsp\Feature\Configuration\ProjectConfigurationValidationSnapshotLoad
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Server\ServerLogger;
 
 final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
 {
@@ -20,6 +21,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         private readonly ProjectRegistry $projects,
         private readonly ProjectConfigurationValidationSnapshotLoader $configurationValidation,
         private readonly ProjectIndexStatusRegistry $statuses,
+        private readonly ServerLogger $logger,
         private readonly ?RuntimeSnapshotStore $snapshotStore = null,
         private readonly ?RuntimeSnapshotState $snapshotState = null,
         private readonly string $releaseMetadataUrl = '',
@@ -48,6 +50,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                 '--debug=1',
                 '--sections='.implode(',', $sections),
                 '--configuration-generation='.$this->configurationValidation->generation($project),
+                ...($this->logger->isVerbose() ? ['--error-details=1'] : []),
                 ...('' === $this->releaseMetadataUrl ? [] : [
                     '--release-metadata-url='.$this->releaseMetadataUrl,
                     '--release-metadata-cache='.$this->pathMapper->toContainer($project, \dirname($bridge).'/release-metadata.json'),
@@ -87,6 +90,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             $errors = $snapshot['errors'] ?? null;
             $loadableSnapshot = $snapshot;
             $failedSections = [];
+            $sectionErrors = [];
             foreach (\is_array($errors) ? $errors : [] as $error) {
                 if (!\is_array($error)) {
                     continue;
@@ -100,6 +104,10 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                 }
                 if ('runtime' === $section || \in_array($section, $sections, true)) {
                     $failedSections[$section] = true;
+                    $chain = $this->runtimeMetadataCauseChain($error['cause'] ?? null);
+                    if (null !== $chain && \count($sectionErrors) < 10) {
+                        $sectionErrors[] = ['section' => $section, 'chain' => $chain];
+                    }
                 }
             }
             $this->snapshotLoaders->load($project, $loadableSnapshot);
@@ -114,11 +122,10 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                     && $applicationBooted
                     && [] !== $loadedSections
                 ) {
-                    throw new PartialRuntimeMetadataException(array_keys($failedSections));
+                    throw new PartialRuntimeMetadataException(array_keys($failedSections), $sectionErrors);
                 }
-                $detail = [] === $failedSections ? '' : ': '.implode(', ', array_keys($failedSections));
 
-                throw new \RuntimeException('The project bridge could not load runtime metadata'.$detail.'.');
+                throw new RuntimeMetadataException(array_keys($failedSections), $sectionErrors);
             }
 
             $this->snapshotStore?->save($project, $bridge, $snapshot, $sections, null === $requestedSections);
@@ -129,6 +136,56 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
 
             throw $error;
         }
+    }
+
+    /**
+     * @return non-empty-list<array{class: string, message: string, origin?: string, frames: list<string>}>|null
+     */
+    private function runtimeMetadataCauseChain(mixed $cause): ?array
+    {
+        if (!\is_array($cause) || !\is_array($cause['chain'] ?? null)) {
+            return null;
+        }
+
+        $chain = [];
+        foreach (\array_slice($cause['chain'], 0, 3) as $candidate) {
+            if (!\is_array($candidate)
+                || !\is_string($candidate['class'] ?? null)
+                || '' === $candidate['class']
+                || !\is_string($candidate['message'] ?? null)
+            ) {
+                continue;
+            }
+            $item = [
+                'class' => $this->truncateRuntimeMetadataString($candidate['class'], 300),
+                'message' => $this->truncateRuntimeMetadataString($candidate['message'], 500),
+                'frames' => [],
+            ];
+            if (\is_string($candidate['origin'] ?? null) && '' !== $candidate['origin']) {
+                $item['origin'] = $this->truncateRuntimeMetadataString($candidate['origin'], 500);
+            }
+            foreach (\is_array($candidate['frames'] ?? null) ? \array_slice($candidate['frames'], 0, 5) : [] as $frame) {
+                if (\is_string($frame) && '' !== $frame) {
+                    $item['frames'][] = $this->truncateRuntimeMetadataString($frame, 500);
+                }
+            }
+            $chain[] = $item;
+        }
+
+        return [] === $chain ? null : $chain;
+    }
+
+    private function truncateRuntimeMetadataString(string $value, int $limit): string
+    {
+        if (\strlen($value) <= $limit) {
+            return $value;
+        }
+        $value = substr($value, 0, $limit - 3);
+        while ('' !== $value && 1 !== preg_match('//u', $value)) {
+            $value = substr($value, 0, -1);
+        }
+
+        return $value.'...';
     }
 
     /** @param list<string> $loadedSections */

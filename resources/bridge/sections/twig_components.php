@@ -126,8 +126,8 @@ function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context)
                 'components' => $components,
                 'warnings' => $warnings,
             ];
-        } catch (Throwable) {
-            $context->addError('twig_components');
+        } catch (Throwable $error) {
+            $context->addError('twig_components', $error);
         }
     }
 

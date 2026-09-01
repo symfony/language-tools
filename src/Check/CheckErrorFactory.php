@@ -6,6 +6,7 @@ use Symfony\Lsp\Feature\Configuration\ConfigurationValidationException;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectConfiguration;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Runtime\RuntimeMetadataException;
 use Symfony\Lsp\Runtime\UnsupportedSymfonyVersionException;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 
@@ -58,7 +59,7 @@ final class CheckErrorFactory
     }
 
     /** @return CheckError */
-    public function runtime(Project $project, string $workspace, ?\Throwable $cause, string $fallback): array
+    public function runtime(Project $project, string $workspace, ?\Throwable $cause, string $fallback, bool $verbose): array
     {
         $configurationFailure = $cause instanceof ConfigurationValidationException;
         $error = $this->error(
@@ -71,7 +72,7 @@ final class CheckErrorFactory
             ],
         );
         if (null !== $cause && !$configurationFailure) {
-            $error['cause'] = $this->cause($cause, $workspace);
+            $error['cause'] = $this->cause($cause, $workspace, $verbose);
         }
 
         return $error;
@@ -172,11 +173,20 @@ final class CheckErrorFactory
     }
 
     /** @return array{class: class-string<\Throwable>, message: string} */
-    private function cause(\Throwable $cause, string $workspace): array
+    private function cause(\Throwable $cause, string $workspace, bool $verbose = false): array
     {
+        if ($verbose && $cause instanceof RuntimeMetadataException) {
+            $message = implode("\n", array_map(
+                fn (string $line): string => $this->redactor->redact($line, [$workspace]),
+                [$cause->getMessage(), ...$cause->detailLines()],
+            ));
+        } else {
+            $message = $this->redactor->redact($cause->getMessage(), [$workspace]);
+        }
+
         return [
             'class' => $cause::class,
-            'message' => $this->redactor->redact($cause->getMessage(), [$workspace]),
+            'message' => $message,
         ];
     }
 

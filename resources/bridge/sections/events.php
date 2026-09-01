@@ -38,9 +38,9 @@ function symfonyLspBridgeEventsSection(SymfonyLspBridgeContext $context): ?array
                     $listeners[] = $listener;
                 }
             }
-        } catch (Throwable) {
+        } catch (Throwable $error) {
             $complete = false;
-            $context->addError('events');
+            $context->addError('events', $error);
         }
     }
     $uniqueListeners = [];

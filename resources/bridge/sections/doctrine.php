@@ -35,8 +35,8 @@ function symfonyLspBridgeDoctrineSection(SymfonyLspBridgeContext $context): ?arr
                 $complete = true;
             }
         }
-    } catch (Throwable) {
-        $context->addError('doctrine');
+    } catch (Throwable $error) {
+        $context->addError('doctrine', $error);
     }
     usort($entities, static fn (array $a, array $b): int => $a['className'] <=> $b['className']);
 

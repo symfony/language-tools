@@ -164,7 +164,7 @@
           ],
           "default": "off",
           "scope": "window",
-          "description": "Write redacted Language Server Protocol traffic to the Symfony Language Tools output channel."
+          "description": "Write redacted Language Server Protocol traffic and verbose runtime failure causes to the Symfony Language Tools output channel."
         },
         "symfonyLsp.translationDiagnostics": {
           "type": "boolean",

@@ -22,6 +22,8 @@ use Symfony\Lsp\Runtime\NativeProcessRunner;
 use Symfony\Lsp\Runtime\ProjectRuntimeInitializer;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
+use Symfony\Lsp\Server\SensitiveDataRedactor;
+use Symfony\Lsp\Server\ServerLogger;
 
 /**
  * Simulates a Docker bind mount without Docker: the host project root is a
@@ -74,6 +76,7 @@ final class ContainerProjectRootBridgeTest extends TestCase
             self::projects($project),
             new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
             new ProjectIndexStatusRegistry(),
+            new ServerLogger(null, new SensitiveDataRedactor()),
         );
 
         try {

@@ -129,7 +129,9 @@ for the worktree. If the automatic download fails, install ``symfony-lsp`` on
 If runtime information is unavailable, verify that the project has Composer
 dependencies installed, the workspace is trusted and ``phpCommand`` can run the
 application. Set ``trace`` to ``messages`` or ``verbose`` temporarily for
-redacted protocol logging, then restore it to ``off``.
+redacted protocol logging. The ``verbose`` level also records sanitized runtime
+section failure causes with relative code locations and argument-free frames.
+Restore it to ``off`` after troubleshooting.
 
 .. _`Docker support`: ../docker.rst
 .. _`project configuration`: ../project-configuration.rst

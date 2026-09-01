@@ -22,6 +22,14 @@ final class ServerLoggerTest extends TestCase
         );
     }
 
+    public function testKeepsTruncatedRedactedTextValidUtf8(): void
+    {
+        $redacted = (new SensitiveDataRedactor())->redact(str_repeat('a', 496).'é'.str_repeat('b', 20));
+
+        self::assertSame(1, preg_match('//u', $redacted));
+        self::assertStringEndsWith('...', $redacted);
+    }
+
     public function testReportsFatalErrorsWithLocationAndRedaction(): void
     {
         $output = new CapturingWritableStream();
@@ -33,6 +41,38 @@ final class ServerLoggerTest extends TestCase
             '{^Symfony Language Tools failed: RuntimeException at tests/Server/ServerLoggerTest\.php:\d+: secret=\[redacted\]\n$}',
             $output->contents(),
         );
+    }
+
+    public function testVerboseMessagesAreGatedAndRedacted(): void
+    {
+        $output = new CapturingWritableStream();
+        $logger = new ServerLogger($output, new SensitiveDataRedactor());
+
+        self::assertFalse($logger->isVerbose());
+        $logger->verbose('Failure at /workspace/src/Kernel.php with secret=exposed', ['/workspace']);
+        self::assertSame('', $output->contents());
+
+        $logger->configure('verbose');
+        self::assertTrue($logger->isVerbose());
+        $logger->verbose('Failure at /workspace/src/Kernel.php with secret=exposed', ['/workspace']);
+
+        self::assertSame("[debug] Failure at ./src/Kernel.php with secret=[redacted]\n", $output->contents());
+    }
+
+    public function testVerboseErrorTracesOmitArguments(): void
+    {
+        $output = new CapturingWritableStream();
+        $logger = new ServerLogger($output, new SensitiveDataRedactor());
+        $logger->configure('verbose');
+
+        try {
+            $this->throwWithArgument('CANARY_TRACE_ARGUMENT');
+        } catch (\Throwable $error) {
+            $logger->error($error);
+        }
+
+        self::assertStringContainsString('ServerLoggerTest->throwWithArgument()', $output->contents());
+        self::assertStringNotContainsString('CANARY_TRACE_ARGUMENT', $output->contents());
     }
 
     public function testTrafficLoggingIsDisabledByDefaultAndRecursivelyRedactsContent(): void
@@ -63,5 +103,10 @@ final class ServerLoggerTest extends TestCase
         self::assertStringNotContainsString('exposed', $output->contents());
         self::assertStringNotContainsString('command-secret', $output->contents());
         self::assertSame(3, substr_count($output->contents(), '[redacted]'));
+    }
+
+    private function throwWithArgument(string $argument): never
+    {
+        throw new \RuntimeException('Trace failure.');
     }
 }

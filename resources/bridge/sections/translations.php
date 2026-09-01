@@ -45,8 +45,8 @@ function symfonyLspBridgeTranslationsSection(SymfonyLspBridgeContext $context): 
                     }
                 }
             }
-        } catch (Throwable) {
-            $context->addError('translations');
+        } catch (Throwable $error) {
+            $context->addError('translations', $error);
         }
     }
     usort($items, static fn (array $a, array $b): int => [$a['domain'], $a['key'], $a['locale']] <=> [$b['domain'], $b['key'], $b['locale']]);

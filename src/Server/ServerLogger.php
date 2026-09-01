@@ -23,6 +23,19 @@ final class ServerLogger implements TrafficLoggerInterface
         }
     }
 
+    public function isVerbose(): bool
+    {
+        return 'verbose' === $this->trace;
+    }
+
+    /** @param list<string> $roots */
+    public function verbose(string $message, array $roots = []): void
+    {
+        if ($this->isVerbose()) {
+            $this->write('[debug] '.$this->redactor->redact($message, $roots)."\n");
+        }
+    }
+
     public function logInbound(string $line): void
     {
         $this->traffic('inbound', $line);
@@ -36,8 +49,11 @@ final class ServerLogger implements TrafficLoggerInterface
     public function error(\Throwable $error): void
     {
         $message = $this->redactor->redact($error->getMessage());
-        if ('verbose' === $this->trace) {
-            $message .= "\n".$this->redactor->redact($error->getTraceAsString());
+        if ($this->isVerbose()) {
+            $trace = $this->trace($error);
+            if ('' !== $trace) {
+                $message .= "\n".$this->redactor->redact($trace);
+            }
         }
         $this->write('[error] '.$message."\n");
     }
@@ -51,6 +67,20 @@ final class ServerLogger implements TrafficLoggerInterface
             $error->getLine(),
             $this->redactor->redact($error->getMessage()),
         ));
+    }
+
+    private function trace(\Throwable $error): string
+    {
+        $lines = [];
+        foreach ($error->getTrace() as $index => $frame) {
+            $location = \is_string($frame['file'] ?? null)
+                ? $this->relativeFile($frame['file']).(\is_int($frame['line'] ?? null) ? ':'.$frame['line'] : '')
+                : '[internal function]';
+            $call = ($frame['class'] ?? '').($frame['type'] ?? '').$frame['function'].'()';
+            $lines[] = '#'.$index.' '.$location.' '.$call;
+        }
+
+        return implode("\n", $lines);
     }
 
     private function traffic(string $direction, string $line): void

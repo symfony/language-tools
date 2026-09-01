@@ -48,9 +48,9 @@ function symfonyLspBridgeConfigurationSection(SymfonyLspBridgeContext $context):
                 $warnings[] = sprintf('The %s configuration tree is unavailable.', $bundle::class);
             }
         }
-    } catch (Throwable) {
+    } catch (Throwable $error) {
         $complete = false;
-        $context->addError('configuration');
+        $context->addError('configuration', $error);
     }
     usort($bundles, static fn (array $left, array $right): int => $left['alias'] <=> $right['alias']);
     sort($warnings);

@@ -47,7 +47,7 @@ require __DIR__.'/bridge/sections/doctrine.php';
 require __DIR__.'/bridge/sections/environment.php';
 require __DIR__.'/bridge/sections/console.php';
 
-$options = getopt('', ['project:', 'environment::', 'debug::', 'sections::', 'targeted-refresh::', 'rebuild-container::', 'configuration-generation::', 'release-metadata-url:', 'release-metadata-cache:']);
+$options = getopt('', ['project:', 'environment::', 'debug::', 'sections::', 'targeted-refresh::', 'rebuild-container::', 'error-details::', 'configuration-generation::', 'release-metadata-url:', 'release-metadata-cache:']);
 $project = $options['project'] ?? null;
 if (!is_string($project) || '' === $project) {
     fwrite(STDERR, "The --project option is required.\n");
@@ -90,6 +90,8 @@ $targetedRefreshOption = $options['targeted-refresh'] ?? '0';
 $targetedRefresh = !in_array($targetedRefreshOption, ['0', 'false'], true);
 $rebuildContainerOption = $options['rebuild-container'] ?? '0';
 $rebuildContainer = !in_array($rebuildContainerOption, ['0', 'false'], true);
+$errorDetailsOption = $options['error-details'] ?? '0';
+$errorDetails = !in_array($errorDetailsOption, ['0', 'false'], true);
 $configurationGenerationOption = $options['configuration-generation'] ?? '0';
 $configurationGeneration = is_string($configurationGenerationOption) && ctype_digit($configurationGenerationOption)
     ? (int) $configurationGenerationOption
@@ -135,7 +137,7 @@ if (class_exists(Symfony\Component\Runtime\SymfonyRuntime::class)) {
     );
 }
 
-$context = new SymfonyLspBridgeContext($project, $environment, $debug, $targetedRefresh, $rebuildContainer);
+$context = new SymfonyLspBridgeContext($project, $environment, $debug, $targetedRefresh, $rebuildContainer, $errorDetails);
 $bootstrapMilliseconds = $elapsedMilliseconds($bridgeStartedAt);
 $kernelStartedAt = hrtime(true);
 $configurationValidation = $context->configurationValidation();
@@ -166,8 +168,8 @@ foreach ($requestedSections as $sectionName) {
         if (is_array($section)) {
             $sections[$sectionName] = $section;
         }
-    } catch (Throwable) {
-        $context->addError($sectionName);
+    } catch (Throwable $error) {
+        $context->addError($sectionName, $error);
     } finally {
         $sectionMilliseconds[$sectionName] = $elapsedMilliseconds($sectionStartedAt);
     }

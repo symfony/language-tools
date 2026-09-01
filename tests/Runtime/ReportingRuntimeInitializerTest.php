@@ -59,6 +59,48 @@ final class ReportingRuntimeInitializerTest extends TestCase
         );
     }
 
+    public function testLogsSanitizedSectionCausesOnlyInVerboseMode(): void
+    {
+        $client = new ReportingClient();
+        $statuses = new ProjectIndexStatusRegistry();
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $statuses->runtimeFailed($project);
+        $error = new PartialRuntimeMetadataException(['twig'], [[
+            'section' => 'twig',
+            'chain' => [[
+                'class' => \RuntimeException::class,
+                'message' => 'DATABASE_URL=mysql://user:pass@database',
+                'origin' => 'src/TwigExtension.php:24',
+                'frames' => ['App\\TwigExtension->getFunctions (src/TwigExtension.php:20)'],
+            ]],
+        ]]);
+        $log = new WritableBuffer();
+        $logger = new ServerLogger($log, new SensitiveDataRedactor());
+        $logger->configure('verbose');
+        $initializer = new ReportingRuntimeInitializer(
+            $this->failingInitializer($error),
+            $client,
+            $statuses,
+            $logger,
+        );
+
+        $initializer->initialize($project);
+
+        $log->close();
+        self::assertStringContainsString(
+            '[debug] Runtime section "twig": RuntimeException at src/TwigExtension.php:24: [redacted]',
+            $log->buffer(),
+        );
+        self::assertStringContainsString(
+            '[debug]   at App\\TwigExtension->getFunctions (src/TwigExtension.php:20)',
+            $log->buffer(),
+        );
+        self::assertStringNotContainsString('user:pass', $log->buffer());
+        $message = $client->notifications[0]['params']['message'] ?? null;
+        self::assertIsString($message);
+        self::assertStringNotContainsString('DATABASE_URL', $message);
+    }
+
     public function testReportsInitialFailureAsStaticOnly(): void
     {
         $client = new ReportingClient();

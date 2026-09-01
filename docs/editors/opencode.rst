@@ -125,7 +125,9 @@ Confirm that OpenCode can start the server and receive diagnostics for a file:
 If runtime information is unavailable, verify that the project has Composer
 dependencies installed, ``workspaceTrust`` is ``true`` and ``phpCommand`` can
 run the application. Set ``trace`` to ``messages`` or ``verbose`` temporarily
-for redacted protocol logging, then restore it to ``off``.
+for redacted protocol logging. The ``verbose`` level also records sanitized
+runtime section failure causes with relative code locations and argument-free
+frames. Restore it to ``off`` after troubleshooting.
 
 See the `OpenCode LSP documentation`_ for its custom language server settings
 and debugging commands.

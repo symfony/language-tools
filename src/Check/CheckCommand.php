@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Check;
 use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
+use Symfony\Lsp\Server\ServerLogger;
 
 final class CheckCommand
 {
@@ -19,6 +20,7 @@ final class CheckCommand
         private readonly CheckReporter $reporter,
         private readonly DiagnosticCodeRegistry $diagnosticCodes,
         private readonly SensitiveDataRedactor $redactor,
+        private readonly ServerLogger $logger,
         private readonly string $version,
     ) {
     }
@@ -35,6 +37,7 @@ final class CheckCommand
                 throw $parsed->value;
             }
             $options = $parsed->value;
+            $this->logger->configure($options->verbose ? 'verbose' : 'off');
             if ($options->help) {
                 return new CheckExecution(self::EXIT_SUCCESS, $this->reporter->help());
             }

@@ -77,8 +77,8 @@ function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
                 'resources' => $resources,
                 'warnings' => [],
             ];
-        } catch (Throwable) {
-            $context->addError('routes');
+        } catch (Throwable $error) {
+            $context->addError('routes', $error);
         }
     }
 

@@ -32,6 +32,8 @@ use Symfony\Lsp\Runtime\RuntimeSnapshotState;
 use Symfony\Lsp\Runtime\RuntimeSnapshotStore;
 use Symfony\Lsp\Runtime\StatusRuntimeInitializer;
 use Symfony\Lsp\Runtime\UnsupportedSymfonyVersionException;
+use Symfony\Lsp\Server\SensitiveDataRedactor;
+use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\Bridge\ProjectRuntimeInitializerFixtureBuilder;
 
 final class ProjectRuntimeInitializerTest extends TestCase
@@ -124,6 +126,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame('--configuration-generation=0', $processRunner->command[7]);
         self::assertSame('--release-metadata-url=https://symfony.com/releases.json', $processRunner->command[8]);
         self::assertMatchesRegularExpression('{^--release-metadata-cache=.+/var/symfony-lsp/test/[a-f0-9]{64}/release-metadata\.json$}', $processRunner->command[9]);
+        self::assertNotContains('--error-details=1', $processRunner->command);
         self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
         self::assertSame(90.0, $processRunner->timeout);
         self::assertSame([
@@ -133,6 +136,29 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'shutdownMilliseconds' => 6.0,
             'totalMilliseconds' => 16.0,
         ], $statuses->status($project)['runtime']['timings'] ?? null);
+    }
+
+    public function testRequestsBridgeErrorDetailsInVerboseMode(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $processRunner = new CapturingProcessRunner(new ProcessResult(0, json_encode([
+            'schemaVersion' => 1,
+            'sections' => [],
+        ], \JSON_THROW_ON_ERROR), ''));
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $logger = new ServerLogger(null, new SensitiveDataRedactor());
+        $logger->configure('verbose');
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
+            $processRunner,
+            new RuntimeSnapshotLoaderRegistry([]),
+            self::projects($project),
+            logger: $logger,
+        );
+
+        $initializer->initialize($project);
+
+        self::assertContains('--error-details=1', $processRunner->command);
     }
 
     public function testNeverLoadsMetadataForAProjectRemovedWhileTheBridgeRan(): void
@@ -331,7 +357,16 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 'schemaVersion' => 1,
                 'project' => ['environment' => 'dev'],
                 'configurationValidation' => ['status' => 'valid'],
-                'errors' => [['section' => 'routes', 'message' => 'CANARY_RUNTIME_SECTION_ERROR']],
+                'errors' => [[
+                    'section' => 'routes',
+                    'message' => 'CANARY_RUNTIME_SECTION_ERROR',
+                    'cause' => ['chain' => [[
+                        'class' => \RuntimeException::class,
+                        'message' => 'CANARY_RUNTIME_CAUSE',
+                        'origin' => 'src/RuntimeExtension.php:42',
+                        'frames' => ['App\\RuntimeExtension->load (src/RuntimeExtension.php:40)'],
+                    ]]],
+                ]],
                 'sections' => [
                     'routes' => ['complete' => true, 'items' => [['name' => 'replacement', 'path' => '/replacement']]],
                     'container' => ['complete' => true, 'items' => [
@@ -354,6 +389,10 @@ final class ProjectRuntimeInitializerTest extends TestCase
         } catch (PartialRuntimeMetadataException $error) {
             self::assertSame(['routes'], $error->sections);
             self::assertSame('The project bridge could not load runtime metadata: routes.', $error->getMessage());
+            self::assertSame([
+                'Runtime section "routes": RuntimeException at src/RuntimeExtension.php:42: CANARY_RUNTIME_CAUSE',
+                '  at App\\RuntimeExtension->load (src/RuntimeExtension.php:40)',
+            ], $error->detailLines());
         }
         self::assertSame('app.mailer', $serviceIndexes->forProject($project)->get('app.mailer')?->id);
         self::assertSame('existing', $routeIndexes->forProject($project)->get('existing')?->name);

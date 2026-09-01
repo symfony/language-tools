@@ -211,20 +211,19 @@ final class BridgeTest extends TestCase
         $this->workspace->remove('var');
     }
 
-    public function testDoesNotExposeApplicationExceptionsInSnapshot(): void
+    public function testExposesSanitizedApplicationExceptionsOnlyWhenRequested(): void
     {
         (new RouteFixtureBuilder($this->workspace))->writeRouteApplication();
         self::assertSame(1, $this->workspace->replace(
             'vendor/autoload.php',
             'public function __construct(string $environment, bool $debug) {}',
-            'public function __construct(string $environment, bool $debug) { throw new \\RuntimeException(\'CANARY_RUNTIME_EXCEPTION\'); }',
+            'public function __construct(string $environment, bool $debug) { throw new \\RuntimeException(\'CANARY_RUNTIME_EXCEPTION secret=exposed\'); }',
         ));
 
         $process = $this->bridge->run(['--sections=routes']);
 
-        $snapshot = $process->stdout;
-        self::assertSame(0, $process->exitCode, $process->stderr."\n".$snapshot);
-        self::assertStringNotContainsString('CANARY_RUNTIME_EXCEPTION', $snapshot);
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        self::assertStringNotContainsString('CANARY_RUNTIME_EXCEPTION', $process->stdout);
         $result = $process->snapshot;
         self::assertIsArray($result);
         self::assertSame(['status' => 'unavailable'], $result['configurationValidation'] ?? null);
@@ -232,6 +231,97 @@ final class BridgeTest extends TestCase
             'section' => 'routes',
             'message' => 'Unable to load the "routes" runtime metadata section.',
         ]], $result['errors']);
+
+        $process = $this->bridge->run(['--sections=routes', '--error-details=1']);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        $errors = $result['errors'] ?? null;
+        self::assertIsArray($errors);
+        $error = $errors[0] ?? null;
+        self::assertIsArray($error);
+        $cause = $error['cause'] ?? null;
+        self::assertIsArray($cause);
+        self::assertStringNotContainsString(
+            (string) realpath($this->workspace->path),
+            json_encode($cause, \JSON_THROW_ON_ERROR),
+        );
+        $chain = $cause['chain'] ?? null;
+        self::assertIsArray($chain);
+        $firstCause = $chain[0] ?? null;
+        self::assertIsArray($firstCause);
+        self::assertSame(\RuntimeException::class, $firstCause['class'] ?? null);
+        self::assertSame('CANARY_RUNTIME_EXCEPTION secret=[redacted]', $firstCause['message'] ?? null);
+        $origin = $firstCause['origin'] ?? null;
+        self::assertIsString($origin);
+        self::assertMatchesRegularExpression('{^vendor/autoload\\.php:\\d+$}', $origin);
+    }
+
+    public function testKeepsTruncatedExceptionDetailsValidUtf8(): void
+    {
+        (new RouteFixtureBuilder($this->workspace))->writeRouteApplication();
+        $message = str_repeat('a', 296).'é'.str_repeat('b', 20);
+        self::assertSame(1, $this->workspace->replace(
+            'vendor/autoload.php',
+            'public function __construct(string $environment, bool $debug) {}',
+            'public function __construct(string $environment, bool $debug) { throw new \\RuntimeException('.var_export($message, true).'); }',
+        ));
+
+        $process = $this->bridge->run(['--sections=routes', '--error-details=1']);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        $errors = $result['errors'] ?? null;
+        self::assertIsArray($errors);
+        $error = $errors[0] ?? null;
+        self::assertIsArray($error);
+        $cause = $error['cause'] ?? null;
+        self::assertIsArray($cause);
+        $chain = $cause['chain'] ?? null;
+        self::assertIsArray($chain);
+        $firstCause = $chain[0] ?? null;
+        self::assertIsArray($firstCause);
+        $truncated = $firstCause['message'] ?? null;
+        self::assertIsString($truncated);
+        self::assertSame(1, preg_match('//u', $truncated));
+        self::assertStringEndsWith('...', $truncated);
+    }
+
+    public function testDisablesConsoleExceptionCatchingBeforeRunningSections(): void
+    {
+        (new RouteFixtureBuilder($this->workspace))->writeRouteApplication();
+        self::assertSame(1, $this->workspace->replace(
+            'vendor/autoload.php',
+            <<<'PHP'
+    {
+        $output->write("\n ! [NOTE] Some deprecation notice written to the console output.\n\n");
+PHP,
+            <<<'PHP'
+    {
+        if ($this->catchExceptions) { return 1; }
+        throw new \LogicException('CANARY_COMMAND_EXCEPTION');
+PHP,
+        ));
+
+        $process = $this->bridge->run(['--sections=routes', '--error-details=1']);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        $errors = $result['errors'] ?? null;
+        self::assertIsArray($errors);
+        $error = $errors[0] ?? null;
+        self::assertIsArray($error);
+        $cause = $error['cause'] ?? null;
+        self::assertIsArray($cause);
+        $chain = $cause['chain'] ?? null;
+        self::assertIsArray($chain);
+        $firstCause = $chain[0] ?? null;
+        self::assertIsArray($firstCause);
+        self::assertSame(\LogicException::class, $firstCause['class'] ?? null);
+        self::assertSame('CANARY_COMMAND_EXCEPTION', $firstCause['message'] ?? null);
     }
 
     public function testUsesOneKernelAndApplicationForAllRequestedSections(): void

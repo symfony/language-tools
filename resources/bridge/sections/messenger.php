@@ -34,9 +34,9 @@ function symfonyLspBridgeMessengerSection(SymfonyLspBridgeContext $context): ?ar
             } catch (Throwable) {
                 $warnings[] = 'The messenger routing is unavailable.';
             }
-        } catch (Throwable) {
+        } catch (Throwable $error) {
             $complete = false;
-            $context->addError('messenger');
+            $context->addError('messenger', $error);
         }
     }
     ksort($buses);

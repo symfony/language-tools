@@ -20,6 +20,7 @@ final class SymfonyLspBridgeContext
         private bool $debug,
         private bool $targetedRefresh,
         private bool $rebuildContainer,
+        private bool $errorDetails,
     ) {
     }
 
@@ -61,6 +62,9 @@ final class SymfonyLspBridgeContext
 
         $application = new Symfony\Bundle\FrameworkBundle\Console\Application($this->kernel());
         $application->setAutoExit(false);
+        if (method_exists($application, 'setCatchExceptions')) {
+            $application->setCatchExceptions(false);
+        }
 
         return $this->application = $application;
     }
@@ -469,12 +473,145 @@ final class SymfonyLspBridgeContext
         @rmdir($directory);
     }
 
-    public function addError(string $section): void
+    public function addError(string $section, ?Throwable $error = null): void
     {
-        $this->errors[] = [
+        $entry = [
             'section' => $section,
             'message' => sprintf('Unable to load the "%s" runtime metadata section.', $section),
         ];
+        if ($this->errorDetails && $error instanceof Throwable) {
+            $entry['cause'] = $this->errorCause($error);
+        }
+        $this->errors[] = $entry;
+    }
+
+    private function errorCause(Throwable $error): array
+    {
+        $chain = [];
+        for ($candidate = $error, $depth = 0; $candidate instanceof Throwable && $depth < 3; $candidate = $candidate->getPrevious(), ++$depth) {
+            $cause = [
+                'class' => $this->errorText($candidate::class, 300, false),
+                'message' => $this->errorText($candidate->getMessage(), 300),
+                'frames' => [],
+            ];
+            $origin = $this->errorOrigin($candidate->getFile(), $candidate->getLine());
+            if (null !== $origin) {
+                $cause['origin'] = $origin;
+            }
+            foreach (array_slice($candidate->getTrace(), 0, 5) as $frame) {
+                if (!is_array($frame)) {
+                    continue;
+                }
+                $call = '';
+                if (is_string($frame['class'] ?? null)) {
+                    $call .= $this->errorText($frame['class'], 300, false);
+                }
+                if (is_string($frame['type'] ?? null) && in_array($frame['type'], ['->', '::'], true)) {
+                    $call .= $frame['type'];
+                }
+                if (is_string($frame['function'] ?? null)) {
+                    $call .= $this->errorText($frame['function'], 300, false);
+                }
+                $frameOrigin = is_string($frame['file'] ?? null) && is_int($frame['line'] ?? null)
+                    ? $this->errorOrigin($frame['file'], $frame['line'])
+                    : null;
+                if ('' === $call && null === $frameOrigin) {
+                    continue;
+                }
+                $cause['frames'][] = '' === $call
+                    ? $frameOrigin
+                    : $call.(null === $frameOrigin ? '' : ' ('.$frameOrigin.')');
+            }
+            $chain[] = $cause;
+        }
+
+        return ['chain' => $chain];
+    }
+
+    private function errorOrigin(string $file, int $line): ?string
+    {
+        $file = $this->errorFile($file);
+        if (null === $file) {
+            return null;
+        }
+
+        return $file.(0 < $line ? ':'.$line : '');
+    }
+
+    private function errorFile(string $file): ?string
+    {
+        $file = str_replace('\\', '/', $file);
+        $root = realpath($this->project);
+        $resolved = realpath($file);
+        if (false !== $root && false !== $resolved) {
+            $root = rtrim(str_replace('\\', '/', $root), '/');
+            $resolved = str_replace('\\', '/', $resolved);
+            $prefix = $root.'/';
+            $inside = '\\' === DIRECTORY_SEPARATOR
+                ? 0 === strncasecmp($resolved, $prefix, strlen($prefix))
+                : str_starts_with($resolved, $prefix);
+            if ($inside) {
+                return $this->errorText(substr($resolved, strlen($prefix)), 500, false);
+            }
+        }
+        $file = basename($file);
+
+        return '' === $file ? null : $this->errorText($file, 500, false);
+    }
+
+    private function errorText(string $value, int $limit, bool $redactValues = true): string
+    {
+        if (function_exists('mb_scrub')) {
+            $value = mb_scrub($value, 'UTF-8');
+        } elseif (1 !== preg_match('//u', $value)) {
+            $value = '[invalid UTF-8]';
+        }
+        $roots = array_values(array_unique(array_filter([
+            $this->project,
+            realpath($this->project) ?: null,
+        ], 'is_string')));
+        foreach ($roots as $root) {
+            $root = rtrim(str_replace('\\', '/', $root), '/');
+            $value = str_replace([$root, str_replace('/', '\\', $root)], '.', $value);
+        }
+        if ($redactValues) {
+            $sensitiveValues = [];
+            foreach (array_merge($_SERVER, $_ENV) as $environmentValue) {
+                if (is_string($environmentValue) && strlen($environmentValue) >= 4) {
+                    $sensitiveValues[] = $environmentValue;
+                }
+            }
+            $sensitiveValues = array_values(array_unique($sensitiveValues));
+            usort($sensitiveValues, static fn (string $left, string $right): int => strlen($right) <=> strlen($left));
+            foreach ($sensitiveValues as $environmentValue) {
+                $value = str_replace($environmentValue, '[redacted]', $value);
+            }
+            $value = preg_replace('/\b[A-Z][A-Z0-9_]{2,}\s*=\s*[^\s,;]+/', '[redacted]', $value) ?? '[redacted]';
+            $value = preg_replace('/\b[a-z][a-z0-9+.-]*:\/\/[^\s\/:@]+:[^\s\/@]+@/i', '[redacted]@', $value) ?? '[redacted]';
+            $value = preg_replace('/\bauthorization\s*[=:]\s*[^\r\n,;]+/i', 'authorization=[redacted]', $value) ?? '[redacted]';
+            $value = preg_replace(
+                '/\b(password|passwd|secret|token|credential|cookie|api[_-]?key|private[_-]?key)\s*[=:]\s*[^\s,;]+/i',
+                '$1=[redacted]',
+                $value,
+            ) ?? '[redacted]';
+        }
+        $value = preg_replace('/[\x00-\x20\x7F]+/', ' ', $value) ?? '';
+        $value = trim($value);
+
+        return $this->truncateErrorText($value, $limit);
+    }
+
+    private function truncateErrorText(string $value, int $limit): string
+    {
+        if (strlen($value) <= $limit) {
+            return $value;
+        }
+        $value = substr($value, 0, $limit - 3);
+        while ('' !== $value && 1 !== preg_match('//u', $value)) {
+            $value = substr($value, 0, -1);
+        }
+
+        return $value.'...';
     }
 
     public function errors(): array

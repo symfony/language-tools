@@ -110,7 +110,8 @@ for details.
 
 Use `Docker support`_ when the PHP command runs in a container.
 ``symfonyLsp.trace`` adds redacted protocol messages to the output channel and
-is disabled by default.
+is disabled by default. The ``verbose`` level also records sanitized runtime
+section failure causes with relative code locations and argument-free frames.
 
 The PHP suggestion setting is optional. Symfony Language Tools is designed to
 coexist with a general PHP language server such as Intelephense or PHP Tools.

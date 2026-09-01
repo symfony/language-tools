@@ -15,6 +15,8 @@ use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 use Symfony\Lsp\Runtime\RuntimeSnapshotState;
 use Symfony\Lsp\Runtime\RuntimeSnapshotStore;
+use Symfony\Lsp\Server\SensitiveDataRedactor;
+use Symfony\Lsp\Server\ServerLogger;
 
 final class ProjectRuntimeInitializerFixtureBuilder
 {
@@ -34,6 +36,7 @@ final class ProjectRuntimeInitializerFixtureBuilder
         ?RuntimeSnapshotStore $snapshotStore = null,
         ?RuntimeSnapshotState $snapshotState = null,
         ?ProjectIndexStatusRegistry $statuses = null,
+        ?ServerLogger $logger = null,
         string $releaseMetadataUrl = '',
     ): ProjectRuntimeInitializer {
         $configuration ??= new RuntimeConfiguration();
@@ -47,6 +50,7 @@ final class ProjectRuntimeInitializerFixtureBuilder
             $projects,
             $configurationValidationLoader ?? new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
             $statuses ?? new ProjectIndexStatusRegistry(),
+            $logger ?? new ServerLogger(null, new SensitiveDataRedactor()),
             $snapshotStore,
             $snapshotState,
             $releaseMetadataUrl,

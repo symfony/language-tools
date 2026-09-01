@@ -27,6 +27,11 @@ final class ReportingRuntimeInitializer implements RuntimeInitializerInterface
             throw $error;
         } catch (\Throwable $error) {
             $this->logger->error($error);
+            if ($error instanceof RuntimeMetadataException) {
+                foreach ($error->detailLines() as $line) {
+                    $this->logger->verbose($line, [$project->rootPath]);
+                }
+            }
             $runtimeStatus = $this->statuses->status($project)['runtime'];
             $stale = 'stale' === $runtimeStatus['state'];
             if ($error instanceof PartialRuntimeMetadataException) {

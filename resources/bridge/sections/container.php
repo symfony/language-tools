@@ -40,8 +40,8 @@ function symfonyLspBridgeContainerSection(SymfonyLspBridgeContext $context): ?ar
                 'warnings' => [],
             ];
             $section = symfonyLspBridgeFinalizeSection($section);
-        } catch (Throwable) {
-            $context->addError('container');
+        } catch (Throwable $error) {
+            $context->addError('container', $error);
         }
     }
 

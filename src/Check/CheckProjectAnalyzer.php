@@ -101,6 +101,7 @@ final class CheckProjectAnalyzer
                             $plan->workspace,
                             $runtimeError,
                             $status['runtime']['error'] ?? 'Runtime indexing did not complete.',
+                            $plan->verbose,
                         );
                         $complete[$root] = false;
                         if ($runtimeError instanceof ConfigurationValidationException || $runtimeError instanceof PartialRuntimeMetadataException) {

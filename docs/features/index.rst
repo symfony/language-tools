@@ -170,7 +170,8 @@ from project files. Features that need the application's current routes,
 services or other runtime information may be incomplete. Diagnostics that need
 this information are omitted. If one runtime metadata section fails while other
 sections load, features backed by the healthy sections remain available and the
-editor reports the partial failure.
+editor reports the partial failure. Enable verbose tracing before refreshing the
+index to record the sanitized exception cause and argument-free frames.
 
 Symfony Version Support
 -----------------------
@@ -212,8 +213,10 @@ Privacy
 
 Retained runtime information is stored under ``var/symfony-lsp/`` in the
 application. Parameter values, environment values, credentials and application
-objects are never stored, displayed or written to logs. Protocol tracing is
-disabled by default and redacts values when enabled.
+objects are never stored. Runtime failure causes are omitted from normal output.
+Verbose tracing and verbose checks can include sanitized exception messages,
+relative code locations and argument-free frames. Sensitive values are redacted
+before output.
 
 General Limitations
 -------------------

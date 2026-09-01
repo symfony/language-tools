@@ -349,6 +349,18 @@ final class CheckExecutableTest extends TestCase
             'errors' => [[
                 'section' => 'twig',
                 'message' => 'CANARY_RUNTIME_SECTION_ERROR',
+                'cause' => ['chain' => [[
+                    'class' => \RuntimeException::class,
+                    'message' => 'CANARY_TWIG_FAILURE',
+                    'origin' => 'src/TwigExtension.php:24',
+                    'frames' => [
+                        'App\\TwigExtension->getFunctions (src/TwigExtension.php:20) '.str_repeat('a', 120),
+                        'Twig\\ExtensionSet->initExtension (vendor/twig/twig/src/ExtensionSet.php:454) '.str_repeat('b', 120),
+                        'Twig\\Environment->getFunctions (vendor/twig/twig/src/Environment.php:777) '.str_repeat('c', 120),
+                        'Symfony\\Bridge\\Twig\\Command\\DebugCommand->execute (vendor/symfony/twig-bridge/Command/DebugCommand.php:123) '.str_repeat('d', 120),
+                        'App\\FinalFrame->run (src/FinalFrame.php:99)',
+                    ],
+                ]]],
             ]],
         ];
         $symfonyCli = $this->directory.'/partial-runtime';
@@ -368,7 +380,27 @@ final class CheckExecutableTest extends TestCase
         self::assertSame('route.missing_parameters', $report['diagnostics'][0]['code']);
         self::assertSame('The project bridge could not load runtime metadata: twig.', $report['errors'][0]['message']);
         self::assertSame(PartialRuntimeMetadataException::class, $report['errors'][0]['cause']['class'] ?? null);
+        self::assertStringNotContainsString('CANARY_TWIG_FAILURE', $report['errors'][0]['cause']['message']);
         self::assertSame(1, $report['summary']['blocking']);
+
+        $verbose = $this->execute(
+            ['check', '--verbose', '--format=json', '--workspace='.$this->directory, 'src/ArticleController.php'],
+            ['SYMFONY_LSP_SYMFONY_CLI' => $symfonyCli],
+        );
+        $verboseReport = $this->decodeReport($verbose['stdout']);
+
+        self::assertStringContainsString(
+            'Runtime section "twig": RuntimeException at src/TwigExtension.php:24: CANARY_TWIG_FAILURE',
+            $verboseReport['errors'][0]['cause']['message'] ?? '',
+        );
+        self::assertStringContainsString(
+            'App\\TwigExtension->getFunctions (src/TwigExtension.php:20)',
+            $verboseReport['errors'][0]['cause']['message'] ?? '',
+        );
+        self::assertStringContainsString(
+            'App\\FinalFrame->run (src/FinalFrame.php:99)',
+            $verboseReport['errors'][0]['cause']['message'] ?? '',
+        );
     }
 
     public function testDoesNotReportACleanResultWhenRuntimeIndexingFails(): void

@@ -72,6 +72,7 @@ final class FakeFrameworkPrelude
             namespace Symfony\Bundle\FrameworkBundle\Console;
             final class Application
             {
-            PHP."\n    ".$constructor."\n    public function setAutoExit(bool \$autoExit): void {}".$members."\n}\n";
+                private bool $catchExceptions = true;
+            PHP."\n    ".$constructor."\n    public function setAutoExit(bool \$autoExit): void {}\n    public function setCatchExceptions(bool \$catchExceptions): void { \$this->catchExceptions = \$catchExceptions; }".$members."\n}\n";
     }
 }
