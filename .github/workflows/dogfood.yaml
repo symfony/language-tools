@@ -43,6 +43,7 @@ on:
                     - mautic
                     - shopware
                     - sulu-demo
+                    - sulu-skeleton
                     - sylius
                     - symfony-demo
 
@@ -66,6 +67,7 @@ jobs:
                     - project: kimai
                     - project: mautic
                     - project: sulu-demo
+                    - project: sulu-skeleton
                     - project: symfony-demo
                     - project: sylius
                       environment: |

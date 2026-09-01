@@ -1,0 +1,11 @@
+{
+    "version": 1,
+    "repository": "https://github.com/sulu/skeleton.git",
+    "revision": "39c5c04392562f2e18462b4c762a56de50838c83",
+    "setup": "composer",
+    "ci": true,
+    "environmentVariables": {
+        "APP_ENV": "dev",
+        "DATABASE_URL": "mysql://root:root@127.0.0.1:9/dogfood?serverVersion=8.4.7&charset=utf8mb4"
+    }
+}
