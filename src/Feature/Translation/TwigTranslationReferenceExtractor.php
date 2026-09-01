@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
+use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
@@ -15,6 +16,7 @@ final class TwigTranslationReferenceExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly TwigDocumentParser $parser,
+        private readonly TwigArgumentParser $argumentParser,
         private readonly TwigCommentParser $comments,
         private readonly TranslationParameterAnalyzer $parameters,
     ) {
@@ -29,7 +31,7 @@ final class TwigTranslationReferenceExtractor
 
         return [
             ...$this->filterReferences($uri, $text, $masked, $document, $defaultDomain),
-            ...$this->functionReferences($uri, $text, $document, $defaultDomain),
+            ...$this->functionReferences($uri, $text, $masked, $document, $defaultDomain),
             ...$this->tagReferences($uri, $text, $masked, $defaultDomain),
         ];
     }
@@ -72,7 +74,7 @@ final class TwigTranslationReferenceExtractor
             if (null === $key) {
                 continue;
             }
-            $arguments = $this->arguments($document, $filter);
+            $arguments = $this->arguments($masked, $document, $filter);
             $domain = $this->domain($document, $this->argument($arguments, 1, ['domain']), $defaultDomain);
             if (null === $domain) {
                 continue;
@@ -112,7 +114,7 @@ final class TwigTranslationReferenceExtractor
     }
 
     /** @return list<TranslationReference> */
-    private function functionReferences(string $uri, string $text, TwigDocument $document, string $defaultDomain): array
+    private function functionReferences(string $uri, string $text, string $masked, TwigDocument $document, string $defaultDomain): array
     {
         $references = [];
         foreach ($document->nodesOfType('function_call') as $call) {
@@ -120,7 +122,7 @@ final class TwigTranslationReferenceExtractor
             if (null === $identifier || !\in_array($document->text($identifier), ['trans', 't'], true)) {
                 continue;
             }
-            $arguments = $this->arguments($document, $call);
+            $arguments = $this->arguments($masked, $document, $call);
             $keyArgument = $this->argument($arguments, 0, ['id', 'message']);
             $key = null === $keyArgument ? null : $document->soleStringLiteral($keyArgument);
             $domain = $this->domain($document, $this->argument($arguments, 2, ['domain']), $defaultDomain);
@@ -140,35 +142,42 @@ final class TwigTranslationReferenceExtractor
     }
 
     /** @return list<array{name: string|null, value: TreeSitterNode}> */
-    private function arguments(TwigDocument $document, TreeSitterNode $call): array
+    private function arguments(string $masked, TwigDocument $document, TreeSitterNode $call): array
     {
         $container = $document->directChild($call, 'arguments');
         if (null === $container) {
             return [];
         }
 
+        $text = substr($masked, $container->startByte, $container->endByte - $container->startByte);
+        $offset = $container->startByte;
+        if (str_starts_with($text, '(')) {
+            $text = substr($text, 1);
+            ++$offset;
+        }
+        if (str_ends_with($text, ')')) {
+            $text = substr($text, 0, -1);
+        }
+
+        $parsed = $this->argumentParser->parse($text, $offset);
         $arguments = [];
-        $recoveredName = null;
         foreach ($document->children($container) as $child) {
             if ('argument' !== $child->type) {
-                $recoveredName = $this->argumentName($document, $child);
-
                 continue;
             }
-            $name = $document->directChild($child, 'argument_name');
-            $arguments[] = [
-                'name' => null === $name ? $recoveredName : $this->argumentName($document, $name),
-                'value' => $document->directChild($child, 'argument_value') ?? $child,
-            ];
-            $recoveredName = null;
+            $value = $document->directChild($child, 'argument_value') ?? $child;
+            $name = null;
+            foreach ($parsed as $argument) {
+                if ($value->startByte >= $argument->offset && $value->startByte < $argument->offset + \strlen($argument->text)) {
+                    $name = $argument->name;
+
+                    break;
+                }
+            }
+            $arguments[] = ['name' => $name, 'value' => $value];
         }
 
         return $arguments;
-    }
-
-    private function argumentName(TwigDocument $document, TreeSitterNode $node): ?string
-    {
-        return 1 === preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*[:=]\s*$/D', $document->text($node), $match) ? $match[1] : null;
     }
 
     /**

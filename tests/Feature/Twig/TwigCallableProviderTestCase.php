@@ -24,6 +24,7 @@ use Symfony\Lsp\Feature\Twig\TwigCallableSourceFacts;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
@@ -80,7 +81,7 @@ class TwigCallableProviderTestCase extends TestCase
             new ProjectDocumentReader($documents, new ProjectPathResolver(new UriToPathConverter())),
             $phpParser,
         );
-        $argumentAnalyzer = new TwigCallableArgumentAnalyzer();
+        $argumentAnalyzer = new TwigCallableArgumentAnalyzer(new TwigArgumentParser());
 
         return [
             'documents' => $documents,

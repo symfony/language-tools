@@ -92,6 +92,11 @@ final class TwigCallableDiagnosticProviderTest extends TwigCallableProviderTestC
             array_column($unknown ?? [], 'message'),
         );
         self::assertSame([], $diagnostics("{{ image(name: 'a', width: 3, lazy: true) }}"));
+        self::assertSame([], $diagnostics("{{ image(name = 'a', width = 3, lazy = true) }}"));
+        self::assertSame(
+            ['Unknown argument "wdith" for Twig function "image".'],
+            array_column($diagnostics("{{ image(\n    # vérifié\n    wdith: 3\n) }}") ?? [], 'message'),
+        );
         self::assertSame(
             ['Unknown argument "wdith" for Twig function "attribute_image".', 'Unknown argument "size" for Twig filter "attribute_shorten".'],
             array_column($diagnostics("{{ attribute_image(name: 'a', wdith: 3) }}\n{{ text|attribute_shorten(size: 5) }}\n") ?? [], 'message'),

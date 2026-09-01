@@ -286,6 +286,19 @@ final class TranslationProviderTest extends TestCase
             <twig:Button>
                 {{ 'panel.title'|trans(domain: 'admin') }}
                 {{ 'panel.title'|trans(domain = 'admin') }}
+                {{ 'panel.title'|trans(
+                    # vérifié
+                    domain: 'admin'
+                ) }}
+                {{ 'panel.title'|trans({},
+                    # vérifié
+                    'admin'
+                ) }}
+                {{ t(
+                    # vérifié
+                    message: 'panel.title',
+                    domain: 'admin'
+                ) }}
             </twig:Button>
             TWIG;
         [$provider, , $configuration, $project] = $this->provider($uri, $text, 'twig');

@@ -2,8 +2,14 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
+use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
+
 final class TwigCallableArgumentAnalyzer
 {
+    public function __construct(private readonly TwigArgumentParser $argumentParser)
+    {
+    }
+
     /** @return array{kind: TwigCallableKind, prefix: string}|null */
     public function callableNameCompletion(string $before): ?array
     {
@@ -34,7 +40,7 @@ final class TwigCallableArgumentAnalyzer
             return null;
         }
         $argumentsText = substr($before, $open['offset'] + 1);
-        $arguments = $this->arguments($argumentsText, $open['offset'] + 1);
+        $arguments = $this->argumentParser->parse($argumentsText, $open['offset'] + 1);
         $current = array_pop($arguments);
         if (null === $current || 1 !== preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)?$/', $current->text, $prefix)) {
             return null;
@@ -118,7 +124,7 @@ final class TwigCallableArgumentAnalyzer
                 $open['callable']['callee'],
                 $open['callable']['calleeOffset'],
                 $argumentsOffset,
-                $this->arguments(substr($text, $argumentsOffset, $offset - $argumentsOffset), $argumentsOffset),
+                $this->argumentParser->parse(substr($text, $argumentsOffset, $offset - $argumentsOffset), $argumentsOffset),
                 hasNestedParentheses: $open['callable']['hasNestedParentheses'],
             );
         }
@@ -154,51 +160,6 @@ final class TwigCallableArgumentAnalyzer
     private function isMacroDeclaration(string $text, int $nameOffset): bool
     {
         return 1 === preg_match('/\{%\s*[-~]?\s*macro\s+$/', substr($text, 0, $nameOffset));
-    }
-
-    /** @return list<TwigCallableArgument> */
-    private function arguments(string $text, int $baseOffset): array
-    {
-        $segments = [];
-        $start = 0;
-        $stack = [];
-        $quote = null;
-        $escaped = false;
-        for ($offset = 0, $length = \strlen($text); $offset < $length; ++$offset) {
-            $character = $text[$offset];
-            if (null !== $quote) {
-                if ($escaped) {
-                    $escaped = false;
-                } elseif ('\\' === $character) {
-                    $escaped = true;
-                } elseif ($quote === $character) {
-                    $quote = null;
-                }
-                continue;
-            }
-            if (\in_array($character, ["'", '"'], true)) {
-                $quote = $character;
-            } elseif (\in_array($character, ['(', '[', '{'], true)) {
-                $stack[] = ['(' => ')', '[' => ']', '{' => '}'][$character];
-            } elseif ([] !== $stack && $character === $stack[array_key_last($stack)]) {
-                array_pop($stack);
-            } elseif (',' === $character && [] === $stack) {
-                $segments[] = $this->argument(substr($text, $start, $offset - $start), $baseOffset + $start);
-                $start = $offset + 1;
-            }
-        }
-        $segments[] = $this->argument(substr($text, $start), $baseOffset + $start);
-
-        return $segments;
-    }
-
-    private function argument(string $text, int $offset): TwigCallableArgument
-    {
-        if (1 !== preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*[:=](?![=>])/', $text, $match, \PREG_OFFSET_CAPTURE)) {
-            return new TwigCallableArgument($text, $offset);
-        }
-
-        return new TwigCallableArgument($text, $offset, $match[1][0], $offset + $match[1][1]);
     }
 
     private function maskStringContents(string $text): string

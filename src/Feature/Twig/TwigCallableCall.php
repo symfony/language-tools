@@ -2,9 +2,11 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
+use Symfony\Lsp\Parser\Twig\TwigArgument;
+
 final class TwigCallableCall
 {
-    /** @param list<TwigCallableArgument> $arguments */
+    /** @param list<TwigArgument> $arguments */
     public function __construct(
         public readonly TwigCallableKind $kind,
         public readonly string $callee,
