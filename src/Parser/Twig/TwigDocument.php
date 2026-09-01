@@ -7,8 +7,11 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterTree;
 
 final class TwigDocument
 {
-    public function __construct(private readonly string $source, private readonly TreeSitterTree $tree)
-    {
+    public function __construct(
+        private readonly string $source,
+        private readonly string $masked,
+        private readonly TreeSitterTree $tree,
+    ) {
     }
 
     public function hasErrors(): bool
@@ -112,5 +115,10 @@ final class TwigDocument
     public function text(TreeSitterNode $node): string
     {
         return $this->tree->text($node, $this->source);
+    }
+
+    public function maskedText(TreeSitterNode $node): string
+    {
+        return $this->tree->text($node, $this->masked);
     }
 }

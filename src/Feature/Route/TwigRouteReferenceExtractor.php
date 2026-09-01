@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Route;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
@@ -13,6 +14,7 @@ final class TwigRouteReferenceExtractor
     public function __construct(
         private readonly PositionConverter $positionConverter,
         private readonly TwigDocumentParser $parser,
+        private readonly TwigCallArgumentResolver $arguments,
     ) {
     }
 
@@ -26,17 +28,9 @@ final class TwigRouteReferenceExtractor
             if (null === $function || !\in_array($document->text($function), ['path', 'url'], true)) {
                 continue;
             }
-            $argumentsNode = $document->directChild($call, 'arguments');
-            if (null === $argumentsNode) {
-                continue;
-            }
-            $arguments = [];
-            foreach ($document->children($argumentsNode) as $argument) {
-                if ('argument' === $argument->type) {
-                    $arguments[] = $argument;
-                }
-            }
-            $route = isset($arguments[0]) ? $document->soleStringLiteral($arguments[0]) : null;
+            $arguments = $this->arguments->resolve($document, $call);
+            $routeArgument = $arguments->get(0, 'name');
+            $route = null === $routeArgument ? null : $document->soleStringLiteral($routeArgument);
             if (null === $route) {
                 continue;
             }
@@ -47,7 +41,7 @@ final class TwigRouteReferenceExtractor
                     $this->positionConverter->toPosition($text, $route->startOffset),
                     $this->positionConverter->toPosition($text, $route->endOffset),
                 ),
-                $this->providedParameters($document, $arguments[1] ?? null),
+                $this->providedParameters($document, $arguments->get(1, 'parameters')),
             );
         }
 

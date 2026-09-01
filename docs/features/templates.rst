@@ -19,8 +19,11 @@ calls, in the ``#[Template]`` attribute and in these Twig contexts:
 * the ``include()`` and ``source()`` functions.
 
 Both regular names such as ``article/show.html.twig`` and namespaced names such
-as ``@Admin/dashboard.html.twig`` are supported. Static names use Twig's string
-escape semantics. Completion and navigation resolve a leading ``./`` on regular
+as ``@Admin/dashboard.html.twig`` are supported. The ``include()`` and
+``source()`` functions recognize positional and named template arguments.
+Completion expects named arguments in their declared order; navigation also
+recognizes reordered named arguments. Static names use Twig's string escape
+semantics. Completion and navigation resolve a leading ``./`` on regular
 loader-root names. Before an ``@`` prefix, it keeps the name in Twig's main
 namespace.
 

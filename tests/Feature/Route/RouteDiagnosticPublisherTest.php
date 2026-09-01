@@ -25,6 +25,8 @@ use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
@@ -225,7 +227,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $converter = new PositionConverter();
             $classIndexes = new DependencyInjectionSourceIndexRegistry();
             $phpExtractor = RouteReferenceExtractorFactory::create($converter);
-            $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()));
+            $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser()));
             $templateIndexes = new TemplateIndexRegistry();
             $templateIndexes->forProject($project)->replaceRuntime(true, new TemplateDeclaration('page.html.twig', $uri, new Range(new Position(0, 0), new Position(0, 0))));
             $diagnosticProvider = new RouteDiagnosticPublisher(new DocumentContextResolver($documents, $projects), new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor, $templateIndexes);
@@ -316,7 +318,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 new RouteIndexRegistry(),
                 new DependencyInjectionSourceIndexRegistry(),
                 RouteReferenceExtractorFactory::create($positionConverter),
-                new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
+                new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser())),
                 new TemplateIndexRegistry(),
             )],
         );
@@ -417,7 +419,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 $routeIndexes,
                 new DependencyInjectionSourceIndexRegistry(),
                 RouteReferenceExtractorFactory::create($positionConverter),
-                new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())),
+                new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser())),
                 $templateIndexes,
             )],
         );

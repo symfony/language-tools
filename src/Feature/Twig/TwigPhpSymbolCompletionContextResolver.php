@@ -23,7 +23,7 @@ final class TwigPhpSymbolCompletionContextResolver
             return null;
         }
         $before = substr($masked, 0, $offset);
-        if (preg_match('~\benum\s*\(\s*(?:enum\s*:\s*)?(?<quote>[\'\"])(?<class>[A-Za-z0-9_\x7f-\xff\\\\]*)\k<quote>\s*\)\s*\.\s*(?<prefix>[A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*)?$~s', $before, $match, \PREG_OFFSET_CAPTURE)) {
+        if (preg_match('~\benum\s*\(\s*(?:enum\s*[:=]\s*)?(?<quote>[\'\"])(?<class>[A-Za-z0-9_\x7f-\xff\\\\]*)\k<quote>\s*\)\s*\.\s*(?<prefix>[A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*)?$~s', $before, $match, \PREG_OFFSET_CAPTURE)) {
             $className = $this->decodeClassName($match['class'][0]);
             $prefix = $match['prefix'][0] ?? '';
             if (null === $className) {
@@ -38,7 +38,7 @@ final class TwigPhpSymbolCompletionContextResolver
                 $className,
             );
         }
-        if (preg_match('~\bconstant\s*\(\s*(?:[A-Za-z_][A-Za-z0-9_]*\s*:\s*)?(?<quote>[\'\"])(?<value>[A-Za-z0-9_\x7f-\xff\\\\:]*)$~s', $before, $match, \PREG_OFFSET_CAPTURE)) {
+        if (preg_match('~\bconstant\s*\(\s*(?:constant\s*[:=]\s*)?(?<quote>[\'\"])(?<value>[A-Za-z0-9_\x7f-\xff\\\\:]*)$~s', $before, $match, \PREG_OFFSET_CAPTURE)) {
             $raw = $match['value'][0];
             $separator = strrpos($raw, '::');
             if (false !== $separator) {
@@ -67,7 +67,7 @@ final class TwigPhpSymbolCompletionContextResolver
                 $this->completionRange($text, $match['value'][1], $offset, true),
             );
         }
-        if (preg_match('~\b(?<function>enum_cases|enum)\s*\(\s*(?:[A-Za-z_][A-Za-z0-9_]*\s*:\s*)?(?<quote>[\'\"])(?<class>[A-Za-z0-9_\x7f-\xff\\\\]*)$~s', $before, $match, \PREG_OFFSET_CAPTURE)) {
+        if (preg_match('~\b(?<function>enum_cases|enum)\s*\(\s*(?:enum\s*[:=]\s*)?(?<quote>[\'\"])(?<class>[A-Za-z0-9_\x7f-\xff\\\\]*)$~s', $before, $match, \PREG_OFFSET_CAPTURE)) {
             $prefix = $this->decodeClassPrefix($match['class'][0]);
             if (null === $prefix) {
                 return null;

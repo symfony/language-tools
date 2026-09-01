@@ -21,8 +21,9 @@ function. Enum classes and cases are also recognized through ``enum()`` and
         {{ status.value }}
     {% endfor %}
 
-String arguments use Twig's escape semantics before PHP class and member names
-are resolved.
+Arguments are recognized positionally or by the ``constant`` and ``enum``
+names declared by the Twig functions. String arguments use Twig's escape
+semantics before PHP class and member names are resolved.
 
 Completion
 ----------

@@ -72,6 +72,7 @@ use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\LastResultTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigQuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
@@ -195,6 +196,7 @@ return static function (ContainerConfigurator $container): void {
     $services->load('Symfony\\Lsp\\Parser\\', '../src/Parser/**/*{Parser,Decoder,Locator}.php');
     $services->set(BalancedDelimiterMatcher::class);
     $services->set(QuotedArgumentMatcher::class);
+    $services->set(TwigCallArgumentResolver::class);
     $services->set(TwigQuotedArgumentMatcher::class);
     $services->set(TranslationParameterAnalyzer::class);
     $services->set(XmlCommentParser::class);

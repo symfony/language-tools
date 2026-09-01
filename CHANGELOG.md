@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recognize named arguments in Twig route, template and PHP symbol calls
 - Honor named Twig translation arguments
 - Resolve YAML merge keys during configuration diagnostics
 - Treat conventional routing files as routes during configuration diagnostics

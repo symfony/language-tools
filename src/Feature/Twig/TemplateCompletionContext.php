@@ -19,7 +19,7 @@ final class TemplateCompletionContext
         $pattern = 'php' === $languageId
             ? '/(?:(?:->|::)(?:render|renderView)\s*\(|#\[\s*(?:[^\[\]]*,\s*)?\\\\?(?:Symfony\\\\Bridge\\\\Twig\\\\Attribute\\\\)?Template\s*\(\s*(?:template\s*:)?)\s*([\'\"])([^\'\"]*)$/s'
             : ('twig' === $languageId
-                ? '/(?:(?:{%\s*(?:extends|include|embed|import|from|use)\s+)|(?:\b(?:include|source)\s*\())([\'\"])([^\'\"]*)$/s'
+                ? '/(?:(?:{%\s*(?:extends|include|embed|import|from|use)\s+)|(?:\binclude\s*\(\s*(?:template\s*[:=]\s*)?)|(?:\bsource\s*\(\s*(?:name\s*[:=]\s*)?))([\'\"])([^\'\"]*)$/s'
                 : null);
         if (null === $pattern || !preg_match($pattern, $before, $matches, \PREG_OFFSET_CAPTURE)) {
             return null;

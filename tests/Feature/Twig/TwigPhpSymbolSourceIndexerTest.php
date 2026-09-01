@@ -19,6 +19,8 @@ use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
@@ -115,7 +117,7 @@ final class TwigPhpSymbolSourceIndexerTest extends TestCase
             new TolerantPhpParser(new Parser()),
             new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
             new TwigPhpSymbolDeclarationExtractor($converter),
-            new TwigPhpSymbolReferenceExtractor($converter),
+            new TwigPhpSymbolReferenceExtractor($converter, new TwigCallArgumentResolver(new TwigArgumentParser())),
         );
     }
 
@@ -128,7 +130,7 @@ final class TwigPhpSymbolSourceIndexerTest extends TestCase
             new TolerantPhpParser(new Parser()),
             new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
             new TwigPhpSymbolDeclarationExtractor($converter),
-            new TwigPhpSymbolReferenceExtractor($converter),
+            new TwigPhpSymbolReferenceExtractor($converter, new TwigCallArgumentResolver(new TwigArgumentParser())),
             new TwigPhpSymbolCompletionContextResolver($converter, $comments, new TwigDirectiveLocator()),
         );
     }

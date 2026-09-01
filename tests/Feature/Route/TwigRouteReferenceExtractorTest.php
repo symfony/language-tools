@@ -8,6 +8,8 @@ use Symfony\Lsp\Feature\Route\RouteReference;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
@@ -15,7 +17,7 @@ final class TwigRouteReferenceExtractorTest extends TestCase
 {
     public function testExtractsPathAndUrlReferencesWithLiteralParameters(): void
     {
-        $references = (new TwigRouteReferenceExtractor(new PositionConverter(), new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())))->extract(<<<'TWIG'
+        $references = $this->extractor()->extract(<<<'TWIG'
             {# {{ path('ignored') }} #}
             {## {{ path('documented_outer') }} ##}
             {% types {
@@ -50,7 +52,7 @@ final class TwigRouteReferenceExtractorTest extends TestCase
             {{ path("say \"hi\"", {"parameter \"hi\"": value}) }}
             TWIG;
 
-        $references = (new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())))->extract($text);
+        $references = $this->extractor($converter)->extract($text);
 
         self::assertSame('say "hi"', $references[0]->name);
         self::assertSame(['parameter "hi"'], $references[0]->providedParameters);
@@ -66,7 +68,7 @@ final class TwigRouteReferenceExtractorTest extends TestCase
 
     public function testExtractsShorthandMappingParametersConservatively(): void
     {
-        $references = (new TwigRouteReferenceExtractor(new PositionConverter(), new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())))->extract(<<<'TWIG'
+        $references = $this->extractor()->extract(<<<'TWIG'
             {{ url('blog_archives', {year, month}) }}
             {{ path('blog_new_in_symfony', { version }) }}
             {{ path('legacy_doc', { version, section, page: slug, locale, orm}) }}
@@ -88,13 +90,40 @@ final class TwigRouteReferenceExtractorTest extends TestCase
         );
     }
 
+    public function testExtractsNamedRouteArguments(): void
+    {
+        $references = $this->extractor()->extract(<<<'TWIG'
+            {{ path(parameters: {'id': article.id}, name: 'article_show') }}
+            {{ url(name = 'homepage') }}
+            TWIG);
+
+        self::assertSame(
+            [
+                ['article_show', ['id']],
+                ['homepage', []],
+            ],
+            array_map(static fn (RouteReference $reference): array => [$reference->name, $reference->providedParameters], $references),
+        );
+    }
+
     public function testIgnoresUnclosedVerbatimContent(): void
     {
-        $references = (new TwigRouteReferenceExtractor(new PositionConverter(), new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser())))->extract(<<<'TWIG'
+        $references = $this->extractor()->extract(<<<'TWIG'
             {% verbatim %}
                 {{ path('ignored') }}
             TWIG);
 
         self::assertSame([], $references);
+    }
+
+    private function extractor(?PositionConverter $converter = null): TwigRouteReferenceExtractor
+    {
+        $comments = new TwigCommentParser();
+
+        return new TwigRouteReferenceExtractor(
+            $converter ?? new PositionConverter(),
+            new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
+            new TwigCallArgumentResolver(new TwigArgumentParser()),
+        );
     }
 }

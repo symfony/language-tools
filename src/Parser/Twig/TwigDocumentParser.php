@@ -14,6 +14,8 @@ final class TwigDocumentParser
 
     public function parse(string $source): TwigDocument
     {
-        return new TwigDocument($source, $this->parser->parse('twig', $this->commentParser->mask($source)));
+        $masked = $this->commentParser->mask($source);
+
+        return new TwigDocument($source, $masked, $this->parser->parse('twig', $masked));
     }
 }

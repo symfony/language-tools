@@ -14,6 +14,8 @@ use Symfony\Lsp\Feature\Twig\TwigPhpSymbolReferenceExtractor;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
@@ -46,10 +48,10 @@ final class TwigPhpSymbolExtractorTest extends TestCase
             }
             PHP;
         $twig = <<<'TWIG'
-            é {{ constant('App\\Model\\ViewOptions::FORMAT') }}
+            é {{ constant(constant = 'App\\Model\\ViewOptions::FORMAT') }}
             {{ constant("App\\Model\\Status::Published") }}
-            {{ enum('App\\Model\\Status').Published }}
-            {% for status in enum_cases('App\\Model\\Status') %}
+            {{ enum(enum = 'App\\Model\\Status').Published }}
+            {% for status in enum_cases(enum: 'App\\Model\\Status') %}
             {% endfor %}
             {{ enum(enum: 'App\\Model\\Status').Draft.name }}
             {# {{ constant('App\\Model\\ViewOptions::SECRET') }} #}
@@ -87,7 +89,10 @@ final class TwigPhpSymbolExtractorTest extends TestCase
             ['App\Model\Status', null],
             ['App\Model\Status', 'Draft'],
         ], array_map(static fn ($reference): array => [$reference->className, $reference->memberName], $twigFacts->references));
-        self::assertSame(15, $twigFacts->references[0]->range->start->character);
+        self::assertSame(
+            $converter->toPosition($twig, (int) strpos($twig, 'App\\\\Model\\\\ViewOptions'))->character,
+            $twigFacts->references[0]->range->start->character,
+        );
         foreach ($twigFacts->references as $reference) {
             $start = $converter->toByteOffset($twig, $reference->range->start);
             $end = $converter->toByteOffset($twig, $reference->range->end);
@@ -114,7 +119,7 @@ final class TwigPhpSymbolExtractorTest extends TestCase
     {
         $extractor = $this->extractor($converter = new PositionConverter());
 
-        $constantType = "{{ constant('App\\\\Mod";
+        $constantType = "{{ constant(constant = 'App\\\\Mod";
         $context = $extractor->completionContext($constantType, \strlen($constantType));
         self::assertNotNull($context);
         self::assertSame(TwigPhpSymbolCompletionKind::ConstantType, $context->kind);
@@ -127,13 +132,13 @@ final class TwigPhpSymbolExtractorTest extends TestCase
         self::assertSame('App\Model\ViewOptions', $context->className);
         self::assertSame('FO', $context->prefix);
 
-        $enumType = "{{ enum_cases('App\\\\Model\\\\St";
+        $enumType = "{{ enum_cases(enum: 'App\\\\Model\\\\St";
         $context = $extractor->completionContext($enumType, \strlen($enumType));
         self::assertNotNull($context);
         self::assertSame(TwigPhpSymbolCompletionKind::EnumType, $context->kind);
         self::assertSame('App\Model\St', $context->prefix);
 
-        $enumCase = "{{ enum('App\\\\Model\\\\Status').Pu";
+        $enumCase = "{{ enum(enum = 'App\\\\Model\\\\Status').Pu";
         $context = $extractor->completionContext($enumCase, \strlen($enumCase));
         self::assertNotNull($context);
         self::assertSame(TwigPhpSymbolCompletionKind::EnumCase, $context->kind);
@@ -142,6 +147,8 @@ final class TwigPhpSymbolExtractorTest extends TestCase
 
         $comment = "{# {{ enum('App\\\\Model\\\\Status').Pu";
         self::assertNull($extractor->completionContext($comment, \strlen($comment)));
+        $unknownArgument = "{{ constant(name: 'App";
+        self::assertNull($extractor->completionContext($unknownArgument, \strlen($unknownArgument)));
         self::assertNull($extractor->completionContext('Plain constant(\'App', \strlen('Plain constant(\'App')));
     }
 
@@ -154,7 +161,7 @@ final class TwigPhpSymbolExtractorTest extends TestCase
             new TolerantPhpParser(new Parser()),
             new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
             new TwigPhpSymbolDeclarationExtractor($converter),
-            new TwigPhpSymbolReferenceExtractor($converter),
+            new TwigPhpSymbolReferenceExtractor($converter, new TwigCallArgumentResolver(new TwigArgumentParser())),
             new TwigPhpSymbolCompletionContextResolver($converter, $comments, new TwigDirectiveLocator()),
         );
     }

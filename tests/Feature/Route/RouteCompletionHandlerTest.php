@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Feature\Route;
 
 use Microsoft\PhpParser\Parser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -88,10 +89,10 @@ final class RouteCompletionHandlerTest extends TestCase
         ]) ?? [], 'label'));
     }
 
-    public function testCompletesRouteNamesInTwigFunctions(): void
+    #[DataProvider('twigRouteNameCompletionProvider')]
+    public function testCompletesRouteNamesInTwigFunctions(string $text): void
     {
         $uri = 'file:///workspace/templates/article.html.twig';
-        $text = "{{ path('article_') }}";
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'twig', 1, $text));
         $projects = new ProjectRegistry();
@@ -112,10 +113,10 @@ final class RouteCompletionHandlerTest extends TestCase
         ]) ?? [], 'label'));
     }
 
-    public function testCompletesRouteParametersInTwigFunctions(): void
+    #[DataProvider('twigRouteParameterCompletionProvider')]
+    public function testCompletesRouteParametersInTwigFunctions(string $text): void
     {
         $uri = 'file:///workspace/templates/article.html.twig';
-        $text = "{{ path('article_show', {'section': 'news', 's') }}";
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'twig', 1, $text));
         $projects = new ProjectRegistry();
@@ -257,6 +258,20 @@ final class RouteCompletionHandlerTest extends TestCase
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
         ]));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function twigRouteNameCompletionProvider(): iterable
+    {
+        yield 'positional' => ["{{ path('article_') }}"];
+        yield 'named' => ["{{ path(name: 'article_') }}"];
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function twigRouteParameterCompletionProvider(): iterable
+    {
+        yield 'positional' => ["{{ path('article_show', {'section': 'news', 's') }}"];
+        yield 'named' => ["{{ path(name = 'article_show', parameters = {'section': 'news', 's') }}"];
     }
 
     private function handler(

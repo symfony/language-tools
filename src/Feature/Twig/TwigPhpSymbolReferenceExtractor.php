@@ -4,13 +4,16 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigStringLiteral;
 
 final class TwigPhpSymbolReferenceExtractor
 {
-    public function __construct(private readonly PositionConverter $converter)
-    {
+    public function __construct(
+        private readonly PositionConverter $converter,
+        private readonly TwigCallArgumentResolver $arguments,
+    ) {
     }
 
     /** @return list<TwigPhpSymbolReference> */
@@ -22,8 +25,8 @@ final class TwigPhpSymbolReferenceExtractor
             if (null === $function || !\in_array($name = $document->text($function), ['constant', 'enum', 'enum_cases'], true)) {
                 continue;
             }
-            $arguments = $document->directChild($call, 'arguments');
-            $argument = null === $arguments ? null : $document->directChild($arguments, 'argument');
+            $arguments = $this->arguments->resolve($document, $call);
+            $argument = $arguments->get(0, 'constant' === $name ? 'constant' : 'enum');
             $literal = null === $argument ? null : $document->soleStringLiteral($argument);
             if (null === $literal) {
                 continue;

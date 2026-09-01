@@ -19,7 +19,7 @@ final class TwigRouteCompletionContext
         $cursor = $positionConverter->toByteOffset($text, $position);
         $beforeCursor = substr($text, 0, $cursor);
         if (!preg_match(
-            '/\b(?:path|url)\s*\(\s*([\'\"])([^\'\"]*)$/s',
+            '/\b(?:path|url)\s*\(\s*(?:name\s*[:=]\s*)?([\'\"])([^\'\"]*)$/s',
             $beforeCursor,
             $matches,
             \PREG_OFFSET_CAPTURE,

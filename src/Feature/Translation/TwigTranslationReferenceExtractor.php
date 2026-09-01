@@ -4,7 +4,7 @@ namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
-use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
@@ -16,7 +16,7 @@ final class TwigTranslationReferenceExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly TwigDocumentParser $parser,
-        private readonly TwigArgumentParser $argumentParser,
+        private readonly TwigCallArgumentResolver $arguments,
         private readonly TwigCommentParser $comments,
         private readonly TranslationParameterAnalyzer $parameters,
     ) {
@@ -74,8 +74,8 @@ final class TwigTranslationReferenceExtractor
             if (null === $key) {
                 continue;
             }
-            $arguments = $this->arguments($masked, $document, $filter);
-            $domain = $this->domain($document, $this->argument($arguments, 1, ['domain']), $defaultDomain);
+            $arguments = $this->arguments->resolve($document, $filter);
+            $domain = $this->domain($document, $arguments->get(1, 'domain'), $defaultDomain);
             if (null === $domain) {
                 continue;
             }
@@ -84,7 +84,7 @@ final class TwigTranslationReferenceExtractor
                 $domain,
                 $uri,
                 $text,
-                $this->parameters->twig($document, $this->argument($arguments, 0, ['arguments', 'parameters'])),
+                $this->parameters->twig($document, $arguments->get(0, 'arguments', 'parameters')),
             );
         }
 
@@ -122,10 +122,10 @@ final class TwigTranslationReferenceExtractor
             if (null === $identifier || !\in_array($document->text($identifier), ['trans', 't'], true)) {
                 continue;
             }
-            $arguments = $this->arguments($masked, $document, $call);
-            $keyArgument = $this->argument($arguments, 0, ['id', 'message']);
+            $arguments = $this->arguments->resolve($document, $call);
+            $keyArgument = $arguments->get(0, 'id', 'message');
             $key = null === $keyArgument ? null : $document->soleStringLiteral($keyArgument);
-            $domain = $this->domain($document, $this->argument($arguments, 2, ['domain']), $defaultDomain);
+            $domain = $this->domain($document, $arguments->get(2, 'domain'), $defaultDomain);
             if (null === $key || null === $domain) {
                 continue;
             }
@@ -134,68 +134,11 @@ final class TwigTranslationReferenceExtractor
                 $domain,
                 $uri,
                 $text,
-                $this->parameters->twig($document, $this->argument($arguments, 1, ['arguments', 'parameters'])),
+                $this->parameters->twig($document, $arguments->get(1, 'arguments', 'parameters')),
             );
         }
 
         return $references;
-    }
-
-    /** @return list<array{name: string|null, value: TreeSitterNode}> */
-    private function arguments(string $masked, TwigDocument $document, TreeSitterNode $call): array
-    {
-        $container = $document->directChild($call, 'arguments');
-        if (null === $container) {
-            return [];
-        }
-
-        $text = substr($masked, $container->startByte, $container->endByte - $container->startByte);
-        $offset = $container->startByte;
-        if (str_starts_with($text, '(')) {
-            $text = substr($text, 1);
-            ++$offset;
-        }
-        if (str_ends_with($text, ')')) {
-            $text = substr($text, 0, -1);
-        }
-
-        $parsed = $this->argumentParser->parse($text, $offset);
-        $arguments = [];
-        foreach ($document->children($container) as $child) {
-            if ('argument' !== $child->type) {
-                continue;
-            }
-            $value = $document->directChild($child, 'argument_value') ?? $child;
-            $name = null;
-            foreach ($parsed as $argument) {
-                if ($value->startByte >= $argument->offset && $value->startByte < $argument->offset + \strlen($argument->text)) {
-                    $name = $argument->name;
-
-                    break;
-                }
-            }
-            $arguments[] = ['name' => $name, 'value' => $value];
-        }
-
-        return $arguments;
-    }
-
-    /**
-     * @param list<array{name: string|null, value: TreeSitterNode}> $arguments
-     * @param list<string>                                          $names
-     */
-    private function argument(array $arguments, int $position, array $names): ?TreeSitterNode
-    {
-        $positional = [];
-        foreach ($arguments as $argument) {
-            if (null === $argument['name']) {
-                $positional[] = $argument['value'];
-            } elseif (\in_array($argument['name'], $names, true)) {
-                return $argument['value'];
-            }
-        }
-
-        return $positional[$position] ?? null;
     }
 
     private function domain(TwigDocument $document, ?TreeSitterNode $argument, string $defaultDomain): ?string
