@@ -14,8 +14,9 @@ when they are the first argument, either positionally or as ``id:`` for
 ``trans()`` and ``message:`` for ``t()`` and ``TranslatableMessage``. Literal
 PHP domains are recognized in positional and named arguments, including after
 dynamic parameter expressions. Literal Twig keys follow Twig's string escape
-rules in completion and navigation. Domain, locale and message placeholder
-completion are available in statically recognized call arguments.
+rules in completion and navigation. Literal Twig domains are recognized in
+positional and named ``trans`` filter arguments. Domain, locale and message
+placeholder completion are available in statically recognized call arguments.
 
 Resources
 ---------

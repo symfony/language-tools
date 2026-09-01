@@ -279,6 +279,21 @@ final class TranslationProviderTest extends TestCase
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
+    public function testHonorsNamedTwigTranslationDomainsInsideComponents(): void
+    {
+        $uri = 'file:///workspace/templates/base.html.twig';
+        $text = <<<'TWIG'
+            <twig:Button>
+                {{ 'panel.title'|trans(domain: 'admin') }}
+                {{ 'panel.title'|trans(domain = 'admin') }}
+            </twig:Button>
+            TWIG;
+        [$provider, , $configuration, $project] = $this->provider($uri, $text, 'twig');
+        $configuration->configure($project, true);
+
+        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
     public function testTreatsDynamicPhpTranslationStringsConservatively(): void
     {
         $uri = 'file:///workspace/src/Controller.php';

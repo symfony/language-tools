@@ -73,7 +73,7 @@ final class TwigTranslationReferenceExtractor
                 continue;
             }
             $arguments = $this->arguments($document, $filter);
-            $domain = $this->domain($document, $arguments[1] ?? null, $defaultDomain);
+            $domain = $this->domain($document, $this->argument($arguments, 1, ['domain']), $defaultDomain);
             if (null === $domain) {
                 continue;
             }
@@ -82,7 +82,7 @@ final class TwigTranslationReferenceExtractor
                 $domain,
                 $uri,
                 $text,
-                $this->parameters->twig($document, $arguments[0] ?? null),
+                $this->parameters->twig($document, $this->argument($arguments, 0, ['arguments', 'parameters'])),
             );
         }
 
@@ -121,8 +121,10 @@ final class TwigTranslationReferenceExtractor
                 continue;
             }
             $arguments = $this->arguments($document, $call);
-            $key = isset($arguments[0]) ? $document->soleStringLiteral($arguments[0]) : null;
-            if (null === $key || null === $domain = $this->domain($document, $arguments[2] ?? null, $defaultDomain)) {
+            $keyArgument = $this->argument($arguments, 0, ['id', 'message']);
+            $key = null === $keyArgument ? null : $document->soleStringLiteral($keyArgument);
+            $domain = $this->domain($document, $this->argument($arguments, 2, ['domain']), $defaultDomain);
+            if (null === $key || null === $domain) {
                 continue;
             }
             $references[] = $this->reference(
@@ -130,14 +132,14 @@ final class TwigTranslationReferenceExtractor
                 $domain,
                 $uri,
                 $text,
-                $this->parameters->twig($document, $arguments[1] ?? null),
+                $this->parameters->twig($document, $this->argument($arguments, 1, ['arguments', 'parameters'])),
             );
         }
 
         return $references;
     }
 
-    /** @return list<TreeSitterNode> */
+    /** @return list<array{name: string|null, value: TreeSitterNode}> */
     private function arguments(TwigDocument $document, TreeSitterNode $call): array
     {
         $container = $document->directChild($call, 'arguments');
@@ -145,10 +147,46 @@ final class TwigTranslationReferenceExtractor
             return [];
         }
 
-        return array_values(array_filter(
-            $document->children($container),
-            static fn (TreeSitterNode $node): bool => 'argument' === $node->type,
-        ));
+        $arguments = [];
+        $recoveredName = null;
+        foreach ($document->children($container) as $child) {
+            if ('argument' !== $child->type) {
+                $recoveredName = $this->argumentName($document, $child);
+
+                continue;
+            }
+            $name = $document->directChild($child, 'argument_name');
+            $arguments[] = [
+                'name' => null === $name ? $recoveredName : $this->argumentName($document, $name),
+                'value' => $document->directChild($child, 'argument_value') ?? $child,
+            ];
+            $recoveredName = null;
+        }
+
+        return $arguments;
+    }
+
+    private function argumentName(TwigDocument $document, TreeSitterNode $node): ?string
+    {
+        return 1 === preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*[:=]\s*$/D', $document->text($node), $match) ? $match[1] : null;
+    }
+
+    /**
+     * @param list<array{name: string|null, value: TreeSitterNode}> $arguments
+     * @param list<string>                                          $names
+     */
+    private function argument(array $arguments, int $position, array $names): ?TreeSitterNode
+    {
+        $positional = [];
+        foreach ($arguments as $argument) {
+            if (null === $argument['name']) {
+                $positional[] = $argument['value'];
+            } elseif (\in_array($argument['name'], $names, true)) {
+                return $argument['value'];
+            }
+        }
+
+        return $positional[$position] ?? null;
     }
 
     private function domain(TwigDocument $document, ?TreeSitterNode $argument, string $defaultDomain): ?string

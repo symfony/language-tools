@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Honor named Twig translation arguments
 - Resolve YAML merge keys during configuration diagnostics
 - Treat conventional routing files as routes during configuration diagnostics
 - Test Sulu Skeleton in the public dogfood matrix

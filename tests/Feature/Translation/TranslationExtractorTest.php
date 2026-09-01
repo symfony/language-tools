@@ -327,6 +327,7 @@ final class TranslationExtractorTest extends TestCase
             {% trans_default_domain 'admin' %}
             {{ 'filter.key'|trans }}
             {{ t('function.key') }}
+            {{ t(message: 'named.function.key', domain: 'admin') }}
             {% trans from 'tags' %} tag.key {% endtrans %}
             TWIG)->references;
 
@@ -334,6 +335,7 @@ final class TranslationExtractorTest extends TestCase
             [
                 ['filter.key', 'admin'],
                 ['function.key', 'admin'],
+                ['named.function.key', 'admin'],
                 ['tag.key', 'tags'],
             ],
             array_map(static fn ($reference): array => [$reference->key, $reference->domain], $references),
