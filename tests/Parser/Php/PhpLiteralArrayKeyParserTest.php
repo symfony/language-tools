@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Parser\Php;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
+use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 
 final class PhpLiteralArrayKeyParserTest extends TestCase
 {
@@ -15,26 +16,54 @@ final class PhpLiteralArrayKeyParserTest extends TestCase
             'query' => ['locale' => 'fr', ...$parts],
             PHP;
 
-        self::assertSame(['id', 'query'], $parser->parse($items, allowNestedUnpacking: true));
+        self::assertSame(['id', 'query'], $this->values($parser->parse($items, allowNestedUnpacking: true)));
         self::assertNull($parser->parse($items, allowNestedUnpacking: false));
         self::assertNull($parser->parse("'id' => 1, ...\$parameters", allowNestedUnpacking: true));
         self::assertSame(
             ['id', 'after'],
-            $parser->parse("'id' => 1, \$dynamic => 2, ...\$parameters, 'after' => 3", allowNestedUnpacking: true, collectPartialLiteralKeys: true),
+            $this->values($parser->parse("'id' => 1, \$dynamic => 2, ...\$parameters, 'after' => 3", allowNestedUnpacking: true, collectPartialLiteralKeys: true)),
         );
     }
 
-    public function testDecodesKeysAndRejectsDynamicKeys(): void
+    public function testDecodesKeysAndPreservesRawSourceOffsets(): void
     {
         $parser = new PhpLiteralArrayKeyParser();
+        $prefix = 'before ';
+        $items = <<<'PHP'
+            'it\'s' => [']', ',' => 'nested'],
+            "line\nkey" => 'value, with => delimiters',
+            PHP;
+        $source = $prefix.$items;
+        $keys = $parser->parse($items, allowNestedUnpacking: true, sourceOffset: \strlen($prefix));
 
-        self::assertSame(
-            ["it's", "line\nkey"],
-            $parser->parse(<<<'PHP'
-                'it\'s' => 1,
-                "line\nkey" => 2,
-                PHP, allowNestedUnpacking: true),
-        );
-        self::assertNull($parser->parse('$key => 1', allowNestedUnpacking: true));
+        self::assertSame(["it's", "line\nkey"], $this->values($keys));
+        self::assertSame(["it\\'s", 'line\\nkey'], array_map(
+            static fn (PhpStringLiteral $key): string => substr($source, $key->startOffset, $key->endOffset - $key->startOffset),
+            $keys ?? [],
+        ));
+    }
+
+    public function testRejectsDynamicKeysUnlessPartialCollectionIsRequested(): void
+    {
+        $parser = new PhpLiteralArrayKeyParser();
+        $items = <<<'PHP'
+            'before' => 1,
+            key('with, delimiter') => 2,
+            "{$prefix}dynamic" => 3,
+            'after' => 4,
+            PHP;
+
+        self::assertNull($parser->parse($items, allowNestedUnpacking: true));
+        self::assertSame(['before', 'after'], $this->values($parser->parse($items, allowNestedUnpacking: true, collectPartialLiteralKeys: true)));
+    }
+
+    /**
+     * @param list<PhpStringLiteral>|null $keys
+     *
+     * @return list<string>|null
+     */
+    private function values(?array $keys): ?array
+    {
+        return null === $keys ? null : array_map(static fn (PhpStringLiteral $key): string => $key->value, $keys);
     }
 }

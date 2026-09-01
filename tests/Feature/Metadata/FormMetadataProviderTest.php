@@ -283,6 +283,69 @@ final class FormMetadataProviderTest extends MetadataTestCase
         self::assertSame(strpos($text, "'required'") + 1, $converter->toByteOffset($text, $options[1]['range']->start));
     }
 
+    public function testDecodesLiteralOptionKeysAroundDynamicArrayEntries(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = $this->createExtractor($converter);
+        $text = <<<'PHP'
+            <?php
+            use App\Form\EventType;
+
+            $this->createForm(EventType::class, null, [
+                "requ\x69red" => true,
+                'attr' => ['data-pattern' => 'prefix,]=>suffix'],
+                $dynamic => false,
+                ...$options,
+                'after' => true,
+            ]);
+            PHP;
+
+        $options = $extractor->formOptions($text);
+
+        self::assertSame(['required', 'attr', 'after'], array_column($options, 'option'));
+        self::assertSame('requ\\x69red', substr(
+            $text,
+            $converter->toByteOffset($text, $options[0]['range']->start),
+            $converter->toByteOffset($text, $options[0]['range']->end) - $converter->toByteOffset($text, $options[0]['range']->start),
+        ));
+    }
+
+    public function testKeepsDynamicDefaultsConservative(): void
+    {
+        $extractor = $this->createExtractor(new PositionConverter());
+        $text = <<<'PHP'
+            <?php
+            namespace App\Form;
+
+            use App\Dto\Article;
+            use Symfony\Component\OptionsResolver\OptionsResolver;
+
+            final class DynamicDefaultsType
+            {
+                public function configureOptions(OptionsResolver $resolver): void
+                {
+                    $resolver->setDefaults([
+                        'data_class' => Article::class,
+                        $dynamic => true,
+                    ]);
+                }
+            }
+
+            final class UnpackedDefaultsType
+            {
+                public function configureOptions(OptionsResolver $resolver): void
+                {
+                    $resolver->setDefaults([
+                        'data_class' => Article::class,
+                        ...$defaults,
+                    ]);
+                }
+            }
+            PHP;
+
+        self::assertSame([], $extractor->extract(new SourceDocument('file:///workspace/src/Form/Types.php', 'php', $text))->formDataClasses);
+    }
+
     public function testIgnoresNamedArgumentsInPositionalMetadataSlots(): void
     {
         $converter = new PositionConverter();

@@ -51,6 +51,6 @@ final class RouteParameterKeyExtractor
     {
         $keys = $this->arrayKeys->parse($parameters, allowNestedUnpacking: true);
 
-        return null === $keys ? null : array_values(array_unique($keys));
+        return null === $keys ? null : array_values(array_unique(array_map(static fn ($key): string => $key->value, $keys)));
     }
 }

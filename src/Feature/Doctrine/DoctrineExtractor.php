@@ -10,8 +10,11 @@ use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpPropertyDeclaration;
+use Symfony\Lsp\Parser\Php\PhpStringLiteral;
+use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
 
 final class DoctrineExtractor
@@ -23,6 +26,7 @@ final class DoctrineExtractor
         private readonly PhpParserInterface $phpParser,
         private readonly PhpCommentParserInterface $phpComments,
         private readonly DoctrineRepositoryReceiverResolver $repositoryReceivers,
+        private readonly PhpLiteralArrayKeyParser $arrayKeys,
     ) {
     }
 
@@ -236,9 +240,7 @@ final class DoctrineExtractor
                 continue;
             }
             $entity = $this->arrayClassReference($source, $php, $options, 'class');
-            $expression = $options->expression;
-            $offset = $options->expressionStartOffset;
-            if (null === $entity || !\is_string($expression) || !\is_int($offset)) {
+            if (null === $entity) {
                 continue;
             }
             $entityClass = $entity->className;
@@ -250,9 +252,21 @@ final class DoctrineExtractor
                 $this->converter->toRange($text, $entity->startOffset, $entity->endOffset - $entity->startOffset),
                 false,
             );
-            preg_match_all('/[\'"](?:choice_label|choice_value|group_by)[\'"]\s*=>\s*([\'"])([A-Za-z_][A-Za-z0-9_]*)\1/', $expression, $fields, \PREG_OFFSET_CAPTURE);
-            foreach ($fields[2] as [$field, $fieldOffset]) {
-                $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, $field, $entityClass, $uri, $this->converter->toRange($text, $offset + $fieldOffset, \strlen($field)), false);
+            foreach ($this->literalArrayKeys($options, collectPartialLiteralKeys: true) ?? [] as $key) {
+                if (!\in_array($key->value, ['choice_label', 'choice_value', 'group_by'], true)
+                    || null === ($field = $this->literalArrayStringValue($source, $key))
+                    || 1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $field->value)
+                ) {
+                    continue;
+                }
+                $symbols[] = new DoctrineSourceSymbol(
+                    DoctrineSymbolKind::Field,
+                    $field->value,
+                    $entityClass,
+                    $uri,
+                    $this->converter->toRange($text, $field->startOffset, $field->endOffset - $field->startOffset),
+                    false,
+                );
             }
         }
 
@@ -295,10 +309,19 @@ final class DoctrineExtractor
         if (!\is_string($array) || !\is_int($offset) || !preg_match('/^\s*\[/', $array)) {
             return [];
         }
-        preg_match_all('/([\'"])([A-Za-z_][A-Za-z0-9_]*)\1\s*=>/', $array, $keys, \PREG_OFFSET_CAPTURE);
         $symbols = [];
-        foreach ($keys[2] as [$field, $fieldOffset]) {
-            $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, $field, $owner, $uri, $this->converter->toRange($text, $offset + $fieldOffset, \strlen($field)), false);
+        foreach ($this->literalArrayKeys($argument, collectPartialLiteralKeys: true) ?? [] as $key) {
+            if (1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $key->value)) {
+                continue;
+            }
+            $symbols[] = new DoctrineSourceSymbol(
+                DoctrineSymbolKind::Field,
+                $key->value,
+                $owner,
+                $uri,
+                $this->converter->toRange($text, $key->startOffset, $key->endOffset - $key->startOffset),
+                false,
+            );
         }
 
         return $symbols;
@@ -371,18 +394,81 @@ final class DoctrineExtractor
         if (!\is_int($start) || !\is_int($end)) {
             return null;
         }
-        foreach ($php->classReferences as $reference) {
-            if ($reference->startOffset < $start || $reference->endOffset > $end) {
+        foreach ($this->literalArrayKeys($argument, collectPartialLiteralKeys: true) ?? [] as $literalKey) {
+            if ($key !== $literalKey->value) {
                 continue;
             }
-            $before = substr($source, $start, $reference->startOffset - $start);
-            $boundary = max((int) strrpos($before, ','), (int) strrpos($before, '['));
-            if (1 === preg_match('/[\'"]'.preg_quote($key, '/').'[\'"]\s*=>\s*$/', substr($before, $boundary + 1))) {
-                return $reference;
+            foreach ($php->classReferences as $reference) {
+                if ($reference->startOffset < $start || $reference->endOffset > $end || $reference->startOffset <= $literalKey->endOffset) {
+                    continue;
+                }
+                if (1 === preg_match('/^\s*=>\s*$/', substr($source, $literalKey->endOffset + 1, $reference->startOffset - $literalKey->endOffset - 1))) {
+                    return $reference;
+                }
             }
         }
 
         return null;
+    }
+
+    /** @return list<PhpStringLiteral>|null */
+    private function literalArrayKeys(PhpArgument $argument, bool $collectPartialLiteralKeys = false): ?array
+    {
+        $expression = $argument->expression;
+        $offset = $argument->expressionStartOffset;
+        if (!\is_string($expression) || !\is_int($offset) || !preg_match('/^\\s*\\[/', $expression, $open, \PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+        $itemsOffset = $open[0][1] + \strlen($open[0][0]);
+        $items = rtrim(substr($expression, $itemsOffset));
+        if (str_ends_with($items, ']')) {
+            $items = substr($items, 0, -1);
+        }
+
+        return $this->arrayKeys->parse(
+            $items,
+            allowNestedUnpacking: true,
+            collectPartialLiteralKeys: $collectPartialLiteralKeys,
+            sourceOffset: $offset + $itemsOffset,
+        );
+    }
+
+    private function literalArrayStringValue(string $source, PhpStringLiteral $key): ?PhpStringLiteral
+    {
+        $sourceOffset = $key->endOffset + 1;
+        $prefix = '<?php ';
+        $value = null;
+        $afterArrow = false;
+        foreach (\PhpToken::tokenize($prefix.substr($source, $sourceOffset)) as $token) {
+            if ($token->is([\T_OPEN_TAG, \T_WHITESPACE, \T_COMMENT, \T_DOC_COMMENT])) {
+                continue;
+            }
+            if (!$afterArrow) {
+                if (\T_DOUBLE_ARROW !== $token->id) {
+                    return null;
+                }
+                $afterArrow = true;
+
+                continue;
+            }
+            if (null === $value) {
+                if (\T_CONSTANT_ENCAPSED_STRING !== $token->id) {
+                    return null;
+                }
+                $startOffset = $sourceOffset + $token->pos - \strlen($prefix) + 1;
+                $value = new PhpStringLiteral(
+                    PhpStringLiteralDecoder::decode($token->text[0], substr($token->text, 1, -1)),
+                    $startOffset,
+                    $startOffset + \strlen($token->text) - 2,
+                );
+
+                continue;
+            }
+
+            return \in_array($token->text, [',', ']'], true) ? $value : null;
+        }
+
+        return $value;
     }
 
     /** @param list<PhpAttribute> $attributes */

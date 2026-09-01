@@ -144,7 +144,7 @@ final class TemplateReferenceExtractor
             return [];
         }
 
-        return array_values(array_unique(array_filter($keys, static fn (string $key): bool => '' !== $key)));
+        return array_values(array_unique(array_filter(array_map(static fn ($key): string => $key->value, $keys), static fn (string $key): bool => '' !== $key)));
     }
 
     /** @return list<string> */

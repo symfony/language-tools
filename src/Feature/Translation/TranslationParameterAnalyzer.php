@@ -23,7 +23,7 @@ final class TranslationParameterAnalyzer
 
         $keys = $this->arrayKeys->parse(substr($expression, 1, -1), allowNestedUnpacking: false);
 
-        return null === $keys ? null : $this->normalize($keys);
+        return null === $keys ? null : $this->normalize(array_map(static fn ($key): string => $key->value, $keys));
     }
 
     /** @return list<string>|null */

@@ -8,7 +8,9 @@ use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
+use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 use Symfony\Lsp\Parser\Php\PhpTypedVariable;
 use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
@@ -17,6 +19,7 @@ final class FormMetadataExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly BalancedDelimiterMatcher $delimiters,
+        private readonly PhpLiteralArrayKeyParser $arrayKeys,
     ) {
     }
 
@@ -135,8 +138,12 @@ final class FormMetadataExtractor
             if (null === $type || null === $argument) {
                 continue;
             }
-            foreach ($this->arrayKeys($text, $argument) as $key) {
-                $options[] = ['class' => $type->className, 'option' => $key['name'], 'range' => $key['range']];
+            foreach ($this->literalArrayKeys($argument, collectPartialLiteralKeys: true) ?? [] as $key) {
+                $options[] = [
+                    'class' => $type->className,
+                    'option' => $key->value,
+                    'range' => $this->converter->toRange($text, $key->startOffset, $key->endOffset - $key->startOffset),
+                ];
             }
         }
 
@@ -376,17 +383,31 @@ final class FormMetadataExtractor
         if (!preg_match('/^\\s*\\[(.*)\\]\\s*$/s', $text, $array, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
+        $items = $array[1][0];
+        $itemsOffset = $base + $array[1][1];
+        $keys = $this->arrayKeys->parse($items, allowNestedUnpacking: true, sourceOffset: $itemsOffset);
+        if (null === $keys) {
+            return null;
+        }
+        $arguments = array_values(array_filter(
+            $this->arguments($items, $itemsOffset),
+            static fn (array $entry): bool => '' !== trim($entry['text']),
+        ));
+        if (\count($arguments) !== \count($keys)) {
+            return null;
+        }
         $entries = [];
-        foreach ($this->arguments($array[1][0], $base + $array[1][1]) as $entry) {
-            if ('' === trim($entry['text'])) {
-                continue;
-            }
-            if (!preg_match('/^\\s*((?:"[^"]*")|(?:\'[^\']*\'))\\s*=>\\s*(.*?)\\s*$/s', $entry['text'], $match, \PREG_OFFSET_CAPTURE)
-                || null === ($key = $this->quotedIdentifier($match[1][0]))
-            ) {
+        foreach ($arguments as $index => $entry) {
+            $key = $keys[$index];
+            $entryEnd = $entry['offset'] + \strlen($entry['text']);
+            if ($key->startOffset < $entry['offset'] || $key->endOffset >= $entryEnd || 1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $key->value)) {
                 return null;
             }
-            $entries[$key] = ['text' => $match[2][0], 'offset' => $entry['offset'] + $match[2][1]];
+            $tailOffset = $key->endOffset - $entry['offset'] + 1;
+            if (!preg_match('/^\\s*=>\\s*(.*?)\\s*$/s', substr($entry['text'], $tailOffset), $match, \PREG_OFFSET_CAPTURE)) {
+                return null;
+            }
+            $entries[$key->value] = ['text' => $match[1][0], 'offset' => $entry['offset'] + $tailOffset + $match[1][1]];
         }
 
         return $entries;
@@ -504,43 +525,26 @@ final class FormMetadataExtractor
         return $arguments;
     }
 
-    /** @return list<array{name: string, range: Range}> */
-    private function arrayKeys(string $document, PhpArgument $argument): array
+    /** @return list<PhpStringLiteral>|null */
+    private function literalArrayKeys(PhpArgument $argument, bool $collectPartialLiteralKeys = false): ?array
     {
-        $text = $argument->expression;
+        $expression = $argument->expression;
         $offset = $argument->expressionStartOffset;
-        if (!\is_string($text) || !\is_int($offset)) {
-            return [];
+        if (!\is_string($expression) || !\is_int($offset) || !preg_match('/^\\s*\\[/', $expression, $open, \PREG_OFFSET_CAPTURE)) {
+            return null;
         }
-        if (!preg_match('/^\s*\[/', $text, $open, \PREG_OFFSET_CAPTURE)) {
-            return [];
-        }
-        $keys = [];
-        $depth = 0;
-        $length = \strlen($text);
-        for ($index = 0; $index < $length; ++$index) {
-            $character = $text[$index];
-            if ('"' === $character || "'" === $character) {
-                $end = $index + 1;
-                while ($end < $length && $text[$end] !== $character) {
-                    $end += '\\' === $text[$end] ? 2 : 1;
-                }
-                if (1 === $depth && $end < $length && preg_match('/^\s*=>/', substr($text, $end + 1))) {
-                    $name = substr($text, $index + 1, $end - $index - 1);
-                    $absolute = $offset + $index + 1;
-                    $keys[] = ['name' => $name, 'range' => $this->converter->toRange($document, $absolute, \strlen($name))];
-                }
-                $index = $end;
-                continue;
-            }
-            if ('[' === $character) {
-                ++$depth;
-            } elseif (']' === $character) {
-                --$depth;
-            }
+        $itemsOffset = $open[0][1] + \strlen($open[0][0]);
+        $items = rtrim(substr($expression, $itemsOffset));
+        if (str_ends_with($items, ']')) {
+            $items = substr($items, 0, -1);
         }
 
-        return $keys;
+        return $this->arrayKeys->parse(
+            $items,
+            allowNestedUnpacking: true,
+            collectPartialLiteralKeys: $collectPartialLiteralKeys,
+            sourceOffset: $offset + $itemsOffset,
+        );
     }
 
     private function context(MetadataCompletionKind $kind, string $prefix, string $text, int $offset, ?string $owner = null): MetadataCompletionContext

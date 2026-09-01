@@ -23,6 +23,7 @@ use Symfony\Lsp\Feature\Doctrine\DoctrineSymbolKind;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -119,7 +120,7 @@ final class DoctrineProviderTest extends TestCase
             PHP;
 
         $converter = new PositionConverter();
-        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
+        $extractor = $this->extractor($converter);
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -186,7 +187,7 @@ final class DoctrineProviderTest extends TestCase
     public function testUsesPropertyPlacementAndScopedRepositoryReceivers(): void
     {
         $converter = new PositionConverter();
-        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
+        $extractor = $this->extractor($converter);
         $entityText = <<<'PHP'
             <?php
             namespace App\Entity;
@@ -254,7 +255,7 @@ final class DoctrineProviderTest extends TestCase
 
     public function testRecognizesPromotedMappedFields(): void
     {
-        $extractor = new DoctrineExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App\Entity;
@@ -284,7 +285,7 @@ final class DoctrineProviderTest extends TestCase
 
     public function testScopesRepositoryCompletionToTheContainingMethod(): void
     {
-        $extractor = new DoctrineExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App\Service;
@@ -314,7 +315,7 @@ final class DoctrineProviderTest extends TestCase
 
     public function testScopesThisRepositoryCompletionToTheContainingClass(): void
     {
-        $extractor = new DoctrineExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App\Repository;
@@ -354,7 +355,7 @@ final class DoctrineProviderTest extends TestCase
 
     public function testIgnoresNamedArgumentsInPositionalDoctrineSlots(): void
     {
-        $extractor = new DoctrineExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             use App\Entity\Product;
@@ -371,10 +372,64 @@ final class DoctrineProviderTest extends TestCase
         self::assertSame([], $extractor->extract(new SourceDocument('file:///workspace/src/Usage.php', 'php', $text))->symbols);
     }
 
+    public function testExtractsConservativeDecodedLiteralArrayFacts(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = $this->extractor($converter);
+        $text = <<<'PHP'
+            <?php
+            namespace App\Service;
+
+            use App\Entity\Product;
+            use App\Repository\ProductRepository;
+            use Symfony\Bridge\Doctrine\Form\Type\EntityType;
+
+            function inspect(object $builder, ProductRepository $products, array $options, array $criteria, string $dynamic): void
+            {
+                $builder->add('product', EntityType::class, [
+                    'metadata' => [']' => ', =>'],
+                    "cl\x61ss" => Product::class,
+                    'choice_label' => "na\x6de",
+                    'choice_value' => 'id'.suffix(),
+                    $dynamic => 'ignored',
+                    ...$options,
+                    'group_by' => 'category',
+                ]);
+                $products->findBy([
+                    "na\x6de" => 'value, ] =>',
+                    'relation' => ['nested' => true],
+                    $dynamic => true,
+                    ...$criteria,
+                    'after' => true,
+                ]);
+            }
+            PHP;
+
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Service/Inspector.php', 'php', $text));
+        $references = array_values(array_filter($facts->symbols, static fn ($symbol): bool => !$symbol->declaration));
+
+        self::assertSame(
+            [
+                [DoctrineSymbolKind::Entity, 'App\\Entity\\Product'],
+                [DoctrineSymbolKind::Field, 'name'],
+                [DoctrineSymbolKind::Field, 'category'],
+                [DoctrineSymbolKind::Field, 'name'],
+                [DoctrineSymbolKind::Field, 'relation'],
+                [DoctrineSymbolKind::Field, 'after'],
+            ],
+            array_map(static fn ($symbol): array => [$symbol->kind, $symbol->name], $references),
+        );
+        self::assertSame('na\\x6de', substr(
+            $text,
+            $converter->toByteOffset($text, $references[3]->range->start),
+            $converter->toByteOffset($text, $references[3]->range->end) - $converter->toByteOffset($text, $references[3]->range->start),
+        ));
+    }
+
     public function testIgnoresCommentedDoctrinePhpWhilePreservingActiveRanges(): void
     {
         $converter = new PositionConverter();
-        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
+        $extractor = $this->extractor($converter);
         $text = <<<'PHP'
             <?php
             namespace App\Form;
@@ -439,7 +494,7 @@ final class DoctrineProviderTest extends TestCase
     public function testNavigatesToRuntimeOnlyEntities(): void
     {
         $converter = new PositionConverter();
-        $extractor = new DoctrineExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
+        $extractor = $this->extractor($converter);
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -475,7 +530,7 @@ final class DoctrineProviderTest extends TestCase
 
     public function testOffersNoDoctrineCompletionsInsidePhpComments(): void
     {
-        $extractor = new DoctrineExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             use App\Repository\ProductRepository;
@@ -485,5 +540,16 @@ final class DoctrineProviderTest extends TestCase
             PHP;
 
         self::assertNull($extractor->completionContext('php', $text, strpos($text, "['na") + \strlen("['na")));
+    }
+
+    private function extractor(?PositionConverter $converter = null): DoctrineExtractor
+    {
+        return new DoctrineExtractor(
+            $converter ?? new PositionConverter(),
+            new TolerantPhpParser(new Parser()),
+            new PhpCommentParser(),
+            new DoctrineRepositoryReceiverResolver(),
+            new PhpLiteralArrayKeyParser(),
+        );
     }
 }

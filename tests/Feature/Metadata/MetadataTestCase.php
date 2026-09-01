@@ -16,6 +16,7 @@ use Symfony\Lsp\Feature\Metadata\ValidationMetadataExtractor;
 use Symfony\Lsp\Feature\Metadata\YamlMetadataExtractor;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -32,7 +33,7 @@ abstract class MetadataTestCase extends TestCase
             $converter,
             $parser,
             $comments,
-            new FormMetadataExtractor($converter, new BalancedDelimiterMatcher()),
+            new FormMetadataExtractor($converter, new BalancedDelimiterMatcher(), new PhpLiteralArrayKeyParser()),
             new ValidationMetadataExtractor($converter),
             new SerializerMetadataExtractor($converter),
             new YamlMetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))),
