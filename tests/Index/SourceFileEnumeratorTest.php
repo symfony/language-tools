@@ -26,7 +26,7 @@ final class SourceFileEnumeratorTest extends TestCase
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        (new Filesystem())->remove([$this->directory, $this->directory.'-outside']);
     }
 
     public function testEnumeratesFilesAndTraversalFailuresTogether(): void
@@ -46,6 +46,25 @@ final class SourceFileEnumeratorTest extends TestCase
 
         self::assertContains(['path' => Path::canonicalize($this->directory.'/src/Controller.php')], $entries);
         self::assertContains(['directory' => Path::canonicalize($this->directory.'/blocked'), 'error' => 'unreadable'], $entries);
+    }
+
+    public function testIgnoresExcludedSymlinkDirectoriesOutsideTheProject(): void
+    {
+        if ('Windows' === \PHP_OS_FAMILY || !\function_exists('symlink')) {
+            self::markTestSkipped('Directory symlinks are not supported in this environment.');
+        }
+        $outside = $this->directory.'-outside';
+        mkdir($outside);
+        if (!symlink($outside, $this->directory.'/linked')) {
+            self::markTestSkipped('Unable to create a directory symlink in this environment.');
+        }
+        $this->fileScope->configure($this->project, ['linked/**']);
+
+        self::assertSame([], iterator_to_array($this->enumerator()->entries($this->project)));
+        self::assertSame(
+            [['directory' => Path::canonicalize($this->directory.'/linked'), 'error' => 'outside']],
+            array_values(iterator_to_array($this->enumerator()->entries($this->project, true))),
+        );
     }
 
     public function testKeepsRootDotenvFilesWhileApplyingGitignoreAndFileScopeRules(): void

@@ -118,14 +118,14 @@ final class SourceFileEnumerator
                     if (\in_array($entry, ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)) {
                         continue;
                     }
+                    if (!$includeExcluded && $this->fileScope->isDirectoryExcluded($project, $path)) {
+                        continue;
+                    }
                     if (is_link($path)) {
                         if (!$this->realPathBelongsToProject($root, $path)) {
                             yield ['directory' => $path, 'error' => 'outside'];
                         }
 
-                        continue;
-                    }
-                    if (!$includeExcluded && $this->fileScope->isDirectoryExcluded($project, $path)) {
                         continue;
                     }
                     if (!is_readable($path)) {
