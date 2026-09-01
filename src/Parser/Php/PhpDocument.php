@@ -114,6 +114,12 @@ final class PhpDocument
     }
 
     /** @return list<PhpAttribute> */
+    public function attributesNamed(string $name): array
+    {
+        return array_values(array_filter($this->attributes, static fn (PhpAttribute $attribute): bool => $name === $attribute->name));
+    }
+
+    /** @return list<PhpAttribute> */
     public function attributesOn(PhpAttributeTargetKind $kind, string $className, ?string $memberName = null): array
     {
         $attributes = [];

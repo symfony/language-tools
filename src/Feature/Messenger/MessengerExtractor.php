@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Feature\Messenger;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
-use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
@@ -51,24 +50,11 @@ final class MessengerExtractor
         if ('php' === $languageId) {
             $php = $this->parser->parse($text);
             $source = $this->phpComments->mask($text);
-            /** @var array<int, PhpAttribute> $handlerAttributes */
-            $handlerAttributes = [];
-            foreach ($php->typeDeclarations as $type) {
-                foreach ($php->attributesOn(PhpAttributeTargetKind::Type, $type->name) as $attribute) {
-                    if (self::AS_MESSAGE_HANDLER === $attribute->name) {
-                        $handlerAttributes[$attribute->startOffset] = $attribute;
-                    }
+            foreach ($php->attributesNamed(self::AS_MESSAGE_HANDLER) as $attribute) {
+                $target = $attribute->targets[0] ?? null;
+                if (!\in_array($target?->kind, [PhpAttributeTargetKind::Type, PhpAttributeTargetKind::Method], true)) {
+                    continue;
                 }
-            }
-            foreach ($php->methodDeclarations as $method) {
-                foreach ($php->attributesOn(PhpAttributeTargetKind::Method, $method->className, $method->name) as $attribute) {
-                    if (self::AS_MESSAGE_HANDLER === $attribute->name) {
-                        $handlerAttributes[$attribute->startOffset] = $attribute;
-                    }
-                }
-            }
-            ksort($handlerAttributes);
-            foreach ($handlerAttributes as $attribute) {
                 $handlers[] = substr($text, $attribute->startOffset, $attribute->endOffset - $attribute->startOffset);
                 foreach ([
                     [MessengerSymbolKind::Bus, 'bus'],

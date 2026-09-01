@@ -107,6 +107,35 @@ YAML;
         self::assertSame(['command.bus'], array_map(static fn ($symbol): string => $symbol->name, $incompleteFacts->symbols));
     }
 
+    public function testPreservesGroupedRepeatableHandlerAttributes(): void
+    {
+        $converter = new PositionConverter();
+        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
+        $extractor = new MessengerExtractor(
+            $converter,
+            new TolerantPhpParser(new Parser()),
+            new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
+            new PhpCommentParser(),
+            new YamlCommentParser($treeSitter),
+        );
+        $facts = $extractor->extract('file:///workspace/src/Handler.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            use App\Message\First;
+            use App\Message\Second;
+            use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+
+            #[AsMessageHandler(handles: First::class), AsMessageHandler(handles: Second::class)]
+            final class Handler
+            {
+            }
+            PHP);
+
+        self::assertSame(['App\Message\First', 'App\Message\Second'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
+        self::assertCount(2, $facts->handlers);
+    }
+
     public function testScopesMessageBusParametersToTheirMethod(): void
     {
         $converter = new PositionConverter();

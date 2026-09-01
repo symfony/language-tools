@@ -78,24 +78,22 @@ final class EventExtractor
         $php = $this->parser->parse($text);
         $source = $this->phpComments->mask($text);
         $listeners = [];
-        /** @var array<int, array{PhpAttribute, PhpTypeDeclaration|null}> $listenerAttributes */
-        $listenerAttributes = [];
+        $types = [];
         foreach ($php->typeDeclarations as $type) {
-            foreach ($php->attributesOn(PhpAttributeTargetKind::Type, $type->name) as $attribute) {
-                if (self::AS_EVENT_LISTENER === $attribute->name) {
-                    $listenerAttributes[$attribute->startOffset] = [$attribute, $type];
-                }
-            }
+            $types[$type->name] = $type;
         }
-        foreach ($php->methodDeclarations as $method) {
-            foreach ($php->attributesOn(PhpAttributeTargetKind::Method, $method->className, $method->name) as $attribute) {
-                if (self::AS_EVENT_LISTENER === $attribute->name) {
-                    $listenerAttributes[$attribute->startOffset] = [$attribute, null];
+        foreach ($php->attributesNamed(self::AS_EVENT_LISTENER) as $attribute) {
+            $target = $attribute->targets[0] ?? null;
+            if (PhpAttributeTargetKind::Type === $target?->kind) {
+                $type = $types[$target->className] ?? null;
+                if (null === $type) {
+                    continue;
                 }
+            } elseif (PhpAttributeTargetKind::Method === $target?->kind) {
+                $type = null;
+            } else {
+                continue;
             }
-        }
-        ksort($listenerAttributes);
-        foreach ($listenerAttributes as [$attribute, $type]) {
             $listeners[] = substr($text, $attribute->startOffset, $attribute->endOffset - $attribute->startOffset);
             $eventArgument = $attribute->argument('event');
             $event = $eventArgument?->stringLiteral;

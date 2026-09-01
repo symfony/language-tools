@@ -81,6 +81,24 @@ YAML;
         self::assertSame('legacy.order_placed', $extractor->extract('file:///workspace/config/services.yaml', 'yaml', $yaml)->symbols[0]->name);
     }
 
+    public function testPreservesGroupedRepeatableListenerAttributes(): void
+    {
+        $facts = $this->extractor()->extract('file:///workspace/src/Listener.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+
+            #[AsEventListener(event: 'app.first'), AsEventListener(event: 'app.second')]
+            final class Listener
+            {
+            }
+            PHP);
+
+        self::assertSame(['app.first', 'app.second'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
+        self::assertCount(2, $facts->listeners);
+    }
+
     public function testExtractsAndCompletesYamlListenerEventsWithByteExactRanges(): void
     {
         $converter = new PositionConverter();

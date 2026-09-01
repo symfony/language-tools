@@ -12,8 +12,10 @@ Event-name completion is available in resolved ``AsEventListener`` attributes,
 including imported aliases and fully qualified names. It is also available in
 ``EventSubscriberInterface::getSubscribedEvents()`` arrays, event-listener
 service tags and calls on statically typed event dispatchers. Unrelated
-attributes that share the ``AsEventListener`` short name are ignored. PHP class
-completion remains the responsibility of the general PHP language server.
+attributes that share the ``AsEventListener`` short name are ignored. Every
+repeatable listener attribute is indexed when several are grouped in one
+attribute block. PHP class completion remains the responsibility of the general
+PHP language server.
 
 Hover
 -----
