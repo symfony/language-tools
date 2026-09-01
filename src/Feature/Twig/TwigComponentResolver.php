@@ -3,7 +3,7 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 
@@ -11,7 +11,7 @@ final class TwigComponentResolver
 {
     public function __construct(
         private readonly DocumentContextResolver $documents,
-        private readonly PositionConverter $converter,
+        private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly TwigComponentIndexRegistry $indexes,
         private readonly TemplateIndexRegistry $templates,
         private readonly TwigComponentExtractor $extractor,
@@ -113,12 +113,10 @@ final class TwigComponentResolver
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        $facts = $this->extractor->extract($request->project, new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text));
-        foreach ($facts->actionReferences as $reference) {
-            if (!$this->converter->containsByteOffset($request->document->text, $reference->range, $offset, inclusiveEnd: true)) {
-                continue;
-            }
+        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
+        $facts = $this->extractor->extract($request->project, $document);
+        $reference = $this->positionedSymbols->resolve($document, $request->position, $facts->actionReferences);
+        if (null !== $reference) {
             $component = $this->indexes->forProject($request->project)->get($reference->component);
             if (null === $component) {
                 return null;
@@ -130,10 +128,9 @@ final class TwigComponentResolver
             }
         }
         foreach ($facts->components as $component) {
-            foreach ($component->actions as $action) {
-                if ($this->converter->containsByteOffset($request->document->text, $action->range, $offset, inclusiveEnd: true)) {
-                    return [$this->indexes->forProject($request->project)->get($component->name) ?? $component, $action, $request->project];
-                }
+            $action = $this->positionedSymbols->resolve($document, $request->position, $component->actions);
+            if (null !== $action) {
+                return [$this->indexes->forProject($request->project)->get($component->name) ?? $component, $action, $request->project];
             }
         }
 
@@ -151,22 +148,17 @@ final class TwigComponentResolver
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        $facts = $this->extractor->extract($request->project, new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text));
-        foreach ($facts->references as $reference) {
-            if ($this->converter->containsByteOffset($request->document->text, $reference->range, $offset, inclusiveEnd: true)) {
-                $component = $this->indexes->forProject($request->project)->get($reference->name);
+        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
+        $facts = $this->extractor->extract($request->project, $document);
+        $reference = $this->positionedSymbols->resolve($document, $request->position, $facts->references);
+        if (null !== $reference) {
+            $component = $this->indexes->forProject($request->project)->get($reference->name);
 
-                return null === $component ? null : [$component, $request->project];
-            }
+            return null === $component ? null : [$component, $request->project];
         }
-        foreach ($facts->components as $component) {
-            if ($this->converter->containsByteOffset($request->document->text, $component->range, $offset, inclusiveEnd: true)) {
-                return [$this->indexes->forProject($request->project)->get($component->name) ?? $component, $request->project];
-            }
-        }
+        $component = $this->positionedSymbols->resolve($document, $request->position, $facts->components);
 
-        return null;
+        return null === $component ? null : [$this->indexes->forProject($request->project)->get($component->name) ?? $component, $request->project];
     }
 
     private function componentForUri(Project $project, string $uri): ?TwigComponent

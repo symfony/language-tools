@@ -34,6 +34,7 @@ use Symfony\Lsp\Feature\Twig\TwigComponentRelationshipProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentResolver;
 use Symfony\Lsp\Feature\Twig\TwigComponentTemplateExtractor;
 use Symfony\Lsp\Feature\Twig\TwigVariableProvider;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
@@ -321,7 +322,7 @@ final class TemplateProviderTest extends TestCase
         $templateIndexes->forProject($project)->replaceRuntime(true);
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
-        $componentResolver = new TwigComponentResolver($documentResolver, $converter, $indexes, $templateIndexes, $extractor);
+        $componentResolver = new TwigComponentResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
         $completionProvider = new TwigComponentCompletionProvider($documentResolver, $converter, $protocol, $indexes, $componentResolver, $commentParser);
         $relationshipProvider = new TwigComponentRelationshipProvider($protocol, $indexes, $componentResolver);
         $diagnosticProvider = new TwigComponentDiagnosticProvider($documentResolver, $protocol, $indexes, $templateIndexes, $extractor, $componentResolver);
@@ -395,7 +396,7 @@ final class TemplateProviderTest extends TestCase
         $templateIndexes = new TemplateIndexRegistry();
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
-        $componentResolver = new TwigComponentResolver($documentResolver, $converter, $indexes, $templateIndexes, $extractor);
+        $componentResolver = new TwigComponentResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
         $provider = new TwigComponentDiagnosticProvider($documentResolver, $protocol, $indexes, $templateIndexes, $extractor, $componentResolver);
         $params = ['textDocument' => ['uri' => $usageUri]];
 
@@ -452,7 +453,7 @@ final class TemplateProviderTest extends TestCase
             new TemplateDeclaration('page.html.twig', 'file:///workspace/templates/page.html.twig', $range),
         );
         $documentResolver = new DocumentContextResolver($documents, $projects);
-        $componentResolver = new TwigComponentResolver($documentResolver, $converter, $indexes, $templateIndexes, $extractor);
+        $componentResolver = new TwigComponentResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
         $provider = new TwigComponentCompletionProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $componentResolver, $commentParser);
 
         $position = $converter->toPosition($completionText, \strlen($completionText));
@@ -583,7 +584,7 @@ final class TemplateProviderTest extends TestCase
         $indexes->forProject($project)->replaceRuntime(true);
         $converter = new PositionConverter();
         $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser()), new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()), new PhpLiteralArrayKeyParser(), new BalancedDelimiterMatcher());
-        $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $extractor, $indexes);
+        $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes);
         $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
         self::assertIsArray($diagnostics);
         $provider = new TemplateCodeActionProvider(new DocumentContextResolver($documents, $projects), $extractor, $indexes, new UriToPathConverter(), new ProjectPathResolver(new UriToPathConverter()), new LspProtocolMapper());
@@ -623,7 +624,7 @@ final class TemplateProviderTest extends TestCase
         $indexes->forProject($project)->replaceRuntime(true);
         $positionConverter = new PositionConverter();
         $extractor = new TemplateReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser()), new QuotedArgumentMatcher($positionConverter), new PhpCommentParser(), new TolerantPhpParser(new Parser()), new PhpLiteralArrayKeyParser(), new BalancedDelimiterMatcher());
-        $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), $positionConverter, new LspProtocolMapper(), $extractor, $indexes);
+        $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($positionConverter), new LspProtocolMapper(), $extractor, $indexes);
 
         try {
             $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -807,7 +808,7 @@ final class TemplateProviderTest extends TestCase
 
         return [
             new TemplateCompletionHandler($resolver, $converter, new LspProtocolMapper(), $indexes, $commentParser, new PhpCommentParser()),
-            new TemplateNavigationProvider($resolver, $converter, new LspProtocolMapper(), $extractor, $indexes),
+            new TemplateNavigationProvider($resolver, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes),
             $converter,
         ];
     }

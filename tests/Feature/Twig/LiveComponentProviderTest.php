@@ -19,6 +19,7 @@ use Symfony\Lsp\Feature\Twig\TwigComponentPhpExtractor;
 use Symfony\Lsp\Feature\Twig\TwigComponentRelationshipProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentResolver;
 use Symfony\Lsp\Feature\Twig\TwigComponentTemplateExtractor;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -91,7 +92,7 @@ final class LiveComponentProviderTest extends TestCase
         );
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
-        $componentResolver = new TwigComponentResolver($documentResolver, $converter, $indexes, new TemplateIndexRegistry(), $extractor);
+        $componentResolver = new TwigComponentResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $indexes, new TemplateIndexRegistry(), $extractor);
         $completionProvider = new TwigComponentCompletionProvider($documentResolver, $converter, $protocol, $indexes, $componentResolver, $commentParser);
         $relationshipProvider = new TwigComponentRelationshipProvider($protocol, $indexes, $componentResolver);
 
@@ -123,7 +124,7 @@ final class LiveComponentProviderTest extends TestCase
             );
         }
 
-        $eventProvider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser());
+        $eventProvider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser());
         self::assertSame(['search:completed'], array_column($eventProvider->complete($this->params($converter, $classUri, $classText, strpos($classText, "emit('search:co") + \strlen("emit('search:co"))) ?? [], 'label'));
         $eventParams = $this->params($converter, $classUri, $classText, strpos($classText, "emit('search:completed") + \strlen("emit('search:"));
         self::assertSame([$classUri], array_column($eventProvider->definition($eventParams) ?? [], 'uri'));
@@ -207,7 +208,7 @@ final class LiveComponentProviderTest extends TestCase
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $indexes = new TwigComponentIndexRegistry();
         $indexes->forProject($project)->replace($extractor->extract($project, new SourceDocument($uri, 'php', $text)));
-        $provider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser());
+        $provider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser());
 
         self::assertNull($provider->complete($this->params($converter, $uri, $text, strpos($text, 'search:c') + \strlen('search:c'))));
     }

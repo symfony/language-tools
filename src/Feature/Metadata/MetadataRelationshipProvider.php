@@ -3,10 +3,10 @@
 namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -15,7 +15,7 @@ final class MetadataRelationshipProvider implements DefinitionProviderInterface,
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
-        private readonly PositionConverter $converter,
+        private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly LspProtocolMapper $protocol,
         private readonly MetadataSourceIndexRegistry $sourceIndexes,
         private readonly MetadataExtractor $extractor,
@@ -106,13 +106,9 @@ final class MetadataRelationshipProvider implements DefinitionProviderInterface,
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->symbols as $symbol) {
-            if ($this->converter->containsByteOffset($request->document->text, $symbol->range, $offset, inclusiveEnd: true)) {
-                return [$symbol, $request->project];
-            }
-        }
+        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
+        $symbol = $this->positionedSymbols->resolve($document, $request->position, $this->extractor->extract($document)->symbols);
 
-        return null;
+        return null === $symbol ? null : [$symbol, $request->project];
     }
 }

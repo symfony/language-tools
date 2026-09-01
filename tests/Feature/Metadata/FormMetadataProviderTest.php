@@ -13,6 +13,7 @@ use Symfony\Lsp\Feature\Metadata\MetadataIndexRegistry;
 use Symfony\Lsp\Feature\Metadata\MetadataRelationshipProvider;
 use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexRegistry;
 use Symfony\Lsp\Feature\Metadata\MetadataSymbolKind;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -162,7 +163,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
         $documents->open(new Document($formUri, 'php', 1, $formText));
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
-        $relationshipProvider = new MetadataRelationshipProvider($resolver, $converter, $protocol, $sourceIndexes, $extractor);
+        $relationshipProvider = new MetadataRelationshipProvider($resolver, new PositionedSourceSymbolResolver($converter), $protocol, $sourceIndexes, $extractor);
         $completionProvider = new MetadataCompletionProvider($resolver, $converter, $protocol, new MetadataIndexRegistry(), $sourceIndexes, $extractor);
 
         $titleOffset = strpos($formText, "'title'") + 2;

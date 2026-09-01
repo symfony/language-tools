@@ -208,7 +208,7 @@ final class SourceFileEnumerator
         return Path::makeRelative($path, $root);
     }
 
-    private function realPathBelongsToProject(string $projectRoot, string $path): bool
+    public function realPathBelongsToProject(string $projectRoot, string $path): bool
     {
         $realRoot = realpath($projectRoot);
         $realPath = realpath($path);

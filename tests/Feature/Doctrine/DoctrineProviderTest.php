@@ -20,6 +20,7 @@ use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipCodeLensProvider;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipProvider;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRepositoryReceiverResolver;
 use Symfony\Lsp\Feature\Doctrine\DoctrineSymbolKind;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -151,7 +152,7 @@ final class DoctrineProviderTest extends TestCase
         $protocol = new LspProtocolMapper();
         $completionBuilder = new DoctrineFieldCompletionBuilder($protocol);
         $completionProvider = new DoctrineCompletionProvider($resolver, $converter, $indexes, $extractor, $completionBuilder);
-        $relationshipProvider = new DoctrineRelationshipProvider($resolver, $converter, $protocol, $indexes, $extractor);
+        $relationshipProvider = new DoctrineRelationshipProvider($resolver, new PositionedSourceSymbolResolver($converter), $protocol, $indexes, $extractor);
         $codeLensProvider = new DoctrineRelationshipCodeLensProvider($resolver, $protocol, $indexes, $extractor);
 
         self::assertSame(['name'], array_column($completionProvider->complete($this->params($converter, $formCompletionUri, $formCompletionText, \strlen($formCompletionText))) ?? [], 'label'));
@@ -461,7 +462,7 @@ final class DoctrineProviderTest extends TestCase
             PHP;
         $documents = new DocumentStore();
         $documents->open(new Document($usageUri, 'php', 1, $usageText));
-        $provider = new DoctrineRelationshipProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor);
+        $provider = new DoctrineRelationshipProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor);
 
         $params = $this->params($converter, $usageUri, $usageText, strpos($usageText, "['title'") + 3);
         self::assertSame([$entityUri], array_column($provider->definition($params) ?? [], 'uri'));

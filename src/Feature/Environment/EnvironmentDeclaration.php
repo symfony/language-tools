@@ -3,8 +3,9 @@
 namespace Symfony\Lsp\Feature\Environment;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\RangedSourceSymbolInterface;
 
-final class EnvironmentDeclaration
+final class EnvironmentDeclaration implements RangedSourceSymbolInterface
 {
     public function __construct(
         public readonly string $name,

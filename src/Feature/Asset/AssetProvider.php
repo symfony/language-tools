@@ -10,6 +10,7 @@ use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -20,6 +21,7 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
     public function __construct(
         private readonly DocumentContextResolver $resolver,
         private readonly PositionConverter $converter,
+        private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly UriToPathConverter $uriConverter,
         private readonly LspProtocolMapper $protocol,
         private readonly AssetIndexRegistry $indexes,
@@ -215,14 +217,10 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->symbols as $symbol) {
-            if ($this->converter->containsByteOffset($request->document->text, $symbol->range, $offset, inclusiveEnd: true)) {
-                return [$symbol, $request->project];
-            }
-        }
+        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
+        $symbol = $this->positionedSymbols->resolve($document, $request->position, $this->extractor->extract($document)->symbols);
 
-        return null;
+        return null === $symbol ? null : [$symbol, $request->project];
     }
 
     private function target(Project $project, AssetSourceSymbol $symbol): ?string

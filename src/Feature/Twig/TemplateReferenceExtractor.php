@@ -95,19 +95,6 @@ final class TemplateReferenceExtractor
         return $this->sorted($references);
     }
 
-    public function at(SourceDocument $document, int $offset): ?TemplateReference
-    {
-        foreach ($this->extract($document) as $reference) {
-            $start = $this->positionConverter->toByteOffset($document->text, $reference->range->start);
-            $end = $this->positionConverter->toByteOffset($document->text, $reference->range->end);
-            if ($offset >= $start && $offset <= $end) {
-                return $reference;
-            }
-        }
-
-        return null;
-    }
-
     /** @return list<TemplateReference> */
     private function twigReferences(string $uri, string $text): array
     {

@@ -3,8 +3,9 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\RangedSourceSymbolInterface;
 
-final class TwigComponent
+final class TwigComponent implements RangedSourceSymbolInterface
 {
     /**
      * @param list<string>              $properties

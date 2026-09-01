@@ -3,12 +3,12 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -17,7 +17,7 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
-        private readonly PositionConverter $converter,
+        private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly LspProtocolMapper $protocol,
         private readonly TemplateReferenceExtractor $extractor,
         private readonly TemplateIndexRegistry $indexes,
@@ -117,8 +117,8 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        $reference = $this->extractor->at(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text), $offset);
+        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
+        $reference = $this->positionedSymbols->resolve($document, $request->position, $this->extractor->extract($document));
         if (null === $reference) {
             return null;
         }

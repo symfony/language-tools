@@ -3,8 +3,9 @@
 namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\RangedSourceSymbolInterface;
 
-final class AssetSourceSymbol
+final class AssetSourceSymbol implements RangedSourceSymbolInterface
 {
     public function __construct(
         public readonly AssetSymbolKind $kind,

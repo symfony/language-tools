@@ -9,6 +9,7 @@ use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Project\Project;
@@ -19,6 +20,7 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
     public function __construct(
         private readonly DocumentContextResolver $resolver,
         private readonly PositionConverter $converter,
+        private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly LspProtocolMapper $protocol,
         private readonly TwigComponentIndexRegistry $indexes,
         private readonly TwigComponentExtractor $extractor,
@@ -110,13 +112,9 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        foreach ($this->extractor->extract($request->project, new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->events as $event) {
-            if ($this->converter->containsByteOffset($request->document->text, $event->range, $offset, inclusiveEnd: true)) {
-                return [$event, $request->project];
-            }
-        }
+        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
+        $event = $this->positionedSymbols->resolve($document, $request->position, $this->extractor->extract($request->project, $document)->events);
 
-        return null;
+        return null === $event ? null : [$event, $request->project];
     }
 }

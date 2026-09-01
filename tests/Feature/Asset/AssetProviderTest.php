@@ -17,6 +17,7 @@ use Symfony\Lsp\Feature\Asset\ImportMapEntry;
 use Symfony\Lsp\Feature\Asset\ImportMapEntrypointExtractor;
 use Symfony\Lsp\Feature\Asset\PublicAssetResolver;
 use Symfony\Lsp\Feature\Asset\TwigAssetReferenceExtractor;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
@@ -82,6 +83,7 @@ final class AssetProviderTest extends TestCase
         $provider = new AssetProvider(
             new DocumentContextResolver($documents, $projects),
             $converter,
+            new PositionedSourceSymbolResolver($converter),
             new UriToPathConverter(),
             new LspProtocolMapper(),
             $indexes,
@@ -208,6 +210,7 @@ final class AssetProviderTest extends TestCase
             $provider = new AssetProvider(
                 new DocumentContextResolver($documents, $projects),
                 $converter,
+                new PositionedSourceSymbolResolver($converter),
                 new UriToPathConverter(),
                 new LspProtocolMapper(),
                 new AssetIndexRegistry(),

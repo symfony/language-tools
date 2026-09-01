@@ -3,7 +3,7 @@
 namespace Symfony\Lsp\Feature\Environment;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 
@@ -11,7 +11,7 @@ final class EnvironmentSymbolResolver
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
-        private readonly PositionConverter $converter,
+        private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly EnvironmentExtractor $extractor,
     ) {
     }
@@ -27,19 +27,14 @@ final class EnvironmentSymbolResolver
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        $facts = $this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text));
-        foreach ($facts->declarations as $declaration) {
-            if ($this->converter->containsByteOffset($request->document->text, $declaration->range, $offset, inclusiveEnd: true)) {
-                return [new EnvironmentReference($declaration->name, $request->document->uri, $declaration->range, []), $request->project];
-            }
+        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
+        $facts = $this->extractor->extract($document);
+        $declaration = $this->positionedSymbols->resolve($document, $request->position, $facts->declarations);
+        if (null !== $declaration) {
+            return [new EnvironmentReference($declaration->name, $request->document->uri, $declaration->range, []), $request->project];
         }
-        foreach ($facts->references as $reference) {
-            if ($this->converter->containsByteOffset($request->document->text, $reference->range, $offset, inclusiveEnd: true)) {
-                return [$reference, $request->project];
-            }
-        }
+        $reference = $this->positionedSymbols->resolve($document, $request->position, $facts->references);
 
-        return null;
+        return null === $reference ? null : [$reference, $request->project];
     }
 }

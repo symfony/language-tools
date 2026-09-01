@@ -3,8 +3,9 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\RangedSourceSymbolInterface;
 
-final class TemplateReference
+final class TemplateReference implements RangedSourceSymbolInterface
 {
     /** @param list<string> $variables */
     public function __construct(

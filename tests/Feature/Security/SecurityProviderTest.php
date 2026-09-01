@@ -21,6 +21,7 @@ use Symfony\Lsp\Feature\Security\SecuritySourceIndexRegistry;
 use Symfony\Lsp\Feature\Security\SecuritySymbolResolver;
 use Symfony\Lsp\Feature\Security\SecurityUserProvider;
 use Symfony\Lsp\Feature\Security\SecurityVoter;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -312,7 +313,7 @@ PHP;
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $completionProvider = new SecurityCompletionProvider($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
-        $relationshipProvider = new SecurityRelationshipProvider($protocol, $indexes, $sourceIndexes, new SecuritySymbolResolver($documentResolver, $converter, $extractor));
+        $relationshipProvider = new SecurityRelationshipProvider($protocol, $indexes, $sourceIndexes, new SecuritySymbolResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $extractor));
         $diagnosticProvider = new SecurityDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $extractor);
 
         $completionPosition = $converter->toPosition($completion, strpos($completion, "ROLE_A')") + \strlen('ROLE_A'));
@@ -355,7 +356,7 @@ PHP;
             new LspProtocolMapper(),
             new SecurityIndexRegistry(),
             $sourceIndexes,
-            new SecuritySymbolResolver($documentResolver, $converter, $extractor),
+            new SecuritySymbolResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $extractor),
         );
         $rangeEnd = $converter->toPosition($text, (int) strpos($text, 'provider: users') + \strlen('provider: users'));
 

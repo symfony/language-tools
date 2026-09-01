@@ -16,6 +16,7 @@ use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Environment\EnvironmentProcessorChainValidator;
 use Symfony\Lsp\Feature\Environment\EnvironmentRelationshipProvider;
 use Symfony\Lsp\Feature\Environment\EnvironmentSymbolResolver;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -278,7 +279,7 @@ final class EnvironmentProviderTest extends TestCase
 
         return [
             new EnvironmentCompletionProvider($resolver, $converter, $protocol, $indexes, $twigComments, $phpComments, $yamlParser, $xmlComments),
-            new EnvironmentRelationshipProvider($protocol, $indexes, new EnvironmentSymbolResolver($resolver, $converter, $extractor)),
+            new EnvironmentRelationshipProvider($protocol, $indexes, new EnvironmentSymbolResolver($resolver, new PositionedSourceSymbolResolver($converter), $extractor)),
             new EnvironmentDiagnosticProvider($resolver, $converter, $protocol, $indexes, $extractor, new EnvironmentProcessorChainValidator(), $twigComments, $phpComments, $yamlParser, $xmlComments),
         ];
     }

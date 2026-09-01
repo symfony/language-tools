@@ -223,7 +223,7 @@ final class CheckFileSelector
         if (!is_readable($path)) {
             return \sprintf('The application file "%s" is unreadable.', $workspacePath);
         }
-        if (!$this->realPathBelongsToProject($project->rootPath, $path)) {
+        if (!$this->files->realPathBelongsToProject($project->rootPath, $path)) {
             return \sprintf('The application file "%s" resolves outside its Symfony project.', $workspacePath);
         }
 
@@ -237,19 +237,6 @@ final class CheckFileSelector
         return 'outside' === $error
             ? \sprintf('The application directory "%s" resolves outside its Symfony project.', $path)
             : \sprintf('The application directory "%s" is unreadable.', $path);
-    }
-
-    private function realPathBelongsToProject(string $projectRoot, string $path): bool
-    {
-        $realRoot = realpath($projectRoot);
-        $realPath = realpath($path);
-        if (false === $realRoot || false === $realPath) {
-            return false;
-        }
-        $realRoot = Path::canonicalize($realRoot);
-        $realPath = Path::canonicalize($realPath);
-
-        return $realRoot !== $realPath && Path::isBasePath($realRoot, $realPath);
     }
 
     private function patternRegex(string $pattern): string

@@ -9,6 +9,7 @@ use Symfony\Lsp\Check\CheckFileSelector;
 use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Project\AnalysisSettings;
 use Symfony\Lsp\Project\GitignoreMatcher;
+use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectConfiguration;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
@@ -47,7 +48,23 @@ final class CheckFileSelectorTest extends TestCase
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        (new Filesystem())->remove([$this->directory, $this->directory.'-outside.php']);
+    }
+
+    public function testRejectsASelectedFileResolvingOutsideTheProject(): void
+    {
+        if ('Windows' === \PHP_OS_FAMILY || !\function_exists('symlink')) {
+            self::markTestSkipped('File symlinks are not supported in this environment.');
+        }
+        file_put_contents($this->directory.'-outside.php', '<?php');
+        if (!symlink($this->directory.'-outside.php', $this->directory.'/src/Linked.php')) {
+            self::markTestSkipped('Unable to create a file symlink in this environment.');
+        }
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('The application file "src/Linked.php" resolves outside its Symfony project.');
+
+        $this->selector->select($this->directory, ['src/Linked*.php']);
     }
 
     /**

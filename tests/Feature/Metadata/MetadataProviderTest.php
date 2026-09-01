@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Metadata\MetadataRelationshipProvider;
 use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexRegistry;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -59,7 +60,7 @@ final class MetadataProviderTest extends MetadataTestCase
         $documents->open(new Document($entityUri, 'php', 1, $entityText));
         $documents->open(new Document($mappingUri, 'yaml', 1, $mappingText));
         $resolver = new DocumentContextResolver($documents, $projects);
-        $relationshipProvider = new MetadataRelationshipProvider($resolver, $converter, new LspProtocolMapper(), $sourceIndexes, $extractor);
+        $relationshipProvider = new MetadataRelationshipProvider($resolver, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $sourceIndexes, $extractor);
 
         $mappedClass = strpos($mappingText, 'App\Entity\User') + 1;
         $classDefinition = $relationshipProvider->definition($this->params($converter, $mappingUri, $mappingText, $mappedClass));
