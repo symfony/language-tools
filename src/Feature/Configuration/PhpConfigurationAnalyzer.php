@@ -15,9 +15,7 @@ final class PhpConfigurationAnalyzer
     ) {
     }
 
-    /**
-     * @return list<array{path: list<string>, argument: string, start: int, end: int}>
-     */
+    /** @return list<PhpConfigurationOccurrence> */
     public function occurrences(string $source, ConfigurationIndex $index): array
     {
         $document = $this->parser->parse($source);
@@ -27,21 +25,21 @@ final class PhpConfigurationAnalyzer
             $callsByRange[$call->startOffset.':'.$call->endOffset] = $call;
         }
 
-        /** @var array<int, array{path: list<string>, argument: string, start: int, end: int}|null> $resolved */
+        /** @var array<int, PhpConfigurationOccurrence|null> $resolved */
         $resolved = [];
         foreach ($document->methodCalls as $call) {
             $this->resolveCall($call, $source, $masked, $callsByRange, $resolved);
         }
 
         $occurrences = array_values(array_filter($resolved));
-        usort($occurrences, static fn (array $left, array $right): int => $left['start'] <=> $right['start']);
+        usort($occurrences, static fn (PhpConfigurationOccurrence $left, PhpConfigurationOccurrence $right): int => $left->startOffset <=> $right->startOffset);
 
-        return array_values(array_filter($occurrences, static function (array $occurrence) use ($index): bool {
-            if (!isset($index->roots()[$occurrence['path'][0]])) {
+        return array_values(array_filter($occurrences, static function (PhpConfigurationOccurrence $occurrence) use ($index): bool {
+            if (!isset($index->roots()[$occurrence->path[0]])) {
                 return false;
             }
-            for ($length = 2, $count = \count($occurrence['path']); $length < $count; ++$length) {
-                if (null === $index->find(\array_slice($occurrence['path'], 0, $length))) {
+            for ($length = 2, $count = \count($occurrence->path); $length < $count; ++$length) {
+                if (null === $index->find(\array_slice($occurrence->path, 0, $length))) {
                     return false;
                 }
             }
@@ -54,12 +52,12 @@ final class PhpConfigurationAnalyzer
     public function resolveNode(string $source, ConfigurationIndex $index, int $cursor): ?array
     {
         foreach ($this->occurrences($source, $index) as $occurrence) {
-            if ($cursor < $occurrence['start'] || $cursor > $occurrence['end']) {
+            if ($cursor < $occurrence->startOffset || $cursor > $occurrence->endOffset) {
                 continue;
             }
-            $node = $index->find($occurrence['path']);
+            $node = $index->find($occurrence->path);
 
-            return null === $node ? null : [$occurrence['path'], $node];
+            return null === $node ? null : [$occurrence->path, $node];
         }
 
         return null;
@@ -83,12 +81,10 @@ final class PhpConfigurationAnalyzer
     }
 
     /**
-     * @param array<string, PhpMethodCall>                                                       $callsByRange
-     * @param array<int, array{path: list<string>, argument: string, start: int, end: int}|null> $resolved
-     *
-     * @return array{path: list<string>, argument: string, start: int, end: int}|null
+     * @param array<string, PhpMethodCall>                $callsByRange
+     * @param array<int, PhpConfigurationOccurrence|null> $resolved
      */
-    private function resolveCall(PhpMethodCall $call, string $source, string $masked, array $callsByRange, array &$resolved): ?array
+    private function resolveCall(PhpMethodCall $call, string $source, string $masked, array $callsByRange, array &$resolved): ?PhpConfigurationOccurrence
     {
         $id = spl_object_id($call);
         if (\array_key_exists($id, $resolved)) {
@@ -107,16 +103,16 @@ final class PhpConfigurationAnalyzer
             if (null === $receiver || null === $parent = $this->resolveCall($receiver, $source, $masked, $callsByRange, $resolved)) {
                 return null;
             }
-            $path = $parent['path'];
+            $path = $parent->path;
         }
         $path[] = $this->methodName($call->method);
 
-        return $resolved[$id] = [
-            'path' => $path,
-            'argument' => $this->argument($call, $source, $masked, $methodRange[1]),
-            'start' => $methodRange[0],
-            'end' => $methodRange[1],
-        ];
+        return $resolved[$id] = new PhpConfigurationOccurrence(
+            $path,
+            $this->argument($call, $source, $masked, $methodRange[1]),
+            $methodRange[0],
+            $methodRange[1],
+        );
     }
 
     /** @return array{int, int}|null */

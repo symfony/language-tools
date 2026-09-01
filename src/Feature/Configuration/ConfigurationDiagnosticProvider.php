@@ -120,11 +120,11 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
     {
         $diagnostics = [];
         foreach ($this->php->occurrences($document->text, $index) as $occurrence) {
-            $node = $index->find($occurrence['path']);
-            $range = $this->converter->toRange($document->text, $occurrence['start'], $occurrence['end'] - $occurrence['start']);
-            $key = implode('.', $occurrence['path']);
+            $node = $index->find($occurrence->path);
+            $range = $this->converter->toRange($document->text, $occurrence->startOffset, $occurrence->endOffset - $occurrence->startOffset);
+            $key = implode('.', $occurrence->path);
             if (null === $node) {
-                if (!$index->allowsUnknownKeys($occurrence['path'])) {
+                if (!$index->allowsUnknownKeys($occurrence->path)) {
                     $diagnostics[] = $this->diagnostic($range, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', $key));
                 }
                 continue;
@@ -132,7 +132,7 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
             if ($node->deprecated) {
                 $diagnostics[] = $this->diagnostic($range, 2, 'config.deprecated_key', \sprintf('Configuration key "%s" is deprecated.', $key));
             }
-            $argument = trim($occurrence['argument']);
+            $argument = trim($occurrence->argument);
             if ('' !== $argument && !$this->values->acceptsValue($node, $argument)) {
                 $diagnostics[] = $this->diagnostic($range, 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $node->type, $key));
             }
@@ -146,18 +146,18 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
     {
         $diagnostics = [];
         foreach ($this->xml->events($document->text, $index) as $event) {
-            $range = $this->converter->toRange($document->text, $event['start'], $event['end'] - $event['start']);
-            if ('structure' === $event['kind']) {
-                $diagnostics[] = $this->diagnostic($range, 1, 'config.malformed_structure', $event['message']);
+            $range = $this->converter->toRange($document->text, $event->startOffset, $event->endOffset - $event->startOffset);
+            if ($event instanceof XmlConfigurationStructureError) {
+                $diagnostics[] = $this->diagnostic($range, 1, 'config.malformed_structure', $event->message);
                 continue;
             }
-            if (null === $event['path']) {
+            if (null === $event->path) {
                 continue;
             }
-            $node = $index->find($event['path']);
-            $key = implode('.', $event['path']);
+            $node = $index->find($event->path);
+            $key = implode('.', $event->path);
             if (null === $node) {
-                if (!$index->allowsUnknownKeys($event['path'])) {
+                if (!$index->allowsUnknownKeys($event->path)) {
                     $diagnostics[] = $this->diagnostic($range, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', $key));
                 }
                 continue;
@@ -165,15 +165,15 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
             if ($node->deprecated) {
                 $diagnostics[] = $this->diagnostic($range, 2, 'config.deprecated_key', \sprintf('Configuration key "%s" is deprecated.', $key));
             }
-            foreach ($event['attributes'] as $attribute) {
-                $child = $node->child($attribute['name']);
-                $attributePath = [...$event['path'], $attribute['name']];
-                $attributeRange = $this->converter->toRange($document->text, $attribute['start'], $attribute['end'] - $attribute['start']);
+            foreach ($event->attributes as $attribute) {
+                $child = $node->child($attribute->name);
+                $attributePath = [...$event->path, $attribute->name];
+                $attributeRange = $this->converter->toRange($document->text, $attribute->startOffset, $attribute->endOffset - $attribute->startOffset);
                 if (null === $child) {
                     if (!$index->allowsUnknownKeys($attributePath)) {
                         $diagnostics[] = $this->diagnostic($attributeRange, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', implode('.', $attributePath)));
                     }
-                } elseif (!$this->values->acceptsValue($child, $attribute['value'])) {
+                } elseif (!$this->values->acceptsValue($child, $attribute->value)) {
                     $diagnostics[] = $this->diagnostic($attributeRange, 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $child->type, implode('.', $attributePath)));
                 }
             }

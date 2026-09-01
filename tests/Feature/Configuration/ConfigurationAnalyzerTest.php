@@ -7,7 +7,10 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\Configuration\ConfigurationIndex;
 use Symfony\Lsp\Feature\Configuration\ConfigurationNode;
 use Symfony\Lsp\Feature\Configuration\PhpConfigurationAnalyzer;
+use Symfony\Lsp\Feature\Configuration\PhpConfigurationOccurrence;
 use Symfony\Lsp\Feature\Configuration\XmlConfigurationAnalyzer;
+use Symfony\Lsp\Feature\Configuration\XmlConfigurationOccurrence;
+use Symfony\Lsp\Feature\Configuration\XmlConfigurationStructureError;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
@@ -23,7 +26,7 @@ final class ConfigurationAnalyzerTest extends TestCase
         self::assertSame([
             ['path' => ['framework', 'router'], 'argument' => ''],
             ['path' => ['framework', 'router', 'utf8'], 'argument' => 'true'],
-        ], array_map(static fn (array $occurrence): array => ['path' => $occurrence['path'], 'argument' => $occurrence['argument']], $analyzer->occurrences($text, $index)));
+        ], array_map(static fn (PhpConfigurationOccurrence $occurrence): array => ['path' => $occurrence->path, 'argument' => $occurrence->argument], $analyzer->occurrences($text, $index)));
         self::assertSame(['framework', 'router', 'utf8'], $analyzer->resolveNode($text, $index, strpos($text, 'utf8') + 1)[0] ?? null);
 
         $incomplete = '<?php function configure(FrameworkConfig $options) { $options->router()->ut';
@@ -37,9 +40,23 @@ final class ConfigurationAnalyzerTest extends TestCase
     {
         $analyzer = new XmlConfigurationAnalyzer(new XmlCommentParser());
         $index = $this->index();
-        $text = '<container><framework:config><framework:router><framework:utf8/></framework:router></framework:config></container>';
+        $text = '<container><framework:config><framework:router utf8="true"><framework:utf8/></framework:router></framework:config></container>';
 
+        $events = $analyzer->events($text, $index);
+        self::assertInstanceOf(XmlConfigurationOccurrence::class, $events[2]);
+        self::assertSame(['framework', 'router'], $events[2]->path);
+        self::assertSame('utf8', $events[2]->attributes[0]->name);
+        self::assertSame('true', $events[2]->attributes[0]->value);
+        self::assertSame(strpos($text, 'utf8="true"'), $events[2]->attributes[0]->startOffset);
+        self::assertSame(strpos($text, 'utf8="true"') + \strlen('utf8'), $events[2]->attributes[0]->endOffset);
         self::assertSame(['framework', 'router', 'utf8'], $analyzer->resolveNode($text, $index, strpos($text, 'framework:utf8') + 11)[0] ?? null);
+
+        $malformed = '<framework:config>';
+        $error = $analyzer->events($malformed, $index)[1];
+        self::assertInstanceOf(XmlConfigurationStructureError::class, $error);
+        self::assertSame('Element "framework:config" is not closed.', $error->message);
+        self::assertSame(\strlen($malformed), $error->startOffset);
+        self::assertSame(\strlen($malformed), $error->endOffset);
 
         $incomplete = '<container><framework:config><framework:router ut';
         self::assertSame(

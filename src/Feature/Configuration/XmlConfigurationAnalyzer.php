@@ -11,9 +11,7 @@ final class XmlConfigurationAnalyzer
     ) {
     }
 
-    /**
-     * @return list<array{kind: 'element', path: list<string>|null, name: string, start: int, end: int, attributes: list<array{name: string, value: string, start: int, end: int}>}|array{kind: 'structure', message: string, start: int, end: int}>
-     */
+    /** @return list<XmlConfigurationOccurrence|XmlConfigurationStructureError> */
     public function events(string $source, ConfigurationIndex $index): array
     {
         [$events] = $this->scan($source, $index);
@@ -25,12 +23,12 @@ final class XmlConfigurationAnalyzer
     public function resolveNode(string $source, ConfigurationIndex $index, int $cursor): ?array
     {
         foreach ($this->events($source, $index) as $event) {
-            if ('element' !== $event['kind'] || null === $event['path'] || $cursor < $event['start'] || $cursor > $event['end']) {
+            if (!$event instanceof XmlConfigurationOccurrence || null === $event->path || $cursor < $event->startOffset || $cursor > $event->endOffset) {
                 continue;
             }
-            $node = $index->find($event['path']);
+            $node = $index->find($event->path);
 
-            return null === $node ? null : [$event['path'], $node];
+            return null === $node ? null : [$event->path, $node];
         }
 
         return null;
@@ -70,12 +68,7 @@ final class XmlConfigurationAnalyzer
         ];
     }
 
-    /**
-     * @return array{
-     *     list<array{kind: 'element', path: list<string>|null, name: string, start: int, end: int, attributes: list<array{name: string, value: string, start: int, end: int}>}|array{kind: 'structure', message: string, start: int, end: int}>,
-     *     list<string>
-     * }
-     */
+    /** @return array{list<XmlConfigurationOccurrence|XmlConfigurationStructureError>, list<string>} */
     private function scan(string $source, ConfigurationIndex $index): array
     {
         $events = [];
@@ -87,12 +80,11 @@ final class XmlConfigurationAnalyzer
             if ('' !== $tag[1][0]) {
                 $open = array_pop($elements);
                 if ($open !== $tag[2][0]) {
-                    $events[] = [
-                        'kind' => 'structure',
-                        'message' => \sprintf('Closing element "%s" does not match "%s".', $tag[2][0], $open ?? 'none'),
-                        'start' => $tag[2][1],
-                        'end' => $tag[2][1] + \strlen($tag[2][0]),
-                    ];
+                    $events[] = new XmlConfigurationStructureError(
+                        \sprintf('Closing element "%s" does not match "%s".', $tag[2][0], $open ?? 'none'),
+                        $tag[2][1],
+                        $tag[2][1] + \strlen($tag[2][0]),
+                    );
                 }
                 if ([] !== $stack) {
                     array_pop($stack);
@@ -107,32 +99,31 @@ final class XmlConfigurationAnalyzer
             $attributes = [];
             preg_match_all('/([A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(["\'])(.*?)\2/', $tag[3][0], $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
             foreach ($matches as $attribute) {
-                $attributes[] = [
-                    'name' => str_replace('-', '_', $attribute[1][0]),
-                    'value' => $attribute[3][0],
-                    'start' => $tag[3][1] + $attribute[1][1],
-                    'end' => $tag[3][1] + $attribute[1][1] + \strlen($attribute[1][0]),
-                ];
+                $startOffset = $tag[3][1] + $attribute[1][1];
+                $attributes[] = new XmlConfigurationAttribute(
+                    str_replace('-', '_', $attribute[1][0]),
+                    $attribute[3][0],
+                    $startOffset,
+                    $startOffset + \strlen($attribute[1][0]),
+                );
             }
-            $events[] = [
-                'kind' => 'element',
-                'path' => $path,
-                'name' => $tag[2][0],
-                'start' => $tag[2][1],
-                'end' => $tag[2][1] + \strlen($tag[2][0]),
-                'attributes' => $attributes,
-            ];
+            $events[] = new XmlConfigurationOccurrence(
+                $path,
+                $tag[2][0],
+                $tag[2][1],
+                $tag[2][1] + \strlen($tag[2][0]),
+                $attributes,
+            );
             if (null !== $path && !$selfClosing) {
                 $stack = $path;
             }
         }
         if ([] !== $elements) {
-            $events[] = [
-                'kind' => 'structure',
-                'message' => \sprintf('Element "%s" is not closed.', array_pop($elements)),
-                'start' => \strlen($source),
-                'end' => \strlen($source),
-            ];
+            $events[] = new XmlConfigurationStructureError(
+                \sprintf('Element "%s" is not closed.', array_pop($elements)),
+                \strlen($source),
+                \strlen($source),
+            );
         }
 
         return [$events, $stack];
