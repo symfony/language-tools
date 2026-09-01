@@ -47,6 +47,8 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
         $relativePath = $this->projectPaths->relative($request->project, $request->document->uri);
         if (null === $relativePath
             || !str_starts_with($relativePath, 'config/')
+            || str_starts_with($relativePath, 'config/routes.')
+            || str_starts_with($relativePath, 'config/routes/')
             || $this->routeIndexes->forProject($request->project)->isResource($relativePath)
         ) {
             return null;

@@ -37,11 +37,13 @@ Diagnostics report statically provable configuration errors, including unknown
 or duplicate keys, invalid scalar types, invalid enum values, deprecated nodes
 and malformed structures. Symfony Language Tools suppresses diagnostics when a
 root key doesn't belong to an installed bundle, so application service and
-import sections aren't mistaken for bundle configuration. Files loaded by the
-selected environment's router are analyzed as routes instead. Diagnostics are
-limited to the application's own ``config/`` directory because
-configuration files elsewhere, such as bundle test fixtures, can target another
-kernel.
+import sections aren't mistaken for bundle configuration. Files in
+conventional routing locations, including ``config/routes/`` and
+``config/routes.yaml``, are analyzed as routes instead. Files loaded by the
+selected environment's router receive the same treatment, including files in
+custom locations. Diagnostics are limited to the application's own ``config/``
+directory because configuration files elsewhere, such as bundle test fixtures,
+can target another kernel.
 
 Unknown keys, invalid types and invalid enum values are reported as warnings.
 When runtime analysis confirms that saved application configuration is invalid,

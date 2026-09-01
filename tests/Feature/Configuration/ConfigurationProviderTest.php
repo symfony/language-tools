@@ -204,24 +204,21 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
-    public function testSkipsOnlyResourcesLoadedByTheRouter(): void
+    public function testSkipsConventionalRouteFilesAndResourcesLoadedByTheRouter(): void
     {
         $fixture = $this->providers();
-        foreach (['config/routes/framework.yaml', 'config/http_endpoints.yaml'] as $path) {
+        foreach (['config/routes/sulu_website.yaml', 'config/routes.yaml', 'config/http_endpoints.yaml'] as $path) {
             $uri = 'file:///workspace/'.$path;
-            $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    mystery: true\n"));
+            $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    resource: routes.yaml\n"));
 
             self::assertNull($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
             $fixture->documents->close($uri);
         }
 
-        foreach (['config/routes.yaml', 'config/packages/framework.yaml'] as $path) {
-            $uri = 'file:///workspace/'.$path;
-            $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    mystery: true\n"));
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    resource: routes.yaml\n"));
 
-            self::assertSame(['config.unknown_key'], array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
-            $fixture->documents->close($uri);
-        }
+        self::assertSame(['config.unknown_key'], array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
     }
 
     public function testIgnoresInactiveEnvironmentSemantics(): void

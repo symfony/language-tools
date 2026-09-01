@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Treat conventional routing files as routes during configuration diagnostics
 - Test Sulu Skeleton in the public dogfood matrix
 - Ignore commented Messenger bus and transport options in YAML
 - Expose sanitized runtime section failure causes in verbose output
