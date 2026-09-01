@@ -18,7 +18,6 @@ final class ConsoleExtractor
 {
     private const AS_COMMAND_ATTRIBUTE = 'Symfony\\Component\\Console\\Attribute\\AsCommand';
     private const COMMAND = 'Symfony\\Component\\Console\\Command\\Command';
-    private const INPUT_INTERFACE = 'Symfony\\Component\\Console\\Input\\InputInterface';
 
     public function __construct(
         private readonly PositionConverter $converter,
@@ -26,6 +25,7 @@ final class ConsoleExtractor
         private readonly PhpCommentParserInterface $phpComments,
         private readonly ConsoleDefinitionExtractor $definitionExtractor,
         private readonly ConsoleInvokableParameterExtractor $invokableParameterExtractor,
+        private readonly ConsoleInputReceiverResolver $inputReceivers,
     ) {
     }
 
@@ -47,7 +47,7 @@ final class ConsoleExtractor
 
         $references = [];
         foreach ($php->methodCalls as $call) {
-            if (!\in_array($call->method, ['getArgument', 'getOption'], true) || !$this->hasInputReceiver($call, $php)) {
+            if (!\in_array($call->method, ['getArgument', 'getOption'], true) || !$this->inputReceivers->hasInputReceiver($masked, $php, $call)) {
                 continue;
             }
             $name = $call->positionalArgument(0)?->stringLiteral;
@@ -83,7 +83,7 @@ final class ConsoleExtractor
         $receiver = $property ? $match[2][0] : ($match[1][0] ?? null);
         $receiverKind = $property ? PhpMethodReceiverKind::ThisProperty : PhpMethodReceiverKind::Variable;
         $call = \is_string($receiver) ? array_find($php->methodCalls, static fn (PhpMethodCall $call): bool => $match[3][0] === $call->method && $receiver === $call->receiverContext->name && $receiverKind === $call->receiverContext->kind && $methodOffset >= $call->startOffset && $methodOffset < $call->endOffset) : null;
-        if (null === $call || null === $call->className || !$this->hasInputReceiver($call, $php)) {
+        if (null === $call || null === $call->className || !$this->inputReceivers->hasInputReceiver($masked, $php, $call)) {
             return null;
         }
         $rawPrefix = $match['prefix'][0];
@@ -124,10 +124,5 @@ final class ConsoleExtractor
                 || 0 === strcasecmp(self::COMMAND, (string) $type->parentClassName),
             $complete && $attributesComplete,
         );
-    }
-
-    private function hasInputReceiver(PhpMethodCall $call, PhpDocument $php): bool
-    {
-        return array_any($php->receiverVariables($call), static fn ($variable): bool => \in_array(self::INPUT_INTERFACE, $variable->types, true));
     }
 }

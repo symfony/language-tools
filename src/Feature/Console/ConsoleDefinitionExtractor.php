@@ -21,10 +21,15 @@ final class ConsoleDefinitionExtractor
         $arguments = [];
         $options = [];
         $complete = true;
+        $configureRanges = $this->methodBodyRanges($text, $type, 'configure');
         foreach ($php->methodCalls as $call) {
+            $nested = 'configure' !== $call->enclosingMethod && $this->isWithinMethod($call->startOffset, $call->endOffset, $configureRanges);
             $receiver = substr($text, $call->receiverContext->startOffset, $call->receiverContext->endOffset - $call->receiverContext->startOffset);
-            if ($type->name !== $call->className || 'configure' !== $call->enclosingMethod || !$this->isDefinitionReceiver($receiver)) {
+            if ($type->name !== $call->className || ('configure' !== $call->enclosingMethod && !$nested) || !$this->isDefinitionReceiver($receiver)) {
                 continue;
+            }
+            if ($nested) {
+                $complete = false;
             }
             if ('addArgument' === $call->method || 'addOption' === $call->method) {
                 $name = $call->positionalArgument(0)?->stringLiteral?->value;
@@ -52,7 +57,7 @@ final class ConsoleDefinitionExtractor
             $options = [...$options, ...$definitionOptions];
             $complete = $complete && $definitionComplete;
         }
-        foreach ($this->methodBodyRanges($text, $type, 'configure') as $range) {
+        foreach ($configureRanges as $range) {
             if (!$range['closed']) {
                 $complete = false;
             }
@@ -107,6 +112,12 @@ final class ConsoleDefinitionExtractor
         }
 
         return [array_values(array_unique($arguments)), array_values(array_unique($options)), $complete];
+    }
+
+    /** @param list<array{start: int, end: int, closed: bool}> $ranges */
+    private function isWithinMethod(int $start, int $end, array $ranges): bool
+    {
+        return array_any($ranges, static fn (array $range): bool => $start > $range['start'] && $end <= $range['end']);
     }
 
     /** @return list<array{start: int, end: int, closed: bool}> */

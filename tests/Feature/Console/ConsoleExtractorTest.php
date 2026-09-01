@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Console\ConsoleDefinitionExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleInputKind;
+use Symfony\Lsp\Feature\Console\ConsoleInputReceiverResolver;
 use Symfony\Lsp\Feature\Console\ConsoleInvokableParameterExtractor;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\LastResultPhpParser;
@@ -105,6 +106,32 @@ final class ConsoleExtractorTest extends TestCase
         self::assertSame([ConsoleInputKind::Argument, ConsoleInputKind::Option], array_map(static fn ($reference): ConsoleInputKind => $reference->kind, $facts->references));
     }
 
+    public function testIndexesInputReferencesCapturedInsideClosures(): void
+    {
+        $facts = $this->extractor()->extract('file:///workspace/src/Command/CapturedCommand.php', 'php', <<<'PHP'
+            <?php
+            use Symfony\Component\Console\Input\InputInterface;
+
+            final class CapturedCommand
+            {
+                public function execute(InputInterface $input): void
+                {
+                    $closure = function () use ($input): void {
+                        $input->getArgument('closure');
+                    };
+                    $arrow = fn (): string => $input->getOption('arrow');
+                    $uncaptured = function (): void {
+                        $input->getOption('uncaptured');
+                    };
+                    $shadowed = fn ($input): string => $input->getOption('shadowed');
+                }
+            }
+            PHP);
+
+        self::assertSame(['closure', 'arrow'], array_map(static fn ($reference): string => $reference->name, $facts->references));
+        self::assertSame([ConsoleInputKind::Argument, ConsoleInputKind::Option], array_map(static fn ($reference): ConsoleInputKind => $reference->kind, $facts->references));
+    }
+
     public function testScopesInputReferencesToTheirOwningMethods(): void
     {
         $facts = $this->extractor()->extract('file:///workspace/src/Command/ScopedCommand.php', 'php', <<<'PHP'
@@ -193,6 +220,27 @@ final class ConsoleExtractorTest extends TestCase
         self::assertSame(['neighbor'], $declarations['App\Command\NeighborCommand']->arguments);
         self::assertTrue($declarations['App\Command\FirstCommand']->command);
         self::assertFalse($declarations['App\Command\NeighborCommand']->command);
+    }
+
+    public function testIndexesConfigureCallsInsideClosuresConservatively(): void
+    {
+        $facts = $this->extractor()->extract('file:///workspace/src/Command/DeferredCommand.php', 'php', <<<'PHP'
+            <?php
+            final class DeferredCommand
+            {
+                protected function configure(): void
+                {
+                    $argument = function (): void {
+                        $this->addArgument('closure');
+                    };
+                    $option = fn () => $this->addOption('arrow');
+                }
+            }
+            PHP);
+
+        self::assertSame(['closure'], $facts->declarations[0]->arguments);
+        self::assertSame(['arrow'], $facts->declarations[0]->options);
+        self::assertFalse($facts->declarations[0]->complete);
     }
 
     public function testMarksDynamicDefinitionsIncomplete(): void
@@ -320,6 +368,7 @@ final class ConsoleExtractorTest extends TestCase
             new PhpCommentParser(),
             new ConsoleDefinitionExtractor(new PhpExpressionParser($expressionParser), $delimiters),
             new ConsoleInvokableParameterExtractor($delimiters),
+            new ConsoleInputReceiverResolver($delimiters),
         );
 
         $facts = $extractor->extract('file:///workspace/src/Command/ReportCommand.php', 'php', $text);
@@ -343,6 +392,7 @@ final class ConsoleExtractorTest extends TestCase
             new PhpCommentParser(),
             new ConsoleDefinitionExtractor(new PhpExpressionParser(new TolerantPhpParser(new Parser())), $delimiters),
             new ConsoleInvokableParameterExtractor($delimiters),
+            new ConsoleInputReceiverResolver($delimiters),
         );
     }
 }

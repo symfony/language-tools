@@ -13,6 +13,7 @@ use Symfony\Lsp\Feature\Console\ConsoleCommandMetadata;
 use Symfony\Lsp\Feature\Console\ConsoleDefinitionExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleIndexRegistry;
+use Symfony\Lsp\Feature\Console\ConsoleInputReceiverResolver;
 use Symfony\Lsp\Feature\Console\ConsoleInvokableParameterExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleProvider;
 use Symfony\Lsp\Feature\Console\ConsoleSourceIndexRegistry;
@@ -165,6 +166,7 @@ final class ConsoleProviderTest extends TestCase
             new PhpCommentParser(),
             new ConsoleDefinitionExtractor(new PhpExpressionParser(new TolerantPhpParser(new Parser())), $delimiters),
             new ConsoleInvokableParameterExtractor($delimiters),
+            new ConsoleInputReceiverResolver($delimiters),
         );
         $sourceIndexes = new ConsoleSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($extractor->extract($uri, 'php', $text));
