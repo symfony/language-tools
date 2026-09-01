@@ -61,7 +61,8 @@ final class WorkspaceConfiguration
         $this->rediscoverProjects();
     }
 
-    public function requestWorkspaceTrust(): void
+    /** @return list<string> */
+    public function requestWorkspaceTrust(): array
     {
         $runtimeProjects = [];
         foreach ($this->projectRegistry->all() as $project) {
@@ -71,7 +72,8 @@ final class WorkspaceConfiguration
                 $this->workspaceTrustManager->invalidateRuntime($project);
             }
         }
-        $this->workspaceTrustManager->requestUnknownDecisions($runtimeProjects);
+
+        return $this->workspaceTrustManager->requestUnknownDecisions($runtimeProjects);
     }
 
     /** @param array<array-key, mixed> $params */

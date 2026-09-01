@@ -44,13 +44,20 @@ final class WorkspaceTrustManager implements ProjectStateInterface
         }
     }
 
-    /** @param list<Project> $projects */
-    public function requestUnknownDecisions(array $projects): void
+    /**
+     * @param list<Project> $projects
+     *
+     * @return list<string>
+     */
+    public function requestUnknownDecisions(array $projects): array
     {
+        $started = [];
         foreach ($projects as $project) {
             $status = $this->workspaceTrust->status($project);
             if (TrustStatus::Trusted === $status) {
-                $this->startRuntime($project);
+                if ($this->startRuntime($project)) {
+                    $started[] = $project->rootPath;
+                }
                 continue;
             }
             if (TrustStatus::Untrusted === $status) {
@@ -77,10 +84,12 @@ final class WorkspaceTrustManager implements ProjectStateInterface
                 && 'Trust and enable runtime indexing' === ($response['title'] ?? null);
             $status = $trusted ? TrustStatus::Trusted : TrustStatus::Untrusted;
             $this->workspaceTrust->set($project, $status);
-            if (TrustStatus::Trusted === $status) {
-                $this->startRuntime($project);
+            if (TrustStatus::Trusted === $status && $this->startRuntime($project)) {
+                $started[] = $project->rootPath;
             }
         }
+
+        return $started;
     }
 
     public function invalidateRuntime(Project $project): void
@@ -93,7 +102,7 @@ final class WorkspaceTrustManager implements ProjectStateInterface
         $this->invalidateRuntime($project);
     }
 
-    private function startRuntime(Project $project): void
+    private function startRuntime(Project $project): bool
     {
         $configuration = hash('sha256', serialize([
             $this->configuration->phpCommand($project),
@@ -104,7 +113,7 @@ final class WorkspaceTrustManager implements ProjectStateInterface
             $this->configuration->releaseMetadata($project),
         ]));
         if (($this->runtimeStarted[$project->rootPath] ?? null) === $configuration) {
-            return;
+            return false;
         }
 
         $this->runtimeInitializer->initialize($project);
@@ -113,5 +122,7 @@ final class WorkspaceTrustManager implements ProjectStateInterface
         } else {
             unset($this->runtimeStarted[$project->rootPath]);
         }
+
+        return true;
     }
 }

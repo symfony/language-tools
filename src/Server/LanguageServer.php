@@ -272,6 +272,7 @@ final class LanguageServer
         }
 
         async(function () use ($rediscover, $reloadConfiguration, $refreshWatchers, $watchedChanges): void {
+            $configurationReady = true;
             try {
                 if ($reloadConfiguration) {
                     $this->workspaceConfiguration->reloadProjectConfiguration();
@@ -283,31 +284,33 @@ final class LanguageServer
                 if ($rediscover || $reloadConfiguration || $refreshWatchers) {
                     $this->workspaceFileWatcher->refresh();
                 }
-                $rediscoveredChanges = [];
-                if ($rediscover) {
-                    foreach ($watchedChanges as $change) {
-                        $rediscoveredChanges[] = [
-                            'uri' => $change['uri'],
-                            'composer' => $change['composer'],
-                            'source' => $this->sourceScanner->refreshUri($change['uri'], $change['deleted']),
-                        ];
-                    }
-                }
-                $this->sourceScanner->indexAll();
-                if ($rediscover || $reloadConfiguration) {
-                    $this->workspaceConfiguration->requestWorkspaceTrust();
-                }
-                foreach ($rediscoveredChanges as $change) {
-                    if ($change['composer']) {
-                        $this->projectRuntimeRefresher->refreshAfterRediscovery($change['uri']);
-                    } else {
-                        $this->projectRuntimeRefresher->refreshUri($change['uri'], $change['source']);
-                    }
-                }
-                $this->diagnosticProviders->refreshAll();
             } catch (InvalidConfigurationException $error) {
+                $configurationReady = false;
                 $this->logger->error($error);
             }
+
+            $rediscoveredChanges = [];
+            if ($rediscover) {
+                foreach ($watchedChanges as $change) {
+                    $rediscoveredChanges[] = [
+                        'uri' => $change['uri'],
+                        'composer' => $change['composer'],
+                        'source' => $this->sourceScanner->refreshUri($change['uri'], $change['deleted']),
+                    ];
+                }
+            }
+            $this->sourceScanner->indexAll();
+            $initializedProjects = $configurationReady && ($rediscover || $reloadConfiguration)
+                ? $this->workspaceConfiguration->requestWorkspaceTrust()
+                : [];
+            foreach ($rediscoveredChanges as $change) {
+                if ($change['composer']) {
+                    $this->projectRuntimeRefresher->refreshAfterRediscovery($change['uri'], $initializedProjects);
+                } else {
+                    $this->projectRuntimeRefresher->refreshUri($change['uri'], $change['source']);
+                }
+            }
+            $this->diagnosticProviders->refreshAll();
         })->ignore();
     }
 

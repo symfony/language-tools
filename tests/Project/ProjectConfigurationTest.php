@@ -59,6 +59,29 @@ final class ProjectConfigurationTest extends TestCase
         self::assertSame('apps/admin/config/services.yaml', $this->configuration->workspaceRelativePath($project, $project->rootPath.'/config/services.yaml'));
     }
 
+    public function testKeepsTheLastValidConfigurationWhenReloadFails(): void
+    {
+        $path = $this->directory.'/.symfony-lsp.json';
+        file_put_contents($path, json_encode([
+            'version' => 1,
+            'environment' => 'test',
+        ], \JSON_THROW_ON_ERROR));
+        $workspace = [['uri' => (new UriToPathConverter())->toUri($this->directory)]];
+        $this->configuration->load($workspace);
+        file_put_contents($path, '{');
+
+        try {
+            $this->configuration->load($workspace);
+            self::fail('The invalid configuration was accepted.');
+        } catch (InvalidConfigurationException) {
+        }
+
+        self::assertSame(
+            ['environment' => 'test'],
+            $this->configuration->settings(new Project($this->directory, 'file:///workspace', '^8.0')),
+        );
+    }
+
     public function testRejectsProjectRootsThatResolveOutsideTheWorkspace(): void
     {
         $external = $this->directory.'-external';

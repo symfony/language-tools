@@ -22,7 +22,7 @@ final class ProjectConfiguration
      */
     public function load(array $workspaceFolders, ?string $configurationPath = null): void
     {
-        $this->workspaces = [];
+        $workspaces = [];
         foreach ($workspaceFolders as $index => $folder) {
             $root = $this->uriToPathConverter->convert($folder['uri']);
             if (null === $root) {
@@ -36,8 +36,9 @@ final class ProjectConfiguration
             if ($explicit && !is_file($path)) {
                 throw new InvalidConfigurationException(\sprintf('The Symfony Language Tools configuration file "%s" does not exist.', $path));
             }
-            $this->workspaces[] = $this->loadWorkspace($root, $path);
+            $workspaces[] = $this->loadWorkspace($root, $path);
         }
+        $this->workspaces = $workspaces;
     }
 
     /** @return list<string>|null */

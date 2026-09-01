@@ -78,6 +78,15 @@ final class ProjectRuntimeRefresherTest extends TestCase
         self::assertNull($scheduler->plans[0]->sections());
     }
 
+    public function testDoesNotRefreshComposerAfterRuntimeAlreadyInitializedForTheChange(): void
+    {
+        [$refresher, $scheduler] = $this->refresher(TrustStatus::Trusted);
+
+        $refresher->refreshAfterRediscovery('file:///workspace/composer.json', ['/workspace']);
+
+        self::assertSame([], $scheduler->plans);
+    }
+
     /** @return iterable<string, array{string}> */
     public static function composerFileProvider(): iterable
     {

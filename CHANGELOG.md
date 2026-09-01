@@ -5,6 +5,8 @@
 - Accept the next Symfony minor development branch
 - Allow release metadata network access to be disabled
 - Persist healthy runtime sections and report partial indexes accurately
+- Avoid duplicate Composer runtime boots after failed initialization
+- Keep watched source updates when project rediscovery fails
 - Diagnose unknown Twig named arguments when values contain nested calls
 - Ignore Twig route completions inside comments
 - Resolve Twig callable methods with consistently normalized class names
