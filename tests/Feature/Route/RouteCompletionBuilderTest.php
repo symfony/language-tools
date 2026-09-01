@@ -6,14 +6,14 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteCompletionBuilder;
 use Symfony\Lsp\Feature\Route\RouteIndex;
-use Symfony\Lsp\Feature\Route\RouteSnapshotLoader;
+use Symfony\Lsp\Feature\Route\RouteSnapshotImporter;
 
 final class RouteCompletionBuilderTest extends TestCase
 {
     public function testCompletesRoutesLoadedFromRuntimeSnapshot(): void
     {
         $index = new RouteIndex();
-        (new RouteSnapshotLoader($index))->load([
+        (new RouteSnapshotImporter($index))->load([
             'complete' => true,
             'resources' => ['config/routes.yaml', 'config/http_endpoints.yaml'],
             'items' => [
@@ -34,7 +34,7 @@ final class RouteCompletionBuilderTest extends TestCase
     public function testCompletesInternationalizedRoutesWithCanonicalNames(): void
     {
         $index = new RouteIndex();
-        (new RouteSnapshotLoader($index))->load([
+        (new RouteSnapshotImporter($index))->load([
             'complete' => true,
             'items' => [
                 ['name' => 'app_home.en', 'canonical' => 'app_home', 'path' => '/en/{english}'],
@@ -50,7 +50,7 @@ final class RouteCompletionBuilderTest extends TestCase
     public function testLoadsRouterRequestContextParameters(): void
     {
         $index = new RouteIndex();
-        (new RouteSnapshotLoader($index))->load([
+        (new RouteSnapshotImporter($index))->load([
             'complete' => true,
             'contextParameters' => ['_locale', null],
             'items' => [
@@ -66,7 +66,7 @@ final class RouteCompletionBuilderTest extends TestCase
     public function testIgnoresMalformedSnapshotEntries(): void
     {
         $index = new RouteIndex();
-        (new RouteSnapshotLoader($index))->load([
+        (new RouteSnapshotImporter($index))->load([
             'complete' => true,
             'resources' => [null, 'config/routes.yaml'],
             'items' => [null, ['path' => '/']],
@@ -80,7 +80,7 @@ final class RouteCompletionBuilderTest extends TestCase
     {
         $index = new RouteIndex();
         $index->replaceRuntime(['config/old_routes.yaml'], []);
-        (new RouteSnapshotLoader($index))->load([
+        (new RouteSnapshotImporter($index))->load([
             'complete' => true,
             'resources' => ['config/new_routes.yaml'],
             'items' => [],

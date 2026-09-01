@@ -36,7 +36,7 @@ final class ProjectSecuritySnapshotLoader implements RuntimeSnapshotLoaderInterf
         $providers = [];
         foreach (\is_array($section['providers'] ?? null) ? $section['providers'] : [] as $item) {
             if (\is_array($item) && \is_string($item['name'] ?? null) && \is_string($item['type'] ?? null)) {
-                $providers[] = new SecurityUserProvider($item['name'], $item['type']);
+                $providers[] = new SecurityUserProviderDeclaration($item['name'], $item['type']);
             }
         }
         $roles = [];

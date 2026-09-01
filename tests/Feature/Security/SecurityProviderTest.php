@@ -19,7 +19,7 @@ use Symfony\Lsp\Feature\Security\SecurityRelationshipProvider;
 use Symfony\Lsp\Feature\Security\SecurityRole;
 use Symfony\Lsp\Feature\Security\SecuritySourceIndexRegistry;
 use Symfony\Lsp\Feature\Security\SecuritySymbolResolver;
-use Symfony\Lsp\Feature\Security\SecurityUserProvider;
+use Symfony\Lsp\Feature\Security\SecurityUserProviderDeclaration;
 use Symfony\Lsp\Feature\Security\SecurityVoter;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
@@ -300,7 +300,7 @@ PHP;
         $indexes = new SecurityIndexRegistry();
         $indexes->forProject($project)->replace(
             [new SecurityFirewall('main', 'users', true, false, true, ['App\\Security\\Authenticator'])],
-            [new SecurityUserProvider('users', 'memory')],
+            [new SecurityUserProviderDeclaration('users', 'memory')],
             [new SecurityRole('ROLE_ADMIN', ['ROLE_USER']), new SecurityRole('ROLE_USER', [])],
             [new SecurityVoter('App\\Security\\PostVoter')],
             true,

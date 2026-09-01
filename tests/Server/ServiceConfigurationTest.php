@@ -17,14 +17,23 @@ use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\Doctrine\DoctrineCompletionProvider;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
+use Symfony\Lsp\Feature\Messenger\MessengerHandlerDeclaration;
 use Symfony\Lsp\Feature\Metadata\MetadataCompletionProvider;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Feature\RenameProviderInterface;
+use Symfony\Lsp\Feature\Route\RouteSnapshotImporter;
+use Symfony\Lsp\Feature\Security\SecurityUserProviderDeclaration;
 use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
+use Symfony\Lsp\Feature\Translation\TranslationParameterAnalyzer;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Index\SourceFactsStore;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
+use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigStringDecoder;
+use Symfony\Lsp\Parser\Yaml\YamlScalarDecoder;
 use Symfony\Lsp\Project\ProjectStateInterface;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Project\WorkspaceTrustManager;
@@ -65,6 +74,31 @@ final class ServiceConfigurationTest extends TestCase
                     break;
                 }
             }
+        }
+    }
+
+    public function testRegistersOnlyContainerManagedServicesFromBroadDiscoveryGroups(): void
+    {
+        $container = $this->container();
+
+        foreach ([
+            MessengerHandlerDeclaration::class,
+            RouteSnapshotImporter::class,
+            SecurityUserProviderDeclaration::class,
+            SourceFactsStore::class,
+            PhpStringLiteralDecoder::class,
+            TwigStringDecoder::class,
+        ] as $class) {
+            self::assertFalse($container->hasDefinition($class), \sprintf('The manually constructed class "%s" is registered as a service.', $class));
+        }
+
+        foreach ([
+            PersistentSourceIndexStore::class,
+            TranslationParameterAnalyzer::class,
+            TreeSitterResultDecoder::class,
+            YamlScalarDecoder::class,
+        ] as $class) {
+            self::assertTrue($container->hasDefinition($class), \sprintf('The injected collaborator "%s" is not registered as a service.', $class));
         }
     }
 

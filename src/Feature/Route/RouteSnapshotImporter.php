@@ -4,7 +4,7 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Runtime\RuntimeSnapshotNormalizer;
 
-final class RouteSnapshotLoader
+final class RouteSnapshotImporter
 {
     public function __construct(
         private readonly RouteIndex $routeIndex,

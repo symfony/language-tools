@@ -32,15 +32,11 @@ use Symfony\Lsp\Feature\Event\EventYamlListenerAnalyzer;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderRegistry;
 use Symfony\Lsp\Feature\Messenger\MessengerCodeLensProvider;
-use Symfony\Lsp\Feature\Messenger\MessengerHandler;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderRegistry;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Feature\RenameProviderRegistry;
-use Symfony\Lsp\Feature\Route\RouteSnapshotLoader;
-use Symfony\Lsp\Feature\Security\SecurityUserProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusCodeLensProvider;
-use Symfony\Lsp\Feature\Translation\TranslationParameterAnalyzer;
 use Symfony\Lsp\Feature\Twig\LiveComponentEventProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCodeActionProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCompletionHandler;
@@ -72,10 +68,12 @@ use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\LastResultTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
+use Symfony\Lsp\Parser\Yaml\YamlScalarDecoder;
 use Symfony\Lsp\Progress\ProgressReporterInterface;
 use Symfony\Lsp\Project\ProjectStateCleaner;
 use Symfony\Lsp\Project\ProjectStateInterface;
@@ -185,19 +183,18 @@ return static function (ContainerConfigurator $container): void {
             '../src/Feature/'.$feature.'/*{Provider,Handler,Extractor,Indexer,Registry,Resolver,Loader,Publisher,Parser,Validator,Builder,Classifier,Analyzer,Reconciler,Lookup}.php',
         );
     }
-    foreach ([MessengerHandler::class, RouteSnapshotLoader::class, SecurityUserProvider::class] as $class) {
-        $services->remove($class);
-    }
 
     $services->load('Symfony\\Lsp\\Check\\', '../src/Check/*{Manager,Registry,Parser,Selector,Runner,Reporter,Command,Client,Factory,Analyzer,Executor,Builder,Codec,Repository,Matcher,Tokenizer,Numberer}.php');
     $services->load('Symfony\\Lsp\\Client\\', '../src/Client/*Client.php');
     $services->load('Symfony\\Lsp\\Document\\', '../src/Document/*{Resolver,Store,Synchronizer,Converter,Reader}.php');
-    $services->load('Symfony\\Lsp\\Index\\', '../src/Index/*{Scanner,Handler,Store,Registry,Codec,Hasher,Enumerator,Pipeline,Processor,Manager,Resolver}.php');
-    $services->load('Symfony\\Lsp\\Parser\\', '../src/Parser/**/*{Parser,Decoder,Locator}.php');
+    $services->load('Symfony\\Lsp\\Index\\', '../src/Index/*{Scanner,Handler,Registry,Codec,Hasher,Enumerator,Pipeline,Processor,Manager,Resolver}.php');
+    $services->set(PersistentSourceIndexStore::class);
+    $services->load('Symfony\\Lsp\\Parser\\', '../src/Parser/**/*{Parser,Locator}.php');
+    $services->set(TreeSitterResultDecoder::class);
+    $services->set(YamlScalarDecoder::class);
     $services->set(BalancedDelimiterMatcher::class);
     $services->set(QuotedArgumentMatcher::class);
     $services->set(TwigCallArgumentResolver::class);
-    $services->set(TranslationParameterAnalyzer::class);
     $services->set(CommentParserRegistry::class)
         ->arg('$parsers', [
             'php' => service(PhpCommentParserInterface::class),

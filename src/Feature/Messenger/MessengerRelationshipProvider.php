@@ -86,8 +86,8 @@ final class MessengerRelationshipProvider implements DefinitionProviderInterface
     }
 
     /**
-     * @param list<string>           $transports
-     * @param list<MessengerHandler> $handlers
+     * @param list<string>                      $transports
+     * @param list<MessengerHandlerDeclaration> $handlers
      *
      * @return list<string>
      */

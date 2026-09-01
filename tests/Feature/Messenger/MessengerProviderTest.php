@@ -19,7 +19,7 @@ use Symfony\Lsp\Feature\Messenger\MessengerCodeLensProvider;
 use Symfony\Lsp\Feature\Messenger\MessengerCompletionProvider;
 use Symfony\Lsp\Feature\Messenger\MessengerDiagnosticProvider;
 use Symfony\Lsp\Feature\Messenger\MessengerExtractor;
-use Symfony\Lsp\Feature\Messenger\MessengerHandler;
+use Symfony\Lsp\Feature\Messenger\MessengerHandlerDeclaration;
 use Symfony\Lsp\Feature\Messenger\MessengerIndexRegistry;
 use Symfony\Lsp\Feature\Messenger\MessengerMessage;
 use Symfony\Lsp\Feature\Messenger\MessengerRelationshipProvider;
@@ -271,8 +271,8 @@ YAML;
             [new MessengerTransport('async', false)],
             [new MessengerMessage('App\\Message\\Ping', ['async'])],
             [
-                new MessengerHandler('App\\Message\\DomainEvent', 'command.bus', 'handler', 'App\\MessageHandler\\PingHandler', '__invoke', 0, 'async'),
-                new MessengerHandler('App\\Message\\Other', 'command.bus', 'string_handler', 'App\\MessageHandler\\StringHandler', 'handle', 0, 'async'),
+                new MessengerHandlerDeclaration('App\\Message\\DomainEvent', 'command.bus', 'handler', 'App\\MessageHandler\\PingHandler', '__invoke', 0, 'async'),
+                new MessengerHandlerDeclaration('App\\Message\\Other', 'command.bus', 'string_handler', 'App\\MessageHandler\\StringHandler', 'handle', 0, 'async'),
             ],
             true,
         );

@@ -71,7 +71,7 @@ final class MessengerRelationshipResolver
         return $this->relations($params, false);
     }
 
-    /** @return list<MessengerHandler> */
+    /** @return list<MessengerHandlerDeclaration> */
     public function handlersForMessage(Project $project, MessengerIndex $index, string $className): array
     {
         $handlers = [];

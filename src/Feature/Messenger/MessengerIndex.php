@@ -10,15 +10,15 @@ final class MessengerIndex
     private array $transports = [];
     /** @var array<string, MessengerMessage> */
     private array $messages = [];
-    /** @var list<MessengerHandler> */
+    /** @var list<MessengerHandlerDeclaration> */
     private array $handlers = [];
     private bool $complete = false;
 
     /**
-     * @param list<MessengerBus>       $buses
-     * @param list<MessengerTransport> $transports
-     * @param list<MessengerMessage>   $messages
-     * @param list<MessengerHandler>   $handlers
+     * @param list<MessengerBus>                $buses
+     * @param list<MessengerTransport>          $transports
+     * @param list<MessengerMessage>            $messages
+     * @param list<MessengerHandlerDeclaration> $handlers
      */
     public function replace(array $buses, array $transports, array $messages, array $handlers, bool $complete): void
     {
@@ -74,16 +74,16 @@ final class MessengerIndex
         return $this->messages[ltrim($className, '\\')] ?? null;
     }
 
-    /** @return list<MessengerHandler> */
+    /** @return list<MessengerHandlerDeclaration> */
     public function handlersForMessage(string $className): array
     {
-        return array_values(array_filter($this->handlers, static fn (MessengerHandler $handler): bool => $handler->message === ltrim($className, '\\')));
+        return array_values(array_filter($this->handlers, static fn (MessengerHandlerDeclaration $handler): bool => $handler->message === ltrim($className, '\\')));
     }
 
-    /** @return list<MessengerHandler> */
+    /** @return list<MessengerHandlerDeclaration> */
     public function handlersByClass(string $className): array
     {
-        return array_values(array_filter($this->handlers, static fn (MessengerHandler $handler): bool => $handler->className === ltrim($className, '\\')));
+        return array_values(array_filter($this->handlers, static fn (MessengerHandlerDeclaration $handler): bool => $handler->className === ltrim($className, '\\')));
     }
 
     public function isComplete(): bool

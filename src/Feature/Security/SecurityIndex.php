@@ -6,7 +6,7 @@ final class SecurityIndex
 {
     /** @var array<string, SecurityFirewall> */
     private array $firewalls = [];
-    /** @var array<string, SecurityUserProvider> */
+    /** @var array<string, SecurityUserProviderDeclaration> */
     private array $providers = [];
     /** @var array<string, SecurityRole> */
     private array $roles = [];
@@ -15,10 +15,10 @@ final class SecurityIndex
     private bool $complete = false;
 
     /**
-     * @param list<SecurityFirewall>     $firewalls
-     * @param list<SecurityUserProvider> $providers
-     * @param list<SecurityRole>         $roles
-     * @param list<SecurityVoter>        $voters
+     * @param list<SecurityFirewall>                $firewalls
+     * @param list<SecurityUserProviderDeclaration> $providers
+     * @param list<SecurityRole>                    $roles
+     * @param list<SecurityVoter>                   $voters
      */
     public function replace(array $firewalls, array $providers, array $roles, array $voters, bool $complete): void
     {
@@ -52,13 +52,13 @@ final class SecurityIndex
         return $this->firewalls[$name] ?? null;
     }
 
-    /** @return list<SecurityUserProvider> */
+    /** @return list<SecurityUserProviderDeclaration> */
     public function providers(): array
     {
         return array_values($this->providers);
     }
 
-    public function provider(string $name): ?SecurityUserProvider
+    public function provider(string $name): ?SecurityUserProviderDeclaration
     {
         return $this->providers[$name] ?? null;
     }

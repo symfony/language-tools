@@ -33,7 +33,7 @@ final class SecurityCompletionProvider implements CompletionProviderInterface
         $index = $this->indexes->forProject($request->project);
         $names = match ($context->kind) {
             SecuritySymbolKind::Firewall => array_map(static fn (SecurityFirewall $firewall): string => $firewall->name, $index->firewalls()),
-            SecuritySymbolKind::Provider => array_map(static fn (SecurityUserProvider $provider): string => $provider->name, $index->providers()),
+            SecuritySymbolKind::Provider => array_map(static fn (SecurityUserProviderDeclaration $provider): string => $provider->name, $index->providers()),
             SecuritySymbolKind::Role => array_map(static fn (SecurityRole $role): string => $role->name, $index->roles()),
         };
         $sourceIndex = $this->sourceIndexes->forProject($request->project);

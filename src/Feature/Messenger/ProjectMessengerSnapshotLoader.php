@@ -43,7 +43,7 @@ final class ProjectMessengerSnapshotLoader implements RuntimeSnapshotLoaderInter
             if (!\is_array($item) || !\is_string($item['message'] ?? null) || !\is_string($item['bus'] ?? null) || !\is_string($item['service'] ?? null) || !\is_string($item['class'] ?? null) || !\is_string($item['method'] ?? null)) {
                 continue;
             }
-            $handlers[] = new MessengerHandler($item['message'], $item['bus'], $item['service'], $item['class'], $item['method'], \is_int($item['priority'] ?? null) ? $item['priority'] : 0, \is_string($item['fromTransport'] ?? null) ? $item['fromTransport'] : null);
+            $handlers[] = new MessengerHandlerDeclaration($item['message'], $item['bus'], $item['service'], $item['class'], $item['method'], \is_int($item['priority'] ?? null) ? $item['priority'] : 0, \is_string($item['fromTransport'] ?? null) ? $item['fromTransport'] : null);
         }
         $this->indexes->forProject($project)->replace($buses, $transports, $messages, $handlers, true === ($section['complete'] ?? false));
     }

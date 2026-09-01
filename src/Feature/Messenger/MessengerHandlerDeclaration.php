@@ -2,7 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Messenger;
 
-final class MessengerHandler
+final class MessengerHandlerDeclaration
 {
     public function __construct(
         public readonly string $message,
