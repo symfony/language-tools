@@ -12,6 +12,7 @@ final class PersistentSourceIndexWriter implements SourceIndexWriterInterface
     private array $offsets = [];
     private bool $finished = false;
     private string $buffer = '';
+    private int $position = 0;
 
     /**
      * @param ?resource $handle
@@ -22,8 +23,12 @@ final class PersistentSourceIndexWriter implements SourceIndexWriterInterface
         private readonly Project $project,
         private $handle,
         private readonly string $temporaryPath,
-        private int $position,
     ) {
+        $header = $this->codec->encodeHeader();
+        $this->buffer = $header;
+        if ($this->flush()) {
+            $this->position = \strlen($header);
+        }
     }
 
     public function add(string $relativePath, array $metadata, array $payloads): void
@@ -47,10 +52,12 @@ final class PersistentSourceIndexWriter implements SourceIndexWriterInterface
             return;
         }
         $this->finished = true;
-        if (!$this->flush() || null === $this->handle) {
+        if (!$this->flush()) {
             return;
         }
-        fclose($this->handle);
+        /** @var resource $handle */
+        $handle = $this->handle;
+        fclose($handle);
         $this->handle = null;
         $this->store->replaceGeneration($this->project, $this->temporaryPath, $this->offsets);
     }
@@ -61,25 +68,20 @@ final class PersistentSourceIndexWriter implements SourceIndexWriterInterface
             return;
         }
         $this->finished = true;
-        $this->buffer = '';
-        if (null !== $this->handle) {
-            fclose($this->handle);
-            $this->handle = null;
-        }
-        @unlink($this->temporaryPath);
+        $this->discard();
     }
 
     private function flush(): bool
     {
         if (null === $this->handle) {
+            $this->discard();
+
             return false;
         }
         while ('' !== $this->buffer) {
             $written = @fwrite($this->handle, $this->buffer);
             if (false === $written || 0 === $written) {
-                fclose($this->handle);
-                $this->handle = null;
-                $this->buffer = '';
+                $this->discard();
 
                 return false;
             }
@@ -87,5 +89,15 @@ final class PersistentSourceIndexWriter implements SourceIndexWriterInterface
         }
 
         return true;
+    }
+
+    private function discard(): void
+    {
+        $this->buffer = '';
+        if (null !== $this->handle) {
+            fclose($this->handle);
+            $this->handle = null;
+        }
+        @unlink($this->temporaryPath);
     }
 }

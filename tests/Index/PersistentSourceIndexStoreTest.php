@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Index;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
+use Symfony\Lsp\Index\PersistentSourceIndexWriter;
 use Symfony\Lsp\Index\SourceIndexJsonLinesCodec;
 use Symfony\Lsp\Index\SourceIndexStoreInterface;
 use Symfony\Lsp\Project\Project;
@@ -53,9 +54,87 @@ final class PersistentSourceIndexStoreTest extends TestCase
         $writer->add('src/After.php', $this->metadata(2), ['routes' => 'after']);
         $writer->commit();
 
+        self::assertSame(['routes' => $largePayload], $store->loadPayloads($this->project, 'src/Large.php'));
+        self::assertSame(['routes' => 'after'], $store->loadPayloads($this->project, 'src/After.php'));
+
         $fresh = $this->store();
         self::assertSame(['routes' => $largePayload], $fresh->loadPayloads($this->project, 'src/Large.php'));
         self::assertSame(['routes' => 'after'], $fresh->loadPayloads($this->project, 'src/After.php'));
+    }
+
+    public function testSkipsMalformedProviderPayloadsInSupersededRecords(): void
+    {
+        $store = $this->store();
+        $writer = $store->beginRewrite($this->project);
+        $writer->add('src/A.php', $this->metadata(1), ['routes' => 'stale']);
+        $writer->commit();
+        $path = $store->path($this->project);
+        $contents = (string) file_get_contents($path);
+        $contents = str_replace('"routes":"stale"', '"routes":42', $contents);
+        file_put_contents($path, $contents);
+        $store->append($this->project, 'src/A.php', $this->metadata(2), ['routes' => 'current']);
+
+        $reader = $this->store()->beginRead($this->project);
+        try {
+            $records = iterator_to_array($reader->records());
+        } finally {
+            $reader->close();
+        }
+
+        self::assertSame(['src/A.php'], array_keys($records));
+        self::assertSame(['routes' => 'current'], $records['src/A.php']['payloads']);
+    }
+
+    public function testRemovesTemporaryFileWhenABufferedWriteFails(): void
+    {
+        $store = $this->store();
+        $codec = new SourceIndexJsonLinesCodec('test');
+        $temporaryPath = $store->path($this->project).'.tmp';
+        (new Filesystem())->mkdir(\dirname($temporaryPath));
+        file_put_contents($temporaryPath, 'temporary');
+        SourceIndexFailingWriteStream::$remainingBytes = \strlen($codec->encodeHeader());
+        stream_wrapper_register('sourceindexfailure', SourceIndexFailingWriteStream::class);
+
+        try {
+            $handle = fopen('sourceindexfailure://buffer', 'w');
+            if (false === $handle) {
+                throw new \RuntimeException('Unable to open the failing source index stream.');
+            }
+            $writer = new PersistentSourceIndexWriter($store, $codec, $this->project, $handle, $temporaryPath);
+            $writer->add('src/A.php', $this->metadata(1), ['routes' => 'payload']);
+            $writer->commit();
+        } finally {
+            stream_wrapper_unregister('sourceindexfailure');
+        }
+
+        self::assertFileDoesNotExist($temporaryPath);
+        self::assertFileDoesNotExist($store->path($this->project));
+    }
+
+    public function testRejectsShortHeaderWrites(): void
+    {
+        $store = $this->store();
+        $codec = new SourceIndexJsonLinesCodec('test');
+        $temporaryPath = $store->path($this->project).'.tmp';
+        (new Filesystem())->mkdir(\dirname($temporaryPath));
+        file_put_contents($temporaryPath, 'temporary');
+        $header = $codec->encodeHeader();
+        SourceIndexFailingWriteStream::$remainingBytes = \strlen($header) - 1;
+        stream_wrapper_register('sourceindexfailure', SourceIndexFailingWriteStream::class);
+
+        try {
+            $handle = fopen('sourceindexfailure://header', 'w');
+            if (false === $handle) {
+                throw new \RuntimeException('Unable to open the failing source index stream.');
+            }
+            $writer = new PersistentSourceIndexWriter($store, $codec, $this->project, $handle, $temporaryPath);
+            $writer->commit();
+        } finally {
+            stream_wrapper_unregister('sourceindexfailure');
+        }
+
+        self::assertFileDoesNotExist($temporaryPath);
+        self::assertFileDoesNotExist($store->path($this->project));
     }
 
     public function testSequentialReaderReturnsOnlyLatestRecords(): void
@@ -220,5 +299,30 @@ final class PersistentSourceIndexStoreTest extends TestCase
             'languageId' => 'php',
             'runtimeStructure' => null,
         ];
+    }
+}
+
+final class SourceIndexFailingWriteStream
+{
+    public mixed $context;
+
+    public static int $remainingBytes = 0;
+
+    public function stream_open(string $path, string $mode, int $options, ?string &$openedPath): bool
+    {
+        return true;
+    }
+
+    public function stream_write(string $data): int
+    {
+        $written = min(\strlen($data), self::$remainingBytes);
+        self::$remainingBytes -= $written;
+
+        return $written;
+    }
+
+    public function stream_flush(): bool
+    {
+        return true;
     }
 }

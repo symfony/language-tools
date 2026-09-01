@@ -88,13 +88,9 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface, Pro
         try {
             $this->filesystem->mkdir(\dirname($path));
         } catch (IOExceptionInterface) {
-            return new PersistentSourceIndexWriter($this, $this->codec, $project, null, $temporaryPath, 0);
+            return new PersistentSourceIndexWriter($this, $this->codec, $project, null, $temporaryPath);
         }
         $handle = @fopen($temporaryPath, 'w');
-        $header = $this->codec->encodeHeader();
-        if (\is_resource($handle)) {
-            fwrite($handle, $header);
-        }
 
         return new PersistentSourceIndexWriter(
             $this,
@@ -102,7 +98,6 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface, Pro
             $project,
             \is_resource($handle) ? $handle : null,
             $temporaryPath,
-            \strlen($header),
         );
     }
 

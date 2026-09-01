@@ -170,6 +170,38 @@ final class ApplicationSourceScannerTest extends TestCase
         self::assertSame(0, $fourthProvider->restores);
     }
 
+    public function testRebuildsMalformedProviderPayloadTypes(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $this->scanner(new RecordingSourceIndexProvider())->indexAll();
+        $cachePath = $this->temporaryDirectory.'/var/symfony-lsp/test/index/source.jsonl';
+        $this->rewriteCacheRecord($cachePath, 'src/Controller.php', static function (array $record): array {
+            $providers = $record['providers'];
+            \assert(\is_array($providers));
+            $providers['recording'] = 42;
+            $record['providers'] = $providers;
+
+            return $record;
+        });
+        $statuses = new ProjectIndexStatusRegistry();
+        $provider = new RecordingSourceIndexProvider();
+
+        $this->scannerWithStore(
+            new PersistentSourceIndexStore('test', new Filesystem(), new SourceIndexJsonLinesCodec('test')),
+            [$provider],
+            statuses: $statuses,
+        )->indexAll();
+
+        self::assertSame(1, $provider->extractions);
+        self::assertSame(0, $provider->restores);
+        self::assertSame('ready', $statuses->status($this->project)['source']['state']);
+
+        $restored = new RecordingSourceIndexProvider();
+        $this->scanner($restored)->indexAll();
+        self::assertSame(0, $restored->extractions);
+        self::assertSame(1, $restored->restores);
+    }
+
     public function testLogsSourceIndexFailuresWithoutExposingDetailsInStatus(): void
     {
         file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
