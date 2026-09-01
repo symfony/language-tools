@@ -12,7 +12,7 @@ use Symfony\Lsp\Document\Range;
  * Double-quoted literals only accept the escaped backslash and quote;
  * interpolation and other escape sequences are dynamic values and never match.
  */
-class QuotedArgumentMatcher
+final class QuotedArgumentMatcher
 {
     private const LITERAL = '(?:\'(?<single>(?:\\\\.|[^\'\\\\])+)\'|"(?<double>(?:\\\\[\\\\"]|[^"\\\\$])+)")';
 
@@ -76,7 +76,7 @@ class QuotedArgumentMatcher
         return $arguments;
     }
 
-    protected function decode(string $raw, bool $single): string
+    private function decode(string $raw, bool $single): string
     {
         return $single
             ? strtr($raw, ['\\\\' => '\\', "\\'" => "'"])
