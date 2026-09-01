@@ -43,16 +43,26 @@ final class BridgeConfigurationTest extends TestCase
         self::assertSame('name', $bundle['tree']['keyAttribute'] ?? null);
         self::assertTrue($bundle['tree']['normalizeKeys'] ?? false);
         self::assertIsArray($bundle['tree']['children'] ?? null);
-        $child = $bundle['tree']['children'][0] ?? null;
-        self::assertIsArray($child);
+        $children = array_column($bundle['tree']['children'], null, 'name');
+        $secret = $children['secret'] ?? null;
+        self::assertIsArray($secret);
         self::assertSame('framework', $bundle['alias'] ?? null);
-        self::assertSame('scalar', $child['type'] ?? null);
-        self::assertSame('string', $child['defaultSummary'] ?? null);
-        $csp = $bundle['tree']['children'][1] ?? null;
+        self::assertSame('scalar', $secret['type'] ?? null);
+        self::assertSame('string', $secret['defaultSummary'] ?? null);
+        $csp = $children['csp'] ?? null;
         self::assertIsArray($csp);
         self::assertFalse($csp['normalizeKeys'] ?? true);
         self::assertIsArray($csp['children'] ?? null);
         self::assertSame(['default-src'], array_column($csp['children'], 'name'));
+        $resetMode = $children['reset_mode'] ?? null;
+        self::assertIsArray($resetMode);
+        self::assertSame(['schema', 'migrate'], $resetMode['allowedValues'] ?? null);
+        self::assertSame(['App\\ResetMode::SCHEMA', 'App\\ResetMode::MIGRATE'], $resetMode['allowedEnumCases'] ?? null);
+        self::assertFalse($resetMode['allowedValuesTruncated'] ?? true);
+        $strictResetMode = $children['strict_reset_mode'] ?? null;
+        self::assertIsArray($strictResetMode);
+        self::assertSame([], $strictResetMode['allowedValues'] ?? null);
+        self::assertSame(['App\\ResetMode::SCHEMA', 'App\\ResetMode::MIGRATE'], $strictResetMode['allowedEnumCases'] ?? null);
     }
 
     public function testDoesNotExposeApplicationExceptionsInSectionWarnings(): void

@@ -31,6 +31,23 @@ final class ConfigurationValueValidatorTest extends TestCase
         self::assertTrue($validator->acceptsValue($this->node('integer'), '$port'));
     }
 
+    public function testValidatesEnumCasesConservatively(): void
+    {
+        $validator = new ConfigurationValueValidator(new EnvironmentIndexRegistry(), new EnvironmentExpressionParser());
+        $backed = $this->node('enum', ['schema', 'migrate'], ['App\\ResetMode::SCHEMA', 'App\\ResetMode::MIGRATE']);
+        $pure = $this->node('enum', [], ['App\\ResetMode::SCHEMA', 'App\\ResetMode::MIGRATE']);
+        $truncated = $this->node('enum', ['schema'], ['App\\ResetMode::SCHEMA'], allowedValuesTruncated: true);
+
+        self::assertTrue($validator->acceptsValue($backed, 'schema'));
+        self::assertTrue($validator->acceptsValue($backed, '!php/enum App\\ResetMode::SCHEMA'));
+        self::assertFalse($validator->acceptsValue($backed, '!php/enum App\\ResetMode::UNKNOWN'));
+        self::assertTrue($validator->acceptsValue($pure, '!php/enum App\\ResetMode::SCHEMA'));
+        self::assertFalse($validator->acceptsValue($pure, 'schema'));
+        self::assertTrue($validator->acceptsValue($this->node('variable'), '!php/enum App\\ResetMode::SCHEMA'));
+        self::assertTrue($validator->acceptsValue($truncated, 'migrate'));
+        self::assertTrue($validator->acceptsValue($truncated, '!php/enum App\\ResetMode::MIGRATE'));
+    }
+
     public function testHonorsProbedArrayNormalization(): void
     {
         $validator = new ConfigurationValueValidator(new EnvironmentIndexRegistry(), new EnvironmentExpressionParser());
@@ -67,10 +84,11 @@ final class ConfigurationValueValidatorTest extends TestCase
 
     /**
      * @param list<string|int|float|bool|null> $allowedValues
+     * @param list<string>                     $allowedEnumCases
      * @param array<string, bool>              $accepts
      */
-    private function node(string $type, array $allowedValues = [], array $accepts = []): ConfigurationNode
+    private function node(string $type, array $allowedValues = [], array $allowedEnumCases = [], array $accepts = [], bool $allowedValuesTruncated = false): ConfigurationNode
     {
-        return new ConfigurationNode('option', $type, false, false, null, null, null, false, $allowedValues, [], null, $accepts);
+        return new ConfigurationNode('option', $type, false, false, null, null, null, false, $allowedValues, $allowedEnumCases, [], null, $accepts, allowedValuesTruncated: $allowedValuesTruncated);
     }
 }

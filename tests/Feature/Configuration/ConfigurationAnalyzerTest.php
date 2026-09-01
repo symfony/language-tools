@@ -63,6 +63,6 @@ final class ConfigurationAnalyzerTest extends TestCase
     /** @param list<ConfigurationNode> $children */
     private function node(string $name, array $children = []): ConfigurationNode
     {
-        return new ConfigurationNode($name, [] === $children ? 'boolean' : 'array', false, false, null, null, null, false, [], $children, null);
+        return new ConfigurationNode($name, [] === $children ? 'boolean' : 'array', false, false, null, null, null, false, [], [], $children, null);
     }
 }

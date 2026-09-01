@@ -51,6 +51,74 @@ function symfonyLspBridgeNormalizeConfigExample(mixed $example): mixed
     return null;
 }
 
+function symfonyLspBridgeConfigNodeAcceptsValue(object $node, mixed $value): bool
+{
+    if (!method_exists($node, 'normalize') || !method_exists($node, 'finalize')) {
+        return false;
+    }
+    try {
+        $node->finalize($node->normalize($value));
+    } catch (Throwable) {
+        return false;
+    }
+
+    return true;
+}
+
+function symfonyLspBridgeConfigAllowedValues(object $node): ?array
+{
+    if (!method_exists($node, 'getValues')) {
+        return null;
+    }
+    $values = $node->getValues();
+    if (!is_array($values)) {
+        return null;
+    }
+    $allowed = [];
+    foreach (array_slice($values, 0, 20) as $value) {
+        if ($value instanceof BackedEnum) {
+            $value = $value->value;
+            if (!symfonyLspBridgeConfigNodeAcceptsValue($node, $value)) {
+                continue;
+            }
+        }
+        if (null === $value || is_scalar($value)) {
+            $allowed[] = $value;
+        }
+    }
+
+    return $allowed;
+}
+
+function symfonyLspBridgeConfigAllowedValuesTruncated(object $node): bool
+{
+    if (!method_exists($node, 'getValues')) {
+        return false;
+    }
+    $values = $node->getValues();
+
+    return is_array($values) && 20 < count($values);
+}
+
+function symfonyLspBridgeConfigAllowedEnumCases(object $node): array
+{
+    if (!method_exists($node, 'getValues')) {
+        return [];
+    }
+    $values = $node->getValues();
+    if (!is_array($values)) {
+        return [];
+    }
+    $cases = [];
+    foreach (array_slice($values, 0, 20) as $value) {
+        if ($value instanceof UnitEnum) {
+            $cases[] = $value::class.'::'.$value->name;
+        }
+    }
+
+    return $cases;
+}
+
 function symfonyLspBridgeConfigNodeNormalizes(object $node, mixed $value): bool
 {
     if (!method_exists($node, 'normalize')) {
@@ -109,7 +177,9 @@ function symfonyLspBridgeNormalizeConfigNode(object $node, int $depth = 0): arra
         'info' => method_exists($node, 'getInfo') && is_string($node->getInfo()) ? $node->getInfo() : null,
         'example' => method_exists($node, 'getExample') ? symfonyLspBridgeNormalizeConfigExample($node->getExample()) : null,
         'deprecated' => method_exists($node, 'isDeprecated') && $node->isDeprecated(),
-        'allowedValues' => method_exists($node, 'getValues') ? symfonyLspBridgeNormalizeConfigExample($node->getValues()) : null,
+        'allowedValues' => symfonyLspBridgeConfigAllowedValues($node),
+        'allowedEnumCases' => symfonyLspBridgeConfigAllowedEnumCases($node),
+        'allowedValuesTruncated' => symfonyLspBridgeConfigAllowedValuesTruncated($node),
         'children' => [],
         'prototype' => null,
         'aliases' => [],

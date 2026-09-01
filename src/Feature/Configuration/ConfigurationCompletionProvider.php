@@ -53,14 +53,21 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
                 continue;
             }
             $node = $index->find($occurrence->path, $occurrence->sequenceDepths, $occurrence->literalDepths);
-            if (null === $node || [] === $node->allowedValues) {
+            if (null === $node || ([] === $node->allowedValues && [] === $node->allowedEnumCases)) {
                 continue;
             }
             $prefix = trim(substr($document->text, $this->converter->toByteOffset($document->text, $occurrence->valueRange->start), $offset));
             $items = [];
-            foreach ($node->allowedValues as $value) {
-                $value = $this->formatValue($value);
-                $items[] = $this->completion($value, $value, 'Allowed value', $document->text, $offset - \strlen($prefix), $position);
+            if ([] !== $node->allowedValues) {
+                foreach ($node->allowedValues as $value) {
+                    $value = $this->formatValue($value);
+                    $items[] = $this->completion($value, $value, 'Allowed value', $document->text, $offset - \strlen($prefix), $position);
+                }
+            } else {
+                foreach ($node->allowedEnumCases as $case) {
+                    $value = '!php/enum '.$case;
+                    $items[] = $this->completion($value, $value, 'Allowed value', $document->text, $offset - \strlen($prefix), $position);
+                }
             }
 
             return $items;

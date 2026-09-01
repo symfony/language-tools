@@ -74,6 +74,59 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
+    public function testAcceptsBackedEnumScalarAndTaggedValues(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = <<<'YAML'
+            framework:
+                router:
+                    reset_mode: schema
+            when@dev:
+                framework:
+                    router:
+                        reset_mode: !php/enum App\ResetMode::SCHEMA
+            YAML;
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+
+        $fixture->documents->update($uri, 2, str_replace('::SCHEMA', '::UNKNOWN', $text));
+        self::assertSame(
+            ['config.invalid_type'],
+            array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]), 'code'),
+        );
+    }
+
+    public function testCompletesAndValidatesPureEnumCases(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = "framework:\n    router:\n        strict_reset_mode: ";
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+        $position = $fixture->converter->toPosition($text, \strlen($text));
+        $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
+
+        self::assertSame(
+            ['!php/enum App\\ResetMode::SCHEMA', '!php/enum App\\ResetMode::MIGRATE'],
+            array_column($fixture->completion->complete($params) ?? [], 'label'),
+        );
+
+        $text .= '!php/enum App\\ResetMode::SCHEMA';
+        $fixture->documents->update($uri, 2, $text);
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        $hoverPosition = $fixture->converter->toPosition($text, (int) strpos($text, 'strict_reset_mode') + 2);
+        /** @var array{contents: array{value: string}} $hover */
+        $hover = $fixture->hover->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $hoverPosition->line, 'character' => $hoverPosition->character]]);
+        self::assertStringContainsString('!php/enum App\\ResetMode::SCHEMA', $hover['contents']['value']);
+
+        $fixture->documents->update($uri, 3, str_replace('::SCHEMA', '::UNKNOWN', $text));
+        self::assertSame(
+            ['config.invalid_type'],
+            array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]), 'code'),
+        );
+    }
+
     public function testResolvesNestedSequencePrototypes(): void
     {
         $fixture = $this->providers();
@@ -659,6 +712,8 @@ final class ConfigurationProviderTest extends TestCase
                         $this->node('utf8', 'boolean', info: 'Use UTF-8 routes.'),
                         $this->node('strict', 'boolean'),
                         $this->node('mode', 'enum', deprecated: true, allowedValues: ['dev', 'prod']),
+                        $this->node('reset_mode', 'enum', allowedValues: ['schema', 'migrate'], allowedEnumCases: ['App\\ResetMode::SCHEMA', 'App\\ResetMode::MIGRATE']),
+                        $this->node('strict_reset_mode', 'enum', allowedEnumCases: ['App\\ResetMode::SCHEMA', 'App\\ResetMode::MIGRATE']),
                     ]),
                     $this->node('normalized_section', 'array', children: [
                         $this->node('nested_key', 'boolean'),
@@ -764,15 +819,16 @@ final class ConfigurationProviderTest extends TestCase
     /**
      * @param array<array-key, array<array-key, mixed>> $children
      * @param list<string|int|float|bool|null>          $allowedValues
+     * @param list<string>                              $allowedEnumCases
      * @param array<array-key, mixed>|null              $prototype
      * @param array<string, bool>                       $accepts
      * @param array<string, string>                     $aliases
      *
      * @return array<array-key, mixed>
      */
-    private function node(string $name, string $type, array $children = [], ?string $info = null, bool $deprecated = false, array $allowedValues = [], bool $required = false, ?array $prototype = null, array $accepts = [], array $aliases = [], ?string $keyAttribute = null, bool $normalizeKeys = true): array
+    private function node(string $name, string $type, array $children = [], ?string $info = null, bool $deprecated = false, array $allowedValues = [], array $allowedEnumCases = [], bool $required = false, ?array $prototype = null, array $accepts = [], array $aliases = [], ?string $keyAttribute = null, bool $normalizeKeys = true): array
     {
-        return ['name' => $name, 'type' => $type, 'required' => $required, 'hasDefault' => false, 'defaultSummary' => null, 'info' => $info, 'example' => null, 'deprecated' => $deprecated, 'allowedValues' => $allowedValues, 'children' => $children, 'prototype' => $prototype, 'accepts' => $accepts, 'aliases' => $aliases, 'keyAttribute' => $keyAttribute, 'normalizeKeys' => $normalizeKeys];
+        return ['name' => $name, 'type' => $type, 'required' => $required, 'hasDefault' => false, 'defaultSummary' => null, 'info' => $info, 'example' => null, 'deprecated' => $deprecated, 'allowedValues' => $allowedValues, 'allowedEnumCases' => $allowedEnumCases, 'children' => $children, 'prototype' => $prototype, 'accepts' => $accepts, 'aliases' => $aliases, 'keyAttribute' => $keyAttribute, 'normalizeKeys' => $normalizeKeys];
     }
 }
 

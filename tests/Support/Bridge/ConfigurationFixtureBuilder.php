@@ -42,19 +42,36 @@ final class ConfigurationFixtureBuilder
                 public function hasDefaultValue(): bool { return true; }
                 public function getDefaultValue(): mixed { return 'CANARY_SECRET_CONFIG_DEFAULT'; }
             }
+            final class EnumNode extends TestNode
+            {
+                public function __construct(string $name, private bool $normalizeStrings) { parent::__construct($name); }
+                public function getValues(): array { return \App\ResetMode::cases(); }
+                public function normalize(mixed $value): mixed { return $this->normalizeStrings && is_string($value) ? \App\ResetMode::tryFrom($value) ?? $value : $value; }
+                public function finalize(mixed $value): mixed
+                {
+                    if (!in_array($value, $this->getValues(), true)) { throw new \RuntimeException(); }
+
+                    return $value;
+                }
+            }
             final class ArrayNode extends TestNode
             {
                 public function __construct(string $name, private bool $normalizeKeys = true) { parent::__construct($name); }
                 public function getChildren(): array
                 {
                     return 'framework' === $this->getName()
-                        ? [new ScalarNode('secret'), new self('csp', false)]
+                        ? [new ScalarNode('secret'), new self('csp', false), new EnumNode('reset_mode', true), new EnumNode('strict_reset_mode', false)]
                         : [new ScalarNode('default-src')];
                 }
                 public function getXmlRemappings(): array { return 'framework' === $this->getName() ? [['alias', 'secret']] : []; }
                 public function getKeyAttribute(): ?string { return 'framework' === $this->getName() ? 'name' : null; }
             }
             namespace App;
+            enum ResetMode: string
+            {
+                case SCHEMA = 'schema';
+                case MIGRATE = 'migrate';
+            }
             final class TreeBuilder
             {
                 public function buildTree(): object { return new \Symfony\Component\Config\Definition\ArrayNode('framework'); }

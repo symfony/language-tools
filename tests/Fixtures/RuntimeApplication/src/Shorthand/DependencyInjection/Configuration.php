@@ -5,6 +5,12 @@ namespace App\Shorthand\DependencyInjection;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
 
+enum StorageMode: string
+{
+    case READ = 'read';
+    case WRITE = 'write';
+}
+
 final class Configuration implements ConfigurationInterface
 {
     public function getConfigTreeBuilder(): TreeBuilder
@@ -39,7 +45,14 @@ final class Configuration implements ConfigurationInterface
                                 ->children()
                                     ->scalarNode('dsn')->end()
                                     ->integerNode('size')->end()
-                                    ->enumNode('mode')->values(['read', 'write'])->end()
+                                    ->enumNode('mode')
+                                        ->beforeNormalization()
+                                            ->ifString()
+                                            ->then(static fn (string $mode): ?StorageMode => StorageMode::tryFrom($mode))
+                                        ->end()
+                                        ->values(StorageMode::cases())
+                                    ->end()
+                                    ->enumNode('strict_mode')->values(StorageMode::cases())->end()
                                 ->end()
                             ->end()
                         ->end()

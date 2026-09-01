@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recognize backed PHP enum values and YAML enum tags in bundle configuration
 - Recognize named PHP render arguments and outer template variable keys
 - Recognize named Twig asset, component and Live Component action arguments
 - Keep event subscriber maps intact when listener method names contain braces

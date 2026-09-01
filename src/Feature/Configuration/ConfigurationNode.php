@@ -9,7 +9,8 @@ final class ConfigurationNode
     /**
      * @param list<ConfigurationNode>          $children
      * @param list<string|int|float|bool|null> $allowedValues
-     * @param array<string, bool>              $accepts       normalized value kinds probed on the real tree
+     * @param list<string>                     $allowedEnumCases
+     * @param array<string, bool>              $accepts          normalized value kinds probed on the real tree
      * @param array<string, string>            $aliases
      */
     public function __construct(
@@ -22,6 +23,7 @@ final class ConfigurationNode
         public readonly mixed $example,
         public readonly bool $deprecated,
         public readonly array $allowedValues,
+        public readonly array $allowedEnumCases,
         public readonly array $children,
         public readonly ?self $prototype,
         private readonly array $accepts = [],
@@ -29,6 +31,7 @@ final class ConfigurationNode
         private readonly ?string $keyAttribute = null,
         ?string $entryKeyAttribute = null,
         public readonly bool $normalizeKeys = true,
+        public readonly bool $allowedValuesTruncated = false,
     ) {
         $this->entryKeyNode = null === $entryKeyAttribute ? null : new self(
             $entryKeyAttribute,
@@ -39,6 +42,7 @@ final class ConfigurationNode
             null,
             null,
             false,
+            [],
             [],
             [],
             null,

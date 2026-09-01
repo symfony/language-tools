@@ -95,9 +95,23 @@ final class BridgeCompatibilityTest extends TestCase
         // shorthand keys relocated into the pools prototype must be merged as regular children
         $storageChildren = array_column(\is_array($shorthandChildren['storage']['children'] ?? null) ? $shorthandChildren['storage']['children'] : [], null, 'name');
         $storageNames = array_keys($storageChildren);
-        foreach (['default_pool', 'pools', 'dsn', 'size', 'mode'] as $expectedChild) {
+        foreach (['default_pool', 'pools', 'dsn', 'size', 'mode', 'strict_mode'] as $expectedChild) {
             self::assertContains($expectedChild, $storageNames);
         }
+        $storageMode = $storageChildren['mode'] ?? null;
+        self::assertIsArray($storageMode);
+        self::assertSame(['read', 'write'], $storageMode['allowedValues'] ?? null);
+        self::assertSame(
+            ['App\\Shorthand\\DependencyInjection\\StorageMode::READ', 'App\\Shorthand\\DependencyInjection\\StorageMode::WRITE'],
+            $storageMode['allowedEnumCases'] ?? null,
+        );
+        $strictStorageMode = $storageChildren['strict_mode'] ?? null;
+        self::assertIsArray($strictStorageMode);
+        self::assertSame([], $strictStorageMode['allowedValues'] ?? null);
+        self::assertSame(
+            ['App\\Shorthand\\DependencyInjection\\StorageMode::READ', 'App\\Shorthand\\DependencyInjection\\StorageMode::WRITE'],
+            $strictStorageMode['allowedEnumCases'] ?? null,
+        );
         $storagePools = $storageChildren['pools'] ?? null;
         self::assertIsArray($storagePools);
         self::assertSame('name', $storagePools['keyAttribute'] ?? null);

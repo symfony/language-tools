@@ -49,12 +49,20 @@ final class ConfigurationValueValidator
         if (str_contains($plain, '%') || str_starts_with($plain, '$')) {
             return true;
         }
+        if ([] !== $node->allowedEnumCases && null !== $enumCase = $this->enumCase($source)) {
+            return $node->allowedValuesTruncated || \in_array($enumCase, $node->allowedEnumCases, true);
+        }
         $literal = $this->literal($source);
         if (null === $literal && $node->acceptsNull()) {
             return true;
         }
-        if ([] !== $node->allowedValues && !\in_array($literal, $node->allowedValues, true)) {
-            return false;
+        if (!$node->allowedValuesTruncated) {
+            if ([] !== $node->allowedValues && !\in_array($literal, $node->allowedValues, true)) {
+                return false;
+            }
+            if ([] === $node->allowedValues && [] !== $node->allowedEnumCases) {
+                return false;
+            }
         }
 
         return match ($node->type) {
@@ -64,6 +72,15 @@ final class ConfigurationValueValidator
             'array' => $this->acceptsArrayValue($node, $plain),
             default => true,
         };
+    }
+
+    private function enumCase(string $source): ?string
+    {
+        if (1 !== preg_match('/^!php\/enum\s+(.+)$/', $source, $match)) {
+            return null;
+        }
+
+        return ltrim(trim($match[1], " \t\"'"), '\\');
     }
 
     private function literal(string $source): string|int|float|bool|null

@@ -50,6 +50,12 @@ final class ProjectConfigurationSnapshotLoader implements RuntimeSnapshotLoaderI
                 $allowed[] = $value;
             }
         }
+        $allowedEnumCases = [];
+        foreach (\is_array($data['allowedEnumCases'] ?? null) ? $data['allowedEnumCases'] : [] as $case) {
+            if (\is_string($case)) {
+                $allowedEnumCases[] = $case;
+            }
+        }
         $accepts = [];
         foreach (\is_array($data['accepts'] ?? null) ? $data['accepts'] : [] as $kind => $accepted) {
             if (\is_string($kind) && \is_bool($accepted)) {
@@ -73,6 +79,7 @@ final class ProjectConfigurationSnapshotLoader implements RuntimeSnapshotLoaderI
             $data['example'] ?? null,
             true === ($data['deprecated'] ?? false),
             $allowed,
+            $allowedEnumCases,
             $children,
             $prototype,
             $accepts,
@@ -80,6 +87,7 @@ final class ProjectConfigurationSnapshotLoader implements RuntimeSnapshotLoaderI
             $keyAttribute,
             $entryKeyAttribute,
             false !== ($data['normalizeKeys'] ?? true),
+            true === ($data['allowedValuesTruncated'] ?? false),
         );
     }
 }

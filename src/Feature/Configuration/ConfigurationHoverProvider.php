@@ -69,15 +69,21 @@ final class ConfigurationHoverProvider implements HoverProviderInterface
             $lines[] = '';
             $lines[] = 'Default: '.$node->defaultSummary;
         }
-        if ([] !== $node->allowedValues) {
+        if ([] !== $node->allowedValues || [] !== $node->allowedEnumCases) {
             $allowedValues = [];
-            foreach ($node->allowedValues as $value) {
-                $allowedValues[] = match ($value) {
-                    true => 'true',
-                    false => 'false',
-                    null => 'null',
-                    default => (string) $value,
-                };
+            if ([] !== $node->allowedValues) {
+                foreach ($node->allowedValues as $value) {
+                    $allowedValues[] = match ($value) {
+                        true => 'true',
+                        false => 'false',
+                        null => 'null',
+                        default => (string) $value,
+                    };
+                }
+            } else {
+                foreach ($node->allowedEnumCases as $case) {
+                    $allowedValues[] = '!php/enum '.$case;
+                }
             }
             $lines[] = '';
             $lines[] = 'Allowed values: `'.implode('`, `', $allowedValues).'`';
