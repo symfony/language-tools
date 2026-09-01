@@ -6,11 +6,10 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
-use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 
 final class MessengerExtractor
 {
@@ -24,8 +23,7 @@ final class MessengerExtractor
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $parser,
         private readonly YamlConfigurationParser $yaml,
-        private readonly PhpCommentParserInterface $phpComments,
-        private readonly YamlCommentParser $yamlComments,
+        private readonly CommentParserRegistry $comments,
     ) {
     }
 
@@ -37,7 +35,7 @@ final class MessengerExtractor
         $handlers = [];
         if ('yaml' === $document->languageId) {
             array_push($symbols, ...$this->yamlSymbols($document->uri, $document->text));
-            $source = $this->yamlComments->mask($document->text);
+            $source = $this->comments->mask('yaml', $document->text);
             foreach ([
                 [MessengerSymbolKind::Bus, '/(?:\bbus|default_bus)\s*:\s*["\']?([A-Za-z_][A-Za-z0-9_.-]*)/'],
                 [MessengerSymbolKind::Transport, '/(?:fromTransport|from_transport|failure_transport)\s*:\s*["\']?([A-Za-z_][A-Za-z0-9_.-]*)/'],
@@ -50,7 +48,7 @@ final class MessengerExtractor
         }
         if ('php' === $document->languageId) {
             $php = $this->parser->parse($document->text);
-            $source = $this->phpComments->mask($document->text);
+            $source = $this->comments->mask('php', $document->text);
             foreach ($php->attributesNamed(self::AS_MESSAGE_HANDLER) as $attribute) {
                 $target = $attribute->targets[0] ?? null;
                 if (!\in_array($target?->kind, [PhpAttributeTargetKind::Type, PhpAttributeTargetKind::Method], true)) {

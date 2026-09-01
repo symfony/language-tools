@@ -7,9 +7,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Xml\XmlCommentParser;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -22,10 +20,8 @@ final class EnvironmentDiagnosticProvider implements DiagnosticProviderInterface
         private readonly EnvironmentIndexRegistry $indexes,
         private readonly EnvironmentExtractor $extractor,
         private readonly EnvironmentProcessorChainValidator $processorChainValidator,
-        private readonly TwigCommentParser $commentParser,
-        private readonly PhpCommentParserInterface $phpComments,
+        private readonly CommentParserRegistry $comments,
         private readonly YamlDocumentParser $yamlParser,
-        private readonly XmlCommentParser $xmlComments,
     ) {
     }
 
@@ -71,19 +67,9 @@ final class EnvironmentDiagnosticProvider implements DiagnosticProviderInterface
             return;
         }
 
-        preg_match_all('/%env\([^\)\r\n]*%/', $this->commentFreeText($languageId, $text), $malformed, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/%env\([^\)\r\n]*%/', $this->comments->mask($languageId, $text), $malformed, \PREG_OFFSET_CAPTURE);
         foreach ($malformed[0] as $match) {
             yield $match;
         }
-    }
-
-    private function commentFreeText(string $languageId, string $text): string
-    {
-        return match ($languageId) {
-            'twig' => $this->commentParser->mask($text),
-            'php' => $this->phpComments->mask($text),
-            'xml' => $this->xmlComments->mask($text),
-            default => $text,
-        };
     }
 }

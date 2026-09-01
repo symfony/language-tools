@@ -8,9 +8,8 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
-use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class MessengerCompletionProvider implements CompletionProviderInterface
@@ -23,8 +22,7 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
         private readonly LspProtocolMapper $protocol,
         private readonly MessengerIndexRegistry $indexes,
         private readonly YamlConfigurationParser $yaml,
-        private readonly PhpCommentParserInterface $phpComments,
-        private readonly YamlCommentParser $yamlComments,
+        private readonly CommentParserRegistry $comments,
         private readonly PhpParserInterface $phpParser,
     ) {
     }
@@ -36,12 +34,7 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        $before = substr($request->document->text, 0, $offset);
-        $before = match ($request->document->languageId) {
-            'php' => $this->phpComments->mask($before),
-            'yaml' => $this->yamlComments->mask($before),
-            default => $before,
-        };
+        $before = $this->comments->mask($request->document->languageId, substr($request->document->text, 0, $offset));
         $lineOffset = (int) strrpos("\n".$before, "\n");
         $kind = null;
         $prefix = '';

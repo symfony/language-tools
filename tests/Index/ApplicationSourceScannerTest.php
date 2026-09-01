@@ -40,6 +40,7 @@ use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Index\SourceIndexReaderInterface;
 use Symfony\Lsp\Index\SourceIndexStoreInterface;
 use Symfony\Lsp\Index\SourceIndexWriterInterface;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -393,7 +394,7 @@ PHP;
         $indexes = new EnvironmentIndexRegistry();
         $this->scanner(new EnvironmentSourceIndexer(
             $indexes,
-            new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser(), new PhpCommentParser(), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new XmlCommentParser()),
+            new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
         ))->indexAll();
 
         self::assertSame(['APP_SECRET'], $indexes->forProject($this->project)->names());
@@ -762,9 +763,8 @@ PHP;
                     $converter,
                     new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
                 ),
-                new TwigCommentParser(),
+                new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]),
                 new TolerantPhpParser(new Parser()),
-                new PhpCommentParser(),
             ),
         );
     }

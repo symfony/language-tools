@@ -23,6 +23,7 @@ use Symfony\Lsp\Feature\Security\SecurityUserProvider;
 use Symfony\Lsp\Feature\Security\SecurityVoter;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -38,7 +39,7 @@ final class SecurityProviderTest extends TestCase
     public function testExtractsOnlyRecognizedSecuritySymbols(): void
     {
         $converter = new PositionConverter();
-        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TwigCommentParser(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]), new TolerantPhpParser(new Parser()));
         $php = <<<'PHP'
 <?php
 namespace App;
@@ -216,7 +217,7 @@ YAML;
     public function testIgnoresCommentedPhpSecurityConstructs(): void
     {
         $converter = new PositionConverter();
-        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TwigCommentParser(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]), new TolerantPhpParser(new Parser()));
         $text = <<<'PHP'
             <?php
             namespace App;
@@ -244,7 +245,7 @@ YAML;
     public function testOffersNoSecurityCompletionsInsidePhpComments(): void
     {
         $converter = new PositionConverter();
-        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TwigCommentParser(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]), new TolerantPhpParser(new Parser()));
         $text = <<<'PHP'
             <?php
             use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -295,7 +296,7 @@ PHP;
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $converter = new PositionConverter();
-        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TwigCommentParser(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]), new TolerantPhpParser(new Parser()));
         $indexes = new SecurityIndexRegistry();
         $indexes->forProject($project)->replace(
             [new SecurityFirewall('main', 'users', true, false, true, ['App\\Security\\Authenticator'])],
@@ -367,7 +368,7 @@ PHP;
     {
         $converter ??= new PositionConverter();
 
-        return new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new TwigCommentParser(), new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        return new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]), new TolerantPhpParser(new Parser()));
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */

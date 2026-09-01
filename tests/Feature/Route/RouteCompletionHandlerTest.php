@@ -16,6 +16,7 @@ use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteCompletionBuilder;
 use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
@@ -313,8 +314,7 @@ final class RouteCompletionHandlerTest extends TestCase
             $indexes,
             $classIndexes ?? new DependencyInjectionSourceIndexRegistry(),
             RouteReferenceExtractorFactory::create($converter),
-            new PhpCommentParser(),
-            new TwigCommentParser(),
+            new CommentParserRegistry(['php' => new PhpCommentParser(), 'twig' => new TwigCommentParser()]),
             new RouteCompletionBuilder(),
         );
     }

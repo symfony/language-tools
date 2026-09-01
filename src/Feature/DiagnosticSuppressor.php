@@ -4,11 +4,8 @@ namespace Symfony\Lsp\Feature;
 
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\SourceComment;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Xml\XmlCommentParser;
-use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class DiagnosticSuppressor
@@ -20,10 +17,7 @@ final class DiagnosticSuppressor
         private readonly PositionConverter $positions,
         private readonly LspProtocolMapper $protocol,
         private readonly DiagnosticCodeRegistry $diagnosticCodes,
-        private readonly PhpCommentParserInterface $phpComments,
-        private readonly TwigCommentParser $twigComments,
-        private readonly YamlCommentParser $yamlComments,
-        private readonly XmlCommentParser $xmlComments,
+        private readonly CommentParserRegistry $comments,
     ) {
     }
 
@@ -117,7 +111,7 @@ final class DiagnosticSuppressor
     {
         $suppressions = [];
         $warnings = [];
-        foreach ($this->comments($document) as $comment) {
+        foreach ($this->comments->comments($document->languageId, $document->text) as $comment) {
             if (!preg_match_all(self::DIRECTIVE_PATTERN, $comment->content, $matches, \PREG_OFFSET_CAPTURE)) {
                 continue;
             }
@@ -156,18 +150,6 @@ final class DiagnosticSuppressor
         }
 
         return [$suppressions, $warnings];
-    }
-
-    /** @return list<SourceComment> */
-    private function comments(Document $document): array
-    {
-        return match ($document->languageId) {
-            'php' => $this->phpComments->comments($document->text),
-            'twig' => $this->twigComments->comments($document->text),
-            'yaml' => $this->yamlComments->comments($document->text),
-            'xml' => $this->xmlComments->comments($document->text),
-            default => [],
-        };
     }
 
     private function targetLine(string $source, SourceComment $comment): int

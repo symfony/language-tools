@@ -2,8 +2,8 @@
 
 namespace Symfony\Lsp\Parser\Xml;
 
+use Symfony\Lsp\Parser\AbstractCommentParser;
 use Symfony\Lsp\Parser\CommentParseResult;
-use Symfony\Lsp\Parser\CommentParserInterface;
 use Symfony\Lsp\Parser\SourceComment;
 
 /**
@@ -13,17 +13,10 @@ use Symfony\Lsp\Parser\SourceComment;
  * byte length and UTF-16 unit count, so positions measured on the masked
  * text always match the original document.
  */
-final class XmlCommentParser implements CommentParserInterface
+final class XmlCommentParser extends AbstractCommentParser
 {
-    private ?string $lastSource = null;
-    private ?CommentParseResult $lastResult = null;
-
-    public function parse(string $source): CommentParseResult
+    protected function parseSource(string $source): CommentParseResult
     {
-        if ($source === $this->lastSource && null !== $this->lastResult) {
-            return $this->lastResult;
-        }
-
         $masked = $source;
         $comments = [];
         $length = \strlen($source);
@@ -54,28 +47,6 @@ final class XmlCommentParser implements CommentParserInterface
             $offset = $end;
         }
 
-        $this->lastSource = $source;
-
-        return $this->lastResult = new CommentParseResult($masked, $comments);
-    }
-
-    public function mask(string $source): string
-    {
-        return $this->parse($source)->masked;
-    }
-
-    public function comments(string $source): array
-    {
-        return $this->parse($source)->comments;
-    }
-
-    private function maskRange(string &$masked, string $source, int $start, int $end): void
-    {
-        for ($offset = $start; $offset < $end; ++$offset) {
-            $byte = $source[$offset];
-            if ("\r" !== $byte && "\n" !== $byte && \ord($byte) < 0x80) {
-                $masked[$offset] = ' ';
-            }
-        }
+        return new CommentParseResult($masked, $comments);
     }
 }

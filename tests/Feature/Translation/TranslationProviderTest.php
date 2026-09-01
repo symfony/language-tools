@@ -16,6 +16,7 @@ use Symfony\Lsp\Feature\Translation\TranslationMessage;
 use Symfony\Lsp\Feature\Translation\TranslationProvider;
 use Symfony\Lsp\Feature\Translation\TranslationReferenceResolver;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
@@ -166,7 +167,7 @@ final class TranslationProviderTest extends TestCase
         $configuration = new TranslationConfigurationRegistry();
         $configuration->configure($project, true);
         $documentResolver = new DocumentContextResolver($documents, $projects);
-        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser, new PhpCommentParser(), new TranslationReferenceResolver($documentResolver, $converter, $extractor));
+        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor));
 
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -223,7 +224,7 @@ final class TranslationProviderTest extends TestCase
         $configuration = new TranslationConfigurationRegistry();
         $configuration->configure($project, true);
         $documentResolver = new DocumentContextResolver($documents, $projects);
-        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser, new PhpCommentParser(), new TranslationReferenceResolver($documentResolver, $converter, $extractor));
+        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor));
 
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -471,6 +472,6 @@ final class TranslationProviderTest extends TestCase
         $configuration = new TranslationConfigurationRegistry();
         $documentResolver = new DocumentContextResolver($documents, $projects);
 
-        return [new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, $commentParser, new PhpCommentParser(), new TranslationReferenceResolver($documentResolver, $converter, $extractor)), $converter, $configuration, $project];
+        return [new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor)), $converter, $configuration, $project];
     }
 }

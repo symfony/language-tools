@@ -13,6 +13,7 @@ use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\DiagnosticSuppressor;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -208,10 +209,12 @@ final class DiagnosticProviderRegistryTest extends TestCase
                 new PositionConverter(),
                 new LspProtocolMapper(),
                 new DiagnosticCodeRegistry(),
-                new PhpCommentParser(),
-                new TwigCommentParser(),
-                new YamlCommentParser($treeSitter),
-                new XmlCommentParser(),
+                new CommentParserRegistry([
+                    'php' => new PhpCommentParser(),
+                    'twig' => new TwigCommentParser(),
+                    'yaml' => new YamlCommentParser($treeSitter),
+                    'xml' => new XmlCommentParser(),
+                ]),
             ),
             $providers,
         );

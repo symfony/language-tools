@@ -7,9 +7,7 @@ use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Xml\XmlCommentParser;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -20,10 +18,8 @@ final class EnvironmentCompletionProvider implements CompletionProviderInterface
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly EnvironmentIndexRegistry $indexes,
-        private readonly TwigCommentParser $commentParser,
-        private readonly PhpCommentParserInterface $phpComments,
+        private readonly CommentParserRegistry $comments,
         private readonly YamlDocumentParser $yamlParser,
-        private readonly XmlCommentParser $xmlComments,
     ) {
     }
 
@@ -75,17 +71,7 @@ final class EnvironmentCompletionProvider implements CompletionProviderInterface
             return null;
         }
 
-        return substr($this->commentFreeText($languageId, $text), 0, $cursor);
-    }
-
-    private function commentFreeText(string $languageId, string $text): string
-    {
-        return match ($languageId) {
-            'twig' => $this->commentParser->mask($text),
-            'php' => $this->phpComments->mask($text),
-            'xml' => $this->xmlComments->mask($text),
-            default => $text,
-        };
+        return substr($this->comments->mask($languageId, $text), 0, $cursor);
     }
 
     /** @return array<array-key, mixed> */

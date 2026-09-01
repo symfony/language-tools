@@ -37,6 +37,7 @@ use Symfony\Lsp\Feature\Twig\TwigVariableProvider;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -807,7 +808,7 @@ final class TemplateProviderTest extends TestCase
         $resolver = new DocumentContextResolver($documents, $projects);
 
         return [
-            new TemplateCompletionHandler($resolver, $converter, new LspProtocolMapper(), $indexes, $commentParser, new PhpCommentParser()),
+            new TemplateCompletionHandler($resolver, $converter, new LspProtocolMapper(), $indexes, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()])),
             new TemplateNavigationProvider($resolver, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes),
             $converter,
         ];
@@ -824,7 +825,7 @@ final class TemplateProviderTest extends TestCase
         $indexes = new TemplateIndexRegistry();
         $converter = new PositionConverter();
         $indexes->forProject($project)->replaceSources(new TemplateDeclaration('article/show.html.twig', 'file:///workspace/templates/article/show.html.twig', new Range(new Position(0, 0), new Position(0, 0))));
-        $handler = new TemplateCompletionHandler(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, new TwigCommentParser(), new PhpCommentParser());
+        $handler = new TemplateCompletionHandler(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]));
         $position = $converter->toPosition($text, \strlen($text));
 
         self::assertNull($handler->complete([

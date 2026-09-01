@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Parser\Php;
 
+use Symfony\Lsp\Parser\AbstractCommentParser;
 use Symfony\Lsp\Parser\CommentParseResult;
 use Symfony\Lsp\Parser\SourceComment;
 
@@ -12,9 +13,9 @@ use Symfony\Lsp\Parser\SourceComment;
  * byte length and UTF-16 unit count, so positions measured on the masked
  * text always match the original document.
  */
-final class PhpCommentParser implements PhpCommentParserInterface
+final class PhpCommentParser extends AbstractCommentParser implements PhpCommentParserInterface
 {
-    public function parse(string $source): CommentParseResult
+    protected function parseSource(string $source): CommentParseResult
     {
         $masked = $source;
         $comments = [];
@@ -37,16 +38,6 @@ final class PhpCommentParser implements PhpCommentParserInterface
         return new CommentParseResult($masked, $comments);
     }
 
-    public function mask(string $source): string
-    {
-        return $this->parse($source)->masked;
-    }
-
-    public function comments(string $source): array
-    {
-        return $this->parse($source)->comments;
-    }
-
     /** @return array{int, int} */
     private function contentOffsets(string $comment, int $start, int $end): array
     {
@@ -58,15 +49,5 @@ final class PhpCommentParser implements PhpCommentParserInterface
         }
 
         return [$start + 2, str_ends_with($comment, '*/') ? $end - 2 : $end];
-    }
-
-    private function maskRange(string &$masked, string $source, int $start, int $end): void
-    {
-        for ($offset = $start; $offset < $end; ++$offset) {
-            $byte = $source[$offset];
-            if ("\r" !== $byte && "\n" !== $byte && \ord($byte) < 0x80) {
-                $masked[$offset] = ' ';
-            }
-        }
     }
 }

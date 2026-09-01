@@ -27,6 +27,7 @@ use Symfony\Lsp\Feature\Messenger\MessengerRelationshipResolver;
 use Symfony\Lsp\Feature\Messenger\MessengerSourceIndexRegistry;
 use Symfony\Lsp\Feature\Messenger\MessengerTransport;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -58,7 +59,7 @@ YAML;
         $converter = new PositionConverter();
         $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
         $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter));
-        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser, new PhpCommentParser(), new YamlCommentParser($treeSitter));
+        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser, new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]));
         $facts = $extractor->extract(new SourceDocument('file:///workspace/config/packages/messenger.yaml', 'yaml', $text));
 
         $names = [];
@@ -116,8 +117,7 @@ YAML;
             $converter,
             new TolerantPhpParser(new Parser()),
             new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
-            new PhpCommentParser(),
-            new YamlCommentParser($treeSitter),
+            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]),
         );
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Handler.php', 'php', <<<'PHP'
             <?php
@@ -144,8 +144,7 @@ YAML;
             $converter,
             new TolerantPhpParser(new Parser()),
             new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-            new PhpCommentParser(),
-            new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))]),
         );
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Dispatch.php', 'php', <<<'PHP'
             <?php
@@ -177,8 +176,7 @@ YAML;
             $converter,
             new TolerantPhpParser(new Parser()),
             new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-            new PhpCommentParser(),
-            new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))]),
         );
         $text = <<<'PHP'
             <?php
@@ -265,8 +263,8 @@ YAML;
         $converter = new PositionConverter();
         $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
         $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter));
-        $yamlComments = new YamlCommentParser($treeSitter);
-        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser, new PhpCommentParser(), $yamlComments);
+        $comments = new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]);
+        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser, $comments);
         $indexes = new MessengerIndexRegistry();
         $indexes->forProject($project)->replace(
             [new MessengerBus('command.bus', true)],
@@ -289,7 +287,7 @@ YAML;
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $relationshipResolver = new MessengerRelationshipResolver($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
-        $completionProvider = new MessengerCompletionProvider($documentResolver, $converter, $protocol, $indexes, $yamlParser, new PhpCommentParser(), $yamlComments, new TolerantPhpParser(new Parser()));
+        $completionProvider = new MessengerCompletionProvider($documentResolver, $converter, $protocol, $indexes, $yamlParser, $comments, new TolerantPhpParser(new Parser()));
         $relationshipProvider = new MessengerRelationshipProvider($protocol, $indexes, $relationshipResolver);
         $diagnosticProvider = new MessengerDiagnosticProvider($documentResolver, $converter, $protocol, $indexes, $extractor, new TolerantPhpParser(new Parser()));
         $codeLensProvider = new MessengerCodeLensProvider($documentResolver, $protocol, $indexes, $classExtractor, $relationshipResolver);
@@ -324,8 +322,7 @@ YAML;
             $converter,
             new TolerantPhpParser(new Parser()),
             new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-            new PhpCommentParser(),
-            new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))]),
         );
         $text = <<<'PHP'
             <?php
@@ -371,8 +368,7 @@ YAML;
             new LspProtocolMapper(),
             $indexes,
             new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-            new PhpCommentParser(),
-            new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))]),
             new TolerantPhpParser(new Parser()),
         );
         $position = $converter->toPosition($text, \strlen($text));
@@ -418,8 +414,7 @@ YAML;
             new LspProtocolMapper(),
             $indexes,
             new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-            new PhpCommentParser(),
-            new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))]),
             new TolerantPhpParser(new Parser()),
         );
         $position = $converter->toPosition($text, \strlen($text));

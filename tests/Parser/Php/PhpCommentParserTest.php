@@ -3,10 +3,7 @@
 namespace Symfony\Lsp\Tests\Parser\Php;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Parser\CommentParseResult;
-use Symfony\Lsp\Parser\Php\LastResultPhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 
 final class PhpCommentParserTest extends TestCase
 {
@@ -74,36 +71,5 @@ final class PhpCommentParserTest extends TestCase
         $source = "<?php \$a = 'open; // trailing\n";
 
         self::assertSame($source, $this->parser->mask($source));
-    }
-
-    public function testCachesTheLastResult(): void
-    {
-        $inner = new class implements PhpCommentParserInterface {
-            public int $calls = 0;
-
-            public function parse(string $source): CommentParseResult
-            {
-                ++$this->calls;
-
-                return new CommentParseResult(strtoupper($source), []);
-            }
-
-            public function mask(string $source): string
-            {
-                return $this->parse($source)->masked;
-            }
-
-            public function comments(string $source): array
-            {
-                return $this->parse($source)->comments;
-            }
-        };
-        $parser = new LastResultPhpCommentParser($inner);
-
-        self::assertSame('<?PHP A;', $parser->mask('<?php a;'));
-        self::assertSame([], $parser->comments('<?php a;'));
-        self::assertSame(1, $inner->calls);
-        self::assertSame('<?PHP B;', $parser->mask('<?php b;'));
-        self::assertSame(2, $inner->calls);
     }
 }

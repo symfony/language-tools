@@ -4,9 +4,7 @@ namespace Symfony\Lsp\Feature\Environment;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Xml\XmlCommentParser;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\UriToPathConverter;
 
@@ -15,10 +13,8 @@ final class EnvironmentExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly UriToPathConverter $uriToPathConverter,
-        private readonly TwigCommentParser $commentParser,
-        private readonly PhpCommentParserInterface $phpComments,
+        private readonly CommentParserRegistry $comments,
         private readonly YamlDocumentParser $yamlParser,
-        private readonly XmlCommentParser $xmlComments,
         private readonly EnvironmentExpressionParser $expressionParser = new EnvironmentExpressionParser(),
     ) {
     }
@@ -51,12 +47,7 @@ final class EnvironmentExtractor
                 array_push($references, ...$this->references($document->uri, $document->text, $scalarText, $scalar->contentStartByte));
             }
         } elseif (\in_array($document->languageId, ['php', 'twig', 'xml'], true)) {
-            $referenceText = match ($document->languageId) {
-                'twig' => $this->commentParser->mask($document->text),
-                'php' => $this->phpComments->mask($document->text),
-                'xml' => $this->xmlComments->mask($document->text),
-            };
-            array_push($references, ...$this->references($document->uri, $document->text, $referenceText));
+            array_push($references, ...$this->references($document->uri, $document->text, $this->comments->mask($document->languageId, $document->text)));
         }
 
         return new EnvironmentSourceFacts($document->uri, $declarations, $references);

@@ -22,6 +22,7 @@ use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -368,10 +369,12 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $positions,
             new LspProtocolMapper(),
             new DiagnosticCodeRegistry(),
-            new PhpCommentParser(),
-            new TwigCommentParser(),
-            new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
-            new XmlCommentParser(),
+            new CommentParserRegistry([
+                'php' => new PhpCommentParser(),
+                'twig' => new TwigCommentParser(),
+                'yaml' => new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+                'xml' => new XmlCommentParser(),
+            ]),
         );
     }
 

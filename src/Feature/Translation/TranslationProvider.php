@@ -10,8 +10,7 @@ use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TranslationProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface, ReferencesProviderInterface
@@ -23,8 +22,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         private readonly TranslationIndexRegistry $indexes,
         private readonly TranslationExtractor $extractor,
         private readonly TranslationConfigurationRegistry $configuration,
-        private readonly TwigCommentParser $commentParser,
-        private readonly PhpCommentParserInterface $phpComments,
+        private readonly CommentParserRegistry $comments,
         private readonly TranslationReferenceResolver $referenceResolver,
     ) {
     }
@@ -38,11 +36,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
 
         $context = TranslationCompletionContext::create(
             $request->document->languageId,
-            match ($request->document->languageId) {
-                'twig' => $this->commentParser->mask($request->document->text),
-                'php' => $this->phpComments->mask($request->document->text),
-                default => $request->document->text,
-            },
+            $this->comments->mask($request->document->languageId, $request->document->text),
             $request->position,
             $this->converter,
         );

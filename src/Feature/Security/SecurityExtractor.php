@@ -7,13 +7,12 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\ConfigurationOccurrence;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 
 final class SecurityExtractor
 {
@@ -28,9 +27,8 @@ final class SecurityExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly YamlConfigurationParser $yaml,
-        private readonly TwigCommentParser $commentParser,
+        private readonly CommentParserRegistry $comments,
         private readonly PhpParserInterface $phpParser,
-        private readonly PhpCommentParserInterface $phpComments,
     ) {
     }
 
@@ -38,7 +36,7 @@ final class SecurityExtractor
     {
         $symbols = match ($document->languageId) {
             'php' => $this->phpSymbols($document->uri, $document->text),
-            'twig' => $this->twigSymbols($document->uri, $this->commentParser->mask($document->text)),
+            'twig' => $this->twigSymbols($document->uri, $this->comments->mask('twig', $document->text)),
             'yaml' => $this->yamlSymbols($document->uri, $document->text),
             default => [],
         };
@@ -48,11 +46,7 @@ final class SecurityExtractor
 
     public function completionContext(string $languageId, string $text, int $offset): ?SecurityCompletionContext
     {
-        $before = substr(match ($languageId) {
-            'twig' => $this->commentParser->mask($text),
-            'php' => $this->phpComments->mask($text),
-            default => $text,
-        }, 0, $offset);
+        $before = substr($this->comments->mask($languageId, $text), 0, $offset);
         if ('twig' === $languageId && preg_match('/\bis_granted\s*\(\s*["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
             return $this->context(SecuritySymbolKind::Role, $match[1][0], $text, $match[1][1]);
         }

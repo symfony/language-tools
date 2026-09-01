@@ -7,8 +7,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteCompletionHandler implements CompletionProviderInterface
@@ -20,8 +19,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         private readonly RouteIndexRegistry $routeIndexes,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly RouteReferenceExtractor $phpReferenceExtractor,
-        private readonly PhpCommentParserInterface $phpComments,
-        private readonly TwigCommentParser $twigComments,
+        private readonly CommentParserRegistry $comments,
         private readonly RouteCompletionBuilder $completionBuilder,
     ) {
     }
@@ -39,8 +37,9 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         }
 
         $routeIndex = $this->routeIndexes->forProject($request->project);
+        $masked = $this->comments->mask($request->document->languageId, $request->document->text);
         if ('twig' === $request->document->languageId) {
-            $twigText = $this->twigComments->mask($request->document->text);
+            $twigText = $masked;
             $parameterContext = TwigRouteParameterCompletionContext::fromTwig(
                 $twigText,
                 $request->position,
@@ -78,7 +77,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         }
         $classIndex = $this->classIndexes->forProject($request->project);
         $isSymfonyReceiver = fn (string $source): bool => $this->phpReferenceExtractor->isSymfonyReceiver($source, $classIndex);
-        $phpText = $this->phpComments->mask($request->document->text);
+        $phpText = $masked;
         $parameterContext = RouteParameterCompletionContext::fromPhp(
             $phpText,
             $request->position,

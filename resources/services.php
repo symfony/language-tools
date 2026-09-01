@@ -61,7 +61,7 @@ use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Index\SourceIndexStoreInterface;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
-use Symfony\Lsp\Parser\Php\LastResultPhpCommentParser;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
@@ -73,6 +73,7 @@ use Symfony\Lsp\Parser\TreeSitter\LastResultTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Progress\ProgressReporterInterface;
@@ -197,8 +198,13 @@ return static function (ContainerConfigurator $container): void {
     $services->set(QuotedArgumentMatcher::class);
     $services->set(TwigCallArgumentResolver::class);
     $services->set(TranslationParameterAnalyzer::class);
-    $services->set(XmlCommentParser::class);
-    $services->set(YamlCommentParser::class);
+    $services->set(CommentParserRegistry::class)
+        ->arg('$parsers', [
+            'php' => service(PhpCommentParserInterface::class),
+            'twig' => service(TwigCommentParser::class),
+            'yaml' => service(YamlCommentParser::class),
+            'xml' => service(XmlCommentParser::class),
+        ]);
     $services->load('Symfony\\Lsp\\Project\\', '../src/Project/*{Discovery,Registry,Resolver,Settings,Converter,Configuration,Trust,Manager,Matcher,Cleaner}.php');
     $services->load('Symfony\\Lsp\\Protocol\\', '../src/Protocol/*Mapper.php');
     $services->load('Symfony\\Lsp\\Runtime\\', '../src/Runtime/*{Installer,Runner,Initializer,Refresher,Scheduler,Configuration,Registry,Planner,Mapper,Normalizer,Store,State}.php');
@@ -219,9 +225,6 @@ return static function (ContainerConfigurator $container): void {
     $services->get(PhpExpressionParser::class)
         ->arg('$parser', service(TolerantPhpParser::class));
     $services->alias(PhpCommentParserInterface::class, PhpCommentParser::class);
-    $services->get(LastResultPhpCommentParser::class)
-        ->decorate(PhpCommentParserInterface::class)
-        ->arg('$parser', service(LastResultPhpCommentParser::class.'.inner'));
     $services->alias(TreeSitterParserInterface::class, NativeTreeSitterParser::class);
     $services->get(LastResultTreeSitterParser::class)
         ->decorate(TreeSitterParserInterface::class)

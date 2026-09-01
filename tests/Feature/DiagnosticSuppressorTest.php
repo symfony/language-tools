@@ -9,6 +9,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CollectedDiagnostic;
 use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Feature\DiagnosticSuppressor;
+use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -196,10 +197,12 @@ final class DiagnosticSuppressorTest extends TestCase
             new PositionConverter(),
             new LspProtocolMapper(),
             new DiagnosticCodeRegistry(),
-            new PhpCommentParser(),
-            new TwigCommentParser(),
-            new YamlCommentParser($treeSitter),
-            new XmlCommentParser(),
+            new CommentParserRegistry([
+                'php' => new PhpCommentParser(),
+                'twig' => new TwigCommentParser(),
+                'yaml' => new YamlCommentParser($treeSitter),
+                'xml' => new XmlCommentParser(),
+            ]),
         );
     }
 
