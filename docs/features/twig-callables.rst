@@ -91,5 +91,7 @@ Limitations
 Dynamic names and non-public attributed methods are ignored. A static name
 with a dynamic callable supports completion, references and navigation to its
 registration, but method navigation and signature-based features are
-unavailable. Functions and filters provided only by dependencies are left to a
-general Twig language server.
+unavailable. A ``self::class`` callable inside an anonymous class is treated as
+dynamic instead of being attributed to the enclosing named class. Functions
+and filters provided only by dependencies are left to a general Twig language
+server.

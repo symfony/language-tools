@@ -93,7 +93,7 @@ final class PhpExpressionFactBuilder
         if (null === $className) {
             return null;
         }
-        $owner = $creation->getFirstAncestor(ClassDeclaration::class);
+        [$owner] = $this->scopes->enclosingContext($creation);
         $method = $creation->getFirstAncestor(MethodDeclaration::class);
         $methodName = $method instanceof MethodDeclaration && $method->name instanceof Token ? $method->name->getText($source) : null;
 

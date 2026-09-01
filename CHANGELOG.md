@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Avoid attributing anonymous-class callables to enclosing classes
 - Ignore unpacked PHP arguments in positional call slots
 - Preserve grouped repeatable Event and Messenger attributes
 - Recognize Doctrine mapping attributes on promoted properties

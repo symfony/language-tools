@@ -447,6 +447,35 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame('Formats the value.', $method->description);
     }
 
+    public function testDoesNotResolveAnonymousClassSelfCallablesToTheOuterClass(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Twig;
+
+            use Twig\TwigFunction;
+
+            final class AppExtension
+            {
+                public function anonymous(): object
+                {
+                    return new class {
+                        public function getFunctions(): array
+                        {
+                            return [new TwigFunction('anonymous', [self::class, 'render'])];
+                        }
+                    };
+                }
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $callable = $document->objectCreations[0]->positionalArgument(1)?->callable;
+
+        self::assertNull($callable);
+        self::assertSame([], $document->classReferences);
+    }
+
     public function testExposesMethodAttributesAndCallableShape(): void
     {
         $source = <<<'PHP'
