@@ -82,6 +82,7 @@ final class RuntimeSnapshotStore
             $previousSnapshot = $previous->snapshot;
         }
         $previousSections = $previousSnapshot['sections'] ?? null;
+        /** @var array<string, array<array-key, mixed>> $sections */
         $sections = \is_array($previousSections) ? $previousSections : [];
         $incomingSections = \is_array($snapshot['sections'] ?? null) ? $snapshot['sections'] : [];
         foreach ($requestedSections as $section) {
@@ -106,8 +107,9 @@ final class RuntimeSnapshotStore
         }
 
         $previous = $this->load($project, $bridge);
-        $previousSnapshot = $previous?->snapshot ?? [];
+        $previousSnapshot = $previous->snapshot ?? [];
         $previousSections = $previousSnapshot['sections'] ?? null;
+        /** @var array<string, array<array-key, mixed>> $sections */
         $sections = \is_array($previousSections) ? $previousSections : [];
         $incomingSections = \is_array($snapshot['sections'] ?? null) ? $snapshot['sections'] : [];
         foreach ($availableSections as $section) {
@@ -119,7 +121,10 @@ final class RuntimeSnapshotStore
         $this->persist($project, $bridge, $sections, $previousSnapshot);
     }
 
-    /** @param array<string, array<array-key, mixed>> $sections */
+    /**
+     * @param array<string, array<array-key, mixed>> $sections
+     * @param array<array-key, mixed>                $previousSnapshot
+     */
     private function persist(Project $project, string $bridge, array $sections, array $previousSnapshot): void
     {
         if ([] === $sections) {
