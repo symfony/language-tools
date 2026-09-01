@@ -25,6 +25,7 @@ use Symfony\Lsp\Feature\Event\EventRelationshipResolver;
 use Symfony\Lsp\Feature\Event\EventSourceIndexRegistry;
 use Symfony\Lsp\Feature\Event\EventSubscriberMapAnalyzer;
 use Symfony\Lsp\Feature\Event\EventYamlListenerAnalyzer;
+use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
@@ -49,7 +50,7 @@ final class Subscriber
     public function __construct(private EventDispatcherInterface $dispatcher) {}
     public static function getSubscribedEvents(): array
     {
-        return [OrderPlaced::class => 'onOrderPlaced', 'legacy.order_placed' => 'onLegacy'];
+        return [OrderPlaced::class => 'onOrderPlaced', 'legacy.order_placed' => 'on}Legacy', 'after.brace' => 'onAfter'];
     }
     public function run(): void
     {
@@ -67,8 +68,8 @@ PHP;
             $names[$symbol->name] = true;
             $declarations += $symbol->declaration ? 1 : 0;
         }
-        self::assertSame(['App\\Event\\OrderPlaced', 'legacy.order_placed'], array_keys($names));
-        self::assertSame(3, $declarations);
+        self::assertSame(['App\\Event\\OrderPlaced', 'legacy.order_placed', 'after.brace'], array_keys($names));
+        self::assertSame(4, $declarations);
         self::assertSame(3, \count($facts->symbols) - $declarations);
 
         $yaml = <<<'YAML'
@@ -307,7 +308,7 @@ PHP;
             new TolerantPhpParser(new Parser()),
             new PhpCommentParser(),
             new EventYamlListenerAnalyzer($converter),
-            new EventSubscriberMapAnalyzer($converter),
+            new EventSubscriberMapAnalyzer($converter, new BalancedDelimiterMatcher()),
         );
     }
 

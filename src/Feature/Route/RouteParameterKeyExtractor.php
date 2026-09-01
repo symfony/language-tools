@@ -2,10 +2,15 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
+use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 
 final class RouteParameterKeyExtractor
 {
+    public function __construct(private readonly BalancedDelimiterMatcher $delimiters)
+    {
+    }
+
     /**
      * @return list<string>|null
      */
@@ -28,7 +33,7 @@ final class RouteParameterKeyExtractor
             return null;
         }
         $open = strpos($afterRouteName, '[', \strlen($match[0]) - 1);
-        if (false === $open || null === $close = $this->matchingBracket($afterRouteName, $open)) {
+        if (false === $open || null === $close = $this->delimiters->matching($afterRouteName, $open, '[', ']')) {
             return null;
         }
         $tail = ltrim(substr($afterRouteName, $close + 1));
@@ -97,34 +102,5 @@ final class RouteParameterKeyExtractor
         }
 
         return array_values(array_unique($keys));
-    }
-
-    private function matchingBracket(string $text, int $open): ?int
-    {
-        $depth = 1;
-        $quote = null;
-        $escaped = false;
-        for ($offset = $open + 1, $length = \strlen($text); $offset < $length; ++$offset) {
-            $character = $text[$offset];
-            if (null !== $quote) {
-                if ($escaped) {
-                    $escaped = false;
-                } elseif ('\\' === $character) {
-                    $escaped = true;
-                } elseif ($quote === $character) {
-                    $quote = null;
-                }
-                continue;
-            }
-            if (\in_array($character, ["'", '"'], true)) {
-                $quote = $character;
-            } elseif ('[' === $character) {
-                ++$depth;
-            } elseif (']' === $character && 0 === --$depth) {
-                return $offset;
-            }
-        }
-
-        return null;
     }
 }

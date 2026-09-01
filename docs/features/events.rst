@@ -42,6 +42,7 @@ The server recognizes event references in these contexts:
 
 Typed parameters are matched only inside their declaring method. Typed
 properties, including promoted properties, remain available across methods.
+Quoted listener method names can contain braces and escaped quotes.
 Commented-out PHP attributes and calls are ignored.
 
 Code Lenses

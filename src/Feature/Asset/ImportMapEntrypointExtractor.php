@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 
 final class ImportMapEntrypointExtractor
@@ -10,6 +11,7 @@ final class ImportMapEntrypointExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly PhpCommentParserInterface $commentParser,
+        private readonly BalancedDelimiterMatcher $delimiters,
     ) {
     }
 
@@ -21,7 +23,7 @@ final class ImportMapEntrypointExtractor
             return [];
         }
         $open = $return[0][1] + \strlen($return[0][0]) - 1;
-        $close = $this->matchingBracket($source, $open);
+        $close = $this->delimiters->matching($source, $open, '[', ']');
         if (null === $close) {
             $close = \strlen($source);
         }
@@ -64,7 +66,7 @@ final class ImportMapEntrypointExtractor
                 $offset = $nameEnd;
                 continue;
             }
-            $optionsClose = $this->matchingBracket($source, $optionsOpen);
+            $optionsClose = $this->delimiters->matching($source, $optionsOpen, '[', ']');
             if (null === $optionsClose) {
                 break;
             }
@@ -83,35 +85,5 @@ final class ImportMapEntrypointExtractor
         }
 
         return $symbols;
-    }
-
-    private function matchingBracket(string $text, int $open): ?int
-    {
-        $depth = 0;
-        $quote = null;
-        $escaped = false;
-        $length = \strlen($text);
-        for ($offset = $open; $offset < $length; ++$offset) {
-            $character = $text[$offset];
-            if (null !== $quote) {
-                if ($escaped) {
-                    $escaped = false;
-                } elseif ('\\' === $character) {
-                    $escaped = true;
-                } elseif ($character === $quote) {
-                    $quote = null;
-                }
-                continue;
-            }
-            if ('"' === $character || "'" === $character) {
-                $quote = $character;
-            } elseif ('[' === $character) {
-                ++$depth;
-            } elseif (']' === $character && 0 === --$depth) {
-                return $offset;
-            }
-        }
-
-        return null;
     }
 }

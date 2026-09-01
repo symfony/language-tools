@@ -4,12 +4,15 @@ namespace Symfony\Lsp\Feature\Event;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 
 final class EventSubscriberMapAnalyzer
 {
-    public function __construct(private readonly PositionConverter $converter)
-    {
+    public function __construct(
+        private readonly PositionConverter $converter,
+        private readonly BalancedDelimiterMatcher $delimiters,
+    ) {
     }
 
     /** @return list<EventSourceSymbol> */
@@ -19,7 +22,7 @@ final class EventSubscriberMapAnalyzer
         preg_match_all('/function\s+getSubscribedEvents\s*\([^)]*\)[^{]*\{/', $source, $subscriberMethods, \PREG_OFFSET_CAPTURE);
         foreach ($subscriberMethods[0] as [$declaration, $declarationOffset]) {
             $open = $declarationOffset + \strlen($declaration) - 1;
-            $close = $this->matchingBrace($source, $open);
+            $close = $this->delimiters->matching($source, $open, '{', '}') ?? \strlen($source);
             $body = substr($source, $open + 1, $close - $open - 1);
             preg_match_all('/["\']([^"\']+)["\']\s*=>/', $body, $stringEvents, \PREG_OFFSET_CAPTURE);
             foreach ($stringEvents[1] as [$name, $offset]) {
@@ -39,7 +42,7 @@ final class EventSubscriberMapAnalyzer
         preg_match_all('/function\s+getSubscribedEvents\s*\([^)]*\)[^{]*\{/', $source, $subscriberMethods, \PREG_OFFSET_CAPTURE);
         foreach ($subscriberMethods[0] as [$declaration, $declarationOffset]) {
             $open = $declarationOffset + \strlen($declaration) - 1;
-            if ($offset <= $open || $offset > $this->matchingBrace($source, $open)) {
+            if ($offset <= $open || $offset > ($this->delimiters->matching($source, $open, '{', '}') ?? \strlen($source))) {
                 continue;
             }
             $bodyBefore = substr($source, $open + 1, $offset - $open - 1);
@@ -62,19 +65,5 @@ final class EventSubscriberMapAnalyzer
             ),
             true,
         );
-    }
-
-    private function matchingBrace(string $text, int $open): int
-    {
-        $depth = 0;
-        for ($offset = $open, $length = \strlen($text); $offset < $length; ++$offset) {
-            if ('{' === $text[$offset]) {
-                ++$depth;
-            } elseif ('}' === $text[$offset] && 0 === --$depth) {
-                return $offset;
-            }
-        }
-
-        return \strlen($text);
     }
 }

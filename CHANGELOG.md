@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep event subscriber maps intact when listener method names contain braces
 - Recognize named arguments in Twig route, template and PHP symbol calls
 - Honor named Twig translation arguments
 - Resolve YAML merge keys during configuration diagnostics

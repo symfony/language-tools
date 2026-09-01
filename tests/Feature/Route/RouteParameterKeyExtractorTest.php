@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Feature\Route;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\Route\RouteParameterKeyExtractor;
+use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 
 final class RouteParameterKeyExtractorTest extends TestCase
 {
@@ -12,7 +13,7 @@ final class RouteParameterKeyExtractorTest extends TestCase
     #[DataProvider('parameterProvider')]
     public function testExtractsConservativeLiteralParameterKeys(?array $expected, string $afterRouteName): void
     {
-        self::assertSame($expected, (new RouteParameterKeyExtractor())->extract($afterRouteName));
+        self::assertSame($expected, (new RouteParameterKeyExtractor(new BalancedDelimiterMatcher()))->extract($afterRouteName));
     }
 
     /** @return iterable<string, array{list<string>|null, string}> */

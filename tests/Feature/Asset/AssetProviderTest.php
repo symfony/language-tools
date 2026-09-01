@@ -17,6 +17,7 @@ use Symfony\Lsp\Feature\Asset\ImportMapEntry;
 use Symfony\Lsp\Feature\Asset\ImportMapEntrypointExtractor;
 use Symfony\Lsp\Feature\Asset\PublicAssetResolver;
 use Symfony\Lsp\Feature\Asset\TwigAssetReferenceExtractor;
+use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigQuotedArgumentMatcher;
@@ -213,7 +214,7 @@ final class AssetProviderTest extends TestCase
         return new AssetExtractor(
             new UriToPathConverter(),
             new TwigAssetReferenceExtractor($converter, $comments, new TwigQuotedArgumentMatcher($converter)),
-            new ImportMapEntrypointExtractor($converter, new PhpCommentParser()),
+            new ImportMapEntrypointExtractor($converter, new PhpCommentParser(), new BalancedDelimiterMatcher()),
             new AssetCompletionContextResolver($converter, $comments),
         );
     }

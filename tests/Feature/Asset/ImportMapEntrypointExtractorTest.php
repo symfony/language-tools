@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Asset\AssetSourceSymbol;
 use Symfony\Lsp\Feature\Asset\ImportMapEntrypointExtractor;
+use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 
 final class ImportMapEntrypointExtractorTest extends TestCase
@@ -47,7 +48,7 @@ final class ImportMapEntrypointExtractorTest extends TestCase
     /** @return list<AssetSourceSymbol> */
     private function extract(string $text): array
     {
-        return (new ImportMapEntrypointExtractor(new PositionConverter(), new PhpCommentParser()))
+        return (new ImportMapEntrypointExtractor(new PositionConverter(), new PhpCommentParser(), new BalancedDelimiterMatcher()))
             ->extract('file:///workspace/importmap.php', $text);
     }
 }
