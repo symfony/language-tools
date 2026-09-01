@@ -11,19 +11,25 @@ final class StimulusReferenceExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly TwigCommentParser $commentParser,
+        private readonly JavaScriptSourceAnalyzer $codeMasker,
     ) {
     }
 
     /** @return list<StimulusReference> */
     public function extractJavaScript(string $uri, string $text): array
     {
+        $code = $this->codeMasker->mask($text);
         $references = [];
         foreach ([
             '/\b(?:application|this\.application)\s*\.\s*register\s*\(\s*([\'"])([^\'"]+)\1/',
             '/\b(?:application|this\.application)\s*\.\s*getControllerForElementAndIdentifier\s*\([^,]+,\s*([\'"])([^\'"]+)\1/',
         ] as $pattern) {
-            preg_match_all($pattern, $text, $matches, \PREG_OFFSET_CAPTURE);
-            foreach ($matches[2] as [$name, $offset]) {
+            preg_match_all($pattern, $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+            foreach ($matches as $match) {
+                if (' ' === $code[$match[0][1]]) {
+                    continue;
+                }
+                [$name, $offset] = $match[2];
                 $references[] = new StimulusReference($name, null, null, $uri, $this->converter->toRange($text, $offset, \strlen($name)));
             }
         }

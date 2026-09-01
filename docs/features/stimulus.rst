@@ -31,8 +31,9 @@ Hover describes the controller source, loading mode, actions, targets, values,
 outlets and CSS classes. Go to Definition and document links open controller
 files or member declarations. Find All References connects controller and
 member declarations to their static Twig usages. Escaped characters in static
-helper arguments follow Twig's string rules. Controller files also provide usage
-code lenses.
+helper arguments follow Twig's string rules. JavaScript comments and string
+contents aren't indexed as registrations or controller members. Controller files
+also provide usage code lenses.
 
 An unknown static controller name is reported only after all registered
 controllers are known. Unknown actions and targets aren't diagnosed because

@@ -14,6 +14,7 @@ final class StimulusControllerExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly ProjectPathResolver $pathResolver,
+        private readonly JavaScriptSourceAnalyzer $codeMasker,
     ) {
     }
 
@@ -29,17 +30,18 @@ final class StimulusControllerExtractor
         $declarationOffset = 0;
         $declarationLength = 0;
         if (null !== $class = $this->exportedClass($text)) {
-            [$declarationOffset, $declarationLength, $bodyOffset, $bodyLength] = $class;
+            [$declarationOffset, $declarationLength, $bodyOffset, $bodyLength, $code] = $class;
             $body = substr($text, $bodyOffset, $bodyLength);
-            $members = $this->methodMembers($text, $body, $bodyOffset);
+            $bodyCode = substr($code, $bodyOffset, $bodyLength);
+            $members = $this->methodMembers($text, $body, $bodyCode, $bodyOffset);
             foreach ([
                 'targets' => StimulusMemberKind::Target,
                 'outlets' => StimulusMemberKind::Outlet,
                 'classes' => StimulusMemberKind::ClassName,
             ] as $property => $kind) {
-                array_push($members, ...$this->stringArrayMembers($text, $body, $bodyOffset, $property, $kind));
+                array_push($members, ...$this->stringArrayMembers($text, $body, $bodyCode, $bodyOffset, $property, $kind));
             }
-            array_push($members, ...$this->valueMembers($text, $body, $bodyOffset));
+            array_push($members, ...$this->valueMembers($text, $bodyCode, $bodyOffset));
             usort($members, fn (StimulusMember $a, StimulusMember $b): int => $this->converter->toByteOffset($text, $a->range->start) <=> $this->converter->toByteOffset($text, $b->range->start));
         }
 
@@ -52,10 +54,10 @@ final class StimulusControllerExtractor
         )];
     }
 
-    /** @return array{int, int, int, int}|null */
+    /** @return array{int, int, int, int, string}|null */
     private function exportedClass(string $text): ?array
     {
-        $code = $this->maskNonCode($text);
+        $code = $this->codeMasker->mask($text);
         if (!preg_match('/\bexport\s+default\s+(?:abstract\s+)?class\b/', $code, $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
@@ -64,7 +66,7 @@ final class StimulusControllerExtractor
         $declarationOffset = $match[0][1];
         $open = strpos($code, '{', $declarationOffset + \strlen($declaration));
         if (false === $open) {
-            return [$declarationOffset, \strlen($declaration), \strlen($text), 0];
+            return [$declarationOffset, \strlen($declaration), \strlen($text), 0, $code];
         }
 
         $depth = 0;
@@ -73,84 +75,20 @@ final class StimulusControllerExtractor
             if ('{' === $code[$offset]) {
                 ++$depth;
             } elseif ('}' === $code[$offset] && 0 === --$depth) {
-                return [$declarationOffset, \strlen($declaration), $open + 1, $offset - $open - 1];
+                return [$declarationOffset, \strlen($declaration), $open + 1, $offset - $open - 1, $code];
             }
         }
 
-        return [$declarationOffset, \strlen($declaration), $open + 1, $length - $open - 1];
-    }
-
-    private function maskNonCode(string $text): string
-    {
-        $masked = $text;
-        $length = \strlen($text);
-        $state = 'code';
-        $quote = null;
-
-        for ($offset = 0; $offset < $length; ++$offset) {
-            $character = $text[$offset];
-            if ('code' === $state) {
-                if ('//' === substr($text, $offset, 2)) {
-                    $this->maskByte($masked, $text, $offset);
-                    $this->maskByte($masked, $text, ++$offset);
-                    $state = 'line_comment';
-                } elseif ('/*' === substr($text, $offset, 2)) {
-                    $this->maskByte($masked, $text, $offset);
-                    $this->maskByte($masked, $text, ++$offset);
-                    $state = 'block_comment';
-                } elseif ('\'' === $character || '"' === $character || '`' === $character) {
-                    $quote = $character;
-                    $this->maskByte($masked, $text, $offset);
-                    $state = 'string';
-                }
-                continue;
-            }
-
-            if ('line_comment' === $state) {
-                if ("\r" === $character || "\n" === $character) {
-                    $state = 'code';
-                } else {
-                    $this->maskByte($masked, $text, $offset);
-                }
-                continue;
-            }
-
-            $this->maskByte($masked, $text, $offset);
-            if ('block_comment' === $state) {
-                if ('*/' === substr($text, $offset, 2)) {
-                    $this->maskByte($masked, $text, ++$offset);
-                    $state = 'code';
-                }
-                continue;
-            }
-
-            if ('\\' === $character) {
-                if (++$offset < $length) {
-                    $this->maskByte($masked, $text, $offset);
-                }
-            } elseif ($character === $quote) {
-                $quote = null;
-                $state = 'code';
-            }
-        }
-
-        return $masked;
-    }
-
-    private function maskByte(string &$masked, string $text, int $offset): void
-    {
-        if ("\r" !== $text[$offset] && "\n" !== $text[$offset] && \ord($text[$offset]) < 0x80) {
-            $masked[$offset] = ' ';
-        }
+        return [$declarationOffset, \strlen($declaration), $open + 1, $length - $open - 1, $code];
     }
 
     /** @return list<StimulusMember> */
-    private function methodMembers(string $text, string $body, int $bodyOffset): array
+    private function methodMembers(string $text, string $body, string $bodyCode, int $bodyOffset): array
     {
         preg_match_all('/^[ \t]*(?:async\s+)?([A-Za-z_$][A-Za-z0-9_$]*)\s*\([^)]*\)\s*(?::\s*[^\{\r\n]+)?\s*\{/m', $body, $matches, \PREG_OFFSET_CAPTURE);
         $members = [];
         foreach ($matches[1] as [$name, $offset]) {
-            if (!\in_array($name, self::LIFECYCLE_METHODS, true)) {
+            if (' ' !== $bodyCode[$offset] && !\in_array($name, self::LIFECYCLE_METHODS, true)) {
                 $members[] = new StimulusMember($name, StimulusMemberKind::Action, $this->converter->toRange($text, $bodyOffset + $offset, \strlen($name)));
             }
         }
@@ -159,37 +97,54 @@ final class StimulusControllerExtractor
     }
 
     /** @return list<StimulusMember> */
-    private function stringArrayMembers(string $text, string $body, int $bodyOffset, string $property, StimulusMemberKind $kind): array
+    private function stringArrayMembers(string $text, string $body, string $bodyCode, int $bodyOffset, string $property, StimulusMemberKind $kind): array
     {
-        if (!preg_match('/\bstatic\s+'.preg_quote($property, '/').'\s*=\s*\[(.*?)\]/s', $body, $match, \PREG_OFFSET_CAPTURE)) {
+        if (!preg_match('/\bstatic\s+'.preg_quote($property, '/').'\s*=\s*(\[)/', $bodyCode, $match, \PREG_OFFSET_CAPTURE)) {
             return [];
         }
-        $valuesBody = $match[1][0];
-        $valuesOffset = $bodyOffset + $match[1][1];
-        preg_match_all('/([\'"])([^\'"]+)\1/', $valuesBody, $values, \PREG_OFFSET_CAPTURE);
+        $open = $match[1][1];
+        $close = $this->closingDelimiter($bodyCode, $open, '[', ']');
+        $valuesOffset = $open + 1;
+        $valuesBody = substr($body, $valuesOffset, $close - $valuesOffset);
         $members = [];
-        foreach ($values[2] as [$name, $offset]) {
-            $members[] = new StimulusMember($name, $kind, $this->converter->toRange($text, $valuesOffset + $offset, \strlen($name)));
+        foreach ($this->codeMasker->quotedStrings($valuesBody) as [$name, $offset]) {
+            $members[] = new StimulusMember($name, $kind, $this->converter->toRange($text, $bodyOffset + $valuesOffset + $offset, \strlen($name)));
         }
 
         return $members;
     }
 
     /** @return list<StimulusMember> */
-    private function valueMembers(string $text, string $body, int $bodyOffset): array
+    private function valueMembers(string $text, string $bodyCode, int $bodyOffset): array
     {
-        if (!preg_match('/\bstatic\s+values\s*=\s*\{(.*?)\}/s', $body, $match, \PREG_OFFSET_CAPTURE)) {
+        if (!preg_match('/\bstatic\s+values\s*=\s*(\{)/', $bodyCode, $match, \PREG_OFFSET_CAPTURE)) {
             return [];
         }
-        $valuesBody = $match[1][0];
-        $valuesOffset = $bodyOffset + $match[1][1];
+        $open = $match[1][1];
+        $close = $this->closingDelimiter($bodyCode, $open, '{', '}');
+        $valuesOffset = $open + 1;
+        $valuesBody = substr($bodyCode, $valuesOffset, $close - $valuesOffset);
         preg_match_all('/(?:^|,)\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*:/m', $valuesBody, $values, \PREG_OFFSET_CAPTURE);
         $members = [];
         foreach ($values[1] as [$name, $offset]) {
-            $members[] = new StimulusMember($name, StimulusMemberKind::Value, $this->converter->toRange($text, $valuesOffset + $offset, \strlen($name)));
+            $members[] = new StimulusMember($name, StimulusMemberKind::Value, $this->converter->toRange($text, $bodyOffset + $valuesOffset + $offset, \strlen($name)));
         }
 
         return $members;
+    }
+
+    private function closingDelimiter(string $code, int $open, string $openingDelimiter, string $closingDelimiter): int
+    {
+        $depth = 0;
+        for ($offset = $open, $length = \strlen($code); $offset < $length; ++$offset) {
+            if ($openingDelimiter === $code[$offset]) {
+                ++$depth;
+            } elseif ($closingDelimiter === $code[$offset] && 0 === --$depth) {
+                return $offset;
+            }
+        }
+
+        return \strlen($code);
     }
 
     private function controllerName(Project $project, string $uri): ?string

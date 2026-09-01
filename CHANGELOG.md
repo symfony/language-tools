@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ignore Stimulus JavaScript references and members inside comments and strings
 - Match Symfony YAML folded block and chomping semantics
 - Preserve YAML diagnostic suppressions while syntax is incomplete
 - Keep direct YAML PHP constants opaque during configuration validation

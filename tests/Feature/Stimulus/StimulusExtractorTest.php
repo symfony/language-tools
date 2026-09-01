@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Feature\Stimulus;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Stimulus\JavaScriptSourceAnalyzer;
 use Symfony\Lsp\Feature\Stimulus\StimulusCompletionContextResolver;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusExtractor;
@@ -48,6 +49,24 @@ final class StimulusExtractorTest extends TestCase
         self::assertSame(['open'], array_map(static fn ($member): string => $member->name, $facts->declarations[0]->members));
     }
 
+    public function testIgnoresJavaScriptReferencesInsideCommentsAndStrings(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $facts = $this->createExtractor()->extract($project, 'file:///workspace/assets/controllers/example_controller.js', 'javascript', <<<'JS'
+            const example = "application.register('string', Controller)";
+            const template = `this.application.getControllerForElementAndIdentifier(element, 'template')`;
+            // application.register('line-comment', Controller);
+            /* this.application.getControllerForElementAndIdentifier(element, 'block-comment'); */
+            application.register('registered', Controller);
+            this.application.getControllerForElementAndIdentifier(element, 'resolved');
+            JS);
+
+        self::assertSame(
+            ['registered', 'resolved'],
+            array_map(static fn ($reference): string => $reference->controller, $facts->references),
+        );
+    }
+
     public function testIgnoresTwigReferencesInsideDocumentationComments(): void
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
@@ -84,10 +103,11 @@ final class StimulusExtractorTest extends TestCase
     {
         $converter = new PositionConverter();
         $comments = new TwigCommentParser();
+        $codeMasker = new JavaScriptSourceAnalyzer();
 
         return new StimulusExtractor(
-            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter())),
-            new StimulusReferenceExtractor($converter, $comments),
+            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $codeMasker),
+            new StimulusReferenceExtractor($converter, $comments, $codeMasker),
             new StimulusCompletionContextResolver($converter, $comments),
         );
     }

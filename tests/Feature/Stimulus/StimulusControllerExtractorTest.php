@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Feature\Stimulus;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Stimulus\JavaScriptSourceAnalyzer;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerDeclaration;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerExtractor;
 use Symfony\Lsp\Project\Project;
@@ -49,6 +50,39 @@ final class StimulusControllerExtractorTest extends TestCase
         self::assertSame(['open'], array_map(static fn ($member): string => $member->name, $declaration->members));
     }
 
+    public function testIgnoresMembersInsideCommentsAndStrings(): void
+    {
+        $declaration = $this->extract(<<<'JS'
+            export default class extends Controller {
+                static targets = [
+                    'result',
+                    /* 'commentedTarget', */
+                ];
+                static values = {
+                    query: String,
+                    label: "value, stringValue: Number",
+                    // commentedValue: Boolean,
+                };
+
+                open() {
+                    const example = `
+                        stringAction() {
+                        }
+                        static targets = ['stringTarget'];
+                    `;
+                }
+
+                // commentedAction() {
+                // }
+            }
+            JS);
+
+        self::assertSame(
+            [['result', 'target'], ['query', 'value'], ['label', 'value'], ['open', 'action']],
+            array_map(static fn ($member): array => [$member->name, $member->kind->value], $declaration->members),
+        );
+    }
+
     public function testReturnsADeclarationForAnIncompleteClassHeader(): void
     {
         $declaration = $this->extract('export default class extends Controller');
@@ -59,7 +93,7 @@ final class StimulusControllerExtractorTest extends TestCase
     private function extract(string $text): StimulusControllerDeclaration
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
-        $extractor = new StimulusControllerExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()));
+        $extractor = new StimulusControllerExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new JavaScriptSourceAnalyzer());
 
         return $extractor->extract($project, 'file:///workspace/assets/controllers/example_controller.js', $text)[0];
     }

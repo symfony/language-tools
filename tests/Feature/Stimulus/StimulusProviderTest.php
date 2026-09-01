@@ -7,6 +7,7 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Stimulus\JavaScriptSourceAnalyzer;
 use Symfony\Lsp\Feature\Stimulus\StimulusCodeLensProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusCompletionContextResolver;
 use Symfony\Lsp\Feature\Stimulus\StimulusCompletionProvider;
@@ -34,9 +35,10 @@ final class StimulusProviderTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
         $comments = new TwigCommentParser();
+        $codeMasker = new JavaScriptSourceAnalyzer();
         $extractor = new StimulusExtractor(
-            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter())),
-            new StimulusReferenceExtractor($converter, $comments),
+            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $codeMasker),
+            new StimulusReferenceExtractor($converter, $comments, $codeMasker),
             new StimulusCompletionContextResolver($converter, $comments),
         );
         $controllerUri = 'file:///workspace/assets/controllers/search_controller.js';
