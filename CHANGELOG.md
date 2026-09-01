@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ignore commented Messenger bus and transport options in YAML
 - Expose sanitized runtime section failure causes in verbose output
 - Keep diagnostics from healthy runtime metadata sections after a partial bridge failure
 - Add GitLab Code Quality reports to the diagnostics checker

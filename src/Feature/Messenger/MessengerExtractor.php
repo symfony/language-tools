@@ -10,6 +10,7 @@ use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 
 final class MessengerExtractor
 {
@@ -24,6 +25,7 @@ final class MessengerExtractor
         private readonly PhpParserInterface $parser,
         private readonly YamlConfigurationParser $yaml,
         private readonly PhpCommentParserInterface $phpComments,
+        private readonly YamlCommentParser $yamlComments,
     ) {
     }
 
@@ -35,11 +37,12 @@ final class MessengerExtractor
         $handlers = [];
         if ('yaml' === $languageId) {
             array_push($symbols, ...$this->yamlSymbols($uri, $text));
+            $source = $this->yamlComments->mask($text);
             foreach ([
                 [MessengerSymbolKind::Bus, '/(?:\bbus|default_bus)\s*:\s*["\']?([A-Za-z_][A-Za-z0-9_.-]*)/'],
                 [MessengerSymbolKind::Transport, '/(?:fromTransport|from_transport|failure_transport)\s*:\s*["\']?([A-Za-z_][A-Za-z0-9_.-]*)/'],
             ] as [$kind, $pattern]) {
-                preg_match_all($pattern, $text, $matches, \PREG_OFFSET_CAPTURE);
+                preg_match_all($pattern, $source, $matches, \PREG_OFFSET_CAPTURE);
                 foreach ($matches[1] as [$name, $offset]) {
                     $symbols[] = $this->symbol($kind, $name, $uri, $text, $offset, false);
                 }

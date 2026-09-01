@@ -59,7 +59,7 @@ registered handlers. From a message class, definition navigates to handlers and
 references include recognized dispatch sites. Handler classes navigate back to
 the message classes they handle. Handler relationships inherited through
 application-owned parent classes and interfaces are included. Commented-out PHP
-attributes and calls are ignored.
+attributes and calls are ignored, as are YAML bus and transport options.
 
 Code Lenses
 -----------
