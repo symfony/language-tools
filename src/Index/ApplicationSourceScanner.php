@@ -165,6 +165,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
     private function refreshUriUnlocked(SourceIndexFileLocation $location, bool $deleted): SourceFileChange
     {
         $project = $location->project;
+        // The project can be removed from the workspace while waiting for the lock
         if ($this->projects->forDocumentUri($location->uri)?->rootPath !== $project->rootPath) {
             return SourceFileChange::untracked();
         }
@@ -197,6 +198,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
             $updated = $this->processor->update(
                 $project,
                 $location->relativePath,
+                $this->uri($project, $location->relativePath),
                 $location->path,
                 $languageId,
                 $entries[$location->relativePath] ?? null,
@@ -242,6 +244,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
             }
 
             $reader?->close();
+            $reader = null;
             $this->providers->finish($project);
             $writer->commit();
 
@@ -262,12 +265,13 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         $parsedCount = 0;
         if (null === $reader || !$reader->hasRecords()) {
             foreach ($this->sourceFiles($project, $cancellation) as $relativePath => $source) {
-                $processed = $this->processor->scan($project, $relativePath, $source['path'], $source['languageId'], null);
-                if (null !== $processed) {
-                    $entries[$relativePath] = $processed->metadata;
-                    $writer->add($relativePath, $processed->metadata, $processed->payloads);
+                $processed = $this->processor->scan($project, $relativePath, $source['uri'], $source['path'], $source['languageId'], null);
+                if (null === $processed) {
+                    continue;
                 }
-                if (null !== $processed && $processed->parsed && $collectCycles && 0 === ++$parsedCount % 256) {
+                $entries[$relativePath] = $processed->metadata;
+                $writer->add($relativePath, $processed->metadata, $processed->payloads);
+                if ($processed->parsed && $collectCycles && 0 === ++$parsedCount % 256) {
                     gc_collect_cycles();
                 }
             }
@@ -287,12 +291,13 @@ final class ApplicationSourceScanner implements ProjectStateInterface
                 continue;
             }
             unset($sources[$relativePath]);
-            $processed = $this->processor->scan($project, $relativePath, $source['path'], $source['languageId'], $cached);
-            if (null !== $processed) {
-                $entries[$relativePath] = $processed->metadata;
-                $writer->add($relativePath, $processed->metadata, $processed->payloads);
+            $processed = $this->processor->scan($project, $relativePath, $source['uri'], $source['path'], $source['languageId'], $cached);
+            if (null === $processed) {
+                continue;
             }
-            if (null !== $processed && $processed->parsed && $collectCycles && 0 === ++$parsedCount % 256) {
+            $entries[$relativePath] = $processed->metadata;
+            $writer->add($relativePath, $processed->metadata, $processed->payloads);
+            if ($processed->parsed && $collectCycles && 0 === ++$parsedCount % 256) {
                 gc_collect_cycles();
             }
         }
@@ -301,12 +306,13 @@ final class ApplicationSourceScanner implements ProjectStateInterface
                 delay(0, cancellation: $cancellation);
             }
             $cancellation->throwIfRequested();
-            $processed = $this->processor->scan($project, $relativePath, $source['path'], $source['languageId'], null);
-            if (null !== $processed) {
-                $entries[$relativePath] = $processed->metadata;
-                $writer->add($relativePath, $processed->metadata, $processed->payloads);
+            $processed = $this->processor->scan($project, $relativePath, $source['uri'], $source['path'], $source['languageId'], null);
+            if (null === $processed) {
+                continue;
             }
-            if (null !== $processed && $processed->parsed && $collectCycles && 0 === ++$parsedCount % 256) {
+            $entries[$relativePath] = $processed->metadata;
+            $writer->add($relativePath, $processed->metadata, $processed->payloads);
+            if ($processed->parsed && $collectCycles && 0 === ++$parsedCount % 256) {
                 gc_collect_cycles();
             }
         }
@@ -314,7 +320,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         return $entries;
     }
 
-    /** @return \Generator<string, array{path: string, languageId: string}> */
+    /** @return \Generator<string, array{uri: string, path: string, languageId: string}> */
     private function sourceFiles(Project $project, Cancellation $cancellation): \Generator
     {
         $fileCount = 0;
@@ -327,13 +333,14 @@ final class ApplicationSourceScanner implements ProjectStateInterface
             if (null === $relativePath) {
                 continue;
             }
-            $owner = $this->projects->forDocumentUri($this->uri($project, $relativePath));
+            $uri = $this->uri($project, $relativePath);
+            $owner = $this->projects->forDocumentUri($uri);
             if (null !== $owner && $owner->rootPath !== $project->rootPath) {
                 continue;
             }
             $languageId = $this->files->languageId($path);
             if (null !== $languageId) {
-                yield $relativePath => ['path' => $path, 'languageId' => $languageId];
+                yield $relativePath => ['uri' => $uri, 'path' => $path, 'languageId' => $languageId];
             }
         }
     }

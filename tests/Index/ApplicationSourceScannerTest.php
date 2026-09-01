@@ -101,6 +101,18 @@ final class ApplicationSourceScannerTest extends TestCase
         self::assertSame(2, $provider->extractions);
     }
 
+    public function testBuildsSourceUrisFromTheProjectRootUri(): void
+    {
+        $this->project = new Project($this->temporaryDirectory, 'file://localhost'.$this->temporaryDirectory, '^8.0');
+        $this->projects->replace([$this->project]);
+        file_put_contents($this->temporaryDirectory.'/src/Named Service.php', '<?php final class NamedService {}');
+        $provider = new RecordingSourceIndexProvider();
+
+        $this->scanner($provider)->indexAll();
+
+        self::assertArrayHasKey($this->project->rootUri.'/src/Named%20Service.php', $provider->sources);
+    }
+
     public function testExcludesConfiguredPathsFromPersistentSourceIndexing(): void
     {
         file_put_contents($path = $this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');

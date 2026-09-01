@@ -18,7 +18,7 @@ final class SourceIndexFileProcessor
     }
 
     /** @param ?SourceIndexRecord $cached */
-    public function scan(Project $project, string $relativePath, string $path, string $languageId, ?array $cached): ?ProcessedSourceIndexFile
+    public function scan(Project $project, string $relativePath, string $uri, string $path, string $languageId, ?array $cached): ?ProcessedSourceIndexFile
     {
         $source = $this->read($path);
         if (null === $source) {
@@ -34,7 +34,7 @@ final class SourceIndexFileProcessor
             return new ProcessedSourceIndexFile($cached['metadata'], $cached['payloads'], false);
         }
 
-        [$document, $runtimeStructure, $metadata] = $this->analyze($project, $relativePath, $path, $languageId, $source);
+        [$document, $runtimeStructure, $metadata] = $this->analyze($relativePath, $uri, $path, $languageId, $source);
 
         return new ProcessedSourceIndexFile(
             $metadata,
@@ -44,7 +44,7 @@ final class SourceIndexFileProcessor
     }
 
     /** @param ?SourceIndexMetadata $cached */
-    public function update(Project $project, string $relativePath, string $path, string $languageId, ?array $cached, bool $indexed): ?UpdatedSourceIndexFile
+    public function update(Project $project, string $relativePath, string $uri, string $path, string $languageId, ?array $cached, bool $indexed): ?UpdatedSourceIndexFile
     {
         $source = $this->read($path);
         if (null === $source) {
@@ -61,13 +61,13 @@ final class SourceIndexFileProcessor
             } catch (\UnexpectedValueException) {
             }
         }
-        [$document, $runtimeStructure, $metadata] = $this->analyze($project, $relativePath, $path, $languageId, $source);
+        [$document, $runtimeStructure, $metadata] = $this->analyze($relativePath, $uri, $path, $languageId, $source);
         $replacement = $this->providers->replace($project, $document, $previousPayloads);
-        $change = null === $cached ? SourceFileChange::untracked() : SourceFileChange::factsChanged([]);
-        if (null !== $runtimeStructure->hash && $runtimeStructure->hash === ($cached['runtimeStructure'] ?? null)) {
+        if (null === $cached) {
+            $change = SourceFileChange::untracked();
+        } elseif (null !== $runtimeStructure->hash && $runtimeStructure->hash === $cached['runtimeStructure']) {
             $change = SourceFileChange::contentOnly();
-        }
-        if (null !== $cached && $change->requiresRuntimeRefresh()) {
+        } else {
             $change = 'php' === $languageId && !$runtimeStructure->requiresFullTracking && $replacement->factsChanged && [] === $replacement->changedProviders
                 ? SourceFileChange::contentOnly()
                 : SourceFileChange::factsChanged($replacement->changedProviders);
@@ -92,9 +92,9 @@ final class SourceIndexFileProcessor
      *
      * @return array{SourceDocument, PhpRuntimeStructureAnalysis, SourceIndexMetadata}
      */
-    private function analyze(Project $project, string $relativePath, string $path, string $languageId, array $source): array
+    private function analyze(string $relativePath, string $uri, string $path, string $languageId, array $source): array
     {
-        $document = new SourceDocument($this->uri($project, $relativePath), $languageId, $source['text']);
+        $document = new SourceDocument($uri, $languageId, $source['text']);
         $runtimeStructure = $this->runtimeStructureHasher->analyze($relativePath, $source['text']);
 
         return [$document, $runtimeStructure, $this->metadata($path, $languageId, $source['hash'], $runtimeStructure->hash)];
@@ -125,12 +125,5 @@ final class SourceIndexFileProcessor
             'languageId' => $languageId,
             'runtimeStructure' => $runtimeStructure,
         ];
-    }
-
-    private function uri(Project $project, string $relativePath): string
-    {
-        $encodedPath = implode('/', array_map('rawurlencode', explode('/', $relativePath)));
-
-        return rtrim($project->rootUri, '/').'/'.$encodedPath;
     }
 }

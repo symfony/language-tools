@@ -181,11 +181,6 @@ final class SourceFileEnumerator
         return $this->fileScope->isExcluded($project, $path);
     }
 
-    public function isDirectoryExcluded(Project $project, string $path): bool
-    {
-        return $this->fileScope->isDirectoryExcluded($project, $path);
-    }
-
     public function belongsToProject(Project $project, string $path): bool
     {
         $relativePath = $this->relativePath($project, $path);

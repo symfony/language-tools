@@ -30,17 +30,17 @@ final class SourceIndexFileProcessorTest extends TestCase
 
         try {
             file_put_contents($path, '<?php final class Service { public function value(): int { return 1; } }');
-            $processed = $processor->scan($project, 'src/Service.php', $path, 'php', null);
+            $processed = $processor->scan($project, 'src/Service.php', 'file://'.$path, $path, 'php', null);
             self::assertNotNull($processed);
             $store->append($project, 'src/Service.php', $processed->metadata, $processed->payloads);
 
             file_put_contents($path, '<?php final class Service { public function value(): int { return 2; } }');
-            $bodyChange = $processor->update($project, 'src/Service.php', $path, 'php', $processed->metadata, true);
+            $bodyChange = $processor->update($project, 'src/Service.php', 'file://'.$path, $path, 'php', $processed->metadata, true);
             self::assertNotNull($bodyChange);
             self::assertSame([], $bodyChange->change->domains());
 
             file_put_contents($path, '<?php final class RenamedService { public function value(): int { return 2; } }');
-            $declarationChange = $processor->update($project, 'src/Service.php', $path, 'php', $processed->metadata, true);
+            $declarationChange = $processor->update($project, 'src/Service.php', 'file://'.$path, $path, 'php', $processed->metadata, true);
             self::assertNotNull($declarationChange);
             self::assertSame(['processor'], $declarationChange->change->domains());
         } finally {
