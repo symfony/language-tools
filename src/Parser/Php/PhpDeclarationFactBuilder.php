@@ -359,9 +359,9 @@ final class PhpDeclarationFactBuilder
     /** @param list<PhpAttribute> $attributes */
     private function methodDeclaration(MethodDeclaration $declaration, string $source, PhpNameContext $names, array $attributes): ?PhpMethodDeclaration
     {
-        $owner = $declaration->getFirstAncestor(ObjectCreationExpression::class, ClassDeclaration::class, TraitDeclaration::class);
+        $owner = $declaration->getFirstAncestor(ObjectCreationExpression::class, ClassDeclaration::class, InterfaceDeclaration::class, TraitDeclaration::class, EnumDeclaration::class);
         $nameToken = $declaration->name;
-        if ($owner instanceof ObjectCreationExpression || (!$owner instanceof ClassDeclaration && !$owner instanceof TraitDeclaration) || !$nameToken instanceof Token) {
+        if ($owner instanceof ObjectCreationExpression || (!$owner instanceof ClassDeclaration && !$owner instanceof InterfaceDeclaration && !$owner instanceof TraitDeclaration && !$owner instanceof EnumDeclaration) || !$nameToken instanceof Token) {
             return null;
         }
         $name = $nameToken->getText($source);
@@ -381,7 +381,6 @@ final class PhpDeclarationFactBuilder
             $firstParameterTypes = $this->resolvedTypes($firstTypeDeclaration, $source, $names);
             $firstParameterType = 1 === \count($firstParameterTypes) ? $firstParameterTypes[0] : null;
         }
-        $description = trim($declaration->getDescriptionFormatted());
 
         return new PhpMethodDeclaration(
             (string) $owner->getNamespacedName(),
@@ -389,7 +388,7 @@ final class PhpDeclarationFactBuilder
             $nameToken->getStartPosition(),
             $nameToken->getEndPosition(),
             trim(substr($source, $signatureStart, $signatureEnd - $signatureStart)),
-            '' === $description ? null : $description,
+            $this->description($declaration),
             $attributes,
             $firstParameterType,
             isset($parameters[0]) && $parameters[0]->dotDotDotToken instanceof Token,

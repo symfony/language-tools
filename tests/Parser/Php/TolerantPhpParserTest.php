@@ -531,6 +531,44 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame('string', $methods[3]->firstParameterType);
     }
 
+    public function testExposesInterfaceAndEnumMethodsWithCleanDescriptions(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+
+            interface Formatter
+            {
+                /**
+                 * Formats a value.
+                 *
+                 * @param string $value
+                 */
+                public function format(string $value): string;
+            }
+
+            enum Status
+            {
+                /**
+                 * Returns the display label.
+                 *
+                 * @return string
+                 */
+                public function label(): string
+                {
+                    return $this->name;
+                }
+            }
+            PHP;
+
+        $methods = (new TolerantPhpParser(new Parser()))->parse($source)->methodDeclarations;
+
+        self::assertSame(['App\Formatter', 'App\Status'], array_map(static fn (PhpMethodDeclaration $method): string => $method->className, $methods));
+        self::assertSame(['format', 'label'], array_map(static fn (PhpMethodDeclaration $method): string => $method->name, $methods));
+        self::assertSame(['Formats a value.', 'Returns the display label.'], array_map(static fn (PhpMethodDeclaration $method): ?string => $method->description, $methods));
+        self::assertSame(['public function format(string $value): string', 'public function label(): string'], array_map(static fn (PhpMethodDeclaration $method): string => $method->signature, $methods));
+    }
+
     public function testExposesClassConstantsAndEnumCases(): void
     {
         $source = <<<'PHP'

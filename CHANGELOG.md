@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Show clean PHP method summaries in Twig callable hover
 - Avoid attributing anonymous-class callables to enclosing classes
 - Ignore unpacked PHP arguments in positional call slots
 - Preserve grouped repeatable Event and Messenger attributes

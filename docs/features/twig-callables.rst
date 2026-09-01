@@ -77,7 +77,8 @@ Hover
 -----
 
 Hover describes the custom function or filter. When its callable resolves to an
-application method, hover also shows the PHP signature and documentation.
+application method, hover also shows the PHP signature and documentation
+summary without PHPDoc tags.
 
 Definition
 ----------
