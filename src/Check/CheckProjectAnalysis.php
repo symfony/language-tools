@@ -2,20 +2,21 @@
 
 namespace Symfony\Lsp\Check;
 
+use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+
 /**
  * @phpstan-import-type CheckError from CheckResult
- *
- * @phpstan-type ProjectStatus array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string, timings?: array<string, mixed>}}
+ * @phpstan-import-type ProjectIndexStatus from ProjectIndexStatusRegistry
  */
 final class CheckProjectAnalysis
 {
     /**
-     * @param list<CheckError>             $errors
-     * @param array<string, string>        $preparedHashes
-     * @param array<string, string>        $preparedTexts
-     * @param array<string, true>          $diagnosableProjects
-     * @param array<string, bool>          $completeProjects
-     * @param array<string, ProjectStatus> $statuses
+     * @param list<CheckError>                  $errors
+     * @param array<string, string>             $preparedHashes
+     * @param array<string, string>             $preparedTexts
+     * @param array<string, true>               $diagnosableProjects
+     * @param array<string, bool>               $completeProjects
+     * @param array<string, ProjectIndexStatus> $statuses
      */
     public function __construct(
         public readonly array $errors,

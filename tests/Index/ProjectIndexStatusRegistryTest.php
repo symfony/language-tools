@@ -42,6 +42,7 @@ final class ProjectIndexStatusRegistryTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $statuses = new ProjectIndexStatusRegistry();
         $timings = [
+            'scope' => 'full',
             'bootstrapMilliseconds' => 1.0,
             'kernelMilliseconds' => 2.0,
             'sectionsMilliseconds' => ['routes' => 3.0],

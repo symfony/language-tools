@@ -5,10 +5,12 @@ namespace Symfony\Lsp\Tools\Dogfood;
 use Amp\Sync\LocalSemaphore;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Runtime\RuntimeBridgeTimingNormalizer;
 
 use function Amp\async;
 use function Amp\Future\await;
 
+/** @phpstan-import-type RuntimeBridgeTimings from RuntimeBridgeTimingNormalizer */
 final class MatrixCommand
 {
     private const WORKING_TREE_LIMIT = 50;
@@ -34,6 +36,7 @@ final class MatrixCommand
         private RunClassifier $classifier,
         private ProcessRunnerInterface $processes,
         private Filesystem $filesystem,
+        private RuntimeBridgeTimingNormalizer $runtimeBridgeTimingNormalizer,
         private \Closure $output,
         private SupportScorer $scorer = new SupportScorer(),
     ) {
@@ -242,6 +245,8 @@ final class MatrixCommand
         }
         $serverVersion = $result['serverVersion'] ?? null;
         $violations = $result['violations'] ?? null;
+        /** @var RuntimeBridgeTimings|null $runtimeBridgeTimings */
+        $runtimeBridgeTimings = $this->runtimeBridgeTimingNormalizer->normalize($result['runtimeBridgeTimings'] ?? null);
 
         return new RunSummary(
             $this->classifier->classify($run),
@@ -254,7 +259,7 @@ final class MatrixCommand
             \is_string($serverVersion) ? $serverVersion : null,
             $this->scorer->score($result, $project)['score'] ?? null,
             $this->runTimings($run, $result),
-            $this->runtimeBridgeTimings($result),
+            $runtimeBridgeTimings,
         );
     }
 
@@ -283,41 +288,6 @@ final class MatrixCommand
         }
 
         return $timings;
-    }
-
-    /**
-     * @param array<mixed> $result
-     *
-     * @return array{bootstrapMilliseconds: float, kernelMilliseconds: float, sectionsMilliseconds: array<string, float>, shutdownMilliseconds: float, totalMilliseconds: float}|null
-     */
-    private function runtimeBridgeTimings(array $result): ?array
-    {
-        $reported = $result['runtimeBridgeTimings'] ?? null;
-        if (!\is_array($reported) || !\is_array($reported['sectionsMilliseconds'] ?? null)) {
-            return null;
-        }
-        $timings = [];
-        foreach (['bootstrapMilliseconds', 'kernelMilliseconds', 'shutdownMilliseconds', 'totalMilliseconds'] as $key) {
-            $value = $reported[$key] ?? null;
-            if (!\is_int($value) && !\is_float($value)) {
-                return null;
-            }
-            $timings[$key] = (float) $value;
-        }
-        $sections = [];
-        foreach ($reported['sectionsMilliseconds'] as $section => $value) {
-            if (\is_string($section) && (\is_int($value) || \is_float($value))) {
-                $sections[$section] = (float) $value;
-            }
-        }
-
-        return [
-            'bootstrapMilliseconds' => $timings['bootstrapMilliseconds'],
-            'kernelMilliseconds' => $timings['kernelMilliseconds'],
-            'sectionsMilliseconds' => $sections,
-            'shutdownMilliseconds' => $timings['shutdownMilliseconds'],
-            'totalMilliseconds' => $timings['totalMilliseconds'],
-        ];
     }
 
     /**

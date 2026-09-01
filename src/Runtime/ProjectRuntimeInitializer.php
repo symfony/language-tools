@@ -9,6 +9,7 @@ use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Server\ServerLogger;
+use Symfony\Lsp\Server\Utf8StringTruncator;
 
 final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
 {
@@ -21,7 +22,9 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         private readonly ProjectRegistry $projects,
         private readonly ProjectConfigurationValidationSnapshotLoader $configurationValidation,
         private readonly ProjectIndexStatusRegistry $statuses,
+        private readonly RuntimeBridgeTimingNormalizer $runtimeBridgeTimings,
         private readonly ServerLogger $logger,
+        private readonly Utf8StringTruncator $truncator,
         private readonly ?RuntimeSnapshotStore $snapshotStore = null,
         private readonly ?RuntimeSnapshotState $snapshotState = null,
         private readonly string $releaseMetadataUrl = '',
@@ -81,7 +84,11 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
 
                 throw new UnsupportedSymfonyVersionException($symfonyBranch);
             }
-            $timings = $this->bridgeTimings($snapshot['timings'] ?? null, $sections);
+            $timings = $this->runtimeBridgeTimings->normalize(
+                $snapshot['timings'] ?? null,
+                $sections,
+                null === $requestedSections ? 'full' : 'targeted',
+            );
             if (null !== $timings) {
                 $this->statuses->runtimeTimings($project, $timings);
             }
@@ -159,35 +166,22 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                 continue;
             }
             $item = [
-                'class' => $this->truncateRuntimeMetadataString($candidate['class'], 300),
-                'message' => $this->truncateRuntimeMetadataString($candidate['message'], 500),
+                'class' => $this->truncator->truncate($candidate['class'], 300),
+                'message' => $this->truncator->truncate($candidate['message'], 500),
                 'frames' => [],
             ];
             if (\is_string($candidate['origin'] ?? null) && '' !== $candidate['origin']) {
-                $item['origin'] = $this->truncateRuntimeMetadataString($candidate['origin'], 500);
+                $item['origin'] = $this->truncator->truncate($candidate['origin'], 500);
             }
             foreach (\is_array($candidate['frames'] ?? null) ? \array_slice($candidate['frames'], 0, 5) : [] as $frame) {
                 if (\is_string($frame) && '' !== $frame) {
-                    $item['frames'][] = $this->truncateRuntimeMetadataString($frame, 500);
+                    $item['frames'][] = $this->truncator->truncate($frame, 500);
                 }
             }
             $chain[] = $item;
         }
 
         return [] === $chain ? null : $chain;
-    }
-
-    private function truncateRuntimeMetadataString(string $value, int $limit): string
-    {
-        if (\strlen($value) <= $limit) {
-            return $value;
-        }
-        $value = substr($value, 0, $limit - 3);
-        while ('' !== $value && 1 !== preg_match('//u', $value)) {
-            $value = substr($value, 0, -1);
-        }
-
-        return $value.'...';
     }
 
     /** @param list<string> $loadedSections */
@@ -220,49 +214,6 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             return;
         }
         $this->snapshotState->restore($project, $snapshot->lastSuccessfulAt);
-    }
-
-    /**
-     * @param list<string> $sections
-     *
-     * @return array{bootstrapMilliseconds: float, kernelMilliseconds: float, sectionsMilliseconds: array<string, float>, shutdownMilliseconds: float, totalMilliseconds: float}|null
-     */
-    private function bridgeTimings(mixed $timings, array $sections): ?array
-    {
-        if (!\is_array($timings) || !\is_array($timings['sectionsMilliseconds'] ?? null)) {
-            return null;
-        }
-        $bootstrap = $this->milliseconds($timings['bootstrapMilliseconds'] ?? null);
-        $kernel = $this->milliseconds($timings['kernelMilliseconds'] ?? null);
-        $shutdown = $this->milliseconds($timings['shutdownMilliseconds'] ?? null);
-        $total = $this->milliseconds($timings['totalMilliseconds'] ?? null);
-        if (null === $bootstrap || null === $kernel || null === $shutdown || null === $total) {
-            return null;
-        }
-        $sectionTimings = [];
-        foreach ($sections as $section) {
-            $milliseconds = $this->milliseconds($timings['sectionsMilliseconds'][$section] ?? null);
-            if (null !== $milliseconds) {
-                $sectionTimings[$section] = $milliseconds;
-            }
-        }
-
-        return [
-            'bootstrapMilliseconds' => $bootstrap,
-            'kernelMilliseconds' => $kernel,
-            'sectionsMilliseconds' => $sectionTimings,
-            'shutdownMilliseconds' => $shutdown,
-            'totalMilliseconds' => $total,
-        ];
-    }
-
-    private function milliseconds(mixed $value): ?float
-    {
-        if ((!\is_int($value) && !\is_float($value)) || $value < 0 || !is_finite((float) $value)) {
-            return null;
-        }
-
-        return (float) $value;
     }
 
     /** @param array<array-key, mixed> $snapshot */

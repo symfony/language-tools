@@ -59,20 +59,48 @@ final class ServerLoggerTest extends TestCase
         self::assertSame("[debug] Failure at ./src/Kernel.php with secret=[redacted]\n", $output->contents());
     }
 
-    public function testVerboseErrorTracesOmitArguments(): void
+    public function testVerboseErrorTracesTruncateAndRedactEachFrame(): void
+    {
+        $output = new CapturingWritableStream();
+        $logger = new ServerLogger($output, new SensitiveDataRedactor());
+        $logger->configure('verbose');
+        $shortFunction = 'longTraceFrame'.str_repeat('A', 600).bin2hex(random_bytes(4));
+        $function = __NAMESPACE__.'\\'.$shortFunction;
+        eval('namespace '.__NAMESPACE__.'; function '.$shortFunction.'(string $argument): never { throw new \\RuntimeException("Trace failure."); }');
+        if (!\function_exists($function)) {
+            self::fail('The trace function was not created.');
+        }
+
+        try {
+            $this->canary_secret_token_frame(\Closure::fromCallable($function), 'CANARY_TRACE_ARGUMENT');
+        } catch (\Throwable $error) {
+            $logger->error($error);
+        }
+
+        $contents = $output->contents();
+        self::assertStringContainsString('ServerLoggerTest->[redacted]()', $contents);
+        self::assertStringNotContainsString('canary_secret_token_frame', $contents);
+        self::assertStringNotContainsString('CANARY_TRACE_ARGUMENT', $contents);
+        foreach (preg_split('/\R/', $contents, flags: \PREG_SPLIT_NO_EMPTY) ?: [] as $line) {
+            self::assertLessThanOrEqual(500, \strlen($line));
+        }
+    }
+
+    public function testVerboseErrorTraceFrameCountIsBounded(): void
     {
         $output = new CapturingWritableStream();
         $logger = new ServerLogger($output, new SensitiveDataRedactor());
         $logger->configure('verbose');
 
         try {
-            $this->throwWithArgument('CANARY_TRACE_ARGUMENT');
+            $this->throwRecursively(30);
         } catch (\Throwable $error) {
             $logger->error($error);
         }
 
-        self::assertStringContainsString('ServerLoggerTest->throwWithArgument()', $output->contents());
-        self::assertStringNotContainsString('CANARY_TRACE_ARGUMENT', $output->contents());
+        self::assertStringContainsString('#19 ', $output->contents());
+        self::assertStringNotContainsString('#20 ', $output->contents());
+        self::assertMatchesRegularExpression('/\.\.\. \d+ more frames/', $output->contents());
     }
 
     public function testTrafficLoggingIsDisabledByDefaultAndRecursivelyRedactsContent(): void
@@ -105,8 +133,19 @@ final class ServerLoggerTest extends TestCase
         self::assertSame(3, substr_count($output->contents(), '[redacted]'));
     }
 
-    private function throwWithArgument(string $argument): never
+    private function canary_secret_token_frame(\Closure $function, string $argument): never
     {
-        throw new \RuntimeException('Trace failure.');
+        $function($argument);
+
+        throw new \LogicException('The trace function unexpectedly returned.');
+    }
+
+    private function throwRecursively(int $remaining): never
+    {
+        if (0 === $remaining) {
+            throw new \RuntimeException('Trace failure.');
+        }
+
+        $this->throwRecursively($remaining - 1);
     }
 }

@@ -12,6 +12,7 @@ use Symfony\Lsp\Tools\Dogfood\GitProvisioner;
 use Symfony\Lsp\Tools\Dogfood\MatrixCommand;
 use Symfony\Lsp\Tools\Dogfood\NativeProcessRunner;
 use Symfony\Lsp\Tools\Dogfood\ProcessInterruptedException;
+use Symfony\Lsp\Runtime\RuntimeBridgeTimingNormalizer;
 use Symfony\Lsp\Tools\Dogfood\RunClassifier;
 use Symfony\Lsp\Tools\Dogfood\ServerHarness;
 use Symfony\Lsp\Tools\Dogfood\SetupInterface;
@@ -162,6 +163,7 @@ $command = new MatrixCommand(
     new RunClassifier(),
     $processes,
     new Filesystem(),
+    new RuntimeBridgeTimingNormalizer(),
     static function (string $line): void {
         fwrite(\STDOUT, $line."\n");
     },

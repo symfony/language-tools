@@ -211,6 +211,11 @@ clients can invoke these command identifiers directly:
 * ``symfony.indexStatus``;
 * ``symfony.switchEnvironment``.
 
+Runtime timing data returned by ``symfony.indexStatus`` includes a ``scope``
+field. ``full`` means section timings cover a complete runtime index;
+``targeted`` means they cover only the sections requested by the latest
+refresh.
+
 Privacy
 -------
 
@@ -218,7 +223,8 @@ Retained runtime information is stored under ``var/symfony-lsp/`` in the
 application. Parameter values, environment values, credentials and application
 objects are never stored. Runtime failure causes are omitted from normal output.
 Verbose tracing and verbose checks can include sanitized exception messages,
-relative code locations and argument-free frames. Sensitive values are redacted
+relative code locations and argument-free frames. Server traces retain up to 20
+frames and truncate each frame independently. Sensitive values are redacted
 before output.
 
 General Limitations

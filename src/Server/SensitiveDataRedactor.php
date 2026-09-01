@@ -6,6 +6,11 @@ use Symfony\Component\Filesystem\Path;
 
 final class SensitiveDataRedactor
 {
+    public function __construct(
+        private readonly Utf8StringTruncator $truncator = new Utf8StringTruncator(),
+    ) {
+    }
+
     /** @param list<string> $roots */
     public function redact(string $value, array $roots = []): string
     {
@@ -29,14 +34,7 @@ final class SensitiveDataRedactor
             '[redacted]',
             $value,
         ) ?? '[redacted]';
-        if (\strlen($value) <= 500) {
-            return $value;
-        }
-        $value = substr($value, 0, 497);
-        while ('' !== $value && 1 !== preg_match('//u', $value)) {
-            $value = substr($value, 0, -1);
-        }
 
-        return $value.'...';
+        return $this->truncator->truncate($value, 500);
     }
 }

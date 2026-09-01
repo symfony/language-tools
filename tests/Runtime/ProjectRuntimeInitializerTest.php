@@ -130,6 +130,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
         self::assertSame(90.0, $processRunner->timeout);
         self::assertSame([
+            'scope' => 'full',
             'bootstrapMilliseconds' => 1.0,
             'kernelMilliseconds' => 2.0,
             'sectionsMilliseconds' => ['routes' => 3.0, 'container' => 4.0],
@@ -352,14 +353,26 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
         $processRunner = new CapturingProcessRunner(
-            new ProcessResult(0, json_encode(['schemaVersion' => 1, 'sections' => []], \JSON_THROW_ON_ERROR), ''),
+            new ProcessResult(0, json_encode([
+                'schemaVersion' => 1,
+                'sections' => [],
+                'timings' => [
+                    'bootstrapMilliseconds' => 1.0,
+                    'kernelMilliseconds' => 2.0,
+                    'sectionsMilliseconds' => ['routes' => 3.0, 'container' => 4.0],
+                    'shutdownMilliseconds' => 5.0,
+                    'totalMilliseconds' => 11.0,
+                ],
+            ], \JSON_THROW_ON_ERROR), ''),
         );
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $statuses = new ProjectIndexStatusRegistry();
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
             new RuntimeSnapshotLoaderRegistry([]),
             self::projects($project),
             configuration: new RuntimeConfiguration(),
+            statuses: $statuses,
         );
 
         $initializer->initialize(
@@ -370,6 +383,14 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertCount(1, $processRunner->commands);
         self::assertContains('--sections=routes', $processRunner->commands[0]);
         self::assertContains('--targeted-refresh=1', $processRunner->commands[0]);
+        self::assertSame([
+            'scope' => 'targeted',
+            'bootstrapMilliseconds' => 1.0,
+            'kernelMilliseconds' => 2.0,
+            'sectionsMilliseconds' => ['routes' => 3.0],
+            'shutdownMilliseconds' => 5.0,
+            'totalMilliseconds' => 11.0,
+        ], $statuses->status($project)['runtime']['timings'] ?? null);
     }
 
     public function testLoadsAvailableSectionsBeforeReportingSectionErrors(): void

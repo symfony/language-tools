@@ -2,12 +2,15 @@
 
 namespace Symfony\Lsp\Tools\Dogfood;
 
+use Symfony\Lsp\Runtime\RuntimeBridgeTimingNormalizer;
+
+/** @phpstan-import-type RuntimeBridgeTimings from RuntimeBridgeTimingNormalizer */
 final class RunSummary
 {
     /**
      * @param list<string>              $layers
      * @param array<string, float|null> $timings
-     * @param array<string, mixed>|null $runtimeBridgeTimings
+     * @param RuntimeBridgeTimings|null $runtimeBridgeTimings
      */
     public function __construct(
         public readonly array $layers,

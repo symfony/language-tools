@@ -8,6 +8,8 @@ use Symfony\Component\Filesystem\Path;
 
 final class ServerLogger implements TrafficLoggerInterface
 {
+    private const MAX_TRACE_FRAMES = 20;
+
     private string $trace = 'off';
 
     public function __construct(
@@ -50,9 +52,8 @@ final class ServerLogger implements TrafficLoggerInterface
     {
         $message = $this->redactor->redact($error->getMessage());
         if ($this->isVerbose()) {
-            $trace = $this->trace($error);
-            if ('' !== $trace) {
-                $message .= "\n".$this->redactor->redact($trace);
+            foreach ($this->trace($error) as $line) {
+                $message .= "\n".$this->redactor->redact($line);
             }
         }
         $this->write('[error] '.$message."\n");
@@ -69,18 +70,23 @@ final class ServerLogger implements TrafficLoggerInterface
         ));
     }
 
-    private function trace(\Throwable $error): string
+    /** @return list<string> */
+    private function trace(\Throwable $error): array
     {
+        $trace = $error->getTrace();
         $lines = [];
-        foreach ($error->getTrace() as $index => $frame) {
+        foreach (\array_slice($trace, 0, self::MAX_TRACE_FRAMES) as $index => $frame) {
             $location = \is_string($frame['file'] ?? null)
                 ? $this->relativeFile($frame['file']).(\is_int($frame['line'] ?? null) ? ':'.$frame['line'] : '')
                 : '[internal function]';
             $call = ($frame['class'] ?? '').($frame['type'] ?? '').$frame['function'].'()';
             $lines[] = '#'.$index.' '.$location.' '.$call;
         }
+        if (\count($trace) > self::MAX_TRACE_FRAMES) {
+            $lines[] = \sprintf('... %d more frames', \count($trace) - self::MAX_TRACE_FRAMES);
+        }
 
-        return implode("\n", $lines);
+        return $lines;
     }
 
     private function traffic(string $direction, string $line): void

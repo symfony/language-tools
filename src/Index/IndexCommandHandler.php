@@ -13,6 +13,11 @@ use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 use Symfony\Lsp\Runtime\RuntimeRefreshMode;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 
+/**
+ * @phpstan-import-type ProjectRuntimeIndexStatus from ProjectIndexStatusRegistry
+ *
+ * @phpstan-type ProjectIndexCommandStatus array{root: string, environment: string, runtimeEnabled: bool, trusted: bool, source: array{state: string, error?: string}, runtime: ProjectRuntimeIndexStatus}
+ */
 final class IndexCommandHandler
 {
     public const REFRESH_COMMAND = 'symfony.refreshIndex';
@@ -32,7 +37,7 @@ final class IndexCommandHandler
     /**
      * @param array<array-key, mixed> $params
      *
-     * @return list<array{root: string, environment: string, runtimeEnabled: bool, trusted: bool, source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string, timings?: array<string, mixed>}}>|null
+     * @return list<ProjectIndexCommandStatus>|null
      */
     public function execute(array $params, ?Cancellation $cancellation = null): ?array
     {

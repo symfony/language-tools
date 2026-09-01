@@ -4,11 +4,19 @@ namespace Symfony\Lsp\Index;
 
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectStateInterface;
+use Symfony\Lsp\Runtime\RuntimeBridgeTimingNormalizer;
 use Symfony\Lsp\Runtime\RuntimeSnapshotState;
 
+/**
+ * @phpstan-import-type RuntimeBridgeTimings from RuntimeBridgeTimingNormalizer
+ *
+ * @phpstan-type ProjectRuntimeIndexStatus array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string, timings?: RuntimeBridgeTimings}
+ * @phpstan-type ProjectIndexSections array{source: array{state: string, error?: string}, runtime: ProjectRuntimeIndexStatus}
+ * @phpstan-type ProjectIndexStatus array{root: string, source: array{state: string, error?: string}, runtime: ProjectRuntimeIndexStatus}
+ */
 final class ProjectIndexStatusRegistry implements ProjectStateInterface
 {
-    /** @var array<string, array{source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string, timings?: array{bootstrapMilliseconds: float, kernelMilliseconds: float, sectionsMilliseconds: array<string, float>, shutdownMilliseconds: float, totalMilliseconds: float}}}> */
+    /** @var array<string, ProjectIndexSections> */
     private array $statuses = [];
 
     private readonly RuntimeSnapshotState $runtimeSnapshots;
@@ -55,9 +63,7 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
         $this->section($project, 'runtime', 'partial', 'Some runtime metadata could not be loaded.');
     }
 
-    /**
-     * @param array{bootstrapMilliseconds: float, kernelMilliseconds: float, sectionsMilliseconds: array<string, float>, shutdownMilliseconds: float, totalMilliseconds: float} $timings
-     */
+    /** @param RuntimeBridgeTimings $timings */
     public function runtimeTimings(Project $project, array $timings): void
     {
         $status = $this->status($project);
@@ -86,9 +92,7 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
         $this->runtimeSnapshots->removeProject($project);
     }
 
-    /**
-     * @return array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string, timings?: array{bootstrapMilliseconds: float, kernelMilliseconds: float, sectionsMilliseconds: array<string, float>, shutdownMilliseconds: float, totalMilliseconds: float}}}
-     */
+    /** @return ProjectIndexStatus */
     public function status(Project $project): array
     {
         $status = $this->statuses[$project->rootPath] ?? [

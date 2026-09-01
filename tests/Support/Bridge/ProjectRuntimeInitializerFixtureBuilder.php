@@ -11,12 +11,14 @@ use Symfony\Lsp\Runtime\BridgeInstaller;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\ProcessRunnerInterface;
 use Symfony\Lsp\Runtime\ProjectRuntimeInitializer;
+use Symfony\Lsp\Runtime\RuntimeBridgeTimingNormalizer;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 use Symfony\Lsp\Runtime\RuntimeSnapshotState;
 use Symfony\Lsp\Runtime\RuntimeSnapshotStore;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
+use Symfony\Lsp\Server\Utf8StringTruncator;
 
 final class ProjectRuntimeInitializerFixtureBuilder
 {
@@ -40,6 +42,7 @@ final class ProjectRuntimeInitializerFixtureBuilder
         string $releaseMetadataUrl = '',
     ): ProjectRuntimeInitializer {
         $configuration ??= new RuntimeConfiguration();
+        $truncator = new Utf8StringTruncator();
 
         return new ProjectRuntimeInitializer(
             $this->bridgeInstaller,
@@ -50,7 +53,9 @@ final class ProjectRuntimeInitializerFixtureBuilder
             $projects,
             $configurationValidationLoader ?? new ProjectConfigurationValidationSnapshotLoader(new ConfigurationValidationRegistry()),
             $statuses ?? new ProjectIndexStatusRegistry(),
-            $logger ?? new ServerLogger(null, new SensitiveDataRedactor()),
+            new RuntimeBridgeTimingNormalizer(),
+            $logger ?? new ServerLogger(null, new SensitiveDataRedactor($truncator)),
+            $truncator,
             $snapshotStore,
             $snapshotState,
             $releaseMetadataUrl,

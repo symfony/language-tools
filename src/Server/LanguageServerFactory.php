@@ -40,7 +40,7 @@ final class LanguageServerFactory
 
     public function create(ReadableStream $input, WritableStream $output, ?WritableStream $errorOutput = null): LanguageServer
     {
-        $logger = new ServerLogger($errorOutput, new SensitiveDataRedactor());
+        $logger = new ServerLogger($errorOutput, new SensitiveDataRedactor(new Utf8StringTruncator()));
         $peer = new JsonRpcPeer(
             new ContentLengthJsonRpcTransport($input, $output),
             trafficLogger: $logger,
@@ -71,7 +71,7 @@ final class LanguageServerFactory
         $container->getDefinition(SerializedRuntimeInitializer::class)
             ->setArgument('$initializer', new Reference(StatusRuntimeInitializer::class));
         $container->compile();
-        $container->set(ServerLogger::class, new ServerLogger($errorOutput, new SensitiveDataRedactor()));
+        $container->set(ServerLogger::class, new ServerLogger($errorOutput, new SensitiveDataRedactor(new Utf8StringTruncator())));
 
         /** @var CheckCommand $command */
         $command = $container->get(CheckCommand::class);

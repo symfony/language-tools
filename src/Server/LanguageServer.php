@@ -28,6 +28,7 @@ use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
 
 use function Amp\async;
 
+/** @phpstan-import-type ProjectIndexCommandStatus from IndexCommandHandler */
 final class LanguageServer
 {
     public function __construct(
@@ -338,7 +339,7 @@ final class LanguageServer
     /**
      * @param array<array-key, mixed> $params
      *
-     * @return list<array{root: string, environment: string, runtimeEnabled: bool, trusted: bool, source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string, timings?: array<string, mixed>}}>|null
+     * @return list<ProjectIndexCommandStatus>|null
      */
     private function executeCommand(array $params, Cancellation $cancellation): ?array
     {

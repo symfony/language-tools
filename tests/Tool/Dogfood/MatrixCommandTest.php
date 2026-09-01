@@ -6,6 +6,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Runtime\RuntimeBridgeTimingNormalizer;
 use Symfony\Lsp\Tools\Dogfood\ComposerSetup;
 use Symfony\Lsp\Tools\Dogfood\HarnessInterface;
 use Symfony\Lsp\Tools\Dogfood\HarnessResult;
@@ -68,6 +69,8 @@ final class MatrixCommandTest extends TestCase
         self::assertSame(8.0, (float) ($report['cold']['timings']['budgetProbeDiscoveryMilliseconds'] ?? -1));
         self::assertSame(30.0, (float) ($report['cold']['timings']['processMilliseconds'] ?? -1));
         self::assertSame(4.0, (float) ($report['cold']['timings']['runtimeIndexMilliseconds'] ?? -1));
+        self::assertIsArray($report['cold']['runtimeBridgeTimings']);
+        self::assertSame('full', $report['cold']['runtimeBridgeTimings']['scope']);
         $runtimeBridgeTotal = $report['cold']['runtimeBridgeTimings']['totalMilliseconds'] ?? null;
         self::assertTrue(\is_int($runtimeBridgeTotal) || \is_float($runtimeBridgeTotal));
         self::assertSame(11.0, (float) $runtimeBridgeTotal);
@@ -329,6 +332,7 @@ final class MatrixCommandTest extends TestCase
             new RunClassifier(),
             $processes,
             new Filesystem(),
+            new RuntimeBridgeTimingNormalizer(),
             function (string $line): void {
                 $this->lines[] = $line;
             },
@@ -364,6 +368,7 @@ final class MatrixCommandTest extends TestCase
             'serverError' => null,
             'exitCode' => 0,
             'runtimeBridgeTimings' => [
+                'scope' => 'full',
                 'bootstrapMilliseconds' => 1.0,
                 'kernelMilliseconds' => 2.0,
                 'sectionsMilliseconds' => ['routes' => 3.0],

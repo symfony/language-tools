@@ -8,6 +8,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectConfiguration;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
+/** @phpstan-import-type ProjectIndexStatus from ProjectIndexStatusRegistry */
 final class CheckResultBuilder
 {
     public function __construct(
@@ -106,9 +107,7 @@ final class CheckResultBuilder
         );
     }
 
-    /**
-     * @param array{root: string, source: array{state: string, error?: string}, runtime: array{state: string, error?: string, stage?: string, lastSuccessfulAt?: string, timings?: array<string, mixed>}} $status
-     */
+    /** @param ProjectIndexStatus $status */
     private function projectResult(Project $project, array $status, bool $complete): CheckProjectResult
     {
         $reason = $this->runtimeConfiguration->sourceOnlyReason($project);
