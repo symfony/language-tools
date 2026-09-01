@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 
 final class PhpRouteDeclarationExtractorTest extends TestCase
@@ -32,8 +33,8 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
             PHP;
 
         $declarations = (new PhpRouteDeclarationExtractor(new PositionConverter(), new TolerantPhpParser(new Parser())))->extract(
-            'file:///workspace/src/ArticleController.php',
-            $text,
+            new SourceDocument('file:///workspace/src/ArticleController.php',
+                'php', $text),
         );
 
         self::assertCount(2, $declarations);
@@ -60,8 +61,8 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
             PHP;
 
         $declarations = (new PhpRouteDeclarationExtractor(new PositionConverter(), new TolerantPhpParser(new Parser())))->extract(
-            'file:///workspace/src/HomeController.php',
-            $text,
+            new SourceDocument('file:///workspace/src/HomeController.php',
+                'php', $text),
         );
 
         self::assertCount(1, $declarations);
@@ -84,8 +85,8 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
             PHP;
 
         $declarations = (new PhpRouteDeclarationExtractor(new PositionConverter(), new TolerantPhpParser(new Parser())))->extract(
-            'file:///workspace/src/ArticleController.php',
-            $text,
+            new SourceDocument('file:///workspace/src/ArticleController.php',
+                'php', $text),
         );
 
         self::assertSame(['blog\'s\\archive'], array_map(
@@ -110,8 +111,8 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
             PHP;
 
         $declarations = (new PhpRouteDeclarationExtractor(new PositionConverter(), new TolerantPhpParser(new Parser())))->extract(
-            'file:///workspace/src/ArticleController.php',
-            $text,
+            new SourceDocument('file:///workspace/src/ArticleController.php',
+                'php', $text),
         );
 
         self::assertSame(['aliased_route', 'legacy_route'], array_map(
@@ -133,8 +134,8 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
             PHP;
 
         $declarations = (new PhpRouteDeclarationExtractor(new PositionConverter(), new TolerantPhpParser(new Parser())))->extract(
-            'file:///workspace/src/DraftController.php',
-            $text,
+            new SourceDocument('file:///workspace/src/DraftController.php',
+                'php', $text),
         );
 
         self::assertSame('draft_route', $declarations[0]->name);
@@ -158,8 +159,8 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
             PHP;
 
         $declarations = (new PhpRouteDeclarationExtractor(new PositionConverter(), new TolerantPhpParser(new Parser())))->extract(
-            'file:///workspace/config/routes.php',
-            $text,
+            new SourceDocument('file:///workspace/config/routes.php',
+                'php', $text),
         );
 
         self::assertSame(['article_list', 'legacy_article'], array_map(

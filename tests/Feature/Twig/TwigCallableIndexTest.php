@@ -13,6 +13,7 @@ use Symfony\Lsp\Feature\Twig\TwigCallableIndex;
 use Symfony\Lsp\Feature\Twig\TwigCallableKind;
 use Symfony\Lsp\Feature\Twig\TwigCallableSourceFacts;
 use Symfony\Lsp\Feature\Twig\TwigCallableUsage;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 
 final class TwigCallableIndexTest extends TestCase
@@ -67,8 +68,8 @@ final class TwigCallableIndexTest extends TestCase
         $saved = "<?php class Extension { public function getFunctions(): array { return [new \\Twig\\TwigFunction('saved_name', null)]; } }";
         $unsaved = "<?php class Extension { public function getFunctions(): array { return [new \\Twig\\TwigFunction('unsaved_name', null)]; } }";
 
-        $index->replace($extractor->extract($uri, $saved));
-        $index->overlay($extractor->extract($uri, $unsaved));
+        $index->replace($extractor->extract(new SourceDocument($uri, 'php', $saved)));
+        $index->overlay($extractor->extract(new SourceDocument($uri, 'php', $unsaved)));
 
         self::assertSame([], $index->declarations(TwigCallableKind::Function, 'saved_name'));
         self::assertCount(1, $index->declarations(TwigCallableKind::Function, 'unsaved_name'));

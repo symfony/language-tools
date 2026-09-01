@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
@@ -18,11 +19,11 @@ final class TwigPhpSymbolExtractor
     ) {
     }
 
-    public function extract(string $uri, string $languageId, string $text): ?TwigPhpSymbolSourceFacts
+    public function extract(SourceDocument $document): ?TwigPhpSymbolSourceFacts
     {
-        return match ($languageId) {
-            'php' => new TwigPhpSymbolSourceFacts($uri, $this->declarations->extract($uri, $text, $this->phpParser->parse($text))),
-            'twig' => new TwigPhpSymbolSourceFacts($uri, references: $this->references->extract($uri, $text, $this->twigParser->parse($text))),
+        return match ($document->languageId) {
+            'php' => new TwigPhpSymbolSourceFacts($document->uri, $this->declarations->extract($document->uri, $document->text, $this->phpParser->parse($document->text))),
+            'twig' => new TwigPhpSymbolSourceFacts($document->uri, references: $this->references->extract($document->uri, $document->text, $this->twigParser->parse($document->text))),
             default => null,
         };
     }

@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Console;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
@@ -29,14 +30,14 @@ final class ConsoleExtractor
     ) {
     }
 
-    public function extract(string $uri, string $languageId, string $text): ConsoleSourceFacts
+    public function extract(SourceDocument $document): ConsoleSourceFacts
     {
-        if ('php' !== $languageId) {
-            return new ConsoleSourceFacts($uri, [], []);
+        if ('php' !== $document->languageId) {
+            return new ConsoleSourceFacts($document->uri, [], []);
         }
 
-        $masked = $this->phpComments->mask($text);
-        $php = $this->parser->parse($text);
+        $masked = $this->phpComments->mask($document->text);
+        $php = $this->parser->parse($document->text);
         $declarations = [];
         foreach ($php->typeDeclarations as $type) {
             if (!\in_array($type->kind, [PhpTypeKind::Class_, PhpTypeKind::Trait_], true)) {
@@ -58,13 +59,13 @@ final class ConsoleExtractor
             $references[] = new ConsoleInputReference(
                 'getArgument' === $call->method ? ConsoleInputKind::Argument : ConsoleInputKind::Option,
                 $name->value,
-                $uri,
-                new Range($this->converter->toPosition($text, $name->startOffset), $this->converter->toPosition($text, $name->endOffset)),
+                $document->uri,
+                new Range($this->converter->toPosition($document->text, $name->startOffset), $this->converter->toPosition($document->text, $name->endOffset)),
                 $className,
             );
         }
 
-        return new ConsoleSourceFacts($uri, $declarations, $references);
+        return new ConsoleSourceFacts($document->uri, $declarations, $references);
     }
 
     public function completionContext(string $languageId, string $text, int $offset): ?ConsoleCompletionContext

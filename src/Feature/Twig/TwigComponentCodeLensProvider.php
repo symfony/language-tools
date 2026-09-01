@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\CodeLensProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TwigComponentCodeLensProvider implements CodeLensProviderInterface
@@ -23,7 +24,7 @@ final class TwigComponentCodeLensProvider implements CodeLensProviderInterface
             return null;
         }
         $lenses = [];
-        foreach ($this->extractor->extract($request->project, $request->document->uri, 'php', $request->document->text)->components as $component) {
+        foreach ($this->extractor->extract($request->project, new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->components as $component) {
             $locations = [];
             foreach ($this->indexes->forProject($request->project)->references($component->name) as $reference) {
                 $locations[] = $this->protocol->location($reference->uri, $reference->range);

@@ -57,26 +57,23 @@ final class ProjectRouteSourceIndexer extends AbstractSourceIndexer
 
     protected function extract(Project $project, SourceDocument $document): RouteSourceFacts
     {
-        $uri = $document->uri;
-        $languageId = $document->languageId;
-        $text = $document->text;
         $declarations = [];
-        if ('php' === $languageId) {
-            $declarations = $this->phpDeclarationExtractor->extract($uri, $text);
-            $references = $this->phpReferenceExtractor->extractCandidates($text);
-        } elseif ('twig' === $languageId) {
-            $references = $this->twigReferenceExtractor->extract($text);
-        } elseif ('yaml' === $languageId && $this->isRouteYaml($project, $uri)) {
-            $declarations = $this->yamlDeclarationExtractor->extract($uri, $text);
+        if ('php' === $document->languageId) {
+            $declarations = $this->phpDeclarationExtractor->extract($document);
+            $references = $this->phpReferenceExtractor->extractCandidates($document);
+        } elseif ('twig' === $document->languageId) {
+            $references = $this->twigReferenceExtractor->extract($document);
+        } elseif ('yaml' === $document->languageId && $this->isRouteYaml($project, $document->uri)) {
+            $declarations = $this->yamlDeclarationExtractor->extract($document);
             $references = [];
         } else {
-            return new RouteSourceFacts($uri, [], []);
+            return new RouteSourceFacts($document->uri, [], []);
         }
 
-        return new RouteSourceFacts($uri, $declarations, array_map(
+        return new RouteSourceFacts($document->uri, $declarations, array_map(
             static fn (RouteReference $reference): RouteReferenceLocation => new RouteReferenceLocation(
                 $reference->name,
-                $uri,
+                $document->uri,
                 $reference->range,
                 $reference->controllerClass,
             ),

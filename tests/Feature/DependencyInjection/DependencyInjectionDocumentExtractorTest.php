@@ -13,6 +13,7 @@ use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -32,19 +33,19 @@ final class DependencyInjectionDocumentExtractorTest extends TestCase
             </container>
             XML;
 
-        $facts = $extractor->extractForIndexing($uri, 'xml', $text);
+        $facts = $extractor->extractForIndexing(new SourceDocument($uri, 'xml', $text));
 
         self::assertInstanceOf(DependencyInjectionSourceFacts::class, $facts);
         self::assertSame(['app.mailer'], array_map(static fn ($service): string => $service->id, $facts->services));
-        self::assertNull($extractor->extractForInteractive($uri, 'xml', $text));
+        self::assertNull($extractor->extractForInteractive(new SourceDocument($uri, 'xml', $text)));
     }
 
     public function testPhpExtractionCombinesAutowireReferencesAndClassDeclarations(): void
     {
         $facts = $this->extractor()->extractForIndexing(
-            'file:///workspace/src/Consumer.php',
-            'php',
-            <<<'PHP'
+            new SourceDocument('file:///workspace/src/Consumer.php',
+                'php',
+                <<<'PHP'
                 <?php
 
                 namespace App;
@@ -57,7 +58,7 @@ final class DependencyInjectionDocumentExtractorTest extends TestCase
                     {
                     }
                 }
-                PHP,
+                PHP),
         );
 
         self::assertInstanceOf(DependencyInjectionSourceFacts::class, $facts);

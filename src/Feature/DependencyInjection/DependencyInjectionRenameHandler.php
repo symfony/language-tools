@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\RenameProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -111,9 +112,7 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
             return null;
         }
         $symbol = $this->symbolResolver->resolve(
-            $request->document->uri,
-            $request->document->languageId,
-            $request->document->text,
+            new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text),
             $request->position,
         );
 

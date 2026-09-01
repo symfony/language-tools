@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
 final class RouteReferenceExtractor
@@ -19,12 +20,12 @@ final class RouteReferenceExtractor
     /**
      * @return list<RouteReference>
      */
-    public function extract(string $text, ?DependencyInjectionSourceIndex $classIndex = null): array
+    public function extract(SourceDocument $source, ?DependencyInjectionSourceIndex $classIndex = null): array
     {
-        $document = $this->parser->parse($text);
+        $document = $this->parser->parse($source->text);
 
         return array_values(array_filter(
-            $this->candidates->extract($text, $document),
+            $this->candidates->extract($source->text, $document),
             fn (RouteReference $reference): bool => $this->controllers->isController($reference->controllerClass, $document, $classIndex),
         ));
     }
@@ -32,11 +33,11 @@ final class RouteReferenceExtractor
     /**
      * @return list<RouteReference>
      */
-    public function extractCandidates(string $text): array
+    public function extractCandidates(SourceDocument $source): array
     {
-        $document = $this->parser->parse($text);
+        $document = $this->parser->parse($source->text);
 
-        return $this->candidates->extract($text, $document);
+        return $this->candidates->extract($source->text, $document);
     }
 
     public function isSymfonyReceiver(string $source, DependencyInjectionSourceIndex $classIndex): bool
@@ -47,11 +48,11 @@ final class RouteReferenceExtractor
         return null !== $receiver && $this->controllers->isController($receiver->controllerClass, $document, $classIndex);
     }
 
-    public function at(string $text, int $byteOffset, ?DependencyInjectionSourceIndex $classIndex = null): ?RouteReference
+    public function at(SourceDocument $document, int $byteOffset, ?DependencyInjectionSourceIndex $classIndex = null): ?RouteReference
     {
-        foreach ($this->extract($text, $classIndex) as $reference) {
-            $start = $this->positionConverter->toByteOffset($text, $reference->range->start);
-            $end = $this->positionConverter->toByteOffset($text, $reference->range->end);
+        foreach ($this->extract($document, $classIndex) as $reference) {
+            $start = $this->positionConverter->toByteOffset($document->text, $reference->range->start);
+            $end = $this->positionConverter->toByteOffset($document->text, $reference->range->end);
             if ($byteOffset >= $start && $byteOffset <= $end) {
                 return $reference;
             }

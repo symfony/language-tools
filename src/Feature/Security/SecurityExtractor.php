@@ -6,6 +6,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\ConfigurationOccurrence;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
@@ -33,16 +34,16 @@ final class SecurityExtractor
     ) {
     }
 
-    public function extract(string $uri, string $languageId, string $text): SecuritySourceFacts
+    public function extract(SourceDocument $document): SecuritySourceFacts
     {
-        $symbols = match ($languageId) {
-            'php' => $this->phpSymbols($uri, $text),
-            'twig' => $this->twigSymbols($uri, $this->commentParser->mask($text)),
-            'yaml' => $this->yamlSymbols($uri, $text),
+        $symbols = match ($document->languageId) {
+            'php' => $this->phpSymbols($document->uri, $document->text),
+            'twig' => $this->twigSymbols($document->uri, $this->commentParser->mask($document->text)),
+            'yaml' => $this->yamlSymbols($document->uri, $document->text),
             default => [],
         };
 
-        return new SecuritySourceFacts($uri, $this->unique($symbols));
+        return new SecuritySourceFacts($document->uri, $this->unique($symbols));
     }
 
     public function completionContext(string $languageId, string $text, int $offset): ?SecurityCompletionContext

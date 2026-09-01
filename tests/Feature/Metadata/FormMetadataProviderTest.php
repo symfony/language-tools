@@ -13,6 +13,7 @@ use Symfony\Lsp\Feature\Metadata\MetadataIndexRegistry;
 use Symfony\Lsp\Feature\Metadata\MetadataRelationshipProvider;
 use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexRegistry;
 use Symfony\Lsp\Feature\Metadata\MetadataSymbolKind;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -141,7 +142,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
                 }
             }
             PHP;
-        $formFacts = $extractor->extract($formUri, 'php', $formText);
+        $formFacts = $extractor->extract(new SourceDocument($formUri, 'php', $formText));
         $dataClasses = [];
         foreach ($formFacts->formDataClasses as $formDataClass) {
             $dataClasses[$formDataClass->formClass] = $formDataClass->dataClass;
@@ -153,7 +154,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
 
         $sourceIndexes = new MetadataSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace(
-            $extractor->extract($dtoUri, 'php', $dtoText),
+            $extractor->extract(new SourceDocument($dtoUri, 'php', $dtoText)),
             $formFacts,
         );
         $documents = new DocumentStore();
@@ -242,7 +243,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
             }
             PHP;
 
-        $facts = $extractor->extract('file:///workspace/src/Form/ArticleType.php', 'php', $text);
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Form/ArticleType.php', 'php', $text));
         $dataClasses = [];
         foreach ($facts->formDataClasses as $dataClass) {
             $dataClasses[$dataClass->formClass] = $dataClass->dataClass;

@@ -53,7 +53,7 @@ final class TemplateSourceIndexer extends AbstractSourceIndexer
         return new TemplateSourceFacts(
             $document->uri,
             $this->declaration($project, $document->uri),
-            $this->extractor->extract($document->uri, $document->languageId, $document->text),
+            $this->extractor->extract($document),
         );
     }
 

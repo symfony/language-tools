@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Parser\Yaml\YamlMapping;
 
@@ -31,9 +32,9 @@ final class YamlRouteDeclarationExtractor
     /**
      * @return list<RouteDeclaration>
      */
-    public function extract(string $uri, string $text): array
+    public function extract(SourceDocument $document): array
     {
-        $mappings = $this->parser->parse($text);
+        $mappings = $this->parser->parse($document->text);
         $routeGroups = [];
         foreach ($mappings as $mapping) {
             if (\count($mapping->path) < 2 || !$this->hasRouteKey($mapping)) {
@@ -54,8 +55,8 @@ final class YamlRouteDeclarationExtractor
 
             $declarations[$mapping->keyStartByte] = $this->declaration(
                 $mapping->path[0],
-                $uri,
-                $text,
+                $document->uri,
+                $document->text,
                 $mapping->keyStartByte,
                 $mapping->keyEndByte,
             );

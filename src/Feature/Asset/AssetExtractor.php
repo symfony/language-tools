@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Asset;
 
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\UriToPathConverter;
 
 final class AssetExtractor
@@ -14,15 +15,15 @@ final class AssetExtractor
     ) {
     }
 
-    public function extract(string $uri, string $languageId, string $text): AssetSourceFacts
+    public function extract(SourceDocument $document): AssetSourceFacts
     {
-        $symbols = match ($languageId) {
-            'twig' => $this->twigReferences->extract($uri, $text),
-            'php' => 'importmap.php' === basename($this->uriToPathConverter->convert($uri) ?? '') ? $this->importMapEntrypoints->extract($uri, $text) : [],
+        $symbols = match ($document->languageId) {
+            'twig' => $this->twigReferences->extract($document->uri, $document->text),
+            'php' => 'importmap.php' === basename($this->uriToPathConverter->convert($document->uri) ?? '') ? $this->importMapEntrypoints->extract($document->uri, $document->text) : [],
             default => [],
         };
 
-        return new AssetSourceFacts($uri, $symbols);
+        return new AssetSourceFacts($document->uri, $symbols);
     }
 
     public function completionContext(string $languageId, string $text, int $offset): ?AssetCompletionContext

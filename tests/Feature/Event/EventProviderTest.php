@@ -25,6 +25,7 @@ use Symfony\Lsp\Feature\Event\EventRelationshipResolver;
 use Symfony\Lsp\Feature\Event\EventSourceIndexRegistry;
 use Symfony\Lsp\Feature\Event\EventSubscriberMapAnalyzer;
 use Symfony\Lsp\Feature\Event\EventYamlListenerAnalyzer;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -61,7 +62,7 @@ final class Subscriber
 }
 PHP;
 
-        $facts = $extractor->extract('file:///workspace/src/Subscriber.php', 'php', $php);
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Subscriber.php', 'php', $php));
         $names = [];
         $declarations = 0;
         foreach ($facts->symbols as $symbol) {
@@ -78,12 +79,12 @@ services:
     tags:
       - { name: kernel.event_listener, event: legacy.order_placed }
 YAML;
-        self::assertSame('legacy.order_placed', $extractor->extract('file:///workspace/config/services.yaml', 'yaml', $yaml)->symbols[0]->name);
+        self::assertSame('legacy.order_placed', $extractor->extract(new SourceDocument('file:///workspace/config/services.yaml', 'yaml', $yaml))->symbols[0]->name);
     }
 
     public function testPreservesGroupedRepeatableListenerAttributes(): void
     {
-        $facts = $this->extractor()->extract('file:///workspace/src/Listener.php', 'php', <<<'PHP'
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Listener.php', 'php', <<<'PHP'
             <?php
             namespace App;
 
@@ -93,7 +94,7 @@ YAML;
             final class Listener
             {
             }
-            PHP);
+            PHP));
 
         self::assertSame(['app.first', 'app.second'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
         self::assertCount(2, $facts->listeners);
@@ -113,7 +114,7 @@ YAML;
                   - name: kernel.event_listener
                     event: App\Event\OrderPlaced
             YAML;
-        $facts = $extractor->extract('file:///workspace/config/services.yaml', 'yaml', $text);
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/config/services.yaml', 'yaml', $text));
 
         self::assertSame(['legacy.order_placed', 'App\Event\OrderPlaced'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
         self::assertSame(
@@ -135,7 +136,7 @@ YAML;
     public function testScopesEventDispatcherParametersToTheirMethod(): void
     {
         $extractor = $this->extractor();
-        $facts = $extractor->extract('file:///workspace/src/Dispatch.php', 'php', <<<'PHP'
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Dispatch.php', 'php', <<<'PHP'
             <?php
             namespace App;
 
@@ -153,7 +154,7 @@ YAML;
                     $dispatcher->dispatch(new IgnoredEvent());
                 }
             }
-            PHP);
+            PHP));
 
         self::assertSame(['App\ExpectedEvent'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
     }
@@ -184,7 +185,7 @@ YAML;
             }
             PHP;
 
-        $facts = $extractor->extract('file:///workspace/src/Dispatch.php', 'php', $text);
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Dispatch.php', 'php', $text));
         $ranges = array_map(static function ($symbol) use ($converter, $text): string {
             $start = $converter->toByteOffset($text, $symbol->range->start);
             $end = $converter->toByteOffset($text, $symbol->range->end);
@@ -253,8 +254,8 @@ PHP;
         );
         $sourceIndexes = new EventSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace(
-            $extractor->extract($listenerUri, 'php', $listener),
-            $extractor->extract($dispatcherUri, 'php', $dispatcher),
+            $extractor->extract(new SourceDocument($listenerUri, 'php', $listener)),
+            $extractor->extract(new SourceDocument($dispatcherUri, 'php', $dispatcher)),
         );
         $classExtractor = new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser()));
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
@@ -312,7 +313,7 @@ PHP;
             }
             PHP;
 
-        $facts = $extractor->extract('file:///workspace/src/Listener.php', 'php', $text);
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Listener.php', 'php', $text));
 
         self::assertSame([], $facts->symbols);
         self::assertSame([], $facts->listeners);

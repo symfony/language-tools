@@ -15,6 +15,7 @@ use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationMessage;
 use Symfony\Lsp\Feature\Translation\TranslationProvider;
 use Symfony\Lsp\Feature\Translation\TranslationReferenceResolver;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
@@ -161,7 +162,7 @@ final class TranslationProviderTest extends TestCase
         $extractor = TranslationExtractorTestFactory::create($converter, $commentParser);
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true);
-        $indexes->forProject($project)->replaceSources($extractor->extract('file://'.$translationPath, 'yaml', "existing: Existing\n"));
+        $indexes->forProject($project)->replaceSources($extractor->extract(new SourceDocument('file://'.$translationPath, 'yaml', "existing: Existing\n")));
         $configuration = new TranslationConfigurationRegistry();
         $configuration->configure($project, true);
         $documentResolver = new DocumentContextResolver($documents, $projects);
@@ -218,7 +219,7 @@ final class TranslationProviderTest extends TestCase
         $extractor = TranslationExtractorTestFactory::create($converter, $commentParser);
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true);
-        $indexes->forProject($project)->replaceSources($extractor->extract('file://'.$translationPath, 'yaml', "existing: Existing\n"));
+        $indexes->forProject($project)->replaceSources($extractor->extract(new SourceDocument('file://'.$translationPath, 'yaml', "existing: Existing\n")));
         $configuration = new TranslationConfigurationRegistry();
         $configuration->configure($project, true);
         $documentResolver = new DocumentContextResolver($documents, $projects);
@@ -464,7 +465,7 @@ final class TranslationProviderTest extends TestCase
         );
         $sourceFacts = [];
         foreach ($sources as [$sourceUri, $sourceLanguageId, $source]) {
-            $sourceFacts[] = $extractor->extract($sourceUri, $sourceLanguageId, $source);
+            $sourceFacts[] = $extractor->extract(new SourceDocument($sourceUri, $sourceLanguageId, $source));
         }
         $indexes->forProject($project)->replaceSources(...$sourceFacts);
         $configuration = new TranslationConfigurationRegistry();

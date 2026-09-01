@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Stimulus;
 
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 
 final class StimulusExtractor
@@ -13,16 +14,16 @@ final class StimulusExtractor
     ) {
     }
 
-    public function extract(Project $project, string $uri, string $languageId, string $text): StimulusSourceFacts
+    public function extract(Project $project, SourceDocument $document): StimulusSourceFacts
     {
-        if (\in_array($languageId, ['javascript', 'typescript'], true)) {
-            return new StimulusSourceFacts($uri, $this->controllers->extract($project, $uri, $text), $this->references->extractJavaScript($uri, $text));
+        if (\in_array($document->languageId, ['javascript', 'typescript'], true)) {
+            return new StimulusSourceFacts($document->uri, $this->controllers->extract($project, $document->uri, $document->text), $this->references->extractJavaScript($document->uri, $document->text));
         }
-        if ('twig' === $languageId) {
-            return new StimulusSourceFacts($uri, [], $this->references->extractTwig($uri, $text));
+        if ('twig' === $document->languageId) {
+            return new StimulusSourceFacts($document->uri, [], $this->references->extractTwig($document->uri, $document->text));
         }
 
-        return new StimulusSourceFacts($uri, [], []);
+        return new StimulusSourceFacts($document->uri, [], []);
     }
 
     public function completionContext(string $languageId, string $text, int $offset): ?StimulusCompletionContext

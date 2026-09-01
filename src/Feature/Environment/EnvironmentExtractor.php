@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Environment;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
@@ -22,43 +23,43 @@ final class EnvironmentExtractor
     ) {
     }
 
-    public function extract(string $uri, string $languageId, string $text): EnvironmentSourceFacts
+    public function extract(SourceDocument $document): EnvironmentSourceFacts
     {
         $declarations = [];
         $references = [];
-        $path = $this->uriToPathConverter->convert($uri);
-        if ('dotenv' === $languageId || (null !== $path && str_starts_with(basename($path), '.env'))) {
-            preg_match_all('/^(?:export[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)[ \t]*=(.*)$/m', $text, $matches, \PREG_OFFSET_CAPTURE);
+        $path = $this->uriToPathConverter->convert($document->uri);
+        if ('dotenv' === $document->languageId || (null !== $path && str_starts_with(basename($path), '.env'))) {
+            preg_match_all('/^(?:export[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)[ \t]*=(.*)$/m', $document->text, $matches, \PREG_OFFSET_CAPTURE);
             foreach ($matches[1] as [$name, $offset]) {
                 $declarations[] = new EnvironmentDeclaration(
                     $name,
-                    $uri,
-                    $this->converter->toRange($text, $offset, \strlen($name)),
+                    $document->uri,
+                    $this->converter->toRange($document->text, $offset, \strlen($name)),
                     true,
                 );
             }
-            preg_match_all('/(?<!\\\\)\$(?:\{)?([A-Za-z_][A-Za-z0-9_]*)/', $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+            preg_match_all('/(?<!\\\\)\$(?:\{)?([A-Za-z_][A-Za-z0-9_]*)/', $document->text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
             foreach ($matches as $match) {
                 [$name, $offset] = $match[1];
-                $references[] = new EnvironmentReference($name, $uri, $this->converter->toRange($text, $offset, \strlen($name)), []);
+                $references[] = new EnvironmentReference($name, $document->uri, $this->converter->toRange($document->text, $offset, \strlen($name)), []);
             }
         }
-        if ('yaml' === $languageId) {
-            foreach ($this->yamlParser->parseDocument($text)->scalars as $scalar) {
+        if ('yaml' === $document->languageId) {
+            foreach ($this->yamlParser->parseDocument($document->text)->scalars as $scalar) {
                 $contentOffset = $scalar->contentStartByte - $scalar->startByte;
                 $scalarText = substr($scalar->raw, $contentOffset, $scalar->contentEndByte - $scalar->contentStartByte);
-                array_push($references, ...$this->references($uri, $text, $scalarText, $scalar->contentStartByte));
+                array_push($references, ...$this->references($document->uri, $document->text, $scalarText, $scalar->contentStartByte));
             }
-        } elseif (\in_array($languageId, ['php', 'twig', 'xml'], true)) {
-            $referenceText = match ($languageId) {
-                'twig' => $this->commentParser->mask($text),
-                'php' => $this->phpComments->mask($text),
-                'xml' => $this->xmlComments->mask($text),
+        } elseif (\in_array($document->languageId, ['php', 'twig', 'xml'], true)) {
+            $referenceText = match ($document->languageId) {
+                'twig' => $this->commentParser->mask($document->text),
+                'php' => $this->phpComments->mask($document->text),
+                'xml' => $this->xmlComments->mask($document->text),
             };
-            array_push($references, ...$this->references($uri, $text, $referenceText));
+            array_push($references, ...$this->references($document->uri, $document->text, $referenceText));
         }
 
-        return new EnvironmentSourceFacts($uri, $declarations, $references);
+        return new EnvironmentSourceFacts($document->uri, $declarations, $references);
     }
 
     /** @return list<EnvironmentReference> */

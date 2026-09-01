@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Route;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteDocumentLinkHandler implements DocumentLinkProviderInterface
@@ -31,9 +32,10 @@ final class RouteDocumentLinkHandler implements DocumentLinkProviderInterface
             return null;
         }
 
+        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
         $references = 'twig' === $request->document->languageId
-            ? $this->twigReferenceExtractor->extract($request->document->text)
-            : $this->phpReferenceExtractor->extract($request->document->text, $this->classIndexes->forProject($request->project));
+            ? $this->twigReferenceExtractor->extract($document)
+            : $this->phpReferenceExtractor->extract($document, $this->classIndexes->forProject($request->project));
         $links = [];
         foreach ($references as $reference) {
             $declarations = $this->declarationIndexes->forProject($request->project)->find($reference->name);

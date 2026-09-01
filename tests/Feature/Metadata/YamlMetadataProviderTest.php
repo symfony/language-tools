@@ -9,6 +9,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Metadata\MetadataCompletionProvider;
 use Symfony\Lsp\Feature\Metadata\MetadataIndexRegistry;
 use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexRegistry;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -31,7 +32,7 @@ final class YamlMetadataProviderTest extends MetadataTestCase
             }
             PHP;
         $sourceIndexes = new MetadataSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace($extractor->extract('file:///workspace/src/Entity/User.php', 'php', $entityText));
+        $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument('file:///workspace/src/Entity/User.php', 'php', $entityText)));
         $documents = new DocumentStore();
         $resolver = new DocumentContextResolver($documents, $projects);
         $completionProvider = new MetadataCompletionProvider($resolver, $converter, new LspProtocolMapper(), new MetadataIndexRegistry(), $sourceIndexes, $extractor);

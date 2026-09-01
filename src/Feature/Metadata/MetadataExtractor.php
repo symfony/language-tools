@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -21,21 +22,21 @@ final class MetadataExtractor
     ) {
     }
 
-    public function extract(string $uri, string $languageId, string $text): MetadataSourceFacts
+    public function extract(SourceDocument $document): MetadataSourceFacts
     {
-        if ('php' === $languageId) {
-            $php = $this->phpParser->parse($text);
-            $source = $this->phpComments->mask($text);
+        if ('php' === $document->languageId) {
+            $php = $this->phpParser->parse($document->text);
+            $source = $this->phpComments->mask($document->text);
             $formDataClasses = $this->forms->dataClasses($source, $php);
 
             return new MetadataSourceFacts(
-                $uri,
-                $this->unique($this->phpSymbols($uri, $text, $source, $php, $formDataClasses)),
+                $document->uri,
+                $this->unique($this->phpSymbols($document->uri, $document->text, $source, $php, $formDataClasses)),
                 $formDataClasses,
             );
         }
 
-        return new MetadataSourceFacts($uri, 'yaml' === $languageId ? $this->unique($this->yaml->symbols($uri, $text)) : []);
+        return new MetadataSourceFacts($document->uri, 'yaml' === $document->languageId ? $this->unique($this->yaml->symbols($document->uri, $document->text)) : []);
     }
 
     public function completionContext(string $languageId, string $text, int $offset): ?MetadataCompletionContext

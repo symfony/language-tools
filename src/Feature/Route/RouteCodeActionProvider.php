@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -36,9 +37,10 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
         ) {
             return null;
         }
+        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
         $references = 'twig' === $request->document->languageId
-            ? $this->twigExtractor->extract($request->document->text)
-            : $this->phpExtractor->extract($request->document->text, $this->classIndexes->forProject($request->project));
+            ? $this->twigExtractor->extract($document)
+            : $this->phpExtractor->extract($document, $this->classIndexes->forProject($request->project));
         $actions = [];
         foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
             if (!\is_array($diagnostic) || 'route.missing_parameters' !== ($diagnostic['code'] ?? null)) {

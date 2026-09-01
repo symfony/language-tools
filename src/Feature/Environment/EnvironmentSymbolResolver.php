@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Environment;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 
 final class EnvironmentSymbolResolver
@@ -27,7 +28,7 @@ final class EnvironmentSymbolResolver
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        $facts = $this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text);
+        $facts = $this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text));
         foreach ($facts->declarations as $declaration) {
             if ($this->converter->containsByteOffset($request->document->text, $declaration->range, $offset, inclusiveEnd: true)) {
                 return [new EnvironmentReference($declaration->name, $request->document->uri, $declaration->range, []), $request->project];

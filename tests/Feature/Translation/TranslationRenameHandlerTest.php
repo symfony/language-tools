@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationReferenceResolver;
 use Symfony\Lsp\Feature\Translation\TranslationRenameHandler;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -32,8 +33,8 @@ final class TranslationRenameHandlerTest extends TestCase
         $extractor = TranslationExtractorTestFactory::create($converter);
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceSources(
-            $extractor->extract($resourceUri, 'yaml', $resource),
-            $extractor->extract($referenceUri, 'php', $reference),
+            $extractor->extract(new SourceDocument($resourceUri, 'yaml', $resource)),
+            $extractor->extract(new SourceDocument($referenceUri, 'php', $reference)),
         );
         $handler = new TranslationRenameHandler(
             new TranslationReferenceResolver(new DocumentContextResolver($documents, $projects), $converter, $extractor),

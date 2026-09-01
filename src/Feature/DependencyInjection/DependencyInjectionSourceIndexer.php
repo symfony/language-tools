@@ -73,6 +73,6 @@ final class DependencyInjectionSourceIndexer extends AbstractSourceIndexer
 
     protected function extract(Project $project, SourceDocument $document): ?DependencyInjectionSourceFacts
     {
-        return $this->extractor->extractForIndexing($document->uri, $document->languageId, $document->text);
+        return $this->extractor->extractForIndexing($document);
     }
 }

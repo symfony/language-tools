@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
@@ -19,9 +20,9 @@ final class TwigRouteReferenceExtractor
     }
 
     /** @return list<RouteReference> */
-    public function extract(string $text): array
+    public function extract(SourceDocument $source): array
     {
-        $document = $this->parser->parse($text);
+        $document = $this->parser->parse($source->text);
         $references = [];
         foreach ($document->nodesOfType('function_call') as $call) {
             $function = $document->directChild($call, 'function_identifier');
@@ -38,8 +39,8 @@ final class TwigRouteReferenceExtractor
             $references[] = new RouteReference(
                 $route->value,
                 new Range(
-                    $this->positionConverter->toPosition($text, $route->startOffset),
-                    $this->positionConverter->toPosition($text, $route->endOffset),
+                    $this->positionConverter->toPosition($source->text, $route->startOffset),
+                    $this->positionConverter->toPosition($source->text, $route->endOffset),
                 ),
                 $this->providedParameters($document, $arguments->get(1, 'parameters')),
             );
@@ -48,11 +49,11 @@ final class TwigRouteReferenceExtractor
         return $references;
     }
 
-    public function at(string $text, int $byteOffset): ?RouteReference
+    public function at(SourceDocument $document, int $byteOffset): ?RouteReference
     {
-        foreach ($this->extract($text) as $reference) {
-            $start = $this->positionConverter->toByteOffset($text, $reference->range->start);
-            $end = $this->positionConverter->toByteOffset($text, $reference->range->end);
+        foreach ($this->extract($document) as $reference) {
+            $start = $this->positionConverter->toByteOffset($document->text, $reference->range->start);
+            $end = $this->positionConverter->toByteOffset($document->text, $reference->range->end);
             if ($byteOffset >= $start && $byteOffset <= $end) {
                 return $reference;
             }

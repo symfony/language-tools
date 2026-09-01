@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Twig\TwigCallableDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableKind;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 
 final class TwigCallableDeclarationExtractorTest extends TestCase
@@ -85,7 +86,7 @@ final class TwigCallableDeclarationExtractorTest extends TestCase
             }
             PHP;
 
-        $declarations = $extractor->extract('file:///workspace/src/Twig/AppExtension.php', $source)->declarations;
+        $declarations = $extractor->extract(new SourceDocument('file:///workspace/src/Twig/AppExtension.php', 'php', $source))->declarations;
 
         self::assertSame([
             [TwigCallableKind::Filter, 'filter_name', 'App\Twig\AppExtensionRuntime', 'doSomething', false, false, true, false, false, true],
@@ -137,7 +138,7 @@ final class TwigCallableDeclarationExtractorTest extends TestCase
             }
             PHP;
 
-        $declarations = $this->declarationExtractor(new PositionConverter())->extract('file:///workspace/src/Twig/AppExtension.php', $source)->declarations;
+        $declarations = $this->declarationExtractor(new PositionConverter())->extract(new SourceDocument('file:///workspace/src/Twig/AppExtension.php', 'php', $source))->declarations;
 
         self::assertSame([], $declarations);
     }
@@ -158,7 +159,7 @@ final class TwigCallableDeclarationExtractorTest extends TestCase
             }
             PHP;
 
-        $declarations = $this->declarationExtractor(new PositionConverter())->extract('file:///workspace/src/Twig/AppExtension.php', $source)->declarations;
+        $declarations = $this->declarationExtractor(new PositionConverter())->extract(new SourceDocument('file:///workspace/src/Twig/AppExtension.php', 'php', $source))->declarations;
 
         self::assertSame(['complete'], array_map(static fn ($declaration): string => $declaration->name, $declarations));
     }

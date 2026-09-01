@@ -6,6 +6,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
@@ -49,9 +50,10 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
         }
 
         $diagnostics = [];
+        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
         $references = 'twig' === $request->document->languageId
-            ? $this->twigReferenceExtractor->extract($request->document->text)
-            : $this->phpReferenceExtractor->extract($request->document->text, $this->classIndexes->forProject($request->project));
+            ? $this->twigReferenceExtractor->extract($document)
+            : $this->phpReferenceExtractor->extract($document, $this->classIndexes->forProject($request->project));
         foreach ($references as $reference) {
             $route = $routeIndex->get($reference->name);
             if (null === $route) {

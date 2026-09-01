@@ -10,6 +10,7 @@ use Symfony\Lsp\Feature\Twig\TwigComponentExtractor;
 use Symfony\Lsp\Feature\Twig\TwigComponentNameResolver;
 use Symfony\Lsp\Feature\Twig\TwigComponentPhpExtractor;
 use Symfony\Lsp\Feature\Twig\TwigComponentTemplateExtractor;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -27,9 +28,9 @@ final class TwigComponentExtractorTest extends TestCase
     {
         $facts = $this->extractor()->extract(
             new Project('/workspace', 'file:///workspace', '^8.0'),
-            'file:///workspace/templates/components/Search.html.twig',
-            'twig',
-            <<<'TWIG'
+            new SourceDocument('file:///workspace/templates/components/Search.html.twig',
+                'twig',
+                <<<'TWIG'
                 {# {{ component(name: 'Commented') }} #}
                 {# {{ live_action(actionName: 'commented') }} #}
                 {{ component('Card', {title: title}) }}
@@ -42,7 +43,7 @@ final class TwigComponentExtractorTest extends TestCase
                 {{ live_action(actionName = "reset") }}
                 {{ live_action(actionName: dynamic_action) }}
                 {{ live_action(actionName: 'prefix-' ~ suffix) }}
-                TWIG,
+                TWIG),
         );
 
         self::assertSame(
@@ -59,9 +60,9 @@ final class TwigComponentExtractorTest extends TestCase
     {
         $facts = $this->extractor()->extract(
             new Project('/workspace', 'file:///workspace', '^8.0'),
-            'file:///workspace/templates/page.html.twig',
-            'twig',
-            "{{ component('it\\'s') }}",
+            new SourceDocument('file:///workspace/templates/page.html.twig',
+                'twig',
+                "{{ component('it\\'s') }}"),
         );
 
         self::assertSame(["it's"], array_map(static fn ($reference): string => $reference->name, $facts->references));
@@ -71,9 +72,9 @@ final class TwigComponentExtractorTest extends TestCase
     {
         $facts = $this->extractor()->extract(
             new Project('/workspace', 'file:///workspace', '^8.0'),
-            'file:///workspace/templates/components/Search.html.twig',
-            'twig',
-            "{{ live_action('it\\'s') }}",
+            new SourceDocument('file:///workspace/templates/components/Search.html.twig',
+                'twig',
+                "{{ live_action('it\\'s') }}"),
         );
 
         self::assertSame(["it's"], array_map(static fn ($reference): string => $reference->action, $facts->actionReferences));

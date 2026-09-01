@@ -21,6 +21,7 @@ use Symfony\Lsp\Feature\Security\SecuritySourceIndexRegistry;
 use Symfony\Lsp\Feature\Security\SecuritySymbolResolver;
 use Symfony\Lsp\Feature\Security\SecurityUserProvider;
 use Symfony\Lsp\Feature\Security\SecurityVoter;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -54,7 +55,7 @@ final class AdminController extends AbstractController
 PHP;
         self::assertSame(
             ['ROLE_ADMIN', 'ROLE_USER'],
-            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract('file:///workspace/src/AdminController.php', 'php', $php)->symbols),
+            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract(new SourceDocument('file:///workspace/src/AdminController.php', 'php', $php))->symbols),
         );
 
         $yaml = <<<'YAML'
@@ -73,7 +74,7 @@ security:
 YAML;
         self::assertSame(
             ['users', 'main', 'users', 'ROLE_ADMIN', 'ROLE_USER', 'ROLE_EDITOR'],
-            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract('file:///workspace/config/packages/security.yaml', 'yaml', $yaml)->symbols),
+            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract(new SourceDocument('file:///workspace/config/packages/security.yaml', 'yaml', $yaml))->symbols),
         );
     }
 
@@ -100,7 +101,7 @@ YAML;
 
         self::assertSame(
             ['ROLE_ALLOWED'],
-            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract('file:///workspace/src/Controller.php', 'php', $text)->symbols),
+            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract(new SourceDocument('file:///workspace/src/Controller.php', 'php', $text))->symbols),
         );
 
         $completion = str_replace("isGranted('ROLE_UNRELATED');", "isGranted('ROLE_U", $text);
@@ -137,7 +138,7 @@ YAML;
 
         self::assertSame(
             ['ROLE_ADMIN'],
-            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract('file:///workspace/src/Controller.php', 'php', $text)->symbols),
+            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract(new SourceDocument('file:///workspace/src/Controller.php', 'php', $text))->symbols),
         );
 
         $completion = str_replace("isGranted('ROLE_UNRELATED');", "isGranted('ROLE_U", $text);
@@ -170,7 +171,7 @@ YAML;
 
         self::assertSame(
             ['ROLE_ADMIN'],
-            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract('file:///workspace/src/Controller.php', 'php', $text)->symbols),
+            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract(new SourceDocument('file:///workspace/src/Controller.php', 'php', $text))->symbols),
         );
 
         $completion = str_replace("denyAccessUnlessGranted('ROLE_UNRELATED');", "denyAccessUnlessGranted('ROLE_U", $text);
@@ -198,7 +199,7 @@ YAML;
 
         self::assertSame(
             ['ROLE_ALIAS', 'ROLE_FULL'],
-            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract('file:///workspace/src/Controller.php', 'php', $text)->symbols),
+            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract(new SourceDocument('file:///workspace/src/Controller.php', 'php', $text))->symbols),
         );
 
         $aliasedCompletion = str_replace("ROLE_ALIAS')]", 'ROLE_A', $text);
@@ -236,7 +237,7 @@ YAML;
             }
             PHP;
 
-        self::assertSame([], $extractor->extract('file:///workspace/src/AdminController.php', 'php', $text)->symbols);
+        self::assertSame([], $extractor->extract(new SourceDocument('file:///workspace/src/AdminController.php', 'php', $text))->symbols);
     }
 
     public function testOffersNoSecurityCompletionsInsidePhpComments(): void
@@ -304,9 +305,9 @@ PHP;
         );
         $sourceIndexes = new SecuritySourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace(
-            $extractor->extract($yamlUri, 'yaml', $yaml),
-            $extractor->extract($phpUri, 'php', $php),
-            $extractor->extract($twigUri, 'twig', $twig),
+            $extractor->extract(new SourceDocument($yamlUri, 'yaml', $yaml)),
+            $extractor->extract(new SourceDocument($phpUri, 'php', $php)),
+            $extractor->extract(new SourceDocument($twigUri, 'twig', $twig)),
         );
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
@@ -348,7 +349,7 @@ PHP;
         $converter = new PositionConverter();
         $extractor = $this->extractor($converter);
         $sourceIndexes = new SecuritySourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace($extractor->extract($uri, 'yaml', $text));
+        $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($uri, 'yaml', $text)));
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $provider = new SecurityRelationshipProvider(
             new LspProtocolMapper(),

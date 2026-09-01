@@ -20,6 +20,7 @@ use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipCodeLensProvider;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipProvider;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRepositoryReceiverResolver;
 use Symfony\Lsp\Feature\Doctrine\DoctrineSymbolKind;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
@@ -124,9 +125,9 @@ final class DoctrineProviderTest extends TestCase
         $indexes = new DoctrineIndexRegistry();
         $index = $indexes->forProject($project);
         $index->replace(
-            $extractor->extract($entityUri, 'php', $entityText),
-            $extractor->extract($repositoryUri, 'php', $repositoryText),
-            $extractor->extract($usageUri, 'php', $usageText),
+            $extractor->extract(new SourceDocument($entityUri, 'php', $entityText)),
+            $extractor->extract(new SourceDocument($repositoryUri, 'php', $repositoryText)),
+            $extractor->extract(new SourceDocument($usageUri, 'php', $usageText)),
         );
         $fieldNames = [];
         foreach ($index->entity('App\\Entity\\Product')->fields ?? [] as $field) {
@@ -235,13 +236,13 @@ final class DoctrineProviderTest extends TestCase
             }
             PHP;
 
-        $entityFacts = $extractor->extract('file:///workspace/src/Entity/Product.php', 'php', $entityText);
+        $entityFacts = $extractor->extract(new SourceDocument('file:///workspace/src/Entity/Product.php', 'php', $entityText));
         self::assertSame(['name', 'sku'], array_map(static fn (DoctrineField $field): string => $field->name, $entityFacts->entities[0]->fields));
 
-        $repositoryFacts = $extractor->extract('file:///workspace/src/Repository/ProductRepository.php', 'php', $repositoryText);
+        $repositoryFacts = $extractor->extract(new SourceDocument('file:///workspace/src/Repository/ProductRepository.php', 'php', $repositoryText));
         self::assertSame('App\Entity\Product', $repositoryFacts->repositories[0]->entityClass);
 
-        $usageFacts = $extractor->extract('file:///workspace/src/Service/ProductFinder.php', 'php', $usageText);
+        $usageFacts = $extractor->extract(new SourceDocument('file:///workspace/src/Service/ProductFinder.php', 'php', $usageText));
         $fieldReferences = array_values(array_filter(
             $usageFacts->symbols,
             static fn ($symbol): bool => DoctrineSymbolKind::Field === $symbol->kind,
@@ -272,7 +273,7 @@ final class DoctrineProviderTest extends TestCase
             }
             PHP;
 
-        $fields = $extractor->extract('file:///workspace/src/Entity/Product.php', 'php', $text)->entities[0]->fields;
+        $fields = $extractor->extract(new SourceDocument('file:///workspace/src/Entity/Product.php', 'php', $text))->entities[0]->fields;
 
         self::assertSame(['name', 'category'], array_map(static fn (DoctrineField $field): string => $field->name, $fields));
         self::assertFalse($fields[0]->association);
@@ -366,7 +367,7 @@ final class DoctrineProviderTest extends TestCase
             $repository->findBy(['name' => 'Symfony']);
             PHP;
 
-        self::assertSame([], $extractor->extract('file:///workspace/src/Usage.php', 'php', $text)->symbols);
+        self::assertSame([], $extractor->extract(new SourceDocument('file:///workspace/src/Usage.php', 'php', $text))->symbols);
     }
 
     public function testIgnoresCommentedDoctrinePhpWhilePreservingActiveRanges(): void
@@ -399,7 +400,7 @@ final class DoctrineProviderTest extends TestCase
             }
             PHP;
 
-        $facts = $extractor->extract('file:///workspace/src/Form/ProductType.php', 'php', $text);
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Form/ProductType.php', 'php', $text));
         self::assertSame([], $facts->entities);
 
         $references = array_values(array_filter($facts->symbols, static fn ($symbol): bool => !$symbol->declaration));

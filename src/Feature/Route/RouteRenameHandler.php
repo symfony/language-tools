@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Route;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\RenameProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -121,7 +122,7 @@ final class RouteRenameHandler implements RenameProviderInterface
             return null;
         }
 
-        $symbol = $this->symbolResolver->resolve($request->project, $request->document->uri, $request->document->text, $request->position);
+        $symbol = $this->symbolResolver->resolve($request->project, new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text), $request->position);
 
         return null === $symbol ? null : [$request->project, $symbol];
     }

@@ -47,6 +47,6 @@ final class MetadataSourceIndexer extends AbstractSourceIndexer
 
     protected function extract(Project $project, SourceDocument $document): MetadataSourceFacts
     {
-        return $this->extractor->extract($document->uri, $document->languageId, $document->text);
+        return $this->extractor->extract($document);
     }
 }

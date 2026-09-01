@@ -7,6 +7,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -124,7 +125,7 @@ final class DoctrineRelationshipProvider implements DefinitionProviderInterface,
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols as $symbol) {
+        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->symbols as $symbol) {
             if ($this->converter->containsByteOffset($request->document->text, $symbol->range, $offset, inclusiveEnd: true)) {
                 return [$symbol, $request->project];
             }

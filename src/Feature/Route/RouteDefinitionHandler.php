@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteDefinitionHandler implements DefinitionProviderInterface
@@ -28,7 +29,7 @@ final class RouteDefinitionHandler implements DefinitionProviderInterface
             return null;
         }
 
-        $symbol = $this->symbolResolver->resolve($request->project, $request->document->uri, $request->document->text, $request->position);
+        $symbol = $this->symbolResolver->resolve($request->project, new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text), $request->position);
         if (null === $symbol) {
             return null;
         }

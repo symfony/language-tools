@@ -17,6 +17,7 @@ use Symfony\Lsp\Feature\Console\ConsoleInputReceiverResolver;
 use Symfony\Lsp\Feature\Console\ConsoleInvokableParameterExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleProvider;
 use Symfony\Lsp\Feature\Console\ConsoleSourceIndexRegistry;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpExpressionParser;
@@ -169,7 +170,7 @@ final class ConsoleProviderTest extends TestCase
             new ConsoleInputReceiverResolver($delimiters),
         );
         $sourceIndexes = new ConsoleSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace($extractor->extract($uri, 'php', $text));
+        $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($uri, 'php', $text)));
         $indexes = new ConsoleIndexRegistry();
         $indexes->forProject($project)->replace(null === $command ? [] : [$command], $runtimeComplete);
 

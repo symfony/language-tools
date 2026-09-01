@@ -47,6 +47,6 @@ final class TwigComponentSourceIndexer extends AbstractSourceIndexer
 
     protected function extract(Project $project, SourceDocument $document): TwigComponentSourceFacts
     {
-        return $this->extractor->extract($project, $document->uri, $document->languageId, $document->text);
+        return $this->extractor->extract($project, $document);
     }
 }

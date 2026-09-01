@@ -9,6 +9,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\ProjectDocumentReader;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -35,7 +36,7 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
             return null;
         }
 
-        $references = $this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->references;
+        $references = $this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->references;
         $actions = [];
         foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
             if (!\is_array($diagnostic) || 'translation.not_found' !== ($diagnostic['code'] ?? null)) {

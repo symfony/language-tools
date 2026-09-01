@@ -6,6 +6,7 @@ use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
 
@@ -22,23 +23,23 @@ final class RouteSymbolResolver
     ) {
     }
 
-    public function resolve(Project $project, string $uri, string $text, Position $position): ?RouteSymbol
+    public function resolve(Project $project, SourceDocument $document, Position $position): ?RouteSymbol
     {
-        $offset = $this->positionConverter->toByteOffset($text, $position);
-        $extension = Path::getExtension($this->uriToPathConverter->convert($uri) ?? '', true);
+        $offset = $this->positionConverter->toByteOffset($document->text, $position);
+        $extension = Path::getExtension($this->uriToPathConverter->convert($document->uri) ?? '', true);
         $reference = 'twig' === $extension
-            ? $this->twigReferenceExtractor->at($text, $offset)
-            : $this->phpReferenceExtractor->at($text, $offset, $this->classIndexes->forProject($project));
+            ? $this->twigReferenceExtractor->at($document, $offset)
+            : $this->phpReferenceExtractor->at($document, $offset, $this->classIndexes->forProject($project));
         if (null !== $reference) {
             return new RouteSymbol($reference->name, $reference->range);
         }
 
         $declarations = \in_array($extension, ['yaml', 'yml'], true)
-            ? $this->yamlDeclarationExtractor->extract($uri, $text)
-            : $this->phpDeclarationExtractor->extract($uri, $text);
+            ? $this->yamlDeclarationExtractor->extract($document)
+            : $this->phpDeclarationExtractor->extract($document);
         foreach ($declarations as $declaration) {
-            $start = $this->positionConverter->toByteOffset($text, $declaration->range->start);
-            $end = $this->positionConverter->toByteOffset($text, $declaration->range->end);
+            $start = $this->positionConverter->toByteOffset($document->text, $declaration->range->start);
+            $end = $this->positionConverter->toByteOffset($document->text, $declaration->range->end);
             if ($offset >= $start && $offset <= $end) {
                 return new RouteSymbol($declaration->name, $declaration->range);
             }

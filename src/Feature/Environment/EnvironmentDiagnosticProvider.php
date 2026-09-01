@@ -6,6 +6,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
@@ -41,7 +42,7 @@ final class EnvironmentDiagnosticProvider implements DiagnosticProviderInterface
         }
         $index = $this->indexes->forProject($request->project);
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->references as $reference) {
+        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->references as $reference) {
             foreach ($this->processorChainValidator->validate($reference->processors, $index) as $issue) {
                 $diagnostics[] = $this->protocol->diagnostic($reference->range, 1, $issue->code, $issue->message);
             }

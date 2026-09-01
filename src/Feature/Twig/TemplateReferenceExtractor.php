@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
@@ -31,16 +32,16 @@ final class TemplateReferenceExtractor
     }
 
     /** @return list<TemplateReference> */
-    public function extract(string $uri, string $languageId, string $text): array
+    public function extract(SourceDocument $document): array
     {
-        if ('twig' === $languageId) {
-            return $this->twigReferences($uri, $text);
+        if ('twig' === $document->languageId) {
+            return $this->twigReferences($document->uri, $document->text);
         }
-        if ('php' !== $languageId) {
+        if ('php' !== $document->languageId) {
             return [];
         }
 
-        $php = $this->phpParser->parse($text);
+        $php = $this->phpParser->parse($document->text);
         $references = [];
         foreach ($php->methodCalls as $call) {
             if (!\in_array($call->method, ['render', 'renderView'], true)) {
@@ -52,24 +53,24 @@ final class TemplateReferenceExtractor
             }
             $references[] = $this->reference(
                 $template->value,
-                $uri,
-                $text,
+                $document->uri,
+                $document->text,
                 $template->startOffset,
                 $template->endOffset,
                 $this->literalArrayKeys(($call->argument('parameters') ?? $call->positionalArgument(1))?->expression),
             );
         }
 
-        $masked = $this->phpComments->mask($text);
+        $masked = $this->phpComments->mask($document->text);
         foreach ($this->matcher->methodCalls($masked, ['render', 'renderView']) as $call) {
             if ('::' !== substr($masked, max(0, $call->nameOffset - 2), 2)) {
                 continue;
             }
             $references[] = new TemplateReference(
                 $call->value,
-                $uri,
+                $document->uri,
                 $call->range,
-                $this->staticVariables($text, $masked, $call),
+                $this->staticVariables($document->text, $masked, $call),
             );
         }
         foreach ($php->attributes as $attribute) {
@@ -82,10 +83,10 @@ final class TemplateReferenceExtractor
             }
             $references[] = new TemplateReference(
                 $template->value,
-                $uri,
+                $document->uri,
                 new Range(
-                    $this->positionConverter->toPosition($text, $template->startOffset),
-                    $this->positionConverter->toPosition($text, $template->endOffset),
+                    $this->positionConverter->toPosition($document->text, $template->startOffset),
+                    $this->positionConverter->toPosition($document->text, $template->endOffset),
                 ),
                 $this->attributeVariables(($attribute->argument('vars') ?? $attribute->positionalArgument(1))?->expression),
             );
@@ -94,11 +95,11 @@ final class TemplateReferenceExtractor
         return $this->sorted($references);
     }
 
-    public function at(string $uri, string $languageId, string $text, int $offset): ?TemplateReference
+    public function at(SourceDocument $document, int $offset): ?TemplateReference
     {
-        foreach ($this->extract($uri, $languageId, $text) as $reference) {
-            $start = $this->positionConverter->toByteOffset($text, $reference->range->start);
-            $end = $this->positionConverter->toByteOffset($text, $reference->range->end);
+        foreach ($this->extract($document) as $reference) {
+            $start = $this->positionConverter->toByteOffset($document->text, $reference->range->start);
+            $end = $this->positionConverter->toByteOffset($document->text, $reference->range->end);
             if ($offset >= $start && $offset <= $end) {
                 return $reference;
             }

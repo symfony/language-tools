@@ -16,6 +16,7 @@ use Symfony\Lsp\Feature\Twig\TwigPhpSymbolIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolProvider;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolSourceFacts;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -71,8 +72,8 @@ final class TwigPhpSymbolProviderTest extends TestCase
         $documents->open(new Document($phpUri, 'php', 1, $php));
         $documents->open(new Document($twigUri, 'twig', 1, $twig));
         $extractor = $this->extractor($converter);
-        $phpFacts = $extractor->extract($phpUri, 'php', $php);
-        $twigFacts = $extractor->extract($twigUri, 'twig', $twig);
+        $phpFacts = $extractor->extract(new SourceDocument($phpUri, 'php', $php));
+        $twigFacts = $extractor->extract(new SourceDocument($twigUri, 'twig', $twig));
         self::assertInstanceOf(TwigPhpSymbolSourceFacts::class, $phpFacts);
         self::assertInstanceOf(TwigPhpSymbolSourceFacts::class, $twigFacts);
         $indexes = new TwigPhpSymbolIndexRegistry();

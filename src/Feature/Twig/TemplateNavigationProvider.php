@@ -9,6 +9,7 @@ use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -67,7 +68,7 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
             return null;
         }
         $links = [];
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text) as $reference) {
+        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text)) as $reference) {
             $template = $this->indexes->forProject($request->project)->get($reference->name);
             if (null !== $template) {
                 $links[] = ['range' => $this->protocol->range($reference->range), 'target' => $template->uri];
@@ -96,7 +97,7 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
             return [];
         }
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text) as $reference) {
+        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text)) as $reference) {
             if (null === $index->get($reference->name)) {
                 $diagnostics[] = $this->protocol->diagnostic($reference->range, 1, 'template.not_found', \sprintf('Template "%s" does not exist in the selected environment.', $reference->name));
             }
@@ -117,7 +118,7 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        $reference = $this->extractor->at($request->document->uri, $request->document->languageId, $request->document->text, $offset);
+        $reference = $this->extractor->at(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text), $offset);
         if (null === $reference) {
             return null;
         }

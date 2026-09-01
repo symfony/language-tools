@@ -11,6 +11,7 @@ use Symfony\Lsp\Feature\Twig\TwigPhpSymbolDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolExtractor;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolKind;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolReferenceExtractor;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -59,7 +60,7 @@ final class TwigPhpSymbolExtractorTest extends TestCase
             {{ constant(dynamic_name) }}
             TWIG;
 
-        $phpFacts = $extractor->extract('file:///workspace/src/Model.php', 'php', $php);
+        $phpFacts = $extractor->extract(new SourceDocument('file:///workspace/src/Model.php', 'php', $php));
         self::assertNotNull($phpFacts);
         self::assertSame([
             [TwigPhpSymbolKind::Enum, 'App\Model\Status', null, true],
@@ -76,7 +77,7 @@ final class TwigPhpSymbolExtractorTest extends TestCase
             $declaration->public,
         ], $phpFacts->declarations));
 
-        $twigFacts = $extractor->extract('file:///workspace/templates/page.html.twig', 'twig', $twig);
+        $twigFacts = $extractor->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', $twig));
         self::assertNotNull($twigFacts);
         self::assertSame([
             ['App\Model\ViewOptions', null],
@@ -103,12 +104,12 @@ final class TwigPhpSymbolExtractorTest extends TestCase
     public function testRejectsEscapedQuotesInDecodedTwigPhpSymbolNames(): void
     {
         $facts = $this->extractor(new PositionConverter())->extract(
-            'file:///workspace/templates/page.html.twig',
-            'twig',
-            <<<'TWIG'
+            new SourceDocument('file:///workspace/templates/page.html.twig',
+                'twig',
+                <<<'TWIG'
                 {{ enum("App\\Model\\Sta\"tus") }}
                 {{ constant("App\\Model\\Status::Publi\"shed") }}
-                TWIG,
+                TWIG),
         );
 
         self::assertNotNull($facts);

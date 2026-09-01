@@ -16,6 +16,7 @@ use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Environment\EnvironmentProcessorChainValidator;
 use Symfony\Lsp\Feature\Environment\EnvironmentRelationshipProvider;
 use Symfony\Lsp\Feature\Environment\EnvironmentSymbolResolver;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -32,14 +33,14 @@ final class EnvironmentProviderTest extends TestCase
     public function testIndexesNamesAndReferencesWithoutValues(): void
     {
         $extractor = new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser(), new PhpCommentParser(), $this->yamlParser(), new XmlCommentParser());
-        $facts = $extractor->extract('file:///workspace/.env', 'dotenv', "APP_SECRET=CANARY_SECRET_VALUE\nAPP_URL=https://example.com\nEMPTY=\nCHILD=\${APP_URL:-\${FALLBACK_URL}}/\$EMPTY\nPARTIAL=\${UNFINISHED\nESCAPED=\\\$IGNORED\n");
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/.env', 'dotenv', "APP_SECRET=CANARY_SECRET_VALUE\nAPP_URL=https://example.com\nEMPTY=\nCHILD=\${APP_URL:-\${FALLBACK_URL}}/\$EMPTY\nPARTIAL=\${UNFINISHED\nESCAPED=\\\$IGNORED\n"));
 
         self::assertSame(['APP_SECRET', 'APP_URL', 'EMPTY', 'CHILD', 'PARTIAL', 'ESCAPED'], array_map(static fn ($item): string => $item->name, $facts->declarations));
         self::assertSame(['APP_URL', 'FALLBACK_URL', 'EMPTY', 'UNFINISHED'], array_map(static fn ($item): string => $item->name, $facts->references));
         self::assertTrue($facts->declarations[2]->hasDefault);
         self::assertStringNotContainsString('CANARY_SECRET_VALUE', implode(' ', array_map(static fn ($item): string => $item->name, $facts->declarations)));
 
-        $twigFacts = $extractor->extract('file:///workspace/templates/page.html.twig', 'twig', "{## %env(DOCUMENTED_ENV)% #}\n{{ '%env(REAL_ENV)%' }}");
+        $twigFacts = $extractor->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', "{## %env(DOCUMENTED_ENV)% #}\n{{ '%env(REAL_ENV)%' }}"));
         self::assertSame(['REAL_ENV'], array_map(static fn ($item): string => $item->name, $twigFacts->references));
     }
 
@@ -59,12 +60,12 @@ final class EnvironmentProviderTest extends TestCase
         $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $twigComments, $phpComments, $yamlParser, $xmlComments);
         $indexes = new EnvironmentIndexRegistry();
         $indexes->forProject($project)->replaceSources(
-            $extractor->extract('file:///workspace/.env', 'dotenv', "PARTIAL_ENV=value\n"),
-            $extractor->extract($uri, 'yaml', $text),
+            $extractor->extract(new SourceDocument('file:///workspace/.env', 'dotenv', "PARTIAL_ENV=value\n")),
+            $extractor->extract(new SourceDocument($uri, 'yaml', $text)),
         );
         [$completionProvider, , $diagnosticProvider] = $this->providers($documents, $projects, $converter, $indexes, $extractor, $twigComments, $phpComments, $yamlParser, $xmlComments);
 
-        $facts = $extractor->extract($uri, 'yaml', $text);
+        $facts = $extractor->extract(new SourceDocument($uri, 'yaml', $text));
         self::assertSame(['COMPLETE_ENV'], array_map(static fn ($reference): string => $reference->name, $facts->references));
         self::assertSame($this->protocolRange($converter, $text, (int) strpos($text, 'COMPLETE_ENV'), \strlen('COMPLETE_ENV')), $this->protocolRangeFromObject($facts->references[0]->range));
 
@@ -128,7 +129,7 @@ final class EnvironmentProviderTest extends TestCase
         $xmlComments = new XmlCommentParser();
         $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $commentParser, $phpComments, $yamlParser, $xmlComments);
         $indexes = new EnvironmentIndexRegistry();
-        $indexes->forProject($project)->replaceSources($extractor->extract('file:///workspace/.env', 'dotenv', "APP_URL=CANARY_SECRET_VALUE\n"), $extractor->extract($uri, 'yaml', $text));
+        $indexes->forProject($project)->replaceSources($extractor->extract(new SourceDocument('file:///workspace/.env', 'dotenv', "APP_URL=CANARY_SECRET_VALUE\n")), $extractor->extract(new SourceDocument($uri, 'yaml', $text)));
         $indexes->forProject($project)->replaceProcessors(['custom' => 'string', 'json' => 'array']);
         [$completionProvider, $relationshipProvider, $diagnosticProvider] = $this->providers($documents, $projects, $converter, $indexes, $extractor, $commentParser, $phpComments, $yamlParser, $xmlComments);
         $position = $converter->toPosition($text, strpos($text, 'APP_UR') + \strlen('APP_UR'));
@@ -173,8 +174,8 @@ final class EnvironmentProviderTest extends TestCase
         $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $twigComments, $phpComments, $yamlParser, $xmlComments);
         $indexes = new EnvironmentIndexRegistry();
         $indexes->forProject($project)->replaceSources(
-            $extractor->extract('file:///workspace/.env', 'dotenv', "APP_URL=value\n"),
-            $extractor->extract($uri, $languageId, $text),
+            $extractor->extract(new SourceDocument('file:///workspace/.env', 'dotenv', "APP_URL=value\n")),
+            $extractor->extract(new SourceDocument($uri, $languageId, $text)),
         );
         $indexes->forProject($project)->replaceProcessors(['json' => 'array']);
         [$completionProvider, $relationshipProvider, $diagnosticProvider] = $this->providers($documents, $projects, $converter, $indexes, $extractor, $twigComments, $phpComments, $yamlParser, $xmlComments);
@@ -243,7 +244,7 @@ final class EnvironmentProviderTest extends TestCase
         $xmlComments = new XmlCommentParser();
         $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $commentParser, $phpComments, $yamlParser, $xmlComments);
         $indexes = new EnvironmentIndexRegistry();
-        $indexes->forProject($project)->replaceSources($extractor->extract('file:///workspace/.env', 'dotenv', "APP_URL=value\n"));
+        $indexes->forProject($project)->replaceSources($extractor->extract(new SourceDocument('file:///workspace/.env', 'dotenv', "APP_URL=value\n")));
         [$completionProvider, , $diagnosticProvider] = $this->providers($documents, $projects, $converter, $indexes, $extractor, $commentParser, $phpComments, $yamlParser, $xmlComments);
         $completionOffset = strpos($text, 'APP_U') + \strlen('APP_U');
         $position = $converter->toPosition($text, $completionOffset);
@@ -259,12 +260,12 @@ final class EnvironmentProviderTest extends TestCase
     {
         $extractor = new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new TwigCommentParser(), new PhpCommentParser(), $this->yamlParser(), new XmlCommentParser());
 
-        $facts = $extractor->extract('file:///workspace/src/Kernel.php', 'php', <<<'PHP'
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Kernel.php', 'php', <<<'PHP'
             <?php
             // $dsn = '%env(COMMENTED_ENV)%';
             /* uses '%env(BLOCKED_ENV)%' */
             $dsn = '%env(LIVE_ENV)%';
-            PHP);
+            PHP));
 
         self::assertSame(['LIVE_ENV'], array_map(static fn ($reference): string => $reference->name, $facts->references));
     }

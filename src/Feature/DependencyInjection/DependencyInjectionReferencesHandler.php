@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class DependencyInjectionReferencesHandler implements ReferencesProviderInterface
@@ -24,9 +25,7 @@ final class DependencyInjectionReferencesHandler implements ReferencesProviderIn
         }
 
         $symbol = $this->symbolResolver->resolve(
-            $request->document->uri,
-            $request->document->languageId,
-            $request->document->text,
+            new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text),
             $request->position,
         );
         if (null === $symbol) {

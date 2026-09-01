@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -26,7 +27,7 @@ final class StimulusDocumentLinkProvider implements DocumentLinkProviderInterfac
             return null;
         }
         $links = [];
-        foreach ($this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text)->references as $reference) {
+        foreach ($this->extractor->extract($request->project, new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->references as $reference) {
             $locations = $this->stimulus->declarationLocations($request->project, $reference);
             $target = $locations[0]['uri'] ?? null;
             if (!\is_string($target)) {

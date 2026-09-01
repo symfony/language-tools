@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
 final class PhpRouteDeclarationExtractor
@@ -17,10 +18,10 @@ final class PhpRouteDeclarationExtractor
     /**
      * @return list<RouteDeclaration>
      */
-    public function extract(string $uri, string $text): array
+    public function extract(SourceDocument $source): array
     {
         $declarations = [];
-        $document = $this->parser->parse($text);
+        $document = $this->parser->parse($source->text);
         foreach ($document->attributes as $attribute) {
             if (!\in_array($attribute->name, [
                 'Symfony\Component\Routing\Annotation\Route',
@@ -36,8 +37,8 @@ final class PhpRouteDeclarationExtractor
 
             $declarations[] = $this->declaration(
                 $name->value,
-                $uri,
-                $text,
+                $source->uri,
+                $source->text,
                 $name->startOffset,
                 $name->endOffset,
             );
@@ -47,7 +48,7 @@ final class PhpRouteDeclarationExtractor
             if ('add' !== $call->method || !preg_match('/^\$(\w+)$/', $call->receiver, $variable)) {
                 continue;
             }
-            $beforeCall = substr($text, 0, $call->startOffset);
+            $beforeCall = substr($source->text, 0, $call->startOffset);
             if (!preg_match(
                 '/(?:RoutingConfigurator\s+\$'.preg_quote($variable[1], '/').'\b|\$'.preg_quote($variable[1], '/').'\s*=\s*new\s+(?:\\\\?RouteCollection|[^\s;(]*\\\\RouteCollection)\b)/s',
                 $beforeCall,
@@ -61,8 +62,8 @@ final class PhpRouteDeclarationExtractor
 
             $declarations[] = $this->declaration(
                 $name->value,
-                $uri,
-                $text,
+                $source->uri,
+                $source->text,
                 $name->startOffset,
                 $name->endOffset,
             );

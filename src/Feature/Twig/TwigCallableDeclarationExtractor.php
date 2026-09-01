@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpObjectCreation;
@@ -18,11 +19,11 @@ final class TwigCallableDeclarationExtractor
     ) {
     }
 
-    public function extract(string $uri, string $text): TwigCallableSourceFacts
+    public function extract(SourceDocument $document): TwigCallableSourceFacts
     {
         $declarations = [];
-        $document = $this->parser->parse($text);
-        foreach ($document->objectCreations as $creation) {
+        $php = $this->parser->parse($document->text);
+        foreach ($php->objectCreations as $creation) {
             $kind = $this->objectKind($creation);
             if (null === $kind) {
                 continue;
@@ -36,10 +37,10 @@ final class TwigCallableDeclarationExtractor
             $declarations[] = new TwigCallableDeclaration(
                 kind: $kind,
                 name: $name->value,
-                uri: $uri,
+                uri: $document->uri,
                 range: new Range(
-                    $this->converter->toPosition($text, $name->startOffset),
-                    $this->converter->toPosition($text, $name->endOffset),
+                    $this->converter->toPosition($document->text, $name->startOffset),
+                    $this->converter->toPosition($document->text, $name->endOffset),
                 ),
                 className: $callable?->className,
                 method: $callable?->method,
@@ -52,7 +53,7 @@ final class TwigCallableDeclarationExtractor
             );
         }
 
-        foreach ($document->methodDeclarations as $method) {
+        foreach ($php->methodDeclarations as $method) {
             if (!$method->public) {
                 continue;
             }
@@ -69,10 +70,10 @@ final class TwigCallableDeclarationExtractor
                 $declarations[] = new TwigCallableDeclaration(
                     kind: $kind,
                     name: $name->value,
-                    uri: $uri,
+                    uri: $document->uri,
                     range: new Range(
-                        $this->converter->toPosition($text, $name->startOffset),
-                        $this->converter->toPosition($text, $name->endOffset),
+                        $this->converter->toPosition($document->text, $name->startOffset),
+                        $this->converter->toPosition($document->text, $name->endOffset),
                     ),
                     className: $method->className,
                     method: $method->name,
@@ -86,7 +87,7 @@ final class TwigCallableDeclarationExtractor
             }
         }
 
-        return new TwigCallableSourceFacts($uri, $declarations);
+        return new TwigCallableSourceFacts($document->uri, $declarations);
     }
 
     private function literalName(?PhpStringLiteral $name): ?PhpStringLiteral

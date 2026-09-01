@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Index\SourceDocument;
 
 final class DependencyInjectionSymbolResolver
 {
@@ -13,16 +14,16 @@ final class DependencyInjectionSymbolResolver
     ) {
     }
 
-    public function resolve(string $uri, string $languageId, string $text, Position $position): ?DependencyInjectionSymbol
+    public function resolve(SourceDocument $document, Position $position): ?DependencyInjectionSymbol
     {
-        $facts = $this->extractor->extractForInteractive($uri, $languageId, $text);
+        $facts = $this->extractor->extractForInteractive($document);
         if (null === $facts) {
             return null;
         }
 
-        $offset = $this->positionConverter->toByteOffset($text, $position);
+        $offset = $this->positionConverter->toByteOffset($document->text, $position);
         foreach ($facts->services as $declaration) {
-            if ($this->positionConverter->containsByteOffset($text, $declaration->range, $offset, inclusiveEnd: true)) {
+            if ($this->positionConverter->containsByteOffset($document->text, $declaration->range, $offset, inclusiveEnd: true)) {
                 return new DependencyInjectionSymbol(
                     DependencyInjectionSymbolKind::Service,
                     $declaration->id,
@@ -31,7 +32,7 @@ final class DependencyInjectionSymbolResolver
             }
         }
         foreach ($facts->parameters as $declaration) {
-            if ($this->positionConverter->containsByteOffset($text, $declaration->range, $offset, inclusiveEnd: true)) {
+            if ($this->positionConverter->containsByteOffset($document->text, $declaration->range, $offset, inclusiveEnd: true)) {
                 return new DependencyInjectionSymbol(
                     DependencyInjectionSymbolKind::Parameter,
                     $declaration->name,
@@ -41,7 +42,7 @@ final class DependencyInjectionSymbolResolver
         }
 
         foreach ($facts->references as $reference) {
-            if ($this->positionConverter->containsByteOffset($text, $reference->range, $offset, inclusiveEnd: true)) {
+            if ($this->positionConverter->containsByteOffset($document->text, $reference->range, $offset, inclusiveEnd: true)) {
                 return new DependencyInjectionSymbol(
                     $reference->kind,
                     $reference->name,

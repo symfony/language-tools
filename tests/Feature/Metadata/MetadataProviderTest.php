@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Metadata\MetadataRelationshipProvider;
 use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexRegistry;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -50,9 +51,9 @@ final class MetadataProviderTest extends MetadataTestCase
             YAML;
         $sourceIndexes = new MetadataSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace(
-            $extractor->extract($entityUri, 'php', $entityText),
-            $extractor->extract($constraintDeclarationUri, 'php', $constraintDeclarationText),
-            $extractor->extract($mappingUri, 'yaml', $mappingText),
+            $extractor->extract(new SourceDocument($entityUri, 'php', $entityText)),
+            $extractor->extract(new SourceDocument($constraintDeclarationUri, 'php', $constraintDeclarationText)),
+            $extractor->extract(new SourceDocument($mappingUri, 'yaml', $mappingText)),
         );
         $documents = new DocumentStore();
         $documents->open(new Document($entityUri, 'php', 1, $entityText));

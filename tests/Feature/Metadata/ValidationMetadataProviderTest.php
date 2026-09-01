@@ -12,6 +12,7 @@ use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexRegistry;
 use Symfony\Lsp\Feature\Metadata\MetadataSymbolKind;
 use Symfony\Lsp\Feature\Metadata\ValidationConstraint;
 use Symfony\Lsp\Feature\Metadata\ValidationMetadataProvider;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -109,7 +110,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
             }
             PHP;
         $sourceIndexes = new MetadataSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace($extractor->extract('file:///workspace/src/Validator/Slug.php', 'php', $constraintDeclarationText));
+        $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument('file:///workspace/src/Validator/Slug.php', 'php', $constraintDeclarationText)));
         $documents = new DocumentStore();
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
@@ -155,7 +156,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
         self::assertSame(['active_constraint'], array_column($constraintOptions, 'option'));
         self::assertSame(strpos($text, 'active_constraint'), $converter->toByteOffset($text, $constraintOptions[0]['range']->start));
 
-        $symbols = $extractor->extract('file:///workspace/src/Dto/Input.php', 'php', $text)->symbols;
+        $symbols = $extractor->extract(new SourceDocument('file:///workspace/src/Dto/Input.php', 'php', $text))->symbols;
         $constraints = [];
         foreach ($symbols as $symbol) {
             self::assertStringNotContainsString('commented_', $symbol->name);

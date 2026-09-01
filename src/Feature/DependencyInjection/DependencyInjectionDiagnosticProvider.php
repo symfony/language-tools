@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
@@ -31,9 +32,7 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
             return null;
         }
         $facts = $this->extractor->extractForInteractive(
-            $request->document->uri,
-            $request->document->languageId,
-            $request->document->text,
+            new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text),
             $this->runtimeConfiguration->environment($request->project),
         );
         if (null === $facts) {

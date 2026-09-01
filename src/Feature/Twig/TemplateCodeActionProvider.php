@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Twig;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -29,7 +30,7 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
             return null;
         }
 
-        $references = $this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text);
+        $references = $this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text));
         $actions = [];
         foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
             if (!\is_array($diagnostic) || 'template.not_found' !== ($diagnostic['code'] ?? null)) {

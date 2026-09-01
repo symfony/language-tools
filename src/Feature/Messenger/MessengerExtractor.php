@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Messenger;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpDocument;
@@ -28,34 +29,34 @@ final class MessengerExtractor
     ) {
     }
 
-    public function extract(string $uri, string $languageId, string $text): MessengerSourceFacts
+    public function extract(SourceDocument $document): MessengerSourceFacts
     {
         /** @var list<MessengerSourceSymbol> $symbols */
         $symbols = [];
         $parents = [];
         $handlers = [];
-        if ('yaml' === $languageId) {
-            array_push($symbols, ...$this->yamlSymbols($uri, $text));
-            $source = $this->yamlComments->mask($text);
+        if ('yaml' === $document->languageId) {
+            array_push($symbols, ...$this->yamlSymbols($document->uri, $document->text));
+            $source = $this->yamlComments->mask($document->text);
             foreach ([
                 [MessengerSymbolKind::Bus, '/(?:\bbus|default_bus)\s*:\s*["\']?([A-Za-z_][A-Za-z0-9_.-]*)/'],
                 [MessengerSymbolKind::Transport, '/(?:fromTransport|from_transport|failure_transport)\s*:\s*["\']?([A-Za-z_][A-Za-z0-9_.-]*)/'],
             ] as [$kind, $pattern]) {
                 preg_match_all($pattern, $source, $matches, \PREG_OFFSET_CAPTURE);
                 foreach ($matches[1] as [$name, $offset]) {
-                    $symbols[] = $this->symbol($kind, $name, $uri, $text, $offset, false);
+                    $symbols[] = $this->symbol($kind, $name, $document->uri, $document->text, $offset, false);
                 }
             }
         }
-        if ('php' === $languageId) {
-            $php = $this->parser->parse($text);
-            $source = $this->phpComments->mask($text);
+        if ('php' === $document->languageId) {
+            $php = $this->parser->parse($document->text);
+            $source = $this->phpComments->mask($document->text);
             foreach ($php->attributesNamed(self::AS_MESSAGE_HANDLER) as $attribute) {
                 $target = $attribute->targets[0] ?? null;
                 if (!\in_array($target?->kind, [PhpAttributeTargetKind::Type, PhpAttributeTargetKind::Method], true)) {
                     continue;
                 }
-                $handlers[] = substr($text, $attribute->startOffset, $attribute->endOffset - $attribute->startOffset);
+                $handlers[] = substr($document->text, $attribute->startOffset, $attribute->endOffset - $attribute->startOffset);
                 foreach ([
                     [MessengerSymbolKind::Bus, 'bus'],
                     [MessengerSymbolKind::Transport, 'fromTransport'],
@@ -64,16 +65,16 @@ final class MessengerExtractor
                     if (null === $literal || 1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_.-]*$/D', $literal->value)) {
                         continue;
                     }
-                    $symbols[] = $this->symbol($kind, $literal->value, $uri, $text, $literal->startOffset, false, $literal->endOffset - $literal->startOffset);
+                    $symbols[] = $this->symbol($kind, $literal->value, $document->uri, $document->text, $literal->startOffset, false, $literal->endOffset - $literal->startOffset);
                 }
                 $handles = $php->firstClassReference($attribute->argument('handles'));
                 if (null !== $handles) {
-                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $handles->className, $uri, $text, $handles->startOffset, false, $handles->endOffset - $handles->startOffset);
+                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $handles->className, $document->uri, $document->text, $handles->startOffset, false, $handles->endOffset - $handles->startOffset);
                 }
             }
             preg_match_all('/BusNameStamp\s*\(\s*["\']([A-Za-z_][A-Za-z0-9_.-]*)/', $source, $matches, \PREG_OFFSET_CAPTURE);
             foreach ($matches[1] as [$name, $offset]) {
-                $symbols[] = $this->symbol(MessengerSymbolKind::Bus, $name, $uri, $text, $offset, false);
+                $symbols[] = $this->symbol(MessengerSymbolKind::Bus, $name, $document->uri, $document->text, $offset, false);
             }
             $parents = $this->phpParents($source, $php);
             foreach ($php->methodCalls as $call) {
@@ -83,7 +84,7 @@ final class MessengerExtractor
                 $messageArgument = $call->positionalArgument(0);
                 $message = $php->firstObjectCreation($messageArgument);
                 if (null !== $message && $message->startOffset === $messageArgument?->expressionStartOffset) {
-                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $message->className, $uri, $text, $message->classNameStartOffset, false, $message->classNameEndOffset - $message->classNameStartOffset);
+                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $message->className, $document->uri, $document->text, $message->classNameStartOffset, false, $message->classNameEndOffset - $message->classNameStartOffset);
                 }
             }
             foreach ($php->objectCreations as $envelope) {
@@ -93,12 +94,12 @@ final class MessengerExtractor
                 $messageArgument = $envelope->positionalArgument(0);
                 $message = $php->firstObjectCreation($messageArgument);
                 if (null !== $message && $message->startOffset === $messageArgument?->expressionStartOffset) {
-                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $message->className, $uri, $text, $message->classNameStartOffset, false, $message->classNameEndOffset - $message->classNameStartOffset);
+                    $symbols[] = $this->symbol(MessengerSymbolKind::Message, $message->className, $document->uri, $document->text, $message->classNameStartOffset, false, $message->classNameEndOffset - $message->classNameStartOffset);
                 }
             }
         }
 
-        return new MessengerSourceFacts($uri, $this->unique($symbols), $parents, $handlers);
+        return new MessengerSourceFacts($document->uri, $this->unique($symbols), $parents, $handlers);
     }
 
     /** @return list<MessengerSourceSymbol> */

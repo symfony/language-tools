@@ -26,6 +26,7 @@ use Symfony\Lsp\Feature\Messenger\MessengerRelationshipProvider;
 use Symfony\Lsp\Feature\Messenger\MessengerRelationshipResolver;
 use Symfony\Lsp\Feature\Messenger\MessengerSourceIndexRegistry;
 use Symfony\Lsp\Feature\Messenger\MessengerTransport;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -58,7 +59,7 @@ YAML;
         $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
         $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter));
         $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser, new PhpCommentParser(), new YamlCommentParser($treeSitter));
-        $facts = $extractor->extract('file:///workspace/config/packages/messenger.yaml', 'yaml', $text);
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/config/packages/messenger.yaml', 'yaml', $text));
 
         $names = [];
         $declarations = [];
@@ -68,13 +69,13 @@ YAML;
         }
         self::assertSame(['command.bus', 'async', 'failed', 'App\\Message\\Ping', 'async', 'command.bus', 'failed'], $names);
         self::assertSame([true, true, true, false, false, false, false], $declarations);
-        $phpFacts = $extractor->extract('file:///workspace/src/Example.php', 'php', "<?php\nfoo(bus: 'not_messenger');\n\$dispatcher->dispatch(new NotAMessage());\n");
+        $phpFacts = $extractor->extract(new SourceDocument('file:///workspace/src/Example.php', 'php', "<?php\nfoo(bus: 'not_messenger');\n\$dispatcher->dispatch(new NotAMessage());\n"));
         self::assertSame([], $phpFacts->symbols);
 
         $handlerFacts = $extractor->extract(
-            'file:///workspace/src/Handler.php',
-            'php',
-            <<<'PHP'
+            new SourceDocument('file:///workspace/src/Handler.php',
+                'php',
+                <<<'PHP'
                 <?php
                 namespace App;
 
@@ -87,7 +88,7 @@ YAML;
                     #[HandlerAttribute(fromTransport: 'async', handles: Ping::class)]
                     public function __invoke(): void {}
                 }
-                PHP,
+                PHP),
         );
         self::assertSame([
             "#[HandlerAttribute(bus: 'command.bus')]",
@@ -96,13 +97,13 @@ YAML;
         self::assertSame(['command.bus', 'async', 'App\Message\Ping'], array_map(static fn ($symbol): string => $symbol->name, $handlerFacts->symbols));
         self::assertFalse($handlerFacts->symbols[0]->declaration);
 
-        $incompleteFacts = $extractor->extract('file:///workspace/src/IncompleteHandler.php', 'php', <<<'PHP'
+        $incompleteFacts = $extractor->extract(new SourceDocument('file:///workspace/src/IncompleteHandler.php', 'php', <<<'PHP'
             <?php
             use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
             #[AsMessageHandler(bus: 'command.bus')
             final class IncompleteHandler {}
-            PHP);
+            PHP));
         self::assertSame(["#[AsMessageHandler(bus: 'command.bus')"], $incompleteFacts->handlers);
         self::assertSame(['command.bus'], array_map(static fn ($symbol): string => $symbol->name, $incompleteFacts->symbols));
     }
@@ -118,7 +119,7 @@ YAML;
             new PhpCommentParser(),
             new YamlCommentParser($treeSitter),
         );
-        $facts = $extractor->extract('file:///workspace/src/Handler.php', 'php', <<<'PHP'
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Handler.php', 'php', <<<'PHP'
             <?php
             namespace App;
 
@@ -130,7 +131,7 @@ YAML;
             final class Handler
             {
             }
-            PHP);
+            PHP));
 
         self::assertSame(['App\Message\First', 'App\Message\Second'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
         self::assertCount(2, $facts->handlers);
@@ -146,7 +147,7 @@ YAML;
             new PhpCommentParser(),
             new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
         );
-        $facts = $extractor->extract('file:///workspace/src/Dispatch.php', 'php', <<<'PHP'
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Dispatch.php', 'php', <<<'PHP'
             <?php
             namespace App;
 
@@ -164,7 +165,7 @@ YAML;
                     $bus->dispatch(new IgnoredMessage());
                 }
             }
-            PHP);
+            PHP));
 
         self::assertSame(['App\ExpectedMessage'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
     }
@@ -207,7 +208,7 @@ YAML;
             }
             PHP;
 
-        $facts = $extractor->extract('file:///workspace/src/Dispatch.php', 'php', $text);
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Dispatch.php', 'php', $text));
         $ranges = array_map(static function ($symbol) use ($converter, $text): string {
             $start = $converter->toByteOffset($text, $symbol->range->start);
             $end = $converter->toByteOffset($text, $symbol->range->end);
@@ -278,7 +279,7 @@ YAML;
             true,
         );
         $sourceIndexes = new MessengerSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace($extractor->extract($yamlUri, 'yaml', $yaml), $extractor->extract($messageUri, 'php', $message), $extractor->extract($controllerUri, 'php', $controller));
+        $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($yamlUri, 'yaml', $yaml)), $extractor->extract(new SourceDocument($messageUri, 'php', $message)), $extractor->extract(new SourceDocument($controllerUri, 'php', $controller)));
         $classExtractor = new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser()));
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
         $classIndexes->forProject($project)->replace(
@@ -346,7 +347,7 @@ YAML;
             }
             PHP;
 
-        $facts = $extractor->extract('file:///workspace/src/Handler.php', 'php', $text);
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Handler.php', 'php', $text));
 
         self::assertSame([], $facts->symbols);
         self::assertSame([], $facts->handlers);

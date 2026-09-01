@@ -21,6 +21,7 @@ use Symfony\Lsp\Feature\Twig\TwigCallableMethodResolver;
 use Symfony\Lsp\Feature\Twig\TwigCallableReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableRelationshipProvider;
 use Symfony\Lsp\Feature\Twig\TwigCallableSourceFacts;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -63,12 +64,12 @@ class TwigCallableProviderTestCase extends TestCase
         $classExtractor = new PhpClassDeclarationExtractor($converter, $phpParser);
         foreach ($phpDocuments as $uri => $text) {
             $documents->open(new Document($uri, 'php', 1, $text));
-            $callableFacts[] = $declarationExtractor->extract($uri, $text);
+            $callableFacts[] = $declarationExtractor->extract(new SourceDocument($uri, 'php', $text));
             $classFacts[] = new DependencyInjectionSourceFacts($uri, classes: $classExtractor->extract($uri, $text));
         }
         foreach ($twigDocuments as $uri => $text) {
             $documents->open(new Document($uri, 'twig', 1, $text));
-            $callableFacts[] = new TwigCallableSourceFacts($uri, [], $referenceExtractor->all($uri, $text));
+            $callableFacts[] = new TwigCallableSourceFacts($uri, [], $referenceExtractor->all(new SourceDocument($uri, 'twig', $text)));
         }
         $indexes = new TwigCallableIndexRegistry();
         $indexes->forProject($project)->replace(...$callableFacts);

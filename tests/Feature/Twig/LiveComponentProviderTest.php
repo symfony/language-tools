@@ -19,6 +19,7 @@ use Symfony\Lsp\Feature\Twig\TwigComponentPhpExtractor;
 use Symfony\Lsp\Feature\Twig\TwigComponentRelationshipProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentResolver;
 use Symfony\Lsp\Feature\Twig\TwigComponentTemplateExtractor;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -84,9 +85,9 @@ final class LiveComponentProviderTest extends TestCase
         $projects->replace([$project]);
         $indexes = new TwigComponentIndexRegistry();
         $indexes->forProject($project)->replace(
-            $extractor->extract($project, $classUri, 'php', $classText),
-            $extractor->extract($project, $templateUri, 'twig', $templateText),
-            $extractor->extract($project, $usageUri, 'twig', $usageText),
+            $extractor->extract($project, new SourceDocument($classUri, 'php', $classText)),
+            $extractor->extract($project, new SourceDocument($templateUri, 'twig', $templateText)),
+            $extractor->extract($project, new SourceDocument($usageUri, 'twig', $usageText)),
         );
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
@@ -139,7 +140,7 @@ final class LiveComponentProviderTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
         $converter = new PositionConverter();
         $extractor = $this->extractor($converter);
-        $facts = $extractor->extract($project, 'file:///workspace/src/Twig/Components/Card.php', 'php', <<<'PHP'
+        $facts = $extractor->extract($project, new SourceDocument('file:///workspace/src/Twig/Components/Card.php', 'php', <<<'PHP'
             <?php
             use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
 
@@ -147,7 +148,7 @@ final class LiveComponentProviderTest extends TestCase
             final class Card
             {
                 public string $title;
-            PHP);
+            PHP));
 
         self::assertSame(['Card'], array_map(static fn ($component): string => $component->name, $facts->components));
         self::assertSame(['title'], $facts->components[0]->properties);
@@ -205,7 +206,7 @@ final class LiveComponentProviderTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
         $indexes = new TwigComponentIndexRegistry();
-        $indexes->forProject($project)->replace($extractor->extract($project, $uri, 'php', $text));
+        $indexes->forProject($project)->replace($extractor->extract($project, new SourceDocument($uri, 'php', $text)));
         $provider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser());
 
         self::assertNull($provider->complete($this->params($converter, $uri, $text, strpos($text, 'search:c') + \strlen('search:c'))));
@@ -216,7 +217,7 @@ final class LiveComponentProviderTest extends TestCase
         $converter = new PositionConverter();
         $extractor = $this->extractor($converter);
 
-        $facts = $extractor->extract(new Project('/workspace', 'file:///workspace', '^8.0'), 'file:///workspace/src/Twig/Components/Events.php', 'php', <<<'PHP'
+        $facts = $extractor->extract(new Project('/workspace', 'file:///workspace', '^8.0'), new SourceDocument('file:///workspace/src/Twig/Components/Events.php', 'php', <<<'PHP'
             <?php
             namespace App\Twig\Components;
 
@@ -249,7 +250,7 @@ final class LiveComponentProviderTest extends TestCase
                     $this->emit('ignored:class');
                 }
             }
-            PHP);
+            PHP));
 
         self::assertSame(
             [
@@ -266,7 +267,7 @@ final class LiveComponentProviderTest extends TestCase
         $converter = new PositionConverter();
         $extractor = $this->extractor($converter);
 
-        $facts = $extractor->extract(new Project('/workspace', 'file:///workspace', '^8.0'), 'file:///workspace/src/Twig/Components/Search.php', 'php', <<<'PHP'
+        $facts = $extractor->extract(new Project('/workspace', 'file:///workspace', '^8.0'), new SourceDocument('file:///workspace/src/Twig/Components/Search.php', 'php', <<<'PHP'
             <?php
             namespace App\Twig\Components;
 
@@ -283,7 +284,7 @@ final class LiveComponentProviderTest extends TestCase
                     $this->emit('live:event');
                 }
             }
-            PHP);
+            PHP));
 
         self::assertSame(['live:event'], array_map(static fn ($event): string => $event->name, $facts->events));
     }

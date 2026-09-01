@@ -17,6 +17,7 @@ use Symfony\Lsp\Feature\Asset\ImportMapEntry;
 use Symfony\Lsp\Feature\Asset\ImportMapEntrypointExtractor;
 use Symfony\Lsp\Feature\Asset\PublicAssetResolver;
 use Symfony\Lsp\Feature\Asset\TwigAssetReferenceExtractor;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -72,8 +73,8 @@ final class AssetProviderTest extends TestCase
             TWIG;
         $sourceIndexes = new AssetSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace(
-            $extractor->extract($importMapUri, 'php', $importMapText),
-            $extractor->extract($usageUri, 'twig', $usageText),
+            $extractor->extract(new SourceDocument($importMapUri, 'php', $importMapText)),
+            $extractor->extract(new SourceDocument($usageUri, 'twig', $usageText)),
         );
         $documents = new DocumentStore();
         $documents->open(new Document($importMapUri, 'php', 1, $importMapText));
@@ -136,7 +137,7 @@ final class AssetProviderTest extends TestCase
         $converter = new PositionConverter();
         $extractor = $this->createExtractor($converter);
 
-        $facts = $extractor->extract('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
             {# {{ asset(path: 'commented.js') }} #}
             {{ asset('positional.js') }}
             {{ asset(path: 'colon.js') }}
@@ -148,7 +149,7 @@ final class AssetProviderTest extends TestCase
             {{ asset('packaged.js', 'legacy') }}
             {{ asset(path: 'named-packaged.js', packageName: 'legacy') }}
             {{ asset(path: '/absolute.js') }}
-            TWIG);
+            TWIG));
 
         self::assertSame(
             ['positional.js', 'colon.js', 'equals.js', 'comment-separated.js'],
@@ -161,7 +162,7 @@ final class AssetProviderTest extends TestCase
         $converter = new PositionConverter();
         $extractor = $this->createExtractor($converter);
 
-        $facts = $extractor->extract('file:///workspace/templates/page.html.twig', 'twig', "{{ asset('it\\'s.js') }}");
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', "{{ asset('it\\'s.js') }}"));
 
         self::assertSame(["it's.js"], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
     }

@@ -6,6 +6,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\HoverProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteHoverHandler implements HoverProviderInterface
@@ -34,9 +35,10 @@ final class RouteHoverHandler implements HoverProviderInterface
         }
 
         $offset = $this->positionConverter->toByteOffset($request->document->text, $request->position);
+        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
         $reference = 'twig' === $request->document->languageId
-            ? $this->twigReferenceExtractor->at($request->document->text, $offset)
-            : $this->phpReferenceExtractor->at($request->document->text, $offset, $this->classIndexes->forProject($request->project));
+            ? $this->twigReferenceExtractor->at($document, $offset)
+            : $this->phpReferenceExtractor->at($document, $offset, $this->classIndexes->forProject($request->project));
         if (null === $reference || null === $route = $this->routeIndexes->forProject($request->project)->get($reference->name)) {
             return null;
         }

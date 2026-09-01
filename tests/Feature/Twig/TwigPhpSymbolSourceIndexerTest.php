@@ -90,8 +90,8 @@ final class TwigPhpSymbolSourceIndexerTest extends TestCase
         $uri = 'file:///workspace/src/Status.php';
         $extractor = $this->extractor(new PositionConverter());
         $index = (new TwigPhpSymbolIndexRegistry())->forProject($project);
-        $saved = $extractor->extract($uri, 'php', '<?php enum Status { case Saved; }');
-        $unsaved = $extractor->extract($uri, 'php', '<?php enum Status { case Unsaved; }');
+        $saved = $extractor->extract(new SourceDocument($uri, 'php', '<?php enum Status { case Saved; }'));
+        $unsaved = $extractor->extract(new SourceDocument($uri, 'php', '<?php enum Status { case Unsaved; }'));
         self::assertInstanceOf(TwigPhpSymbolSourceFacts::class, $saved);
         self::assertInstanceOf(TwigPhpSymbolSourceFacts::class, $unsaved);
 

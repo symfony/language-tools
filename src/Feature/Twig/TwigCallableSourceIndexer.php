@@ -51,10 +51,10 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
     protected function extract(Project $project, SourceDocument $document): ?TwigCallableSourceFacts
     {
         if ('php' === $document->languageId) {
-            return $this->extractor->extract($document->uri, $document->text);
+            return $this->extractor->extract($document);
         }
         if ('twig' === $document->languageId) {
-            return new TwigCallableSourceFacts($document->uri, [], $this->references->all($document->uri, $document->text));
+            return new TwigCallableSourceFacts($document->uri, [], $this->references->all($document));
         }
 
         return null;

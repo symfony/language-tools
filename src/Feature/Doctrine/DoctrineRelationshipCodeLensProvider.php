@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Doctrine;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\CodeLensProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class DoctrineRelationshipCodeLensProvider implements CodeLensProviderInterface
@@ -23,7 +24,7 @@ final class DoctrineRelationshipCodeLensProvider implements CodeLensProviderInte
             return null;
         }
         $index = $this->indexes->forProject($request->project);
-        $facts = $this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text);
+        $facts = $this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text));
         $lenses = [];
         foreach ($facts->entities as $entity) {
             $repository = null === $entity->repositoryClass ? null : $index->repository($entity->repositoryClass);

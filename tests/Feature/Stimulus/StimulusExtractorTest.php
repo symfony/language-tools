@@ -10,6 +10,7 @@ use Symfony\Lsp\Feature\Stimulus\StimulusCompletionContextResolver;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusReferenceExtractor;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -21,7 +22,7 @@ final class StimulusExtractorTest extends TestCase
     public function testDetectsLazyControllersOnlyWhenTheCommentIsAttachedToTheClass(string $languageId, string $text, bool $expected): void
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
-        $facts = $this->createExtractor()->extract($project, 'file:///workspace/assets/controllers/example_controller.js', $languageId, $text);
+        $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/assets/controllers/example_controller.js', $languageId, $text));
 
         self::assertSame($expected, $facts->declarations[0]->lazy);
     }
@@ -29,7 +30,7 @@ final class StimulusExtractorTest extends TestCase
     public function testIgnoresMembersOutsideExportedControllerClass(): void
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
-        $facts = $this->createExtractor()->extract($project, 'file:///workspace/assets/controllers/example_controller.js', 'javascript', <<<'JS'
+        $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/assets/controllers/example_controller.js', 'javascript', <<<'JS'
             class BeforeController {
                 before() {
                 }
@@ -44,7 +45,7 @@ final class StimulusExtractorTest extends TestCase
                 after() {
                 }
             }
-            JS);
+            JS));
 
         self::assertSame(['open'], array_map(static fn ($member): string => $member->name, $facts->declarations[0]->members));
     }
@@ -52,14 +53,14 @@ final class StimulusExtractorTest extends TestCase
     public function testIgnoresJavaScriptReferencesInsideCommentsAndStrings(): void
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
-        $facts = $this->createExtractor()->extract($project, 'file:///workspace/assets/controllers/example_controller.js', 'javascript', <<<'JS'
+        $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/assets/controllers/example_controller.js', 'javascript', <<<'JS'
             const example = "application.register('string', Controller)";
             const template = `this.application.getControllerForElementAndIdentifier(element, 'template')`;
             // application.register('line-comment', Controller);
             /* this.application.getControllerForElementAndIdentifier(element, 'block-comment'); */
             application.register('registered', Controller);
             this.application.getControllerForElementAndIdentifier(element, 'resolved');
-            JS);
+            JS));
 
         self::assertSame(
             ['registered', 'resolved'],
@@ -70,10 +71,10 @@ final class StimulusExtractorTest extends TestCase
     public function testIgnoresTwigReferencesInsideDocumentationComments(): void
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
-        $facts = $this->createExtractor()->extract($project, 'file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+        $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
             {## Use stimulus_controller('documented') in examples. #}
             {{ stimulus_controller('real') }}
-            TWIG);
+            TWIG));
 
         self::assertSame(['real'], array_map(static fn ($reference): string => $reference->controller, $facts->references));
     }
@@ -81,11 +82,11 @@ final class StimulusExtractorTest extends TestCase
     public function testDecodesEscapedTwigHelperArguments(): void
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
-        $facts = $this->createExtractor()->extract($project, 'file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+        $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
             {{ stimulus_controller('it\'s') }}
             {{ stimulus_action('it\'s', 'open\'s') }}
             {{ stimulus_target('it\'s', 'result\'s') }}
-            TWIG);
+            TWIG));
 
         self::assertSame(
             [

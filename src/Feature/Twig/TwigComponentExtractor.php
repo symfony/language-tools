@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Project\Project;
 
@@ -14,12 +15,12 @@ final class TwigComponentExtractor
     ) {
     }
 
-    public function extract(Project $project, string $uri, string $languageId, string $text): TwigComponentSourceFacts
+    public function extract(Project $project, SourceDocument $document): TwigComponentSourceFacts
     {
-        return match ($languageId) {
-            'php' => $this->phpExtractor->extract($uri, $text, $this->phpParser->parse($text)),
-            'twig' => $this->templateExtractor->extract($project, $uri, $text),
-            default => new TwigComponentSourceFacts($uri, [], []),
+        return match ($document->languageId) {
+            'php' => $this->phpExtractor->extract($document->uri, $document->text, $this->phpParser->parse($document->text)),
+            'twig' => $this->templateExtractor->extract($project, $document->uri, $document->text),
+            default => new TwigComponentSourceFacts($document->uri, [], []),
         };
     }
 }

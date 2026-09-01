@@ -10,6 +10,7 @@ use Symfony\Lsp\Feature\Console\ConsoleExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleInputKind;
 use Symfony\Lsp\Feature\Console\ConsoleInputReceiverResolver;
 use Symfony\Lsp\Feature\Console\ConsoleInvokableParameterExtractor;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
@@ -88,7 +89,7 @@ final class ConsoleExtractorTest extends TestCase
             }
             PHP;
 
-        $facts = $this->extractor()->extract('file:///workspace/src/Command/ReportCommand.php', 'php', $text);
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/ReportCommand.php', 'php', $text));
         $declarations = [];
         foreach ($facts->declarations as $declaration) {
             $declarations[$declaration->className] = $declaration;
@@ -108,7 +109,7 @@ final class ConsoleExtractorTest extends TestCase
 
     public function testIndexesInputReferencesCapturedInsideClosures(): void
     {
-        $facts = $this->extractor()->extract('file:///workspace/src/Command/CapturedCommand.php', 'php', <<<'PHP'
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/CapturedCommand.php', 'php', <<<'PHP'
             <?php
             use Symfony\Component\Console\Input\InputInterface;
 
@@ -126,7 +127,7 @@ final class ConsoleExtractorTest extends TestCase
                     $shadowed = fn ($input): string => $input->getOption('shadowed');
                 }
             }
-            PHP);
+            PHP));
 
         self::assertSame(['closure', 'arrow'], array_map(static fn ($reference): string => $reference->name, $facts->references));
         self::assertSame([ConsoleInputKind::Argument, ConsoleInputKind::Option], array_map(static fn ($reference): ConsoleInputKind => $reference->kind, $facts->references));
@@ -134,7 +135,7 @@ final class ConsoleExtractorTest extends TestCase
 
     public function testScopesInputReferencesToTheirOwningMethods(): void
     {
-        $facts = $this->extractor()->extract('file:///workspace/src/Command/ScopedCommand.php', 'php', <<<'PHP'
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/ScopedCommand.php', 'php', <<<'PHP'
             <?php
             use Symfony\Component\Console\Input\InputInterface;
 
@@ -150,7 +151,7 @@ final class ConsoleExtractorTest extends TestCase
                     $input->getArgument('ignored');
                 }
             }
-            PHP);
+            PHP));
 
         self::assertSame(['tracked'], array_map(static fn ($reference): string => $reference->name, $facts->references));
         self::assertSame(['ScopedCommand'], array_map(static fn ($reference): string => $reference->commandClass, $facts->references));
@@ -158,7 +159,7 @@ final class ConsoleExtractorTest extends TestCase
 
     public function testKeepsDeclarationsCallsAndAttributesWithTheirOwningTypes(): void
     {
-        $facts = $this->extractor()->extract('file:///workspace/src/Command/Declarations.php', 'php', <<<'PHP'
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/Declarations.php', 'php', <<<'PHP'
             <?php
             namespace App\Command;
 
@@ -204,7 +205,7 @@ final class ConsoleExtractorTest extends TestCase
                     $this->addArgument('neighbor');
                 }
             }
-            PHP);
+            PHP));
         $declarations = [];
         foreach ($facts->declarations as $declaration) {
             $declarations[$declaration->className] = $declaration;
@@ -224,7 +225,7 @@ final class ConsoleExtractorTest extends TestCase
 
     public function testIndexesConfigureCallsInsideClosuresConservatively(): void
     {
-        $facts = $this->extractor()->extract('file:///workspace/src/Command/DeferredCommand.php', 'php', <<<'PHP'
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/DeferredCommand.php', 'php', <<<'PHP'
             <?php
             final class DeferredCommand
             {
@@ -236,7 +237,7 @@ final class ConsoleExtractorTest extends TestCase
                     $option = fn () => $this->addOption('arrow');
                 }
             }
-            PHP);
+            PHP));
 
         self::assertSame(['closure'], $facts->declarations[0]->arguments);
         self::assertSame(['arrow'], $facts->declarations[0]->options);
@@ -245,7 +246,7 @@ final class ConsoleExtractorTest extends TestCase
 
     public function testMarksDynamicDefinitionsIncomplete(): void
     {
-        $facts = $this->extractor()->extract('file:///workspace/src/Command/DynamicCommand.php', 'php', <<<'PHP'
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/DynamicCommand.php', 'php', <<<'PHP'
             <?php
             use Symfony\Component\Console\Attribute\AsCommand;
             use Symfony\Component\Console\Attribute\Option;
@@ -267,7 +268,7 @@ final class ConsoleExtractorTest extends TestCase
                     return 0;
                 }
             }
-            PHP);
+            PHP));
 
         self::assertFalse($facts->declarations[0]->complete);
         self::assertFalse($facts->declarations[1]->complete);
@@ -327,14 +328,14 @@ final class ConsoleExtractorTest extends TestCase
 
     public function testMarksUnterminatedConfigureIncomplete(): void
     {
-        $facts = $this->extractor()->extract('file:///workspace/src/Command/DraftCommand.php', 'php', <<<'PHP'
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/DraftCommand.php', 'php', <<<'PHP'
             <?php
             final class DraftCommand
             {
                 protected function configure(): void
                 {
                     $this->addArgument('draft');
-            PHP);
+            PHP));
 
         self::assertFalse($facts->declarations[0]->complete);
     }
@@ -371,7 +372,7 @@ final class ConsoleExtractorTest extends TestCase
             new ConsoleInputReceiverResolver($delimiters),
         );
 
-        $facts = $extractor->extract('file:///workspace/src/Command/ReportCommand.php', 'php', $text);
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Command/ReportCommand.php', 'php', $text));
         $parser->parse($text);
 
         self::assertSame(['report'], $facts->declarations[0]->arguments);

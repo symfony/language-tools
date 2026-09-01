@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Doctrine;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
@@ -25,13 +26,13 @@ final class DoctrineExtractor
     ) {
     }
 
-    public function extract(string $uri, string $languageId, string $text): DoctrineSourceFacts
+    public function extract(SourceDocument $document): DoctrineSourceFacts
     {
-        if ('php' !== $languageId) {
-            return new DoctrineSourceFacts($uri, [], [], []);
+        if ('php' !== $document->languageId) {
+            return new DoctrineSourceFacts($document->uri, [], [], []);
         }
-        $php = $this->phpParser->parse($text);
-        $source = $this->phpComments->mask($text);
+        $php = $this->phpParser->parse($document->text);
+        $source = $this->phpComments->mask($document->text);
         $entities = [];
         $repositories = [];
         $symbols = [];
@@ -39,48 +40,48 @@ final class DoctrineExtractor
             if (!$type->isClass()) {
                 continue;
             }
-            $range = $this->converter->toRange($text, $type->nameStartOffset, $type->nameEndOffset - $type->nameStartOffset);
+            $range = $this->converter->toRange($document->text, $type->nameStartOffset, $type->nameEndOffset - $type->nameStartOffset);
             if ([] !== $this->mappingAttributes($php, PhpAttributeTargetKind::Type, $type->name, null, ['Entity', 'MappedSuperclass'])) {
                 $repositoryReference = $this->repositoryClassReference($php, $type->name);
-                $fields = $this->fields($uri, $text, $type->name, $php);
-                $entity = new DoctrineEntity($type->name, $uri, $range, $repositoryReference?->className, $fields);
+                $fields = $this->fields($document->uri, $document->text, $type->name, $php);
+                $entity = new DoctrineEntity($type->name, $document->uri, $range, $repositoryReference?->className, $fields);
                 $entities[] = $entity;
-                $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Entity, $entity->className, null, $uri, $entity->range, true);
+                $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Entity, $entity->className, null, $document->uri, $entity->range, true);
                 foreach ($fields as $field) {
-                    $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, $field->name, $entity->className, $uri, $field->range, true);
+                    $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, $field->name, $entity->className, $document->uri, $field->range, true);
                 }
                 if (null !== $repositoryReference) {
                     $symbols[] = new DoctrineSourceSymbol(
                         DoctrineSymbolKind::Repository,
                         $repositoryReference->className,
                         null,
-                        $uri,
-                        $this->converter->toRange($text, $repositoryReference->startOffset, $repositoryReference->endOffset - $repositoryReference->startOffset),
+                        $document->uri,
+                        $this->converter->toRange($document->text, $repositoryReference->startOffset, $repositoryReference->endOffset - $repositoryReference->startOffset),
                         false,
                     );
                 }
             }
-            $repository = $this->repository($uri, $text, $source, $type, $php);
+            $repository = $this->repository($document->uri, $document->text, $source, $type, $php);
             if (null !== $repository) {
                 $repositories[] = $repository;
-                $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Repository, $repository->className, null, $uri, $repository->range, true);
+                $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Repository, $repository->className, null, $document->uri, $repository->range, true);
                 $entityReference = $this->repositoryEntityReference($source, $type, $php);
                 if (null !== $entityReference) {
                     $symbols[] = new DoctrineSourceSymbol(
                         DoctrineSymbolKind::Entity,
                         $repository->entityClass,
                         null,
-                        $uri,
-                        $this->converter->toRange($text, $entityReference->startOffset, $entityReference->endOffset - $entityReference->startOffset),
+                        $document->uri,
+                        $this->converter->toRange($document->text, $entityReference->startOffset, $entityReference->endOffset - $entityReference->startOffset),
                         false,
                     );
                 }
             }
         }
-        array_push($symbols, ...$this->formSymbols($uri, $text, $source, $php));
-        array_push($symbols, ...$this->repositorySymbols($uri, $text, $source, $php, $repositories));
+        array_push($symbols, ...$this->formSymbols($document->uri, $document->text, $source, $php));
+        array_push($symbols, ...$this->repositorySymbols($document->uri, $document->text, $source, $php, $repositories));
 
-        return new DoctrineSourceFacts($uri, $entities, $repositories, $this->unique($symbols));
+        return new DoctrineSourceFacts($document->uri, $entities, $repositories, $this->unique($symbols));
     }
 
     public function completionContext(string $languageId, string $text, int $offset): ?DoctrineCompletionContext

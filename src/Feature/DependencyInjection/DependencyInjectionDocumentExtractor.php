@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
+use Symfony\Lsp\Index\SourceDocument;
+
 final class DependencyInjectionDocumentExtractor
 {
     public function __construct(
@@ -12,33 +14,33 @@ final class DependencyInjectionDocumentExtractor
     ) {
     }
 
-    public function extractForIndexing(string $uri, string $languageId, string $text): ?DependencyInjectionSourceFacts
+    public function extractForIndexing(SourceDocument $document): ?DependencyInjectionSourceFacts
     {
-        return $this->extract($uri, $languageId, $text, false);
+        return $this->extract($document, false);
     }
 
-    public function extractForInteractive(string $uri, string $languageId, string $text, ?string $environment = null): ?DependencyInjectionSourceFacts
+    public function extractForInteractive(SourceDocument $document, ?string $environment = null): ?DependencyInjectionSourceFacts
     {
-        return $this->extract($uri, $languageId, $text, true, $environment);
+        return $this->extract($document, true, $environment);
     }
 
-    private function extract(string $uri, string $languageId, string $text, bool $interactive, ?string $environment = null): ?DependencyInjectionSourceFacts
+    private function extract(SourceDocument $document, bool $interactive, ?string $environment = null): ?DependencyInjectionSourceFacts
     {
-        if (!\in_array($languageId, $interactive ? ['php', 'yaml'] : ['php', 'xml', 'yaml'], true)) {
+        if (!\in_array($document->languageId, $interactive ? ['php', 'yaml'] : ['php', 'xml', 'yaml'], true)) {
             return null;
         }
 
-        if ('yaml' === $languageId) {
-            return $this->yamlExtractor->extract($uri, $text, $environment);
+        if ('yaml' === $document->languageId) {
+            return $this->yamlExtractor->extract($document->uri, $document->text, $environment);
         }
-        if ('xml' === $languageId) {
-            return $this->xmlExtractor->extract($uri, $text);
+        if ('xml' === $document->languageId) {
+            return $this->xmlExtractor->extract($document->uri, $document->text);
         }
 
         return new DependencyInjectionSourceFacts(
-            $uri,
-            references: $this->autowireExtractor->extract($uri, $text),
-            classes: $this->classExtractor->extract($uri, $text),
+            $document->uri,
+            references: $this->autowireExtractor->extract($document->uri, $document->text),
+            classes: $this->classExtractor->extract($document->uri, $document->text),
         );
     }
 }

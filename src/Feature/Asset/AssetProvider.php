@@ -10,6 +10,7 @@ use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -146,7 +147,7 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
             return null;
         }
         $links = [];
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols as $symbol) {
+        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->symbols as $symbol) {
             $target = $this->target($request->project, $symbol);
             if (null !== $target) {
                 $links[] = ['range' => $this->protocol->range($symbol->range), 'target' => $target];
@@ -173,7 +174,7 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         }
         $known = array_fill_keys($this->entrypointNames($request->project), true);
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols as $symbol) {
+        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->symbols as $symbol) {
             if (AssetSymbolKind::Entrypoint !== $symbol->kind || isset($known[$symbol->name])) {
                 continue;
             }
@@ -215,7 +216,7 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        foreach ($this->extractor->extract($request->document->uri, $request->document->languageId, $request->document->text)->symbols as $symbol) {
+        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->symbols as $symbol) {
             if ($this->converter->containsByteOffset($request->document->text, $symbol->range, $offset, inclusiveEnd: true)) {
                 return [$symbol, $request->project];
             }

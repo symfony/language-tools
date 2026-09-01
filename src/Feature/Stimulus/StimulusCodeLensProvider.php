@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\CodeLensProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class StimulusCodeLensProvider implements CodeLensProviderInterface
@@ -23,7 +24,7 @@ final class StimulusCodeLensProvider implements CodeLensProviderInterface
             return null;
         }
         $lenses = [];
-        foreach ($this->extractor->extract($request->project, $request->document->uri, $request->document->languageId, $request->document->text)->declarations as $declaration) {
+        foreach ($this->extractor->extract($request->project, new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->declarations as $declaration) {
             $locations = [];
             foreach ($this->sourceIndexes->forProject($request->project)->references($declaration->name) as $reference) {
                 $locations[] = $this->protocol->location($reference->uri, $reference->range);

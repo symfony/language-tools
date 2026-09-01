@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\HoverProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class DependencyInjectionHoverHandler implements HoverProviderInterface
@@ -24,9 +25,7 @@ final class DependencyInjectionHoverHandler implements HoverProviderInterface
         }
 
         $symbol = $this->symbolResolver->resolve(
-            $request->document->uri,
-            $request->document->languageId,
-            $request->document->text,
+            new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text),
             $request->position,
         );
         if (null === $symbol) {

@@ -21,6 +21,7 @@ use Symfony\Lsp\Feature\Stimulus\StimulusReferenceExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusRelationshipProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusResolver;
 use Symfony\Lsp\Feature\Stimulus\StimulusSourceIndexRegistry;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -100,8 +101,8 @@ final class StimulusProviderTest extends TestCase
         ));
         $sourceIndexes = new StimulusSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace(
-            $extractor->extract($project, $controllerUri, 'javascript', $controllerText),
-            $extractor->extract($project, $usageUri, 'twig', $usageText),
+            $extractor->extract($project, new SourceDocument($controllerUri, 'javascript', $controllerText)),
+            $extractor->extract($project, new SourceDocument($usageUri, 'twig', $usageText)),
         );
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $uriConverter = new UriToPathConverter();

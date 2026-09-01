@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
@@ -45,10 +46,10 @@ final class TwigCallableReferenceExtractor
     }
 
     /** @return list<TwigCallableUsage> */
-    public function all(string $uri, string $text): array
+    public function all(SourceDocument $source): array
     {
-        $document = $this->parser->parse($text);
-        $masked = $this->commentParser->mask($text);
+        $document = $this->parser->parse($source->text);
+        $masked = $this->commentParser->mask($source->text);
         $usages = [];
         foreach ([
             ['function_call', 'function_identifier', TwigCallableKind::Function],
@@ -66,10 +67,10 @@ final class TwigCallableReferenceExtractor
                 $usages[$identifier->startByte] = new TwigCallableUsage(
                     $kind,
                     $name,
-                    $uri,
+                    $source->uri,
                     new Range(
-                        $this->converter->toPosition($text, $identifier->startByte),
-                        $this->converter->toPosition($text, $identifier->endByte),
+                        $this->converter->toPosition($source->text, $identifier->startByte),
+                        $this->converter->toPosition($source->text, $identifier->endByte),
                     ),
                 );
             }

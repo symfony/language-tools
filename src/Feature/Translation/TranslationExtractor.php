@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Feature\Translation;
 
+use Symfony\Lsp\Index\SourceDocument;
+
 final class TranslationExtractor
 {
     public function __construct(
@@ -11,22 +13,22 @@ final class TranslationExtractor
     ) {
     }
 
-    public function extract(string $uri, string $languageId, string $text): TranslationSourceFacts
+    public function extract(SourceDocument $document): TranslationSourceFacts
     {
         $globalParameters = [];
         $dynamicGlobalParameters = false;
-        if ('php' === $languageId) {
-            $php = $this->phpReferences->extract($uri, $text);
+        if ('php' === $document->languageId) {
+            $php = $this->phpReferences->extract($document->uri, $document->text);
             $references = $php->references;
             $globalParameters = $php->globalParameters;
             $dynamicGlobalParameters = $php->dynamicGlobalParameters;
         } else {
-            $references = 'twig' === $languageId ? $this->twigReferences->extract($uri, $text) : [];
+            $references = 'twig' === $document->languageId ? $this->twigReferences->extract($document->uri, $document->text) : [];
         }
 
         return new TranslationSourceFacts(
-            $uri,
-            $this->catalogs->extract($uri, $text),
+            $document->uri,
+            $this->catalogs->extract($document->uri, $document->text),
             $references,
             $globalParameters,
             $dynamicGlobalParameters,

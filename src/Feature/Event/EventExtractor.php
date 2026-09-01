@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Event;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
@@ -29,16 +30,16 @@ final class EventExtractor
     ) {
     }
 
-    public function extract(string $uri, string $languageId, string $text): EventSourceFacts
+    public function extract(SourceDocument $document): EventSourceFacts
     {
-        if ('php' === $languageId) {
-            return $this->extractPhp($uri, $text);
+        if ('php' === $document->languageId) {
+            return $this->extractPhp($document->uri, $document->text);
         }
-        if ('yaml' === $languageId) {
-            return new EventSourceFacts($uri, $this->yamlListenerAnalyzer->symbols($uri, $text));
+        if ('yaml' === $document->languageId) {
+            return new EventSourceFacts($document->uri, $this->yamlListenerAnalyzer->symbols($document->uri, $document->text));
         }
 
-        return new EventSourceFacts($uri, []);
+        return new EventSourceFacts($document->uri, []);
     }
 
     public function completionPrefix(string $languageId, string $text, int $offset): ?string
