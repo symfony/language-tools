@@ -80,14 +80,20 @@ selection:
     $ symfony-lsp check src/ templates/
     $ symfony-lsp check 'config/**/*.yaml'
 
-Paths and patterns are resolved from the workspace root. Files under ``.git/``,
-``node_modules/``, ``var/`` or ``vendor/`` are skipped. Files excluded by
-``.gitignore`` are also skipped, except project-root dotenv files (``.env*``),
-which Symfony reads even when ignored. This exception applies to default and
-explicit selections. The default selection also skips project
-``excludePaths``. An explicit file, directory or pattern can select those
-configured exclusions, but it can't bypass the excluded directories or other
-``.gitignore`` rules.
+Paths and patterns are resolved from the workspace root. Arguments without
+``*`` or ``?`` select literal files or directories. In patterns, ``*`` and
+``?`` stay within one path segment, while ``**`` crosses directories wherever
+it appears. For example, ``**.twig`` selects Twig files at every depth and
+``src/**.php`` selects PHP files directly or recursively under ``src/``. Quote
+patterns so that the shell passes them unchanged to the checker.
+
+Files under ``.git/``, ``node_modules/``, ``var/`` or ``vendor/`` are skipped.
+Files excluded by ``.gitignore`` are also skipped, except project-root dotenv
+files (``.env*``), which Symfony reads even when ignored. This exception
+applies to default and explicit selections. The default selection also skips
+project ``excludePaths``. An explicit file, directory or pattern can select
+those configured exclusions, but it can't bypass the excluded directories or
+other ``.gitignore`` rules.
 
 Runtime analysis is enabled by default and boots the application with the
 configured PHP command. Use source-only mode for code that you don't trust or

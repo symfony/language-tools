@@ -124,7 +124,7 @@ final class CheckFileSelector
                 $compiled[] = [
                     'selector' => $selector,
                     'type' => 'pattern',
-                    'regex' => Glob::toRegex($pattern, false, true, '~'),
+                    'regex' => $this->patternRegex($pattern),
                 ];
 
                 continue;
@@ -250,6 +250,28 @@ final class CheckFileSelector
         $realPath = Path::canonicalize($realPath);
 
         return $realRoot !== $realPath && Path::isBasePath($realRoot, $realPath);
+    }
+
+    private function patternRegex(string $pattern): string
+    {
+        $compiled = '';
+        $length = \strlen($pattern);
+        for ($index = 0; $index < $length; ++$index) {
+            if ('*' !== $pattern[$index] || '*' !== ($pattern[$index + 1] ?? null)) {
+                $compiled .= $pattern[$index];
+
+                continue;
+            }
+
+            $previous = $pattern[$index - 1] ?? null;
+            $next = $pattern[$index + 2] ?? null;
+            $compiled .= (0 === $index && '/' === $next) || ('/' === $previous && (null === $next || '/' === $next))
+                ? '**'
+                : "\0";
+            ++$index;
+        }
+
+        return str_replace("\0", '.*', Glob::toRegex($compiled, false, true, '~'));
     }
 
     private function isPattern(string $selector): bool

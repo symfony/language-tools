@@ -94,12 +94,14 @@ that don't belong to the running application:
     }
 
 Patterns are relative to each Symfony project root. ``*`` and ``?`` match
-within one path segment, while ``**`` can cross directories. A pattern ending
-in ``/`` excludes the complete directory.
+within one path segment. Use ``**`` as a complete path segment to cross
+directories. A pattern ending in ``/`` excludes the complete directory.
 
 Excluded files don't contribute source facts and don't receive editor
 diagnostics. A path passed explicitly to ``symfony-lsp check`` remains
-selectable, which lets you inspect an excluded fixture when needed.
+selectable, which lets you inspect an excluded fixture when needed. See the
+:doc:`headless diagnostics guide </features/headless-diagnostics>` for checker
+selector syntax.
 
 Overrides and Workspace Trust
 -----------------------------
