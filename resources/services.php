@@ -73,7 +73,6 @@ use Symfony\Lsp\Parser\TreeSitter\LastResultTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
-use Symfony\Lsp\Parser\Twig\TwigQuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Progress\ProgressReporterInterface;
@@ -197,7 +196,6 @@ return static function (ContainerConfigurator $container): void {
     $services->set(BalancedDelimiterMatcher::class);
     $services->set(QuotedArgumentMatcher::class);
     $services->set(TwigCallArgumentResolver::class);
-    $services->set(TwigQuotedArgumentMatcher::class);
     $services->set(TranslationParameterAnalyzer::class);
     $services->set(XmlCommentParser::class);
     $services->set(YamlCommentParser::class);

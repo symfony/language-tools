@@ -11,7 +11,6 @@ use Symfony\Lsp\Document\Range;
  * Single-quoted literals use PHP escaping and preserve unknown escapes.
  * Double-quoted literals only accept the escaped backslash and quote;
  * interpolation and other escape sequences are dynamic values and never match.
- * Twig sources must use TwigQuotedArgumentMatcher.
  */
 class QuotedArgumentMatcher
 {

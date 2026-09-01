@@ -6,7 +6,6 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
-use Symfony\Lsp\Parser\Twig\TwigQuotedArgumentMatcher;
 
 final class QuotedArgumentMatcherTest extends TestCase
 {
@@ -68,17 +67,6 @@ final class QuotedArgumentMatcherTest extends TestCase
         $arguments = $this->matcher->methodCalls($text, ['trans']);
 
         self::assertSame('path\\to\\np', $arguments[0]->value ?? null);
-    }
-
-    public function testTwigVariantUsesTwigEscapesWithoutChangingPhpSemantics(): void
-    {
-        $text = "{{ asset('line\\nfeed') }}";
-
-        $phpArguments = $this->matcher->functionCalls($text, ['asset']);
-        $twigArguments = (new TwigQuotedArgumentMatcher($this->converter))->functionCalls($text, ['asset']);
-
-        self::assertSame('line\\nfeed', $phpArguments[0]->value ?? null);
-        self::assertSame("line\nfeed", $twigArguments[0]->value ?? null);
     }
 
     public function testNeverMatchesDynamicDoubleQuotedStrings(): void
