@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
+use Symfony\Lsp\Parser\Yaml\YamlMapping;
 use Symfony\Lsp\Project\UriToPathConverter;
 
 final class TranslationCatalogExtractor
@@ -78,14 +79,28 @@ final class TranslationCatalogExtractor
             );
         }
 
+        $document = $this->yamlParser->parseDocument($text);
+        /** @var array<string, YamlMapping> $mappings */
+        $mappings = [];
+        foreach ($document->mappings as $mapping) {
+            if (!$mapping->isSequenceItem()) {
+                $mappings[$this->yamlPathKey($mapping->scope, $mapping->path)] = $mapping;
+            }
+        }
+
         $result = [];
-        foreach ($this->yamlParser->parse($text) as $mapping) {
-            if ('' === $mapping->value) {
+        foreach ($document->scalars as $scalar) {
+            if ($scalar->isSequenceItem() || [] === $scalar->path) {
+                continue;
+            }
+            $scope = null === $scalar->environment ? 'base' : 'when@'.$scalar->environment;
+            $mapping = $mappings[$this->yamlPathKey($scope, $scalar->path)] ?? null;
+            if (null === $mapping) {
                 continue;
             }
             $result[] = $this->declaration(
-                implode('.', $mapping->path),
-                trim($mapping->value, "'\""),
+                implode('.', $scalar->path),
+                $scalar->value,
                 $domain,
                 $locale,
                 $uri,
@@ -96,6 +111,12 @@ final class TranslationCatalogExtractor
         }
 
         return $result;
+    }
+
+    /** @param list<string> $path */
+    private function yamlPathKey(string $scope, array $path): string
+    {
+        return $scope."\0".json_encode($path, \JSON_THROW_ON_ERROR);
     }
 
     /** @return list<TranslationDeclaration> */

@@ -22,8 +22,9 @@ Resources
 ---------
 
 Definitions are read from YAML, JSON, XLIFF and PHP resources under a
-``translations/`` directory. Nested YAML and JSON keys use dot notation. PHP
-messages can use quoted strings, heredocs or nowdocs. INI catalogs using a
+``translations/`` directory. Nested YAML and JSON keys use dot notation. YAML
+messages follow YAML quoting, escape, folded block and literal block semantics.
+PHP messages can use quoted strings, heredocs or nowdocs. INI catalogs using a
 locale directory, such as ``Translations/en_US/messages.ini``, are recognized
 too. Unsaved resource changes are available immediately, and changes made by
 external tools are picked up while the server is running.

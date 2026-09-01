@@ -30,6 +30,34 @@ final class TranslationExtractorTest extends TestCase
         ], array_map(static fn ($item): array => [$item->key, $item->domain, $item->placeholders], $references->references));
     }
 
+    public function testDecodesYamlMessagesAndPreservesKeyRanges(): void
+    {
+        $facts = $this->extractor()->extract('file:///workspace/translations/messages.en.yaml', 'yaml', <<<'YAML'
+            "article.title": "Line\n\u0041"
+            single: 'It''s %name%'
+            folded: >-
+                First
+                second
+
+                third
+            literal: |-
+                one
+                two
+            YAML);
+
+        self::assertSame(
+            [
+                ['article.title', "Line\nA"],
+                ['single', "It's %name%"],
+                ['folded', "First second\nthird"],
+                ['literal', "one\ntwo"],
+            ],
+            array_map(static fn ($item): array => [$item->key, $item->message], $facts->declarations),
+        );
+        self::assertSame(1, $facts->declarations[0]->range->start->character);
+        self::assertSame(14, $facts->declarations[0]->range->end->character);
+    }
+
     public function testExtractsNamedPhpTranslationKeys(): void
     {
         $references = $this->extractor()->extract('file:///workspace/src/Controller.php', 'php', <<<'PHP'
