@@ -47,6 +47,9 @@ final class ConfigurationValueValidator
     {
         $source = trim($value);
         $plain = trim($source, "\"'");
+        if (1 === preg_match('/^!php\/const(?:\s|$)/', $source)) {
+            return true;
+        }
         if (str_contains($plain, '%') || str_starts_with($plain, '$')) {
             return true;
         }

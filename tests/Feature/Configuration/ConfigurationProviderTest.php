@@ -435,7 +435,7 @@ final class ConfigurationProviderTest extends TestCase
         );
     }
 
-    public function testKeepsPhpConstantsOpaqueWhileResolvingAliases(): void
+    public function testKeepsPhpConstantsOpaqueDirectlyAndWhileResolvingAliases(): void
     {
         $fixture = $this->providers();
         $uri = 'file:///workspace/config/packages/framework.yaml';
@@ -445,6 +445,7 @@ final class ConfigurationProviderTest extends TestCase
             framework:
                 router:
                     <<: *defaults
+                    utf8: !php/const PHP_VERSION_ID
             YAML));
 
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
