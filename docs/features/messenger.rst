@@ -54,6 +54,7 @@ Imported aliases of ``AsMessageHandler`` are recognized. Every repeatable
 handler attribute is indexed when several are grouped in one attribute block.
 Typed parameters are matched only inside their declaring method. Typed
 properties, including promoted properties, remain available across methods.
+Named and unpacked arguments aren't treated as positional message arguments.
 
 From a dispatch site, definition results include the message class and its
 registered handlers. From a message class, definition navigates to handlers and

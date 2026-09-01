@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ignore unpacked PHP arguments in positional call slots
 - Preserve grouped repeatable Event and Messenger attributes
 - Recognize Doctrine mapping attributes on promoted properties
 - Recognize backed PHP enum values and YAML enum tags in bundle configuration

@@ -77,6 +77,7 @@ final class PhpExpressionFactBuilder
                 $child->getEndPosition(),
                 $child->expression?->getStartPosition(),
                 $child->expression?->getEndPosition(),
+                $child->dotDotDotToken instanceof Token,
             );
         }
 

@@ -178,6 +178,7 @@ YAML;
                     $this->dispatcher->dispatch(new AliasedEvent());
                     $this->dispatcher->dispatch(new \App\Event\QualifiedEvent());
                     $this->dispatcher->dispatch(unrelated: new IgnoredEvent());
+                    $this->dispatcher->dispatch(...[new SpreadEvent()]);
                     $this->dispatcher->dispatch(factory(new NestedEvent()));
                 }
             }

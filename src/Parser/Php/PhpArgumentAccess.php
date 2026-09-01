@@ -18,7 +18,10 @@ trait PhpArgumentAccess
     public function positionalArgument(int $position): ?PhpArgument
     {
         $argument = $this->arguments[$position] ?? null;
+        if (null === $argument || null !== $argument->name || $argument->unpacked) {
+            return null;
+        }
 
-        return null === $argument?->name ? $argument : null;
+        return $argument;
     }
 }

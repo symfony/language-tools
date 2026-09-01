@@ -632,6 +632,20 @@ final class TolerantPhpParserTest extends TestCase
         self::assertNull($attribute->argument('missing'));
     }
 
+    public function testPositionalArgumentsRejectSpreadCandidates(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            $service->run(...$arguments, 'second');
+            PHP;
+
+        $call = (new TolerantPhpParser(new Parser()))->parse($source)->methodCalls[0];
+
+        self::assertTrue($call->arguments[0]->unpacked);
+        self::assertNull($call->positionalArgument(0));
+        self::assertSame('second', $call->positionalArgument(1)?->stringLiteral?->value);
+    }
+
     public function testFindsClassReferencesAndObjectCreationsInsideArguments(): void
     {
         $source = <<<'PHP'

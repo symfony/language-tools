@@ -196,10 +196,12 @@ YAML;
                     $this->bus->dispatch(new AliasedMessage());
                     $this->bus->dispatch(new \App\Message\QualifiedMessage());
                     $this->bus->dispatch(unrelated: new IgnoredMessage());
+                    $this->bus->dispatch(...[new SpreadMessage()]);
                     $this->bus->dispatch(factory(new NestedMessage()));
                     new MessageEnvelope(new AliasedEnvelopeMessage());
                     new \Symfony\Component\Messenger\Envelope(new \App\Message\QualifiedEnvelopeMessage());
                     new MessageEnvelope(unrelated: new IgnoredEnvelopeMessage());
+                    new MessageEnvelope(...[new SpreadEnvelopeMessage()]);
                     new MessageEnvelope(factory(new NestedEnvelopeMessage()));
                 }
             }
