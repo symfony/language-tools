@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Omit baseline-matched diagnostics from GitLab Code Quality reports
 - Match recursive headless check selectors wherever `**` appears
 - Preserve form options after nested strings containing closing brackets
 - Recognize Console input references and definitions inside closures and arrow functions

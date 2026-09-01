@@ -475,6 +475,16 @@ final class CheckExecutableTest extends TestCase
         self::assertSame(0, $matched['exitCode'], $matched['stderr']);
         self::assertSame($baselineHash, hash_file('sha256', $baseline));
 
+        $gitLab = $this->execute([
+            'check',
+            '--source-only',
+            '--format=gitlab',
+            '--workspace='.$this->directory,
+            '--baseline=baseline.json',
+        ]);
+        self::assertSame(0, $gitLab['exitCode'], $gitLab['stderr']);
+        self::assertSame([], json_decode($gitLab['stdout'], true, flags: \JSON_THROW_ON_ERROR));
+
         file_put_contents($this->directory.'/config/services.yaml', "parameters:\n    # @symfony-lsp-ignore env.malformed_chain (intentional malformed expression)\n    broken: '%env(APP_SECRET%'\n");
         $strict = $this->execute([
             'check',

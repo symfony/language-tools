@@ -73,17 +73,21 @@ final class CheckReporterTest extends TestCase
         /** @var list<GitLabIssue> $report */
         $report = json_decode($this->reporter()->render($this->goldenResult(), 'gitlab', false, 12), true, flags: \JSON_THROW_ON_ERROR);
 
-        self::assertSame("Missing 100%\nservice", $report[0]['description']);
+        self::assertCount(1, $report);
+        self::assertSame('Duplicate missing service.', $report[0]['description']);
         self::assertSame('service.not_found', $report[0]['check_name']);
-        self::assertSame('18b038519c38aa70d5513201b4a0d9ff1f2d5197c3645de0faf74192b8ff0c17', $report[0]['fingerprint']);
-        self::assertSame('major', $report[0]['severity']);
+        self::assertSame('86edefeed2092c1f9554ff748f59692c96ff7b5345710358b5042829a7785c89', $report[0]['fingerprint']);
+        self::assertSame('minor', $report[0]['severity']);
         self::assertSame([
             'path' => 'apps/api/config/services.yaml',
-            'lines' => ['begin' => 2],
+            'lines' => ['begin' => 4],
         ], $report[0]['location']);
-        self::assertSame('minor', $report[1]['severity']);
-        self::assertNotSame($report[0]['fingerprint'], $report[1]['fingerprint']);
         self::assertSame("[]\n", $this->reporter()->codes(['service.not_found'], 'gitlab'));
+    }
+
+    public function testOmitsBaselineMatchesFromGitLabCodeQualityReports(): void
+    {
+        self::assertSame("[]\n", $this->reporter()->render($this->fixtureResult(), 'gitlab', false, 0));
     }
 
     #[DataProvider('gitLabInformationSeverities')]

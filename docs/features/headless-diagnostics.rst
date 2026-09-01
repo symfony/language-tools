@@ -159,9 +159,10 @@ Publish diagnostics as a GitLab Code Quality report:
 
 GitLab reports map errors to ``major``, warnings to ``minor`` and information
 and hints to ``info``. They use repository-relative paths, one-based lines and
-occurrence-specific fingerprints. Invocation and operational failures still
-produce a valid JSON array, while the nonzero exit status and standard error
-identify the failed check.
+occurrence-specific fingerprints. Baseline-matched diagnostics are omitted so
+that accepted findings don't appear as Code Quality degradations. Invocation
+and operational failures still produce a valid JSON array, while the nonzero
+exit status and standard error identify the failed check.
 
 Generate a SARIF 2.1.0 report for code-scanning systems:
 
@@ -272,7 +273,8 @@ but never modify the baseline:
 
     $ symfony-lsp check --baseline=.symfony-lsp-baseline.json
 
-Matched occurrences remain visible and don't block. A second identical
+Matched occurrences remain visible in human, JSON, GitHub and SARIF output and
+don't block. GitLab Code Quality output omits them. A second identical
 occurrence in the same file remains active, and known diagnostics continue to
 match after unrelated line movement.
 

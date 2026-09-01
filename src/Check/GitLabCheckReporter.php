@@ -6,10 +6,14 @@ final class GitLabCheckReporter
 {
     public function render(CheckReportView $view): string
     {
-        return json_encode(array_map(static function (CheckReportDiagnosticView $diagnosticView): array {
+        $issues = [];
+        foreach ($view->diagnostics as $diagnosticView) {
             $diagnostic = $diagnosticView->diagnostic;
+            if ('matched' === $diagnostic->baselineState) {
+                continue;
+            }
 
-            return [
+            $issues[] = [
                 'description' => $diagnostic->message,
                 'check_name' => $diagnostic->code,
                 'fingerprint' => $diagnosticView->occurrenceFingerprint,
@@ -23,7 +27,9 @@ final class GitLabCheckReporter
                     'lines' => ['begin' => $diagnostic->startLine + 1],
                 ],
             ];
-        }, $view->diagnostics), \JSON_THROW_ON_ERROR | \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_INVALID_UTF8_SUBSTITUTE)."\n";
+        }
+
+        return json_encode($issues, \JSON_THROW_ON_ERROR | \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_INVALID_UTF8_SUBSTITUTE)."\n";
     }
 
     public function codes(): string
