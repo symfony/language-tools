@@ -11,14 +11,50 @@ use Symfony\Lsp\Feature\Twig\TwigComponentNameResolver;
 use Symfony\Lsp\Feature\Twig\TwigComponentPhpExtractor;
 use Symfony\Lsp\Feature\Twig\TwigComponentTemplateExtractor;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Twig\TwigQuotedArgumentMatcher;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\UriToPathConverter;
 
 final class TwigComponentExtractorTest extends TestCase
 {
+    public function testExtractsStaticTwigHelperArgumentsConservatively(): void
+    {
+        $facts = $this->extractor()->extract(
+            new Project('/workspace', 'file:///workspace', '^8.0'),
+            'file:///workspace/templates/components/Search.html.twig',
+            'twig',
+            <<<'TWIG'
+                {# {{ component(name: 'Commented') }} #}
+                {# {{ live_action(actionName: 'commented') }} #}
+                {{ component('Card', {title: title}) }}
+                {{ component(props: {}, name: 'Alert') }}
+                {{ component(name = "Banner") }}
+                {{ component(name: dynamic_name) }}
+                {{ component(name: 'Prefix' ~ suffix) }}
+                {{ live_action('save', {id: id}) }}
+                {{ live_action(args: {}, actionName: 'submit') }}
+                {{ live_action(actionName = "reset") }}
+                {{ live_action(actionName: dynamic_action) }}
+                {{ live_action(actionName: 'prefix-' ~ suffix) }}
+                TWIG,
+        );
+
+        self::assertSame(
+            ['Card', 'Alert', 'Banner'],
+            array_map(static fn ($reference): string => $reference->name, $facts->references),
+        );
+        self::assertSame(
+            ['save', 'submit', 'reset'],
+            array_map(static fn ($reference): string => $reference->action, $facts->actionReferences),
+        );
+    }
+
     public function testDecodesEscapedTwigComponentNames(): void
     {
         $facts = $this->extractor()->extract(
@@ -48,11 +84,18 @@ final class TwigComponentExtractorTest extends TestCase
         $converter = new PositionConverter();
 
         $names = new TwigComponentNameResolver(new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())));
+        $comments = new TwigCommentParser();
 
         return new TwigComponentExtractor(
             new TolerantPhpParser(new Parser()),
             new TwigComponentPhpExtractor($converter, $names),
-            new TwigComponentTemplateExtractor($converter, $names, new TwigCommentParser(), new TwigQuotedArgumentMatcher($converter)),
+            new TwigComponentTemplateExtractor(
+                $converter,
+                $names,
+                new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
+                new TwigCallArgumentResolver(new TwigArgumentParser()),
+                $comments,
+            ),
         );
     }
 }

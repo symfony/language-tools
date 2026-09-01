@@ -43,7 +43,6 @@ use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
-use Symfony\Lsp\Parser\Twig\TwigQuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigTypeDeclarationParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -446,7 +445,13 @@ final class TemplateProviderTest extends TestCase
         return new TwigComponentExtractor(
             new TolerantPhpParser(new Parser()),
             new TwigComponentPhpExtractor($converter, $names),
-            new TwigComponentTemplateExtractor($converter, $names, $comments, new TwigQuotedArgumentMatcher($converter)),
+            new TwigComponentTemplateExtractor(
+                $converter,
+                $names,
+                new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
+                new TwigCallArgumentResolver(new TwigArgumentParser()),
+                $comments,
+            ),
         );
     }
 

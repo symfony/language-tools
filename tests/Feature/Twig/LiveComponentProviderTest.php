@@ -21,8 +21,12 @@ use Symfony\Lsp\Feature\Twig\TwigComponentResolver;
 use Symfony\Lsp\Feature\Twig\TwigComponentTemplateExtractor;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Twig\TwigQuotedArgumentMatcher;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -110,6 +114,14 @@ final class LiveComponentProviderTest extends TestCase
         self::assertStringContainsString('Properties: `query`', $componentHover['contents']['value']);
         self::assertStringContainsString('Actions: `submit`, `refresh`', $componentHover['contents']['value']);
 
+        foreach (["{{ live_action(actionName: 'sub", "{{ live_action(actionName = 'sub"] as $version => $namedActionCompletionText) {
+            $documents->update($templateUri, $version + 2, $namedActionCompletionText);
+            self::assertSame(
+                ['submit'],
+                array_column($completionProvider->complete($this->params($converter, $templateUri, $namedActionCompletionText, \strlen($namedActionCompletionText))) ?? [], 'label'),
+            );
+        }
+
         $eventProvider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser());
         self::assertSame(['search:completed'], array_column($eventProvider->complete($this->params($converter, $classUri, $classText, strpos($classText, "emit('search:co") + \strlen("emit('search:co"))) ?? [], 'label'));
         $eventParams = $this->params($converter, $classUri, $classText, strpos($classText, "emit('search:completed") + \strlen("emit('search:"));
@@ -149,7 +161,13 @@ final class LiveComponentProviderTest extends TestCase
         return new TwigComponentExtractor(
             new TolerantPhpParser(new Parser()),
             new TwigComponentPhpExtractor($converter, $names),
-            new TwigComponentTemplateExtractor($converter, $names, $comments, new TwigQuotedArgumentMatcher($converter)),
+            new TwigComponentTemplateExtractor(
+                $converter,
+                $names,
+                new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
+                new TwigCallArgumentResolver(new TwigArgumentParser()),
+                $comments,
+            ),
         );
     }
 

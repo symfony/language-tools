@@ -19,7 +19,7 @@ final class AssetCompletionContextResolver
             return null;
         }
         $before = substr($this->commentParser->mask($text), 0, $offset);
-        if (preg_match('/\basset\s*\(\s*["\']([A-Za-z0-9_@.\/-]*)$/s', $before, $match, \PREG_OFFSET_CAPTURE)) {
+        if (preg_match('/\basset\s*\(\s*(?:path\s*[:=](?![=>])\s*)?["\']([A-Za-z0-9_@.\/-]*)$/s', $before, $match, \PREG_OFFSET_CAPTURE)) {
             return $this->context(AssetSymbolKind::Asset, $match[1][0], $text, $match[1][1]);
         }
         if (preg_match('/\bimportmap\s*\(\s*(?:\[[^\]]*)?["\']([A-Za-z0-9_@.\/-]*)$/s', $before, $match, \PREG_OFFSET_CAPTURE)) {

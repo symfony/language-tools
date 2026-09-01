@@ -3,28 +3,44 @@
 namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Twig\TwigQuotedArgumentMatcher;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
 final class TwigAssetReferenceExtractor
 {
     public function __construct(
         private readonly PositionConverter $converter,
+        private readonly TwigDocumentParser $parser,
+        private readonly TwigCallArgumentResolver $arguments,
         private readonly TwigCommentParser $commentParser,
-        private readonly TwigQuotedArgumentMatcher $matcher,
     ) {
     }
 
     /** @return list<AssetSourceSymbol> */
     public function extract(string $uri, string $text): array
     {
+        $document = $this->parser->parse($text);
         $source = $this->commentParser->mask($text);
         $symbols = [];
-        foreach ($this->matcher->functionCalls($source, ['asset']) as $call) {
-            if (str_starts_with($call->value, '/') || 1 !== preg_match('/^\s*\)/', substr($source, $call->end()))) {
+        foreach ($document->nodesOfType('function_call') as $call) {
+            $function = $document->directChild($call, 'function_identifier');
+            if (null === $function || 'asset' !== $document->text($function)) {
                 continue;
             }
-            $symbols[] = new AssetSourceSymbol(AssetSymbolKind::Asset, $call->value, $uri, $call->range, false);
+            $arguments = $this->arguments->resolve($document, $call);
+            $path = $arguments->get(0, 'path');
+            $literal = null === $path ? null : $document->soleStringLiteral($path);
+            if (null === $literal || str_starts_with($literal->value, '/') || null !== $arguments->get(1, 'packageName')) {
+                continue;
+            }
+            $symbols[] = new AssetSourceSymbol(
+                AssetSymbolKind::Asset,
+                $literal->value,
+                $uri,
+                $this->converter->toRange($text, $literal->startOffset, $literal->endOffset - $literal->startOffset),
+                false,
+            );
         }
         preg_match_all('/\bimportmap\s*\(\s*(\[[^\]]*\]|["\'][^"\']+["\'])\s*\)/s', $source, $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($calls as $call) {

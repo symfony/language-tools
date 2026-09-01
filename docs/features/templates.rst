@@ -61,8 +61,9 @@ show statically recognized component usages.
 
 Symfony Language Tools recognizes ``#[AsTwigComponent]`` and
 ``#[AsLiveComponent]`` classes, templates under ``templates/components/``,
-``<twig:...>`` tags and static ``component()`` function calls. Escaped
-characters in static component names follow Twig's string rules. Imported
+``<twig:...>`` tags and static ``component()`` function calls using positional
+or named ``name`` arguments. Escaped characters in static component names
+follow Twig's string rules. Imported
 aliases of the component attributes are recognized. Live Component properties
 and actions are included in completion and navigation. Unknown
 static component names are reported only after all registered components,

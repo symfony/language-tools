@@ -33,7 +33,7 @@ final class TwigComponentResolver
             $component = $this->componentForUri($project, $uri);
             $value = $match[2];
         }
-        if (null === $component && preg_match('/\blive_action\s*\(\s*([\'"])([^\'"]*)$/s', $before, $match)) {
+        if (null === $component && preg_match('/\blive_action\s*\(\s*(?:actionName\s*[:=](?![=>])\s*)?([\'"])([^\'"]*)$/s', $before, $match)) {
             $component = $this->componentForUri($project, $uri);
             $value = $match[2];
         }

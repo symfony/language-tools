@@ -19,8 +19,12 @@ use Symfony\Lsp\Feature\Asset\PublicAssetResolver;
 use Symfony\Lsp\Feature\Asset\TwigAssetReferenceExtractor;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Twig\TwigQuotedArgumentMatcher;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -90,6 +94,12 @@ final class AssetProviderTest extends TestCase
         $documents->open(new Document($assetCompletionUri, 'twig', 1, $assetCompletionText));
         self::assertSame(['images/logo.svg'], $this->completionLabels($provider, $converter, $assetCompletionUri, $assetCompletionText));
 
+        foreach (["{{ asset(path: 'images/lo", "{{ asset(path = 'images/lo"] as $index => $namedAssetCompletionText) {
+            $namedAssetCompletionUri = 'file:///workspace/templates/named-asset-'.$index.'.html.twig';
+            $documents->open(new Document($namedAssetCompletionUri, 'twig', 1, $namedAssetCompletionText));
+            self::assertSame(['images/logo.svg'], $this->completionLabels($provider, $converter, $namedAssetCompletionUri, $namedAssetCompletionText));
+        }
+
         $entryCompletionUri = 'file:///workspace/templates/entrypoint.html.twig';
         $entryCompletionText = "{{ importmap(['ap";
         $documents->open(new Document($entryCompletionUri, 'twig', 1, $entryCompletionText));
@@ -119,6 +129,31 @@ final class AssetProviderTest extends TestCase
         $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $usageUri]]);
         self::assertIsArray($diagnostics);
         self::assertSame(['importmap.unknown_entrypoint'], array_column($diagnostics, 'code'));
+    }
+
+    public function testExtractsStaticTwigAssetArgumentsConservatively(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = $this->createExtractor($converter);
+
+        $facts = $extractor->extract('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+            {# {{ asset(path: 'commented.js') }} #}
+            {{ asset('positional.js') }}
+            {{ asset(path: 'colon.js') }}
+            {{ asset(path = "equals.js") }}
+            {{ asset(path: # documented
+                'comment-separated.js') }}
+            {{ asset(path: dynamic_path) }}
+            {{ asset(path: 'prefix-' ~ suffix) }}
+            {{ asset('packaged.js', 'legacy') }}
+            {{ asset(path: 'named-packaged.js', packageName: 'legacy') }}
+            {{ asset(path: '/absolute.js') }}
+            TWIG);
+
+        self::assertSame(
+            ['positional.js', 'colon.js', 'equals.js', 'comment-separated.js'],
+            array_map(static fn ($symbol): string => $symbol->name, $facts->symbols),
+        );
     }
 
     public function testDecodesEscapedTwigAssetPaths(): void
@@ -213,7 +248,12 @@ final class AssetProviderTest extends TestCase
 
         return new AssetExtractor(
             new UriToPathConverter(),
-            new TwigAssetReferenceExtractor($converter, $comments, new TwigQuotedArgumentMatcher($converter)),
+            new TwigAssetReferenceExtractor(
+                $converter,
+                new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
+                new TwigCallArgumentResolver(new TwigArgumentParser()),
+                $comments,
+            ),
             new ImportMapEntrypointExtractor($converter, new PhpCommentParser(), new BalancedDelimiterMatcher()),
             new AssetCompletionContextResolver($converter, $comments),
         );

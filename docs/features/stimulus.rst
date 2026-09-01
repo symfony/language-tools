@@ -44,9 +44,10 @@ Live Components
 Symfony Language Tools recognizes ``#[AsLiveComponent]``, ``#[LiveProp]``,
 ``#[LiveAction]`` and ``#[LiveListener]`` attributes, including imported
 aliases. Live properties are included in component property completion. Actions
-are completed in
-``data-live-action-param`` attributes and ``live_action()`` calls when the
-containing component is known.
+are completed in ``data-live-action-param`` attributes and ``live_action()``
+calls when the containing component is known. Static ``live_action()``
+references and completion recognize positional and named ``actionName``
+arguments.
 
 Hover identifies Live Components and their properties and actions. Go to
 Definition and Find All References connect action attributes to their PHP

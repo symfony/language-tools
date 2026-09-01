@@ -3,8 +3,9 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Twig\TwigQuotedArgumentMatcher;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 
 final class TwigComponentTemplateExtractor
@@ -12,14 +13,16 @@ final class TwigComponentTemplateExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly TwigComponentNameResolver $names,
+        private readonly TwigDocumentParser $parser,
+        private readonly TwigCallArgumentResolver $arguments,
         private readonly TwigCommentParser $comments,
-        private readonly TwigQuotedArgumentMatcher $matcher,
     ) {
     }
 
     public function extract(Project $project, string $uri, string $text): TwigComponentSourceFacts
     {
-        $text = $this->comments->mask($text);
+        $document = $this->parser->parse($text);
+        $masked = $this->comments->mask($text);
         $name = $this->names->anonymous($project, $uri);
         $components = [];
         if (null !== $name) {
@@ -27,19 +30,16 @@ final class TwigComponentTemplateExtractor
         }
 
         $references = [];
-        preg_match_all('/<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\b/', $text, $tags, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\b/', $masked, $tags, \PREG_OFFSET_CAPTURE);
         foreach ($tags[1] as [$componentName, $offset]) {
             if ('block' !== strtolower($componentName)) {
                 $references[] = new TwigComponentReference($componentName, $uri, $this->converter->toRange($text, $offset, \strlen($componentName)));
             }
         }
-        foreach ($this->matcher->functionCalls($text, ['component']) as $function) {
-            $references[] = new TwigComponentReference($function->value, $uri, $function->range);
-        }
 
         $actionReferences = [];
         if (null === $name) {
-            preg_match_all('/<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\b([^>]*)>/s', $text, $componentTags, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+            preg_match_all('/<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\b([^>]*)>/s', $masked, $componentTags, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
             foreach ($componentTags as $componentTag) {
                 $attributes = $componentTag[2][0];
                 $attributesOffset = $componentTag[2][1];
@@ -51,16 +51,38 @@ final class TwigComponentTemplateExtractor
                 }
             }
         } else {
-            preg_match_all('/\bdata-live-action-param\s*=\s*([\'"])([^\'"]+)\1/', $text, $actionAttributes, \PREG_OFFSET_CAPTURE);
+            preg_match_all('/\bdata-live-action-param\s*=\s*([\'"])([^\'"]+)\1/', $masked, $actionAttributes, \PREG_OFFSET_CAPTURE);
             foreach ($actionAttributes[2] as [$actionValue, $actionOffset]) {
                 $action = $this->liveActionName($actionValue);
                 $offset = $actionOffset + (int) strrpos($actionValue, $action);
                 $actionReferences[] = new TwigComponentActionReference($name, $action, $uri, $this->converter->toRange($text, $offset, \strlen($action)));
             }
-            foreach ($this->matcher->functionCalls($text, ['live_action']) as $liveAction) {
-                $action = $this->liveActionName($liveAction->value);
-                $offset = $liveAction->offset + (int) strrpos($liveAction->value, $action);
-                $actionReferences[] = new TwigComponentActionReference($name, $action, $uri, $this->converter->toRange($text, $offset, \strlen($action)));
+        }
+
+        foreach ($document->nodesOfType('function_call') as $call) {
+            $identifier = $document->directChild($call, 'function_identifier');
+            if (null === $identifier) {
+                continue;
+            }
+            $function = $document->text($identifier);
+            if ('component' === $function) {
+                $argument = $this->arguments->resolve($document, $call)->get(0, 'name');
+                $literal = null === $argument ? null : $document->soleStringLiteral($argument);
+                if (null !== $literal) {
+                    $references[] = new TwigComponentReference(
+                        $literal->value,
+                        $uri,
+                        $this->converter->toRange($text, $literal->startOffset, $literal->endOffset - $literal->startOffset),
+                    );
+                }
+            } elseif ('live_action' === $function && null !== $name) {
+                $argument = $this->arguments->resolve($document, $call)->get(0, 'actionName');
+                $literal = null === $argument ? null : $document->soleStringLiteral($argument);
+                if (null !== $literal) {
+                    $action = $this->liveActionName($literal->value);
+                    $offset = $literal->startOffset + (int) strrpos($literal->value, $action);
+                    $actionReferences[] = new TwigComponentActionReference($name, $action, $uri, $this->converter->toRange($text, $offset, \strlen($action)));
+                }
             }
         }
 
