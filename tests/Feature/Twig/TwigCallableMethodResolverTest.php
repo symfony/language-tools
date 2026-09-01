@@ -43,6 +43,11 @@ final class TwigCallableMethodResolverTest extends TestCase
                 {
                     return $value;
                 }
+
+                public function attrs(string $tag, array $arguments): string
+                {
+                    return $tag;
+                }
             }
             PHP;
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
@@ -79,7 +84,7 @@ final class TwigCallableMethodResolverTest extends TestCase
             'image',
             $uri,
             $range,
-            'App\Twig\MediaExtension',
+            '\\App\Twig\MediaExtension',
             'render',
             needsEnvironment: true,
             needsContext: true,
@@ -92,15 +97,43 @@ final class TwigCallableMethodResolverTest extends TestCase
             'App\Twig\MediaExtension',
             'shorten',
         );
+        $dynamicImage = new TwigCallableDeclaration(
+            TwigCallableKind::Function,
+            'dynamic_image',
+            $uri,
+            $range,
+            'App\Twig\MediaExtension',
+            'render',
+            optionsKnown: false,
+        );
+        $attrs = new TwigCallableDeclaration(
+            TwigCallableKind::Function,
+            'attrs',
+            $uri,
+            $range,
+            'App\Twig\MediaExtension',
+            'attrs',
+            variadic: true,
+        );
 
         $parameters = $resolver->parameters($project, [
             'image' => ['kind' => TwigCallableKind::Function, 'declarations' => [$image, $image]],
             'shorten' => ['kind' => TwigCallableKind::Filter, 'declarations' => [$shorten]],
+            'dynamic_image' => ['kind' => TwigCallableKind::Function, 'declarations' => [$dynamicImage]],
+            'attrs' => ['kind' => TwigCallableKind::Function, 'declarations' => [$attrs]],
         ]);
 
         self::assertSame(1, $countingParser->calls);
         self::assertSame(['name', 'width'], $parameters['image']->nameable);
+        self::assertFalse($parameters['image']->variadic);
+        self::assertTrue($parameters['image']->reliable);
         self::assertSame(['length'], $parameters['shorten']->nameable);
+        self::assertSame(['name', 'width'], $parameters['dynamic_image']->nameable);
+        self::assertFalse($parameters['dynamic_image']->variadic);
+        self::assertFalse($parameters['dynamic_image']->reliable);
+        self::assertSame(['tag'], $parameters['attrs']->nameable);
+        self::assertTrue($parameters['attrs']->variadic);
+        self::assertTrue($parameters['attrs']->reliable);
         $methods = $resolver->resolve($project, [$image]);
         self::assertCount(1, $methods);
         self::assertSame($uri, $methods[0]->uri);

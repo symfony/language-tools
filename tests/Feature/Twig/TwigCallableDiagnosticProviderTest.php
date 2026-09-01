@@ -108,7 +108,10 @@ final class TwigCallableDiagnosticProviderTest extends TwigCallableProviderTestC
         self::assertSame([], $diagnostics('{{ dynamic_image(unknown: 1) }}'));
         self::assertSame([], $diagnostics("{{ image({name: 'a'}) }}"));
         self::assertSame([], $diagnostics("{{ image(name ? 'a' : 'b') }}"));
-        self::assertSame([], $diagnostics('{{ image(nested(), wdith: 3) }}'));
+        self::assertSame(
+            ['Unknown argument "wdith" for Twig function "image".'],
+            array_column($diagnostics("{{ image(name: nested('a', transform()), wdith: other()) }}") ?? [], 'message'),
+        );
         self::assertSame([], $diagnostics('{{ unknown_callable(anything: 1) }}'));
         self::assertSame([], $diagnostics('{% macro image(name, wdith = 3) %}{% endmacro %}'));
         self::assertSame([], $diagnostics('{# {{ image(wdith: 3) }} #}'));

@@ -18,6 +18,7 @@ use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -230,6 +231,30 @@ final class RouteCompletionHandlerTest extends TestCase
         ]));
     }
 
+    public function testOffersNoRouteCompletionsInsideTwigComments(): void
+    {
+        $uri = 'file:///workspace/templates/article.html.twig';
+        $documents = new DocumentStore();
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $indexes = new RouteIndexRegistry();
+        $indexes->forProject($project)->replace(new Route('article_show', '/article/{slug}', [], [], null, null));
+        $converter = new PositionConverter();
+        $handler = $this->handler($documents, $projects, $converter, $indexes);
+
+        foreach (["{# {{ path('artic') }} #}", "{# {{ path('article_show', {'s') }} #}"] as $text) {
+            $documents->open(new Document($uri, 'twig', 1, $text));
+            $cursor = strpos($text, "')");
+            self::assertIsInt($cursor);
+            $position = $converter->toPosition($text, $cursor);
+
+            self::assertNull($handler->complete([
+                'textDocument' => ['uri' => $uri],
+                'position' => ['line' => $position->line, 'character' => $position->character],
+            ]));
+        }
+    }
+
     public function testOffersNoRouteCompletionsInsidePhpComments(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
@@ -289,6 +314,7 @@ final class RouteCompletionHandlerTest extends TestCase
             $classIndexes ?? new DependencyInjectionSourceIndexRegistry(),
             RouteReferenceExtractorFactory::create($converter),
             new PhpCommentParser(),
+            new TwigCommentParser(),
             new RouteCompletionBuilder(),
         );
     }

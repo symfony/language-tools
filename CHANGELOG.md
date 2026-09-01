@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Diagnose unknown Twig named arguments when values contain nested calls
+- Ignore Twig route completions inside comments
+- Resolve Twig callable methods with consistently normalized class names
 - Ignore Stimulus JavaScript references and members inside comments and strings
 - Match Symfony YAML folded block and chomping semantics
 - Preserve YAML diagnostic suppressions while syntax is incomplete

@@ -25,7 +25,7 @@ final class TwigCallableIndexTest extends TestCase
 
         self::assertSame(['first'], $index->names(TwigCallableKind::Function));
         self::assertSame([$firstDeclaration], $index->declarations(TwigCallableKind::Function, 'first'));
-        self::assertSame([$firstDeclaration], $index->declarationsForCallable('app\\extension', 'FIRST'));
+        self::assertSame([$firstDeclaration], $index->declarationsForCallable('\\app\\extension', 'FIRST'));
         self::assertTrue($index->hasCallableDeclarations());
         self::assertSame($firstDeclaration, $index->declarationAt($firstDeclaration->uri, new Position(0, 0)));
         self::assertSame($firstDeclaration, $index->declarationAt($firstDeclaration->uri, new Position(0, 1)));

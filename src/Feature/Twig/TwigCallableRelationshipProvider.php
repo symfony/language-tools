@@ -66,13 +66,13 @@ final class TwigCallableRelationshipProvider implements DefinitionProviderInterf
         [, $declarations, $project] = $resolved;
         $methods = [];
         foreach ($this->methods->resolve($project, $declarations) as $method) {
-            $methods[$this->callableKey($method->declaration->className, $method->declaration->name)][] = $method;
+            $methods[TwigCallableKey::from($method->declaration->className, $method->declaration->name)][] = $method;
         }
         $locations = [];
         foreach ($declarations as $declaration) {
             $callableMethods = null === $declaration->className || null === $declaration->method
                 ? []
-                : $methods[$this->callableKey($declaration->className, $declaration->method)] ?? [];
+                : $methods[TwigCallableKey::from($declaration->className, $declaration->method)] ?? [];
             if ([] === $callableMethods) {
                 $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
                 continue;
@@ -170,11 +170,6 @@ final class TwigCallableRelationshipProvider implements DefinitionProviderInterf
             fn (TwigCallableUsage $usage): array => $this->protocol->location($usage->uri, $usage->range),
             $usages,
         );
-    }
-
-    private function callableKey(string $className, string $method): string
-    {
-        return strtolower(ltrim($className, '\\'))."\0".strtolower($method);
     }
 
     /**

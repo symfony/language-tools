@@ -12,6 +12,7 @@ final class TwigCallableParameters
         public readonly array $all,
         public readonly array $nameable,
         public readonly bool $variadic,
+        public readonly bool $reliable,
     ) {
     }
 }

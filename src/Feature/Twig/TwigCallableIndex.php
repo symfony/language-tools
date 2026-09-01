@@ -54,7 +54,7 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
     {
         $this->index();
 
-        return $this->declarationsByCallable[$this->callableKey($className, $method)] ?? [];
+        return $this->declarationsByCallable[TwigCallableKey::from($className, $method)] ?? [];
     }
 
     public function hasCallableDeclarations(): bool
@@ -107,7 +107,7 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
                 $this->declarations[$kind][$name][] = $declaration;
                 $this->declarationsByUri[$declaration->uri][] = $declaration;
                 if (null !== $declaration->className && null !== $declaration->method) {
-                    $this->declarationsByCallable[$this->callableKey($declaration->className, $declaration->method)][] = $declaration;
+                    $this->declarationsByCallable[TwigCallableKey::from($declaration->className, $declaration->method)][] = $declaration;
                 }
             }
             foreach ($facts->usages as $usage) {
@@ -144,10 +144,5 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
         }
         unset($kindUsages);
         $this->indexed = true;
-    }
-
-    private function callableKey(string $className, string $method): string
-    {
-        return strtolower($className)."\0".strtolower($method);
     }
 }

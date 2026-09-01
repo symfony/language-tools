@@ -38,7 +38,7 @@ final class TwigCallableDiagnosticProvider implements DiagnosticProviderInterfac
         $calls = [];
         $callables = [];
         foreach ($this->arguments->completeCalls($masked) as $call) {
-            if ($call->hasNestedParentheses || !$this->references->insideDirective($masked, $call->calleeOffset)) {
+            if (!$this->references->insideDirective($masked, $call->calleeOffset)) {
                 continue;
             }
             $key = $call->kind->value."\0".$call->callee;
@@ -52,7 +52,7 @@ final class TwigCallableDiagnosticProvider implements DiagnosticProviderInterfac
         $diagnostics = [];
         foreach ($calls as [$key, $call]) {
             $callableParameters = $parameters[$key] ?? null;
-            if (null === $callableParameters || $callableParameters->variadic) {
+            if (null === $callableParameters || !$callableParameters->reliable || $callableParameters->variadic) {
                 continue;
             }
             foreach ($call->arguments as $argument) {

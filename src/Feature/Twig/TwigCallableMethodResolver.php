@@ -29,7 +29,8 @@ final class TwigCallableMethodResolver
             if (null === $declaration->className || null === $declaration->method) {
                 continue;
             }
-            $targets[$this->callableKey($declaration->className, $declaration->method)] = [$declaration->className, $declaration->method];
+            $className = ltrim($declaration->className, '\\');
+            $targets[TwigCallableKey::from($className, $declaration->method)] = [$className, $declaration->method];
         }
 
         /** @var array<string, string|null> $sources */
@@ -73,7 +74,7 @@ final class TwigCallableMethodResolver
         }
         $methods = [];
         foreach ($this->resolve($project, $declarations) as $method) {
-            $methods[$this->callableKey($method->declaration->className, $method->declaration->name)][] = $method;
+            $methods[TwigCallableKey::from($method->declaration->className, $method->declaration->name)][] = $method;
         }
 
         $parameters = [];
@@ -82,7 +83,7 @@ final class TwigCallableMethodResolver
                 if (null === $declaration->className || null === $declaration->method) {
                     continue;
                 }
-                $method = $methods[$this->callableKey($declaration->className, $declaration->method)][0] ?? null;
+                $method = $methods[TwigCallableKey::from($declaration->className, $declaration->method)][0] ?? null;
                 if (null === $method) {
                     continue;
                 }
@@ -138,11 +139,6 @@ final class TwigCallableMethodResolver
             array_pop($nameable);
         }
 
-        return new TwigCallableParameters($all, $nameable, $variadic || !$callable->optionsKnown);
-    }
-
-    private function callableKey(string $className, string $method): string
-    {
-        return strtolower(ltrim($className, '\\'))."\0".strtolower($method);
+        return new TwigCallableParameters($all, $nameable, $variadic, $callable->optionsKnown);
     }
 }

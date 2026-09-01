@@ -14,7 +14,6 @@ final class TwigCallableCall
         public readonly int $argumentsOffset,
         public readonly array $arguments,
         public readonly ?string $prefix = null,
-        public readonly bool $hasNestedParentheses = false,
     ) {
     }
 }

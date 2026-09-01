@@ -54,7 +54,6 @@ final class TwigCallableArgumentAnalyzer
             $open['offset'] + 1,
             $arguments,
             $prefix[1] ?? '',
-            $open['callable']['hasNestedParentheses'],
         );
     }
 
@@ -69,7 +68,7 @@ final class TwigCallableArgumentAnalyzer
     /**
      * @return array{
      *     list<TwigCallableCall>,
-     *     list<array{delimiter: string, offset: int, callable: array{kind: TwigCallableKind, callee: string, calleeOffset: int, hasNestedParentheses: bool}|null}>,
+     *     list<array{delimiter: string, offset: int, callable: array{kind: TwigCallableKind, callee: string, calleeOffset: int}|null}>,
      *     string|null
      * }
      */
@@ -96,14 +95,6 @@ final class TwigCallableArgumentAnalyzer
                 continue;
             }
             if (\in_array($character, ['(', '[', '{'], true)) {
-                if ('(' === $character) {
-                    foreach ($stack as &$entry) {
-                        if (null !== $entry['callable']) {
-                            $entry['callable']['hasNestedParentheses'] = true;
-                        }
-                    }
-                    unset($entry);
-                }
                 $stack[] = [
                     'delimiter' => $character,
                     'offset' => $offset,
@@ -125,14 +116,13 @@ final class TwigCallableArgumentAnalyzer
                 $open['callable']['calleeOffset'],
                 $argumentsOffset,
                 $this->argumentParser->parse(substr($text, $argumentsOffset, $offset - $argumentsOffset), $argumentsOffset),
-                hasNestedParentheses: $open['callable']['hasNestedParentheses'],
             );
         }
 
         return [$calls, $stack, $quote];
     }
 
-    /** @return array{kind: TwigCallableKind, callee: string, calleeOffset: int, hasNestedParentheses: bool}|null */
+    /** @return array{kind: TwigCallableKind, callee: string, calleeOffset: int}|null */
     private function callableAt(string $text, int $openOffset): ?array
     {
         $head = substr($text, 0, $openOffset);
@@ -141,7 +131,6 @@ final class TwigCallableArgumentAnalyzer
                 'kind' => TwigCallableKind::Filter,
                 'callee' => $match[1][0],
                 'calleeOffset' => $match[1][1],
-                'hasNestedParentheses' => false,
             ];
         }
         if (1 !== preg_match('/(?<![\w.|])([A-Za-z_][A-Za-z0-9_]*)\s*$/', $head, $match, \PREG_OFFSET_CAPTURE)
@@ -153,7 +142,6 @@ final class TwigCallableArgumentAnalyzer
             'kind' => TwigCallableKind::Function,
             'callee' => $match[1][0],
             'calleeOffset' => $match[1][1],
-            'hasNestedParentheses' => false,
         ];
     }
 
