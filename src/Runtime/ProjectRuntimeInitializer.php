@@ -51,7 +51,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                 '--sections='.implode(',', $sections),
                 '--configuration-generation='.$this->configurationValidation->generation($project),
                 ...($this->logger->isVerbose() ? ['--error-details=1'] : []),
-                ...('' === $this->releaseMetadataUrl ? [] : [
+                ...('' === $this->releaseMetadataUrl || !$this->configuration->releaseMetadata($project) ? [] : [
                     '--release-metadata-url='.$this->releaseMetadataUrl,
                     '--release-metadata-cache='.$this->pathMapper->toContainer($project, \dirname($bridge).'/release-metadata.json'),
                 ]),

@@ -20,6 +20,17 @@ final class RuntimeConfigurationTest extends TestCase
         self::assertSame(['initialization-php'], $configuration->phpCommand());
     }
 
+    public function testReleaseMetadataAccessCanBeDisabled(): void
+    {
+        $configuration = new RuntimeConfiguration();
+
+        self::assertTrue($configuration->releaseMetadata());
+
+        $configuration->configure(['releaseMetadata' => false]);
+
+        self::assertFalse($configuration->releaseMetadata());
+    }
+
     /** @param array<array-key, mixed> $command */
     #[DataProvider('invalidDefaultPhpCommandProvider')]
     public function testRejectsInvalidDefaultPhpCommands(array $command): void

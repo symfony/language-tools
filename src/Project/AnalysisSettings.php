@@ -12,6 +12,7 @@ final class AnalysisSettings
         'environment',
         'debug',
         'runtimeIndexing',
+        'releaseMetadata',
         'bridgeTimeout',
         'translationDiagnostics',
         'excludePaths',
@@ -39,7 +40,7 @@ final class AnalysisSettings
                     'phpCommand' => $this->phpCommand($value, $context),
                     'containerProjectRoot' => $this->containerProjectRoot($value, $context),
                     'environment' => $this->environment($value, $context),
-                    'debug', 'runtimeIndexing', 'translationDiagnostics' => $this->boolean($name, $value, $context),
+                    'debug', 'runtimeIndexing', 'releaseMetadata', 'translationDiagnostics' => $this->boolean($name, $value, $context),
                     'bridgeTimeout' => $this->positiveNumber($name, $value, $context),
                     'excludePaths' => $this->excludePaths($value, $context),
                 };

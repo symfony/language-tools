@@ -34,6 +34,8 @@ These settings can be configured globally or for one project:
   runtime analysis;
 * ``runtimeIndexing``: whether Symfony Language Tools may execute the
   application to load routes, services and other information;
+* ``releaseMetadata``: whether runtime indexing may request Symfony release
+  metadata to check the installed branch;
 * ``bridgeTimeout``: maximum duration in seconds for each application run;
 * ``translationDiagnostics``: whether to report statically known missing
   translation keys;
@@ -41,9 +43,11 @@ These settings can be configured globally or for one project:
   indexing and diagnostics.
 
 The defaults are automatic project discovery, ``["php"]``, no container
-project root, the ``dev`` environment, debug and runtime indexing enabled, a
-300-second timeout and missing-translation diagnostics disabled. When a
-compatible Symfony CLI starts the server or checker, its project-aware
+project root, the ``dev`` environment, debug, runtime indexing and release
+metadata enabled, a 300-second timeout and missing-translation diagnostics
+disabled. Set ``releaseMetadata`` to ``false`` to prevent release metadata
+network access and skip the installed-branch support check. When a compatible
+Symfony CLI starts the server or checker, its project-aware
 ``symfony php`` command becomes the lower-precedence PHP default.
 
 Configuring Multiple Projects

@@ -138,6 +138,33 @@ final class ProjectRuntimeInitializerTest extends TestCase
         ], $statuses->status($project)['runtime']['timings'] ?? null);
     }
 
+    public function testCanDisableReleaseMetadataAccess(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $processRunner = new CapturingProcessRunner(new ProcessResult(0, json_encode([
+            'schemaVersion' => 1,
+            'sections' => [],
+        ], \JSON_THROW_ON_ERROR), ''));
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $configuration = new RuntimeConfiguration();
+        $configuration->configure(['releaseMetadata' => false]);
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
+            $processRunner,
+            new RuntimeSnapshotLoaderRegistry([]),
+            self::projects($project),
+            configuration: $configuration,
+            releaseMetadataUrl: 'https://symfony.com/releases.json',
+        );
+
+        $initializer->initialize($project);
+
+        self::assertSame([], array_values(array_filter(
+            $processRunner->command,
+            static fn (string $argument): bool => str_starts_with($argument, '--release-metadata-'),
+        )));
+    }
+
     public function testRequestsBridgeErrorDetailsInVerboseMode(): void
     {
         $source = $this->temporaryDirectory.'/source.php';

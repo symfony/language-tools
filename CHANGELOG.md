@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Accept the next Symfony minor development branch
+- Allow release metadata network access to be disabled
 - Diagnose unknown Twig named arguments when values contain nested calls
 - Ignore Twig route completions inside comments
 - Resolve Twig callable methods with consistently normalized class names

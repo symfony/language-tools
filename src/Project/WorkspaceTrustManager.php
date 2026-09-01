@@ -101,6 +101,7 @@ final class WorkspaceTrustManager implements ProjectStateInterface
             $this->configuration->environment($project),
             $this->configuration->debug($project),
             $this->configuration->runtimeIndexing($project),
+            $this->configuration->releaseMetadata($project),
         ]));
         if (($this->runtimeStarted[$project->rootPath] ?? null) === $configuration) {
             return;

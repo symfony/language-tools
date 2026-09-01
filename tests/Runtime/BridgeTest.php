@@ -66,9 +66,10 @@ final class BridgeTest extends TestCase
         self::assertSame((string) file_get_contents($metadata), (string) file_get_contents($cache));
     }
 
-    public function testAcceptsIntermediateBranchesWithinTheReleaseMetadataRange(): void
+    #[DataProvider('acceptedBranchProvider')]
+    public function testAcceptsIntermediateAndNextMinorBranches(string $version): void
     {
-        (new AutoloaderFixtureBuilder($this->workspace))->writeAutoloader('8.0.13');
+        (new AutoloaderFixtureBuilder($this->workspace))->writeAutoloader($version);
         $metadata = $this->workspace->write('releases.json', json_encode([
             'supported_versions' => ['8.1', '6.4', '7.4'],
         ], \JSON_THROW_ON_ERROR));
@@ -149,11 +150,18 @@ final class BridgeTest extends TestCase
         yield 'prerelease' => ['42.7.0-RC1'];
     }
 
+    /** @return iterable<string, array{string}> */
+    public static function acceptedBranchProvider(): iterable
+    {
+        yield 'intermediate' => ['8.0.13'];
+        yield 'next minor development' => ['8.2.0-BETA1'];
+    }
+
     /** @return iterable<string, array{string, string}> */
     public static function unsupportedBranchProvider(): iterable
     {
         yield 'older' => ['5.4.45', '5.4'];
-        yield 'newer' => ['8.2.0-BETA1', '8.2'];
+        yield 'beyond next minor' => ['8.3.0-DEV', '8.3'];
     }
 
     public function testKeepsStrayProjectOutputOffTheStdoutPayload(): void

@@ -117,6 +117,9 @@ Configuring the Check
 
 The checker and editor integrations share ``.symfony-lsp.json``. See the
 `project configuration`_ for available settings and multi-project examples.
+Set ``releaseMetadata`` to ``false`` when the checker must not access Symfony's
+release metadata over the network. This also skips the installed-branch support
+check.
 
 Command-line options override the shared configuration. Use ``--config=PATH``
 to select another file and ``symfony-lsp check --help`` to list every option.

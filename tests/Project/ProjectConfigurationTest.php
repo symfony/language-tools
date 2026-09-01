@@ -34,6 +34,7 @@ final class ProjectConfigurationTest extends TestCase
             'projectRoots' => ['.', 'apps/admin'],
             'environment' => 'prod',
             'bridgeTimeout' => 90,
+            'releaseMetadata' => false,
             'excludePaths' => ['tests/**'],
             'projects' => [
                 'apps/admin' => [
@@ -50,6 +51,7 @@ final class ProjectConfigurationTest extends TestCase
         self::assertSame([
             'environment' => 'admin',
             'bridgeTimeout' => 90.0,
+            'releaseMetadata' => false,
             'excludePaths' => ['tests/Fixtures/**', 'var/generated/**'],
             'translationDiagnostics' => true,
         ], $this->configuration->settings($project));

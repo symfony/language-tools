@@ -128,6 +128,11 @@ final class RuntimeConfiguration implements ProjectStateInterface
         return $this->debug($project) && $this->runtimeIndexingRequested($project);
     }
 
+    public function releaseMetadata(?Project $project = null): bool
+    {
+        return true === $this->setting($project, 'releaseMetadata', true);
+    }
+
     public function sourceOnlyReason(Project $project): ?string
     {
         if (!$this->debug($project)) {
