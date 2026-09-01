@@ -47,7 +47,7 @@ final class TemplateReferenceExtractor
             if (!\in_array($call->method, ['render', 'renderView'], true)) {
                 continue;
             }
-            $template = ($call->argument('view') ?? $call->positionalArgument(0))?->stringLiteral;
+            $template = $call->namedOrPositionalArgument('view', 0)?->stringLiteral;
             if (null === $template || '' === $template->value) {
                 continue;
             }
@@ -57,7 +57,7 @@ final class TemplateReferenceExtractor
                 $document->text,
                 $template->startOffset,
                 $template->endOffset,
-                $this->literalArrayKeys(($call->argument('parameters') ?? $call->positionalArgument(1))?->expression),
+                $this->literalArrayKeys($call->namedOrPositionalArgument('parameters', 1)?->expression),
             );
         }
 
@@ -77,7 +77,7 @@ final class TemplateReferenceExtractor
             if (self::TEMPLATE_ATTRIBUTE !== $attribute->name) {
                 continue;
             }
-            $template = ($attribute->argument('template') ?? $attribute->positionalArgument(0))?->stringLiteral;
+            $template = $attribute->namedOrPositionalArgument('template', 0)?->stringLiteral;
             if (null === $template || '' === $template->value) {
                 continue;
             }
@@ -88,7 +88,7 @@ final class TemplateReferenceExtractor
                     $this->positionConverter->toPosition($document->text, $template->startOffset),
                     $this->positionConverter->toPosition($document->text, $template->endOffset),
                 ),
-                $this->attributeVariables(($attribute->argument('vars') ?? $attribute->positionalArgument(1))?->expression),
+                $this->attributeVariables($attribute->namedOrPositionalArgument('vars', 1)?->expression),
             );
         }
 

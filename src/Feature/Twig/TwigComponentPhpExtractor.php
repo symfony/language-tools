@@ -72,7 +72,7 @@ final class TwigComponentPhpExtractor
 
             $className = $target->className;
             $template = $attribute->argument('template')?->stringLiteral?->value;
-            $explicitName = ($attribute->argument('name') ?? $attribute->positionalArgument(0))?->stringLiteral?->value;
+            $explicitName = $attribute->namedOrPositionalArgument('name', 0)?->stringLiteral?->value;
             $name = $this->names->component($explicitName, $template, $className);
             $properties = $this->properties($propertiesByClass[$className] ?? [], $attributesByTarget);
             [$actions, $listenerEvents] = $this->actions($methodsByClass[$className] ?? [], $attributesByTarget, $name, $uri, $text);
@@ -142,7 +142,7 @@ final class TwigComponentPhpExtractor
             }
             $actions[$method->name] = new TwigComponentAction($method->name, $this->converter->toRange($text, $method->nameStartOffset, $method->nameEndOffset - $method->nameStartOffset));
             foreach ($listeners as $listener) {
-                $event = ($listener->argument('event') ?? $listener->positionalArgument(0))?->stringLiteral;
+                $event = $listener->namedOrPositionalArgument('event', 0)?->stringLiteral;
                 if (null === $event || '' === $event->value) {
                     continue;
                 }
@@ -172,7 +172,7 @@ final class TwigComponentPhpExtractor
             if ('emit' !== $call->method || PhpMethodReceiverKind::This !== $call->receiverContext->kind) {
                 continue;
             }
-            $event = ($call->argument('event') ?? $call->positionalArgument(0))?->stringLiteral;
+            $event = $call->namedOrPositionalArgument('event', 0)?->stringLiteral;
             if (null === $event) {
                 continue;
             }

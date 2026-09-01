@@ -37,7 +37,7 @@ final class PhpTranslationReferenceExtractor
         $dynamicGlobalParameters = false;
         foreach ($document->methodCalls as $call) {
             if ('addGlobalParameter' === $call->method && $this->hasGlobalParameterReceiver($call, $document)) {
-                $parameter = $call->argument('id') ?? $call->positionalArgument(0);
+                $parameter = $call->namedOrPositionalArgument('id', 0);
                 if (null === $parameter?->stringLiteral) {
                     $dynamicGlobalParameters = true;
                 } else {
@@ -49,8 +49,8 @@ final class PhpTranslationReferenceExtractor
             if ('trans' !== $call->method) {
                 continue;
             }
-            $key = ($call->argument('id') ?? $call->argument('key') ?? $call->positionalArgument(0))?->stringLiteral;
-            if (null === $key || null === $domain = $this->domain($call->argument('domain') ?? $call->positionalArgument(2))) {
+            $key = ($call->argument('id') ?? $call->namedOrPositionalArgument('key', 0))?->stringLiteral;
+            if (null === $key || null === $domain = $this->domain($call->namedOrPositionalArgument('domain', 2))) {
                 continue;
             }
             $references[] = [
@@ -60,7 +60,7 @@ final class PhpTranslationReferenceExtractor
                     $domain,
                     $uri,
                     $text,
-                    $this->parameters->php($call->argument('parameters') ?? $call->positionalArgument(1)),
+                    $this->parameters->php($call->namedOrPositionalArgument('parameters', 1)),
                 ),
             ];
         }
@@ -68,8 +68,8 @@ final class PhpTranslationReferenceExtractor
             if (!$this->isTranslatableMessage($creation)) {
                 continue;
             }
-            $key = ($creation->argument('message') ?? $creation->positionalArgument(0))?->stringLiteral;
-            if (null === $key || null === $domain = $this->domain($creation->argument('domain') ?? $creation->positionalArgument(2))) {
+            $key = $creation->namedOrPositionalArgument('message', 0)?->stringLiteral;
+            if (null === $key || null === $domain = $this->domain($creation->namedOrPositionalArgument('domain', 2))) {
                 continue;
             }
             $references[] = [
@@ -79,7 +79,7 @@ final class PhpTranslationReferenceExtractor
                     $domain,
                     $uri,
                     $text,
-                    $this->parameters->php($creation->argument('parameters') ?? $creation->positionalArgument(1)),
+                    $this->parameters->php($creation->namedOrPositionalArgument('parameters', 1)),
                 ),
             ];
         }

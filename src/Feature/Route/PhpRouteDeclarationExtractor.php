@@ -30,7 +30,7 @@ final class PhpRouteDeclarationExtractor
                 continue;
             }
 
-            $name = ($attribute->argument('name') ?? $attribute->positionalArgument(1))?->stringLiteral;
+            $name = $attribute->namedOrPositionalArgument('name', 1)?->stringLiteral;
             if (null === $name || '' === $name->value) {
                 continue;
             }

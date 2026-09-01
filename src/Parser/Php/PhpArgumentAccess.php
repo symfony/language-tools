@@ -15,6 +15,11 @@ trait PhpArgumentAccess
         return null;
     }
 
+    public function namedOrPositionalArgument(string $name, int $position): ?PhpArgument
+    {
+        return $this->argument($name) ?? $this->positionalArgument($position);
+    }
+
     public function positionalArgument(int $position): ?PhpArgument
     {
         $argument = $this->arguments[$position] ?? null;

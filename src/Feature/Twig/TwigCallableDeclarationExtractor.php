@@ -28,11 +28,11 @@ final class TwigCallableDeclarationExtractor
             if (null === $kind) {
                 continue;
             }
-            $name = $this->literalName(($creation->argument('name') ?? $creation->positionalArgument(0))?->stringLiteral);
+            $name = $this->literalName($creation->namedOrPositionalArgument('name', 0)?->stringLiteral);
             if (null === $name) {
                 continue;
             }
-            $callable = ($creation->argument('callable') ?? $creation->positionalArgument(1))?->callable;
+            $callable = $creation->namedOrPositionalArgument('callable', 1)?->callable;
             $options = $this->objectOptions($creation);
             $declarations[] = new TwigCallableDeclaration(
                 kind: $kind,
@@ -62,7 +62,7 @@ final class TwigCallableDeclarationExtractor
                 if (null === $kind) {
                     continue;
                 }
-                $name = $this->literalName(($attribute->argument('name') ?? $attribute->positionalArgument(0))?->stringLiteral);
+                $name = $this->literalName($attribute->namedOrPositionalArgument('name', 0)?->stringLiteral);
                 if (null === $name) {
                     continue;
                 }
@@ -98,7 +98,7 @@ final class TwigCallableDeclarationExtractor
     /** @return array{needsCharset: bool, needsEnvironment: bool, needsContext: bool, needsIsSandboxed: bool, variadic: bool, known: bool} */
     private function objectOptions(PhpObjectCreation $creation): array
     {
-        $argument = $creation->argument('options') ?? $creation->positionalArgument(2);
+        $argument = $creation->namedOrPositionalArgument('options', 2);
         if (null === $argument) {
             return ['needsCharset' => false, 'needsEnvironment' => false, 'needsContext' => false, 'needsIsSandboxed' => false, 'variadic' => false, 'known' => true];
         }
@@ -140,15 +140,12 @@ final class TwigCallableDeclarationExtractor
     /** @return array{bool, bool} */
     private function attributeSandboxOption(PhpAttribute $attribute): array
     {
-        if (null !== $attribute->argument('needsIsSandboxed')) {
-            return $this->attributeOption($attribute, 'needsIsSandboxed', 4, false);
-        }
-        $positional = $attribute->positionalArgument(4);
-        if (null === $positional) {
+        $argument = $attribute->namedOrPositionalArgument('needsIsSandboxed', 4);
+        if (null === $argument) {
             return [false, true];
         }
-        $expression = trim((string) $positional->expression);
-        if (str_starts_with($expression, '[') || 1 === preg_match('/^array\s*\(/i', $expression)) {
+        $expression = trim((string) $argument->expression);
+        if (null === $argument->name && (str_starts_with($expression, '[') || 1 === preg_match('/^array\s*\(/i', $expression))) {
             return [false, true];
         }
 
@@ -158,7 +155,7 @@ final class TwigCallableDeclarationExtractor
     /** @return array{bool, bool} */
     private function attributeOption(PhpAttribute $attribute, string $name, int $position, bool $default): array
     {
-        $argument = $attribute->argument($name) ?? $attribute->positionalArgument($position);
+        $argument = $attribute->namedOrPositionalArgument($name, $position);
         if (null === $argument) {
             return [$default, true];
         }

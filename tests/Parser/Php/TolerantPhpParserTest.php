@@ -427,7 +427,7 @@ final class TolerantPhpParserTest extends TestCase
         $document = (new TolerantPhpParser(new Parser()))->parse($source);
         $creations = $document->objectCreations;
 
-        self::assertSame(['array_name', 'self_name', 'this_name', 'property_name', 'untyped_name', 'static_name', 'empty_name'], array_map(static fn ($creation): ?string => $creation->argument('name')?->stringLiteral->value ?? $creation->positionalArgument(0)?->stringLiteral?->value, $creations));
+        self::assertSame(['array_name', 'self_name', 'this_name', 'property_name', 'untyped_name', 'static_name', 'empty_name'], array_map(static fn ($creation): ?string => $creation->namedOrPositionalArgument('name', 0)?->stringLiteral?->value, $creations));
         self::assertSame(array_fill(0, 7, 'getFunctions'), array_map(static fn ($creation): ?string => $creation->enclosingMethod, $creations));
         self::assertSame([
             ['App\Twig\Runtime\AppRuntime', 'fromArray'],
@@ -438,8 +438,8 @@ final class TolerantPhpParserTest extends TestCase
             ['App\Twig\Runtime\AppRuntime', 'fromStatic'],
             [null, null],
         ], array_map(static fn ($creation): array => [
-            ($creation->argument('callable') ?? $creation->positionalArgument(1))?->callable?->className,
-            ($creation->argument('callable') ?? $creation->positionalArgument(1))?->callable?->method,
+            $creation->namedOrPositionalArgument('callable', 1)?->callable?->className,
+            $creation->namedOrPositionalArgument('callable', 1)?->callable?->method,
         ], $creations));
         $method = array_values(array_filter($document->methodDeclarations, static fn ($method): bool => 'ownMethod' === $method->name))[0];
         self::assertSame('App\Twig\AppExtension', $method->className);
@@ -710,6 +710,7 @@ final class TolerantPhpParserTest extends TestCase
 
         self::assertTrue($call->arguments[0]->unpacked);
         self::assertNull($call->positionalArgument(0));
+        self::assertNull($call->namedOrPositionalArgument('first', 0));
         self::assertSame('second', $call->positionalArgument(1)?->stringLiteral?->value);
     }
 
