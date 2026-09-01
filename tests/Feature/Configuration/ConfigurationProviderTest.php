@@ -307,6 +307,51 @@ final class ConfigurationProviderTest extends TestCase
         ], array_column($diagnostics, 'message'));
     }
 
+    public function testAcceptsYamlMergeKeys(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $fixture->documents->open(new Document($uri, 'yaml', 1, <<<'YAML'
+            framework:
+                items:
+                    default: &defaults
+                        name: true
+                        handlers:
+                            - type: stream
+                              nested: true
+                    readonly:
+                        <<: *defaults
+                        name: false
+            YAML));
+
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
+    public function testValidatesConfigurationInheritedFromYamlAliases(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = <<<'YAML'
+            defaults: &defaults
+                mystery: true
+            framework:
+                router:
+                    <<: *defaults
+            YAML;
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.unknown_key'], array_column($diagnostics, 'code'));
+        self::assertSame(['Unknown configuration key "framework.router.mystery".'], array_column($diagnostics, 'message'));
+        self::assertSame(
+            [$this->protocolRange($fixture->converter, $text, (int) strpos($text, '<<'), 2)],
+            array_column($diagnostics, 'range'),
+        );
+
+        $fixture->documents->update($uri, 2, $text."\nbroken: [");
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
     public function testAcceptsKeyAttributesInsideMappedPrototypeEntries(): void
     {
         $fixture = $this->providers();

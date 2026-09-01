@@ -14,7 +14,8 @@
         "symfony/config": "^8.1",
         "symfony/dependency-injection": "^8.1",
         "symfony/filesystem": "^8.1",
-        "symfony/finder": "^8.1"
+        "symfony/finder": "^8.1",
+        "symfony/yaml": "^8.1"
     },
     "require-dev": {
         "phpstan/phpstan": "^2.1",
