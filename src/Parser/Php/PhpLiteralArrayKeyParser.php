@@ -5,7 +5,7 @@ namespace Symfony\Lsp\Parser\Php;
 final class PhpLiteralArrayKeyParser
 {
     /** @return list<string>|null */
-    public function parse(string $items, bool $allowNestedUnpacking): ?array
+    public function parse(string $items, bool $allowNestedUnpacking, bool $collectPartialLiteralKeys = false): ?array
     {
         $keys = [];
         $depth = 0;
@@ -15,6 +15,12 @@ final class PhpLiteralArrayKeyParser
         foreach (token_get_all('<?php '.$items) as $token) {
             if (\is_array($token)) {
                 if (\T_ELLIPSIS === $token[0] && (!$allowNestedUnpacking || 0 === $depth)) {
+                    if ($collectPartialLiteralKeys && 0 === $depth) {
+                        $keyParsed = true;
+
+                        continue;
+                    }
+
                     return null;
                 }
                 if (\in_array($token[0], [\T_CURLY_OPEN, \T_DOLLAR_OPEN_CURLY_BRACES], true)) {
@@ -30,9 +36,12 @@ final class PhpLiteralArrayKeyParser
                 }
                 if (\T_DOUBLE_ARROW === $token[0] && !$keyParsed) {
                     if (!$keyIsLiteral || null === $literalKey) {
-                        return null;
+                        if (!$collectPartialLiteralKeys) {
+                            return null;
+                        }
+                    } else {
+                        $keys[] = PhpStringLiteralDecoder::decode($literalKey[0], substr($literalKey, 1, -1));
                     }
-                    $keys[] = PhpStringLiteralDecoder::decode($literalKey[0], substr($literalKey, 1, -1));
                     $keyParsed = true;
                 } elseif (!$keyParsed) {
                     if (\T_CONSTANT_ENCAPSED_STRING === $token[0] && null === $literalKey) {

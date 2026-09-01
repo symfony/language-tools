@@ -18,6 +18,10 @@ final class PhpLiteralArrayKeyParserTest extends TestCase
         self::assertSame(['id', 'query'], $parser->parse($items, allowNestedUnpacking: true));
         self::assertNull($parser->parse($items, allowNestedUnpacking: false));
         self::assertNull($parser->parse("'id' => 1, ...\$parameters", allowNestedUnpacking: true));
+        self::assertSame(
+            ['id', 'after'],
+            $parser->parse("'id' => 1, \$dynamic => 2, ...\$parameters, 'after' => 3", allowNestedUnpacking: true, collectPartialLiteralKeys: true),
+        );
     }
 
     public function testDecodesKeysAndRejectsDynamicKeys(): void

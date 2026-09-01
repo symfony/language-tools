@@ -4,10 +4,12 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
+use Symfony\Lsp\Parser\QuotedArgument;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
@@ -24,6 +26,7 @@ final class TemplateReferenceExtractor
         private readonly PhpCommentParserInterface $phpComments,
         private readonly PhpParserInterface $phpParser,
         private readonly PhpLiteralArrayKeyParser $arrayKeys,
+        private readonly BalancedDelimiterMatcher $delimiters,
     ) {
     }
 
@@ -62,12 +65,12 @@ final class TemplateReferenceExtractor
             if ('::' !== substr($masked, max(0, $call->nameOffset - 2), 2)) {
                 continue;
             }
-            $variables = [];
-            if (1 === preg_match('/^\s*,\s*\[([^\]]*)\]/', substr($masked, $call->end()), $arrayMatch)) {
-                preg_match_all('/([\'"])([^\'"]+)\1\s*=>/', $arrayMatch[1], $keys);
-                $variables = array_values(array_unique($keys[2]));
-            }
-            $references[] = new TemplateReference($call->value, $uri, $call->range, $variables);
+            $references[] = new TemplateReference(
+                $call->value,
+                $uri,
+                $call->range,
+                $this->staticVariables($text, $masked, $call),
+            );
         }
         foreach ($php->attributes as $attribute) {
             if (self::TEMPLATE_ATTRIBUTE !== $attribute->name) {
@@ -148,12 +151,31 @@ final class TemplateReferenceExtractor
         } else {
             return [];
         }
-        $keys = $this->arrayKeys->parse($items, allowNestedUnpacking: true);
+        $keys = $this->arrayKeys->parse($items, allowNestedUnpacking: true, collectPartialLiteralKeys: true);
         if (null === $keys) {
             return [];
         }
 
         return array_values(array_unique(array_filter($keys, static fn (string $key): bool => '' !== $key)));
+    }
+
+    /** @return list<string> */
+    private function staticVariables(string $text, string $masked, QuotedArgument $call): array
+    {
+        $tailOffset = $call->end();
+        $tail = substr($masked, $tailOffset);
+        if (1 !== preg_match('/^\s*,\s*(\[|array\s*\()/i', $tail, $match, \PREG_OFFSET_CAPTURE)) {
+            return [];
+        }
+        $expressionOffset = $tailOffset + $match[1][1];
+        $opening = str_starts_with($match[1][0], '[') ? '[' : '(';
+        $open = '[' === $opening ? $expressionOffset : $expressionOffset + (int) strrpos($match[1][0], '(');
+        $close = $this->delimiters->matching($masked, $open, $opening, '[' === $opening ? ']' : ')');
+        if (null === $close) {
+            return [];
+        }
+
+        return $this->literalArrayKeys(substr($text, $expressionOffset, $close - $expressionOffset + 1));
     }
 
     /** @return list<string> */
