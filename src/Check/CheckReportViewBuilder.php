@@ -45,7 +45,6 @@ final class CheckReportViewBuilder
             $result->version,
             $result->complete,
             $result->projects,
-            $projectsById,
             $diagnostics,
             $staleBaseline,
             $result->baselinePath,

@@ -29,19 +29,17 @@ final class CheckRunner
         $this->installSignalHandlers($cancellation->signal());
 
         try {
-            try {
-                $analysis = $this->projects->analyze($plan, $cancellation);
-                if (!$analysis->canceled) {
-                    $execution = $this->diagnostics->execute($plan, $analysis, $cancellation);
-                }
-            } catch (\Throwable $error) {
-                $execution = new CheckDiagnosticExecution(
-                    $execution->diagnostics,
-                    [...$execution->errors, $this->errors->internal($error, $plan->workspace)],
-                    $execution->incompleteProjects,
-                    false,
-                );
+            $analysis = $this->projects->analyze($plan, $cancellation, $options->verbose);
+            if (!$analysis->canceled) {
+                $execution = $this->diagnostics->execute($plan, $analysis, $cancellation);
             }
+        } catch (\Throwable $error) {
+            $execution = new CheckDiagnosticExecution(
+                $execution->diagnostics,
+                [...$execution->errors, $this->errors->internal($error, $plan->workspace)],
+                $execution->incompleteProjects,
+                false,
+            );
         } finally {
             $this->restoreSignalHandlers();
         }

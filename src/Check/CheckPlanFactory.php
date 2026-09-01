@@ -58,7 +58,7 @@ final class CheckPlanFactory
             $selectedProjects[$root] = $file->project;
         }
 
-        return new CheckPlan($workspace, $files, $filesByProject, $selectedProjects, $options->verbose);
+        return new CheckPlan($workspace, $files, $filesByProject, $selectedProjects);
     }
 
     private function workspace(string $workspace): string

@@ -21,7 +21,7 @@ final class CheckProjectAnalyzer
     ) {
     }
 
-    public function analyze(CheckPlan $plan, CheckRunCancellation $cancellation): CheckProjectAnalysis
+    public function analyze(CheckPlan $plan, CheckRunCancellation $cancellation, bool $verbose): CheckProjectAnalysis
     {
         $errors = [];
         $preparedHashes = [];
@@ -101,7 +101,7 @@ final class CheckProjectAnalyzer
                             $plan->workspace,
                             $runtimeError,
                             $status['runtime']['error'] ?? 'Runtime indexing did not complete.',
-                            $plan->verbose,
+                            $verbose,
                         );
                         $complete[$root] = false;
                         if ($runtimeError instanceof ConfigurationValidationException || $runtimeError instanceof PartialRuntimeMetadataException) {

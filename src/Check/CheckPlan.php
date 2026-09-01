@@ -16,7 +16,6 @@ final class CheckPlan
         public readonly array $files,
         public readonly array $filesByProject,
         public readonly array $projects,
-        public readonly bool $verbose,
     ) {
     }
 }

@@ -10,38 +10,6 @@ final class CheckOptionsParser
 {
     private const FORMATS = ['human', 'json', 'github', 'gitlab', 'sarif'];
 
-    private const FLAG_OPTIONS = [
-        '--help' => ['help', true],
-        '-h' => ['help', true],
-        '--verbose' => ['verbose', true],
-        '--list-codes' => ['listCodes', true],
-        '--source-only' => ['overrides.runtimeIndexing', false],
-        '--no-runtime-indexing' => ['overrides.runtimeIndexing', false],
-        '--runtime-indexing' => ['overrides.runtimeIndexing', true],
-        '--debug' => ['overrides.debug', true],
-        '--no-debug' => ['overrides.debug', false],
-        '--no-container-project-root' => ['overrides.containerProjectRoot', null],
-        '--translation-diagnostics' => ['overrides.translationDiagnostics', true],
-        '--no-translation-diagnostics' => ['overrides.translationDiagnostics', false],
-        '--generate-baseline' => ['baselineMode', 'create'],
-        '--refresh-baseline' => ['baselineMode', 'refresh'],
-        '--strict-baseline' => ['strictBaseline', true],
-    ];
-
-    private const VALUE_OPTIONS = [
-        'format' => ['format', 'format'],
-        'workspace' => ['workspace', 'string'],
-        'config' => ['configurationPath', 'string'],
-        'project-root' => ['projectRoots', 'append'],
-        'container-project-root' => ['overrides.containerProjectRoot', 'string'],
-        'environment' => ['overrides.environment', 'string'],
-        'bridge-timeout' => ['overrides.bridgeTimeout', 'positive-number'],
-        'timeout' => ['timeout', 'positive-number'],
-        'php-command' => ['overrides.phpCommand', 'php-command'],
-        'fail-on' => ['blockingCodes', 'blocking-codes'],
-        'baseline' => ['baselinePath', 'string'],
-    ];
-
     public function __construct(
         private readonly DiagnosticCodeRegistry $diagnosticCodes,
         private readonly AnalysisSettings $analysisSettings,
@@ -67,48 +35,19 @@ final class CheckOptionsParser
             throw new InvalidConfigurationException('Unable to determine the current working directory.');
         }
 
-        $values = [
-            'format' => 'human',
-            'workspace' => $workspace,
-            'configurationPath' => null,
-            'blockingCodes' => null,
-            'baselinePath' => null,
-            'strictBaseline' => false,
-            'timeout' => 600.0,
-            'verbose' => false,
-            'listCodes' => false,
-            'help' => false,
-        ];
-        $overrides = [];
-        $selectors = [];
-        $projectRoots = [];
-        $baselineMode = 'none';
-        $selectedFormat = null;
-
+        $draft = new CheckOptionsDraft($workspace);
         foreach ($arguments->tokens as $token) {
             if ('separator' === $token->kind) {
                 continue;
             }
             if ('positional' === $token->kind) {
-                $selectors[] = $token->raw;
+                $draft->selectors[] = $token->raw;
+
                 continue;
             }
             if ('flag' === $token->kind) {
-                $specification = self::FLAG_OPTIONS[$token->raw] ?? null;
-                if (null === $specification) {
-                    throw new InvalidConfigurationException(\sprintf('The check option "%s" requires a value.', $token->raw));
-                }
-                [$target, $value] = $specification;
-                if ('baselineMode' === $target) {
-                    if (!\in_array($value, ['create', 'refresh'], true)) {
-                        throw new \LogicException('The baseline mode specification must request create or refresh.');
-                    }
-                    $baselineMode = $this->baselineMode($baselineMode, $value);
-                } elseif (str_starts_with($target, 'overrides.')) {
-                    $overrides[substr($target, \strlen('overrides.'))] = $value;
-                } else {
-                    $values[$target] = $value;
-                }
+                $this->applyFlag($draft, $token->raw);
+
                 continue;
             }
 
@@ -120,79 +59,95 @@ final class CheckOptionsParser
             if ('' === $value && !\in_array($name, ['fail-on', 'format'], true)) {
                 throw new InvalidConfigurationException(\sprintf('The check option "%s" requires a value.', $token->raw));
             }
-            $specification = self::VALUE_OPTIONS[$name] ?? null;
-            if (null === $specification) {
-                throw new InvalidConfigurationException(\sprintf('Unknown check option "--%s".', $name));
-            }
-            [$target, $normalizer] = $specification;
-            if ('format' === $normalizer) {
-                $selectedFormat = $this->format($selectedFormat, $value);
-                $normalized = $selectedFormat;
-            } else {
-                $normalized = match ($normalizer) {
-                    'positive-number' => $this->positiveNumber($name, $value),
-                    'php-command' => $this->phpCommand($value),
-                    'blocking-codes' => $this->blockingCodes($value),
-                    default => $value,
-                };
-            }
-            if (str_starts_with($target, 'overrides.')) {
-                $overrides[substr($target, \strlen('overrides.'))] = $normalized;
-            } elseif ('append' === $normalizer) {
-                if ('projectRoots' !== $target) {
-                    throw new \LogicException('An appended option must target the project root list.');
-                }
-                $projectRoots[] = $normalized;
-            } else {
-                $values[$target] = $normalized;
-            }
+            $this->applyValue($draft, $name, $value);
         }
 
-        $overrides = $this->analysisSettings->normalizeProject($overrides, context: 'command-line');
-        if ('none' !== $baselineMode && null === $values['baselinePath']) {
-            $values['baselinePath'] = '.symfony-lsp-baseline.json';
+        $draft->overrides = $this->analysisSettings->normalizeProject($draft->overrides, context: 'command-line');
+        if ('none' !== $draft->baselineMode && null === $draft->baselinePath) {
+            $draft->baselinePath = '.symfony-lsp-baseline.json';
         }
-        if ($values['strictBaseline'] && null === $values['baselinePath']) {
+        if ($draft->strictBaseline && null === $draft->baselinePath) {
             throw new InvalidConfigurationException('The --strict-baseline option requires --baseline.');
         }
 
-        /** @var string $format */
-        $format = $values['format'];
-        /** @var string $workspace */
-        $workspace = $values['workspace'];
-        /** @var string|null $configurationPath */
-        $configurationPath = $values['configurationPath'];
-        /** @var list<string>|null $blockingCodes */
-        $blockingCodes = $values['blockingCodes'];
-        /** @var string|null $baselinePath */
-        $baselinePath = $values['baselinePath'];
-        /** @var bool $strictBaseline */
-        $strictBaseline = $values['strictBaseline'];
-        /** @var float $timeout */
-        $timeout = $values['timeout'];
-        /** @var bool $verbose */
-        $verbose = $values['verbose'];
-        /** @var bool $listCodes */
-        $listCodes = $values['listCodes'];
-        /** @var bool $help */
-        $help = $values['help'];
-
         return new CheckOptions(
-            $format,
-            $workspace,
-            $configurationPath,
-            $selectors,
-            array_values(array_unique($projectRoots)),
-            $overrides,
-            $blockingCodes,
-            $baselinePath,
-            $baselineMode,
-            $strictBaseline,
-            $timeout,
-            $verbose,
-            $listCodes,
-            $help,
+            $draft->format,
+            $draft->workspace,
+            $draft->configurationPath,
+            $draft->selectors,
+            array_values(array_unique($draft->projectRoots)),
+            $draft->overrides,
+            $draft->blockingCodes,
+            $draft->baselinePath,
+            $draft->baselineMode,
+            $draft->strictBaseline,
+            $draft->timeout,
+            $draft->verbose,
+            $draft->listCodes,
+            $draft->help,
         );
+    }
+
+    private function applyFlag(CheckOptionsDraft $draft, string $option): void
+    {
+        match ($option) {
+            '--help', '-h' => $draft->help = true,
+            '--verbose' => $draft->verbose = true,
+            '--list-codes' => $draft->listCodes = true,
+            '--source-only', '--no-runtime-indexing' => $draft->overrides['runtimeIndexing'] = false,
+            '--runtime-indexing' => $draft->overrides['runtimeIndexing'] = true,
+            '--debug' => $draft->overrides['debug'] = true,
+            '--no-debug' => $draft->overrides['debug'] = false,
+            '--no-container-project-root' => $draft->overrides['containerProjectRoot'] = null,
+            '--translation-diagnostics' => $draft->overrides['translationDiagnostics'] = true,
+            '--no-translation-diagnostics' => $draft->overrides['translationDiagnostics'] = false,
+            '--generate-baseline' => $draft->baselineMode = $this->baselineMode($draft->baselineMode, 'create'),
+            '--refresh-baseline' => $draft->baselineMode = $this->baselineMode($draft->baselineMode, 'refresh'),
+            '--strict-baseline' => $draft->strictBaseline = true,
+            default => throw new InvalidConfigurationException(\sprintf('The check option "%s" requires a value.', $option)),
+        };
+    }
+
+    private function applyValue(CheckOptionsDraft $draft, string $name, string $value): void
+    {
+        switch ($name) {
+            case 'format':
+                $draft->selectedFormat = $this->format($draft->selectedFormat, $value);
+                $draft->format = $draft->selectedFormat;
+                break;
+            case 'workspace':
+                $draft->workspace = $value;
+                break;
+            case 'config':
+                $draft->configurationPath = $value;
+                break;
+            case 'project-root':
+                $draft->projectRoots[] = $value;
+                break;
+            case 'container-project-root':
+                $draft->overrides['containerProjectRoot'] = $value;
+                break;
+            case 'environment':
+                $draft->overrides['environment'] = $value;
+                break;
+            case 'bridge-timeout':
+                $draft->overrides['bridgeTimeout'] = $this->positiveNumber($name, $value);
+                break;
+            case 'timeout':
+                $draft->timeout = $this->positiveNumber($name, $value);
+                break;
+            case 'php-command':
+                $draft->overrides['phpCommand'] = $this->phpCommand($value);
+                break;
+            case 'fail-on':
+                $draft->blockingCodes = $this->blockingCodes($value);
+                break;
+            case 'baseline':
+                $draft->baselinePath = $value;
+                break;
+            default:
+                throw new InvalidConfigurationException(\sprintf('Unknown check option "--%s".', $name));
+        }
     }
 
     /** @return non-empty-list<string> */
