@@ -36,45 +36,28 @@ final class YamlRouteDeclarationExtractor
         $mappings = $this->parser->parse($text);
         $routeGroups = [];
         foreach ($mappings as $mapping) {
-            if ('base' !== $mapping->scope || \count($mapping->path) < 2 || !$this->hasRouteKey($mapping)) {
+            if (\count($mapping->path) < 2 || !$this->hasRouteKey($mapping)) {
                 continue;
             }
 
-            $routeGroups[$mapping->path[0]] = true;
+            $routeGroups[$mapping->scope][$mapping->path[0]] = true;
         }
 
         $declarations = [];
-        $environmentOffsets = [];
         foreach ($mappings as $mapping) {
-            if ('base' === $mapping->scope) {
-                if (1 !== \count($mapping->path) || \in_array(0, $mapping->sequenceDepths, true) || !isset($routeGroups[$mapping->path[0]])) {
-                    continue;
-                }
-
-                $declarations[$mapping->keyStartByte] = $this->declaration(
-                    $mapping->path[0],
-                    $uri,
-                    $text,
-                    $mapping->keyStartByte,
-                    $mapping->keyEndByte,
-                );
+            if (1 !== \count($mapping->path)
+                || \in_array(0, $mapping->sequenceDepths, true)
+                || !isset($routeGroups[$mapping->scope][$mapping->path[0]])
+            ) {
                 continue;
             }
 
-            if (!$this->hasRouteKey($mapping)) {
-                continue;
-            }
-            $offset = strrpos(substr($text, 0, $mapping->keyStartByte), $mapping->scope);
-            if (false === $offset || isset($environmentOffsets[$offset])) {
-                continue;
-            }
-            $environmentOffsets[$offset] = true;
-            $declarations[$offset] = $this->declaration(
-                $mapping->scope,
+            $declarations[$mapping->keyStartByte] = $this->declaration(
+                $mapping->path[0],
                 $uri,
                 $text,
-                $offset,
-                $offset + \strlen($mapping->scope),
+                $mapping->keyStartByte,
+                $mapping->keyEndByte,
             );
         }
         ksort($declarations);

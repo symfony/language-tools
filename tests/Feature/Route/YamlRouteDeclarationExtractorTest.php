@@ -59,19 +59,26 @@ final class YamlRouteDeclarationExtractorTest extends TestCase
         self::assertSame(13, $declarations[1]->range->end->character);
     }
 
-    public function testExtractsEnvironmentRouteSection(): void
+    public function testExtractsActualRouteNamesFromEnvironmentSections(): void
     {
         $declarations = $this->extract(<<<'YAML'
             when@test:
                 article_show:
                     path: /article/{id}
+                'article_edit':
+                    controller: App\Controller\ArticleController::edit
             YAML);
 
-        self::assertCount(1, $declarations);
-        self::assertSame('when@test', $declarations[0]->name);
-        self::assertSame(0, $declarations[0]->range->start->line);
-        self::assertSame(0, $declarations[0]->range->start->character);
-        self::assertSame(9, $declarations[0]->range->end->character);
+        self::assertSame(['article_show', 'article_edit'], array_map(
+            static fn (RouteDeclaration $declaration): string => $declaration->name,
+            $declarations,
+        ));
+        self::assertSame(1, $declarations[0]->range->start->line);
+        self::assertSame(4, $declarations[0]->range->start->character);
+        self::assertSame(16, $declarations[0]->range->end->character);
+        self::assertSame(3, $declarations[1]->range->start->line);
+        self::assertSame(5, $declarations[1]->range->start->character);
+        self::assertSame(17, $declarations[1]->range->end->character);
     }
 
     public function testExtractsRouteMixedWithNonRouteMappings(): void

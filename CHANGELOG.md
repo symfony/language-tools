@@ -6,6 +6,7 @@
 - Preserve YAML diagnostic suppressions while syntax is incomplete
 - Keep direct YAML PHP constants opaque during configuration validation
 - Decode quoted and block scalar messages in YAML translation catalogs
+- Index environment-scoped YAML routes by their route names
 - Omit baseline-matched diagnostics from GitLab Code Quality reports
 - Match recursive headless check selectors wherever `**` appears
 - Preserve form options after nested strings containing closing brackets

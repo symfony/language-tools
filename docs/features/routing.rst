@@ -84,8 +84,10 @@ Definition and Links
 --------------------
 
 Definition requests navigate to matching named PHP ``#[Route]`` attributes,
-PHP routing configurator calls or YAML route declarations. Route references
-also become document links when exactly one source declaration is known.
+PHP routing configurator calls or YAML route declarations. YAML routes nested
+under ``when@environment`` sections are indexed by their route names. Route
+references also become document links when exactly one source declaration is
+known.
 
 References and Rename
 ---------------------
