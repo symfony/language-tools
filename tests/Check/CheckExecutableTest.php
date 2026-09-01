@@ -376,7 +376,7 @@ final class CheckExecutableTest extends TestCase
         self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode'], $result['stderr']);
         self::assertFalse($report['complete']);
         self::assertFalse($report['projects'][0]['complete']);
-        self::assertSame('failed', $report['projects'][0]['runtime']['state']);
+        self::assertSame('partial', $report['projects'][0]['runtime']['state']);
         self::assertSame('route.missing_parameters', $report['diagnostics'][0]['code']);
         self::assertSame('The project bridge could not load runtime metadata: twig.', $report['errors'][0]['message']);
         self::assertSame(PartialRuntimeMetadataException::class, $report['errors'][0]['cause']['class'] ?? null);

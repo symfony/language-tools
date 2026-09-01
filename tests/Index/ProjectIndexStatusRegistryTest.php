@@ -60,6 +60,21 @@ final class ProjectIndexStatusRegistryTest extends TestCase
         self::assertSame(['state' => 'indexing'], $statuses->status($project)['runtime']);
     }
 
+    public function testReportsPartialRuntimeMetadataAsAvailable(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $snapshots = new RuntimeSnapshotState();
+        $statuses = new ProjectIndexStatusRegistry($snapshots);
+
+        $statuses->runtimePartial($project);
+
+        self::assertSame([
+            'state' => 'partial',
+            'error' => 'Some runtime metadata could not be loaded.',
+        ], $statuses->status($project)['runtime']);
+        self::assertTrue($snapshots->has($project));
+    }
+
     public function testReportsRestoredRuntimeMetadataAsStale(): void
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');

@@ -24,7 +24,7 @@ final class RunClassifier
             $timedOut = true;
         }
         $runtime = $this->indexState($run->result, 'runtime');
-        if ('failed' === $runtime || 'stale' === $runtime) {
+        if (\in_array($runtime, ['failed', 'partial', 'stale'], true)) {
             $layers[] = 'bootstrap' === $this->runtimeStage($run->result) ? 'bootstrap' : 'runtime-index';
         } elseif ('ready' !== $runtime) {
             $timedOut = true;

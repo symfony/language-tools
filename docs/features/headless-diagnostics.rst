@@ -108,9 +108,9 @@ invalid application configuration prevents runtime analysis, the report
 identifies the configuration failure and remains incomplete. Other runtime
 failures also exit with status ``12`` instead of silently switching to
 source-only analysis. If one runtime metadata section fails after other sections
-load, diagnostics backed by the healthy sections are still reported. Last
-successful metadata for the failed section remains active when available;
-otherwise diagnostics that need it are omitted.
+load, diagnostics backed by the healthy sections are still reported and the
+runtime state is ``partial``. Last successful metadata for the failed section
+remains active when available; otherwise diagnostics that need it are omitted.
 
 Configuring the Check
 ---------------------

@@ -122,6 +122,8 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                     && $applicationBooted
                     && [] !== $loadedSections
                 ) {
+                    $this->snapshotStore?->savePartial($project, $bridge, $loadableSnapshot, $loadedSections);
+
                     throw new PartialRuntimeMetadataException(array_keys($failedSections), $sectionErrors);
                 }
 

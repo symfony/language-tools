@@ -170,8 +170,8 @@ from project files. Features that need the application's current routes,
 services or other runtime information may be incomplete. Diagnostics that need
 this information are omitted. If one runtime metadata section fails while other
 sections load, features backed by the healthy sections remain available and the
-editor reports the partial failure. Enable verbose tracing before refreshing the
-index to record the sanitized exception cause and argument-free frames.
+runtime index reports a partial state. Enable verbose tracing before refreshing
+the index to record the sanitized exception cause and argument-free frames.
 
 Symfony Version Support
 -----------------------

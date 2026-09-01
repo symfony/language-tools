@@ -73,7 +73,6 @@ final class RuntimeSnapshotStore
         }
 
         if ($complete) {
-            $previous = null;
             $previousSnapshot = [];
         } else {
             $previous = $this->load($project, $bridge);
@@ -93,6 +92,36 @@ final class RuntimeSnapshotStore
             }
         }
 
+        $this->persist($project, $bridge, $sections, $previousSnapshot);
+    }
+
+    /**
+     * @param array<array-key, mixed> $snapshot
+     * @param list<string>            $availableSections
+     */
+    public function savePartial(Project $project, string $bridge, array $snapshot, array $availableSections): void
+    {
+        if (self::SNAPSHOT_SCHEMA_VERSION !== ($snapshot['schemaVersion'] ?? null)) {
+            return;
+        }
+
+        $previous = $this->load($project, $bridge);
+        $previousSnapshot = $previous?->snapshot ?? [];
+        $previousSections = $previousSnapshot['sections'] ?? null;
+        $sections = \is_array($previousSections) ? $previousSections : [];
+        $incomingSections = \is_array($snapshot['sections'] ?? null) ? $snapshot['sections'] : [];
+        foreach ($availableSections as $section) {
+            if (\is_array($incomingSections[$section] ?? null)) {
+                $sections[$section] = $incomingSections[$section];
+            }
+        }
+
+        $this->persist($project, $bridge, $sections, $previousSnapshot);
+    }
+
+    /** @param array<string, array<array-key, mixed>> $sections */
+    private function persist(Project $project, string $bridge, array $sections, array $previousSnapshot): void
+    {
         if ([] === $sections) {
             $this->remove($project, $bridge);
 
@@ -108,7 +137,7 @@ final class RuntimeSnapshotStore
             ],
             'sections' => $sections,
         ];
-        if (null !== $previous && $payload === $previousSnapshot) {
+        if ($payload === $previousSnapshot) {
             return;
         }
 

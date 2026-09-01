@@ -87,6 +87,33 @@ final class WorkspaceTrustManagerTest extends TestCase
         self::assertSame('ready', $statuses->status($project)['runtime']['state']);
     }
 
+    public function testDoesNotRestartAPartialRuntimeIndex(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $trust = new WorkspaceTrust();
+        $trust->set($project, TrustStatus::Trusted);
+        $statuses = new ProjectIndexStatusRegistry();
+        $runtimeInitializer = new class($statuses) implements RuntimeInitializerInterface {
+            public int $count = 0;
+
+            public function __construct(private readonly ProjectIndexStatusRegistry $statuses)
+            {
+            }
+
+            public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+            {
+                ++$this->count;
+                $this->statuses->runtimePartial($project);
+            }
+        };
+        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $this->registry($project));
+
+        $manager->requestUnknownDecisions([$project]);
+        $manager->requestUnknownDecisions([$project]);
+
+        self::assertSame(1, $runtimeInitializer->count);
+    }
+
     public function testDoesNotRestartInitializedRuntimeWhileARefreshIsPending(): void
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');

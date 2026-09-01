@@ -31,6 +31,12 @@ final class StatusRuntimeInitializer implements RuntimeInitializerInterface
             }
 
             throw $error;
+        } catch (PartialRuntimeMetadataException $error) {
+            if ($this->projects->contains($project)) {
+                $this->statuses->runtimePartial($project);
+            }
+
+            throw $error;
         } catch (\Throwable $error) {
             if ($this->projects->contains($project)) {
                 $stage = match (true) {

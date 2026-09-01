@@ -112,6 +112,30 @@ final class RuntimeSnapshotStoreTest extends TestCase
         ], $loaded?->snapshot);
     }
 
+    public function testPersistsAvailableSectionsFromPartialRefreshes(): void
+    {
+        $configuration = new RuntimeConfiguration();
+        $store = new RuntimeSnapshotStore($configuration, new Filesystem());
+        $store->savePartial($this->project, $this->bridge, [
+            'schemaVersion' => 1,
+            'sections' => [
+                'routes' => ['items' => [['name' => 'initial']]],
+            ],
+        ], ['routes']);
+        $store->savePartial($this->project, $this->bridge, [
+            'schemaVersion' => 1,
+            'sections' => [
+                'routes' => ['items' => [['name' => 'replacement']]],
+                'container' => ['items' => [['id' => 'mailer']]],
+            ],
+        ], ['container']);
+
+        self::assertSame([
+            'routes' => ['items' => [['name' => 'initial']]],
+            'container' => ['items' => [['id' => 'mailer']]],
+        ], $store->load($this->project, $this->bridge)?->snapshot['sections'] ?? null);
+    }
+
     public function testCreatesSnapshotsOnlyFromCompleteRefreshes(): void
     {
         $store = new RuntimeSnapshotStore(new RuntimeConfiguration(), new Filesystem());

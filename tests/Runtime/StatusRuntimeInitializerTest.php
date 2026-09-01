@@ -11,6 +11,7 @@ use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Runtime\BridgeExecutionException;
+use Symfony\Lsp\Runtime\PartialRuntimeMetadataException;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 use Symfony\Lsp\Runtime\StatusRuntimeInitializer;
@@ -103,6 +104,30 @@ final class StatusRuntimeInitializerTest extends TestCase
 
         self::assertSame(
             ['state' => 'failed', 'error' => 'The application configuration is invalid.', 'stage' => 'configuration'],
+            $statuses->status($project)['runtime'],
+        );
+    }
+
+    public function testRecordsPartialRuntimeMetadataAsAvailable(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $registry = new ProjectRegistry();
+        $registry->replace([$project]);
+        $statuses = new ProjectIndexStatusRegistry();
+        $initializer = new StatusRuntimeInitializer(
+            new ThrowingInitializer(new PartialRuntimeMetadataException(['twig'])),
+            $statuses,
+            $registry,
+        );
+
+        try {
+            $initializer->initialize($project);
+            self::fail('The partial failure should have propagated.');
+        } catch (PartialRuntimeMetadataException) {
+        }
+
+        self::assertSame(
+            ['state' => 'partial', 'error' => 'Some runtime metadata could not be loaded.'],
             $statuses->status($project)['runtime'],
         );
     }

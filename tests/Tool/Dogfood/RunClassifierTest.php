@@ -32,6 +32,7 @@ final class RunClassifierTest extends TestCase
         yield 'source index failed' => [self::harnessResult(['status' => self::indexStatus('failed', 'ready')]), ['source-index']];
         yield 'runtime index failed' => [self::harnessResult(['status' => self::indexStatus('ready', 'failed')]), ['runtime-index']];
         yield 'runtime index stale' => [self::harnessResult(['status' => self::indexStatus('ready', 'stale')]), ['runtime-index']];
+        yield 'runtime index partial' => [self::harnessResult(['status' => self::indexStatus('ready', 'partial')]), ['runtime-index']];
         yield 'bootstrap failed' => [
             self::harnessResult(['status' => ['source' => ['state' => 'ready'], 'runtime' => ['state' => 'failed', 'stage' => 'bootstrap']]]),
             ['bootstrap'],

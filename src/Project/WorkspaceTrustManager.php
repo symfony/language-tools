@@ -108,7 +108,7 @@ final class WorkspaceTrustManager implements ProjectStateInterface
         }
 
         $this->runtimeInitializer->initialize($project);
-        if ('ready' === $this->statuses->status($project)['runtime']['state']) {
+        if (\in_array($this->statuses->status($project)['runtime']['state'], ['ready', 'partial'], true)) {
             $this->runtimeStarted[$project->rootPath] = $configuration;
         } else {
             unset($this->runtimeStarted[$project->rootPath]);

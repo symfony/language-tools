@@ -95,7 +95,7 @@ try {
             if (null === $sourceIndexMilliseconds && in_array($status['source']['state'] ?? null, ['ready', 'failed'], true)) {
                 $sourceIndexMilliseconds = $elapsedMilliseconds($indexStartedAt);
             }
-            if (null === $runtimeIndexMilliseconds && in_array($status['runtime']['state'] ?? null, ['ready', 'failed', 'stale'], true)) {
+            if (null === $runtimeIndexMilliseconds && in_array($status['runtime']['state'] ?? null, ['ready', 'partial', 'failed', 'stale'], true)) {
                 $runtimeIndexMilliseconds = $elapsedMilliseconds($indexStartedAt);
             }
             if (null !== $sourceIndexMilliseconds && null !== $runtimeIndexMilliseconds) {

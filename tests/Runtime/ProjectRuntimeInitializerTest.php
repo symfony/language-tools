@@ -487,6 +487,14 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame('old.service', $serviceIndexes->forProject($project)->get('old.service')?->id);
         self::assertNull($serviceIndexes->forProject($project)->get('new.service'));
         self::assertTrue($state->has($project));
+        self::assertSame([
+            'routes' => ['complete' => true, 'items' => [['name' => 'new_route', 'path' => '/new']]],
+            'container' => [
+                'complete' => true,
+                'items' => [['id' => 'old.service', 'class' => 'App\\OldService']],
+                'parameters' => [],
+            ],
+        ], $store->load($project, $bridgeInstaller->install($project))?->snapshot['sections'] ?? null);
     }
 
     public function testRejectsStaleConfigurationValidationResults(): void

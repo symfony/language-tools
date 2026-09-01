@@ -49,6 +49,12 @@ final class ProjectIndexStatusRegistry implements ProjectStateInterface
         $this->section($project, 'runtime', 'stale');
     }
 
+    public function runtimePartial(Project $project): void
+    {
+        $this->runtimeSnapshots->markReady($project);
+        $this->section($project, 'runtime', 'partial', 'Some runtime metadata could not be loaded.');
+    }
+
     /**
      * @param array{bootstrapMilliseconds: float, kernelMilliseconds: float, sectionsMilliseconds: array<string, float>, shutdownMilliseconds: float, totalMilliseconds: float} $timings
      */
