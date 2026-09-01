@@ -19,8 +19,9 @@ the entity from:
 Typed repository parameters are scoped to their declaring method, so
 same-named parameters with unrelated types in other methods are ignored. Calls
 on ``$this`` use the repository class containing the call, including when one
-file declares several repository classes. When one Doctrine attribute maps
-several properties declared in the same statement, each property is available.
+file declares several repository classes. Doctrine attributes on promoted
+constructor properties are recognized. When one Doctrine attribute maps several
+properties declared in the same statement, each property is available.
 
 For example, ``name`` and ``category`` are completed from the ``Product``
 entity:

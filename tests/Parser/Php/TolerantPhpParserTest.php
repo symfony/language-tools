@@ -127,6 +127,34 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame('Dependency', substr($source, $document->classReferences[0]->startOffset, $document->classReferences[0]->endOffset - $document->classReferences[0]->startOffset));
     }
 
+    public function testTargetsPromotedParameterAttributesAsProperties(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+
+            use Doctrine\ORM\Mapping as ORM;
+
+            final class Product
+            {
+                public function __construct(
+                    #[ORM\Column]
+                    private string $name,
+                    #[ORM\Column]
+                    string $unpromoted,
+                ) {
+                }
+            }
+            PHP;
+
+        $attributes = (new TolerantPhpParser(new Parser()))->parse($source)->attributes;
+
+        self::assertSame(PhpAttributeTargetKind::Property, $attributes[0]->targets[0]->kind);
+        self::assertSame('App\Product', $attributes[0]->targets[0]->className);
+        self::assertSame('name', $attributes[0]->targets[0]->memberName);
+        self::assertSame([], $attributes[1]->targets);
+    }
+
     public function testExposesNamespaceImportsAndNameResolution(): void
     {
         $source = <<<'PHP'

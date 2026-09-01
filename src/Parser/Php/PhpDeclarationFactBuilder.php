@@ -459,6 +459,22 @@ final class PhpDeclarationFactBuilder
                 $nameToken->getEndPosition(),
             )];
         }
+        if ($declaration instanceof Parameter) {
+            $method = $declaration->getFirstAncestor(MethodDeclaration::class);
+            $methodName = $method instanceof MethodDeclaration && $method->name instanceof Token ? $method->name->getText($source) : null;
+            $name = $this->scopes->variableName($declaration->variableName, $source);
+            if (!\is_string($methodName) || '__construct' !== strtolower($methodName) || !$declaration->visibilityToken instanceof Token || null === $name) {
+                return [];
+            }
+
+            return [new PhpAttributeTarget(
+                PhpAttributeTargetKind::Property,
+                (string) $owner->getNamespacedName(),
+                $name,
+                $declaration->variableName->getStartPosition() + 1,
+                $declaration->variableName->getEndPosition(),
+            )];
+        }
         if (!$declaration instanceof PropertyDeclaration) {
             return [];
         }

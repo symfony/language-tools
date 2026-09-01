@@ -250,6 +250,36 @@ final class DoctrineProviderTest extends TestCase
         self::assertSame(strpos($usageText, "'name'") + 1, $converter->toByteOffset($usageText, $fieldReferences[0]->range->start));
     }
 
+    public function testRecognizesPromotedMappedFields(): void
+    {
+        $extractor = new DoctrineExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
+        $text = <<<'PHP'
+            <?php
+            namespace App\Entity;
+
+            use Doctrine\ORM\Mapping as ORM;
+
+            #[ORM\Entity]
+            final class Product
+            {
+                public function __construct(
+                    #[ORM\Column]
+                    public readonly string $name,
+                    #[ORM\ManyToOne]
+                    public readonly ?Category $category,
+                ) {
+                }
+            }
+            PHP;
+
+        $fields = $extractor->extract('file:///workspace/src/Entity/Product.php', 'php', $text)->entities[0]->fields;
+
+        self::assertSame(['name', 'category'], array_map(static fn (DoctrineField $field): string => $field->name, $fields));
+        self::assertFalse($fields[0]->association);
+        self::assertTrue($fields[1]->association);
+        self::assertSame('App\Entity\Category', $fields[1]->targetEntity);
+    }
+
     public function testScopesRepositoryCompletionToTheContainingMethod(): void
     {
         $extractor = new DoctrineExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new PhpCommentParser(), new DoctrineRepositoryReceiverResolver());
