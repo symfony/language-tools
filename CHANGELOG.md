@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Preserve form options after nested strings containing closing brackets
 - Recognize Console input references and definitions inside closures and arrow functions
 - Show clean PHP method summaries in Twig callable hover
 - Avoid attributing anonymous-class callables to enclosing classes

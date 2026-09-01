@@ -259,6 +259,28 @@ final class FormMetadataProviderTest extends MetadataTestCase
         self::assertSame(strpos($text, "'title'") + 1, $converter->toByteOffset($text, $references[0]->range->start));
     }
 
+    public function testKeepsOptionsAfterClosingBracketsInNestedStrings(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = $this->createExtractor($converter);
+        $text = <<<'PHP'
+            <?php
+            use App\Form\EventType;
+
+            $this->createForm(EventType::class, null, [
+                'attr' => [
+                    'data-pattern' => 'prefix]suffix',
+                ],
+                'required' => true,
+            ]);
+            PHP;
+
+        $options = $extractor->formOptions($text);
+
+        self::assertSame(['attr', 'required'], array_column($options, 'option'));
+        self::assertSame(strpos($text, "'required'") + 1, $converter->toByteOffset($text, $options[1]['range']->start));
+    }
+
     public function testIgnoresNamedArgumentsInPositionalMetadataSlots(): void
     {
         $converter = new PositionConverter();

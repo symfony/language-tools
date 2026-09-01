@@ -520,29 +520,24 @@ final class FormMetadataExtractor
         $length = \strlen($text);
         for ($index = 0; $index < $length; ++$index) {
             $character = $text[$index];
-            if ('[' === $character) {
-                ++$depth;
-                continue;
-            }
-            if (']' === $character) {
-                --$depth;
-                continue;
-            }
-            if (1 !== $depth || ('"' !== $character && "'" !== $character)) {
-                continue;
-            }
-            $end = $index + 1;
-            while ($end < $length && $text[$end] !== $character) {
-                $end += '\\' === $text[$end] ? 2 : 1;
-            }
-            if ($end >= $length || !preg_match('/^\s*=>/', substr($text, $end + 1))) {
+            if ('"' === $character || "'" === $character) {
+                $end = $index + 1;
+                while ($end < $length && $text[$end] !== $character) {
+                    $end += '\\' === $text[$end] ? 2 : 1;
+                }
+                if (1 === $depth && $end < $length && preg_match('/^\s*=>/', substr($text, $end + 1))) {
+                    $name = substr($text, $index + 1, $end - $index - 1);
+                    $absolute = $offset + $index + 1;
+                    $keys[] = ['name' => $name, 'range' => $this->converter->toRange($document, $absolute, \strlen($name))];
+                }
                 $index = $end;
                 continue;
             }
-            $name = substr($text, $index + 1, $end - $index - 1);
-            $absolute = $offset + $index + 1;
-            $keys[] = ['name' => $name, 'range' => $this->converter->toRange($document, $absolute, \strlen($name))];
-            $index = $end;
+            if ('[' === $character) {
+                ++$depth;
+            } elseif (']' === $character) {
+                --$depth;
+            }
         }
 
         return $keys;

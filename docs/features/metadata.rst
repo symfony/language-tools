@@ -15,6 +15,8 @@ details.
 
 After runtime indexing, definitely unknown literal options are diagnosed for
 known form types. Dynamic option arrays and unresolved form types are ignored.
+Quoted strings in nested option values can contain closing brackets without
+hiding later options.
 
 For form types that configure a static ``data_class`` with ``setDefaults()``
 or ``setDefault()``, literal field names passed to
