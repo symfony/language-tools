@@ -100,8 +100,7 @@ directories. A pattern ending in ``/`` excludes the complete directory.
 Excluded files don't contribute source facts and don't receive editor
 diagnostics. A path passed explicitly to ``symfony-lsp check`` remains
 selectable, which lets you inspect an excluded fixture when needed. See the
-:doc:`headless diagnostics guide </features/headless-diagnostics>` for checker
-selector syntax.
+`headless diagnostics guide`_ for checker selector syntax.
 
 Overrides and Workspace Trust
 -----------------------------
@@ -118,4 +117,5 @@ or executes application code by itself.
 
 See `Docker support`_ when ``phpCommand`` runs in a container.
 
+.. _`headless diagnostics guide`: features/headless-diagnostics.rst
 .. _`Docker support`: docker.rst
