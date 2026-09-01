@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Match Symfony YAML folded block and chomping semantics
+- Preserve YAML diagnostic suppressions while syntax is incomplete
 - Omit baseline-matched diagnostics from GitLab Code Quality reports
 - Match recursive headless check selectors wherever `**` appears
 - Preserve form options after nested strings containing closing brackets

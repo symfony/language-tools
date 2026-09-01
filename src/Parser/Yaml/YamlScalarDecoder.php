@@ -182,21 +182,21 @@ final class YamlScalarDecoder
         unset($line);
 
         $value = YamlScalarStyle::BlockLiteral === $style ? implode("\n", $lines) : $this->foldBlockLines($lines);
-        $chomping = str_contains($header, '-') ? '-' : (str_contains($header, '+') ? '+' : '');
-        if ('-' === $chomping) {
+        $modifiers = $this->blockModifiers($header);
+        if (str_contains($modifiers, '-')) {
             return rtrim($value, "\n");
         }
-        if ('+' === $chomping) {
-            return $value."\n";
+        if (str_contains($modifiers, '+')) {
+            return $value;
         }
 
-        return rtrim($value, "\n")."\n";
+        return str_ends_with($value, "\n") ? rtrim($value, "\n")."\n" : $value;
     }
 
     /** @param list<string> $lines */
     private function blockIndent(string $header, array $lines, int $baseIndent): int
     {
-        if (preg_match('/[1-9]/', $header, $match)) {
+        if (preg_match('/[1-9]/', $this->blockModifiers($header), $match)) {
             return $baseIndent + (int) $match[0];
         }
         $indent = null;
@@ -215,16 +215,35 @@ final class YamlScalarDecoder
     private function foldBlockLines(array $lines): string
     {
         $result = '';
+        $previousIndented = false;
+        $previousBlank = false;
         foreach ($lines as $index => $line) {
-            if (0 < $index) {
-                $previous = $lines[$index - 1];
-                $moreIndented = '' !== $line && ctype_space($line[0]);
-                $previousMoreIndented = '' !== $previous && ctype_space($previous[0]);
-                $result .= '' !== $previous && '' !== $line && !$moreIndented && !$previousMoreIndented ? ' ' : "\n";
+            if ('' === $line) {
+                $result .= "\n";
+                $previousIndented = false;
+                $previousBlank = true;
+            } elseif (ctype_space($line[0])) {
+                $result .= "\n".$line;
+                $previousIndented = true;
+                $previousBlank = false;
+            } elseif ($previousIndented) {
+                $result .= "\n".$line;
+                $previousIndented = false;
+                $previousBlank = false;
+            } elseif ($previousBlank || 0 === $index) {
+                $result .= $line;
+                $previousIndented = false;
+                $previousBlank = false;
+            } else {
+                $result .= ' '.$line;
             }
-            $result .= $line;
         }
 
         return $result;
+    }
+
+    private function blockModifiers(string $header): string
+    {
+        return preg_match('/^[|>](?<modifiers>(?:[+-][1-9]?|[1-9][+-]?)?)/', $header, $match) ? $match['modifiers'] : '';
     }
 }

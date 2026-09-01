@@ -54,6 +54,27 @@ final class YamlCommentParserTest extends TestCase
         self::assertSame("content: |\n    # kept\n      \n", $this->parser()->mask($source));
     }
 
+    public function testRecoversCommentsAfterMalformedYaml(): void
+    {
+        $source = "broken: !<unterminated\n# recovered\nnext: value\n";
+
+        self::assertSame("broken: !<unterminated\n           \nnext: value\n", $this->parser()->mask($source));
+    }
+
+    public function testRecoveryKeepsHashesInsideParsedMultilineScalars(): void
+    {
+        $source = "quoted: \"first\n  # kept\n  last\"\nbroken: [\n# gone\n";
+
+        self::assertSame("quoted: \"first\n  # kept\n  last\"\nbroken: [\n      \n", $this->parser()->mask($source));
+    }
+
+    public function testRecoveryKeepsHashesInsideBlockScalars(): void
+    {
+        $source = "broken: !<unterminated\ncontent: |\n  # kept\n# gone\n";
+
+        self::assertSame("broken: !<unterminated\ncontent: |\n  # kept\n      \n", $this->parser()->mask($source));
+    }
+
     private function parser(): YamlCommentParser
     {
         return new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()));

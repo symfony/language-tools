@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Parser\Yaml;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
@@ -83,11 +84,11 @@ final class YamlDocumentParserTest extends TestCase
                 ['@app.first', "'@app.first'", 'single-quoted', ['sequence'], [[1, 0]], null, '!service', '@app.first'],
                 ['plain', 'plain', 'plain', ['sequence'], [[1, 1]], null, null, 'plain'],
                 ['nested', '"nested"', 'double-quoted', ['sequence', 'name'], [[1, 2]], null, null, 'nested'],
-                ['sequence block', "|-\n    sequence block", 'block-literal', ['sequence'], [[1, 3]], null, null, 'sequence block'],
-                ["%env(BLOCK_ONE)% # content\nsecond", "|-\n  %env(BLOCK_ONE)% # content\n  second", 'block-literal', ['block'], [], null, null, "%env(BLOCK_ONE)% # content\n  second"],
-                ["folded value\n", ">\n  folded\n  value", 'block-folded', ['folded'], [], null, null, "folded\n  value"],
-                ['  kept', "|2-\n    kept", 'block-literal', ['explicit'], [], null, null, '  kept'],
-                ["first\n  code\nlast", ">-\n  first\n    code\n  last", 'block-folded', ['folded_indented'], [], null, null, "first\n    code\n  last"],
+                ['sequence block', "|-\n    sequence block\n", 'block-literal', ['sequence'], [[1, 3]], null, null, "sequence block\n"],
+                ["%env(BLOCK_ONE)% # content\nsecond", "|-\n  %env(BLOCK_ONE)% # content\n  second\n", 'block-literal', ['block'], [], null, null, "%env(BLOCK_ONE)% # content\n  second\n"],
+                ["folded value\n", ">\n  folded\n  value\n", 'block-folded', ['folded'], [], null, null, "folded\n  value\n"],
+                ['  kept', "|2-\n    kept\n", 'block-literal', ['explicit'], [], null, null, "  kept\n"],
+                ["first\n  code\nlast", ">-\n  first\n    code\n  last\n", 'block-folded', ['folded_indented'], [], null, null, "first\n    code\n  last\n"],
                 ['@app.foo', "'@app.foo'", 'single-quoted', ['services', 'App\\Foo'], [], 'test', '!service', '@app.foo'],
             ],
             array_map(static fn (YamlScalar $scalar): array => self::scalarData($source, $scalar), $document->scalars),
@@ -107,6 +108,100 @@ final class YamlDocumentParserTest extends TestCase
         self::assertSame('!php/enum', $scalar->tag);
         self::assertSame($tagStart, $scalar->tagStartByte);
         self::assertSame($tagStart + \strlen('!php/enum'), $scalar->tagEndByte);
+    }
+
+    public function testRecoveryProvidesYamlTagOffsets(): void
+    {
+        $source = 'value: !php/const PHP_VERSION_ID';
+        $scalar = (new YamlDocumentParser(self::errorParser()))->parseDocument($source)->scalars[0];
+        $tagStart = (int) strpos($source, '!php/const');
+
+        self::assertSame('!php/const', $scalar->tag);
+        self::assertSame($tagStart, $scalar->tagStartByte);
+        self::assertSame($tagStart + \strlen('!php/const'), $scalar->tagEndByte);
+    }
+
+    public function testKeepsParsedTagFactsWhenRecoveringMalformedYaml(): void
+    {
+        $source = "value: !php/enum App\\ResetMode::SCHEMA\nbroken: [";
+        $scalars = array_values(array_filter(
+            (new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))->parseDocument($source)->scalars,
+            static fn (YamlScalar $scalar): bool => '!php/enum' === $scalar->tag,
+        ));
+        $scalar = $scalars[0];
+        $tagStart = (int) strpos($source, '!php/enum');
+
+        self::assertCount(1, $scalars);
+        self::assertSame('App\\ResetMode::SCHEMA', $scalar->value);
+        self::assertSame($tagStart, $scalar->tagStartByte);
+        self::assertSame($tagStart + \strlen('!php/enum'), $scalar->tagEndByte);
+    }
+
+    #[DataProvider('blockScalarProvider')]
+    public function testDecodesBlockScalarsLikeSymfonyYaml(string $indicator, string $trailing, string $expected): void
+    {
+        $source = "message: $indicator\n  one\n  two".$trailing;
+        $scalar = (new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))->parseDocument($source)->scalars[0];
+
+        self::assertSame($expected, $scalar->value);
+    }
+
+    /** @return iterable<string, array{string, string, string}> */
+    public static function blockScalarProvider(): iterable
+    {
+        yield 'literal strip without trailing newline' => ['|-', '', "one\ntwo"];
+        yield 'literal strip with one trailing newline' => ['|-', "\n", "one\ntwo"];
+        yield 'literal strip with multiple trailing newlines' => ['|-', "\n\n", "one\ntwo"];
+        yield 'literal clip without trailing newline' => ['|', '', "one\ntwo"];
+        yield 'literal clip with one trailing newline' => ['|', "\n", "one\ntwo\n"];
+        yield 'literal clip with multiple trailing newlines' => ['|', "\n\n", "one\ntwo\n"];
+        yield 'literal keep without trailing newline' => ['|+', '', "one\ntwo"];
+        yield 'literal keep with one trailing newline' => ['|+', "\n", "one\ntwo\n"];
+        yield 'literal keep with multiple trailing newlines' => ['|+', "\n\n", "one\ntwo\n\n"];
+        yield 'folded strip without trailing newline' => ['>-', '', 'one two'];
+        yield 'folded strip with one trailing newline' => ['>-', "\n", 'one two'];
+        yield 'folded strip with multiple trailing newlines' => ['>-', "\n\n", 'one two'];
+        yield 'folded clip without trailing newline' => ['>', '', 'one two'];
+        yield 'folded clip with one trailing newline' => ['>', "\n", "one two\n"];
+        yield 'folded clip with multiple trailing newlines' => ['>', "\n\n", "one two\n"];
+        yield 'folded keep without trailing newline' => ['>+', '', 'one two'];
+        yield 'folded keep with one trailing newline' => ['>+', "\n", "one two\n"];
+        yield 'folded keep with multiple trailing newlines' => ['>+', "\n\n", "one two\n\n"];
+    }
+
+    #[DataProvider('blockBeforeMappingProvider')]
+    public function testPreservesBlockChompingBeforeTheNextMapping(string $indicator, string $expected): void
+    {
+        $source = "message: $indicator\n  one\n  two\n\nnext: value";
+        $scalar = (new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))->parseDocument($source)->scalars[0];
+
+        self::assertSame($expected, $scalar->value);
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function blockBeforeMappingProvider(): iterable
+    {
+        yield 'literal clip' => ['|', "one\ntwo\n"];
+        yield 'literal keep' => ['|+', "one\ntwo\n\n"];
+        yield 'folded clip' => ['>', "one two\n"];
+        yield 'folded keep' => ['>+', "one two\n\n"];
+    }
+
+    #[DataProvider('foldedBlockProvider')]
+    public function testFoldsBlockLinesLikeSymfonyYaml(string $body, string $expected): void
+    {
+        $source = "message: >-\n".$body;
+        $scalar = (new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))->parseDocument($source)->scalars[0];
+
+        self::assertSame($expected, $scalar->value);
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function foldedBlockProvider(): iterable
+    {
+        yield 'blank line' => ["  one\n\n  two", "one\ntwo"];
+        yield 'two blank lines' => ["  one\n\n\n  two", "one\n\ntwo"];
+        yield 'more-indented line' => ["  one\n    code\n  two", "one\n  code\ntwo"];
     }
 
     public function testRecoveryProducesCompatibleScalarFacts(): void
@@ -137,9 +232,9 @@ final class YamlDocumentParserTest extends TestCase
 
         self::assertSame(
             [
-                ['one', ['broken'], [[1, 0]], null, null],
+                ['one', [], [], null, null],
                 ["'@after'", ['sequence'], [[1, 0]], null, '!service'],
-                ["|-\n  %env(AFTER)%", ['block'], [], null, null],
+                ["|-\n  %env(AFTER)%\n", ['block'], [], null, null],
                 ['"scoped"', ['value'], [], 'dev', null],
             ],
             array_map(static fn (YamlScalar $scalar): array => [

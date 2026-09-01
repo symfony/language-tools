@@ -250,7 +250,8 @@ follow the codes. Bare directives, malformed directives and unknown codes
 produce a ``suppression.invalid`` warning instead of suppressing diagnostics.
 
 Only native comments are recognized. Directive-shaped text in strings, Twig
-verbatim content, YAML block scalars and XML CDATA sections has no effect.
+verbatim content, YAML block scalars and XML CDATA sections has no effect. YAML
+comment suppressions remain active while surrounding syntax is incomplete.
 Suppressed diagnostics are omitted from editor publications and checker
 reports, and they aren't written to new baselines. A matching entry in an
 existing baseline becomes stale.

@@ -112,6 +112,19 @@ final class DiagnosticSuppressorTest extends TestCase
         );
     }
 
+    public function testSuppressesYamlDiagnosticsAfterIncompleteSyntax(): void
+    {
+        $source = "broken: !<unterminated\n# @symfony-lsp-ignore template.not_found\ntemplate: missing.html.twig\n";
+
+        self::assertSame(
+            [],
+            $this->suppressor()->suppress(
+                new Document('file:///workspace/source.yaml', 'yaml', 1, $source),
+                [$this->diagnostic('template.not_found', 2)],
+            ),
+        );
+    }
+
     public function testSuppressesOneOccurrencePerListedCode(): void
     {
         $source = "<?php\n// @symfony-lsp-ignore template.not_found\nfirst(); second();\n";

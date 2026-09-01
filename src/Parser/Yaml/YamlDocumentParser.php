@@ -183,10 +183,11 @@ final class YamlDocumentParser
      */
     private function treeScalar(TreeSitterTree $tree, TreeSitterNode $container, TreeSitterNode $node, string $source, array $path, array $sequence, string $scope): YamlScalar
     {
-        $raw = $tree->text($node, $source);
+        $endByte = 'block_scalar' === $node->type ? $this->blockScalarEnd($source, $node->endByte) : $node->endByte;
+        $raw = substr($source, $node->startByte, $endByte - $node->startByte);
         $style = $this->scalarDecoder->style($node->type, $raw);
         $baseIndent = $this->lineIndent($source, $node->startByte);
-        [$contentStart, $contentEnd] = $this->scalarDecoder->contentOffsets($raw, $node->startByte, $node->endByte, $style, $baseIndent);
+        [$contentStart, $contentEnd] = $this->scalarDecoder->contentOffsets($raw, $node->startByte, $endByte, $style, $baseIndent);
         $tag = null;
         $tagStartByte = null;
         $tagEndByte = null;
@@ -203,7 +204,7 @@ final class YamlDocumentParser
             $this->scalarDecoder->decode($raw, $style, $baseIndent),
             $raw,
             $node->startByte,
-            $node->endByte,
+            $endByte,
             $contentStart,
             $contentEnd,
             $style,
@@ -214,6 +215,29 @@ final class YamlDocumentParser
             $tagStartByte,
             $tagEndByte,
         );
+    }
+
+    private function blockScalarEnd(string $source, int $end): int
+    {
+        $length = \strlen($source);
+        if ($end >= $length || !\in_array($source[$end], ["\r", "\n"], true)) {
+            return $end;
+        }
+
+        $end += "\r" === $source[$end] && "\n" === ($source[$end + 1] ?? null) ? 2 : 1;
+        while ($end < $length) {
+            $lineEnd = $end + strcspn($source, "\r\n", $end);
+            if ('' !== trim(substr($source, $end, $lineEnd - $end))) {
+                break;
+            }
+            if ($lineEnd >= $length) {
+                $end = $lineEnd;
+                break;
+            }
+            $end = $lineEnd + ("\r" === $source[$lineEnd] && "\n" === ($source[$lineEnd + 1] ?? null) ? 2 : 1);
+        }
+
+        return $end;
     }
 
     private function lineIndent(string $source, int $offset): int
@@ -255,10 +279,10 @@ final class YamlDocumentParser
     private function mergeScalars(array $parsed, array $recovered): array
     {
         $merged = [];
-        foreach ($recovered as $scalar) {
+        foreach ($parsed as $scalar) {
             $merged[$scalar->startByte."\0".$scalar->endByte] = $scalar;
         }
-        foreach ($parsed as $scalar) {
+        foreach ($recovered as $scalar) {
             $key = $scalar->startByte."\0".$scalar->endByte;
             $merged[$key] ??= $scalar;
         }

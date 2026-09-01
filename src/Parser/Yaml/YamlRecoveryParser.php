@@ -17,7 +17,7 @@ final class YamlRecoveryParser
         $stack = [];
         /** @var array<string, int> $sequenceIndexes */
         $sequenceIndexes = [];
-        /** @var array{start: int, end: int, indent: int, path: list<string>, sequence: list<YamlSequenceItem>, scope: string, tag: string|null}|null $block */
+        /** @var array{start: int, end: int, indent: int, path: list<string>, sequence: list<YamlSequenceItem>, scope: string, tag: string|null, tagStart: int|null, tagEnd: int|null}|null $block */
         $block = null;
 
         preg_match_all('/^.*(?:\R|$)/m', $source, $lines, \PREG_OFFSET_CAPTURE);
@@ -26,7 +26,7 @@ final class YamlRecoveryParser
             $indent = \strlen($line) - \strlen(ltrim($line, " \t"));
             if (null !== $block) {
                 if ('' === trim($line) || $indent > $block['indent']) {
-                    $block['end'] = $lineOffset + \strlen($line);
+                    $block['end'] = $lineOffset + \strlen($rawLine);
                     continue;
                 }
                 $scalars[] = $this->recoveredBlockScalar($source, $block);
@@ -74,6 +74,8 @@ final class YamlRecoveryParser
                         'sequence' => $sequence,
                         'scope' => $scope,
                         'tag' => $scalar->tag,
+                        'tagStart' => $scalar->tagStartByte,
+                        'tagEnd' => $scalar->tagEndByte,
                     ];
                 } elseif (null !== $scalar) {
                     $scalars[] = $scalar;
@@ -121,6 +123,8 @@ final class YamlRecoveryParser
                         'sequence' => $sequence,
                         'scope' => $scope,
                         'tag' => $value->tag,
+                        'tagStart' => $value->tagStartByte,
+                        'tagEnd' => $value->tagEndByte,
                     ];
                 }
             } elseif (str_starts_with($parsed['value'], '[')) {
@@ -315,8 +319,12 @@ final class YamlRecoveryParser
             return null;
         }
         $tag = null;
+        $tagStart = null;
+        $tagEnd = null;
         if (preg_match('/^(?<tag>!(?:<[^>]*>|[^\s]+))(?<space>\s*)/', $fragment, $match)) {
             $tag = $match['tag'];
+            $tagStart = $start;
+            $tagEnd = $start + \strlen($tag);
             $shift = \strlen($match[0]);
             $fragment = substr($fragment, $shift);
             $start += $shift;
@@ -351,6 +359,8 @@ final class YamlRecoveryParser
             $sequence,
             'base' === $scope ? null : substr($scope, \strlen('when@')),
             $tag,
+            $tagStart,
+            $tagEnd,
         );
     }
 
@@ -402,7 +412,7 @@ final class YamlRecoveryParser
         return null;
     }
 
-    /** @param array{start: int, end: int, indent: int, path: list<string>, sequence: list<YamlSequenceItem>, scope: string, tag: string|null} $block */
+    /** @param array{start: int, end: int, indent: int, path: list<string>, sequence: list<YamlSequenceItem>, scope: string, tag: string|null, tagStart: int|null, tagEnd: int|null} $block */
     private function recoveredBlockScalar(string $source, array $block): YamlScalar
     {
         $raw = substr($source, $block['start'], $block['end'] - $block['start']);
@@ -421,6 +431,8 @@ final class YamlRecoveryParser
             $block['sequence'],
             'base' === $block['scope'] ? null : substr($block['scope'], \strlen('when@')),
             $block['tag'],
+            $block['tagStart'],
+            $block['tagEnd'],
         );
     }
 }
