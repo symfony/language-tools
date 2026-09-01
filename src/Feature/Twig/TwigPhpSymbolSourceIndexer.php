@@ -4,8 +4,6 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Index\AbstractSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\Php\PhpParserInterface;
-use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 
 /** @extends AbstractSourceIndexer<TwigPhpSymbolSourceFacts> */
@@ -13,10 +11,7 @@ final class TwigPhpSymbolSourceIndexer extends AbstractSourceIndexer
 {
     public function __construct(
         private readonly TwigPhpSymbolIndexRegistry $indexes,
-        private readonly PhpParserInterface $phpParser,
-        private readonly TwigDocumentParser $twigParser,
-        private readonly TwigPhpSymbolDeclarationExtractor $declarations,
-        private readonly TwigPhpSymbolReferenceExtractor $references,
+        private readonly TwigPhpSymbolExtractor $extractor,
     ) {
     }
 
@@ -52,10 +47,6 @@ final class TwigPhpSymbolSourceIndexer extends AbstractSourceIndexer
 
     protected function extract(Project $project, SourceDocument $document): ?TwigPhpSymbolSourceFacts
     {
-        return match ($document->languageId) {
-            'php' => new TwigPhpSymbolSourceFacts($document->uri, $this->declarations->extract($document->uri, $document->text, $this->phpParser->parse($document->text))),
-            'twig' => new TwigPhpSymbolSourceFacts($document->uri, references: $this->references->extract($document->uri, $document->text, $this->twigParser->parse($document->text))),
-            default => null,
-        };
+        return $this->extractor->extract($document->uri, $document->languageId, $document->text);
     }
 }

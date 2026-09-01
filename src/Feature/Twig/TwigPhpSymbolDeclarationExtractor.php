@@ -41,9 +41,12 @@ final class TwigPhpSymbolDeclarationExtractor
             $kind = match ($type->kind) {
                 PhpTypeKind::Class_ => TwigPhpSymbolKind::Class_,
                 PhpTypeKind::Interface_ => TwigPhpSymbolKind::Interface_,
-                PhpTypeKind::Trait_ => TwigPhpSymbolKind::Trait_,
                 PhpTypeKind::Enum => TwigPhpSymbolKind::Enum,
+                default => null,
             };
+            if (null === $kind) {
+                continue;
+            }
             $declarations[] = new TwigPhpSymbolDeclaration(
                 $kind,
                 $type->name,

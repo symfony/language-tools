@@ -8,7 +8,6 @@ use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
-use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TwigPhpSymbolProvider implements CompletionProviderInterface, DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
@@ -164,7 +163,7 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
     /**
      * @param array<array-key, mixed> $params
      *
-     * @return array{TwigPhpSymbolReference, list<TwigPhpSymbolDeclaration>, Project}|null
+     * @return array{TwigPhpSymbolReference, list<TwigPhpSymbolDeclaration>}|null
      */
     private function resolveTwig(array $params): ?array
     {
@@ -179,7 +178,7 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
         }
         $declarations = $this->declarations($this->indexes->forProject($request->project), $reference->className, $reference->memberName);
 
-        return [] === $declarations ? null : [$reference, $declarations, $request->project];
+        return [] === $declarations ? null : [$reference, $declarations];
     }
 
     /** @return list<TwigPhpSymbolDeclaration> */
@@ -196,7 +195,6 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
             TwigPhpSymbolKind::Enum => 13,
             TwigPhpSymbolKind::EnumCase => 20,
             TwigPhpSymbolKind::ClassConstant => 21,
-            TwigPhpSymbolKind::Trait_ => 25,
         };
     }
 

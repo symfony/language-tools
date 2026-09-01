@@ -109,16 +109,7 @@ final class TwigPhpSymbolSourceIndexerTest extends TestCase
 
     private function indexer(TwigPhpSymbolIndexRegistry $indexes): TwigPhpSymbolSourceIndexer
     {
-        $converter = new PositionConverter();
-        $comments = new TwigCommentParser();
-
-        return new TwigPhpSymbolSourceIndexer(
-            $indexes,
-            new TolerantPhpParser(new Parser()),
-            new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
-            new TwigPhpSymbolDeclarationExtractor($converter),
-            new TwigPhpSymbolReferenceExtractor($converter, new TwigCallArgumentResolver(new TwigArgumentParser())),
-        );
+        return new TwigPhpSymbolSourceIndexer($indexes, $this->extractor(new PositionConverter()));
     }
 
     private function extractor(PositionConverter $converter): TwigPhpSymbolExtractor
