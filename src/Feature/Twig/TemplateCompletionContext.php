@@ -17,7 +17,7 @@ final class TemplateCompletionContext
         $cursor = $converter->toByteOffset($text, $position);
         $before = substr($text, 0, $cursor);
         $pattern = 'php' === $languageId
-            ? '/(?:(?:->|::)(?:render|renderView)\s*\(|#\[\s*(?:[^\[\]]*,\s*)?\\\\?(?:Symfony\\\\Bridge\\\\Twig\\\\Attribute\\\\)?Template\s*\(\s*(?:template\s*:)?)\s*([\'\"])([^\'\"]*)$/s'
+            ? '/(?:(?:->|::)(?:render|renderView)\s*\(\s*(?:view\s*:)?|#\[\s*(?:[^\[\]]*,\s*)?\\\\?(?:Symfony\\\\Bridge\\\\Twig\\\\Attribute\\\\)?Template\s*\(\s*(?:template\s*:)?)\s*([\'\"])([^\'\"]*)$/s'
             : ('twig' === $languageId
                 ? '/(?:(?:{%\s*(?:extends|include|embed|import|from|use)\s+)|(?:\binclude\s*\(\s*(?:template\s*[:=]\s*)?)|(?:\bsource\s*\(\s*(?:name\s*[:=]\s*)?))([\'\"])([^\'\"]*)$/s'
                 : null);

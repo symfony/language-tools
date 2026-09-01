@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Twig;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
@@ -22,6 +23,7 @@ final class TemplateReferenceExtractor
         private readonly QuotedArgumentMatcher $matcher,
         private readonly PhpCommentParserInterface $phpComments,
         private readonly PhpParserInterface $phpParser,
+        private readonly PhpLiteralArrayKeyParser $arrayKeys,
     ) {
     }
 
@@ -35,9 +37,31 @@ final class TemplateReferenceExtractor
             return [];
         }
 
-        $masked = $this->phpComments->mask($text);
+        $php = $this->phpParser->parse($text);
         $references = [];
+        foreach ($php->methodCalls as $call) {
+            if (!\in_array($call->method, ['render', 'renderView'], true)) {
+                continue;
+            }
+            $template = ($call->argument('view') ?? $call->positionalArgument(0))?->stringLiteral;
+            if (null === $template || '' === $template->value) {
+                continue;
+            }
+            $references[] = $this->reference(
+                $template->value,
+                $uri,
+                $text,
+                $template->startOffset,
+                $template->endOffset,
+                $this->literalArrayKeys(($call->argument('parameters') ?? $call->positionalArgument(1))?->expression),
+            );
+        }
+
+        $masked = $this->phpComments->mask($text);
         foreach ($this->matcher->methodCalls($masked, ['render', 'renderView']) as $call) {
+            if ('::' !== substr($masked, max(0, $call->nameOffset - 2), 2)) {
+                continue;
+            }
             $variables = [];
             if (1 === preg_match('/^\s*,\s*\[([^\]]*)\]/', substr($masked, $call->end()), $arrayMatch)) {
                 preg_match_all('/([\'"])([^\'"]+)\1\s*=>/', $arrayMatch[1], $keys);
@@ -45,7 +69,7 @@ final class TemplateReferenceExtractor
             }
             $references[] = new TemplateReference($call->value, $uri, $call->range, $variables);
         }
-        foreach ($this->phpParser->parse($text)->attributes as $attribute) {
+        foreach ($php->attributes as $attribute) {
             if (self::TEMPLATE_ATTRIBUTE !== $attribute->name) {
                 continue;
             }
@@ -111,6 +135,25 @@ final class TemplateReferenceExtractor
         }
 
         return $this->sorted($references);
+    }
+
+    /** @return list<string> */
+    private function literalArrayKeys(?string $expression): array
+    {
+        $expression = trim((string) $expression);
+        if (str_starts_with($expression, '[') && str_ends_with($expression, ']')) {
+            $items = substr($expression, 1, -1);
+        } elseif (preg_match('/^array\s*\((.*)\)$/is', $expression, $match)) {
+            $items = $match[1];
+        } else {
+            return [];
+        }
+        $keys = $this->arrayKeys->parse($items, allowNestedUnpacking: true);
+        if (null === $keys) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter($keys, static fn (string $key): bool => '' !== $key)));
     }
 
     /** @return list<string> */

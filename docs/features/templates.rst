@@ -9,7 +9,8 @@ Completion
 ----------
 
 Template completion is available in PHP ``render()`` and ``renderView()``
-calls, in the ``#[Template]`` attribute and in these Twig contexts:
+calls using positional or named ``view`` arguments, in the ``#[Template]``
+attribute and in these Twig contexts:
 
 * ``extends``;
 * ``include``;
@@ -38,9 +39,11 @@ Variables
 ---------
 
 Variable completion and hover are available in Twig templates for Twig globals,
-literal keys passed by PHP ``render()`` and ``renderView()`` calls and literal
-names listed in the ``vars`` argument of the ``#[Template]`` attribute. Twig
-component templates also expose public component properties.
+outer literal keys passed in short or long arrays to PHP ``render()`` and
+``renderView()`` calls and literal names listed in the ``vars`` argument of the
+``#[Template]`` attribute. Render calls recognize positional and named
+``parameters`` arguments. Twig component templates also expose public component
+properties.
 
 Variables declared by Twig's ``types`` tag are completed with their declared
 type and required or optional status. Documentation comments attached to type
