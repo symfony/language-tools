@@ -10,6 +10,7 @@ use Symfony\Lsp\Feature\Route\RouteParameterKeyExtractor;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
@@ -24,7 +25,7 @@ final class RouteReferenceExtractorFactory
             new PhpRouteReferenceCandidateExtractor(
                 new QuotedArgumentMatcher($converter),
                 new PhpCommentParser(),
-                new RouteParameterKeyExtractor(new BalancedDelimiterMatcher()),
+                new RouteParameterKeyExtractor(new BalancedDelimiterMatcher(), new PhpLiteralArrayKeyParser()),
             ),
             new RouteControllerClassifier(),
         );

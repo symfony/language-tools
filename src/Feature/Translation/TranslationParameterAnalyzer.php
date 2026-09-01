@@ -3,12 +3,16 @@
 namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Parser\Php\PhpArgument;
-use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
+use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 
 final class TranslationParameterAnalyzer
 {
+    public function __construct(private readonly PhpLiteralArrayKeyParser $arrayKeys)
+    {
+    }
+
     /** @return list<string>|null */
     public function php(?PhpArgument $argument): ?array
     {
@@ -17,7 +21,7 @@ final class TranslationParameterAnalyzer
             return null;
         }
 
-        $keys = $this->phpLiteralKeys(substr($expression, 1, -1));
+        $keys = $this->arrayKeys->parse(substr($expression, 1, -1), allowNestedUnpacking: false);
 
         return null === $keys ? null : $this->normalize($keys);
     }
@@ -56,65 +60,6 @@ final class TranslationParameterAnalyzer
         }
 
         return $expectsValue ? null : $this->normalize($keys);
-    }
-
-    /** @return list<string>|null */
-    private function phpLiteralKeys(string $parameters): ?array
-    {
-        $keys = [];
-        $depth = 0;
-        $literalKey = null;
-        $keyIsLiteral = true;
-        $keyParsed = false;
-        foreach (token_get_all('<?php '.$parameters) as $token) {
-            if (\is_array($token)) {
-                if (\T_ELLIPSIS === $token[0]) {
-                    return null;
-                }
-                if (\in_array($token[0], [\T_CURLY_OPEN, \T_DOLLAR_OPEN_CURLY_BRACES], true)) {
-                    if (0 === $depth && !$keyParsed) {
-                        $keyIsLiteral = false;
-                    }
-                    ++$depth;
-
-                    continue;
-                }
-                if (0 !== $depth || \in_array($token[0], [\T_OPEN_TAG, \T_WHITESPACE, \T_COMMENT, \T_DOC_COMMENT], true)) {
-                    continue;
-                }
-                if (\T_DOUBLE_ARROW === $token[0] && !$keyParsed) {
-                    if (!$keyIsLiteral || null === $literalKey) {
-                        return null;
-                    }
-                    $keys[] = PhpStringLiteralDecoder::decode($literalKey[0], substr($literalKey, 1, -1));
-                    $keyParsed = true;
-                } elseif (!$keyParsed) {
-                    if (\T_CONSTANT_ENCAPSED_STRING === $token[0] && null === $literalKey) {
-                        $literalKey = $token[1];
-                    } else {
-                        $keyIsLiteral = false;
-                    }
-                }
-
-                continue;
-            }
-            if (\in_array($token, ['(', '[', '{'], true)) {
-                if (0 === $depth && !$keyParsed) {
-                    $keyIsLiteral = false;
-                }
-                ++$depth;
-            } elseif (\in_array($token, [')', ']', '}'], true)) {
-                --$depth;
-            } elseif (0 === $depth && ',' === $token) {
-                $literalKey = null;
-                $keyIsLiteral = true;
-                $keyParsed = false;
-            } elseif (0 === $depth && !$keyParsed) {
-                $keyIsLiteral = false;
-            }
-        }
-
-        return $keys;
     }
 
     private function twigHashKey(TwigDocument $document, TreeSitterNode $key): ?string

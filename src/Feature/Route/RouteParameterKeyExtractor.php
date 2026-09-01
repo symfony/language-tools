@@ -3,12 +3,14 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
-use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
+use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 
 final class RouteParameterKeyExtractor
 {
-    public function __construct(private readonly BalancedDelimiterMatcher $delimiters)
-    {
+    public function __construct(
+        private readonly BalancedDelimiterMatcher $delimiters,
+        private readonly PhpLiteralArrayKeyParser $arrayKeys,
+    ) {
     }
 
     /**
@@ -47,60 +49,8 @@ final class RouteParameterKeyExtractor
     /** @return list<string>|null */
     private function literalParameterKeys(string $parameters): ?array
     {
-        $keys = [];
-        $depth = 0;
-        $literalKey = null;
-        $keyIsLiteral = true;
-        $keyParsed = false;
-        foreach (token_get_all('<?php '.$parameters) as $token) {
-            if (\is_array($token)) {
-                if (\T_ELLIPSIS === $token[0] && 0 === $depth) {
-                    return null;
-                }
-                if (\in_array($token[0], [\T_CURLY_OPEN, \T_DOLLAR_OPEN_CURLY_BRACES], true)) {
-                    if (0 === $depth && !$keyParsed) {
-                        $keyIsLiteral = false;
-                    }
-                    ++$depth;
+        $keys = $this->arrayKeys->parse($parameters, allowNestedUnpacking: true);
 
-                    continue;
-                }
-                if (0 !== $depth || \in_array($token[0], [\T_OPEN_TAG, \T_WHITESPACE, \T_COMMENT, \T_DOC_COMMENT], true)) {
-                    continue;
-                }
-                if (\T_DOUBLE_ARROW === $token[0] && !$keyParsed) {
-                    if (!$keyIsLiteral || null === $literalKey) {
-                        return null;
-                    }
-                    $quote = $literalKey[0];
-                    $value = substr($literalKey, 1, -1);
-                    $keys[] = "'" === $quote ? strtr($value, ['\\\\' => '\\', "\\'" => "'"]) : PhpStringLiteralDecoder::decodeDoubleQuoted($value);
-                    $keyParsed = true;
-                } elseif (!$keyParsed) {
-                    if (\T_CONSTANT_ENCAPSED_STRING === $token[0] && null === $literalKey) {
-                        $literalKey = $token[1];
-                    } else {
-                        $keyIsLiteral = false;
-                    }
-                }
-                continue;
-            }
-            if (\in_array($token, ['(', '[', '{'], true)) {
-                if (0 === $depth && !$keyParsed) {
-                    $keyIsLiteral = false;
-                }
-                ++$depth;
-            } elseif (\in_array($token, [')', ']', '}'], true)) {
-                --$depth;
-            } elseif (0 === $depth && ',' === $token) {
-                $literalKey = null;
-                $keyIsLiteral = true;
-                $keyParsed = false;
-            } elseif (0 === $depth && !$keyParsed) {
-                $keyIsLiteral = false;
-            }
-        }
-
-        return array_values(array_unique($keys));
+        return null === $keys ? null : array_values(array_unique($keys));
     }
 }
