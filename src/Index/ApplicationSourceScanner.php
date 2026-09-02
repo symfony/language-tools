@@ -95,11 +95,11 @@ final class ApplicationSourceScanner implements ProjectStateInterface
     }
 
     /** @param array<array-key, mixed> $params */
-    public function updateOpenDocument(array $params, bool $includeExcluded = false): void
+    public function updateOpenDocument(array $params, bool $includeExcluded = false, bool $trackParseHealth = true): void
     {
         $uri = $this->uriParameter($params);
         if (null !== $uri) {
-            $this->overlays->updateUri($uri, $includeExcluded);
+            $this->overlays->updateUri($uri, $includeExcluded, $trackParseHealth);
         }
     }
 

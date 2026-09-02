@@ -564,7 +564,7 @@ final class TolerantPhpParserTest extends TestCase
                     return $value;
                 }
 
-                public function union((TwigEnvironment&\Stringable)|\stdClass $environment, TwigEnvironment|string $fallback): void {}
+                public function union((TwigEnvironment&\Stringable)|\stdClass $environment, TwigEnvironment|string $fallback, TwigEnvironment|null $explicitNullable, ?TwigEnvironment $nullable): void {}
 
                 #[FunctionAttribute('hidden')]
                 private function hidden(): void {}
@@ -600,6 +600,8 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame([
             ['Twig\Environment', 'Stringable', 'stdClass'],
             ['Twig\Environment', 'string'],
+            ['Twig\Environment', 'null'],
+            ['Twig\Environment'],
         ], array_map(static fn (PhpParameter $parameter): array => $parameter->types, $methods[1]->parameters));
         self::assertFalse($methods[2]->public);
         self::assertSame([], $methods[3]->attributes);

@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature;
 
+use Fabpot\JsonRpc\Exception\JsonRpcException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
@@ -195,8 +196,13 @@ final class ProviderRegistryTest extends TestCase
         $health->record($project, 'file:///workspace/src/Target.php', SourceParseHealth::Partial);
         $provider = new StubProvider([$edit]);
 
-        self::assertNull((new RenameProviderRegistry($health, [$provider]))->rename([]));
-        self::assertSame(['rename'], $provider->calls);
+        try {
+            (new RenameProviderRegistry($health, [$provider]))->rename([]);
+            self::fail('The rename should have been refused.');
+        } catch (JsonRpcException $error) {
+            self::assertSame('Rename is unavailable while an affected open PHP document contains syntax errors.', $error->getMessage());
+            self::assertSame(['rename'], $provider->calls);
+        }
     }
 
     /** @return iterable<string, array{array<array-key, mixed>}> */

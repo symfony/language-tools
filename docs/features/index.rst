@@ -199,10 +199,10 @@ Unsaved Files and Refreshes
 Navigation, references, rename and diagnostics from project files reflect
 unsaved changes. While an open PHP file is temporarily invalid, declarations
 from its last valid version remain available and references that can still be
-recognized reflect the current text. Declaration-dependent Event listener and
-Messenger handler diagnostics are withheld for that file until its syntax is
-valid again. Rename is refused if it would edit any PHP file with invalid
-syntax.
+recognized reflect the current text. Declaration changes become visible after
+the syntax is valid again. Declaration-dependent Console, Event and Messenger
+diagnostics are withheld until then. Rename reports an error if it would edit
+an open PHP file with invalid syntax.
 
 If no valid open version has been seen, features use the current best-effort
 facts. Closing the file discards retained declarations and exposes its saved

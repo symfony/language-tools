@@ -75,7 +75,8 @@ A named argument that doesn't match any parameter of the resolved PHP
 callable is reported as an error, including when other argument values contain
 nested function calls. String contents, member calls, hash literal keys and
 macro declarations aren't interpreted as function calls. Unrecognized, dynamic
-and variadic callables aren't diagnosed.
+and variadic callables aren't diagnosed. Argument diagnostics wait until the
+callable's PHP method has valid syntax.
 
 Hover
 -----

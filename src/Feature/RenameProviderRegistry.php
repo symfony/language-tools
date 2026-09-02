@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Feature;
 
+use Fabpot\JsonRpc\Exception\JsonRpcException;
+use Fabpot\JsonRpc\JsonRpcError;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 
 final class RenameProviderRegistry
@@ -41,7 +43,11 @@ final class RenameProviderRegistry
                 continue;
             }
 
-            return $this->targetsDegradedDocument($result) ? null : $result;
+            if ($this->targetsDegradedDocument($result)) {
+                throw new JsonRpcException(JsonRpcError::INVALID_REQUEST, 'Rename is unavailable while an affected open PHP document contains syntax errors.');
+            }
+
+            return $result;
         }
 
         return null;

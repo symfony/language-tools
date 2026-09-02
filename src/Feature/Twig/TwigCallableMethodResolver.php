@@ -53,7 +53,7 @@ final class TwigCallableMethodResolver
                         continue;
                     }
                     $key = $callableKey."\0".$class->uri."\0".$method->nameStartOffset;
-                    $resolved[$key] = new TwigCallableResolvedMethod($class->uri, $source, $method);
+                    $resolved[$key] = new TwigCallableResolvedMethod($class->uri, $source, $method, [] === $document->diagnostics);
                 }
             }
         }
@@ -106,7 +106,7 @@ final class TwigCallableMethodResolver
                 + (int) $callable->needsIsSandboxed;
         } else {
             $skip = 'charset' === ($parameters[0]->name ?? null) ? 1 : 0;
-            if (\in_array('Twig\\Environment', $parameters[$skip]->types ?? [], true)) {
+            if (['Twig\\Environment'] === ($parameters[$skip]->types ?? [])) {
                 ++$skip;
             }
             if ('context' === ($parameters[$skip]->name ?? null) && \in_array('array', $parameters[$skip]->types ?? [], true)) {
@@ -125,6 +125,6 @@ final class TwigCallableMethodResolver
             array_pop($nameable);
         }
 
-        return new TwigCallableParameters($all, $nameable, $variadic, $callable->optionsKnown);
+        return new TwigCallableParameters($all, $nameable, $variadic, $callable->optionsKnown && $method->reliable);
     }
 }

@@ -7,41 +7,36 @@ use Symfony\Lsp\Project\ProjectStateInterface;
 
 final class SourceOverlayHealthRegistry implements ProjectStateInterface
 {
-    /** @var array<string, array<string, true>> */
+    /** @var array<string, string> */
     private array $degraded = [];
 
     public function record(Project $project, string $uri, SourceParseHealth $health): void
     {
         if (SourceParseHealth::Partial === $health) {
-            $this->degraded[$project->rootPath][$uri] = true;
+            $this->degraded[$uri] = $project->rootPath;
 
             return;
         }
 
-        $this->clear($project, $uri);
+        $this->clear($uri);
     }
 
-    public function clear(Project $project, string $uri): void
+    public function clear(string $uri): void
     {
-        unset($this->degraded[$project->rootPath][$uri]);
-        if ([] === ($this->degraded[$project->rootPath] ?? [])) {
-            unset($this->degraded[$project->rootPath]);
-        }
+        unset($this->degraded[$uri]);
     }
 
     public function isDegraded(string $uri): bool
     {
-        foreach ($this->degraded as $uris) {
-            if (isset($uris[$uri])) {
-                return true;
-            }
-        }
-
-        return false;
+        return isset($this->degraded[$uri]);
     }
 
     public function removeProject(Project $project): void
     {
-        unset($this->degraded[$project->rootPath]);
+        foreach ($this->degraded as $uri => $rootPath) {
+            if ($project->rootPath === $rootPath) {
+                unset($this->degraded[$uri]);
+            }
+        }
     }
 }

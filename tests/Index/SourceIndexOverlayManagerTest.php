@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Index\PhpParseHealthResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Index\SourceFileEnumerator;
@@ -17,7 +18,6 @@ use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Index\SourceParseHealth;
 use Symfony\Lsp\Parser\Php\PhpDocument;
-use Symfony\Lsp\Parser\Php\PhpParseHealthResolver;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\GitignoreMatcher;
@@ -101,14 +101,23 @@ final class SourceIndexOverlayManagerTest extends TestCase
             self::assertSame([SourceParseHealth::Partial], $provider->healths);
             self::assertTrue($health->isDegraded($uri));
 
+            $manager->updateUri($uri, trackParseHealth: false);
+            self::assertSame(1, $parser->calls);
+            self::assertSame([SourceParseHealth::Partial, SourceParseHealth::Healthy], $provider->healths);
+            self::assertFalse($health->isDegraded($uri));
+
+            $manager->updateUri($uri);
+            self::assertSame(2, $parser->calls);
+            self::assertTrue($health->isDegraded($uri));
+
             $scope->configure($project, ['src/**']);
             $manager->updateUri($uri);
-            self::assertSame(1, $parser->calls);
+            self::assertSame(2, $parser->calls);
             self::assertFalse($health->isDegraded($uri));
 
             $scope->configure($project, []);
             $manager->updateUri($uri);
-            self::assertSame(2, $parser->calls);
+            self::assertSame(3, $parser->calls);
             self::assertTrue($health->isDegraded($uri));
 
             $manager->removeUri($uri);

@@ -124,7 +124,7 @@ final class TwigCallableDeclarationExtractor
             $attribute,
             'needsEnvironment',
             2,
-            null !== $firstParameter && \in_array('Twig\Environment', $firstParameter->types, true) && !$firstParameter->variadic,
+            null !== $firstParameter && ['Twig\Environment'] === $firstParameter->types && !$firstParameter->variadic,
         );
         [$needsContext, $contextKnown] = $this->attributeOption($attribute, 'needsContext', 3, false);
         [$needsIsSandboxed, $sandboxKnown] = $this->attributeSandboxOption($attribute);

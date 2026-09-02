@@ -232,7 +232,7 @@ final class PhpDeclarationFactBuilder
     }
 
     /** @return list<string> */
-    private function resolvedTypes(mixed $types, string $source, PhpNameContext $names): array
+    private function resolvedTypes(mixed $types, string $source, PhpNameContext $names, bool $includeNull = false): array
     {
         if (!$types instanceof QualifiedNameList) {
             return [];
@@ -245,7 +245,10 @@ final class PhpDeclarationFactBuilder
             $name = $type->getResolvedName();
             $resolved[] = null === $name ? $names->resolve($this->scopes->qualifiedName($type, $source)) : (string) $name;
         }
-        preg_match_all('/(?<![A-Za-z0-9_\\\\])(?:array|bool|callable|false|float|int|iterable|mixed|never|object|string|true|void)(?![A-Za-z0-9_\\\\])/i', $types->getText($source), $builtinTypes);
+        $builtinPattern = $includeNull
+            ? 'array|bool|callable|false|float|int|iterable|mixed|never|null|object|string|true|void'
+            : 'array|bool|callable|false|float|int|iterable|mixed|never|object|string|true|void';
+        preg_match_all('/(?<![A-Za-z0-9_\\\\])(?:'.$builtinPattern.')(?![A-Za-z0-9_\\\\])/i', $types->getText($source), $builtinTypes);
         foreach ($builtinTypes[0] as $type) {
             $resolved[] = strtolower($type);
         }
@@ -382,7 +385,7 @@ final class PhpDeclarationFactBuilder
             }
             $parameters[] = new PhpParameter(
                 $parameterName,
-                $this->resolvedTypes($parameter->typeDeclarationList, $source, $names),
+                $this->resolvedTypes($parameter->typeDeclarationList, $source, $names, true),
                 $parameter->variableName->getStartPosition() + 1,
                 $parameter->variableName->getEndPosition(),
                 $parameter->dotDotDotToken instanceof Token,

@@ -149,7 +149,7 @@ final class TwigCallableMethodResolverTest extends TestCase
         self::assertSame(['tag'], $parameters['attrs']->nameable);
         self::assertTrue($parameters['attrs']->variadic);
         self::assertTrue($parameters['attrs']->reliable);
-        self::assertSame(['name'], $parameters['dynamic']->nameable);
+        self::assertSame(['environment', 'context', 'name'], $parameters['dynamic']->nameable);
         self::assertTrue($parameters['dynamic']->variadic);
         self::assertFalse($parameters['dynamic']->reliable);
         $methods = $resolver->resolve($project, [$image]);
@@ -157,5 +157,51 @@ final class TwigCallableMethodResolverTest extends TestCase
         self::assertSame($uri, $methods[0]->uri);
         self::assertSame($source, $methods[0]->source);
         self::assertSame('render', $methods[0]->declaration->name);
+        self::assertTrue($methods[0]->reliable);
+    }
+
+    public function testMarksParametersFromPartiallyParsedMethodsAsUnreliable(): void
+    {
+        $uri = 'file:///workspace/src/Twig/MediaExtension.php';
+        $source = <<<'PHP'
+            <?php
+            namespace App\Twig;
+
+            final class MediaExtension
+            {
+                public function render(string $name, int $width = 200
+            PHP;
+        $project = new Project('/workspace', 'file:///workspace');
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $source));
+        $parser = new TolerantPhpParser(new Parser());
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $classIndexes->forProject($project)->replace(new DependencyInjectionSourceFacts(
+            $uri,
+            classes: (new PhpClassDeclarationExtractor(new PositionConverter(), $parser))->extract($uri, $source),
+        ));
+        $resolver = new TwigCallableMethodResolver(
+            $classIndexes,
+            new ProjectDocumentReader($documents, new ProjectPathResolver(new UriToPathConverter())),
+            $parser,
+        );
+        $declaration = new TwigCallableDeclaration(
+            TwigCallableKind::Function,
+            'image',
+            $uri,
+            new Range(new Position(0, 0), new Position(0, 1)),
+            'App\Twig\MediaExtension',
+            'render',
+        );
+
+        $parameters = $resolver->parameters($project, [
+            'image' => ['kind' => TwigCallableKind::Function, 'declarations' => [$declaration]],
+        ]);
+        $methods = $resolver->resolve($project, [$declaration]);
+
+        self::assertSame(['name', 'width'], $parameters['image']->all);
+        self::assertFalse($parameters['image']->reliable);
+        self::assertCount(1, $methods);
+        self::assertFalse($methods[0]->reliable);
     }
 }

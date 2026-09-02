@@ -1,14 +1,14 @@
 <?php
 
-namespace Symfony\Lsp\Tests\Parser\Php;
+namespace Symfony\Lsp\Tests\Index;
 
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
+use Symfony\Lsp\Index\PhpParseHealthResolver;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Index\SourceParseHealth;
-use Symfony\Lsp\Parser\Php\PhpParseHealthResolver;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 
@@ -39,6 +39,24 @@ final class PhpParseHealthResolverTest extends TestCase
                 }
             }
             PHP];
+        yield 'promoted property hooks' => [<<<'PHP'
+            <?php
+            final class Article
+            {
+                public function __construct(public string $title { set(string $value) { $this->title = trim($value); } })
+                {
+                }
+            }
+            PHP];
+        yield 'by-reference get hooks' => [<<<'PHP'
+            <?php
+            final class Article
+            {
+                public array $tags {
+                    &get { return $this->tags; }
+                }
+            }
+            PHP];
         yield 'PHP 8.5 pipe operator' => [<<<'PHP'
             <?php
             $title = ' Symfony ' |> trim(...) |> strtoupper(...);
@@ -62,6 +80,17 @@ final class PhpParseHealthResolverTest extends TestCase
             SourceParseHealth::Healthy,
             $resolver->resolve($project, new Document($uri, 'php', 2, '<?php final class Article {}')),
         );
+        self::assertFalse($registry->isDegraded($uri));
+    }
+
+    public function testHealthyStateClearsTheUriAfterProjectRemapping(): void
+    {
+        $registry = new SourceOverlayHealthRegistry();
+        $uri = 'file:///workspace/src/Article.php';
+        $registry->record(new Project('/workspace', 'file:///workspace'), $uri, SourceParseHealth::Partial);
+
+        $registry->record(new Project('/workspace/src', 'file:///workspace/src'), $uri, SourceParseHealth::Healthy);
+
         self::assertFalse($registry->isDegraded($uri));
     }
 

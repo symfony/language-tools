@@ -8,6 +8,8 @@ use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 final class PartialParseDiagnosticFilter
 {
     private const FILTERED_CODES = [
+        'console.unknown_argument' => true,
+        'console.unknown_option' => true,
         'event.invalid_listener_method' => true,
         'messenger.invalid_handler_signature' => true,
     ];

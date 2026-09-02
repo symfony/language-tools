@@ -41,7 +41,7 @@ final class CheckDiagnosticExecutor
                 $this->documents->open(new Document($file->uri, $file->languageId, 0, $analysis->preparedTexts[$file->path]));
                 $openDocuments[$file->uri] = true;
                 $excludedOverlays[$file->uri] = true;
-                $this->sourceScanner->updateOpenDocument(['textDocument' => ['uri' => $file->uri]], true);
+                $this->sourceScanner->updateOpenDocument(['textDocument' => ['uri' => $file->uri]], true, false);
             }
 
             $diagnosedCount = 0;

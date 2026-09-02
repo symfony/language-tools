@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Recognize promoted and by-reference PHP property hooks
+- Report rename refusals for partially parsed PHP documents
+- Withhold Twig callable argument diagnostics for partial PHP methods
 - Preserve PHP declarations during transient parse errors
 - Read PHP method parameters structurally across Twig, Form and Messenger analysis
 - Scope PHP property hooks and expose interface hook properties

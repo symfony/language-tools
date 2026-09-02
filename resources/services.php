@@ -63,7 +63,6 @@ use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpExpressionParser;
-use Symfony\Lsp\Parser\Php\PhpParseHealthResolver;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
@@ -197,7 +196,6 @@ return static function (ContainerConfigurator $container): void {
     $services->set(YamlScalarDecoder::class);
     $services->set(BalancedDelimiterMatcher::class);
     $services->set(PhpCapturedReceiverResolver::class);
-    $services->set(PhpParseHealthResolver::class);
     $services->set(QuotedArgumentMatcher::class);
     $services->set(TwigCallArgumentResolver::class);
     $services->set(CommentParserRegistry::class)

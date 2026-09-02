@@ -10,6 +10,7 @@ final class TwigCallableResolvedMethod
         public readonly string $uri,
         public readonly string $source,
         public readonly PhpMethodDeclaration $declaration,
+        public readonly bool $reliable,
     ) {
     }
 }

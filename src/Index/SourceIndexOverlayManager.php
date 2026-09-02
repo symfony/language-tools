@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Index;
 
 use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Parser\Php\PhpParseHealthResolver;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -21,7 +20,7 @@ final class SourceIndexOverlayManager
     ) {
     }
 
-    public function updateUri(string $uri, bool $includeExcluded = false): void
+    public function updateUri(string $uri, bool $includeExcluded = false, bool $trackParseHealth = true): void
     {
         $document = $this->documents->get($uri);
         $project = $this->projects->forDocumentUri($uri);
@@ -34,12 +33,16 @@ final class SourceIndexOverlayManager
             || $this->files->gitignoreExcluded($project->rootPath, $path)
         ) {
             $this->providers->removeOverlay($project, $uri);
-            $this->overlayHealth->clear($project, $uri);
+            $this->overlayHealth->clear($uri);
 
             return;
         }
 
-        $this->providers->overlay($project, $document, $this->parseHealth->resolve($project, $document));
+        $health = $trackParseHealth ? $this->parseHealth->resolve($project, $document) : SourceParseHealth::Healthy;
+        if (!$trackParseHealth) {
+            $this->overlayHealth->clear($uri);
+        }
+        $this->providers->overlay($project, $document, $health);
     }
 
     public function removeUri(string $uri): void
@@ -47,7 +50,7 @@ final class SourceIndexOverlayManager
         $project = $this->projects->forDocumentUri($uri);
         if (null !== $project) {
             $this->providers->removeOverlay($project, $uri);
-            $this->overlayHealth->clear($project, $uri);
+            $this->overlayHealth->clear($uri);
         }
     }
 

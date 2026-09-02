@@ -21,6 +21,8 @@ final class PartialParseDiagnosticFilterTest extends TestCase
         $filter = new PartialParseDiagnosticFilter($health);
         $document = new Document($uri, 'php', 2, '<?php final class Listener {');
         $diagnostics = [
+            ['code' => 'console.unknown_argument'],
+            ['code' => 'console.unknown_option'],
             ['code' => 'event.invalid_listener_method'],
             ['code' => 'messenger.invalid_handler_signature'],
             ['code' => 'service.not_found'],

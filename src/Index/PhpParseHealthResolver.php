@@ -1,10 +1,9 @@
 <?php
 
-namespace Symfony\Lsp\Parser\Php;
+namespace Symfony\Lsp\Index;
 
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
-use Symfony\Lsp\Index\SourceParseHealth;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Project\Project;
 
 final class PhpParseHealthResolver
