@@ -1,0 +1,34 @@
+#!/usr/bin/env php
+<?php
+
+require_once __DIR__.'/InteractiveProcessRunner.php';
+require_once __DIR__.'/ReleaseVersion.php';
+require_once __DIR__.'/ReleaseReference.php';
+require_once __DIR__.'/ReleasePharDownloader.php';
+require_once __DIR__.'/ReleasePharBuilder.php';
+
+use Symfony\Lsp\Tools\InteractiveProcessRunner;
+use Symfony\Lsp\Tools\ReleasePharBuilder;
+use Symfony\Lsp\Tools\ReleasePharDownloader;
+use Symfony\Lsp\Tools\ReleaseReference;
+
+const BOX_URL = 'https://github.com/box-project/box/releases/download/4.6.7/box.phar';
+const BOX_CHECKSUM = 'f49a711985219c9e0ef9faa49a95d8ab47385b8b8966dc5ac0ca10f9ac318e6b';
+
+if (3 !== $argc) {
+    fwrite(\STDERR, "Usage: tools/build-release-phar <branch|tag> <ref-name>\n");
+    exit(2);
+}
+
+try {
+    $root = \dirname(__DIR__);
+    $reference = new ReleaseReference($argv[1], $argv[2]);
+    (new ReleasePharBuilder(
+        $root,
+        new ReleasePharDownloader(BOX_URL, BOX_CHECKSUM),
+        new InteractiveProcessRunner(),
+    ))->build($reference);
+} catch (\Throwable $error) {
+    fwrite(\STDERR, $error->getMessage()."\n");
+    exit(1);
+}
