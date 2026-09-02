@@ -47,6 +47,20 @@ final class ReleaseWorkflowTest extends TestCase
         self::assertStringContainsString('verify_only: true', $workflow);
     }
 
+    public function testProductionPackagingRunsFastProductionPharChecksOnEveryChange(): void
+    {
+        $workflow = $this->workflow('packaging.yaml');
+
+        self::assertStringContainsString("    pull_request:\n    push:\n        branches: [main]\n    workflow_dispatch:", $workflow);
+        self::assertStringNotContainsString('paths:', $workflow);
+        self::assertStringNotContainsString('paths-ignore:', $workflow);
+        self::assertStringContainsString('os: [ubuntu-latest, windows-2022]', $workflow);
+        self::assertStringContainsString('composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader', $workflow);
+        self::assertStringContainsString('php tools/build-release-phar branch dev', $workflow);
+        self::assertStringContainsString('php tools/smoke-test-server --commands-only --php build/symfony-lsp.phar dev', $workflow);
+        self::assertStringContainsString('PHPRC="$GITHUB_WORKSPACE/var/build/phar-smoke/php.ini" php tools/smoke-test-server --php build/symfony-lsp.phar dev', $workflow);
+    }
+
     public function testTagReleasePromotesOnlyTheExactSuccessfulCandidate(): void
     {
         $workflow = $this->workflow('release.yaml');

@@ -1,0 +1,45 @@
+name: Production packaging
+
+on:
+    pull_request:
+    push:
+        branches: [main]
+    workflow_dispatch:
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+    contents: read
+
+jobs:
+    phar:
+        name: PHAR (${{ matrix.os }})
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, windows-2022]
+        steps:
+            - uses: actions/checkout@v7
+            - uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.4'
+                  coverage: none
+            - name: Install production dependencies
+              run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+            - name: Build the production PHAR
+              run: php tools/build-release-phar branch dev
+            - name: Smoke-test PHAR commands on Windows
+              if: runner.os == 'Windows'
+              run: php tools/smoke-test-server --commands-only --php build/symfony-lsp.phar dev
+            - name: Build the Tree-sitter extension
+              if: runner.os == 'Linux'
+              run: composer tree-sitter:build
+            - name: Fully smoke-test the PHAR on Ubuntu
+              if: runner.os == 'Linux'
+              run: |
+                  mkdir -p var/build/phar-smoke
+                  printf 'extension=%s\n' "$GITHUB_WORKSPACE/var/build/tree_sitter/modules/symfony_lsp_tree_sitter.so" > var/build/phar-smoke/php.ini
+                  PHPRC="$GITHUB_WORKSPACE/var/build/phar-smoke/php.ini" php tools/smoke-test-server --php build/symfony-lsp.phar dev
