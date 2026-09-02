@@ -43,6 +43,8 @@ jobs:
                   php-version: '8.4'
                   coverage: none
             - uses: ramsey/composer-install@v4
+            - name: Validate Composer autoloading
+              run: composer autoload-check
             - name: Install the runtime fixture
               run: composer runtime-fixture:install
             - name: Build the Tree-sitter extension

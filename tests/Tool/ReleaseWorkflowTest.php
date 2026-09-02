@@ -85,6 +85,11 @@ final class ReleaseWorkflowTest extends TestCase
         }
     }
 
+    public function testQualityValidatesComposerAutoloading(): void
+    {
+        self::assertStringContainsString('run: composer autoload-check', $this->workflow('quality.yaml'));
+    }
+
     public function testWorkflowsUseTheApprovedActionMajors(): void
     {
         $approved = [
