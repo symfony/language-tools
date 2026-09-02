@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.18.0 (2026-09-02)
 
 - Detect lazy Stimulus markers anywhere in controller files
 - Treat CRLF line endings as single terminators in document positions
