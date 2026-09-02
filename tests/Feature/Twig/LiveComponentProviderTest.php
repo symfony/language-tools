@@ -124,7 +124,7 @@ final class LiveComponentProviderTest extends TestCase
             );
         }
 
-        $eventProvider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser());
+        $eventProvider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
         self::assertSame(['search:completed'], array_column($eventProvider->complete($this->params($converter, $classUri, $classText, strpos($classText, "emit('search:co") + \strlen("emit('search:co"))) ?? [], 'label'));
         $eventParams = $this->params($converter, $classUri, $classText, strpos($classText, "emit('search:completed") + \strlen("emit('search:"));
         self::assertSame([$classUri], array_column($eventProvider->definition($eventParams) ?? [], 'uri'));
@@ -134,6 +134,66 @@ final class LiveComponentProviderTest extends TestCase
         self::assertIsArray($eventHover['contents'] ?? null);
         self::assertIsString($eventHover['contents']['value'] ?? null);
         self::assertStringContainsString('Listener: `Search#refresh`', $eventHover['contents']['value']);
+    }
+
+    public function testCompletesOnlyEmitCallsOnTheirOwningLiveComponents(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = $this->extractor($converter);
+        $uri = 'file:///workspace/src/Twig/Components/Events.php';
+        $text = <<<'PHP'
+            <?php
+            namespace App\Twig\Components;
+
+            use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
+            use Symfony\UX\LiveComponent\Attribute\LiveListener;
+
+            #[AsLiveComponent(name: 'Search')]
+            final class Search
+            {
+                #[LiveListener('search:completed')]
+                public function refresh(): void
+                {
+                }
+
+                public function submit(): void
+                {
+                    $this->emit('search:completed');
+                    $this->emit(event: 'search:completed');
+                    $bus->emit('search:completed');
+                    emit('search:completed');
+                }
+            }
+
+            final class Helper
+            {
+                public function submit(): void
+                {
+                    $this->emit('search:completed');
+                }
+            }
+            PHP;
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $indexes = new TwigComponentIndexRegistry();
+        $indexes->forProject($project)->replace($extractor->extract($project, new SourceDocument($uri, 'php', $text)));
+        $provider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
+
+        /** @var list<array{string, list<string>, bool}> $cases */
+        $cases = [
+            ['$this->emit(\'search:c', ['search:completed'], false],
+            ['$this->emit(event: \'search:c', ['search:completed'], false],
+            ['$bus->emit(\'search:c', [], false],
+            ["\n                    emit('search:c", [], false],
+            ['$this->emit(\'search:c', [], true],
+        ];
+        foreach ($cases as [$needle, $expected, $last]) {
+            $offset = (int) ($last ? strrpos($text, $needle) : strpos($text, $needle)) + \strlen($needle);
+
+            self::assertSame($expected, array_column($provider->complete($this->params($converter, $uri, $text, $offset)) ?? [], 'label'));
+        }
     }
 
     public function testRecoversComponentFromIncompletePhp(): void
@@ -208,7 +268,7 @@ final class LiveComponentProviderTest extends TestCase
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new TwigComponentIndexRegistry();
         $indexes->forProject($project)->replace($extractor->extract($project, new SourceDocument($uri, 'php', $text)));
-        $provider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser());
+        $provider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
 
         self::assertNull($provider->complete($this->params($converter, $uri, $text, strpos($text, 'search:c') + \strlen('search:c'))));
     }
