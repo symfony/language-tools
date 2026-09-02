@@ -40,16 +40,15 @@ PHP enum case, diagnostics recognize that value. YAML values that use the
 ``!php/enum`` tag are matched to the declared cases. Direct ``!php/const``
 values stay opaque because their runtime value can't be determined statically.
 YAML aliases and merge keys are resolved before validation. Direct alias
-diagnostics point to the alias
-reference. Inherited mapping keys and values are checked at their effective
-configuration paths, with diagnostics pointing to the corresponding ``<<`` key.
-Symfony Language Tools suppresses diagnostics when a root key doesn't belong to
-an installed bundle, so application service and import sections aren't mistaken
-for bundle configuration. Files in
-conventional routing locations, including ``config/routes/`` and
-``config/routes.yaml``, are analyzed as routes instead. Files loaded by the
-selected environment's router receive the same treatment, including files in
-custom locations. Diagnostics are limited to the application's own ``config/``
+diagnostics point to the alias reference. Inherited mapping keys and values are
+checked at their effective configuration paths, with diagnostics pointing to the
+corresponding ``<<`` key. Symfony Language Tools suppresses diagnostics when a
+root key doesn't belong to an installed bundle, so application service and
+import sections aren't mistaken for bundle configuration. Files in conventional
+routing locations, including ``config/routes/`` and ``config/routes.yaml``, are
+analyzed as routes instead. Files loaded by the selected environment's router
+receive the same treatment, including files in custom locations. Diagnostics are
+limited to the application's own ``config/``
 directory because configuration files elsewhere, such as bundle test fixtures,
 can target another kernel.
 

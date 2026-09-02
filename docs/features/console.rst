@@ -25,7 +25,8 @@ calls:
 
 Suggestions include names configured by the command, inherited definitions and
 application-level options such as ``help``, ``verbose``, ``env`` and
-``no-debug``.
+``no-debug``. Input references through typed parameters captured by closures and
+arrow functions are also recognized.
 
 Diagnostics
 -----------
@@ -47,8 +48,7 @@ The integration recognizes arguments and options added in ``configure()`` with
 ``addArgument()``, ``addOption()`` and static ``setDefinition()`` calls. It also
 recognizes ``#[Argument]`` and ``#[Option]`` parameters on invokable commands.
 Definitions inherited from application-owned parent classes and traits are
-included. Input references through typed parameters captured by closures and
-arrow functions are also recognized.
+included.
 
 Limitations
 -----------
