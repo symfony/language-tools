@@ -575,16 +575,16 @@
         },
         {
             "name": "fabpot/tolerant-php-parser",
-            "version": "v0.2.1",
+            "version": "v0.2.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/fabpot/tolerant-php-parser.git",
-                "reference": "6ca211ab2c76e42a3dfeb39a654588884d979104"
+                "reference": "e1dda3dc54071267628eff4ad5ba5a3ce2ec7e0f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/fabpot/tolerant-php-parser/zipball/6ca211ab2c76e42a3dfeb39a654588884d979104",
-                "reference": "6ca211ab2c76e42a3dfeb39a654588884d979104",
+                "url": "https://api.github.com/repos/fabpot/tolerant-php-parser/zipball/e1dda3dc54071267628eff4ad5ba5a3ce2ec7e0f",
+                "reference": "e1dda3dc54071267628eff4ad5ba5a3ce2ec7e0f",
                 "shasum": ""
             },
             "require": {
@@ -633,7 +633,7 @@
                     "url": "https://github.com/fabpot"
                 }
             ],
-            "time": "2026-08-01T12:54:25+00:00"
+            "time": "2026-09-02T16:12:54+00:00"
         },
         {
             "name": "psr/container",

@@ -603,6 +603,7 @@ final class TolerantPhpParserTest extends TestCase
                 case Published = 'published';
 
                 public const LABEL = 'Status';
+                public const ?string DESCRIPTION = null;
                 private const SECRET = 'secret';
             }
 
@@ -635,6 +636,7 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame([
             [PhpConstantKind::EnumCase, 'App\Model\Status', 'Published', 'case Published;', 'The published state.', true],
             [PhpConstantKind::ClassConstant, 'App\Model\Status', 'LABEL', 'public const LABEL;', null, true],
+            [PhpConstantKind::ClassConstant, 'App\Model\Status', 'DESCRIPTION', 'public const ?string DESCRIPTION;', null, true],
             [PhpConstantKind::ClassConstant, 'App\Model\Status', 'SECRET', 'private const SECRET;', null, false],
             [PhpConstantKind::ClassConstant, 'App\Model\Options', 'FORMAT', 'public const FORMAT;', null, true],
             [PhpConstantKind::ClassConstant, 'App\Model\Options', 'EXTENSION', 'public const EXTENSION;', null, true],

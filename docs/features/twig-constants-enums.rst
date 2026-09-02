@@ -23,7 +23,8 @@ function. Enum classes and cases are also recognized through ``enum()`` and
 
 Arguments are recognized positionally or by the ``constant`` and ``enum``
 names declared by the Twig functions. String arguments use Twig's escape
-semantics before PHP class and member names are resolved.
+semantics before PHP class and member names are resolved. Typed class
+constants, including nullable declarations, are indexed like untyped constants.
 
 Completion
 ----------

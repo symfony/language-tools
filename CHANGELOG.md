@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Parse nullable typed class constants
 - Gate releases on green main, public dogfooding and exact candidates with safe retries
 - Validate and promote exact release candidate artifacts
 - Share release PHAR building and package validation across platforms
