@@ -63,6 +63,8 @@ final class TranslationExtractorTest extends TestCase
     {
         $references = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Controller.php', 'php', <<<'PHP'
             <?php
+            use Symfony\Component\Translation\TranslatableMessage;
+
             $translator->trans(id: 'panel.title', domain: 'admin');
             t(message: 'article.title');
             new TranslatableMessage(message: 'article.title');
@@ -347,6 +349,28 @@ final class TranslationExtractorTest extends TestCase
                 ['panel.title', 'admin', ['id']],
             ],
             array_map(static fn ($reference): array => [$reference->key, $reference->domain, $reference->placeholders], $references),
+        );
+    }
+
+    public function testOnlyExtractsSymfonyTranslatableMessageReferences(): void
+    {
+        $references = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Controller.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            use Acme\TranslatableMessage as AcmeMessage;
+            use Symfony\Component\Translation\TranslatableMessage as SymfonyMessage;
+
+            new SymfonyMessage('symfony.imported');
+            new \Symfony\Component\Translation\TranslatableMessage('symfony.qualified');
+            new AcmeMessage('acme.imported');
+            new TranslatableMessage('app.local');
+            new \Acme\TranslatableMessage('acme.qualified');
+            PHP))->references;
+
+        self::assertSame(
+            ['symfony.imported', 'symfony.qualified'],
+            array_map(static fn ($reference): string => $reference->key, $references),
         );
     }
 

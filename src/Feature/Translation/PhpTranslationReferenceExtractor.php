@@ -110,9 +110,7 @@ final class PhpTranslationReferenceExtractor
 
     private function isTranslatableMessage(PhpObjectCreation $creation): bool
     {
-        $separator = strrpos($creation->className, '\\');
-
-        return 'TranslatableMessage' === (false === $separator ? $creation->className : substr($creation->className, $separator + 1));
+        return 'Symfony\\Component\\Translation\\TranslatableMessage' === $creation->className;
     }
 
     /** @param list<string>|null $placeholders */
