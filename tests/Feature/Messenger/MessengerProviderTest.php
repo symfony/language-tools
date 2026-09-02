@@ -111,6 +111,33 @@ YAML;
         self::assertSame(['command.bus'], array_map(static fn ($symbol): string => $symbol->name, $incompleteFacts->symbols));
     }
 
+    public function testIgnoresClassReferencesEmbeddedInHandlerExpressions(): void
+    {
+        $converter = new PositionConverter();
+        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
+        $extractor = new MessengerExtractor(
+            $converter,
+            new TolerantPhpParser(new Parser()),
+            new CapturedReceiverResolver(new BalancedDelimiterMatcher()),
+            new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
+            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]),
+        );
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Handler.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+
+            #[AsMessageHandler(handles: MESSAGE_PREFIX . IgnoredPrefixMessage::class)]
+            #[AsMessageHandler(handles: IgnoredSuffixMessage::class . MESSAGE_SUFFIX)]
+            final class Handler
+            {
+            }
+            PHP));
+
+        self::assertSame([], $facts->symbols);
+    }
+
     public function testPreservesGroupedRepeatableHandlerAttributes(): void
     {
         $converter = new PositionConverter();

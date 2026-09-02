@@ -186,6 +186,32 @@ final class DoctrineProviderTest extends TestCase
         self::assertSame('Entity: App\\Entity\\Product', $repositoryLenses[0]['command']['title'] ?? null);
     }
 
+    public function testIgnoresClassReferencesEmbeddedInMappingExpressions(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Entity/Product.php', 'php', <<<'PHP'
+            <?php
+            namespace App\Entity;
+
+            use App\Repository\ProductRepository;
+            use Doctrine\ORM\Mapping as ORM;
+
+            #[ORM\Entity(repositoryClass: REPOSITORY_PREFIX . ProductRepository::class)]
+            final class Product
+            {
+                #[ORM\ManyToOne(targetEntity: Category::class . ENTITY_SUFFIX)]
+                private mixed $category;
+            }
+            PHP));
+
+        self::assertNull($facts->entities[0]->repositoryClass);
+        self::assertNull($facts->entities[0]->fields[0]->targetEntity);
+        self::assertSame([], $facts->repositories);
+        self::assertSame([], array_values(array_filter(
+            $facts->symbols,
+            static fn ($symbol): bool => DoctrineSymbolKind::Repository === $symbol->kind,
+        )));
+    }
+
     public function testUsesPropertyPlacementAndScopedRepositoryReceivers(): void
     {
         $converter = new PositionConverter();

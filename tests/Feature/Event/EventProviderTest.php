@@ -83,6 +83,24 @@ YAML;
         self::assertSame('legacy.order_placed', $extractor->extract(new SourceDocument('file:///workspace/config/services.yaml', 'yaml', $yaml))->symbols[0]->name);
     }
 
+    public function testIgnoresClassReferencesEmbeddedInListenerEventExpressions(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Listener.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+
+            #[AsEventListener(event: EVENT_PREFIX . IgnoredPrefixEvent::class)]
+            #[AsEventListener(event: IgnoredSuffixEvent::class . EVENT_SUFFIX)]
+            final class Listener
+            {
+            }
+            PHP));
+
+        self::assertSame([], $facts->symbols);
+    }
+
     public function testPreservesGroupedRepeatableListenerAttributes(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Listener.php', 'php', <<<'PHP'

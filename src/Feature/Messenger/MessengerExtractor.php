@@ -8,7 +8,9 @@ use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Feature\Console\CapturedReceiverResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\CommentParserRegistry;
+use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
+use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
@@ -67,7 +69,7 @@ final class MessengerExtractor
                     }
                     $symbols[] = $this->symbol($kind, $literal->value, $document->uri, $document->text, $literal->startOffset, false, $literal->endOffset - $literal->startOffset);
                 }
-                $handles = $php->firstClassReference($attribute->argument('handles'));
+                $handles = $this->directClassReference($source, $php, $attribute->argument('handles'));
                 if (null !== $handles) {
                     $symbols[] = $this->symbol(MessengerSymbolKind::Message, $handles->className, $document->uri, $document->text, $handles->startOffset, false, $handles->endOffset - $handles->startOffset);
                 }
@@ -100,6 +102,20 @@ final class MessengerExtractor
         }
 
         return new MessengerSourceFacts($document->uri, $this->unique($symbols), $parents, $handlers);
+    }
+
+    private function directClassReference(string $source, PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
+    {
+        $reference = $php->soleClassReference($argument);
+        $start = $argument?->expressionStartOffset;
+        $end = $argument?->expressionEndOffset;
+        if (null === $reference || !\is_int($start) || !\is_int($end)) {
+            return null;
+        }
+        $before = trim(substr($source, $start, $reference->startOffset - $start));
+        $after = substr($source, $reference->endOffset, $end - $reference->endOffset);
+
+        return '' === $before && 1 === preg_match('/^\s*::\s*class\s*$/iD', $after) ? $reference : null;
     }
 
     /** @return list<MessengerSourceSymbol> */
