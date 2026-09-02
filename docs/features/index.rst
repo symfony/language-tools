@@ -201,7 +201,8 @@ unsaved changes. While an open PHP file is temporarily invalid, declarations
 from its last valid version remain available and references that can still be
 recognized reflect the current text. Declaration-dependent Event listener and
 Messenger handler diagnostics are withheld for that file until its syntax is
-valid again.
+valid again. Rename is refused if it would edit any PHP file with invalid
+syntax.
 
 If no valid open version has been seen, features use the current best-effort
 facts. Closing the file discards retained declarations and exposes its saved

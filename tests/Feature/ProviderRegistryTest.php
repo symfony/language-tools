@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Feature\CodeActionProviderRegistry;
@@ -19,6 +20,9 @@ use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderRegistry;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Feature\RenameProviderRegistry;
+use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
+use Symfony\Lsp\Index\SourceParseHealth;
+use Symfony\Lsp\Project\Project;
 
 final class ProviderRegistryTest extends TestCase
 {
@@ -150,15 +154,15 @@ final class ProviderRegistryTest extends TestCase
 
         self::assertSame(
             ['placeholder' => 'second'],
-            (new RenameProviderRegistry([$first, $second, $third]))->prepare([]),
+            (new RenameProviderRegistry(new SourceOverlayHealthRegistry(), [$first, $second, $third]))->prepare([]),
         );
         self::assertSame(['prepare'], $first->calls);
         self::assertSame(['prepare'], $second->calls);
         self::assertSame([], $third->calls);
-        self::assertNull((new RenameProviderRegistry([new StubProvider(null)]))->prepare([]));
+        self::assertNull((new RenameProviderRegistry(new SourceOverlayHealthRegistry(), [new StubProvider(null)]))->prepare([]));
 
         $afterEmpty = new StubProvider([['placeholder' => 'later']]);
-        self::assertSame([], (new RenameProviderRegistry([new StubProvider([[]]), $afterEmpty]))->prepare([]));
+        self::assertSame([], (new RenameProviderRegistry(new SourceOverlayHealthRegistry(), [new StubProvider([[]]), $afterEmpty]))->prepare([]));
         self::assertSame([], $afterEmpty->calls);
     }
 
@@ -170,16 +174,43 @@ final class ProviderRegistryTest extends TestCase
 
         self::assertSame(
             ['changes' => ['second']],
-            (new RenameProviderRegistry([$first, $second, $third]))->rename([]),
+            (new RenameProviderRegistry(new SourceOverlayHealthRegistry(), [$first, $second, $third]))->rename([]),
         );
         self::assertSame(['rename'], $first->calls);
         self::assertSame(['rename'], $second->calls);
         self::assertSame([], $third->calls);
-        self::assertNull((new RenameProviderRegistry([new StubProvider(null)]))->rename([]));
+        self::assertNull((new RenameProviderRegistry(new SourceOverlayHealthRegistry(), [new StubProvider(null)]))->rename([]));
 
         $afterEmpty = new StubProvider([['changes' => ['later']]]);
-        self::assertSame([], (new RenameProviderRegistry([new StubProvider([[]]), $afterEmpty]))->rename([]));
+        self::assertSame([], (new RenameProviderRegistry(new SourceOverlayHealthRegistry(), [new StubProvider([[]]), $afterEmpty]))->rename([]));
         self::assertSame([], $afterEmpty->calls);
+    }
+
+    /** @param array<array-key, mixed> $edit */
+    #[DataProvider('workspaceEditProvider')]
+    public function testRenameRefusesWorkspaceEditsTargetingADegradedDocument(array $edit): void
+    {
+        $health = new SourceOverlayHealthRegistry();
+        $project = new Project('/workspace', 'file:///workspace');
+        $health->record($project, 'file:///workspace/src/Target.php', SourceParseHealth::Partial);
+        $provider = new StubProvider([$edit]);
+
+        self::assertNull((new RenameProviderRegistry($health, [$provider]))->rename([]));
+        self::assertSame(['rename'], $provider->calls);
+    }
+
+    /** @return iterable<string, array{array<array-key, mixed>}> */
+    public static function workspaceEditProvider(): iterable
+    {
+        yield 'document changes' => [[
+            'documentChanges' => [[
+                'textDocument' => ['uri' => 'file:///workspace/src/Target.php', 'version' => null],
+                'edits' => [],
+            ]],
+        ]];
+        yield 'changes' => [[
+            'changes' => ['file:///workspace/src/Target.php' => []],
+        ]];
     }
 }
 
