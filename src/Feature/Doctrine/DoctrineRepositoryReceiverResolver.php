@@ -2,14 +2,14 @@
 
 namespace Symfony\Lsp\Feature\Doctrine;
 
-use Symfony\Lsp\Feature\Console\CapturedReceiverResolver;
+use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 
 final class DoctrineRepositoryReceiverResolver
 {
-    public function __construct(private readonly CapturedReceiverResolver $capturedReceivers)
+    public function __construct(private readonly PhpCapturedReceiverResolver $capturedReceivers)
     {
     }
 

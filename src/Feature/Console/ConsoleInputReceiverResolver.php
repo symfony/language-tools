@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Console;
 
+use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpTypedVariable;
@@ -10,7 +11,7 @@ final class ConsoleInputReceiverResolver
 {
     private const INPUT_INTERFACE = 'Symfony\\Component\\Console\\Input\\InputInterface';
 
-    public function __construct(private readonly CapturedReceiverResolver $capturedReceivers)
+    public function __construct(private readonly PhpCapturedReceiverResolver $capturedReceivers)
     {
     }
 

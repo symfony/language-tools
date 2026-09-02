@@ -7,7 +7,6 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
-use Symfony\Lsp\Feature\Console\CapturedReceiverResolver;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\Metadata\FormMetadataExtractor;
@@ -16,6 +15,7 @@ use Symfony\Lsp\Feature\Metadata\SerializerMetadataExtractor;
 use Symfony\Lsp\Feature\Metadata\ValidationMetadataExtractor;
 use Symfony\Lsp\Feature\Metadata\YamlMetadataExtractor;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
+use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -34,7 +34,7 @@ abstract class MetadataTestCase extends TestCase
             $converter,
             $parser,
             $comments,
-            new FormMetadataExtractor($converter, new BalancedDelimiterMatcher(), new CapturedReceiverResolver(new BalancedDelimiterMatcher()), new PhpLiteralArrayKeyParser()),
+            new FormMetadataExtractor($converter, new BalancedDelimiterMatcher(), new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher()), new PhpLiteralArrayKeyParser()),
             new ValidationMetadataExtractor($converter),
             new SerializerMetadataExtractor($converter),
             new YamlMetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))),

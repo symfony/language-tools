@@ -59,6 +59,7 @@ use Symfony\Lsp\Index\SourceIndexStoreInterface;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\LastResultPhpParser;
+use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpExpressionParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -192,6 +193,7 @@ return static function (ContainerConfigurator $container): void {
     $services->set(TreeSitterResultDecoder::class);
     $services->set(YamlScalarDecoder::class);
     $services->set(BalancedDelimiterMatcher::class);
+    $services->set(PhpCapturedReceiverResolver::class);
     $services->set(QuotedArgumentMatcher::class);
     $services->set(TwigCallArgumentResolver::class);
     $services->set(CommentParserRegistry::class)

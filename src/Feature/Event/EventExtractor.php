@@ -4,11 +4,11 @@ namespace Symfony\Lsp\Feature\Event;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Feature\Console\CapturedReceiverResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
+use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
@@ -28,7 +28,7 @@ final class EventExtractor
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $parser,
         private readonly PhpCommentParser $phpComments,
-        private readonly CapturedReceiverResolver $capturedReceivers,
+        private readonly PhpCapturedReceiverResolver $capturedReceivers,
         private readonly EventYamlListenerAnalyzer $yamlListenerAnalyzer,
         private readonly EventSubscriberMapAnalyzer $subscriberMapAnalyzer,
     ) {

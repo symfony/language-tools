@@ -1,15 +1,10 @@
 <?php
 
-namespace Symfony\Lsp\Feature\Console;
+namespace Symfony\Lsp\Parser\Php;
 
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
-use Symfony\Lsp\Parser\Php\PhpDocument;
-use Symfony\Lsp\Parser\Php\PhpMethodCall;
-use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
-use Symfony\Lsp\Parser\Php\PhpTypedVariable;
-use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
-final class CapturedReceiverResolver
+final class PhpCapturedReceiverResolver
 {
     public function __construct(private readonly BalancedDelimiterMatcher $delimiters)
     {

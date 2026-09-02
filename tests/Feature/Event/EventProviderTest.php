@@ -10,7 +10,6 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Feature\Console\CapturedReceiverResolver;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
@@ -28,6 +27,7 @@ use Symfony\Lsp\Feature\Event\EventSubscriberMapAnalyzer;
 use Symfony\Lsp\Feature\Event\EventYamlListenerAnalyzer;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
+use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
@@ -373,7 +373,7 @@ PHP;
             $converter,
             new TolerantPhpParser(new Parser()),
             new PhpCommentParser(),
-            new CapturedReceiverResolver(new BalancedDelimiterMatcher()),
+            new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher()),
             new EventYamlListenerAnalyzer($converter),
             new EventSubscriberMapAnalyzer($converter, new BalancedDelimiterMatcher()),
         );

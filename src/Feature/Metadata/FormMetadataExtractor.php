@@ -4,9 +4,9 @@ namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Feature\Console\CapturedReceiverResolver;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpArgument;
+use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
@@ -19,7 +19,7 @@ final class FormMetadataExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly BalancedDelimiterMatcher $delimiters,
-        private readonly CapturedReceiverResolver $capturedReceivers,
+        private readonly PhpCapturedReceiverResolver $capturedReceivers,
         private readonly PhpLiteralArrayKeyParser $arrayKeys,
     ) {
     }
