@@ -82,6 +82,7 @@ final class TwigDocumentParserTest extends TestCase
     {
         $source = <<<'TWIG'
             {{ single('it\'s a plain value') }}
+            {{ single_class('App\Entity\Article') }}
             {{ double("say \"hi\"\twith\x41tab") }}
             TWIG;
         $document = $this->parser()->parse($source);
@@ -94,8 +95,9 @@ final class TwigDocumentParserTest extends TestCase
         self::assertSame("it\\'s a plain value", $literals[0]->raw);
         self::assertSame("'", $literals[0]->quote);
         self::assertSame($literals[0]->raw, substr($source, $literals[0]->startOffset, $literals[0]->endOffset - $literals[0]->startOffset));
-        self::assertSame("say \"hi\"\twithAtab", $literals[1]?->value);
-        self::assertSame('"', $literals[1]->quote);
+        self::assertSame('App\Entity\Article', $literals[1]?->value);
+        self::assertSame("say \"hi\"\twithAtab", $literals[2]?->value);
+        self::assertSame('"', $literals[2]->quote);
     }
 
     public function testRejectsInterpolatedStringsAsLiterals(): void
@@ -109,10 +111,11 @@ final class TwigDocumentParserTest extends TestCase
 
     public function testDecoderMatchesTwigEscapeSemantics(): void
     {
-        self::assertSame("it's \n raw", TwigStringDecoder::decode("it\\'s \\n raw"));
-        self::assertSame("tab\thexAoctalA", TwigStringDecoder::decode('tab\\thex\\x41octal\\101'));
-        self::assertSame('literal #{brace}', TwigStringDecoder::decode('literal \\#{brace}'));
-        self::assertSame('plain', TwigStringDecoder::decode('plain'));
+        self::assertSame("it's \\n raw", TwigStringDecoder::decode("it\\'s \\n raw", "'"));
+        self::assertSame('App\\Entity\\Article', TwigStringDecoder::decode('App\\Entity\\Article', "'"));
+        self::assertSame("tab\thexAoctalA", TwigStringDecoder::decode('tab\\thex\\x41octal\\101', '"'));
+        self::assertSame('literal #{brace}', TwigStringDecoder::decode('literal \\#{brace}', '"'));
+        self::assertSame('plain', TwigStringDecoder::decode('plain', '"'));
     }
 
     public function testLocatesDirectiveContexts(): void

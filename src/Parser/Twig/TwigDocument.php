@@ -71,7 +71,7 @@ final class TwigDocument
         }
         $raw = substr($value, 1, -1);
 
-        return new TwigStringLiteral($raw, TwigStringDecoder::decode($raw), $node->startByte + 1, $node->endByte - 1, $value[0]);
+        return new TwigStringLiteral($raw, TwigStringDecoder::decode($raw, $value[0]), $node->startByte + 1, $node->endByte - 1, $value[0]);
     }
 
     public function directStringLiteral(TreeSitterNode $node): ?TwigStringLiteral

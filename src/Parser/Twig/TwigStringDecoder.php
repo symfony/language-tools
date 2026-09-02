@@ -12,7 +12,7 @@ final class TwigStringDecoder
         'v' => "\v",
     ];
 
-    public static function decode(string $value): string
+    public static function decode(string $value, ?string $quote = null): string
     {
         $value = str_replace(["\r\n", "\r"], "\n", $value);
         $result = '';
@@ -33,9 +33,11 @@ final class TwigStringDecoder
             }
 
             $character = $value[$offset];
-            if (isset(self::SPECIAL_CHARACTERS[$character])) {
+            if ("'" === $quote) {
+                $result .= \in_array($character, ['\\', "'"], true) ? $character : '\\'.$character;
+            } elseif (isset(self::SPECIAL_CHARACTERS[$character])) {
                 $result .= self::SPECIAL_CHARACTERS[$character];
-            } elseif ('\\' === $character || "'" === $character || '"' === $character) {
+            } elseif ('\\' === $character || '"' === $character || (null === $quote && "'" === $character)) {
                 $result .= $character;
             } elseif ('#' === $character && '{' === ($value[$offset + 1] ?? null)) {
                 $result .= '#{';
@@ -53,7 +55,7 @@ final class TwigStringDecoder
                 }
                 $result .= \chr(((int) octdec($octal)) & 0xFF);
             } else {
-                $result .= $character;
+                $result .= '\\'.$character;
             }
 
             ++$offset;
