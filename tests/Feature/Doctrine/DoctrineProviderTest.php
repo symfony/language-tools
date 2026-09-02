@@ -212,6 +212,33 @@ final class DoctrineProviderTest extends TestCase
         )));
     }
 
+    public function testRequiresGetRepositoryToBeTheTerminalReceiverCall(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Service/ProductFinder.php', 'php', <<<'PHP'
+            <?php
+            namespace App\Service;
+
+            use App\Entity\Product;
+
+            final class ProductFinder
+            {
+                public function find(object $manager): void
+                {
+                    $manager->getRepository(Product::class)->findBy(['direct' => true]);
+                    $manager->getRepository(Product::class)->differentRepository()->findBy(['changed' => true]);
+                }
+            }
+            PHP));
+
+        self::assertSame(
+            ['direct'],
+            array_map(
+                static fn ($symbol): string => $symbol->name,
+                array_values(array_filter($facts->symbols, static fn ($symbol): bool => DoctrineSymbolKind::Field === $symbol->kind)),
+            ),
+        );
+    }
+
     public function testUsesPropertyPlacementAndScopedRepositoryReceivers(): void
     {
         $converter = new PositionConverter();

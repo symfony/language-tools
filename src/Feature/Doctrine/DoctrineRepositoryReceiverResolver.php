@@ -83,17 +83,18 @@ final class DoctrineRepositoryReceiverResolver
                 return ['entityClass' => array_key_first($entities), 'repositoryClass' => null];
             }
         }
-        if (PhpMethodReceiverKind::Other !== $receiver->kind || 1 !== preg_match('/->\s*getRepository\s*\(/', $call->receiver)) {
+        if (PhpMethodReceiverKind::Other !== $receiver->kind) {
             return null;
         }
-        $references = [];
-        foreach ($php->classReferences as $reference) {
-            if ($reference->startOffset >= $receiver->startOffset && $reference->endOffset <= $receiver->endOffset) {
-                $references[] = $reference;
-            }
-        }
+        $repositoryCall = array_find(
+            $php->methodCalls,
+            static fn (PhpMethodCall $candidate): bool => 'getRepository' === $candidate->method
+                && $receiver->startOffset === $candidate->startOffset
+                && $receiver->endOffset === $candidate->endOffset,
+        );
+        $reference = $php->soleClassReference($repositoryCall?->positionalArgument(0));
 
-        return 1 === \count($references) ? ['entityClass' => $references[0]->className, 'repositoryClass' => null] : null;
+        return null !== $reference ? ['entityClass' => $reference->className, 'repositoryClass' => null] : null;
     }
 
     /** @return array<string, array{entityClass: string, variable: string, scopeStartOffset: int|null}> */
