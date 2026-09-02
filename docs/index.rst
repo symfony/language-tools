@@ -62,9 +62,10 @@ Requirements
 ------------
 
 The language server supports the maintained Symfony versions listed in
-Symfony's `release metadata`_ and the next minor development branch. Your
-application must have its Composer dependencies installed and provide a PHP
-command compatible with its Symfony version. The PHP command doesn't have to
+Symfony's `release metadata`_ and the next development branch, including the
+next major's ``.0`` branch after an ``X.4`` branch. Your application must have
+its Composer dependencies installed and provide a PHP command compatible with
+its Symfony version. The PHP command doesn't have to
 run on your machine: applications that run in a container are officially
 supported through `Docker support`_.
 

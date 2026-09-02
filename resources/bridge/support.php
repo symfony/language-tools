@@ -67,9 +67,11 @@ function symfonyLspBridgeSupportsBranch(string $branch, array $supportedVersions
     }
 
     [$newestMajor, $newestMinor] = array_map('intval', explode('.', $newest));
-    $nextMinor = $newestMajor.'.'.($newestMinor + 1);
+    $nextDevelopment = 4 === $newestMinor
+        ? ($newestMajor + 1).'.0'
+        : $newestMajor.'.'.($newestMinor + 1);
 
-    return version_compare($branch, $oldest, '>=') && version_compare($branch, $nextMinor, '<=');
+    return version_compare($branch, $oldest, '>=') && version_compare($branch, $nextDevelopment, '<=');
 }
 
 /** @return list<string>|null */

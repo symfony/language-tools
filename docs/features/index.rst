@@ -178,13 +178,15 @@ Symfony Version Support
 
 During runtime indexing, Symfony Language Tools checks the installed branch
 against Symfony's `release metadata`_. Maintained branches, intermediate
-branches and the next minor development branch are accepted. Each project's
-metadata cache is refreshed at most once per hour under ``var/symfony-lsp/``.
-If a refresh fails, the last cached metadata is used. Without a cache, runtime
-indexing continues without the support check.
+branches and the next development branch are accepted. The next development
+branch is the following minor, or the following major's ``.0`` branch when the
+newest supported branch is ``X.4``. Each project's metadata cache is refreshed
+at most once per hour under ``var/symfony-lsp/``. If a refresh fails, the last
+cached metadata is used. Without a cache, runtime indexing continues without
+the support check.
 
 If the installed branch is older than the oldest maintained branch or newer
-than the next minor branch, the application isn't booted. The editor or
+than the next development branch, the application isn't booted. The editor or
 diagnostics checker reports the detected version and static-only features
 remain active. Set ``releaseMetadata`` to ``false`` in
 ``.symfony-lsp.json`` to prevent release metadata network access and skip this

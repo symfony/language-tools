@@ -42,12 +42,13 @@ final class BridgeTest extends TestCase
         self::assertFalse($result['project']['debug']);
     }
 
+    /** @param list<string> $supportedVersions */
     #[DataProvider('unsupportedBranchProvider')]
-    public function testReportsBranchesOutsideTheReleaseMetadataRangeWithoutBootingTheApplication(string $version, string $branch): void
+    public function testReportsBranchesOutsideTheReleaseMetadataRangeWithoutBootingTheApplication(string $version, string $branch, array $supportedVersions): void
     {
         (new AutoloaderFixtureBuilder($this->workspace))->writeAutoloader($version);
         $metadata = $this->workspace->write('releases.json', json_encode([
-            'supported_versions' => ['6.4', '7.4', '8.1'],
+            'supported_versions' => $supportedVersions,
         ], \JSON_THROW_ON_ERROR));
         $cache = $this->workspace->path.'/release-metadata-cache.json';
 
@@ -66,12 +67,13 @@ final class BridgeTest extends TestCase
         self::assertSame((string) file_get_contents($metadata), (string) file_get_contents($cache));
     }
 
+    /** @param list<string> $supportedVersions */
     #[DataProvider('acceptedBranchProvider')]
-    public function testAcceptsIntermediateAndNextMinorBranches(string $version): void
+    public function testAcceptsIntermediateAndNextDevelopmentBranches(string $version, array $supportedVersions): void
     {
         (new AutoloaderFixtureBuilder($this->workspace))->writeAutoloader($version);
         $metadata = $this->workspace->write('releases.json', json_encode([
-            'supported_versions' => ['8.1', '6.4', '7.4'],
+            'supported_versions' => $supportedVersions,
         ], \JSON_THROW_ON_ERROR));
 
         $process = $this->bridge->run([
@@ -150,18 +152,20 @@ final class BridgeTest extends TestCase
         yield 'prerelease' => ['42.7.0-RC1'];
     }
 
-    /** @return iterable<string, array{string}> */
+    /** @return iterable<string, array{string, list<string>}> */
     public static function acceptedBranchProvider(): iterable
     {
-        yield 'intermediate' => ['8.0.13'];
-        yield 'next minor development' => ['8.2.0-BETA1'];
+        yield 'intermediate' => ['8.0.13', ['8.1', '6.4', '7.4']];
+        yield 'next minor development' => ['8.2.0-BETA1', ['8.1', '6.4', '7.4']];
+        yield 'next major development after an x.4 branch' => ['9.0.0-DEV', ['6.4', '7.4', '8.4']];
     }
 
-    /** @return iterable<string, array{string, string}> */
+    /** @return iterable<string, array{string, string, list<string>}> */
     public static function unsupportedBranchProvider(): iterable
     {
-        yield 'older' => ['5.4.45', '5.4'];
-        yield 'beyond next minor' => ['8.3.0-DEV', '8.3'];
+        yield 'older' => ['5.4.45', '5.4', ['6.4', '7.4', '8.1']];
+        yield 'beyond next minor' => ['8.3.0-DEV', '8.3', ['6.4', '7.4', '8.1']];
+        yield 'beyond next major' => ['9.1.0-DEV', '9.1', ['6.4', '7.4', '8.4']];
     }
 
     public function testKeepsStrayProjectOutputOffTheStdoutPayload(): void
