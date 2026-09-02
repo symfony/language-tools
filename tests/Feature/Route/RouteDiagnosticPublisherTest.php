@@ -214,6 +214,9 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 }
                 PHP, ", ['id' => null]"],
             ['twig', 'file:///workspace/templates/page.html.twig', "{{ path('article_show', {foo: 1}) }}", "'id': null, "],
+            ['twig', 'file:///workspace/templates/page.html.twig', "{{ path(name: 'article_show') }}", ", parameters: {'id': null}"],
+            ['twig', 'file:///workspace/templates/page.html.twig', "{{ path(name: 'article_show', parameters: {foo: 1}) }}", "'id': null, "],
+            ['twig', 'file:///workspace/templates/page.html.twig', "{{ path(parameters: {foo: 1}, name: 'article_show') }}", "'id': null, "],
         ];
         foreach ($cases as [$languageId, $uri, $text, $expectedText]) {
             $documents = new DocumentStore();

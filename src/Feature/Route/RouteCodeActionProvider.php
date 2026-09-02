@@ -92,6 +92,7 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
             return null;
         }
         $text = $document->text;
+        $start = $this->converter->toByteOffset($text, $reference->range->start);
         $end = $this->converter->toByteOffset($text, $reference->range->end);
         $after = substr($text, $end);
         $twig = 'twig' === $document->languageId;
@@ -100,9 +101,22 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
             static fn (string $name): string => "'".str_replace("'", "\\'", $name)."'".$separator.'null',
             $missing,
         ));
-        if (preg_match('/^([\'\"])\s*\)/', $after, $match, \PREG_OFFSET_CAPTURE)) {
+        $namedSeparator = null;
+        $parametersOffset = null;
+        $before = substr($text, 0, $start);
+        if ($twig && preg_match('/\bname(\s*[:=]\s*)[\'\"]$/', $before, $namedMatch, \PREG_OFFSET_CAPTURE)) {
+            $namedSeparator = str_contains($namedMatch[1][0], '=') ? ' = ' : ': ';
+            $parametersOffset = $this->namedParametersOffset($before, $namedMatch[0][1]);
+        }
+        if (null !== $parametersOffset) {
+            $offset = $parametersOffset;
+            $newText = $entries.', ';
+        } elseif (null !== $namedSeparator && preg_match('/^([\'\"])\s*,\s*parameters\s*[:=]\s*\{/', $after, $match, \PREG_OFFSET_CAPTURE)) {
+            $offset = $end + \strlen($match[0][0]);
+            $newText = $entries.', ';
+        } elseif (preg_match('/^([\'\"])\s*\)/', $after, $match, \PREG_OFFSET_CAPTURE)) {
             $offset = $end + \strlen($match[1][0]);
-            $newText = ', '.($twig ? '{'.$entries.'}' : '['.$entries.']');
+            $newText = ', '.(null !== $namedSeparator ? 'parameters'.$namedSeparator : '').($twig ? '{'.$entries.'}' : '['.$entries.']');
         } elseif (preg_match('/^([\'\"])\s*,\s*([\[\{])/', $after, $match, \PREG_OFFSET_CAPTURE)) {
             $offset = $end + $match[2][1] + 1;
             $newText = $entries.', ';
@@ -112,5 +126,57 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
         $position = $this->converter->toPosition($text, $offset);
 
         return $this->protocol->textEdit(new Range($position, $position), $newText);
+    }
+
+    private function namedParametersOffset(string $text, int $nameOffset): ?int
+    {
+        preg_match_all('/\bparameters\s*[:=]\s*\{/', substr($text, 0, $nameOffset), $matches, \PREG_OFFSET_CAPTURE);
+        foreach (array_reverse($matches[0]) as [$match, $offset]) {
+            $openingOffset = $offset + \strlen($match) - 1;
+            $closingOffset = $this->closingDelimiterOffset($text, $openingOffset);
+            if (null !== $closingOffset && 1 === preg_match('/^\s*,\s*$/', substr($text, $closingOffset + 1, $nameOffset - $closingOffset - 1))) {
+                return $openingOffset + 1;
+            }
+        }
+
+        return null;
+    }
+
+    private function closingDelimiterOffset(string $text, int $openingOffset): ?int
+    {
+        $pairs = ['(' => ')', '[' => ']', '{' => '}'];
+        $closing = $pairs[$text[$openingOffset]] ?? null;
+        if (null === $closing) {
+            return null;
+        }
+        $stack = [$closing];
+        $quote = null;
+        $escaped = false;
+        for ($offset = $openingOffset + 1, $length = \strlen($text); $offset < $length; ++$offset) {
+            $character = $text[$offset];
+            if (null !== $quote) {
+                if ($escaped) {
+                    $escaped = false;
+                } elseif ('\\' === $character) {
+                    $escaped = true;
+                } elseif ($quote === $character) {
+                    $quote = null;
+                }
+
+                continue;
+            }
+            if (\in_array($character, ["'", '"'], true)) {
+                $quote = $character;
+            } elseif (isset($pairs[$character])) {
+                $stack[] = $pairs[$character];
+            } elseif ($character === $stack[array_key_last($stack)]) {
+                array_pop($stack);
+                if ([] === $stack) {
+                    return $offset;
+                }
+            }
+        }
+
+        return null;
     }
 }
