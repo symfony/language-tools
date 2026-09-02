@@ -2,6 +2,7 @@
 
 ## 0.18.0 (2026-09-02)
 
+- Restore dogfood tool autoloading on case-sensitive filesystems
 - Detect lazy Stimulus markers anywhere in controller files
 - Treat CRLF line endings as single terminators in document positions
 - Scope Live Component event completions to their declaring component
