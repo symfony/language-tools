@@ -136,15 +136,33 @@ final class ProbeFinder
 
     private function match(string $category, string $pattern, string $path, string $contents): ?Probe
     {
-        if (1 !== preg_match($pattern, $contents, $matches, \PREG_OFFSET_CAPTURE)) {
+        if (false === preg_match_all($pattern, $contents, $matches, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
-        $value = $matches[1][0];
-        if ('' === $value) {
-            return null;
+        foreach ($matches[1] as [$value, $offset]) {
+            if ('' === $value || $this->isCommented($path, $contents, $offset)) {
+                continue;
+            }
+
+            return $this->probe($category, $path, $contents, $value, $offset);
         }
 
-        return $this->probe($category, $path, $contents, $value, $matches[1][1]);
+        return null;
+    }
+
+    private function isCommented(string $path, string $contents, int $offset): bool
+    {
+        $lineStart = strrpos(substr($contents, 0, $offset), "\n");
+        $lineStart = false === $lineStart ? 0 : $lineStart + 1;
+        $prefix = substr($contents, $lineStart, $offset - $lineStart);
+        if (1 === preg_match('{\.php$}', $path)) {
+            return 1 === preg_match('{//|/\*|(?:^|\s)#(?!\[)}', $prefix);
+        }
+        if (1 === preg_match('{\.twig$}', $path)) {
+            return str_contains($prefix, '{#') && false === strpos($prefix, '#}', (int) strrpos($prefix, '{#'));
+        }
+
+        return 1 === preg_match('{(?:^|\s)#}', $prefix);
     }
 
     private function probe(string $category, string $path, string $contents, string $value, int $offset): Probe

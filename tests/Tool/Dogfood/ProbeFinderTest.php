@@ -160,6 +160,36 @@ final class ProbeFinderTest extends TestCase
         $this->assertPositionInsideValue($filterDeclaration);
     }
 
+    public function testSkipsMatchesOnCommentedLines(): void
+    {
+        $this->write('config/packages/assets.yaml', <<<'YAML'
+            framework:
+                assets:
+                    # json_manifest_path: '%kernel.project_dir%/public/build/manifest.json'
+                    base_path: '%kernel.custom_dir%/uploads'
+            YAML);
+        $this->write('src/Controller.php', "<?php\n// \$this->redirectToRoute('commented_route');\n\$this->redirectToRoute('active_route');\n");
+        $this->write('templates/page.twig', "{# {{ path('commented_route') }} #}\n{{ path('active_twig_route') }}\n");
+
+        self::assertSame('kernel.custom_dir', $this->probes(new ProbeFinder(), 'parameter.yaml')[0]->value);
+        self::assertSame('active_route', $this->probes(new ProbeFinder(), 'route.php')[0]->value);
+        self::assertSame('active_twig_route', $this->probes(new ProbeFinder(), 'route.twig')[0]->value);
+    }
+
+    public function testReturnsNoProbeWhenEveryMatchIsCommented(): void
+    {
+        $this->write('config/services.yaml', "parameters:\n    # commented: '%kernel.project_dir%'\n");
+
+        self::assertSame([], $this->probes(new ProbeFinder(), 'parameter.yaml'));
+    }
+
+    public function testKeepsMatchesAfterInlineFragmentMarkers(): void
+    {
+        $this->write('config/packages/framework.yaml', "framework:\n    router:\n        default_uri: 'https://example.com/a#%app.fragment%'\n");
+
+        self::assertSame('app.fragment', $this->probes(new ProbeFinder(), 'parameter.yaml')[0]->value);
+    }
+
     public function testReportsThePositionInsideTheMatchedValue(): void
     {
         $this->write('src/Controller.php', "<?php\n\$this->redirectToRoute('abcd');\n");
