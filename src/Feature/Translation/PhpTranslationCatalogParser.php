@@ -12,8 +12,17 @@ final class PhpTranslationCatalogParser
     public function parse(string $source): array
     {
         $tokens = $this->tokens($source);
+        $depth = 0;
         foreach ($tokens as $index => $token) {
-            if (\T_RETURN !== $token['id']) {
+            if ('{' === $token['text'] || \T_DOLLAR_OPEN_CURLY_BRACES === $token['id']) {
+                ++$depth;
+                continue;
+            }
+            if ('}' === $token['text']) {
+                $depth = max(0, $depth - 1);
+                continue;
+            }
+            if (0 !== $depth || \T_RETURN !== $token['id']) {
                 continue;
             }
             $opening = $this->nextSignificant($tokens, $index + 1);
