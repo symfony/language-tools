@@ -41,6 +41,32 @@ final class DocumentSynchronizerTest extends TestCase
         self::assertNull($store->get($uri));
     }
 
+    public function testAppliesIncrementalChangesAtCrLfBoundaries(): void
+    {
+        $store = new DocumentStore();
+        $synchronizer = $this->synchronizer($store);
+        $uri = 'file:///workspace/src/Controller.php';
+        $synchronizer->open(['textDocument' => [
+            'uri' => $uri,
+            'languageId' => 'php',
+            'version' => 1,
+            'text' => "first\r\nsecond",
+        ]]);
+
+        $synchronizer->change([
+            'textDocument' => ['uri' => $uri, 'version' => 2],
+            'contentChanges' => [[
+                'range' => [
+                    'start' => ['line' => 0, 'character' => 0],
+                    'end' => ['line' => 0, 'character' => 6],
+                ],
+                'text' => 'updated',
+            ]],
+        ]);
+
+        self::assertSame("updated\r\nsecond", $store->get($uri)?->text);
+    }
+
     public function testRejectsMalformedChangesWithoutUpdatingTheDocument(): void
     {
         $store = new DocumentStore();

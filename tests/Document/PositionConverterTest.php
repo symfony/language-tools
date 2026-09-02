@@ -50,6 +50,18 @@ final class PositionConverterTest extends TestCase
         self::assertSame([2, 0], [$converter->toPosition($text, 13)->line, $converter->toPosition($text, 13)->character]);
     }
 
+    public function testTreatsCrLfAsASingleLineTerminator(): void
+    {
+        $converter = new PositionConverter();
+        $text = "a😀\r\néx";
+
+        self::assertSame(5, $converter->toByteOffset($text, new Position(0, 3)));
+        self::assertSame(5, $converter->toByteOffset($text, new Position(0, 4)));
+        self::assertSame([0, 3], [$converter->toPosition($text, 5)->line, $converter->toPosition($text, 5)->character]);
+        self::assertSame([0, 3], [$converter->toPosition($text, 6)->line, $converter->toPosition($text, 6)->character]);
+        self::assertSame([1, 0], [$converter->toPosition($text, 7)->line, $converter->toPosition($text, 7)->character]);
+    }
+
     public function testInvalidatesThePositionMapWhenTheTextChanges(): void
     {
         $converter = new PositionConverter();

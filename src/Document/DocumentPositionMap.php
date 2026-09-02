@@ -24,10 +24,7 @@ final class DocumentPositionMap
         }
 
         $lineStart = $this->lineStarts[$position->line];
-        $lineEnd = $this->lineStarts[$position->line + 1] ?? \strlen($this->text);
-        if ($lineEnd > $lineStart && "\n" === $this->text[$lineEnd - 1]) {
-            --$lineEnd;
-        }
+        $lineEnd = $this->lineContentEnd($position->line);
         $lineText = substr($this->text, $lineStart, $lineEnd - $lineStart);
         if ('utf-8' === $this->encoding) {
             return $lineStart + min($position->character, \strlen($lineText));
@@ -52,7 +49,9 @@ final class DocumentPositionMap
     {
         $byteOffset = max(0, min($byteOffset, \strlen($this->text)));
         $line = $this->lineAt($byteOffset);
-        $linePrefix = substr($this->text, $this->lineStarts[$line], $byteOffset - $this->lineStarts[$line]);
+        $lineStart = $this->lineStarts[$line];
+        $byteOffset = min($byteOffset, $this->lineContentEnd($line));
+        $linePrefix = substr($this->text, $lineStart, $byteOffset - $lineStart);
         $character = match ($this->encoding) {
             'utf-8' => \strlen($linePrefix),
             'utf-32' => mb_strlen($linePrefix),
@@ -60,6 +59,20 @@ final class DocumentPositionMap
         };
 
         return new Position($line, (int) $character);
+    }
+
+    private function lineContentEnd(int $line): int
+    {
+        $lineStart = $this->lineStarts[$line];
+        $lineEnd = $this->lineStarts[$line + 1] ?? \strlen($this->text);
+        if ($lineEnd > $lineStart && "\n" === $this->text[$lineEnd - 1]) {
+            --$lineEnd;
+            if ($lineEnd > $lineStart && "\r" === $this->text[$lineEnd - 1]) {
+                --$lineEnd;
+            }
+        }
+
+        return $lineEnd;
     }
 
     private function lineAt(int $byteOffset): int
