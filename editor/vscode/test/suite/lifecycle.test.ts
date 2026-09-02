@@ -8,7 +8,7 @@ import {
     serverStartupMessage,
     useSocketTransport,
 } from '../../src/extension';
-import { indexStatusPollingEnabled } from '../../src/indexStatus';
+import { indexStatusBarText, indexStatusPollingEnabled } from '../../src/indexStatus';
 import {
     completions,
     labels,
@@ -30,7 +30,8 @@ interface IndexStatus {
 
 export const lifecycleTests: TestCase[] = [
     ['Server environment carries the configured memory limit', testServerEnvironment],
-    ['Only explicit analysis settings are forwarded at startup', testConfiguredAnalysisOptions],
+    ['Only contributed analysis settings are forwarded at startup', testConfiguredAnalysisOptions],
+    ['Partial runtime indexes use a warning status', testPartialIndexStatus],
     ['Index status polling follows the language client state', testIndexStatusPolling],
     ['Server reports and refreshes indexes', testIndexCommands],
     ['Server remains responsive after workspace configuration changes', testConfigurationChange],
@@ -50,12 +51,46 @@ async function testServerEnvironment(): Promise<void> {
 
 async function testConfiguredAnalysisOptions(): Promise<void> {
     const configuration = {
-        inspect: (name: string): { workspaceValue: unknown } | undefined => 'environment' === name
-            ? { workspaceValue: 'test' }
-            : undefined,
+        inspect: (name: string): { workspaceValue: unknown } | undefined => {
+            if ('environment' === name) {
+                return { workspaceValue: 'test' };
+            }
+            if ('releaseMetadata' === name) {
+                return { workspaceValue: false };
+            }
+
+            return undefined;
+        },
     } as vscode.WorkspaceConfiguration;
 
-    assert.deepEqual(configuredAnalysisOptions(configuration), { environment: 'test' });
+    assert.deepEqual(configuredAnalysisOptions(configuration), { environment: 'test', releaseMetadata: false });
+
+    const forwardedNames: string[] = [];
+    configuredAnalysisOptions({
+        inspect: (name: string): undefined => {
+            forwardedNames.push(name);
+
+            return undefined;
+        },
+    } as vscode.WorkspaceConfiguration);
+    const extension = vscode.extensions.getExtension('symfony.language-tools');
+    assert.ok(extension);
+    const properties = extension.packageJSON.contributes.configuration.properties as Record<string, unknown>;
+    const contributedNames = Object.keys(properties)
+        .map((name) => name.replace(/^symfonyLsp\./, ''))
+        .filter((name) => !['memoryLimit', 'serverPath', 'trace'].includes(name));
+    assert.deepEqual(forwardedNames.sort(), contributedNames.sort());
+}
+
+async function testPartialIndexStatus(): Promise<void> {
+    assert.equal(indexStatusBarText({
+        root: workspace().uri.fsPath,
+        environment: 'dev',
+        runtimeEnabled: true,
+        trusted: true,
+        source: { state: 'ready' },
+        runtime: { state: 'partial' },
+    }), '$(warning) Symfony');
 }
 
 async function testIndexStatusPolling(): Promise<void> {

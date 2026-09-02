@@ -35,7 +35,8 @@ It complements your PHP language server; keep it enabled.
 3. **Check the status bar.** Open a PHP file and wait for the lower-left
    status item. **Symfony: dev** with a check mark means source and runtime
    indexes are ready. **Symfony: static** means runtime indexing is
-   unavailable, disabled or not trusted. Select the item for details.
+   unavailable, disabled or not trusted. A warning means runtime metadata is
+   partial or stale. Select the item for details.
 
 4. **Use your usual gestures.** Completion (`Ctrl+Space`), hover,
    Go to Definition (`F12`), Find All References (`Shift+F12`), Rename (`F2`)
@@ -85,6 +86,7 @@ The defaults work for standard projects. Add settings to
 | `symfonyLsp.phpCommand` | Use `["symfony", "php"]`, a container command or another PHP launcher. |
 | `symfonyLsp.environment` | Index another environment than `dev`. |
 | `symfonyLsp.runtimeIndexing` | Disable application execution while keeping source-only features. |
+| `symfonyLsp.releaseMetadata` | Disable release metadata network access and the installed-branch support check. |
 | `symfonyLsp.bridgeTimeout` | Allow an application more than five minutes to collect runtime metadata. |
 | `symfonyLsp.excludePaths` | Exclude embedded fixtures or generated sources from indexing and diagnostics. |
 | `symfonyLsp.translationDiagnostics` | Enable missing translation-key diagnostics. |

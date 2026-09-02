@@ -5,8 +5,8 @@
 - Clarify whether runtime timings cover full or targeted refreshes
 - Preserve bounded sanitized frames without absolute closure paths in verbose server errors
 - Accept the next Symfony development branch across major boundaries
-- Allow release metadata network access to be disabled
-- Persist healthy runtime sections and report partial indexes accurately
+- Allow release metadata network access to be disabled in project files and VS Code
+- Persist healthy runtime sections and show partial runtime indexes as warnings
 - Avoid duplicate Composer runtime boots after failed initialization
 - Keep watched source updates when project rediscovery fails
 - Diagnose unknown Twig named arguments when values contain nested calls

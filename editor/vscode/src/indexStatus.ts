@@ -26,6 +26,27 @@ export interface IndexStatus {
     runtime: IndexSection;
 }
 
+export function indexStatusBarText(status: IndexStatus): string {
+    const runtimeActive = status.runtimeEnabled && status.trusted;
+    if ('failed' === status.source.state || (runtimeActive && 'failed' === status.runtime.state)) {
+        return '$(error) Symfony';
+    }
+    if ('indexing' === status.source.state || (runtimeActive && 'indexing' === status.runtime.state)) {
+        return '$(sync~spin) Symfony';
+    }
+    if (!runtimeActive) {
+        return '$(shield) Symfony: static';
+    }
+    if ('stale' === status.runtime.state || 'partial' === status.runtime.state) {
+        return '$(warning) Symfony';
+    }
+    if ('ready' === status.source.state && 'ready' === status.runtime.state) {
+        return `$(check) Symfony: ${status.environment}`;
+    }
+
+    return `$(circle-outline) Symfony: ${status.environment}`;
+}
+
 export class IndexStatusController implements vscode.Disposable {
     private statuses: IndexStatus[] = [];
     private timer: NodeJS.Timeout | undefined;
@@ -188,20 +209,7 @@ export class IndexStatusController implements vscode.Disposable {
             return;
         }
 
-        const runtimeActive = status.runtimeEnabled && status.trusted;
-        if ('failed' === status.source.state || (runtimeActive && 'failed' === status.runtime.state)) {
-            this.statusBar.text = '$(error) Symfony';
-        } else if ('indexing' === status.source.state || (runtimeActive && 'indexing' === status.runtime.state)) {
-            this.statusBar.text = '$(sync~spin) Symfony';
-        } else if (!runtimeActive) {
-            this.statusBar.text = '$(shield) Symfony: static';
-        } else if ('stale' === status.runtime.state) {
-            this.statusBar.text = '$(warning) Symfony';
-        } else if ('ready' === status.source.state && 'ready' === status.runtime.state) {
-            this.statusBar.text = `$(check) Symfony: ${status.environment}`;
-        } else {
-            this.statusBar.text = `$(circle-outline) Symfony: ${status.environment}`;
-        }
+        this.statusBar.text = indexStatusBarText(status);
         this.statusBar.tooltip = this.statusDescription(status);
         this.statusBar.accessibilityInformation = {
             label: this.statusDescription(status),

@@ -133,6 +133,11 @@
           "scope": "resource",
           "description": "Enable trusted runtime indexing. The built-in default is true."
         },
+        "symfonyLsp.releaseMetadata": {
+          "type": "boolean",
+          "scope": "resource",
+          "description": "Allow runtime indexing to request Symfony release metadata for the installed-branch support check. The built-in default is true."
+        },
         "symfonyLsp.bridgeTimeout": {
           "type": "number",
           "minimum": 1,
