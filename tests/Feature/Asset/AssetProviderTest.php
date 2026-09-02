@@ -38,7 +38,7 @@ final class AssetProviderTest extends TestCase
     {
         $converter = new PositionConverter();
         $extractor = $this->createExtractor($converter);
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
         $indexes = new AssetIndexRegistry();
@@ -199,7 +199,7 @@ final class AssetProviderTest extends TestCase
             $converter = new PositionConverter();
             $extractor = $this->createExtractor($converter);
             $rootUri = 'file://'.$root;
-            $project = new Project($root, $rootUri, '^8.0');
+            $project = new Project($root, $rootUri);
             $projects = new ProjectRegistry();
             $projects->replace([$project]);
             $uri = $rootUri.'/templates/layout.html.twig';

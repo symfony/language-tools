@@ -36,7 +36,7 @@ final class TwigPhpSymbolProviderTest extends TestCase
         $converter = new PositionConverter();
         $documents = new DocumentStore();
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $phpUri = 'file:///workspace/src/Model.php';
         $php = <<<'PHP'
             <?php

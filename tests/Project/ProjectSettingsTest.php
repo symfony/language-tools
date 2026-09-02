@@ -21,7 +21,7 @@ final class ProjectSettingsTest extends TestCase
     public function testLoadsResourceScopedTranslationDiagnostics(): void
     {
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $configuration = new TranslationConfigurationRegistry();
         $client = new ProjectSettingsClient();
         $runtime = new RuntimeConfiguration();
@@ -62,7 +62,7 @@ final class ProjectSettingsTest extends TestCase
                 'phpCommand' => ['project-php'],
             ], \JSON_THROW_ON_ERROR));
             $projects = new ProjectRegistry();
-            $projects->replace([$project = new Project($directory, 'file://'.$directory, '^8.0')]);
+            $projects->replace([$project = new Project($directory, 'file://'.$directory)]);
             $runtime = new RuntimeConfiguration(defaultPhpCommand: ['/usr/local/bin/symfony', 'php']);
             $analysisSettings = new AnalysisSettings();
             $projectConfiguration = new ProjectConfiguration(new UriToPathConverter(), $analysisSettings);
@@ -105,7 +105,7 @@ final class ProjectSettingsTest extends TestCase
                 'excludePaths' => ['tests/**'],
             ], \JSON_THROW_ON_ERROR));
             $projects = new ProjectRegistry();
-            $projects->replace([$project = new Project($directory, 'file://'.$directory, '^8.0')]);
+            $projects->replace([$project = new Project($directory, 'file://'.$directory)]);
             $translation = new TranslationConfigurationRegistry();
             $runtime = new RuntimeConfiguration();
             $runtime->configure(['environment' => 'initialization']);

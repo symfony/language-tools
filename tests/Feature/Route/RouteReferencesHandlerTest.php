@@ -49,7 +49,7 @@ final class RouteReferencesHandlerTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $declarations = new RouteDeclarationIndexRegistry();
         $declarations->forProject($project)->replace(new RouteDeclaration(
             'article_list',

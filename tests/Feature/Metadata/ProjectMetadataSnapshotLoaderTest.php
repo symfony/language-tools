@@ -11,7 +11,7 @@ final class ProjectMetadataSnapshotLoaderTest extends TestCase
 {
     public function testLoadsFormAndConstraintMetadata(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $indexes = new MetadataIndexRegistry();
         (new ProjectMetadataSnapshotLoader($indexes))->load($project, [
             'formsComplete' => true,

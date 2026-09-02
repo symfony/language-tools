@@ -12,7 +12,7 @@ final class ProjectMessengerSnapshotLoaderTest extends TestCase
     public function testLoadsRuntimeGraph(): void
     {
         $indexes = new MessengerIndexRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         (new ProjectMessengerSnapshotLoader($indexes))->load($project, [
             'complete' => true,
             'buses' => [['name' => 'command.bus', 'default' => true]],

@@ -30,7 +30,7 @@ final class SourceIndexOverlayManagerTest extends TestCase
 
         try {
             $projects = new ProjectRegistry();
-            $projects->replace([$project = new Project($root, 'file://'.$root, '^8.0')]);
+            $projects->replace([$project = new Project($root, 'file://'.$root)]);
             $documents = new DocumentStore();
             $sourceUri = 'file://'.$root.'/src/Service.php';
             $vendorUri = 'file://'.$root.'/vendor/Dependency.php';

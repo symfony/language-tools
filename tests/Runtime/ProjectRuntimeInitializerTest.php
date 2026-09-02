@@ -93,7 +93,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $indexes = new RouteIndexRegistry();
         $serviceIndexes = new ServiceIndexRegistry();
         $parameterIndexes = new ParameterIndexRegistry();
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $configuration = new RuntimeConfiguration();
         $configuration->configure([
             'phpCommand' => ['project-php', '--flag'],
@@ -147,7 +147,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'schemaVersion' => 1,
             'sections' => [],
         ], \JSON_THROW_ON_ERROR), ''));
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['releaseMetadata' => false]);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
@@ -174,7 +174,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'schemaVersion' => 1,
             'sections' => [],
         ], \JSON_THROW_ON_ERROR), ''));
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $logger = new ServerLogger(null, new SensitiveDataRedactor());
         $logger->configure('verbose');
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
@@ -193,7 +193,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $registry = self::projects($project);
         $processRunner = new RemovingProcessRunner($registry, new ProcessResult(0, json_encode([
             'schemaVersion' => 1,
@@ -232,7 +232,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'schemaVersion' => 1,
             'sections' => [],
         ], \JSON_THROW_ON_ERROR), ''));
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $configuration = new RuntimeConfiguration();
         $configuration->configure([
             'phpCommand' => ['docker', 'compose', 'exec', '-T', 'php', 'php'],
@@ -264,7 +264,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         file_put_contents($source, '<?php');
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['debug' => false]);
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(0, '', '')),
             new RuntimeSnapshotLoaderRegistry([]),
@@ -282,7 +282,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^5.4');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(0, json_encode([
                 'schemaVersion' => 1,
@@ -309,7 +309,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'project' => ['symfonyBranch' => '8.0'],
             'sections' => [],
         ], \JSON_THROW_ON_ERROR), ''));
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
             new RuntimeSnapshotLoaderRegistry([]),
@@ -329,7 +329,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $processRunner = new CapturingProcessRunner(
             new ProcessResult(0, json_encode(['schemaVersion' => 1, 'sections' => []], \JSON_THROW_ON_ERROR), ''),
         );
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
             new RuntimeSnapshotLoaderRegistry([]),
@@ -365,7 +365,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 ],
             ], \JSON_THROW_ON_ERROR), ''),
         );
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $statuses = new ProjectIndexStatusRegistry();
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
@@ -399,7 +399,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         file_put_contents($source, '<?php');
         $serviceIndexes = new ServiceIndexRegistry();
         $routeIndexes = new RouteIndexRegistry();
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(0, json_encode([
                 'schemaVersion' => 1,
@@ -451,7 +451,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $projects = self::projects($project);
         $configuration = new RuntimeConfiguration();
         $bridgeInstaller = new BridgeInstaller($source, 'test', new Filesystem());
@@ -522,7 +522,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $projects = self::projects($project);
         $configuration = new RuntimeConfiguration();
         $bridgeInstaller = new BridgeInstaller($source, 'test', new Filesystem());
@@ -569,7 +569,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $validations = new ConfigurationValidationRegistry();
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(0, json_encode([
@@ -602,7 +602,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $projects = self::projects($project);
         $configuration = new RuntimeConfiguration();
         $firstIndexes = new RouteIndexRegistry();
@@ -662,7 +662,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $projects = self::projects($project);
         $configuration = new RuntimeConfiguration();
         $bridgeInstaller = new BridgeInstaller($source, 'test', new Filesystem());
@@ -700,7 +700,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $projects = self::projects($project);
         $configuration = new RuntimeConfiguration();
         $bridgeInstaller = new BridgeInstaller($source, 'test', new Filesystem());
@@ -756,7 +756,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(1, '', "CANARY_SECRET_RUNTIME_OUTPUT\n")),
             new RuntimeSnapshotLoaderRegistry([
@@ -785,7 +785,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             ],
         ], \JSON_THROW_ON_ERROR);
         $indexes = new RouteIndexRegistry();
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(
                 0,
@@ -806,7 +806,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
     {
         $source = $this->temporaryDirectory.'/source.php';
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(
                 0,

@@ -159,7 +159,7 @@ final class ConsoleProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $converter = new PositionConverter();
         $delimiters = new BalancedDelimiterMatcher();
         $extractor = new ConsoleExtractor(

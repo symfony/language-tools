@@ -22,7 +22,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
     {
         $client = new ReportingClient();
         $statuses = new ProjectIndexStatusRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $statuses->runtimeReady($project);
         $statuses->runtimeFailed($project);
         $initializer = new ReportingRuntimeInitializer($this->failingInitializer(), $client, $statuses, new ServerLogger(null, new SensitiveDataRedactor()));
@@ -42,7 +42,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
     {
         $client = new ReportingClient();
         $statuses = new ProjectIndexStatusRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $statuses->runtimeFailed($project);
         $initializer = new ReportingRuntimeInitializer(
             $this->failingInitializer(new PartialRuntimeMetadataException(['twig'])),
@@ -63,7 +63,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
     {
         $client = new ReportingClient();
         $statuses = new ProjectIndexStatusRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $statuses->runtimeFailed($project);
         $error = new PartialRuntimeMetadataException(['twig'], [[
             'section' => 'twig',
@@ -105,7 +105,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
     {
         $client = new ReportingClient();
         $statuses = new ProjectIndexStatusRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $statuses->runtimeFailed($project);
         $initializer = new ReportingRuntimeInitializer($this->failingInitializer(), $client, $statuses, new ServerLogger(null, new SensitiveDataRedactor()));
 
@@ -121,7 +121,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
     {
         $client = new ReportingClient();
         $statuses = new ProjectIndexStatusRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^5.4');
+        $project = new Project('/workspace', 'file:///workspace');
         $statuses->runtimeFailed($project);
         $initializer = new ReportingRuntimeInitializer(
             $this->failingInitializer(new UnsupportedSymfonyVersionException('5.4')),
@@ -142,7 +142,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
     {
         $client = new ReportingClient();
         $statuses = new ProjectIndexStatusRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $statuses->runtimeFailed($project, 'configuration');
         $initializer = new ReportingRuntimeInitializer($this->failingInitializer(), $client, $statuses, new ServerLogger(null, new SensitiveDataRedactor()));
 
@@ -158,7 +158,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
     {
         $client = new ReportingClient();
         $statuses = new ProjectIndexStatusRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $statuses->runtimeReady($project);
         $statuses->runtimeFailed($project, 'configuration');
         $initializer = new ReportingRuntimeInitializer($this->failingInitializer(), $client, $statuses, new ServerLogger(null, new SensitiveDataRedactor()));
@@ -175,7 +175,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
     {
         $client = new ReportingClient();
         $statuses = new ProjectIndexStatusRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $statuses->runtimeFailed($project);
         $log = new WritableBuffer();
         $initializer = new ReportingRuntimeInitializer($this->failingInitializer(), $client, $statuses, new ServerLogger($log, new SensitiveDataRedactor()));

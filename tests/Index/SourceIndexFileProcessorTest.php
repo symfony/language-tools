@@ -23,7 +23,7 @@ final class SourceIndexFileProcessorTest extends TestCase
         $root = sys_get_temp_dir().'/symfony-lsp-processor-'.bin2hex(random_bytes(8));
         mkdir($root.'/src', 0777, true);
         $path = $root.'/src/Service.php';
-        $project = new Project($root, 'file://'.$root, '^8.0');
+        $project = new Project($root, 'file://'.$root);
         $store = new InMemorySourceIndexStore();
         $provider = new ProcessorRecordingProvider();
         $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), [$provider]);

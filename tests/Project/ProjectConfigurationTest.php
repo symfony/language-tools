@@ -45,7 +45,7 @@ final class ProjectConfigurationTest extends TestCase
             ],
         ], \JSON_THROW_ON_ERROR));
         $this->configuration->load([['uri' => (new UriToPathConverter())->toUri($this->directory)]]);
-        $project = new Project($this->directory.'/apps/admin', 'file:///workspace/apps/admin', '^8.0');
+        $project = new Project($this->directory.'/apps/admin', 'file:///workspace/apps/admin');
 
         self::assertSame([$this->directory, $this->directory.'/apps/admin'], $this->configuration->projectRoots($this->directory));
         self::assertSame([
@@ -78,7 +78,7 @@ final class ProjectConfigurationTest extends TestCase
 
         self::assertSame(
             ['environment' => 'test'],
-            $this->configuration->settings(new Project($this->directory, 'file:///workspace', '^8.0')),
+            $this->configuration->settings(new Project($this->directory, 'file:///workspace')),
         );
     }
 

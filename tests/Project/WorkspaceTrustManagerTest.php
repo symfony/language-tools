@@ -23,7 +23,7 @@ final class WorkspaceTrustManagerTest extends TestCase
         $trust = new WorkspaceTrust();
         $statuses = new ProjectIndexStatusRegistry();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
-        $registry = $this->registry($project = new Project('/workspace', 'file:///workspace', '^8.0'));
+        $registry = $this->registry($project = new Project('/workspace', 'file:///workspace'));
         $manager = new WorkspaceTrustManager($client, $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $registry);
 
         $manager->applyInitializationOptions([
@@ -42,7 +42,7 @@ final class WorkspaceTrustManagerTest extends TestCase
         $trust = new WorkspaceTrust();
         $statuses = new ProjectIndexStatusRegistry();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
-        $registry = $this->registry($project = new Project('/workspace', 'file:///workspace', '^8.0'));
+        $registry = $this->registry($project = new Project('/workspace', 'file:///workspace'));
         $manager = new WorkspaceTrustManager($client, $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $registry);
 
         $manager->requestUnknownDecisions($registry->all());
@@ -61,7 +61,7 @@ final class WorkspaceTrustManagerTest extends TestCase
         $trust = new WorkspaceTrust();
         $statuses = new ProjectIndexStatusRegistry();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
-        $registry = $this->registry($project = new Project('/workspace', 'file:///workspace', '^8.0'));
+        $registry = $this->registry($project = new Project('/workspace', 'file:///workspace'));
         $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $registry);
 
         $manager->requestUnknownDecisions($registry->all());
@@ -72,7 +72,7 @@ final class WorkspaceTrustManagerTest extends TestCase
 
     public function testRetriesFailedRuntimeInitialization(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $registry = $this->registry($project);
         $trust = new WorkspaceTrust();
         $trust->set($project, TrustStatus::Trusted);
@@ -89,7 +89,7 @@ final class WorkspaceTrustManagerTest extends TestCase
 
     public function testDoesNotRestartAPartialRuntimeIndex(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $trust = new WorkspaceTrust();
         $trust->set($project, TrustStatus::Trusted);
         $statuses = new ProjectIndexStatusRegistry();
@@ -116,7 +116,7 @@ final class WorkspaceTrustManagerTest extends TestCase
 
     public function testDoesNotRestartInitializedRuntimeWhileARefreshIsPending(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $trust = new WorkspaceTrust();
         $trust->set($project, TrustStatus::Trusted);
         $statuses = new ProjectIndexStatusRegistry();
@@ -132,7 +132,7 @@ final class WorkspaceTrustManagerTest extends TestCase
 
     public function testRestartsRuntimeAfterConfigurationChangesOrProjectRemoval(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $trust = new WorkspaceTrust();
         $trust->set($project, TrustStatus::Trusted);
         $statuses = new ProjectIndexStatusRegistry();
@@ -144,7 +144,7 @@ final class WorkspaceTrustManagerTest extends TestCase
         $manager->requestUnknownDecisions([$project]);
         $configuration->setEnvironment($project, 'test');
         $manager->requestUnknownDecisions([$project]);
-        $replacement = new Project('/workspace', 'file:///workspace', '^8.0');
+        $replacement = new Project('/workspace', 'file:///workspace');
         $manager->requestUnknownDecisions([$replacement]);
         $manager->removeProject($project);
         $manager->requestUnknownDecisions([$replacement]);
@@ -157,7 +157,7 @@ final class WorkspaceTrustManagerTest extends TestCase
         $trust = new WorkspaceTrust();
         $statuses = new ProjectIndexStatusRegistry();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
-        $registry = $this->registry($project = new Project('/workspace', 'file:///workspace', '^8.0'));
+        $registry = $this->registry($project = new Project('/workspace', 'file:///workspace'));
         $client = new RemovingClient($registry, ['title' => 'Trust and enable runtime indexing']);
         $manager = new WorkspaceTrustManager($client, $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $registry);
 
@@ -173,7 +173,7 @@ final class WorkspaceTrustManagerTest extends TestCase
         $trust = new WorkspaceTrust();
         $statuses = new ProjectIndexStatusRegistry();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
-        $registry = $this->registry($project = new Project('/workspace', 'file:///workspace', '^8.0'));
+        $registry = $this->registry($project = new Project('/workspace', 'file:///workspace'));
         $manager = new WorkspaceTrustManager($client, $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $registry);
 
         $manager->requestUnknownDecisions($registry->all());

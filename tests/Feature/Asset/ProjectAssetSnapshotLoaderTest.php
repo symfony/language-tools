@@ -13,7 +13,7 @@ final class ProjectAssetSnapshotLoaderTest extends TestCase
 {
     public function testLoadsAssetsAndImportmapEntries(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $indexes = new AssetIndexRegistry();
         (new ProjectAssetSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration())))->load($project, [
             'assetsComplete' => true,
@@ -40,7 +40,7 @@ final class ProjectAssetSnapshotLoaderTest extends TestCase
 
     public function testMapsContainerSourcePathsToTheHost(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['containerProjectRoot' => '/app']);
         $indexes = new AssetIndexRegistry();

@@ -74,7 +74,7 @@ final class ApplicationSourceScannerTest extends TestCase
     {
         $this->temporaryDirectory = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
         mkdir($this->temporaryDirectory.'/src', 0777, true);
-        $this->project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $this->project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $this->projects = new ProjectRegistry();
         $this->projects->replace([$this->project]);
         $this->fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
@@ -93,7 +93,6 @@ final class ApplicationSourceScannerTest extends TestCase
         $child = new Project(
             $this->temporaryDirectory.'/nested',
             'file://'.$this->temporaryDirectory.'/nested',
-            '^8.0',
         );
         $this->projects->replace([$this->project, $child]);
         $provider = new RecordingSourceIndexProvider();
@@ -105,7 +104,7 @@ final class ApplicationSourceScannerTest extends TestCase
 
     public function testBuildsSourceUrisFromTheProjectRootUri(): void
     {
-        $this->project = new Project($this->temporaryDirectory, 'file://localhost'.$this->temporaryDirectory, '^8.0');
+        $this->project = new Project($this->temporaryDirectory, 'file://localhost'.$this->temporaryDirectory);
         $this->projects->replace([$this->project]);
         file_put_contents($this->temporaryDirectory.'/src/Named Service.php', '<?php final class NamedService {}');
         $provider = new RecordingSourceIndexProvider();
@@ -618,7 +617,7 @@ PHP;
         mkdir($secondRoot.'/src', 0777, true);
 
         try {
-            $this->projects->replace([$this->project, new Project($secondRoot, 'file://'.$secondRoot, '^8.0')]);
+            $this->projects->replace([$this->project, new Project($secondRoot, 'file://'.$secondRoot)]);
             for ($i = 0; $i < 80; ++$i) {
                 file_put_contents(\sprintf('%s/src/File%02d.php', $this->temporaryDirectory, $i), \sprintf('<?php final class File%02d {}', $i));
             }

@@ -11,9 +11,9 @@ final class AbstractProjectIndexRegistryTest extends TestCase
     public function testKeepsOneIndexPerProjectRoot(): void
     {
         $registry = new TestProjectIndexRegistry();
-        $first = new Project('/first', 'file:///first', '^8.0');
-        $sameRoot = new Project('/first', 'file:///other', '^8.0');
-        $second = new Project('/second', 'file:///second', '^8.0');
+        $first = new Project('/first', 'file:///first');
+        $sameRoot = new Project('/first', 'file:///other');
+        $second = new Project('/second', 'file:///second');
 
         self::assertSame($registry->forProject($first), $registry->forProject($sameRoot));
         self::assertNotSame($registry->forProject($first), $registry->forProject($second));
@@ -22,7 +22,7 @@ final class AbstractProjectIndexRegistryTest extends TestCase
     public function testRemovalReleasesTheIndexSoReAddingStartsFresh(): void
     {
         $registry = new TestProjectIndexRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $index = $registry->forProject($project);
 
         $registry->removeProject($project);

@@ -123,7 +123,7 @@ final class DoctrineProviderTest extends TestCase
 
         $converter = new PositionConverter();
         $extractor = $this->extractor($converter);
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
         $indexes = new DoctrineIndexRegistry();
@@ -593,7 +593,7 @@ final class DoctrineProviderTest extends TestCase
     {
         $converter = new PositionConverter();
         $extractor = $this->extractor($converter);
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
         $indexes = new DoctrineIndexRegistry();

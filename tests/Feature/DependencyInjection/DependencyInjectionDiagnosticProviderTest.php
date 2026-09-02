@@ -49,7 +49,7 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'yaml', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $serviceIndexes = new ServiceIndexRegistry();
         $serviceIndexes->forProject($project)->replace(true);
         $parameterIndexes = new ParameterIndexRegistry();

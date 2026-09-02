@@ -294,7 +294,7 @@ PHP;
             $documents->open(new Document($uri, $language, 1, $text));
         }
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $converter = new PositionConverter();
         $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]), new TolerantPhpParser(new Parser()));
         $indexes = new SecurityIndexRegistry();
@@ -347,7 +347,7 @@ PHP;
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'yaml', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $converter = new PositionConverter();
         $extractor = $this->extractor($converter);
         $sourceIndexes = new SecuritySourceIndexRegistry();

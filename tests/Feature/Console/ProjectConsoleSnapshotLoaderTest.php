@@ -14,7 +14,7 @@ final class ProjectConsoleSnapshotLoaderTest extends TestCase
 {
     public function testLoadsAndNormalizesCommandDefinitions(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $configuration = new RuntimeConfiguration();
         $configuration->configureProject($project, ['containerProjectRoot' => '/app']);
         $indexes = new ConsoleIndexRegistry();
@@ -47,7 +47,7 @@ final class ProjectConsoleSnapshotLoaderTest extends TestCase
 
     public function testIgnoresMalformedCommands(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $indexes = new ConsoleIndexRegistry();
         $loader = new ProjectConsoleSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()));
         $loader->load($project, ['commands' => 'invalid']);

@@ -157,7 +157,7 @@ final class TranslationProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project($root, 'file://'.$root, '^8.0')]);
+        $projects->replace([$project = new Project($root, 'file://'.$root)]);
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
         $extractor = TranslationExtractorTestFactory::create($converter, $commentParser);
@@ -214,7 +214,7 @@ final class TranslationProviderTest extends TestCase
         $documents->open(new Document($uri, 'php', 1, $text));
         $documents->open(new Document('file://'.$translationPath, 'yaml', 7, "existing: Existing\nunsaved: Unsaved\n"));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project($root, 'file://'.$root, '^8.0')]);
+        $projects->replace([$project = new Project($root, 'file://'.$root)]);
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
         $extractor = TranslationExtractorTestFactory::create($converter, $commentParser);
@@ -450,7 +450,7 @@ final class TranslationProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, $languageId, 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
         $extractor = TranslationExtractorTestFactory::create($converter, $commentParser);

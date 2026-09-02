@@ -53,7 +53,7 @@ final class EnvironmentProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'yaml', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $converter = new PositionConverter();
         $comments = new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]);
         $yamlParser = $this->yamlParser();
@@ -121,7 +121,7 @@ final class EnvironmentProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'yaml', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $converter = new PositionConverter();
         $comments = new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]);
         $yamlParser = $this->yamlParser();
@@ -163,7 +163,7 @@ final class EnvironmentProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, $languageId, 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $converter = new PositionConverter();
         $comments = new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]);
         $yamlParser = $this->yamlParser();
@@ -232,7 +232,7 @@ final class EnvironmentProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $converter = new PositionConverter();
         $comments = new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]);
         $yamlParser = $this->yamlParser();

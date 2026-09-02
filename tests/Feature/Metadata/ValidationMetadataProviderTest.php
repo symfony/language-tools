@@ -23,7 +23,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
     {
         $converter = new PositionConverter();
         $extractor = $this->createExtractor($converter);
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
         $indexes = $this->createIndexes($project);
@@ -97,7 +97,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
     {
         $converter = new PositionConverter();
         $extractor = $this->createExtractor($converter);
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
         $indexes = $this->createIndexes($project);

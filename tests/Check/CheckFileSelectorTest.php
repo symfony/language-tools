@@ -38,7 +38,7 @@ final class CheckFileSelectorTest extends TestCase
         $projectConfiguration = new ProjectConfiguration($uriToPathConverter, new AnalysisSettings());
         $projectConfiguration->load([['uri' => $uriToPathConverter->toUri($this->directory)]]);
         $projects = new ProjectRegistry();
-        $projects->replace([new Project($this->directory, $uriToPathConverter->toUri($this->directory), '^8.0')]);
+        $projects->replace([new Project($this->directory, $uriToPathConverter->toUri($this->directory))]);
         $globPatterns = new GlobPatternCompiler();
         $this->selector = new CheckFileSelector(
             $projects,

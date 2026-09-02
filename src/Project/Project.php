@@ -7,7 +7,6 @@ final class Project
     public function __construct(
         public readonly string $rootPath,
         public readonly string $rootUri,
-        public readonly string $frameworkBundleConstraint,
     ) {
     }
 }

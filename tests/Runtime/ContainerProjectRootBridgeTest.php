@@ -55,7 +55,7 @@ final class ContainerProjectRootBridgeTest extends TestCase
 
         $hostRoot = sys_get_temp_dir().'/symfony-lsp-host-'.bin2hex(random_bytes(8));
         symlink($containerRoot, $hostRoot);
-        $project = new Project($hostRoot, 'file://'.$hostRoot, '^8.0');
+        $project = new Project($hostRoot, 'file://'.$hostRoot);
         $configuration = new RuntimeConfiguration();
         $configuration->configure([
             'environment' => 'test',

@@ -28,7 +28,7 @@ final class DebouncedRuntimeRefreshSchedulerTest extends TestCase
     public function testCollapsesAndCombinesRapidRefreshesPerProject(): void
     {
         $initializer = new DebouncedRuntimeInitializer();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, self::projects($project), 0.001);
 
         $scheduler->schedule($project, new RuntimeRefreshPlan(RuntimeRefreshMode::Reuse, ['routes'], true));
@@ -43,7 +43,7 @@ final class DebouncedRuntimeRefreshSchedulerTest extends TestCase
     public function testSerializesRefreshesAndQueuesOneReplacement(): void
     {
         $initializer = new QueuingRuntimeInitializer();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, self::projects($project), 0.001);
         $initializer->scheduler = $scheduler;
 
@@ -61,12 +61,12 @@ final class DebouncedRuntimeRefreshSchedulerTest extends TestCase
     public function testNewProjectInstanceSupersedesDelayedRefreshForTheSameRoot(): void
     {
         $initializer = new DebouncedRuntimeInitializer();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $registry = self::projects($project);
         $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, $registry, 0.001);
 
         $scheduler->schedule($project, new RuntimeRefreshPlan(RuntimeRefreshMode::Reuse, ['routes'], true));
-        $replacement = new Project('/workspace', 'file:///workspace', '^8.1');
+        $replacement = new Project('/workspace', 'file:///workspace');
         $registry->replace([$replacement]);
         $scheduler->schedule($replacement, new RuntimeRefreshPlan(RuntimeRefreshMode::Clear));
         EventLoop::run();
@@ -78,7 +78,7 @@ final class DebouncedRuntimeRefreshSchedulerTest extends TestCase
     public function testRemovalCancelsDelayedRefreshes(): void
     {
         $initializer = new DebouncedRuntimeInitializer();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $registry = self::projects($project);
         $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, $registry, 0.001);
 
@@ -93,7 +93,7 @@ final class DebouncedRuntimeRefreshSchedulerTest extends TestCase
     public function testRemovalCancelsTheActiveRefreshAndDropsQueuedPlans(): void
     {
         $initializer = new BlockingRuntimeInitializer();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $registry = self::projects($project);
         $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, $registry, 0.001);
 
@@ -113,7 +113,7 @@ final class DebouncedRuntimeRefreshSchedulerTest extends TestCase
     public function testDoesNotRunForProjectsRemovedFromTheRegistry(): void
     {
         $initializer = new DebouncedRuntimeInitializer();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $registry = self::projects($project);
         $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, $registry, 0.001);
 

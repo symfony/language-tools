@@ -134,7 +134,7 @@ final class ProjectDiscovery
             return null;
         }
 
-        return new Project($rootPath, rtrim($rootUri, '/'), $constraint);
+        return new Project($rootPath, rtrim($rootUri, '/'));
     }
 
     /**

@@ -19,7 +19,7 @@ final class RuntimeSnapshotStoreTest extends TestCase
     {
         $this->temporaryDirectory = sys_get_temp_dir().'/symfony-lsp-runtime-store-'.bin2hex(random_bytes(8));
         $this->bridge = $this->temporaryDirectory.'/bridge/bridge.php';
-        $this->project = new Project($this->temporaryDirectory.'/project', 'file://'.$this->temporaryDirectory.'/project', '^8.0');
+        $this->project = new Project($this->temporaryDirectory.'/project', 'file://'.$this->temporaryDirectory.'/project');
         mkdir(\dirname($this->bridge), 0777, true);
     }
 
@@ -170,7 +170,7 @@ final class RuntimeSnapshotStoreTest extends TestCase
             true,
         );
 
-        $otherProject = new Project($this->project->rootPath.'-other', 'file://'.$this->project->rootPath.'-other', '^8.0');
+        $otherProject = new Project($this->project->rootPath.'-other', 'file://'.$this->project->rootPath.'-other');
         $phpCommand = new RuntimeConfiguration();
         $phpCommand->configure(['phpCommand' => ['custom-php']]);
         $containerRoot = new RuntimeConfiguration();

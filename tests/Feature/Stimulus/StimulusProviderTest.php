@@ -33,7 +33,7 @@ final class StimulusProviderTest extends TestCase
 {
     public function testProvidesStimulusControllersActionsTargetsAndNavigation(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $converter = new PositionConverter();
         $comments = new TwigCommentParser();
         $codeMasker = new JavaScriptSourceAnalyzer();

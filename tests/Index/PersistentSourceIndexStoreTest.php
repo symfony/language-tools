@@ -22,7 +22,7 @@ final class PersistentSourceIndexStoreTest extends TestCase
     {
         $this->temporaryDirectory = sys_get_temp_dir().'/symfony-lsp-store-'.bin2hex(random_bytes(8));
         mkdir($this->temporaryDirectory, 0777, true);
-        $this->project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $this->project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
     }
 
     protected function tearDown(): void

@@ -129,7 +129,7 @@ final class BaselineManagerTest extends TestCase
 
     public function testFingerprintSurvivesUnrelatedLineMovementButNotChangedEvidence(): void
     {
-        $project = new Project($this->directory, 'file://'.$this->directory, '^8.0');
+        $project = new Project($this->directory, 'file://'.$this->directory);
         $file = new CheckFile(
             $project,
             $this->directory.'/config/services.yaml',

@@ -32,7 +32,7 @@ final class ProjectPathResolverTest extends TestCase
         symlink($directory.'/external', $root.'/templates/external');
         symlink($directory.'/external', $root.'/vendor/symfony');
         $converter = new UriToPathConverter();
-        $project = new Project($root, $converter->toUri($root), '^8.0');
+        $project = new Project($root, $converter->toUri($root));
         $resolver = new ProjectPathResolver($converter);
 
         try {
@@ -49,9 +49,9 @@ final class ProjectPathResolverTest extends TestCase
     /** @return iterable<string, array{Project, string, string|null}> */
     public static function relativePathProvider(): iterable
     {
-        yield 'Unix path' => [new Project('/workspace/my app', 'file:///workspace/my%20app', '^8.0'), 'file:///workspace/my%20app/src/Controller.php', 'src/Controller.php'];
-        yield 'Windows path' => [new Project('C:/workspace/app', 'file:///C:/workspace/app', '^8.0'), 'file:///C:/workspace/app/config/routes.yaml', 'config/routes.yaml'];
-        yield 'outside project' => [new Project('/workspace/app', 'file:///workspace/app', '^8.0'), 'file:///workspace/application/src/Controller.php', null];
-        yield 'non-file URI' => [new Project('/workspace/app', 'file:///workspace/app', '^8.0'), 'untitled:Untitled-1', null];
+        yield 'Unix path' => [new Project('/workspace/my app', 'file:///workspace/my%20app'), 'file:///workspace/my%20app/src/Controller.php', 'src/Controller.php'];
+        yield 'Windows path' => [new Project('C:/workspace/app', 'file:///C:/workspace/app'), 'file:///C:/workspace/app/config/routes.yaml', 'config/routes.yaml'];
+        yield 'outside project' => [new Project('/workspace/app', 'file:///workspace/app'), 'file:///workspace/application/src/Controller.php', null];
+        yield 'non-file URI' => [new Project('/workspace/app', 'file:///workspace/app'), 'untitled:Untitled-1', null];
     }
 }

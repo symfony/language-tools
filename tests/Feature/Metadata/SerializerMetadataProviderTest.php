@@ -22,7 +22,7 @@ final class SerializerMetadataProviderTest extends MetadataTestCase
     {
         $converter = new PositionConverter();
         $extractor = $this->createExtractor($converter);
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
         $entityText = <<<'PHP'

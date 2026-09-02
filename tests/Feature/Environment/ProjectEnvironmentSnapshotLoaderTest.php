@@ -12,7 +12,7 @@ final class ProjectEnvironmentSnapshotLoaderTest extends TestCase
     public function testLoadsProcessorNamesAndTypes(): void
     {
         $indexes = new EnvironmentIndexRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         (new ProjectEnvironmentSnapshotLoader($indexes))->load($project, ['complete' => true, 'processors' => [
             ['name' => 'json', 'type' => 'array'],
             ['name' => 'int', 'type' => 'int'],

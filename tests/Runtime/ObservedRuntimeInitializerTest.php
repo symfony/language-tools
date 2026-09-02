@@ -19,7 +19,7 @@ final class ObservedRuntimeInitializerTest extends TestCase
             $observer = new CapturingRuntimeRefreshObserver(),
         );
 
-        $initializer->initialize(new Project('/workspace', 'file:///workspace', '^8.0'));
+        $initializer->initialize(new Project('/workspace', 'file:///workspace'));
 
         self::assertSame(['/workspace'], $observer->projects);
     }

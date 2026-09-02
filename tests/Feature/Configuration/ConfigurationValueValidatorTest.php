@@ -70,7 +70,7 @@ final class ConfigurationValueValidatorTest extends TestCase
 
     public function testResolvesAndChecksEnvironmentProcessorTypes(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $environmentIndexes = new EnvironmentIndexRegistry();
         $environmentIndexes->forProject($project)->replaceProcessors(['bool' => 'bool', 'json' => 'array', 'number' => 'int|float']);
         $validator = new ConfigurationValueValidator($environmentIndexes, new EnvironmentExpressionParser());

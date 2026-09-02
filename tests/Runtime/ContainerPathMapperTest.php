@@ -11,7 +11,7 @@ final class ContainerPathMapperTest extends TestCase
 {
     public function testKeepsPathsUntouchedWithoutAContainerProjectRoot(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $mapper = new ContainerPathMapper(new RuntimeConfiguration());
 
         self::assertSame('/workspace/templates', $mapper->toContainer($project, '/workspace/templates'));
@@ -20,7 +20,7 @@ final class ContainerPathMapperTest extends TestCase
 
     public function testMapsProjectPathsBetweenHostAndContainer(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['containerProjectRoot' => '/app']);
         $mapper = new ContainerPathMapper($configuration);
@@ -33,7 +33,7 @@ final class ContainerPathMapperTest extends TestCase
 
     public function testKeepsPathsOutsideTheMappedRootsUntouched(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['containerProjectRoot' => '/app']);
         $mapper = new ContainerPathMapper($configuration);
@@ -46,7 +46,7 @@ final class ContainerPathMapperTest extends TestCase
 
     public function testMapsWindowsHostPathsToPosixContainerPaths(): void
     {
-        $project = new Project('C:/Users/nath/api', 'file:///C:/Users/nath/api', '^8.0');
+        $project = new Project('C:/Users/nath/api', 'file:///C:/Users/nath/api');
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['containerProjectRoot' => '/app']);
         $mapper = new ContainerPathMapper($configuration);
@@ -57,7 +57,7 @@ final class ContainerPathMapperTest extends TestCase
 
     public function testUsesTheProjectContainerProjectRootOverTheGlobalOne(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['containerProjectRoot' => '/app']);
         $configuration->configureProject($project, ['containerProjectRoot' => '/srv/api']);
@@ -69,7 +69,7 @@ final class ContainerPathMapperTest extends TestCase
 
     public function testClearsTheGlobalContainerProjectRootForAnEmptyProjectValue(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['containerProjectRoot' => '/app']);
         $configuration->configureProject($project, ['containerProjectRoot' => '']);
@@ -80,7 +80,7 @@ final class ContainerPathMapperTest extends TestCase
 
     public function testIgnoresRelativeContainerProjectRoots(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['containerProjectRoot' => 'app']);
         $mapper = new ContainerPathMapper($configuration);

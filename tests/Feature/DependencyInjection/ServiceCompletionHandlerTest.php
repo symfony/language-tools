@@ -38,7 +38,7 @@ final class ServiceCompletionHandlerTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'yaml', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new ServiceIndexRegistry();
         $parameterIndexes = new ParameterIndexRegistry();
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
@@ -99,7 +99,7 @@ final class ServiceCompletionHandlerTest extends TestCase
     {
         $documents = new DocumentStore();
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $serviceIndexes = new ServiceIndexRegistry();
         $serviceIndexes->forProject($project)->replace(
             true,
@@ -161,7 +161,7 @@ final class ServiceCompletionHandlerTest extends TestCase
     {
         $documents = new DocumentStore();
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $parameterIndexes = new ParameterIndexRegistry();
         $parameterIndexes->forProject($project)->replace(true, new Parameter('app.api_key', null));
         $converter = new PositionConverter();
@@ -191,7 +191,7 @@ final class ServiceCompletionHandlerTest extends TestCase
     {
         $documents = new DocumentStore();
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $serviceIndexes = new ServiceIndexRegistry();
         $serviceIndexes->forProject($project)->replace(true, new Service(
             'app.mailer',

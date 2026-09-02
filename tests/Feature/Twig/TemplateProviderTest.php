@@ -162,7 +162,7 @@ final class TemplateProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'twig', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new TemplateIndexRegistry();
         $indexes->forProject($project)->replaceReferences($reference);
         $indexes->forProject($project)->replaceGlobals(['app']);
@@ -213,7 +213,7 @@ final class TemplateProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'twig', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([new Project('/workspace', 'file:///workspace')]);
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
         $provider = new TwigVariableProvider(
@@ -278,7 +278,7 @@ final class TemplateProviderTest extends TestCase
 
     public function testIndexesAndProvidesTwigComponents(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
         $extractor = $this->componentExtractor($converter, $commentParser);
@@ -381,7 +381,7 @@ final class TemplateProviderTest extends TestCase
 
     public function testDiagnosesUnknownComponentsOnlyWithCompleteRuntimeMetadata(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
         $extractor = $this->componentExtractor($converter, $commentParser);
@@ -433,7 +433,7 @@ final class TemplateProviderTest extends TestCase
 
     public function testCompletesBundleProvidedAndAnonymousComponentNames(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
         $extractor = $this->componentExtractor($converter, $commentParser);
@@ -470,7 +470,7 @@ final class TemplateProviderTest extends TestCase
     public function testResolvesBundleTemplateNames(): void
     {
         $resolver = $this->templateNameResolver();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
 
         self::assertSame('@AcmeBundle/article/show.html.twig', $resolver->resolve($project, 'file:///workspace/templates/bundles/AcmeBundle/article/show.html.twig'));
         self::assertSame('bundles/AcmeBundle/article/show.html.twig', $resolver->relative($project, 'file:///workspace/templates/bundles/AcmeBundle/article/show.html.twig'));
@@ -504,7 +504,7 @@ final class TemplateProviderTest extends TestCase
         $root = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
         mkdir($root.'/templates', 0777, true);
         file_put_contents($root.'/templates/index.html', 'Hello');
-        $project = new Project($root, 'file://'.$root, '^8.0');
+        $project = new Project($root, 'file://'.$root);
         $indexes = new TemplateIndexRegistry();
 
         try {
@@ -526,7 +526,7 @@ final class TemplateProviderTest extends TestCase
         $root = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
         mkdir($root.'/templates', 0777, true);
         file_put_contents($root.'/templates/index.html.twig', 'Hello');
-        $project = new Project($root, 'file://'.$root, '^8.0');
+        $project = new Project($root, 'file://'.$root);
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['containerProjectRoot' => '/app']);
         $indexes = new TemplateIndexRegistry();
@@ -555,7 +555,7 @@ final class TemplateProviderTest extends TestCase
         mkdir($root.'/templates/admin', 0777, true);
         file_put_contents($root.'/templates/index.html.twig', 'Hello');
         chmod($root.'/templates/admin', 0000);
-        $project = new Project($root, 'file://'.$root, '^8.0');
+        $project = new Project($root, 'file://'.$root);
         $indexes = new TemplateIndexRegistry();
 
         try {
@@ -581,7 +581,7 @@ final class TemplateProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new TemplateIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true);
         $converter = new PositionConverter();
@@ -621,7 +621,7 @@ final class TemplateProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project($root, $converter->toUri($root), '^8.0')]);
+        $projects->replace([$project = new Project($root, $converter->toUri($root))]);
         $indexes = new TemplateIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true);
         $positionConverter = new PositionConverter();
@@ -775,7 +775,7 @@ final class TemplateProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, $languageId, 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new TemplateIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(
             true,
@@ -822,7 +822,7 @@ final class TemplateProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new TemplateIndexRegistry();
         $converter = new PositionConverter();
         $indexes->forProject($project)->replaceSources(new TemplateDeclaration('article/show.html.twig', 'file:///workspace/templates/article/show.html.twig', new Range(new Position(0, 0), new Position(0, 0))));

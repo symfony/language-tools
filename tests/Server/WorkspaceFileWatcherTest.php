@@ -22,7 +22,7 @@ final class WorkspaceFileWatcherTest extends TestCase
             mkdir($this->directory.'/'.$directory, 0777, true);
         }
         $this->projects = new ProjectRegistry();
-        $this->projects->replace([new Project($this->directory, 'file:///workspace', '^8.0')]);
+        $this->projects->replace([new Project($this->directory, 'file:///workspace')]);
     }
 
     protected function tearDown(): void

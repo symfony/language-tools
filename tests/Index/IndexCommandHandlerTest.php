@@ -55,7 +55,6 @@ final class IndexCommandHandlerTest extends TestCase
         $projects->replace([$project = new Project(
             $this->temporaryDirectory,
             'file://'.$this->temporaryDirectory,
-            '^8.0',
         )]);
         $statuses = new ProjectIndexStatusRegistry();
         $sourceScanner = $this->scanner($projects, $statuses);
@@ -112,7 +111,6 @@ final class IndexCommandHandlerTest extends TestCase
         $projects->replace([$project = new Project(
             $this->temporaryDirectory,
             'file://'.$this->temporaryDirectory,
-            '^8.0',
         )]);
         $statuses = new ProjectIndexStatusRegistry();
         $sourceScanner = $this->scanner($projects, $statuses);

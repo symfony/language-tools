@@ -86,7 +86,7 @@ final class DependencyInjectionNavigationTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($consumerUri, 'php', 1, $consumer));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $converter = new PositionConverter();
         $yamlExtractor = new YamlDependencyInjectionExtractor(
             new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),

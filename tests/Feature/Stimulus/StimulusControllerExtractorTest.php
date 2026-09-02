@@ -117,7 +117,7 @@ final class StimulusControllerExtractorTest extends TestCase
 
     private function extract(string $text): StimulusControllerDeclaration
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $extractor = new StimulusControllerExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new JavaScriptSourceAnalyzer());
 
         return $extractor->extract($project, 'file:///workspace/assets/controllers/example_controller.js', $text)[0];

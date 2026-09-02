@@ -14,7 +14,7 @@ final class ProjectDoctrineSnapshotLoaderTest extends TestCase
 {
     public function testLoadsRuntimeEntities(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $indexes = new DoctrineIndexRegistry();
         $loader = new ProjectDoctrineSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
         $loader->load($project, [

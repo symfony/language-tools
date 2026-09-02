@@ -28,7 +28,7 @@ final class TranslationRenameHandlerTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($referenceUri, 'php', 1, $reference));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $converter = new PositionConverter();
         $extractor = TranslationExtractorTestFactory::create($converter);
         $indexes = new TranslationIndexRegistry();

@@ -30,7 +30,7 @@ final class TwigPhpSymbolSourceIndexerTest extends TestCase
 {
     public function testPersistsDeclarationsReferencesAndLookupIndexes(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $phpUri = 'file:///workspace/src/Model.php';
         $twigUri = 'file:///workspace/templates/page.html.twig';
         $php = <<<'PHP'
@@ -86,7 +86,7 @@ final class TwigPhpSymbolSourceIndexerTest extends TestCase
 
     public function testOpenDocumentOverlayReplacesSavedSymbols(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $uri = 'file:///workspace/src/Status.php';
         $extractor = $this->extractor(new PositionConverter());
         $index = (new TwigPhpSymbolIndexRegistry())->forProject($project);

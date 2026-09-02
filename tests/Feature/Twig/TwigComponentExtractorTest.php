@@ -27,7 +27,7 @@ final class TwigComponentExtractorTest extends TestCase
     public function testExtractsStaticTwigHelperArgumentsConservatively(): void
     {
         $facts = $this->extractor()->extract(
-            new Project('/workspace', 'file:///workspace', '^8.0'),
+            new Project('/workspace', 'file:///workspace'),
             new SourceDocument('file:///workspace/templates/components/Search.html.twig',
                 'twig',
                 <<<'TWIG'
@@ -59,7 +59,7 @@ final class TwigComponentExtractorTest extends TestCase
     public function testDecodesEscapedTwigComponentNames(): void
     {
         $facts = $this->extractor()->extract(
-            new Project('/workspace', 'file:///workspace', '^8.0'),
+            new Project('/workspace', 'file:///workspace'),
             new SourceDocument('file:///workspace/templates/page.html.twig',
                 'twig',
                 "{{ component('it\\'s') }}"),
@@ -71,7 +71,7 @@ final class TwigComponentExtractorTest extends TestCase
     public function testDecodesEscapedTwigLiveActionNames(): void
     {
         $facts = $this->extractor()->extract(
-            new Project('/workspace', 'file:///workspace', '^8.0'),
+            new Project('/workspace', 'file:///workspace'),
             new SourceDocument('file:///workspace/templates/components/Search.html.twig',
                 'twig',
                 "{{ live_action('it\\'s') }}"),

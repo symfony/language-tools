@@ -12,7 +12,7 @@ final class ProjectSecuritySnapshotLoaderTest extends TestCase
     public function testLoadsRuntimeMetadata(): void
     {
         $indexes = new SecurityIndexRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         (new ProjectSecuritySnapshotLoader($indexes))->load($project, [
             'complete' => true,
             'firewalls' => [['name' => 'main', 'provider' => 'users', 'enabled' => true, 'stateless' => false, 'lazy' => true, 'authenticators' => ['App\\Security\\Authenticator']]],

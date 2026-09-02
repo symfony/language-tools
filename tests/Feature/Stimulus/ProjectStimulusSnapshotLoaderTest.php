@@ -14,7 +14,7 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
 {
     public function testLoadsNormalizedStimulusMetadata(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $indexes = new StimulusIndexRegistry();
         (new ProjectStimulusSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration())))->load($project, [
             'complete' => true,
@@ -46,7 +46,7 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
 
     public function testMapsContainerSourcePathsToTheHost(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['containerProjectRoot' => '/app']);
         $indexes = new StimulusIndexRegistry();

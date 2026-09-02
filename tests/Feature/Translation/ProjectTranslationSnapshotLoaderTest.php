@@ -12,7 +12,7 @@ final class ProjectTranslationSnapshotLoaderTest extends TestCase
     public function testLoadsEffectiveCatalogues(): void
     {
         $indexes = new TranslationIndexRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         (new ProjectTranslationSnapshotLoader($indexes))->load($project, ['complete' => true, 'items' => [
             ['key' => 'article.title', 'domain' => 'messages', 'locale' => 'en', 'message' => 'Article %name%'],
         ]]);

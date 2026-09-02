@@ -42,7 +42,7 @@ final class RouteCompletionHandlerTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new RouteIndexRegistry();
         $indexes->forProject($project)->replace(
             new Route('article_show', '/{section}/article/{slug}', [], [], null, null),
@@ -74,7 +74,7 @@ final class RouteCompletionHandlerTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new RouteIndexRegistry();
         $indexes->forProject($project)->replace(
             new Route('app_home.en', '/en/{locale_en}', [], [], null, null, canonicalName: 'app_home'),
@@ -98,7 +98,7 @@ final class RouteCompletionHandlerTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'twig', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new RouteIndexRegistry();
         $indexes->forProject($project)->replace(
             new Route('article_show', '/article/{id}', [], [], null, null),
@@ -122,7 +122,7 @@ final class RouteCompletionHandlerTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'twig', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new RouteIndexRegistry();
         $indexes->forProject($project)->replace(
             new Route('article_show', '/{section}/article/{slug}', [], [], null, null),
@@ -167,7 +167,7 @@ final class RouteCompletionHandlerTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new RouteIndexRegistry();
         $indexes->forProject($project)->replace(new Route('article_show', '/article/{id}', [], [], null, null));
         $converter = new PositionConverter();
@@ -204,7 +204,7 @@ final class RouteCompletionHandlerTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new RouteIndexRegistry();
         $indexes->forProject($project)->replace(
             new Route('article_edit', '/article/{id}/edit', [], [], null, null),
@@ -237,7 +237,7 @@ final class RouteCompletionHandlerTest extends TestCase
         $uri = 'file:///workspace/templates/article.html.twig';
         $documents = new DocumentStore();
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new RouteIndexRegistry();
         $indexes->forProject($project)->replace(new Route('article_show', '/article/{slug}', [], [], null, null));
         $converter = new PositionConverter();
@@ -273,7 +273,7 @@ final class RouteCompletionHandlerTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new RouteIndexRegistry();
         $indexes->forProject($project)->replace(new Route('article_show', '/article/{slug}', [], [], null, null));
         $converter = new PositionConverter();

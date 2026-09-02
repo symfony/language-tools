@@ -30,7 +30,7 @@ final class BridgeInstallerTest extends TestCase
         file_put_contents($source, "<?php require __DIR__.'/bridge/sections/routes.php';");
         file_put_contents($module, '<?php function routes(): array { return []; }');
         $installer = new BridgeInstaller($source, 'test', new ConcurrentBridgeFilesystem());
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
 
         $bridge = $installer->install($project);
 
@@ -46,7 +46,7 @@ final class BridgeInstallerTest extends TestCase
         file_put_contents($source, "<?php require __DIR__.'/bridge/sections/routes.php';");
         file_put_contents($module, '<?php function routes(): array { return []; }');
         $installer = new BridgeInstaller($source, 'test', new Filesystem());
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
 
         $first = $installer->install($project);
         $second = $installer->install($project);

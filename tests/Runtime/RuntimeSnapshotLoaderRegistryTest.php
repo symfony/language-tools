@@ -26,7 +26,7 @@ final class RuntimeSnapshotLoaderRegistryTest extends TestCase
         $container = new RecordingRuntimeSnapshotLoader('container');
         $missing = new RecordingRuntimeSnapshotLoader('missing');
         $registry = new RuntimeSnapshotLoaderRegistry([$routes, $container, $missing]);
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
 
         $registry->load($project, [
             'schemaVersion' => 1,

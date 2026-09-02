@@ -222,7 +222,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $documents = new DocumentStore();
             $documents->open(new Document($uri, $languageId, 1, $text));
             $projects = new ProjectRegistry();
-            $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+            $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
             $indexes = new RouteIndexRegistry();
             $indexes->forProject($project)->replaceRuntime(
                 [],
@@ -307,7 +307,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             }
             PHP));
         $projects = new ProjectRegistry();
-        $projects->replace([new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([new Project('/workspace', 'file:///workspace')]);
         $positionConverter = new PositionConverter();
         $uriConverter = new UriToPathConverter();
         $collector = new DiagnosticCollector(
@@ -400,7 +400,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, $languageId, 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $routeIndexes = new RouteIndexRegistry();
         $routeIndexes->forProject($project)->replaceRuntime([], $contextParameters, ...(\is_array($route) ? $route : [
             $route ?? new Route('article_show', '/article', ['GET'], [], null, null),

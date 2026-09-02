@@ -14,7 +14,7 @@ final class ConfigurationValidationRegistryTest extends TestCase
 {
     public function testLoadsAndReplacesValidationResults(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $registry = new ConfigurationValidationRegistry();
         $loader = new ProjectConfigurationValidationSnapshotLoader($registry);
 
@@ -57,7 +57,7 @@ final class ConfigurationValidationRegistryTest extends TestCase
 
     public function testRejectsResultsFromAnOlderConfigurationGeneration(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $registry = new ConfigurationValidationRegistry();
         $registry->pending($project);
         $loader = new ProjectConfigurationValidationSnapshotLoader($registry);
@@ -78,7 +78,7 @@ final class ConfigurationValidationRegistryTest extends TestCase
 
     public function testRejectsMalformedValidationPayloads(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $registry = new ConfigurationValidationRegistry();
         (new ProjectConfigurationValidationSnapshotLoader($registry))->load($project, [
             'project' => ['environment' => 'dev'],

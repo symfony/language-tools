@@ -22,7 +22,7 @@ final class SourceFileEnumeratorTest extends TestCase
     {
         $this->directory = sys_get_temp_dir().'/symfony-lsp-enumerator-'.bin2hex(random_bytes(6));
         mkdir($this->directory.'/src', 0777, true);
-        $this->project = new Project($this->directory, 'file://'.$this->directory, '^8.0');
+        $this->project = new Project($this->directory, 'file://'.$this->directory);
         $this->fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
     }
 

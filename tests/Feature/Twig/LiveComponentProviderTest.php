@@ -39,7 +39,7 @@ final class LiveComponentProviderTest extends TestCase
 {
     public function testProvidesLivePropertiesActionsAndEvents(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
         $extractor = $this->extractor($converter, $commentParser);
@@ -138,7 +138,7 @@ final class LiveComponentProviderTest extends TestCase
 
     public function testRecoversComponentFromIncompletePhp(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $converter = new PositionConverter();
         $extractor = $this->extractor($converter);
         $facts = $extractor->extract($project, new SourceDocument('file:///workspace/src/Twig/Components/Card.php', 'php', <<<'PHP'
@@ -205,7 +205,7 @@ final class LiveComponentProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new TwigComponentIndexRegistry();
         $indexes->forProject($project)->replace($extractor->extract($project, new SourceDocument($uri, 'php', $text)));
         $provider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser());
@@ -218,7 +218,7 @@ final class LiveComponentProviderTest extends TestCase
         $converter = new PositionConverter();
         $extractor = $this->extractor($converter);
 
-        $facts = $extractor->extract(new Project('/workspace', 'file:///workspace', '^8.0'), new SourceDocument('file:///workspace/src/Twig/Components/Events.php', 'php', <<<'PHP'
+        $facts = $extractor->extract(new Project('/workspace', 'file:///workspace'), new SourceDocument('file:///workspace/src/Twig/Components/Events.php', 'php', <<<'PHP'
             <?php
             namespace App\Twig\Components;
 
@@ -268,7 +268,7 @@ final class LiveComponentProviderTest extends TestCase
         $converter = new PositionConverter();
         $extractor = $this->extractor($converter);
 
-        $facts = $extractor->extract(new Project('/workspace', 'file:///workspace', '^8.0'), new SourceDocument('file:///workspace/src/Twig/Components/Search.php', 'php', <<<'PHP'
+        $facts = $extractor->extract(new Project('/workspace', 'file:///workspace'), new SourceDocument('file:///workspace/src/Twig/Components/Search.php', 'php', <<<'PHP'
             <?php
             namespace App\Twig\Components;
 

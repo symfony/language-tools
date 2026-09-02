@@ -56,7 +56,7 @@ class TwigCallableProviderTestCase extends TestCase
         $phpParser = new TolerantPhpParser(new Parser());
         $documents = new DocumentStore();
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $referenceExtractor = new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()), $commentParser, $converter, new TwigDirectiveLocator());
         $callableFacts = [];
         $classFacts = [];

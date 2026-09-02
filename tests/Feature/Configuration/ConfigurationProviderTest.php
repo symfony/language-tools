@@ -880,7 +880,7 @@ final class ConfigurationProviderTest extends TestCase
         $documents = new DocumentStore();
         $projects = new ProjectRegistry();
         $uriConverter = new UriToPathConverter();
-        $project = new Project($root, $uriConverter->toUri($root), '^8.0');
+        $project = new Project($root, $uriConverter->toUri($root));
         $projects->replace([$project]);
         $converter = new PositionConverter();
         $indexes = new ConfigurationIndexRegistry();

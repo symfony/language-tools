@@ -25,7 +25,7 @@ final class ConsoleSourceIndexerTest extends TestCase
 {
     public function testRestoresPersistedConsoleFacts(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $uri = 'file:///workspace/src/Command/ReportCommand.php';
         $document = new SourceDocument($uri, 'php', <<<'PHP'
             <?php

@@ -50,7 +50,7 @@ final class TwigCallableMethodResolverTest extends TestCase
                 }
             }
             PHP;
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $source));
         $parser = new TolerantPhpParser(new Parser());

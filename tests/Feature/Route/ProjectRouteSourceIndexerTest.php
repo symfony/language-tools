@@ -108,7 +108,6 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         $projects->replace([$project = new Project(
             $this->temporaryDirectory,
             'file://'.$this->temporaryDirectory,
-            '^8.0',
         )]);
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
         $referenceIndexes = new RouteReferenceIndexRegistry($classIndexes);
@@ -175,7 +174,6 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         $projects->replace([$project = new Project(
             $this->temporaryDirectory,
             'file://'.$this->temporaryDirectory,
-            '^8.0',
         )]);
         $indexes = new RouteDeclarationIndexRegistry();
         $referenceIndexes = new RouteReferenceIndexRegistry(new DependencyInjectionSourceIndexRegistry());

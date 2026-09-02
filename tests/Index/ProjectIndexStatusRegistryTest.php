@@ -11,7 +11,7 @@ final class ProjectIndexStatusRegistryTest extends TestCase
 {
     public function testDoesNotExposeFailureDetails(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $statuses = new ProjectIndexStatusRegistry();
 
         $statuses->sourceFailed($project);
@@ -26,7 +26,7 @@ final class ProjectIndexStatusRegistryTest extends TestCase
 
     public function testExposesTheBootstrapFailureStage(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $statuses = new ProjectIndexStatusRegistry();
 
         $statuses->runtimeFailed($project, 'bootstrap');
@@ -39,7 +39,7 @@ final class ProjectIndexStatusRegistryTest extends TestCase
 
     public function testPreservesRuntimeTimingsUntilTheNextIndexingStarts(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $statuses = new ProjectIndexStatusRegistry();
         $timings = [
             'scope' => 'full',
@@ -63,7 +63,7 @@ final class ProjectIndexStatusRegistryTest extends TestCase
 
     public function testReportsPartialRuntimeMetadataAsAvailable(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $snapshots = new RuntimeSnapshotState();
         $statuses = new ProjectIndexStatusRegistry($snapshots);
 
@@ -78,7 +78,7 @@ final class ProjectIndexStatusRegistryTest extends TestCase
 
     public function testReportsRestoredRuntimeMetadataAsStale(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $snapshots = new RuntimeSnapshotState();
         $statuses = new ProjectIndexStatusRegistry($snapshots);
         $snapshots->restore($project, '2026-08-25T20:15:00+00:00');

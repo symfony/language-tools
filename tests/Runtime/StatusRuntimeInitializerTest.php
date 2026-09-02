@@ -20,7 +20,7 @@ final class StatusRuntimeInitializerTest extends TestCase
 {
     public function testDoesNotRecordStatusForAProjectRemovedDuringTheRun(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $registry = new ProjectRegistry();
         $registry->replace([$project]);
         $statuses = new ProjectIndexStatusRegistry();
@@ -41,7 +41,7 @@ final class StatusRuntimeInitializerTest extends TestCase
 
     public function testDoesNotRecordFailuresForAProjectRemovedDuringTheRun(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $registry = new ProjectRegistry();
         $registry->replace([$project]);
         $statuses = new ProjectIndexStatusRegistry();
@@ -62,7 +62,7 @@ final class StatusRuntimeInitializerTest extends TestCase
 
     public function testRecordsTheBootstrapStageForBridgeExecutionFailures(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $registry = new ProjectRegistry();
         $registry->replace([$project]);
         $statuses = new ProjectIndexStatusRegistry();
@@ -86,7 +86,7 @@ final class StatusRuntimeInitializerTest extends TestCase
 
     public function testRecordsTheConfigurationStageForValidationFailures(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $registry = new ProjectRegistry();
         $registry->replace([$project]);
         $statuses = new ProjectIndexStatusRegistry();
@@ -110,7 +110,7 @@ final class StatusRuntimeInitializerTest extends TestCase
 
     public function testRecordsPartialRuntimeMetadataAsAvailable(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $registry = new ProjectRegistry();
         $registry->replace([$project]);
         $statuses = new ProjectIndexStatusRegistry();
@@ -134,7 +134,7 @@ final class StatusRuntimeInitializerTest extends TestCase
 
     public function testRecordsNoStageForOtherRuntimeFailures(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $registry = new ProjectRegistry();
         $registry->replace([$project]);
         $statuses = new ProjectIndexStatusRegistry();

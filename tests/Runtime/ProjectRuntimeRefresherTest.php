@@ -147,7 +147,7 @@ final class ProjectRuntimeRefresherTest extends TestCase
     private function refresher(TrustStatus $status): array
     {
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $workspaceTrust = new WorkspaceTrust();
         $workspaceTrust->set($project, $status);
         $scheduler = new RefreshScheduler();

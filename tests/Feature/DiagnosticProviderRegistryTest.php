@@ -194,7 +194,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, $languageId, 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
         $fileScope->configure($project, $excludePaths);
 

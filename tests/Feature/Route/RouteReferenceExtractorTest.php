@@ -44,7 +44,7 @@ final class RouteReferenceExtractorTest extends TestCase
         $parser = new TolerantPhpParser(new Parser());
         $classExtractor = new PhpClassDeclarationExtractor($converter, $parser);
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $classIndex = $classIndexes->forProject($project);
         $classIndex->replace(new DependencyInjectionSourceFacts(
             $uri,
@@ -92,7 +92,7 @@ final class RouteReferenceExtractorTest extends TestCase
         $parser = new TolerantPhpParser(new Parser());
         $classExtractor = new PhpClassDeclarationExtractor($converter, $parser);
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $classIndex = $classIndexes->forProject($project);
         $classIndex->replace(
             new DependencyInjectionSourceFacts($baseUri, classes: $classExtractor->extract($baseUri, $base)),

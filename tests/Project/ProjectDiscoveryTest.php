@@ -40,7 +40,6 @@ final class ProjectDiscoveryTest extends TestCase
         self::assertCount(1, $projects);
         self::assertSame($this->temporaryDirectory, $projects[0]->rootPath);
         self::assertSame($uri, $projects[0]->rootUri);
-        self::assertSame('^7.4', $projects[0]->frameworkBundleConstraint);
     }
 
     public function testDiscoversNestedAndExplicitProjectRoots(): void
@@ -142,8 +141,8 @@ final class ProjectDiscoveryTest extends TestCase
 
     public function testSelectsMostSpecificProjectForDocument(): void
     {
-        $parent = new Project('/workspace', 'file:///workspace', '^8.0');
-        $child = new Project('/workspace/app', 'file:///workspace/app', '^8.0');
+        $parent = new Project('/workspace', 'file:///workspace');
+        $child = new Project('/workspace/app', 'file:///workspace/app');
         $registry = new ProjectRegistry();
         $registry->replace([$parent, $child]);
 
@@ -171,7 +170,6 @@ final class ProjectDiscoveryTest extends TestCase
         ]);
 
         self::assertCount(1, $projects);
-        self::assertSame('6.4.43', $projects[0]->frameworkBundleConstraint);
     }
 
     public function testIgnoresApplicationsWithoutTheFrameworkBundleInTheLock(): void

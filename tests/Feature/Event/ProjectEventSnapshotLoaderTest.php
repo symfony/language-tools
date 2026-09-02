@@ -12,7 +12,7 @@ final class ProjectEventSnapshotLoaderTest extends TestCase
     public function testLoadsRuntimeGraph(): void
     {
         $indexes = new EventIndexRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         (new ProjectEventSnapshotLoader($indexes))->load($project, [
             'complete' => true,
             'events' => [['name' => 'App\\Event\\OrderPlaced', 'class' => 'App\\Event\\OrderPlaced']],

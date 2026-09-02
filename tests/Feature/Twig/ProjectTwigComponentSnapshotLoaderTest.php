@@ -15,7 +15,7 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
     public function testLoadsRuntimeComponentNames(): void
     {
         $indexes = new TwigComponentIndexRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
 
         $loader->load($project, [
@@ -57,7 +57,7 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
     public function testClearsRuntimeNamesWhenTheIntegrationIsUnavailable(): void
     {
         $indexes = new TwigComponentIndexRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
         $indexes->forProject($project)->replaceRuntime(true, ['stale_component'], 'ui', ['stale_component']);
 
@@ -77,7 +77,7 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
     public function testKeepsIncompleteSectionsConservative(): void
     {
         $indexes = new TwigComponentIndexRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
 
         $loader->load($project, [
@@ -95,7 +95,7 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
     public function testIgnoresMalformedNames(): void
     {
         $indexes = new TwigComponentIndexRegistry();
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
 
         $loader->load($project, ['names' => 'invalid']);

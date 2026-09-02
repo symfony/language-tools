@@ -25,7 +25,7 @@ final class DocumentContextResolverTest extends TestCase
         $this->document = new Document('file:///workspace/config/services.yaml', 'yaml', 1, 'services: {}');
         $this->documents = new DocumentStore();
         $this->documents->open($this->document);
-        $this->project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $this->project = new Project('/workspace', 'file:///workspace');
         $this->projects = new ProjectRegistry();
         $this->projects->replace([$this->project]);
         $this->resolver = new DocumentContextResolver($this->documents, $this->projects);

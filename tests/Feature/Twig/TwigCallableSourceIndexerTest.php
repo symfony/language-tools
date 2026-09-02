@@ -25,7 +25,7 @@ final class TwigCallableSourceIndexerTest extends TestCase
 {
     public function testRestoresPersistedTwigCallableDeclarations(): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $uri = 'file:///workspace/src/Twig/AppExtension.php';
         $document = new SourceDocument($uri, 'php', <<<'PHP'
             <?php

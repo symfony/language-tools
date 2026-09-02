@@ -20,7 +20,7 @@ final class SerializedRuntimeInitializerTest extends TestCase
     {
         $delegate = new ConcurrentRuntimeInitializer();
         $initializer = new SerializedRuntimeInitializer($delegate, new LocalKeyedMutex());
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
 
         await([
             async(static fn () => $initializer->initialize($project)),

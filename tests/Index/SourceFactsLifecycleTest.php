@@ -62,7 +62,7 @@ final class SourceFactsLifecycleTest extends TestCase
     {
         $index = new CountingSourceFactsIndex();
         $indexer = new LifecycleSourceIndexer($index);
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $indexer->overlay($project, new Document('file:///source.php', 'php', 1, 'overlay'));
 
         self::assertSame(['overlay'], $index->values());

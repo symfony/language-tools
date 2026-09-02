@@ -25,7 +25,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
     {
         $converter = new PositionConverter();
         $extractor = $this->createExtractor($converter);
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
         $indexes = new MetadataIndexRegistry();
@@ -76,7 +76,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
     {
         $converter = new PositionConverter();
         $extractor = $this->createExtractor($converter);
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
         $dtoUri = 'file:///workspace/src/Dto/Article.php';
@@ -482,7 +482,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
         self::assertSame(strpos($text, 'active_form'), $converter->toByteOffset($text, $formOptions[0]['range']->start));
 
         $uri = 'file:///workspace/src/Controller/EventController.php';
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
         $indexes = new MetadataIndexRegistry();

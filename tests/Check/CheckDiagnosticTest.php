@@ -17,7 +17,7 @@ final class CheckDiagnosticTest extends TestCase
     #[DataProvider('invalidRangeProvider')]
     public function testRejectsInvalidRanges(array $range): void
     {
-        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $project = new Project('/workspace', 'file:///workspace');
         $file = new CheckFile(
             $project,
             '/workspace/config/services.yaml',
