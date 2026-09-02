@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Preserve unknown escape sequences in quoted Twig strings
+- Fold multiline YAML flow scalars with correct whitespace
+- Keep nested YAML flow collections intact during recovery parsing
+- Reuse identical source facts to avoid needless index rebuilds
+- Mask JavaScript regular expression literals in Stimulus analysis
+- Recognize Stimulus constructs inside JavaScript template interpolations
+- Read PHP translation catalogs from top-level returns only
+- Match only Symfony translatable message classes in PHP sources
+- Ignore spaced Twig member calls in named argument diagnostics
+- Fix missing-parameter quick fixes for named Twig route calls
+- Resolve YAML aliases inside prototype sequences during configuration diagnostics
+- Resolve captured receivers inside closures for Event, Messenger, Doctrine and form analysis
+- Ignore commas inside comments when parsing form option arrays
+- Require direct class constant arguments in Doctrine, Event and Messenger extraction
+- Attribute Doctrine repository calls to terminal getRepository receivers only
+- Redact quoted sensitive values completely in logs and error reports
+- Match existing baselines during incomplete check runs
 - Clarify whether runtime timings cover full or targeted refreshes
 - Preserve bounded sanitized frames without absolute closure paths in verbose server errors
 - Accept the next Symfony development branch across major boundaries

@@ -280,7 +280,9 @@ but never modify the baseline:
 Matched occurrences remain visible in human, JSON, GitHub and SARIF output and
 don't block. GitLab Code Quality output omits them. A second identical
 occurrence in the same file remains active, and known diagnostics continue to
-match after unrelated line movement.
+match after unrelated line movement. Baseline matching also applies when
+analysis is incomplete; generating or refreshing a baseline and stale-entry
+reporting require a complete run.
 
 Refresh the baseline explicitly after reviewing current diagnostics:
 
