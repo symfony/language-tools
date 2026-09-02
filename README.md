@@ -100,10 +100,12 @@ configuration, CI examples and stable exit statuses.
 
 ## Requirements
 
-Symfony Language Tools supports maintained Symfony versions listed in Symfony's
-[release metadata](https://symfony.com/releases.json). Runtime indexing requires
-the application's Composer dependencies to be installed and a PHP command
-compatible with its Symfony version.
+Symfony Language Tools supports the maintained Symfony versions listed in
+Symfony's [release metadata](https://symfony.com/releases.json), intermediate
+branches and the next development branch, including the next major's `.0`
+branch after an `X.4` branch. Runtime indexing requires the application's
+Composer dependencies to be installed and a PHP command compatible with its
+Symfony version.
 
 ## Documentation
 
