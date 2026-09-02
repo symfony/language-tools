@@ -138,19 +138,19 @@ final class ReleaseWorkflowTest extends TestCase
             'actions/setup-node' => 'v7',
             'actions/upload-artifact' => 'v7',
             'azure/login' => 'v3',
+            'JohnnyMorganz/stylua-action' => 'v5',
             'ramsey/composer-install' => 'v4',
+            'rhysd/action-setup-vim' => 'v1',
             'shivammathur/setup-php' => 'v2',
             'softprops/action-gh-release' => 'v3',
         ];
         $seen = [];
         foreach ((new Finder())->files()->in(self::ROOT.'/.github/workflows')->name('*.yaml') as $workflow) {
-            preg_match_all('/uses:\s+([^@\s]+)@(v[0-9]+)/', $workflow->getContents(), $matches, \PREG_SET_ORDER);
+            preg_match_all('/uses:\s+(?!\.\/)([^@\s]+)(?:@(\S+))?/', $workflow->getContents(), $matches, \PREG_SET_ORDER);
             foreach ($matches as $match) {
-                if (!isset($approved[$match[1]])) {
-                    continue;
-                }
+                self::assertArrayHasKey($match[1], $approved, $workflow->getRelativePathname().' uses an action without an approved major.');
                 $seen[$match[1]] = true;
-                self::assertSame($approved[$match[1]], $match[2], $workflow->getRelativePathname().' uses an outdated action major.');
+                self::assertSame($approved[$match[1]], $match[2] ?? '', $workflow->getRelativePathname().' uses an outdated action major.');
             }
         }
 
