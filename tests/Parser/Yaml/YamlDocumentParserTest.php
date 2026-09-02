@@ -237,6 +237,13 @@ final class YamlDocumentParserTest extends TestCase
         );
     }
 
+    public function testRecoveryKeepsNestedFlowCollectionItemsTogether(): void
+    {
+        $document = (new YamlDocumentParser(self::errorParser()))->parseDocument('items: [{foo: bar, baz: qux}, final]');
+
+        self::assertSame(['final'], array_map(static fn (YamlScalar $scalar): string => $scalar->raw, $document->scalars));
+    }
+
     public function testRecoversScalarFactsAfterMalformedFlowSyntax(): void
     {
         $source = <<<'YAML'

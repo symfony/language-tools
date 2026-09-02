@@ -268,6 +268,7 @@ final class YamlRecoveryParser
         $itemStart = 1;
         $quote = null;
         $escaped = false;
+        $depth = 0;
         $index = 0;
         for ($offset = 1, $length = \strlen($fragment); $offset <= $length; ++$offset) {
             $character = $fragment[$offset] ?? ']';
@@ -289,7 +290,15 @@ final class YamlRecoveryParser
                 $quote = $character;
                 continue;
             }
-            if (!\in_array($character, [',', ']'], true)) {
+            if (\in_array($character, ['[', '{'], true)) {
+                ++$depth;
+                continue;
+            }
+            if (\in_array($character, [']', '}'], true) && 0 < $depth) {
+                --$depth;
+                continue;
+            }
+            if (0 < $depth || !\in_array($character, [',', ']'], true)) {
                 continue;
             }
             $rawItem = substr($fragment, $itemStart, $offset - $itemStart);
