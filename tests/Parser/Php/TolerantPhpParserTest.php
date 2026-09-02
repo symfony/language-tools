@@ -531,6 +531,27 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame('string', $methods[3]->firstParameterType);
     }
 
+    public function testDoesNotUsePlainCommentsAsMethodDescriptions(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+
+            final class Formatter
+            {
+                // This comment isn't documentation.
+                public function format(string $value): string
+                {
+                    return $value;
+                }
+            }
+            PHP;
+
+        $method = (new TolerantPhpParser(new Parser()))->parse($source)->methodDeclarations[0];
+
+        self::assertNull($method->description);
+    }
+
     public function testExposesInterfaceAndEnumMethodsWithCleanDescriptions(): void
     {
         $source = <<<'PHP'
