@@ -69,7 +69,8 @@ final class ReleaseWorkflowTest extends TestCase
         self::assertStringContainsString('--commit="$GITHUB_SHA"', $workflow);
         self::assertStringContainsString('--event=workflow_dispatch', $workflow);
         self::assertStringContainsString('--status=success', $workflow);
-        self::assertStringContainsString('.displayTitle == \\"Release candidate $GITHUB_REF_NAME\\"', $workflow);
+        self::assertStringContainsString('first(.[] | select(.headSha == \\"$GITHUB_SHA\\" and .displayTitle == \\"Release candidate $GITHUB_REF_NAME\\") | .databaseId) // empty', $workflow);
+        self::assertStringNotContainsString('| head -1', $workflow);
         self::assertStringContainsString('name: ${{ env.CANDIDATE_ARTIFACT }}', $workflow);
         self::assertStringContainsString('run-id: ${{ steps.candidate.outputs.run_id }}', $workflow);
         self::assertStringContainsString("'.commit == \$commit and .version == \$version", $workflow);

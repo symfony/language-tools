@@ -33,8 +33,7 @@ jobs:
                           --status=success \
                           --limit=100 \
                           --json=databaseId,displayTitle,headSha \
-                          --jq ".[] | select(.headSha == \"$GITHUB_SHA\" and .displayTitle == \"Release candidate $GITHUB_REF_NAME\") | .databaseId" \
-                      | head -1
+                          --jq "first(.[] | select(.headSha == \"$GITHUB_SHA\" and .displayTitle == \"Release candidate $GITHUB_REF_NAME\") | .databaseId) // empty"
                   )"
                   if [[ -z "$run_id" ]]; then
                       echo "No successful release candidate for $GITHUB_REF_NAME at $GITHUB_SHA." >&2
