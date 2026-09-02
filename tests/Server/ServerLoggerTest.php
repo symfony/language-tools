@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Server;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
@@ -20,6 +21,33 @@ final class ServerLoggerTest extends TestCase
                 ['/workspace'],
             ),
         );
+    }
+
+    #[DataProvider('quotedSensitiveValueProvider')]
+    public function testRedactsCompleteQuotedSensitiveValues(string $message, string $expected): void
+    {
+        self::assertSame($expected, (new SensitiveDataRedactor())->redact($message));
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function quotedSensitiveValueProvider(): iterable
+    {
+        yield 'double-quoted environment value' => [
+            'APP_SECRET="alpha beta gamma" after boot',
+            '[redacted] after boot',
+        ];
+        yield 'single-quoted named secret' => [
+            "password='alpha beta gamma' after boot",
+            'password=[redacted] after boot',
+        ];
+        yield 'multiline authorization value' => [
+            "Runtime failed:\nAuthorization: \"Bearer alpha beta\" while booting\nRetrying",
+            "Runtime failed:\nauthorization=[redacted] while booting\nRetrying",
+        ];
+        yield 'quoted DSN value' => [
+            'DATABASE_URL="mysql://user:alpha beta@database/app db" after boot',
+            '[redacted] after boot',
+        ];
     }
 
     public function testKeepsTruncatedRedactedTextValidUtf8(): void

@@ -6,6 +6,9 @@ use Symfony\Component\Filesystem\Path;
 
 final class SensitiveDataRedactor
 {
+    private const VALUE_PATTERN = '(?:"(?:\\\\.|[^"\\\\\r\n])*(?:"|(?=\r?\n|\z))|\'(?:\\\\.|[^\'\\\\\r\n])*(?:\'|(?=\r?\n|\z))|(?!["\'])[^\s,;]+)';
+    private const LINE_VALUE_PATTERN = '(?:"(?:\\\\.|[^"\\\\\r\n])*(?:"|(?=\r?\n|\z))|\'(?:\\\\.|[^\'\\\\\r\n])*(?:\'|(?=\r?\n|\z))|(?!["\'])[^\r\n,;]+)';
+
     public function __construct(
         private readonly Utf8StringTruncator $truncator = new Utf8StringTruncator(),
     ) {
@@ -21,11 +24,11 @@ final class SensitiveDataRedactor
         }
 
         $value = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $value) ?? '';
-        $value = preg_replace('/\b[A-Z][A-Z0-9_]{2,}\s*=\s*[^\s,;]+/', '[redacted]', $value) ?? '[redacted]';
+        $value = preg_replace('/\b[A-Z][A-Z0-9_]{2,}\s*=\s*'.self::VALUE_PATTERN.'/', '[redacted]', $value) ?? '[redacted]';
         $value = preg_replace('/\b[a-z][a-z0-9+.-]*:\/\/[^\s\/:@]+:[^\s\/@]+@/i', '[redacted]@', $value) ?? '[redacted]';
-        $value = preg_replace('/\bauthorization\s*[=:]\s*[^\r\n,;]+/i', 'authorization=[redacted]', $value) ?? '[redacted]';
+        $value = preg_replace('/\bauthorization\s*[=:]\s*'.self::LINE_VALUE_PATTERN.'/i', 'authorization=[redacted]', $value) ?? '[redacted]';
         $value = preg_replace(
-            '/\b(password|passwd|secret|token|credential|cookie|api[_-]?key|private[_-]?key)\s*[=:]\s*[^\s,;]+/i',
+            '/\b(password|passwd|secret|token|credential|cookie|api[_-]?key|private[_-]?key)\s*[=:]\s*'.self::VALUE_PATTERN.'/i',
             '$1=[redacted]',
             $value,
         ) ?? '[redacted]';
