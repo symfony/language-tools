@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Share release PHAR building and package validation across platforms
 - Validate Composer PSR-4 mappings with a strict autoload check
 
 ## 0.18.1 (2026-09-02)

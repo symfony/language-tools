@@ -1,0 +1,28 @@
+#!/usr/bin/env php
+<?php
+
+require_once __DIR__.'/InteractiveProcessRunner.php';
+require_once __DIR__.'/ReleaseVersion.php';
+require_once __DIR__.'/ReleaseReference.php';
+require_once __DIR__.'/ReleasePackager.php';
+
+use Symfony\Lsp\Tools\InteractiveProcessRunner;
+use Symfony\Lsp\Tools\ReleasePackager;
+use Symfony\Lsp\Tools\ReleaseReference;
+
+if (4 !== $argc) {
+    fwrite(\STDERR, "Usage: tools/package-release <platform> <branch|tag> <ref-name>\n");
+    exit(2);
+}
+
+try {
+    $root = \dirname(__DIR__);
+    $archive = (new ReleasePackager($root, new InteractiveProcessRunner()))->package(
+        $argv[1],
+        new ReleaseReference($argv[2], $argv[3]),
+    );
+    fwrite(\STDOUT, $archive."\n");
+} catch (\Throwable $error) {
+    fwrite(\STDERR, $error->getMessage()."\n");
+    exit(1);
+}
