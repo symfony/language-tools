@@ -12,6 +12,7 @@ use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
 
@@ -61,11 +62,20 @@ final class EventExtractor
             if (null !== $prefix = $this->subscriberMapAnalyzer->completionPrefix($masked, $offset)) {
                 return $prefix;
             }
-            $dispatchers = $this->eventDispatcherVariables($php);
-            if (preg_match('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:addListener\s*\(\s*|dispatch\s*\([^,\r\n]+,\s*)["\']([^"\']*)$/', $before, $match)) {
-                $variable = '' !== $match[2] ? $match[2] : $match[1];
-                if (isset($dispatchers[$variable])) {
-                    return $match[3];
+            foreach ($php->methodCalls as $call) {
+                $argument = match ($call->method) {
+                    'addListener' => $call->positionalArgument(0),
+                    'dispatch' => $call->positionalArgument(1),
+                    default => null,
+                };
+                $start = $argument?->expressionStartOffset;
+                $end = $argument?->expressionEndOffset;
+                if (null === $start || null === $end || $offset <= $start || $offset > $end || !$this->hasEventDispatcherReceiver($masked, $php, $call)) {
+                    continue;
+                }
+                $argumentBefore = substr($masked, $start, $offset - $start);
+                if (preg_match('/^(["\'])([^"\']*)$/s', $argumentBefore, $match)) {
+                    return $match[2];
                 }
             }
         }
@@ -116,7 +126,7 @@ final class EventExtractor
         }
 
         foreach ($php->methodCalls as $call) {
-            if (!array_any($this->capturedReceivers->variables($source, $php, $call), static fn ($variable): bool => [] !== array_intersect(self::DISPATCHER_TYPES, $variable->types))) {
+            if (!$this->hasEventDispatcherReceiver($source, $php, $call)) {
                 continue;
             }
             if ('dispatch' === $call->method) {
@@ -187,17 +197,9 @@ final class EventExtractor
         );
     }
 
-    /** @return array<string, true> */
-    private function eventDispatcherVariables(PhpDocument $php): array
+    private function hasEventDispatcherReceiver(string $source, PhpDocument $php, PhpMethodCall $call): bool
     {
-        $variables = [];
-        foreach ($php->typedVariables as $variable) {
-            if ([] !== array_intersect(self::DISPATCHER_TYPES, $variable->types)) {
-                $variables[$variable->name] = true;
-            }
-        }
-
-        return $variables;
+        return array_any($this->capturedReceivers->variables($source, $php, $call), static fn ($variable): bool => [] !== array_intersect(self::DISPATCHER_TYPES, $variable->types));
     }
 
     /**

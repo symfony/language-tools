@@ -385,6 +385,74 @@ PHP;
         return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
     }
 
+    public function testScopesEventDispatcherCompletionsToTheirReceiver(): void
+    {
+        $extractor = $this->extractor();
+        $text = <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+
+            final class Dispatch
+            {
+                public function __construct(private EventDispatcherInterface $propertyDispatcher)
+                {
+                }
+
+                public function valid(EventDispatcherInterface $dispatcher): void
+                {
+                    $dispatcher->addListener('valid.event');
+                    $this->propertyDispatcher->dispatch(new Event(), 'property.event');
+                    $closure = function () use ($dispatcher): void {
+                        $dispatcher->addListener('captured.event');
+                    };
+                    $arrow = fn () => $dispatcher->addListener('arrow.event');
+                    $uncaptured = function (): void {
+                        $dispatcher->addListener('uncaptured.event');
+                    };
+                    $shadowed = fn (object $dispatcher) => $dispatcher->addListener('shadowed.event');
+                }
+
+                public function unrelated(object $dispatcher): void
+                {
+                    $dispatcher->addListener('other.method');
+                }
+            }
+
+            final class OtherDispatch
+            {
+                public function __construct(private object $propertyDispatcher)
+                {
+                }
+
+                public function unrelated(object $dispatcher): void
+                {
+                    $dispatcher->dispatch(new Event(), 'other.class');
+                    $this->propertyDispatcher->addListener('other.property');
+                }
+            }
+            PHP;
+        /** @var list<array{string, ?string}> $cases */
+        $cases = [
+            ["'valid.ev", 'valid.ev'],
+            ["'property.ev", 'property.ev'],
+            ["'captured.ev", 'captured.ev'],
+            ["'arrow.ev", 'arrow.ev'],
+            ["'uncaptured.ev", null],
+            ["'shadowed.ev", null],
+            ["'other.meth", null],
+            ["'other.cla", null],
+            ["'other.prop", null],
+        ];
+
+        foreach ($cases as [$needle, $expectedPrefix]) {
+            $offset = (int) strpos($text, $needle) + \strlen($needle);
+
+            self::assertSame($expectedPrefix, $extractor->completionPrefix('php', $text, $offset));
+        }
+    }
+
     #[DataProvider('eventListenerAttributeCompletionProvider')]
     public function testCompletesEventNamesOnlyInResolvedEventListenerAttributes(string $text, ?string $expectedPrefix): void
     {
