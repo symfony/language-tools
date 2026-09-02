@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Scope PHP property hooks and expose interface hook properties
 - Adopt the Phan parser baseline for modern PHP syntax
 - Parse nullable typed class constants
 - Identify source files that trigger indexing failures

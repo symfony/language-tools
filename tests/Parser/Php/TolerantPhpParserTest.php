@@ -275,6 +275,49 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame('$local->dispatch(\'first\')', substr($source, $firstCall->startOffset, $firstCall->endOffset - $firstCall->startOffset));
     }
 
+    public function testScopesPropertyHookParametersAndCalls(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+
+            use Vendor\FirstService;
+            use Vendor\SecondService;
+
+            final class Hooked
+            {
+                public string $first {
+                    set(FirstService $service) {
+                        $service->run();
+                    }
+                }
+
+                public string $second {
+                    set(SecondService $service) {
+                        $service->run();
+                    }
+                }
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $parameters = array_values(array_filter($document->typedVariables, static fn ($variable): bool => PhpTypedVariableKind::Parameter === $variable->kind));
+        [$firstParameter, $secondParameter] = $parameters;
+        [$firstCall, $secondCall] = $document->methodCalls;
+
+        self::assertIsInt($firstParameter->scopeStartOffset);
+        self::assertIsInt($secondParameter->scopeStartOffset);
+        self::assertIsInt($firstCall->scopeStartOffset);
+        self::assertIsInt($secondCall->scopeStartOffset);
+        self::assertNotSame($firstParameter->scopeStartOffset, $secondParameter->scopeStartOffset);
+        self::assertSame($firstParameter->scopeStartOffset, $firstCall->scopeStartOffset);
+        self::assertSame($secondParameter->scopeStartOffset, $secondCall->scopeStartOffset);
+        self::assertSame([['Vendor\FirstService'], ['Vendor\SecondService']], [
+            array_merge(...array_map(static fn ($variable): array => $variable->types, $document->receiverVariables($firstCall))),
+            array_merge(...array_map(static fn ($variable): array => $variable->types, $document->receiverVariables($secondCall))),
+        ]);
+    }
+
     public function testExposesPropertyDeclarationsWithoutInitializerValues(): void
     {
         $source = <<<'PHP'
@@ -320,6 +363,33 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame([false, false, false, true, false], array_map(static fn ($property): bool => $property->isPublic(), $properties));
         self::assertSame(['Stores customer identities.', 'Stores customer identities.', null, null, null], array_map(static fn ($property): ?string => $property->description, $properties));
         self::assertSame(array_fill(0, 5, false), array_map(static fn ($property): bool => $property->promoted, $properties));
+        foreach ($properties as $property) {
+            self::assertSame($property->name, substr($source, $property->nameStartOffset, $property->nameEndOffset - $property->nameStartOffset));
+        }
+    }
+
+    public function testExposesInterfacePropertyHookDeclarations(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Contract;
+
+            use Vendor\Identity\Identifier;
+
+            interface Identifiable
+            {
+                public Identifier $identifier { get; }
+                public string $label { get; set; }
+            }
+            PHP;
+
+        $properties = (new TolerantPhpParser(new Parser()))->parse($source)->propertyDeclarations;
+
+        self::assertSame(['identifier', 'label'], array_map(static fn ($property): string => $property->name, $properties));
+        self::assertSame(array_fill(0, 2, 'App\Contract\Identifiable'), array_map(static fn ($property): string => $property->className, $properties));
+        self::assertSame(['public Identifier $identifier', 'public string $label'], array_map(static fn ($property): string => $property->signature, $properties));
+        self::assertSame([['Vendor\Identity\Identifier'], ['string']], array_map(static fn ($property): array => $property->types, $properties));
+        self::assertSame(array_fill(0, 2, 'public'), array_map(static fn ($property): string => $property->visibility, $properties));
         foreach ($properties as $property) {
             self::assertSame($property->name, substr($source, $property->nameStartOffset, $property->nameEndOffset - $property->nameStartOffset));
         }

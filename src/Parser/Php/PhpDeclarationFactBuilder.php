@@ -174,8 +174,8 @@ final class PhpDeclarationFactBuilder
                 continue;
             }
 
-            $owner = $declaration->getFirstAncestor(ObjectCreationExpression::class, ClassDeclaration::class, TraitDeclaration::class);
-            if ($owner instanceof ObjectCreationExpression || (!$owner instanceof ClassDeclaration && !$owner instanceof TraitDeclaration)) {
+            $owner = $declaration->getFirstAncestor(ObjectCreationExpression::class, ClassDeclaration::class, InterfaceDeclaration::class, TraitDeclaration::class);
+            if ($owner instanceof ObjectCreationExpression || (!$owner instanceof ClassDeclaration && !$owner instanceof InterfaceDeclaration && !$owner instanceof TraitDeclaration)) {
                 continue;
             }
             $elements = $this->nodes->propertyElements($declaration);

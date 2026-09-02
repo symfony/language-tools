@@ -9,6 +9,7 @@ use Microsoft\PhpParser\Node\Expression\ObjectCreationExpression;
 use Microsoft\PhpParser\Node\Expression\ScopedPropertyAccessExpression;
 use Microsoft\PhpParser\Node\Expression\Variable;
 use Microsoft\PhpParser\Node\MethodDeclaration;
+use Microsoft\PhpParser\Node\PropertyHook;
 use Microsoft\PhpParser\Node\QualifiedName;
 use Microsoft\PhpParser\Node\Statement\ClassDeclaration;
 use Microsoft\PhpParser\Node\Statement\EnumDeclaration;
@@ -26,7 +27,7 @@ final class TolerantPhpScopeResolver
     /**
      * @return array{
      *     ClassDeclaration|InterfaceDeclaration|TraitDeclaration|EnumDeclaration|null,
-     *     MethodDeclaration|FunctionDeclaration|AnonymousFunctionCreationExpression|ArrowFunctionCreationExpression|null
+     *     MethodDeclaration|PropertyHook|FunctionDeclaration|AnonymousFunctionCreationExpression|ArrowFunctionCreationExpression|null
      * }
      */
     public function enclosingContext(Node $node): array
@@ -35,7 +36,7 @@ final class TolerantPhpScopeResolver
         $scope = null;
         $anonymousClass = false;
         while (null !== $node = $node->getParent()) {
-            if (null === $scope && ($node instanceof MethodDeclaration || $node instanceof FunctionDeclaration || $node instanceof AnonymousFunctionCreationExpression || $node instanceof ArrowFunctionCreationExpression)) {
+            if (null === $scope && ($node instanceof MethodDeclaration || $node instanceof PropertyHook || $node instanceof FunctionDeclaration || $node instanceof AnonymousFunctionCreationExpression || $node instanceof ArrowFunctionCreationExpression)) {
                 $scope = $node;
             }
             if (null === $owner) {
