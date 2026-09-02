@@ -6,6 +6,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -17,6 +18,7 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
         private readonly LspProtocolMapper $protocol,
         private readonly DependencyInjectionProjectLookup $lookup,
         private readonly PhpCommentParser $phpComments,
+        private readonly YamlCommentParser $yamlComments,
     ) {
     }
 
@@ -28,7 +30,7 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
         }
 
         $isYaml = 'yaml' === $request->document->languageId;
-        $text = $isYaml ? $request->document->text : $this->phpComments->mask($request->document->text);
+        $text = $isYaml ? $this->yamlComments->mask($request->document->text) : $this->phpComments->mask($request->document->text);
         $parameterContext = $isYaml
             ? ParameterCompletionContext::fromYaml($text, $request->position, $this->positionConverter)
             : ParameterCompletionContext::fromPhp($text, $request->position, $this->positionConverter);

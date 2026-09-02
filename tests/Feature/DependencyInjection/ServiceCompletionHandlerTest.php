@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -21,6 +22,9 @@ use Symfony\Lsp\Feature\DependencyInjection\ServiceCompletionHandler;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -70,6 +74,7 @@ final class ServiceCompletionHandlerTest extends TestCase
             new LspProtocolMapper(),
             new DependencyInjectionProjectLookup($indexes, $parameterIndexes, $sourceIndexes),
             new PhpCommentParser(),
+            $this->yamlComments(),
         );
 
         $result = $handler->complete([
@@ -132,6 +137,7 @@ final class ServiceCompletionHandlerTest extends TestCase
             new LspProtocolMapper(),
             new DependencyInjectionProjectLookup($serviceIndexes, $parameterIndexes, $sourceIndexes),
             new PhpCommentParser(),
+            $this->yamlComments(),
         );
 
         $serviceUri = 'file:///workspace/config/services.yaml';
@@ -157,6 +163,56 @@ final class ServiceCompletionHandlerTest extends TestCase
         );
     }
 
+    #[DataProvider('yamlCommentCompletionProvider')]
+    public function testOffersNoCompletionsInsideYamlComments(string $text, string $prefix): void
+    {
+        $documents = new DocumentStore();
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $serviceIndexes = new ServiceIndexRegistry();
+        $serviceIndexes->forProject($project)->replace(true, new Service(
+            'app.mailer',
+            'App\\Mailer',
+            null,
+            false,
+            false,
+            null,
+            [],
+            null,
+            [],
+        ));
+        $parameterIndexes = new ParameterIndexRegistry();
+        $parameterIndexes->forProject($project)->replace(true, new Parameter('app.api_key', null));
+        $converter = new PositionConverter();
+        $handler = new ServiceCompletionHandler(
+            new DocumentContextResolver($documents, $projects),
+            $converter,
+            new LspProtocolMapper(),
+            new DependencyInjectionProjectLookup(
+                $serviceIndexes,
+                $parameterIndexes,
+                new DependencyInjectionSourceIndexRegistry(),
+            ),
+            new PhpCommentParser(),
+            $this->yamlComments(),
+        );
+        $uri = 'file:///workspace/config/services.yaml';
+        $documents->open(new Document($uri, 'yaml', 1, $text));
+        $position = $converter->toPosition($text, strpos($text, $prefix) + \strlen($prefix));
+
+        self::assertNull($handler->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ]));
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function yamlCommentCompletionProvider(): iterable
+    {
+        yield 'service' => ["# arguments: ['@app.ma']", 'app.ma'];
+        yield 'parameter' => ["# arguments: ['%app.ap']", 'app.ap'];
+    }
+
     public function testOffersNoParameterCompletionsInsidePhpComments(): void
     {
         $documents = new DocumentStore();
@@ -175,6 +231,7 @@ final class ServiceCompletionHandlerTest extends TestCase
                 new DependencyInjectionSourceIndexRegistry(),
             ),
             new PhpCommentParser(),
+            $this->yamlComments(),
         );
         $uri = 'file:///workspace/src/Service.php';
         $text = "<?php // #[Autowire(param: 'app.a";
@@ -221,6 +278,7 @@ final class ServiceCompletionHandlerTest extends TestCase
                 new DependencyInjectionSourceIndexRegistry(),
             ),
             new PhpCommentParser(),
+            $this->yamlComments(),
         );
 
         $yamlUri = 'file:///workspace/config/services.yaml';
@@ -267,6 +325,11 @@ final class ServiceCompletionHandlerTest extends TestCase
         ]);
 
         self::assertSame('app.mailer', $servicePhpResult[0]['label'] ?? null);
+    }
+
+    private function yamlComments(): YamlCommentParser
+    {
+        return new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()));
     }
 
     /** @return array<string, mixed> */
