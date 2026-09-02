@@ -328,11 +328,7 @@ final class FormMetadataExtractor
             return null;
         }
         foreach ($php->typedVariables as $variable) {
-            if (PhpTypedVariableKind::Parameter === $variable->kind
-                && $method->className === $variable->className
-                && $method->name === $variable->methodName
-                && $parameter->nameStartOffset === $variable->nameStartOffset
-            ) {
+            if ($parameter->nameStartOffset === $variable->nameStartOffset) {
                 return $variable;
             }
         }
