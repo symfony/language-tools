@@ -391,7 +391,7 @@ final class FormMetadataExtractor
         }
         $arguments = array_values(array_filter(
             $this->arguments($items, $itemsOffset),
-            static fn (array $entry): bool => '' !== trim($entry['text']),
+            fn (array $entry): bool => $this->hasCode($entry['text']),
         ));
         if (\count($arguments) !== \count($keys)) {
             return null;
@@ -496,9 +496,24 @@ final class FormMetadataExtractor
         $stack = [];
         $quote = null;
         $escaped = false;
+        $lineComment = false;
+        $blockComment = false;
         $length = \strlen($text);
         for ($index = 0; $index < $length; ++$index) {
             $character = $text[$index];
+            if ($lineComment) {
+                if ("\n" === $character || "\r" === $character) {
+                    $lineComment = false;
+                }
+                continue;
+            }
+            if ($blockComment) {
+                if ('*' === $character && '/' === ($text[$index + 1] ?? null)) {
+                    $blockComment = false;
+                    ++$index;
+                }
+                continue;
+            }
             if (null !== $quote) {
                 if ($escaped) {
                     $escaped = false;
@@ -509,7 +524,15 @@ final class FormMetadataExtractor
                 }
                 continue;
             }
-            if ('"' === $character || "'" === $character) {
+            if ('/' === $character && '/' === ($text[$index + 1] ?? null)) {
+                $lineComment = true;
+                ++$index;
+            } elseif ('#' === $character && '[' !== ($text[$index + 1] ?? null)) {
+                $lineComment = true;
+            } elseif ('/' === $character && '*' === ($text[$index + 1] ?? null)) {
+                $blockComment = true;
+                ++$index;
+            } elseif ('"' === $character || "'" === $character) {
                 $quote = $character;
             } elseif (str_contains('([{', $character)) {
                 $stack[] = $character;
@@ -523,6 +546,17 @@ final class FormMetadataExtractor
         $arguments[] = ['text' => substr($text, $start), 'offset' => $base + $start];
 
         return $arguments;
+    }
+
+    private function hasCode(string $text): bool
+    {
+        foreach (\PhpToken::tokenize('<?php '.$text) as $token) {
+            if (!$token->is([\T_OPEN_TAG, \T_WHITESPACE, \T_COMMENT, \T_DOC_COMMENT])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function context(MetadataCompletionKind $kind, string $prefix, string $text, int $offset, ?string $owner = null): MetadataCompletionContext

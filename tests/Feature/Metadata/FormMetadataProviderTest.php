@@ -351,6 +351,57 @@ final class FormMetadataProviderTest extends MetadataTestCase
         ));
     }
 
+    public function testIgnoresCommasInsideCommentsWhenSplittingFormMetadataArrays(): void
+    {
+        $extractor = $this->createExtractor(new PositionConverter());
+        $text = <<<'PHP'
+            <?php
+            namespace App\Form;
+
+            use App\Dto\Article;
+            use Symfony\Component\Form\FormBuilderInterface;
+            use Symfony\Component\OptionsResolver\OptionsResolver;
+
+            final class ArticleType
+            {
+                public function buildForm(FormBuilderInterface $builder): void
+                {
+                    $builder->add('title', null, [
+                        // Configure foo, bar.
+                        'mapped' => true,
+                    ]);
+                    $builder->add('headline', null, [
+                        // Configure foo, bar.
+                        'property_path' => 'summary',
+                    ]);
+                    $builder->add('ignored', null, [
+                        // Configure foo, bar.
+                        'mapped' => false,
+                    ]);
+                }
+
+                public function configureOptions(OptionsResolver $resolver): void
+                {
+                    $resolver->setDefaults([
+                        // Configure foo, bar.
+                        'data_class' => Article::class,
+                    ]);
+                }
+            }
+            PHP;
+
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Form/ArticleType.php', 'php', $text));
+
+        self::assertSame(['App\Dto\Article'], array_map(static fn ($dataClass): string => $dataClass->dataClass, $facts->formDataClasses));
+        self::assertSame(
+            ['App\Dto\Article::$title', 'App\Dto\Article::$summary'],
+            array_map(
+                static fn ($symbol): string => $symbol->name,
+                array_values(array_filter($facts->symbols, static fn ($symbol): bool => MetadataSymbolKind::Property === $symbol->kind && !$symbol->declaration)),
+            ),
+        );
+    }
+
     public function testKeepsDynamicDefaultsConservative(): void
     {
         $extractor = $this->createExtractor(new PositionConverter());
