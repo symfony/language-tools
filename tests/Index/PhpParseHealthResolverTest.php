@@ -7,23 +7,17 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Index\PhpParseHealthResolver;
-use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Index\SourceParseHealth;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Project\Project;
 
 final class PhpParseHealthResolverTest extends TestCase
 {
     #[DataProvider('healthyPhpProvider')]
     public function testRecognizesHealthyModernPhp(string $source): void
     {
-        $registry = new SourceOverlayHealthRegistry();
-        $resolver = new PhpParseHealthResolver(new TolerantPhpParser(new Parser()), $registry);
-        $project = new Project('/workspace', 'file:///workspace');
-        $document = new Document('file:///workspace/src/Article.php', 'php', 1, $source);
+        $resolver = new PhpParseHealthResolver(new TolerantPhpParser(new Parser()));
 
-        self::assertSame(SourceParseHealth::Healthy, $resolver->resolve($project, $document));
-        self::assertFalse($registry->isDegraded($document->uri));
+        self::assertSame(SourceParseHealth::Healthy, $resolver->resolve(new Document('file:///workspace/src/Article.php', 'php', 1, $source)));
     }
 
     /** @return iterable<string, array{string}> */
@@ -63,57 +57,23 @@ final class PhpParseHealthResolverTest extends TestCase
             PHP];
     }
 
-    public function testMarksInvalidPhpAsPartialUntilAHealthyVersionArrives(): void
+    public function testMarksInvalidPhpAsPartial(): void
     {
-        $registry = new SourceOverlayHealthRegistry();
-        $resolver = new PhpParseHealthResolver(new TolerantPhpParser(new Parser()), $registry);
-        $project = new Project('/workspace', 'file:///workspace');
-        $uri = 'file:///workspace/src/Article.php';
+        $resolver = new PhpParseHealthResolver(new TolerantPhpParser(new Parser()));
 
         self::assertSame(
             SourceParseHealth::Partial,
-            $resolver->resolve($project, new Document($uri, 'php', 1, '<?php final class Article { public function title(')),
+            $resolver->resolve(new Document('file:///workspace/src/Article.php', 'php', 1, '<?php final class Article { public function title(')),
         );
-        self::assertTrue($registry->isDegraded($uri));
+    }
+
+    public function testDoesNotParseNonPhpDocuments(): void
+    {
+        $resolver = new PhpParseHealthResolver(new TolerantPhpParser(new Parser()));
 
         self::assertSame(
             SourceParseHealth::Healthy,
-            $resolver->resolve($project, new Document($uri, 'php', 2, '<?php final class Article {}')),
+            $resolver->resolve(new Document('file:///workspace/templates/page.html.twig', 'twig', 1, '{{ broken')),
         );
-        self::assertFalse($registry->isDegraded($uri));
-    }
-
-    public function testHealthyStateClearsTheUriAfterProjectRemapping(): void
-    {
-        $registry = new SourceOverlayHealthRegistry();
-        $uri = 'file:///workspace/src/Article.php';
-        $registry->record(new Project('/workspace', 'file:///workspace'), $uri, SourceParseHealth::Partial);
-
-        $registry->record(new Project('/workspace/src', 'file:///workspace/src'), $uri, SourceParseHealth::Healthy);
-
-        self::assertFalse($registry->isDegraded($uri));
-    }
-
-    public function testProjectRemovalClearsDegradedDocuments(): void
-    {
-        $registry = new SourceOverlayHealthRegistry();
-        $project = new Project('/workspace', 'file:///workspace');
-        $uri = 'file:///workspace/src/Article.php';
-        $registry->record($project, $uri, SourceParseHealth::Partial);
-
-        $registry->removeProject($project);
-
-        self::assertFalse($registry->isDegraded($uri));
-    }
-
-    public function testDoesNotParseNonPhpDocumentsAsDegradedPhp(): void
-    {
-        $registry = new SourceOverlayHealthRegistry();
-        $resolver = new PhpParseHealthResolver(new TolerantPhpParser(new Parser()), $registry);
-        $project = new Project('/workspace', 'file:///workspace');
-        $document = new Document('file:///workspace/templates/page.html.twig', 'twig', 1, '{{ broken');
-
-        self::assertSame(SourceParseHealth::Healthy, $resolver->resolve($project, $document));
-        self::assertFalse($registry->isDegraded($document->uri));
     }
 }

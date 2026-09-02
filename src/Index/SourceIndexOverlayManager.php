@@ -38,10 +38,8 @@ final class SourceIndexOverlayManager
             return;
         }
 
-        $health = $trackParseHealth ? $this->parseHealth->resolve($project, $document) : SourceParseHealth::Healthy;
-        if (!$trackParseHealth) {
-            $this->overlayHealth->clear($uri);
-        }
+        $health = $trackParseHealth ? $this->parseHealth->resolve($document) : SourceParseHealth::Healthy;
+        $this->overlayHealth->record($project, $uri, $health);
         $this->providers->overlay($project, $document, $health);
     }
 

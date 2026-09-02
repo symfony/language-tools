@@ -163,7 +163,7 @@ final class IndexCommandHandlerTest extends TestCase
                 new UriToPathConverter(),
                 $files,
                 $pipeline,
-                new PhpParseHealthResolver(new TolerantPhpParser(new Parser()), $health),
+                new PhpParseHealthResolver(new TolerantPhpParser(new Parser())),
                 $health,
             ),
         );

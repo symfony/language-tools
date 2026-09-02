@@ -52,7 +52,7 @@ final class SourceIndexOverlayManagerTest extends TestCase
                 new UriToPathConverter(),
                 new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry(new GlobPatternCompiler())),
                 $pipeline,
-                new PhpParseHealthResolver(new TolerantPhpParser(new Parser()), $health),
+                new PhpParseHealthResolver(new TolerantPhpParser(new Parser())),
                 $health,
             );
 
@@ -92,7 +92,7 @@ final class SourceIndexOverlayManagerTest extends TestCase
                 new UriToPathConverter(),
                 $files,
                 $pipeline,
-                new PhpParseHealthResolver($parser, $health),
+                new PhpParseHealthResolver($parser),
                 $health,
             );
 
