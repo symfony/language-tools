@@ -5,8 +5,8 @@ namespace Symfony\Lsp\Tests\Server;
 use Amp\Process\Process;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Path;
-use Symfony\Lsp\Tests\Support\ContentLengthMessageCodec;
 use Symfony\Lsp\Tests\Support\ExecutableRunner;
+use Symfony\Lsp\Tools\ContentLengthMessageCodec;
 
 use function Amp\async;
 use function Amp\ByteStream\buffer;

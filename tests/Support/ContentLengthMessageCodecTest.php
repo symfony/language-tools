@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Support;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Tools\ContentLengthMessageCodec;
 
 final class ContentLengthMessageCodecTest extends TestCase
 {

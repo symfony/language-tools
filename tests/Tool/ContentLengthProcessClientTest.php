@@ -44,6 +44,34 @@ final class ContentLengthProcessClientTest extends TestCase
         }
     }
 
+    #[DataProvider('invalidHeaderProvider')]
+    public function testPreservesHeaderValidationErrors(string $frame, string $message): void
+    {
+        $server = $this->server(<<<'PHP'
+            fwrite(STDOUT, base64_decode($argv[1]));
+            fflush(STDOUT);
+            PHP);
+        $client = new ContentLengthProcessClient([$server, base64_encode($frame)], 1.0);
+
+        try {
+            $client->read();
+            self::fail('The invalid header should have failed.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame($message, $exception->getMessage());
+        } finally {
+            $client->terminate();
+        }
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function invalidHeaderProvider(): iterable
+    {
+        yield 'malformed' => ["Broken\r\n\r\n", 'Invalid Content-Length response header.'];
+        yield 'duplicate' => ["Content-Length: 2\r\nContent-Length: 2\r\n\r\n{}", 'Duplicate Content-Length response header.'];
+        yield 'missing' => ["Content-Type: application/json\r\n\r\n{}", 'Missing Content-Length response header.'];
+        yield 'too large' => [str_repeat('X', 65537), 'The Content-Length header exceeds the maximum size.'];
+    }
+
     /** @param non-empty-string $fragment */
     #[DataProvider('incompleteFrameProvider')]
     public function testIncompleteFramesCannotExceedTheReadDeadline(string $fragment): void

@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Tools;
 
 final class ContentLengthProcessClient
 {
-    private const MAX_HEADER_BYTES = 65536;
     private const POLL_INTERVAL_MICROSECONDS = 1000;
     private const TERMINATION_GRACE_SECONDS = 1.0;
 
@@ -28,6 +27,7 @@ final class ContentLengthProcessClient
     private array $notifications = [];
     private ?int $exitCode = null;
     private bool $closed = false;
+    private readonly ContentLengthMessageCodec $codec;
 
     /**
      * @param list<string>               $command
@@ -38,10 +38,13 @@ final class ContentLengthProcessClient
         private float $defaultTimeout = 30.0,
         ?array $environment = null,
         bool $socketMode = false,
+        ?ContentLengthMessageCodec $codec = null,
     ) {
         if ($defaultTimeout <= 0) {
             throw new \InvalidArgumentException('The process timeout must be greater than zero.');
         }
+
+        $this->codec = $codec ?? new ContentLengthMessageCodec(strictJsonObject: false);
 
         $outputPath = tempnam(sys_get_temp_dir(), 'lsp-client-out-');
         $errorPath = tempnam(sys_get_temp_dir(), 'lsp-client-err-');
@@ -146,9 +149,7 @@ final class ContentLengthProcessClient
     /** @param array<string, mixed> $message */
     public function write(array $message, ?float $timeout = null): void
     {
-        $json = json_encode($message, \JSON_THROW_ON_ERROR);
-        $frame = 'Content-Length: '.\strlen($json)."\r\n\r\n".$json;
-        $this->writeBefore($frame, microtime(true) + ($timeout ?? $this->defaultTimeout));
+        $this->writeBefore($this->codec->encode($message), microtime(true) + ($timeout ?? $this->defaultTimeout));
     }
 
     /**
@@ -159,7 +160,7 @@ final class ContentLengthProcessClient
     public function request(int|string $id, string $method, array $params = [], ?float $timeout = null): array
     {
         $deadline = microtime(true) + ($timeout ?? $this->defaultTimeout);
-        $this->writeBefore($this->encode(['jsonrpc' => '2.0', 'id' => $id, 'method' => $method, 'params' => $params]), $deadline);
+        $this->writeBefore($this->codec->encode(['jsonrpc' => '2.0', 'id' => $id, 'method' => $method, 'params' => $params]), $deadline);
 
         return $this->awaitResponseBefore($id, $deadline);
     }
@@ -258,7 +259,7 @@ final class ContentLengthProcessClient
         while (true) {
             $message = $this->readBefore($deadline, \sprintf('Timed out waiting for response %s.', $id));
             if (isset($message['method']) && \array_key_exists('id', $message)) {
-                $this->writeBefore($this->encode(['jsonrpc' => '2.0', 'id' => $message['id'], 'result' => null]), $deadline);
+                $this->writeBefore($this->codec->encode(['jsonrpc' => '2.0', 'id' => $message['id'], 'result' => null]), $deadline);
 
                 continue;
             }
@@ -306,60 +307,23 @@ final class ContentLengthProcessClient
     /** @return array<string, mixed>|null */
     private function extractMessage(): ?array
     {
-        $headerEnd = strpos($this->buffer, "\r\n\r\n");
-        if (false === $headerEnd) {
-            if (\strlen($this->buffer) > self::MAX_HEADER_BYTES) {
-                throw new \RuntimeException('The Content-Length header exceeds the maximum size.');
-            }
-
-            return null;
-        }
-
-        if ($headerEnd > self::MAX_HEADER_BYTES) {
-            throw new \RuntimeException('The Content-Length header exceeds the maximum size.');
-        }
-
-        $length = null;
-        foreach (explode("\r\n", substr($this->buffer, 0, $headerEnd)) as $header) {
-            if (1 !== preg_match('/^Content-Length:\s*(\d+)\s*$/i', $header, $matches)) {
-                if (!str_contains($header, ':')) {
-                    throw new \RuntimeException('Invalid Content-Length response header.');
-                }
-
-                continue;
-            }
-            if (null !== $length) {
-                throw new \RuntimeException('Duplicate Content-Length response header.');
-            }
-            $length = (int) $matches[1];
-        }
-        if (null === $length) {
-            throw new \RuntimeException('Missing Content-Length response header.');
-        }
-
-        $bodyOffset = $headerEnd + 4;
-        if (\strlen($this->buffer) < $bodyOffset + $length) {
-            return null;
-        }
-        $json = substr($this->buffer, $bodyOffset, $length);
-        $this->buffer = substr($this->buffer, $bodyOffset + $length);
         try {
-            $message = json_decode($json, true, flags: \JSON_THROW_ON_ERROR);
+            return $this->codec->decodeNext($this->buffer);
         } catch (\JsonException $exception) {
             throw new \RuntimeException('Invalid JSON in the Content-Length response body.'.$this->formattedErrorOutput(), 0, $exception);
-        }
-        if (!\is_array($message)) {
-            throw new \RuntimeException('The Content-Length response body must contain a JSON object.');
-        }
-        $object = [];
-        foreach ($message as $key => $value) {
-            if (!\is_string($key)) {
-                throw new \RuntimeException('The Content-Length response body must contain a JSON object with string keys.');
-            }
-            $object[$key] = $value;
-        }
+        } catch (ContentLengthMessageException $exception) {
+            $message = match ($exception->reason) {
+                ContentLengthMessageException::HEADER_TOO_LARGE => 'The Content-Length header exceeds the maximum size.',
+                ContentLengthMessageException::MALFORMED_HEADER => 'Invalid Content-Length response header.',
+                ContentLengthMessageException::DUPLICATE_HEADER => 'Duplicate Content-Length response header.',
+                ContentLengthMessageException::MISSING_HEADER => 'Missing Content-Length response header.',
+                ContentLengthMessageException::BODY_NOT_OBJECT => 'The Content-Length response body must contain a JSON object.',
+                ContentLengthMessageException::BODY_KEYS_NOT_STRINGS => 'The Content-Length response body must contain a JSON object with string keys.',
+                default => throw $exception,
+            };
 
-        return $object;
+            throw new \RuntimeException($message);
+        }
     }
 
     private function writeBefore(string $frame, float $deadline): void
@@ -389,14 +353,6 @@ final class ContentLengthProcessClient
             $this->sleepUntil($deadline);
         }
         @fflush($channel);
-    }
-
-    /** @param array<string, mixed> $message */
-    private function encode(array $message): string
-    {
-        $json = json_encode($message, \JSON_THROW_ON_ERROR);
-
-        return 'Content-Length: '.\strlen($json)."\r\n\r\n".$json;
     }
 
     private function drainOutput(): bool

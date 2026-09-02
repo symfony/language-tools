@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Support;
 
 use Amp\ByteStream\ReadableIterableStream;
 use Symfony\Lsp\Server\LanguageServerFactory;
+use Symfony\Lsp\Tools\ContentLengthMessageCodec;
 
 use function Amp\delay;
 
