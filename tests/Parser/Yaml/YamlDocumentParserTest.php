@@ -11,6 +11,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterTree;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Parser\Yaml\YamlMapping;
+use Symfony\Lsp\Parser\Yaml\YamlRecoveryParser;
 use Symfony\Lsp\Parser\Yaml\YamlScalar;
 use Symfony\Lsp\Parser\Yaml\YamlSequenceItem;
 
@@ -121,20 +122,23 @@ final class YamlDocumentParserTest extends TestCase
         self::assertSame($tagStart + \strlen('!php/const'), $scalar->tagEndByte);
     }
 
-    public function testKeepsParsedTagFactsWhenRecoveringMalformedYaml(): void
+    public function testParsedScalarFactsTakePrecedenceOverRecoveredFactsForTheSameRange(): void
     {
-        $source = "value: !php/enum App\\ResetMode::SCHEMA\nbroken: [";
-        $scalars = array_values(array_filter(
+        $source = 'broken: [one';
+        $recovered = array_values(array_filter(
+            (new YamlRecoveryParser())->parse($source)->scalars,
+            static fn (YamlScalar $scalar): bool => 'one' === $scalar->raw,
+        ))[0];
+        $scalar = array_values(array_filter(
             (new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))->parseDocument($source)->scalars,
-            static fn (YamlScalar $scalar): bool => '!php/enum' === $scalar->tag,
-        ));
-        $scalar = $scalars[0];
-        $tagStart = (int) strpos($source, '!php/enum');
+            static fn (YamlScalar $scalar): bool => 'one' === $scalar->raw,
+        ))[0];
 
-        self::assertCount(1, $scalars);
-        self::assertSame('App\\ResetMode::SCHEMA', $scalar->value);
-        self::assertSame($tagStart, $scalar->tagStartByte);
-        self::assertSame($tagStart + \strlen('!php/enum'), $scalar->tagEndByte);
+        self::assertSame([$recovered->startByte, $recovered->endByte], [$scalar->startByte, $scalar->endByte]);
+        self::assertSame(['broken'], $recovered->path);
+        self::assertSame([], $scalar->path);
+        self::assertSame([[1, 0]], array_map(static fn (YamlSequenceItem $item): array => [$item->pathDepth, $item->index], $recovered->sequence));
+        self::assertSame([], $scalar->sequence);
     }
 
     #[DataProvider('blockScalarProvider')]

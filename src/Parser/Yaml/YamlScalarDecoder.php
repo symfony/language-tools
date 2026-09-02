@@ -4,6 +4,8 @@ namespace Symfony\Lsp\Parser\Yaml;
 
 final class YamlScalarDecoder
 {
+    public const BLOCK_SCALAR_HEADER_PATTERN = '[|>](?<modifiers>(?:[+-][1-9]?|[1-9][+-]?)?)';
+
     public function style(string $nodeType, string $raw): YamlScalarStyle
     {
         return match ($nodeType) {
@@ -244,6 +246,6 @@ final class YamlScalarDecoder
 
     private function blockModifiers(string $header): string
     {
-        return preg_match('/^[|>](?<modifiers>(?:[+-][1-9]?|[1-9][+-]?)?)/', $header, $match) ? $match['modifiers'] : '';
+        return preg_match('/^'.self::BLOCK_SCALAR_HEADER_PATTERN.'/', $header, $match) ? $match['modifiers'] : '';
     }
 }

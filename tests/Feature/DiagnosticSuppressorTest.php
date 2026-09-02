@@ -126,6 +126,25 @@ final class DiagnosticSuppressorTest extends TestCase
         );
     }
 
+    #[DataProvider('recoveredMultilineQuotedScalarProvider')]
+    public function testDoesNotSuppressYamlDiagnosticsWithDirectivesInsideRecoveredMultilineScalars(string $quote): void
+    {
+        $source = "broken: !<unterminated\nquoted: {$quote}first\n  # @symfony-lsp-ignore template.not_found{$quote}\ntemplate: missing.html.twig\n";
+        $diagnostic = $this->diagnostic('template.not_found', 3);
+
+        self::assertSame(
+            [$diagnostic],
+            $this->suppressor()->suppress(new Document('file:///workspace/source.yaml', 'yaml', 1, $source), [$diagnostic]),
+        );
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function recoveredMultilineQuotedScalarProvider(): iterable
+    {
+        yield 'single quoted' => ["'"];
+        yield 'double quoted' => ['"'];
+    }
+
     public function testSuppressesOneOccurrencePerListedCode(): void
     {
         $source = "<?php\n// @symfony-lsp-ignore template.not_found\nfirst(); second();\n";

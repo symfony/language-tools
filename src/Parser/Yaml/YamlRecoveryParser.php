@@ -367,7 +367,7 @@ final class YamlRecoveryParser
     private function fallbackRawScalar(string $fragment, YamlScalarStyle $style): string
     {
         if (\in_array($style, [YamlScalarStyle::BlockLiteral, YamlScalarStyle::BlockFolded], true)) {
-            return preg_match('/^[|>](?:[+-][1-9]?|[1-9][+-]?)?/', $fragment, $match) ? $match[0] : $fragment[0];
+            return preg_match('/^'.YamlScalarDecoder::BLOCK_SCALAR_HEADER_PATTERN.'/', $fragment, $match) ? $match[0] : $fragment[0];
         }
         if (\in_array($style, [YamlScalarStyle::SingleQuoted, YamlScalarStyle::DoubleQuoted], true)) {
             $quote = $fragment[0];

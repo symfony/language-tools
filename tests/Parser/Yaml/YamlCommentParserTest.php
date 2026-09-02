@@ -68,6 +68,13 @@ final class YamlCommentParserTest extends TestCase
         self::assertSame("quoted: \"first\n  # kept\n  last\"\nbroken: [\n      \n", $this->parser()->mask($source));
     }
 
+    public function testRecoveryTracksMultilineQuotedScalarsAfterMalformedSyntax(): void
+    {
+        $source = "broken: !<unterminated\nquoted: \"first\n  # kept\"\n# gone\n";
+
+        self::assertSame("broken: !<unterminated\nquoted: \"first\n  # kept\"\n      \n", $this->parser()->mask($source));
+    }
+
     public function testRecoveryKeepsHashesInsideBlockScalars(): void
     {
         $source = "broken: !<unterminated\ncontent: |\n  # kept\n# gone\n";

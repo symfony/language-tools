@@ -78,6 +78,7 @@ final class YamlCommentParser extends AbstractCommentParser
 
         $comments = [];
         $blockIndent = null;
+        $multilineQuote = null;
         preg_match_all('/^.*(?:\R|$)/m', $source, $lines, \PREG_OFFSET_CAPTURE);
         foreach ($lines[0] as [$rawLine, $lineOffset]) {
             $line = rtrim($rawLine, "\r\n");
@@ -89,7 +90,7 @@ final class YamlCommentParser extends AbstractCommentParser
                 $blockIndent = null;
             }
 
-            $commentOffset = $this->commentOffset($line);
+            $commentOffset = $this->commentOffset($line, $multilineQuote);
             $content = null === $commentOffset ? $line : substr($line, 0, $commentOffset);
             if (null !== $commentOffset) {
                 $start = $lineOffset + $commentOffset;
@@ -106,9 +107,10 @@ final class YamlCommentParser extends AbstractCommentParser
         return $comments;
     }
 
-    private function commentOffset(string $line): ?int
+    private function commentOffset(string $line, ?string &$multilineQuote): ?int
     {
-        $quote = null;
+        $quote = $multilineQuote;
+        $quoteCanContinue = null !== $quote;
         $escaped = false;
         for ($index = 0, $length = \strlen($line); $index < $length; ++$index) {
             $character = $line[$index];
@@ -122,23 +124,33 @@ final class YamlCommentParser extends AbstractCommentParser
                         ++$index;
                     } else {
                         $quote = null;
+                        $quoteCanContinue = false;
                     }
                 }
                 continue;
             }
             if (\in_array($character, ["'", '"'], true)) {
                 $quote = $character;
+                $quoteCanContinue = $this->startsQuotedScalar($line, $index);
             } elseif ('#' === $character && (0 === $index || ctype_space($line[$index - 1]))) {
+                $multilineQuote = null;
+
                 return $index;
             }
         }
+        $multilineQuote = $quoteCanContinue ? $quote : null;
 
         return null;
     }
 
+    private function startsQuotedScalar(string $line, int $quoteOffset): bool
+    {
+        return 1 === preg_match('/(?:^\s*|:\s*|-\s+|[,\[{]\s*)(?:!(?:<[^>]*>|[^\s]+)\s+)?$/', substr($line, 0, $quoteOffset));
+    }
+
     private function endsWithBlockHeader(string $line): bool
     {
-        return 1 === preg_match('/(?:^|:\s+|-\s+)(?:!(?:<[^>]*>|[^\s]+)\s+)?[|>](?:[+-][1-9]?|[1-9][+-]?)?\s*$/', trim($line));
+        return 1 === preg_match('/(?:^|:\s+|-\s+)(?:!(?:<[^>]*>|[^\s]+)\s+)?'.YamlScalarDecoder::BLOCK_SCALAR_HEADER_PATTERN.'\s*$/', trim($line));
     }
 
     /** @param list<array{int, int}> $ranges */
