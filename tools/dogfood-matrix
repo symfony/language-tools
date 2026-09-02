@@ -5,6 +5,7 @@ require \dirname(__DIR__).'/vendor/autoload.php';
 
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Runtime\RuntimeBridgeTimingNormalizer;
 use Symfony\Lsp\Tools\Dogfood\ComposerSetup;
 use Symfony\Lsp\Tools\Dogfood\ConfigurationException;
 use Symfony\Lsp\Tools\Dogfood\ConfigurationLoader;
@@ -12,7 +13,6 @@ use Symfony\Lsp\Tools\Dogfood\GitProvisioner;
 use Symfony\Lsp\Tools\Dogfood\MatrixCommand;
 use Symfony\Lsp\Tools\Dogfood\NativeProcessRunner;
 use Symfony\Lsp\Tools\Dogfood\ProcessInterruptedException;
-use Symfony\Lsp\Runtime\RuntimeBridgeTimingNormalizer;
 use Symfony\Lsp\Tools\Dogfood\RunClassifier;
 use Symfony\Lsp\Tools\Dogfood\ServerHarness;
 use Symfony\Lsp\Tools\Dogfood\SetupInterface;
