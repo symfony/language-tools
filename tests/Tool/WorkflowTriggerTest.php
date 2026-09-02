@@ -51,12 +51,12 @@ final class WorkflowTriggerTest extends TestCase
         ], $this->dogfoodConfiguration('shopware')->environmentVariables);
     }
 
-    public function testReleaseBodyUsesOnlyTheCurrentChangelogSection(): void
+    public function testReleaseBodyComesFromThePromotedCandidate(): void
     {
         $contents = file_get_contents(self::ROOT.'/.github/workflows/release.yaml');
         self::assertIsString($contents);
-        self::assertStringContainsString('run: ./tools/release-notes "$GITHUB_REF_NAME" > RELEASE_NOTES.md', $contents);
-        self::assertStringContainsString('body_path: RELEASE_NOTES.md', $contents);
+        self::assertStringContainsString('body_path: candidate/RELEASE_NOTES.md', $contents);
+        self::assertStringNotContainsString('tools/release-notes', $contents);
         self::assertStringNotContainsString('body_path: CHANGELOG.md', $contents);
     }
 

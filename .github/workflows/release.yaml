@@ -6,321 +6,96 @@ on:
     workflow_dispatch:
 
 permissions:
+    actions: read
     contents: write
 
 jobs:
-    unix-binaries:
-        name: ${{ matrix.platform }}
-        runs-on: ${{ matrix.runner }}
-        strategy:
-            fail-fast: false
-            matrix:
-                include:
-                    - platform: linux-x64
-                      runner: ubuntu-latest
-                      spc: linux-x86_64
-                      spc_checksum: 523ba4279c54c7a377156c0dd3a36adf92ee64b01e9a7f5e9e2ec084b8e458e5
-                    - platform: linux-arm64
-                      runner: ubuntu-24.04-arm
-                      spc: linux-aarch64
-                      spc_checksum: 675a3840dcdc4ed041fe20eaa54310ce019a9984c1c03951df9ec66df5795213
-                    - platform: macos-x64
-                      runner: macos-15-intel
-                      spc: macos-x86_64
-                      spc_checksum: e8b798048f62ca4960764196543b60ae703f7174aa418824cf542aeec1d2cd6a
-                    - platform: macos-arm64
-                      runner: macos-14
-                      spc: macos-aarch64
-                      spc_checksum: acf2f25d56d0cbf8e65aa82e5054fef555f7be7c5c38046c6e0819f266d83225
-        steps:
-            - uses: actions/checkout@v7
-            - uses: shivammathur/setup-php@v2
-              with:
-                  php-version: '8.4'
-                  coverage: none
-            - name: Install production dependencies
-              run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
-            - name: Build the server PHAR
-              run: |
-                  mkdir -p var/build/release build
-                  VERSION=dev
-                  if [ "$GITHUB_REF_TYPE" = tag ]; then VERSION="${GITHUB_REF_NAME#v}"; fi
-                  printf '%s\n' "$VERSION" > resources/version
-                  # Box 4.7.0 cannot compile on Windows.
-                  curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 https://github.com/box-project/box/releases/download/4.6.7/box.phar -o var/build/release/box.phar
-                  echo 'f49a711985219c9e0ef9faa49a95d8ab47385b8b8966dc5ac0ca10f9ac318e6b  var/build/release/box.phar' | shasum -a 256 -c
-                  php var/build/release/box.phar compile --no-parallel
-            - name: Trust the preinstalled AWS SAM formula
-              if: runner.os == 'macOS'
-              run: |
-                  if brew tap | grep -Fxq aws/tap; then
-                      brew trust --formula aws/tap/aws-sam-cli
-                  fi
-            - name: Download static-php-cli
-              working-directory: var/build/release
-              run: |
-                  curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 https://github.com/crazywhalecc/static-php-cli/releases/download/2.8.5/spc-${{ matrix.spc }}.tar.gz -o spc.tar.gz
-                  echo '${{ matrix.spc_checksum }}  spc.tar.gz' | shasum -a 256 -c
-                  tar -xzf spc.tar.gz
-            - name: Build the standalone Linux server
-              if: runner.os == 'Linux'
-              env:
-                  ALPINE_IMAGE: alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
-                  EXTENSIONS: ctype,filter,iconv,mbstring,pcntl,phar,posix,tokenizer,zlib
-                  GITHUB_TOKEN: ${{ github.token }}
-                  SPC_DOWNLOAD_RETRIES: 5
-              run: |
-                  docker run --rm \
-                      --env EXTENSIONS \
-                      --env GITHUB_TOKEN \
-                      --env GITHUB_WORKSPACE \
-                      --env SPC_DOWNLOAD_RETRIES \
-                      --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
-                      --workdir "$GITHUB_WORKSPACE/var/build/release" \
-                      "$ALPINE_IMAGE" \
-                      sh -lc '
-                          apk add --no-cache bash ca-certificates curl
-                          ./spc doctor --auto-fix
-                          ./spc download --with-php=8.4 --for-extensions="$EXTENSIONS" --retry="$SPC_DOWNLOAD_RETRIES"
-                          ./spc build "$EXTENSIONS" --build-micro -P "$GITHUB_WORKSPACE/tools/spc-inject-tree-sitter.php"
-                          ./spc micro:combine ../../../build/symfony-lsp.phar -O ../../../build/symfony-lsp
-                          chmod +x ../../../build/symfony-lsp
-                      '
-            - name: Build the standalone macOS server
-              if: runner.os == 'macOS'
-              working-directory: var/build/release
-              env:
-                  EXTENSIONS: ctype,filter,iconv,mbstring,pcntl,phar,posix,tokenizer,zlib
-                  GITHUB_TOKEN: ${{ github.token }}
-                  SPC_DOWNLOAD_RETRIES: 5
-              run: |
-                  ./spc doctor --auto-fix
-                  ./spc download --with-php=8.4 --for-extensions="$EXTENSIONS" --retry="$SPC_DOWNLOAD_RETRIES"
-                  ./spc build "$EXTENSIONS" --build-micro -P "$GITHUB_WORKSPACE/tools/spc-inject-tree-sitter.php"
-                  ./spc micro:combine ../../../build/symfony-lsp.phar -O ../../../build/symfony-lsp
-                  chmod +x ../../../build/symfony-lsp
-            - name: Package and smoke-test
-              env:
-                  PLATFORM: ${{ matrix.platform }}
-                  VERSION: ${{ github.ref_name }}
-              run: |
-                  mkdir -p "dist/symfony-lsp-$VERSION-$PLATFORM"
-                  cp build/symfony-lsp "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp"
-                  cp LICENSE THIRD_PARTY_NOTICES.md "dist/symfony-lsp-$VERSION-$PLATFORM/"
-                  cp -R THIRD_PARTY_LICENSES "dist/symfony-lsp-$VERSION-$PLATFORM/"
-                  test -f "dist/symfony-lsp-$VERSION-$PLATFORM/THIRD_PARTY_LICENSES/runtime/src_php-src_0.txt"
-                  test -f "dist/symfony-lsp-$VERSION-$PLATFORM/THIRD_PARTY_LICENSES/tree-sitter/tree-sitter-twig-LICENSE"
-                  "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp" --version
-                  EXPECTED_VERSION=dev
-                  if [ "$GITHUB_REF_TYPE" = tag ]; then EXPECTED_VERSION="${VERSION#v}"; fi
-                  # The smoke test fails at startup unless the Tree-sitter parser is compiled into the binary.
-                  ./tools/smoke-test-server "dist/symfony-lsp-$VERSION-$PLATFORM/symfony-lsp" "$EXPECTED_VERSION"
-                  tar -czf "dist/symfony-lsp-$VERSION-$PLATFORM.tar.gz" -C dist "symfony-lsp-$VERSION-$PLATFORM"
-            - uses: actions/upload-artifact@v7
-              if: failure()
-              with:
-                  name: spc-logs-${{ matrix.platform }}
-                  path: var/build/release/log/
-                  if-no-files-found: ignore
-            - uses: actions/upload-artifact@v7
-              with:
-                  name: symfony-lsp-${{ github.ref_name }}-${{ matrix.platform }}
-                  path: dist/*.tar.gz
-                  if-no-files-found: error
-
-    windows-binary:
-        name: windows-x64
-        # spc 2.8.5 only detects Visual Studio 2022/2019; windows-latest ships VS 2026.
-        runs-on: windows-2022
-        steps:
-            - uses: actions/checkout@v7
-            - uses: shivammathur/setup-php@v2
-              with:
-                  php-version: '8.4'
-                  coverage: none
-            - name: Install production dependencies
-              run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
-            - name: Build the server PHAR
-              shell: pwsh
-              run: |
-                  New-Item -ItemType Directory -Force var/build/release, build | Out-Null
-                  $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { 'dev' }
-                  Set-Content -Path resources/version -Value $version
-                  # Box 4.7.0 cannot compile on Windows.
-                  Invoke-WebRequest https://github.com/box-project/box/releases/download/4.6.7/box.phar -OutFile var/build/release/box.phar
-                  if ((Get-FileHash var/build/release/box.phar -Algorithm SHA256).Hash.ToLower() -ne 'f49a711985219c9e0ef9faa49a95d8ab47385b8b8966dc5ac0ca10f9ac318e6b') { throw 'Invalid Box checksum.' }
-                  php var/build/release/box.phar compile --no-parallel
-            - name: Build the standalone server
-              shell: pwsh
-              working-directory: var/build/release
-              env:
-                  EXTENSIONS: ctype,filter,iconv,mbstring,phar,tokenizer,zlib
-                  GITHUB_TOKEN: ${{ github.token }}
-                  SPC_DOWNLOAD_RETRIES: 5
-              run: |
-                  Invoke-WebRequest https://github.com/crazywhalecc/static-php-cli/releases/download/2.8.5/spc-windows-x64.exe -OutFile spc.exe
-                  if ((Get-FileHash spc.exe -Algorithm SHA256).Hash.ToLower() -ne '425b54ab857e21409c1fd9b818899ffebabd1e2817ef0a0ed5ae8a3d9f5b463b') { throw 'Invalid static-php-cli checksum.' }
-                  ./spc.exe doctor --auto-fix
-                  if ($LASTEXITCODE -ne 0) { throw 'spc doctor failed.' }
-                  ./spc.exe download --with-php=8.4 --for-extensions="$env:EXTENSIONS" --retry="$env:SPC_DOWNLOAD_RETRIES"
-                  if ($LASTEXITCODE -ne 0) { throw 'spc download failed.' }
-                  ./spc.exe build "$env:EXTENSIONS" --build-micro -P "$env:GITHUB_WORKSPACE/tools/spc-inject-tree-sitter.php"
-                  if ($LASTEXITCODE -ne 0) { throw 'spc build failed.' }
-                  ./spc.exe micro:combine ../../../build/symfony-lsp.phar -O ../../../build/symfony-lsp
-                  if ($LASTEXITCODE -ne 0) { throw 'spc micro:combine failed.' }
-            - name: Package and smoke-test
-              timeout-minutes: 2
-              shell: pwsh
-              run: |
-                  $package = "symfony-lsp-${{ github.ref_name }}-windows-x64"
-                  New-Item -ItemType Directory -Force "dist/$package" | Out-Null
-                  Copy-Item build/symfony-lsp.exe "dist/$package/symfony-lsp.exe"
-                  Copy-Item -Path LICENSE, THIRD_PARTY_NOTICES.md -Destination "dist/$package/"
-                  Copy-Item -Path THIRD_PARTY_LICENSES -Destination "dist/$package/THIRD_PARTY_LICENSES" -Recurse
-                  if (!(Test-Path "dist/$package/THIRD_PARTY_LICENSES/runtime/src_php-src_0.txt")) { throw 'Runtime licenses are missing.' }
-                  if (!(Test-Path "dist/$package/THIRD_PARTY_LICENSES/tree-sitter/tree-sitter-twig-LICENSE")) { throw 'Tree-sitter licenses are missing.' }
-                  & "dist/$package/symfony-lsp.exe" --version
-                  $expected = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { 'dev' }
-                  # Windows editors use the socket transport because micro cannot serve stdio there.
-                  # The smoke test fails at startup unless the Tree-sitter parser is compiled into the binary.
-                  php tools/smoke-test-server --socket "dist/$package/symfony-lsp.exe" $expected
-                  if ($LASTEXITCODE -ne 0) { throw 'The server smoke test failed.' }
-                  Compress-Archive "dist/$package" "dist/$package.zip"
-            - uses: actions/upload-artifact@v7
-              if: failure()
-              with:
-                  name: spc-logs-windows-x64
-                  path: var/build/release/log/
-                  if-no-files-found: ignore
-            - uses: actions/upload-artifact@v7
-              with:
-                  name: symfony-lsp-${{ github.ref_name }}-windows-x64
-                  path: dist/*.zip
-                  if-no-files-found: error
-
-    vscode-extension:
-        name: VS Code extension (${{ matrix.target }})
-        needs: [unix-binaries, windows-binary]
+    release:
+        name: Promote release candidate
         runs-on: ubuntu-latest
-        strategy:
-            fail-fast: false
-            matrix:
-                include:
-                    - platform: linux-x64
-                      target: linux-x64
-                      executable: symfony-lsp
-                    - platform: linux-arm64
-                      target: linux-arm64
-                      executable: symfony-lsp
-                    - platform: macos-x64
-                      target: darwin-x64
-                      executable: symfony-lsp
-                    - platform: macos-arm64
-                      target: darwin-arm64
-                      executable: symfony-lsp
-                    - platform: windows-x64
-                      target: win32-x64
-                      executable: symfony-lsp.exe
+        env:
+            CANDIDATE_ARTIFACT: symfony-lsp-release-candidate-${{ github.ref_name }}-${{ github.sha }}
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/download-artifact@v8
-              with:
-                  name: symfony-lsp-${{ github.ref_name }}-${{ matrix.platform }}
-                  path: var/vscode-server
-            - name: Extract the bundled server
+            - name: Find the exact release candidate
+              id: candidate
               env:
-                  EXECUTABLE: ${{ matrix.executable }}
+                  GH_TOKEN: ${{ github.token }}
               run: |
-                  mkdir -p editor/vscode/server var/vscode-server/extracted
-                  archive="$(find var/vscode-server -maxdepth 1 -type f | head -1)"
-                  case "$archive" in
-                      *.tar.gz)
-                          tar -xzf "$archive" --strip-components=1 -C editor/vscode/server
-                          ;;
-                      *.zip)
-                          unzip -q "$archive" -d var/vscode-server/extracted
-                          find var/vscode-server/extracted -type f -name "$EXECUTABLE" -exec cp {} editor/vscode/server/ \;
-                          ;;
-                      *)
-                          echo "Unsupported server archive: $archive" >&2
-                          exit 1
-                          ;;
-                  esac
-                  rm -rf editor/vscode/server/LICENSE editor/vscode/server/THIRD_PARTY_LICENSES editor/vscode/server/THIRD_PARTY_NOTICES.md
-                  test -f "editor/vscode/server/$EXECUTABLE"
-                  if [[ "$EXECUTABLE" != *.exe ]]; then chmod +x editor/vscode/server/*; fi
-            - uses: actions/setup-node@v7
-              with:
-                  node-version: '24'
-                  cache: npm
-                  cache-dependency-path: editor/vscode/package-lock.json
-            - name: Build the VS Code extension
-              working-directory: editor/vscode
-              env:
-                  EXECUTABLE: ${{ matrix.executable }}
-                  TARGET: ${{ matrix.target }}
-                  VERSION: ${{ github.ref_name }}
-              run: |
-                  npm ci
-                  mkdir -p dist
-                  options=(--target "$TARGET")
-                  if [[ "$VERSION" == *-* ]]; then options=(--pre-release "${options[@]}"); fi
-                  npm run package -- "${options[@]}" --out "dist/symfony-lsp-$VERSION-$TARGET.vsix"
-                  manifest="$(unzip -p "dist/symfony-lsp-$VERSION-$TARGET.vsix" extension.vsixmanifest)"
-                  if [[ "$VERSION" == *-* ]]; then
-                      grep -Fq 'Microsoft.VisualStudio.Code.PreRelease' <<< "$manifest"
-                  elif grep -Fq 'Microsoft.VisualStudio.Code.PreRelease' <<< "$manifest"; then
-                      echo "Stable release contains a prerelease VSIX" >&2
+                  if [[ "$GITHUB_REF_TYPE" != tag || ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+                      echo "The release workflow must run for a vX.Y.Z[-PRERELEASE] tag." >&2
                       exit 1
                   fi
-                  npx vsce ls | grep -Fx 'images/icon.png'
-                  npx vsce ls | grep -Fx "server/$EXECUTABLE"
-                  npx vsce ls | grep -Fx 'THIRD_PARTY_NOTICES.md'
-                  npx vsce ls | grep -Fx 'THIRD_PARTY_LICENSES/runtime/src_php-src_0.txt'
-                  npx vsce ls | grep -Fx 'THIRD_PARTY_LICENSES/tree-sitter/tree-sitter-twig-LICENSE'
-                  npx vsce ls | grep -Fx 'THIRD_PARTY_LICENSES/vscode/vscode-languageclient/LICENSE'
-            - uses: actions/upload-artifact@v7
-              with:
-                  name: symfony-lsp-${{ github.ref_name }}-vscode-${{ matrix.target }}
-                  path: editor/vscode/dist/*.vsix
-                  if-no-files-found: error
-
-    release:
-        name: Create release
-        if: startsWith(github.ref, 'refs/tags/')
-        needs: [unix-binaries, windows-binary, vscode-extension]
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v7
+                  run_id="$(
+                      gh run list \
+                          --workflow=release-candidate.yaml \
+                          --commit="$GITHUB_SHA" \
+                          --event=workflow_dispatch \
+                          --status=success \
+                          --limit=100 \
+                          --json=databaseId,displayTitle,headSha \
+                          --jq ".[] | select(.headSha == \"$GITHUB_SHA\" and .displayTitle == \"Release candidate $GITHUB_REF_NAME\") | .databaseId" \
+                      | head -1
+                  )"
+                  if [[ -z "$run_id" ]]; then
+                      echo "No successful release candidate for $GITHUB_REF_NAME at $GITHUB_SHA." >&2
+                      exit 1
+                  fi
+                  echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
             - uses: actions/download-artifact@v8
               with:
-                  path: dist
-            - name: Generate checksums
+                  name: ${{ env.CANDIDATE_ARTIFACT }}
+                  path: candidate
+                  run-id: ${{ steps.candidate.outputs.run_id }}
+                  github-token: ${{ github.token }}
+            - name: Verify candidate provenance and assets
               run: |
-                  find dist -type f -print0 | sort -z | xargs -0 sha256sum | awk '{ name = $2; sub(/^.*\//, "", name); print $1 "  " name }' > SHA256SUMS
-                  mv SHA256SUMS dist/SHA256SUMS
-            - name: Generate release notes
-              run: ./tools/release-notes "$GITHUB_REF_NAME" > RELEASE_NOTES.md
+                  assets=(
+                      "symfony-lsp-$GITHUB_REF_NAME-linux-x64.tar.gz"
+                      "symfony-lsp-$GITHUB_REF_NAME-linux-arm64.tar.gz"
+                      "symfony-lsp-$GITHUB_REF_NAME-macos-x64.tar.gz"
+                      "symfony-lsp-$GITHUB_REF_NAME-macos-arm64.tar.gz"
+                      "symfony-lsp-$GITHUB_REF_NAME-windows-x64.zip"
+                      "symfony-lsp-$GITHUB_REF_NAME-linux-x64.vsix"
+                      "symfony-lsp-$GITHUB_REF_NAME-linux-arm64.vsix"
+                      "symfony-lsp-$GITHUB_REF_NAME-darwin-x64.vsix"
+                      "symfony-lsp-$GITHUB_REF_NAME-darwin-arm64.vsix"
+                      "symfony-lsp-$GITHUB_REF_NAME-win32-x64.vsix"
+                  )
+                  expected=("${assets[@]}" SHA256SUMS RELEASE_NOTES.md RELEASE_MANIFEST.json)
+                  diff \
+                      <(printf '%s\n' "${expected[@]}" | sort) \
+                      <(find candidate -maxdepth 1 -type f -printf '%f\n' | sort)
+                  jq --exit-status \
+                      --arg commit "$GITHUB_SHA" \
+                      --arg version "$GITHUB_REF_NAME" \
+                      '.commit == $commit and .version == $version and (keys | sort) == ["commit", "version"]' \
+                      candidate/RELEASE_MANIFEST.json
+                  test -s candidate/RELEASE_NOTES.md
+                  (
+                      cd candidate
+                      test "$(wc -l < SHA256SUMS)" -eq "${#assets[@]}"
+                      sha256sum --check --strict SHA256SUMS
+                  )
             - uses: softprops/action-gh-release@v3
               with:
                   files: |
-                      dist/**/*.tar.gz
-                      dist/**/*.zip
-                      dist/**/*.vsix
-                      dist/SHA256SUMS
+                      candidate/*.tar.gz
+                      candidate/*.zip
+                      candidate/*.vsix
+                      candidate/SHA256SUMS
+                      candidate/RELEASE_MANIFEST.json
                   fail_on_unmatched_files: true
-                  body_path: RELEASE_NOTES.md
+                  body_path: candidate/RELEASE_NOTES.md
                   prerelease: ${{ contains(github.ref_name, '-') }}
                   draft: true
             - name: Publish release
               env:
                   GH_TOKEN: ${{ github.token }}
                   PRERELEASE: ${{ contains(github.ref_name, '-') }}
-              run: gh release edit "${{ github.ref_name }}" --draft=false --prerelease="$PRERELEASE"
+              run: gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease="$PRERELEASE"
 
     marketplace:
         name: Publish VS Code extension
-        if: startsWith(github.ref, 'refs/tags/')
         needs: release
         permissions:
             contents: read
