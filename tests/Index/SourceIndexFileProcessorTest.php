@@ -13,6 +13,7 @@ use Symfony\Lsp\Index\SourceIndexFileProcessor;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Index\SourceIndexProviderPipeline;
+use Symfony\Lsp\Index\SourceParseHealth;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
 
@@ -94,7 +95,7 @@ final class ProcessorRecordingProvider implements SourceIndexProviderInterface
     {
     }
 
-    public function overlay(Project $project, Document $document): void
+    public function overlay(Project $project, Document $document, SourceParseHealth $health): void
     {
     }
 

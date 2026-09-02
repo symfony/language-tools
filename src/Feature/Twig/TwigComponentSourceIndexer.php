@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Index\AbstractSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Project\Project;
 
 /** @extends AbstractSourceIndexer<TwigComponentSourceFacts> */
@@ -48,5 +49,16 @@ final class TwigComponentSourceIndexer extends AbstractSourceIndexer
     protected function extract(Project $project, SourceDocument $document): TwigComponentSourceFacts
     {
         return $this->extractor->extract($project, $document);
+    }
+
+    protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): TwigComponentSourceFacts
+    {
+        return new TwigComponentSourceFacts(
+            $current->uri,
+            $healthy->components,
+            $current->references,
+            $current->actionReferences,
+            $healthy->events,
+        );
     }
 }

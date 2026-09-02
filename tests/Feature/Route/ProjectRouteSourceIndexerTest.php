@@ -31,6 +31,8 @@ use Symfony\Lsp\Index\SourceIndexOverlayManager;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Index\SourceIndexProviderPipeline;
+use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
+use Symfony\Lsp\Parser\Php\PhpParseHealthResolver;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -229,12 +231,92 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         self::assertSame([], $indexes->forProject($project)->find('fake_route'));
     }
 
+    public function testPartialPhpOverlayPreservesRoutesAndUpdatesReferencesBeforeAdaptingIndexes(): void
+    {
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project(
+            $this->temporaryDirectory,
+            'file://'.$this->temporaryDirectory,
+        )]);
+        $documents = new DocumentStore();
+        $declarations = new RouteDeclarationIndexRegistry();
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $references = new RouteReferenceIndexRegistry($classIndexes);
+        $positionConverter = new PositionConverter();
+        $parser = new TolerantPhpParser(new Parser());
+        $indexer = new ProjectRouteSourceIndexer(
+            $declarations,
+            $references,
+            new PhpRouteDeclarationExtractor($positionConverter, $parser),
+            new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
+            RouteReferenceExtractorFactory::create($positionConverter, $parser),
+            new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser())),
+            new ProjectPathResolver(new UriToPathConverter()),
+        );
+        $scanner = $this->scanner($projects, $documents, [
+            $indexer,
+            new DependencyInjectionSourceIndexer(
+                $classIndexes,
+                new YamlDependencyInjectionExtractor(
+                    new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+                    new YamlDependencyInjectionDeclarationExtractor($positionConverter),
+                    new YamlDependencyInjectionReferenceExtractor($positionConverter),
+                ),
+                new XmlDependencyInjectionExtractor($positionConverter),
+                new PhpAutowireReferenceExtractor($positionConverter, $parser),
+                new PhpClassDeclarationExtractor($positionConverter, $parser),
+            ),
+        ]);
+        $uri = 'file://'.$this->temporaryDirectory.'/src/Controller.php';
+        $documents->open(new Document($uri, 'php', 1, <<<'PHP'
+            <?php
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+            use Symfony\Component\Routing\Attribute\Route;
+
+            #[Route('/article', name: 'article_show')]
+            final class Controller extends AbstractController
+            {
+                public function index(): void
+                {
+                    $this->generateUrl('old_reference');
+                }
+            }
+            PHP));
+        $scanner->updateOpenDocument(['textDocument' => ['uri' => $uri]]);
+
+        $documents->update($uri, 2, <<<'PHP'
+            <?php
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+            use Symfony\Component\Routing\Attribute\Route;
+
+            #[Route('/article', name: 'partial_route')]
+            final class Controller extends AbstractController
+            {
+                public function index(): void
+                {
+                    $this->generateUrl('current_reference');
+                }
+            }
+
+            final class Incomplete
+            {
+                public function broken(
+            PHP);
+        $scanner->updateOpenDocument(['textDocument' => ['uri' => $uri]]);
+
+        self::assertCount(1, $declarations->forProject($project)->find('article_show'));
+        self::assertSame([], $declarations->forProject($project)->find('partial_route'));
+        self::assertSame([], $references->forProject($project)->find('old_reference'));
+        self::assertCount(1, $references->forProject($project)->find('current_reference'));
+    }
+
     /** @param list<SourceIndexProviderInterface> $providers */
     private function scanner(ProjectRegistry $projects, DocumentStore $documents, array $providers): ApplicationSourceScanner
     {
         $store = new InMemorySourceIndexStore();
         $files = new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry(new GlobPatternCompiler()));
         $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), $providers);
+        $health = new SourceOverlayHealthRegistry();
 
         return new ApplicationSourceScanner(
             $projects,
@@ -246,7 +328,15 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new ServerLogger(null, new SensitiveDataRedactor()),
             $pipeline,
             new SourceIndexFileProcessor($store, $pipeline, new PhpRuntimeStructureHasher()),
-            new SourceIndexOverlayManager($projects, $documents, new UriToPathConverter(), $files, $pipeline),
+            new SourceIndexOverlayManager(
+                $projects,
+                $documents,
+                new UriToPathConverter(),
+                $files,
+                $pipeline,
+                new PhpParseHealthResolver(new TolerantPhpParser(new Parser()), $health),
+                $health,
+            ),
         );
     }
 }

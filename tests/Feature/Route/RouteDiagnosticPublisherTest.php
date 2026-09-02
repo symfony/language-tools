@@ -15,6 +15,7 @@ use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\DiagnosticSuppressor;
+use Symfony\Lsp\Feature\PartialParseDiagnosticFilter;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteCodeActionProvider;
 use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
@@ -22,6 +23,7 @@ use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
+use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -316,6 +318,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             new ProjectPathResolver($uriConverter),
             new ProjectFileScopeRegistry(new GlobPatternCompiler()),
             $uriConverter,
+            new PartialParseDiagnosticFilter(new SourceOverlayHealthRegistry()),
             $this->suppressor($positionConverter),
             [new RouteDiagnosticPublisher(
                 new DocumentContextResolver($documents, $projects),
@@ -419,6 +422,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             new ProjectPathResolver($uriConverter),
             new ProjectFileScopeRegistry(new GlobPatternCompiler()),
             $uriConverter,
+            new PartialParseDiagnosticFilter(new SourceOverlayHealthRegistry()),
             $this->suppressor($positionConverter),
             [new RouteDiagnosticPublisher(
                 new DocumentContextResolver($documents, $projects),

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Preserve PHP declarations during transient parse errors
 - Read PHP method parameters structurally across Twig, Form and Messenger analysis
 - Scope PHP property hooks and expose interface hook properties
 - Adopt the Phan parser baseline for modern PHP syntax

@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Security;
 
 use Symfony\Lsp\Index\AbstractSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Project\Project;
 
 /** @extends AbstractSourceIndexer<SecuritySourceFacts> */
@@ -45,5 +46,13 @@ final class SecuritySourceIndexer extends AbstractSourceIndexer
     protected function extract(Project $project, SourceDocument $document): SecuritySourceFacts
     {
         return $this->extractor->extract($document);
+    }
+
+    protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): SecuritySourceFacts
+    {
+        return new SecuritySourceFacts($current->uri, [
+            ...array_filter($healthy->symbols, static fn (SecuritySourceSymbol $symbol): bool => $symbol->declaration),
+            ...array_filter($current->symbols, static fn (SecuritySourceSymbol $symbol): bool => !$symbol->declaration),
+        ]);
     }
 }

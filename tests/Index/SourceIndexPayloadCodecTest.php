@@ -12,6 +12,7 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
+use Symfony\Lsp\Index\SourceParseHealth;
 use Symfony\Lsp\Project\Project;
 
 final class SourceIndexPayloadCodecTest extends TestCase
@@ -100,7 +101,7 @@ final class PayloadCodecProvider implements SourceIndexProviderInterface
     {
     }
 
-    public function overlay(Project $project, Document $document): void
+    public function overlay(Project $project, Document $document, SourceParseHealth $health): void
     {
     }
 

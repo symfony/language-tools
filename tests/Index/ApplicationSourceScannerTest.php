@@ -40,8 +40,11 @@ use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Index\SourceIndexReaderInterface;
 use Symfony\Lsp\Index\SourceIndexStoreInterface;
 use Symfony\Lsp\Index\SourceIndexWriterInterface;
+use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
+use Symfony\Lsp\Index\SourceParseHealth;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Php\PhpParseHealthResolver;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -796,6 +799,7 @@ PHP;
         $documents ??= new DocumentStore();
         $files = new SourceFileEnumerator(new GitignoreMatcher(), $this->fileScope);
         $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), $providers);
+        $health = new SourceOverlayHealthRegistry();
 
         return new ApplicationSourceScanner(
             $this->projects,
@@ -807,7 +811,15 @@ PHP;
             $logger ?? new ServerLogger(null, new SensitiveDataRedactor()),
             $pipeline,
             new SourceIndexFileProcessor($store, $pipeline, new PhpRuntimeStructureHasher()),
-            new SourceIndexOverlayManager($this->projects, $documents, new UriToPathConverter(), $files, $pipeline),
+            new SourceIndexOverlayManager(
+                $this->projects,
+                $documents,
+                new UriToPathConverter(),
+                $files,
+                $pipeline,
+                new PhpParseHealthResolver(new TolerantPhpParser(new Parser()), $health),
+                $health,
+            ),
         );
     }
 }
@@ -925,7 +937,7 @@ final class ObjectFactsSourceIndexProvider implements SourceIndexProviderInterfa
     {
     }
 
-    public function overlay(Project $project, Document $document): void
+    public function overlay(Project $project, Document $document, SourceParseHealth $health): void
     {
     }
 
@@ -990,7 +1002,7 @@ final class FailingSourceIndexProvider implements SourceIndexProviderInterface
     {
     }
 
-    public function overlay(Project $project, Document $document): void
+    public function overlay(Project $project, Document $document, SourceParseHealth $health): void
     {
     }
 
@@ -1078,7 +1090,7 @@ final class RecordingSourceIndexProvider implements SourceIndexProviderInterface
         unset($this->sources[$uri]);
     }
 
-    public function overlay(Project $project, Document $document): void
+    public function overlay(Project $project, Document $document, SourceParseHealth $health): void
     {
         $this->overlays[] = $document->uri;
     }
@@ -1165,7 +1177,7 @@ final class GenerationalSourceIndexProvider implements SourceIndexProviderInterf
         unset($this->committed[$project->rootPath][$uri]);
     }
 
-    public function overlay(Project $project, Document $document): void
+    public function overlay(Project $project, Document $document, SourceParseHealth $health): void
     {
     }
 

@@ -7,6 +7,7 @@ use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\AbstractSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Project\Project;
 
 /** @extends AbstractSourceIndexer<TemplateSourceFacts> */
@@ -55,6 +56,11 @@ final class TemplateSourceIndexer extends AbstractSourceIndexer
             $this->declaration($project, $document->uri),
             $this->extractor->extract($document),
         );
+    }
+
+    protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): TemplateSourceFacts
+    {
+        return $current;
     }
 
     private function declaration(Project $project, string $uri): ?TemplateDeclaration

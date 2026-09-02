@@ -22,6 +22,7 @@ use Symfony\Lsp\Feature\Twig\TemplateNameResolver;
 use Symfony\Lsp\Feature\Twig\TemplateNavigationProvider;
 use Symfony\Lsp\Feature\Twig\TemplateReference;
 use Symfony\Lsp\Feature\Twig\TemplateReferenceExtractor;
+use Symfony\Lsp\Feature\Twig\TemplateSourceIndexer;
 use Symfony\Lsp\Feature\Twig\TwigComponent;
 use Symfony\Lsp\Feature\Twig\TwigComponentCodeLensProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentCompletionProvider;
@@ -36,6 +37,7 @@ use Symfony\Lsp\Feature\Twig\TwigComponentTemplateExtractor;
 use Symfony\Lsp\Feature\Twig\TwigVariableProvider;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceParseHealth;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
@@ -110,6 +112,51 @@ final class TemplateProviderTest extends TestCase
                 $converter->toByteOffset($text, $reference->range->end) - $converter->toByteOffset($text, $reference->range->start),
             ), $references),
         );
+    }
+
+    public function testPartialPhpOverlayUsesCurrentTemplateReferencesThroughTheAdapter(): void
+    {
+        $converter = new PositionConverter();
+        $parser = new TolerantPhpParser(new Parser());
+        $indexes = new TemplateIndexRegistry();
+        $indexer = new TemplateSourceIndexer(
+            $indexes,
+            new TemplateReferenceExtractor(
+                $converter,
+                new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()),
+                new TwigCallArgumentResolver(new TwigArgumentParser()),
+                new QuotedArgumentMatcher($converter),
+                new PhpCommentParser(),
+                $parser,
+                new PhpLiteralArrayKeyParser(),
+                new BalancedDelimiterMatcher(),
+            ),
+            new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())),
+        );
+        $project = new Project('/workspace', 'file:///workspace');
+        $uri = 'file:///workspace/src/Controller.php';
+
+        $indexer->overlay($project, new Document($uri, 'php', 1, <<<'PHP'
+            <?php
+            final class Controller
+            {
+                public function index(): void
+                {
+                    $this->render('old.html.twig');
+                }
+            }
+            PHP), SourceParseHealth::Healthy);
+        $indexer->overlay($project, new Document($uri, 'php', 2, <<<'PHP'
+            <?php
+            final class Controller
+            {
+                public function index(): void
+                {
+                    $this->render('current.html.twig');
+            PHP), SourceParseHealth::Partial);
+
+        self::assertSame([], $indexes->forProject($project)->references('old.html.twig'));
+        self::assertCount(1, $indexes->forProject($project)->references('current.html.twig'));
     }
 
     public function testExtractsPhpRenderCallsFromParserFacts(): void

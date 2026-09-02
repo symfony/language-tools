@@ -98,10 +98,10 @@ final class SourceIndexProviderPipeline
         }
     }
 
-    public function overlay(Project $project, Document $document): void
+    public function overlay(Project $project, Document $document, SourceParseHealth $health): void
     {
         foreach ($this->providers as $provider) {
-            $provider->overlay($project, $document);
+            $provider->overlay($project, $document, $health);
         }
     }
 

@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Index\AbstractSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Project\Project;
 
 /** @extends AbstractSourceIndexer<DependencyInjectionSourceFacts> */
@@ -74,5 +75,16 @@ final class DependencyInjectionSourceIndexer extends AbstractSourceIndexer
     protected function extract(Project $project, SourceDocument $document): ?DependencyInjectionSourceFacts
     {
         return $this->extractor->extractForIndexing($document);
+    }
+
+    protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): DependencyInjectionSourceFacts
+    {
+        return new DependencyInjectionSourceFacts(
+            $current->uri,
+            $healthy->services,
+            $healthy->parameters,
+            $current->references,
+            $healthy->classes,
+        );
     }
 }

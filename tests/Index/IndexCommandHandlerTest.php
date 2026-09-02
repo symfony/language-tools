@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Index;
 
 use Amp\Cancellation;
 use Amp\Sync\LocalKeyedMutex;
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Feature\Configuration\StaleConfigurationValidationSnapshotException;
@@ -16,6 +17,9 @@ use Symfony\Lsp\Index\SourceIndexFileProcessor;
 use Symfony\Lsp\Index\SourceIndexOverlayManager;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderPipeline;
+use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
+use Symfony\Lsp\Parser\Php\PhpParseHealthResolver;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
@@ -141,6 +145,7 @@ final class IndexCommandHandlerTest extends TestCase
         $store = new InMemorySourceIndexStore();
         $files = new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry(new GlobPatternCompiler()));
         $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), []);
+        $health = new SourceOverlayHealthRegistry();
 
         return new ApplicationSourceScanner(
             $projects,
@@ -152,7 +157,15 @@ final class IndexCommandHandlerTest extends TestCase
             new ServerLogger(null, new SensitiveDataRedactor()),
             $pipeline,
             new SourceIndexFileProcessor($store, $pipeline, new PhpRuntimeStructureHasher()),
-            new SourceIndexOverlayManager($projects, $documents, new UriToPathConverter(), $files, $pipeline),
+            new SourceIndexOverlayManager(
+                $projects,
+                $documents,
+                new UriToPathConverter(),
+                $files,
+                $pipeline,
+                new PhpParseHealthResolver(new TolerantPhpParser(new Parser()), $health),
+                $health,
+            ),
         );
     }
 }

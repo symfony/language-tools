@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Environment;
 
 use Symfony\Lsp\Index\AbstractSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Project\Project;
 
 /** @extends AbstractSourceIndexer<EnvironmentSourceFacts> */
@@ -48,5 +49,10 @@ final class EnvironmentSourceIndexer extends AbstractSourceIndexer
     protected function extract(Project $project, SourceDocument $document): EnvironmentSourceFacts
     {
         return $this->extractor->extract($document);
+    }
+
+    protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): EnvironmentSourceFacts
+    {
+        return $current;
     }
 }

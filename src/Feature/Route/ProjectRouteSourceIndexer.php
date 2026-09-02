@@ -6,6 +6,7 @@ use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Index\AbstractSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 
@@ -79,6 +80,11 @@ final class ProjectRouteSourceIndexer extends AbstractSourceIndexer
             ),
             $references,
         ));
+    }
+
+    protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): RouteSourceFacts
+    {
+        return new RouteSourceFacts($current->uri, $healthy->declarations, $current->references);
     }
 
     protected function supportsOverlay(Project $project, Document $document): bool

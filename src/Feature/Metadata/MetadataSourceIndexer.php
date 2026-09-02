@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Index\AbstractSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Project\Project;
 
 /** @extends AbstractSourceIndexer<MetadataSourceFacts> */
@@ -48,5 +49,13 @@ final class MetadataSourceIndexer extends AbstractSourceIndexer
     protected function extract(Project $project, SourceDocument $document): MetadataSourceFacts
     {
         return $this->extractor->extract($document);
+    }
+
+    protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): MetadataSourceFacts
+    {
+        return new MetadataSourceFacts($current->uri, [
+            ...array_filter($healthy->symbols, static fn (MetadataSourceSymbol $symbol): bool => $symbol->declaration),
+            ...array_filter($current->symbols, static fn (MetadataSourceSymbol $symbol): bool => !$symbol->declaration),
+        ], $healthy->formDataClasses);
     }
 }

@@ -197,9 +197,20 @@ Unsaved Files and Refreshes
 ---------------------------
 
 Navigation, references, rename and diagnostics from project files reflect
-unsaved changes. Information from the running application is refreshed after
-relevant files are saved. If a refresh fails, the editor reports the project as
-stale and keeps the last successful information.
+unsaved changes. While an open PHP file is temporarily invalid, declarations
+from its last valid version remain available and references that can still be
+recognized reflect the current text. Declaration-dependent Event listener and
+Messenger handler diagnostics are withheld for that file until its syntax is
+valid again.
+
+If no valid open version has been seen, features use the current best-effort
+facts. Closing the file discards retained declarations and exposes its saved
+facts again. The headless diagnostics checker only reads saved files, so its
+results don't depend on editor history.
+
+Information from the running application is refreshed after relevant files are
+saved. If a refresh fails, the editor reports the project as stale and keeps the
+last successful information.
 
 Compatible runtime information from the last successful refresh is retained
 across editor restarts. If the application cannot boot during the next refresh,

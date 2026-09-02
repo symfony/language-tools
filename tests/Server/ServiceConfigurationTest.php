@@ -30,6 +30,7 @@ use Symfony\Lsp\Index\PersistentSourceIndexStore;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceFactsStore;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
+use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigStringDecoder;
@@ -132,6 +133,7 @@ final class ServiceConfigurationTest extends TestCase
             ProjectIndexStatusRegistry::class,
             PublicAssetResolver::class,
             RuntimeConfiguration::class,
+            SourceOverlayHealthRegistry::class,
             RuntimeSnapshotState::class,
             TranslationConfigurationRegistry::class,
             WorkspaceTrust::class,

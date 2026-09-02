@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Doctrine;
 
 use Symfony\Lsp\Index\AbstractSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Project\Project;
 
 /** @extends AbstractSourceIndexer<DoctrineSourceFacts> */
@@ -52,5 +53,13 @@ final class DoctrineSourceIndexer extends AbstractSourceIndexer
     protected function extract(Project $project, SourceDocument $document): DoctrineSourceFacts
     {
         return $this->extractor->extract($document);
+    }
+
+    protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): DoctrineSourceFacts
+    {
+        return new DoctrineSourceFacts($current->uri, $healthy->entities, $healthy->repositories, [
+            ...array_filter($healthy->symbols, static fn (DoctrineSourceSymbol $symbol): bool => $symbol->declaration),
+            ...array_filter($current->symbols, static fn (DoctrineSourceSymbol $symbol): bool => !$symbol->declaration),
+        ]);
     }
 }

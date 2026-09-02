@@ -27,7 +27,7 @@ interface SourceIndexProviderInterface
 
     public function remove(Project $project, string $uri): void;
 
-    public function overlay(Project $project, Document $document): void;
+    public function overlay(Project $project, Document $document, SourceParseHealth $health): void;
 
     public function removeOverlay(Project $project, string $uri): void;
 }

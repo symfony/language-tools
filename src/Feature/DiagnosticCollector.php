@@ -18,6 +18,7 @@ final class DiagnosticCollector
         private readonly ProjectPathResolver $pathResolver,
         private readonly ProjectFileScopeRegistry $fileScope,
         private readonly UriToPathConverter $uriToPathConverter,
+        private readonly PartialParseDiagnosticFilter $partialParseFilter,
         private readonly DiagnosticSuppressor $suppressor,
         private readonly iterable $providers,
     ) {
@@ -55,6 +56,7 @@ final class DiagnosticCollector
             array_push($diagnostics, ...$providedDiagnostics);
         }
 
+        $diagnostics = $this->partialParseFilter->filter($document, $diagnostics);
         $diagnostics = $this->suppressor->suppress($document, $diagnostics);
 
         return $matched || [] !== $diagnostics ? $diagnostics : null;
@@ -108,6 +110,7 @@ final class DiagnosticCollector
             array_push($diagnostics, ...$provided);
         }
 
+        $diagnostics = $this->partialParseFilter->filterCollected($document, $diagnostics);
         $diagnostics = $this->suppressor->suppressCollected($document, $diagnostics);
 
         return new DetailedDiagnosticCollection($matched || [] !== $diagnostics, $diagnostics, $failures);

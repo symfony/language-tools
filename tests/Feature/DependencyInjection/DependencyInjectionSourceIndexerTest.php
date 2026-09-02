@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexer;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolKind;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
@@ -24,6 +25,9 @@ use Symfony\Lsp\Index\SourceIndexFileProcessor;
 use Symfony\Lsp\Index\SourceIndexOverlayManager;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderPipeline;
+use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
+use Symfony\Lsp\Index\SourceParseHealth;
+use Symfony\Lsp\Parser\Php\PhpParseHealthResolver;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -56,6 +60,54 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
         @rmdir($this->temporaryDirectory);
     }
 
+    public function testPartialPhpOverlayPreservesDeclarationsAndUsesCurrentReferences(): void
+    {
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $indexes = new DependencyInjectionSourceIndexRegistry();
+        $converter = new PositionConverter();
+        $parser = new TolerantPhpParser(new Parser());
+        $indexer = new DependencyInjectionSourceIndexer(
+            $indexes,
+            new YamlDependencyInjectionExtractor(
+                new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+                new YamlDependencyInjectionDeclarationExtractor($converter),
+                new YamlDependencyInjectionReferenceExtractor($converter),
+            ),
+            new XmlDependencyInjectionExtractor($converter),
+            new PhpAutowireReferenceExtractor($converter, $parser),
+            new PhpClassDeclarationExtractor($converter, $parser),
+        );
+        $uri = 'file://'.$this->temporaryDirectory.'/src/Service.php';
+
+        $indexer->overlay($project, new Document($uri, 'php', 1, <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Component\DependencyInjection\Attribute\Autowire;
+
+            final class HealthyService
+            {
+                public function __construct(#[Autowire(service: 'app.old')] object $dependency) {}
+            }
+            PHP), SourceParseHealth::Healthy);
+        $indexer->overlay($project, new Document($uri, 'php', 2, <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Component\DependencyInjection\Attribute\Autowire;
+
+            final class PartialService
+            {
+                public function __construct(#[Autowire(service: 'app.current')] object $dependency)
+            PHP), SourceParseHealth::Partial);
+
+        $index = $indexes->forProject($project);
+        self::assertCount(1, $index->classDeclarations('App\\HealthyService'));
+        self::assertSame([], $index->classDeclarations('App\\PartialService'));
+        self::assertSame([], $index->references(DependencyInjectionSymbolKind::Service, 'app.old'));
+        self::assertCount(1, $index->references(DependencyInjectionSymbolKind::Service, 'app.current'));
+    }
+
     public function testOpenDocumentsOverlayAndRestoreDiskBackedFacts(): void
     {
         $path = $this->temporaryDirectory.'/config/services.yaml';
@@ -82,6 +134,7 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
             new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser())),
             new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser())),
         )]);
+        $health = new SourceOverlayHealthRegistry();
         $scanner = new ApplicationSourceScanner(
             $projects,
             new ProjectIndexStatusRegistry(),
@@ -92,7 +145,15 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
             new ServerLogger(null, new SensitiveDataRedactor()),
             $pipeline,
             new SourceIndexFileProcessor($store, $pipeline, new PhpRuntimeStructureHasher()),
-            new SourceIndexOverlayManager($projects, $documents, new UriToPathConverter(), $files, $pipeline),
+            new SourceIndexOverlayManager(
+                $projects,
+                $documents,
+                new UriToPathConverter(),
+                $files,
+                $pipeline,
+                new PhpParseHealthResolver(new TolerantPhpParser(new Parser()), $health),
+                $health,
+            ),
         );
 
         $scanner->indexAll();

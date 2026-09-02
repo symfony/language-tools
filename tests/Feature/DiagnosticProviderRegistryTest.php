@@ -13,6 +13,8 @@ use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\DiagnosticSuppressor;
+use Symfony\Lsp\Feature\PartialParseDiagnosticFilter;
+use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -206,6 +208,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
             new ProjectPathResolver($converter),
             $fileScope,
             $converter,
+            new PartialParseDiagnosticFilter(new SourceOverlayHealthRegistry()),
             new DiagnosticSuppressor(
                 new PositionConverter(),
                 new LspProtocolMapper(),

@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Index;
 
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Parser\Php\PhpParseHealthResolver;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -15,6 +16,8 @@ final class SourceIndexOverlayManager
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly SourceFileEnumerator $files,
         private readonly SourceIndexProviderPipeline $providers,
+        private readonly PhpParseHealthResolver $parseHealth,
+        private readonly SourceOverlayHealthRegistry $overlayHealth,
     ) {
     }
 
@@ -31,11 +34,12 @@ final class SourceIndexOverlayManager
             || $this->files->gitignoreExcluded($project->rootPath, $path)
         ) {
             $this->providers->removeOverlay($project, $uri);
+            $this->overlayHealth->clear($project, $uri);
 
             return;
         }
 
-        $this->providers->overlay($project, $document);
+        $this->providers->overlay($project, $document, $this->parseHealth->resolve($project, $document));
     }
 
     public function removeUri(string $uri): void
@@ -43,6 +47,7 @@ final class SourceIndexOverlayManager
         $project = $this->projects->forDocumentUri($uri);
         if (null !== $project) {
             $this->providers->removeOverlay($project, $uri);
+            $this->overlayHealth->clear($project, $uri);
         }
     }
 

@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Index\AbstractSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Project\Project;
 
 /** @extends AbstractSourceIndexer<TwigCallableSourceFacts> */
@@ -58,5 +59,10 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
         }
 
         return null;
+    }
+
+    protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): TwigCallableSourceFacts
+    {
+        return new TwigCallableSourceFacts($current->uri, $healthy->declarations, $current->usages);
     }
 }

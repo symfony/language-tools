@@ -32,6 +32,7 @@ use Symfony\Lsp\Feature\Event\EventYamlListenerAnalyzer;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderRegistry;
 use Symfony\Lsp\Feature\Messenger\MessengerCodeLensProvider;
+use Symfony\Lsp\Feature\PartialParseDiagnosticFilter;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderRegistry;
 use Symfony\Lsp\Feature\RenameProviderInterface;
@@ -62,6 +63,7 @@ use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpExpressionParser;
+use Symfony\Lsp\Parser\Php\PhpParseHealthResolver;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
@@ -136,6 +138,7 @@ return static function (ContainerConfigurator $container): void {
     $services->load('Symfony\\Lsp\\Feature\\', '../src/Feature/*Registry.php');
     $services->set(DiagnosticCollector::class);
     $services->set(DiagnosticSuppressor::class);
+    $services->set(PartialParseDiagnosticFilter::class);
     $featureGroups = [
         'Route' => [],
         'DependencyInjection' => [],
@@ -194,6 +197,7 @@ return static function (ContainerConfigurator $container): void {
     $services->set(YamlScalarDecoder::class);
     $services->set(BalancedDelimiterMatcher::class);
     $services->set(PhpCapturedReceiverResolver::class);
+    $services->set(PhpParseHealthResolver::class);
     $services->set(QuotedArgumentMatcher::class);
     $services->set(TwigCallArgumentResolver::class);
     $services->set(CommentParserRegistry::class)

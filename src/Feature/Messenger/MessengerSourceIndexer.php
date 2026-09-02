@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Messenger;
 
 use Symfony\Lsp\Index\AbstractSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Project\Project;
 
 /** @extends AbstractSourceIndexer<MessengerSourceFacts> */
@@ -49,5 +50,13 @@ final class MessengerSourceIndexer extends AbstractSourceIndexer
     protected function extract(Project $project, SourceDocument $document): MessengerSourceFacts
     {
         return $this->extractor->extract($document);
+    }
+
+    protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): MessengerSourceFacts
+    {
+        return new MessengerSourceFacts($current->uri, [
+            ...array_filter($healthy->symbols, static fn (MessengerSourceSymbol $symbol): bool => $symbol->declaration),
+            ...array_filter($current->symbols, static fn (MessengerSourceSymbol $symbol): bool => !$symbol->declaration),
+        ], $healthy->parents, $healthy->handlers);
     }
 }
