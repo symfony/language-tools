@@ -23,7 +23,7 @@ final class SmokeTestServerExecutableTest extends TestCase
 
     public function testCommandOnlyModeValidatesAPharThroughPhp(): void
     {
-        $result = $this->runSmoke(['--commands-only', '--php', $this->server(), '1.2.3-rc.1']);
+        $result = $this->runSmoke(['--commands-only', '--php', '--php-option=memory_limit=128M', $this->server(), '1.2.3-rc.1']);
 
         self::assertSame(0, $result->exitCode, $result->stderr);
         self::assertStringContainsString('Executable command dispatch passed', $result->stdout);

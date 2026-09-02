@@ -105,7 +105,7 @@ jobs:
                           ./spc micro:combine ../../../build/symfony-lsp.phar -O ../../../build/symfony-lsp
                           chmod +x ../../../build/symfony-lsp
                       '
-            - name: Build the standalone macOS server
+            - name: Download PHP sources
               if: runner.os == 'macOS'
               working-directory: var/build/release
               env:
@@ -115,6 +115,12 @@ jobs:
               run: |
                   ./spc doctor --auto-fix
                   ./spc download --with-php=8.4 --for-extensions="$EXTENSIONS" --retry="$SPC_DOWNLOAD_RETRIES"
+            - name: Build the standalone macOS server
+              if: runner.os == 'macOS'
+              working-directory: var/build/release
+              env:
+                  EXTENSIONS: ctype,filter,iconv,mbstring,pcntl,phar,posix,tokenizer,zlib
+              run: |
                   ./spc build "$EXTENSIONS" --build-micro -P "$GITHUB_WORKSPACE/tools/spc-inject-tree-sitter.php"
                   ./spc micro:combine ../../../build/symfony-lsp.phar -O ../../../build/symfony-lsp
                   chmod +x ../../../build/symfony-lsp
@@ -154,7 +160,13 @@ jobs:
               run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
             - name: Build the server PHAR
               run: php tools/build-release-phar "$env:REFERENCE_TYPE" "$env:VERSION"
-            - name: Build the standalone server
+            - name: Download static-php-cli
+              shell: pwsh
+              working-directory: var/build/release
+              run: |
+                  Invoke-WebRequest https://github.com/crazywhalecc/static-php-cli/releases/download/2.8.5/spc-windows-x64.exe -OutFile spc.exe
+                  if ((Get-FileHash spc.exe -Algorithm SHA256).Hash.ToLower() -ne '425b54ab857e21409c1fd9b818899ffebabd1e2817ef0a0ed5ae8a3d9f5b463b') { throw 'Invalid static-php-cli checksum.' }
+            - name: Download PHP sources
               shell: pwsh
               working-directory: var/build/release
               env:
@@ -162,12 +174,16 @@ jobs:
                   GITHUB_TOKEN: ${{ github.token }}
                   SPC_DOWNLOAD_RETRIES: 5
               run: |
-                  Invoke-WebRequest https://github.com/crazywhalecc/static-php-cli/releases/download/2.8.5/spc-windows-x64.exe -OutFile spc.exe
-                  if ((Get-FileHash spc.exe -Algorithm SHA256).Hash.ToLower() -ne '425b54ab857e21409c1fd9b818899ffebabd1e2817ef0a0ed5ae8a3d9f5b463b') { throw 'Invalid static-php-cli checksum.' }
                   ./spc.exe doctor --auto-fix
                   if ($LASTEXITCODE -ne 0) { throw 'spc doctor failed.' }
                   ./spc.exe download --with-php=8.4 --for-extensions="$env:EXTENSIONS" --retry="$env:SPC_DOWNLOAD_RETRIES"
                   if ($LASTEXITCODE -ne 0) { throw 'spc download failed.' }
+            - name: Build the standalone server
+              shell: pwsh
+              working-directory: var/build/release
+              env:
+                  EXTENSIONS: ctype,filter,iconv,mbstring,phar,tokenizer,zlib
+              run: |
                   ./spc.exe build "$env:EXTENSIONS" --build-micro -P "$env:GITHUB_WORKSPACE/tools/spc-inject-tree-sitter.php"
                   if ($LASTEXITCODE -ne 0) { throw 'spc build failed.' }
                   ./spc.exe micro:combine ../../../build/symfony-lsp.phar -O ../../../build/symfony-lsp

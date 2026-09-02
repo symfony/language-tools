@@ -129,6 +129,7 @@ function removeTree(string $path): void
 $arguments = array_slice($argv, 1);
 $socketMode = false;
 $phpMode = false;
+$phpOptions = [];
 $commandsOnly = false;
 while (isset($arguments[0]) && str_starts_with($arguments[0], '--')) {
     $option = array_shift($arguments);
@@ -136,19 +137,29 @@ while (isset($arguments[0]) && str_starts_with($arguments[0], '--')) {
         $socketMode = true;
     } elseif ('--php' === $option) {
         $phpMode = true;
+    } elseif (str_starts_with($option, '--php-option=')) {
+        $phpOptions[] = substr($option, \strlen('--php-option='));
     } elseif ('--commands-only' === $option) {
         $commandsOnly = true;
     } else {
-        fwrite(\STDERR, "Usage: smoke-test-server [--socket] [--php] [--commands-only] <server> [expected-version]\n");
+        fwrite(\STDERR, "Usage: smoke-test-server [--socket] [--php] [--php-option=SETTING] [--commands-only] <server> [expected-version]\n");
         exit(2);
     }
 }
-if (!isset($arguments[0]) || 2 < \count($arguments)) {
-    fwrite(\STDERR, "Usage: smoke-test-server [--socket] [--php] [--commands-only] <server> [expected-version]\n");
+if (!isset($arguments[0]) || 2 < \count($arguments) || ([] !== $phpOptions && !$phpMode)) {
+    fwrite(\STDERR, "Usage: smoke-test-server [--socket] [--php] [--php-option=SETTING] [--commands-only] <server> [expected-version]\n");
     exit(2);
 }
 
-$serverCommand = [...($phpMode ? [\PHP_BINARY] : []), $arguments[0]];
+$serverCommand = [];
+if ($phpMode) {
+    $serverCommand[] = \PHP_BINARY;
+    foreach ($phpOptions as $phpOption) {
+        $serverCommand[] = '-d';
+        $serverCommand[] = $phpOption;
+    }
+}
+$serverCommand[] = $arguments[0];
 checkCommandDispatch($serverCommand, $arguments[1] ?? null);
 if ($commandsOnly) {
     fwrite(\STDOUT, "Symfony Language Tools command smoke test passed.\n");

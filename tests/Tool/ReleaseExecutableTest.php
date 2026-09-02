@@ -207,7 +207,7 @@ final class ReleaseExecutableTest extends TestCase
             case "$1 $2" in
                 "run list")
                     if [[ "$GH_EXISTING" == 1 || -f "$GH_DISPATCHED" ]]; then
-                        echo '[{"databaseId":789,"headSha":"releasecommit","displayTitle":"v0.19.0"}]'
+                        echo '[{"databaseId":789,"headSha":"releasecommit","displayTitle":"Release candidate v0.19.0"}]'
                     else
                         echo '[]'
                     fi
@@ -266,7 +266,7 @@ final class ReleaseExecutableTest extends TestCase
             $processes = new Symfony\Lsp\Tools\ReleaseProcessRunner(new Symfony\Lsp\Tools\InteractiveProcessRunner());
             $github = new Symfony\Lsp\Tools\ReleaseGitHub($root, $processes);
             try {
-                $runId = $github->workflowRunId('release-candidate.yaml', 'releasecommit', 'workflow_dispatch', 'v0.19.0');
+                $runId = $github->workflowRunId('release-candidate.yaml', 'releasecommit', 'workflow_dispatch', 'Release candidate v0.19.0');
                 fwrite(STDOUT, ('' === $runId ? 'NONE' : $runId)."\n");
             } catch (RuntimeException $error) {
                 fwrite(STDERR, $error->getMessage()."\n");
@@ -416,17 +416,17 @@ final class ReleaseExecutableTest extends TestCase
     public static function candidateMismatchProvider(): iterable
     {
         yield 'different commit' => [
-            '[{"databaseId":789,"headSha":"othercommit","displayTitle":"v0.19.0"}]',
+            '[{"databaseId":789,"headSha":"othercommit","displayTitle":"Release candidate v0.19.0"}]',
             '',
             "The release-candidate.yaml workflow run points to an unexpected commit.\n",
         ];
         yield 'different version' => [
-            '[{"databaseId":789,"headSha":"releasecommit","displayTitle":"dev"}]',
+            '[{"databaseId":789,"headSha":"releasecommit","displayTitle":"Release candidate dev"}]',
             "NONE\n",
             '',
         ];
         yield 'exact commit and version' => [
-            '[{"databaseId":789,"headSha":"releasecommit","displayTitle":"v0.19.0"}]',
+            '[{"databaseId":789,"headSha":"releasecommit","displayTitle":"Release candidate v0.19.0"}]',
             "789\n",
             '',
         ];

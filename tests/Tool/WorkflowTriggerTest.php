@@ -12,7 +12,7 @@ final class WorkflowTriggerTest extends TestCase
     private const ROOT = __DIR__.'/../..';
 
     #[DataProvider('regularWorkflowProvider')]
-    public function testChangelogPushesRunEveryRegularWorkflow(string $workflow): void
+    public function testChangelogPushesRunEveryRegularWorkflow(string $workflow, bool $unfiltered): void
     {
         $contents = file_get_contents(self::ROOT.'/.github/workflows/'.$workflow);
         self::assertIsString($contents);
@@ -21,6 +21,12 @@ final class WorkflowTriggerTest extends TestCase
         }
 
         $push = $matches['push'];
+        if ($unfiltered) {
+            self::assertStringNotContainsString('        paths:', $push);
+            self::assertStringNotContainsString('        paths-ignore:', $push);
+
+            return;
+        }
         if (str_contains($push, '        paths-ignore:')) {
             self::assertStringNotContainsString('            - CHANGELOG.md', $push);
 
@@ -83,14 +89,15 @@ final class WorkflowTriggerTest extends TestCase
         self::assertSame(2, preg_match_all('/^ {18}AZURE_CORE_OUTPUT: none$/m', $contents));
     }
 
-    /** @return iterable<string, array{string}> */
+    /** @return iterable<string, array{string, bool}> */
     public static function regularWorkflowProvider(): iterable
     {
-        yield 'PHP quality' => ['quality.yaml'];
-        yield 'Symfony compatibility' => ['compatibility.yaml'];
-        yield 'Neovim integration' => ['neovim.yaml'];
-        yield 'VS Code integration' => ['vscode.yaml'];
-        yield 'Zed integration' => ['zed.yaml'];
+        yield 'PHP quality' => ['quality.yaml', false];
+        yield 'Symfony compatibility' => ['compatibility.yaml', false];
+        yield 'Neovim integration' => ['neovim.yaml', false];
+        yield 'Production packaging' => ['packaging.yaml', true];
+        yield 'VS Code integration' => ['vscode.yaml', false];
+        yield 'Zed integration' => ['zed.yaml', false];
     }
 
     private function dogfoodConfiguration(string $project): ProjectConfiguration

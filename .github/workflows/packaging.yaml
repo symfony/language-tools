@@ -39,7 +39,4 @@ jobs:
               run: composer tree-sitter:build
             - name: Fully smoke-test the PHAR on Ubuntu
               if: runner.os == 'Linux'
-              run: |
-                  mkdir -p var/build/phar-smoke
-                  printf 'extension=%s\n' "$GITHUB_WORKSPACE/var/build/tree_sitter/modules/symfony_lsp_tree_sitter.so" > var/build/phar-smoke/php.ini
-                  PHPRC="$GITHUB_WORKSPACE/var/build/phar-smoke/php.ini" php tools/smoke-test-server --php build/symfony-lsp.phar dev
+              run: php tools/smoke-test-server --php --php-option="extension=$GITHUB_WORKSPACE/var/build/tree_sitter/modules/symfony_lsp_tree_sitter.so" build/symfony-lsp.phar dev

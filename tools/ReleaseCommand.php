@@ -22,12 +22,12 @@ final class ReleaseCommand
         'dogfood.yaml',
     ];
     private const TRANSIENT_WORKFLOW_STEPS = [
+        'Download PHP sources',
         'Download static-php-cli',
-        'Install production dependencies',
         'Run actions/checkout@v7',
         'Run actions/download-artifact@v8',
         'Run actions/setup-node@v7',
-        'Run ramsey/composer-install@v4',
+        'Run actions/upload-artifact@v7',
         'Run shivammathur/setup-php@v2',
         'Set up job',
     ];
@@ -127,6 +127,7 @@ final class ReleaseCommand
 
     private function validateLocally(): void
     {
+        $this->processes->run(['composer', 'autoload-check'], $this->root);
         $this->processes->run(['composer', 'test'], $this->root);
         $this->processes->run(['composer', 'phpstan'], $this->root);
         $this->processes->run(['composer', 'cs-check'], $this->root);
@@ -229,13 +230,14 @@ final class ReleaseCommand
     private function waitForReleaseCandidate(string $version, string $commit): void
     {
         $workflow = 'release-candidate.yaml';
+        $title = 'Release candidate '.$version;
         fwrite(\STDOUT, \sprintf("Waiting for %s %s on %s...\n", $workflow, $version, $commit));
-        $runId = $this->github->workflowRunId($workflow, $commit, 'workflow_dispatch', $version);
+        $runId = $this->github->workflowRunId($workflow, $commit, 'workflow_dispatch', $title);
         if ('' === $runId) {
             fwrite(\STDOUT, \sprintf("Dispatching %s %s for %s...\n", $workflow, $version, $commit));
             $this->github->dispatchWorkflow($workflow, ['version' => $version]);
             for ($attempt = 0; $attempt < 120; ++$attempt) {
-                $runId = $this->github->workflowRunId($workflow, $commit, 'workflow_dispatch', $version);
+                $runId = $this->github->workflowRunId($workflow, $commit, 'workflow_dispatch', $title);
                 if ('' !== $runId) {
                     break;
                 }

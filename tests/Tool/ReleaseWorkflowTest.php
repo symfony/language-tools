@@ -44,6 +44,7 @@ final class ReleaseWorkflowTest extends TestCase
         self::assertStringContainsString("version: \${{ github.event_name == 'workflow_dispatch' && inputs.version || 'dev' }}", $workflow);
         self::assertStringContainsString('uses: ./.github/workflows/publish-vscode.yaml', $workflow);
         self::assertStringContainsString('needs: build', $workflow);
+        self::assertStringContainsString('secrets: inherit', $workflow);
         self::assertStringContainsString('verify_only: true', $workflow);
     }
 
@@ -58,7 +59,7 @@ final class ReleaseWorkflowTest extends TestCase
         self::assertStringContainsString('composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader', $workflow);
         self::assertStringContainsString('php tools/build-release-phar branch dev', $workflow);
         self::assertStringContainsString('php tools/smoke-test-server --commands-only --php build/symfony-lsp.phar dev', $workflow);
-        self::assertStringContainsString('PHPRC="$GITHUB_WORKSPACE/var/build/phar-smoke/php.ini" php tools/smoke-test-server --php build/symfony-lsp.phar dev', $workflow);
+        self::assertStringContainsString('php tools/smoke-test-server --php --php-option="extension=$GITHUB_WORKSPACE/var/build/tree_sitter/modules/symfony_lsp_tree_sitter.so" build/symfony-lsp.phar dev', $workflow);
     }
 
     public function testTagReleasePromotesOnlyTheExactSuccessfulCandidate(): void
@@ -76,7 +77,8 @@ final class ReleaseWorkflowTest extends TestCase
         self::assertStringContainsString("'.commit == \$commit and .version == \$version", $workflow);
         self::assertStringContainsString('sha256sum --check --strict SHA256SUMS', $workflow);
         self::assertStringContainsString('body_path: candidate/RELEASE_NOTES.md', $workflow);
-        self::assertStringContainsString('candidate/RELEASE_MANIFEST.json', $workflow);
+        self::assertSame(1, substr_count($workflow, 'candidate/RELEASE_MANIFEST.json'));
+        self::assertStringContainsString('secrets: inherit', $workflow);
         self::assertStringNotContainsString('build-release-phar', $workflow);
         self::assertStringNotContainsString('package-release', $workflow);
         self::assertStringNotContainsString('static-php-cli', $workflow);

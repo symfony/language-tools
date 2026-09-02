@@ -82,7 +82,6 @@ jobs:
                       candidate/*.zip
                       candidate/*.vsix
                       candidate/SHA256SUMS
-                      candidate/RELEASE_MANIFEST.json
                   fail_on_unmatched_files: true
                   body_path: candidate/RELEASE_NOTES.md
                   prerelease: ${{ contains(github.ref_name, '-') }}
@@ -100,5 +99,6 @@ jobs:
             contents: read
             id-token: write
         uses: ./.github/workflows/publish-vscode.yaml
+        secrets: inherit
         with:
             tag: ${{ github.ref_name }}
