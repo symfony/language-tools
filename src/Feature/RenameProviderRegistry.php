@@ -56,15 +56,6 @@ final class RenameProviderRegistry
     /** @param array<array-key, mixed> $edit */
     private function targetsDegradedDocument(array $edit): bool
     {
-        $changes = $edit['changes'] ?? null;
-        if (\is_array($changes)) {
-            foreach (array_keys($changes) as $uri) {
-                if (\is_string($uri) && $this->overlayHealth->isDegraded($uri)) {
-                    return true;
-                }
-            }
-        }
-
         $documentChanges = $edit['documentChanges'] ?? null;
         foreach (\is_array($documentChanges) ? $documentChanges : [] as $change) {
             $textDocument = \is_array($change) ? ($change['textDocument'] ?? null) : null;

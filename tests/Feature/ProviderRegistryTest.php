@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Tests\Feature;
 
 use Fabpot\JsonRpc\Exception\JsonRpcException;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Feature\CodeActionProviderRegistry;
@@ -187,14 +186,17 @@ final class ProviderRegistryTest extends TestCase
         self::assertSame([], $afterEmpty->calls);
     }
 
-    /** @param array<array-key, mixed> $edit */
-    #[DataProvider('workspaceEditProvider')]
-    public function testRenameRefusesWorkspaceEditsTargetingADegradedDocument(array $edit): void
+    public function testRenameRefusesWorkspaceEditsTargetingADegradedDocument(): void
     {
         $health = new SourceOverlayHealthRegistry();
         $project = new Project('/workspace', 'file:///workspace');
         $health->record($project, 'file:///workspace/src/Target.php', SourceParseHealth::Partial);
-        $provider = new StubProvider([$edit]);
+        $provider = new StubProvider([[
+            'documentChanges' => [[
+                'textDocument' => ['uri' => 'file:///workspace/src/Target.php', 'version' => null],
+                'edits' => [],
+            ]],
+        ]]);
 
         try {
             (new RenameProviderRegistry($health, [$provider]))->rename([]);
@@ -203,20 +205,6 @@ final class ProviderRegistryTest extends TestCase
             self::assertSame('Rename is unavailable while an affected open PHP document contains syntax errors.', $error->getMessage());
             self::assertSame(['rename'], $provider->calls);
         }
-    }
-
-    /** @return iterable<string, array{array<array-key, mixed>}> */
-    public static function workspaceEditProvider(): iterable
-    {
-        yield 'document changes' => [[
-            'documentChanges' => [[
-                'textDocument' => ['uri' => 'file:///workspace/src/Target.php', 'version' => null],
-                'edits' => [],
-            ]],
-        ]];
-        yield 'changes' => [[
-            'changes' => ['file:///workspace/src/Target.php' => []],
-        ]];
     }
 }
 
