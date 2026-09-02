@@ -65,6 +65,8 @@ final class TranslationExtractorTest extends TestCase
             <?php
             use Symfony\Component\Translation\TranslatableMessage;
 
+            use function Symfony\Component\Translation\t;
+
             $translator->trans(id: 'panel.title', domain: 'admin');
             t(message: 'article.title');
             new TranslatableMessage(message: 'article.title');
@@ -372,6 +374,36 @@ final class TranslationExtractorTest extends TestCase
             ['symfony.imported', 'symfony.qualified'],
             array_map(static fn ($reference): string => $reference->key, $references),
         );
+    }
+
+    public function testOnlyExtractsSymfonyTranslationHelperReferences(): void
+    {
+        $references = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Controller.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            use function Symfony\Component\Translation\t;
+
+            $example = "t('string.literal')";
+            t('symfony.imported');
+            \Symfony\Component\Translation\t(message: 'symfony.qualified');
+            $foo->t('member.receiver');
+            Bar::t('static.receiver');
+            PHP))->references;
+
+        self::assertSame(
+            ['symfony.imported', 'symfony.qualified'],
+            array_map(static fn ($reference): string => $reference->key, $references),
+        );
+
+        $unimported = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Unrelated.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            t('app.function');
+            PHP))->references;
+
+        self::assertSame([], $unimported);
     }
 
     public function testPreservesTwigDefaultDomainsAndTranslationTags(): void

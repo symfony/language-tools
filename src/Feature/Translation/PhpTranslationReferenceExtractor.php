@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\Php\PhpArgument;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpObjectCreation;
@@ -14,6 +13,7 @@ use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 
 final class PhpTranslationReferenceExtractor
 {
+    private const TRANSLATION_HELPER = 'Symfony\\Component\\Translation\\t';
     private const GLOBAL_PARAMETER_TRANSLATORS = [
         'Symfony\\Bundle\\FrameworkBundle\\Translation\\Translator',
         'Symfony\\Component\\Translation\\DataCollectorTranslator',
@@ -24,7 +24,6 @@ final class PhpTranslationReferenceExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $parser,
-        private readonly PhpCommentParser $comments,
         private readonly TranslationParameterAnalyzer $parameters,
     ) {
     }
@@ -83,7 +82,7 @@ final class PhpTranslationReferenceExtractor
                 ),
             ];
         }
-        array_push($references, ...$this->helperReferences($uri, $text));
+        array_push($references, ...$this->helperReferences($uri, $text, $document));
         usort($references, static fn (array $left, array $right): int => $left['offset'] <=> $right['offset']);
         $globalParameters = array_values(array_unique($globalParameters));
         sort($globalParameters);
@@ -126,20 +125,34 @@ final class PhpTranslationReferenceExtractor
     }
 
     /** @return list<array{offset: int, reference: TranslationReference}> */
-    private function helperReferences(string $uri, string $text): array
+    private function helperReferences(string $uri, string $text, PhpDocument $document): array
     {
-        preg_match_all(
-            '/\bt\s*\(\s*(?:message\s*:\s*)?(?|(\')((?:\\\\.|[^\'\\\\])+)\'|(\")((?:\\\\[\\\\\"]|[^\"\\\\$])+)\")/s',
-            $this->comments->mask($text),
-            $matches,
-            \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL,
-        );
+        $tokens = array_values(\PhpToken::tokenize($text));
+        $helperNames = $this->importedHelperNames($tokens);
+        if (0 === strcasecmp('Symfony\\Component\\Translation', $document->namespace())) {
+            $helperNames['t'] = true;
+        }
+
         $references = [];
-        foreach ($matches[2] as $i => [$raw, $offset]) {
-            $quote = $matches[1][$i][0];
-            if (!\is_string($raw) || !\is_string($quote)) {
+        foreach ($tokens as $index => $token) {
+            $fullyQualified = \T_NAME_FULLY_QUALIFIED === $token->id && 0 === strcasecmp(self::TRANSLATION_HELPER, ltrim($token->text, '\\'));
+            if (!$fullyQualified && (\T_STRING !== $token->id || !isset($helperNames[strtolower($token->text)]))) {
                 continue;
             }
+            $previous = $this->previousSignificantToken($tokens, $index);
+            if (null !== $previous && $previous->is([\T_OBJECT_OPERATOR, \T_NULLSAFE_OBJECT_OPERATOR, \T_DOUBLE_COLON])) {
+                continue;
+            }
+            $literal = $this->helperArgument($tokens, $index);
+            if (null === $literal) {
+                continue;
+            }
+            $quote = $literal->text[0];
+            $raw = substr($literal->text, 1, -1);
+            if (!$this->isSupportedHelperLiteral($quote, $raw)) {
+                continue;
+            }
+            $offset = $literal->pos + 1;
             $references[] = [
                 'offset' => $offset,
                 'reference' => new TranslationReference(
@@ -152,5 +165,112 @@ final class PhpTranslationReferenceExtractor
         }
 
         return $references;
+    }
+
+    /**
+     * @param list<\PhpToken> $tokens
+     *
+     * @return array<string, true>
+     */
+    private function importedHelperNames(array $tokens): array
+    {
+        $names = [];
+        foreach ($tokens as $index => $token) {
+            if (\T_USE !== $token->id) {
+                continue;
+            }
+            $functionIndex = $this->nextSignificantIndex($tokens, $index);
+            if (null === $functionIndex || \T_FUNCTION !== $tokens[$functionIndex]->id) {
+                continue;
+            }
+            $statement = '';
+            for ($cursor = $functionIndex + 1; isset($tokens[$cursor]) && ';' !== $tokens[$cursor]->text; ++$cursor) {
+                $statement .= $tokens[$cursor]->is([\T_COMMENT, \T_DOC_COMMENT]) ? ' ' : $tokens[$cursor]->text;
+            }
+            preg_match_all(
+                '/(?:^|,)\s*\\\\?Symfony\\\\Component\\\\Translation\\\\t(?:\s+as\s+([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*))?\s*(?=,|$)/i',
+                trim($statement),
+                $matches,
+            );
+            foreach ($matches[1] as $alias) {
+                $names[strtolower('' === $alias ? 't' : $alias)] = true;
+            }
+            if (preg_match('/^\s*\\\\?Symfony\\\\Component\\\\Translation\\\\\{(?<imports>.*)\}\s*$/is', $statement, $group)) {
+                preg_match_all(
+                    '/(?:^|,)\s*t(?:\s+as\s+([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*))?\s*(?=,|$)/i',
+                    $group['imports'],
+                    $matches,
+                );
+                foreach ($matches[1] as $alias) {
+                    $names[strtolower('' === $alias ? 't' : $alias)] = true;
+                }
+            }
+        }
+
+        return $names;
+    }
+
+    /** @param list<\PhpToken> $tokens */
+    private function helperArgument(array $tokens, int $callIndex): ?\PhpToken
+    {
+        $openIndex = $this->nextSignificantIndex($tokens, $callIndex);
+        if (null === $openIndex || '(' !== $tokens[$openIndex]->text) {
+            return null;
+        }
+        $argumentIndex = $this->nextSignificantIndex($tokens, $openIndex);
+        if (null === $argumentIndex) {
+            return null;
+        }
+        if (\T_STRING === $tokens[$argumentIndex]->id && 0 === strcasecmp('message', $tokens[$argumentIndex]->text)) {
+            $colonIndex = $this->nextSignificantIndex($tokens, $argumentIndex);
+            if (null === $colonIndex || ':' !== $tokens[$colonIndex]->text) {
+                return null;
+            }
+            $argumentIndex = $this->nextSignificantIndex($tokens, $colonIndex);
+        }
+        if (null === $argumentIndex || \T_CONSTANT_ENCAPSED_STRING !== $tokens[$argumentIndex]->id) {
+            return null;
+        }
+        $endIndex = $this->nextSignificantIndex($tokens, $argumentIndex);
+        if (null === $endIndex || !\in_array($tokens[$endIndex]->text, [',', ')'], true)) {
+            return null;
+        }
+
+        return $tokens[$argumentIndex];
+    }
+
+    private function isSupportedHelperLiteral(string $quote, string $raw): bool
+    {
+        if ('' === $raw) {
+            return false;
+        }
+
+        return "'" === $quote
+            ? 1 === preg_match('/^(?:\\\\.|[^\'\\\\])+$/s', $raw)
+            : 1 === preg_match('/^(?:\\\\[\\\\"]|[^"\\\\$])+$/s', $raw);
+    }
+
+    /** @param list<\PhpToken> $tokens */
+    private function previousSignificantToken(array $tokens, int $index): ?\PhpToken
+    {
+        while (--$index >= 0) {
+            if (!$tokens[$index]->is([\T_WHITESPACE, \T_COMMENT, \T_DOC_COMMENT])) {
+                return $tokens[$index];
+            }
+        }
+
+        return null;
+    }
+
+    /** @param list<\PhpToken> $tokens */
+    private function nextSignificantIndex(array $tokens, int $index): ?int
+    {
+        while (isset($tokens[++$index])) {
+            if (!$tokens[$index]->is([\T_WHITESPACE, \T_COMMENT, \T_DOC_COMMENT])) {
+                return $index;
+            }
+        }
+
+        return null;
     }
 }
