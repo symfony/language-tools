@@ -53,6 +53,11 @@ final class TwigCallableMethodResolverTest extends TestCase
                 {
                     return $name;
                 }
+
+                public function nullable(\Twig\Environment|null $environment, string $name): string
+                {
+                    return $name;
+                }
             }
             PHP;
         $project = new Project('/workspace', 'file:///workspace');
@@ -129,6 +134,15 @@ final class TwigCallableMethodResolverTest extends TestCase
             'dynamic',
             optionsKnown: false,
         );
+        $nullable = new TwigCallableDeclaration(
+            TwigCallableKind::Function,
+            'nullable',
+            $uri,
+            $range,
+            'App\Twig\MediaExtension',
+            'nullable',
+            optionsKnown: false,
+        );
 
         $parameters = $resolver->parameters($project, [
             'image' => ['kind' => TwigCallableKind::Function, 'declarations' => [$image, $image]],
@@ -136,6 +150,7 @@ final class TwigCallableMethodResolverTest extends TestCase
             'dynamic_image' => ['kind' => TwigCallableKind::Function, 'declarations' => [$dynamicImage]],
             'attrs' => ['kind' => TwigCallableKind::Function, 'declarations' => [$attrs]],
             'dynamic' => ['kind' => TwigCallableKind::Function, 'declarations' => [$dynamic]],
+            'nullable' => ['kind' => TwigCallableKind::Function, 'declarations' => [$nullable]],
         ]);
 
         self::assertSame(1, $countingParser->calls);
@@ -152,6 +167,8 @@ final class TwigCallableMethodResolverTest extends TestCase
         self::assertSame(['environment', 'context', 'name'], $parameters['dynamic']->nameable);
         self::assertTrue($parameters['dynamic']->variadic);
         self::assertFalse($parameters['dynamic']->reliable);
+        self::assertSame(['name'], $parameters['nullable']->nameable);
+        self::assertFalse($parameters['nullable']->reliable);
         $methods = $resolver->resolve($project, [$image]);
         self::assertCount(1, $methods);
         self::assertSame($uri, $methods[0]->uri);

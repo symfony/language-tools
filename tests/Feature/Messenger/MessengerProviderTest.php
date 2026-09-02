@@ -318,7 +318,7 @@ YAML;
         $messageUri = 'file:///workspace/src/Message/Ping.php';
         $message = "<?php\nnamespace App\\Message;\ninterface DomainEvent {}\nfinal class Ping implements DomainEvent {}\n";
         $handlerUri = 'file:///workspace/src/MessageHandler/PingHandler.php';
-        $handler = "<?php\nnamespace App\\MessageHandler;\nuse App\\Message\\Ping;\nfinal class UnrelatedHandler { public function __invoke(string \$message): void {} }\nfinal class PingHandler { public function __invoke(Ping \$message): void {} }\nfinal class StringHandler { public function handle(string|int \$message): void {} }\n";
+        $handler = "<?php\nnamespace App\\MessageHandler;\nuse App\\Message\\Ping;\nfinal class UnrelatedHandler { public function __invoke(string \$message): void {} }\nfinal class PingHandler { public function __invoke(Ping \$message): void {} }\nfinal class NullableStringHandler { public function handle(string|null \$message): void {} }\nfinal class ScalarUnionHandler { public function handle(string|int \$message): void {} }\n";
         $controllerUri = 'file:///workspace/src/Controller/PingController.php';
         $controller = "<?php\nnamespace App\\Controller;\nuse App\\Message\\{Ping};\nuse Symfony\\Component\\Messenger\\{MessageBusInterface};\nfinal class PingController { public function __construct(private MessageBusInterface \$bus) {} public function send(): void { \$this->bus->dispatch(new Ping()); } }\n";
         $documents = new DocumentStore();
@@ -340,7 +340,8 @@ YAML;
             [new MessengerMessage('App\\Message\\Ping', ['async'])],
             [
                 new MessengerHandlerDeclaration('App\\Message\\DomainEvent', 'command.bus', 'handler', 'App\\MessageHandler\\PingHandler', '__invoke', 0, 'async'),
-                new MessengerHandlerDeclaration('App\\Message\\Other', 'command.bus', 'string_handler', 'App\\MessageHandler\\StringHandler', 'handle', 0, 'async'),
+                new MessengerHandlerDeclaration('App\\Message\\Other', 'command.bus', 'nullable_string_handler', 'App\\MessageHandler\\NullableStringHandler', 'handle', 0, 'async'),
+                new MessengerHandlerDeclaration('App\\Message\\Other', 'command.bus', 'scalar_union_handler', 'App\\MessageHandler\\ScalarUnionHandler', 'handle', 0, 'async'),
             ],
             true,
         );
@@ -370,7 +371,7 @@ YAML;
         self::assertStringContainsString('Messenger transport', json_encode($hover, \JSON_THROW_ON_ERROR));
         self::assertSame([$yamlUri], array_column($relationshipProvider->definition($this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'command.bus') + 2))) ?? [], 'uri'));
         self::assertSame(['messenger.unknown_bus'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $yamlUri]]) ?? [], 'code'));
-        self::assertSame(['messenger.invalid_handler_signature'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $handlerUri]]) ?? [], 'code'));
+        self::assertSame(['messenger.invalid_handler_signature', 'messenger.invalid_handler_signature'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $handlerUri]]) ?? [], 'code'));
 
         $messagePosition = $converter->toPosition($message, (int) strpos($message, 'Ping'));
         self::assertSame([$handlerUri], array_column($relationshipProvider->definition($this->params($messageUri, $messagePosition)) ?? [], 'uri'));

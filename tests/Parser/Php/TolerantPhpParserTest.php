@@ -600,7 +600,7 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame([
             ['Twig\Environment', 'Stringable', 'stdClass'],
             ['Twig\Environment', 'string'],
-            ['Twig\Environment', 'null'],
+            ['Twig\Environment'],
             ['Twig\Environment'],
         ], array_map(static fn (PhpParameter $parameter): array => $parameter->types, $methods[1]->parameters));
         self::assertFalse($methods[2]->public);

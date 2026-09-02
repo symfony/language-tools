@@ -67,6 +67,9 @@ final class TwigCallableDeclarationExtractorTest extends TestCase
                 #[AsTwigFunction('nullable_environment')]
                 public function nullableEnvironment(?Environment $environment, string $value): string { return $value; }
 
+                #[AsTwigFunction('explicit_nullable_environment')]
+                public function explicitNullableEnvironment(Environment|null $environment, string $value): string { return $value; }
+
                 #[AsTwigFunction('union_environment')]
                 public function unionEnvironment(Environment|\stdClass $environment, string $value): string { return $value; }
 
@@ -105,6 +108,7 @@ final class TwigCallableDeclarationExtractorTest extends TestCase
             [TwigCallableKind::Function, 'attribute_function', 'App\Twig\AppExtension', 'attributeFunction', true, false, false, false, true, true],
             [TwigCallableKind::Function, 'auto_environment', 'App\Twig\AppExtension', 'autoEnvironment', false, true, false, false, false, true],
             [TwigCallableKind::Function, 'nullable_environment', 'App\Twig\AppExtension', 'nullableEnvironment', false, true, false, false, false, true],
+            [TwigCallableKind::Function, 'explicit_nullable_environment', 'App\Twig\AppExtension', 'explicitNullableEnvironment', false, true, false, false, false, true],
             [TwigCallableKind::Function, 'union_environment', 'App\Twig\AppExtension', 'unionEnvironment', false, false, false, false, false, true],
             [TwigCallableKind::Function, 'legacy_safe', 'App\Twig\AppExtension', 'legacySafe', false, false, false, false, false, true],
             [TwigCallableKind::Function, 'foo', 'App\Twig\AppExtension', 'escapedAttribute', false, false, false, false, false, true],
