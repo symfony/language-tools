@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Load Content-Length tool dependencies without Composer dev autoloading
+
 ## 0.18.0 (2026-09-02)
 
 - Restore dogfood tool autoloading on case-sensitive filesystems

@@ -2,6 +2,9 @@
 
 namespace Symfony\Lsp\Tools;
 
+require_once __DIR__.'/ContentLengthMessageException.php';
+require_once __DIR__.'/ContentLengthMessageCodec.php';
+
 final class ContentLengthProcessClient
 {
     private const POLL_INTERVAL_MICROSECONDS = 1000;

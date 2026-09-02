@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Tool;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Tests\Support\ExecutableRunner;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\ContentLengthProcessClient;
 
@@ -19,6 +20,18 @@ final class ContentLengthProcessClientTest extends TestCase
     protected function tearDown(): void
     {
         $this->workspace->cleanup();
+    }
+
+    public function testLoadsStandaloneDependencies(): void
+    {
+        $root = \dirname(__DIR__, 2);
+        $script = 'require '.var_export($root.'/tools/ContentLengthProcessClient.php', true).'; echo (int) class_exists("Symfony\\\\Lsp\\\\Tools\\\\ContentLengthMessageCodec", false).(int) class_exists("Symfony\\\\Lsp\\\\Tools\\\\ContentLengthMessageException", false);';
+
+        $result = (new ExecutableRunner())->run([\PHP_BINARY, '-n', '-r', $script], $root);
+
+        self::assertSame(0, $result->exitCode, $result->stderr);
+        self::assertSame('11', $result->stdout);
+        self::assertSame('', $result->stderr);
     }
 
     public function testReadsFragmentedHeadersAndBodies(): void
