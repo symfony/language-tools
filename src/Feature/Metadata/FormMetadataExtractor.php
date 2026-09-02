@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\Console\CapturedReceiverResolver;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpClassReference;
@@ -18,6 +19,7 @@ final class FormMetadataExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly BalancedDelimiterMatcher $delimiters,
+        private readonly CapturedReceiverResolver $capturedReceivers,
         private readonly PhpLiteralArrayKeyParser $arrayKeys,
     ) {
     }
@@ -82,7 +84,7 @@ final class FormMetadataExtractor
      *
      * @return list<MetadataSourceSymbol>
      */
-    public function symbols(string $uri, string $text, PhpDocument $php, array $formDataClasses): array
+    public function symbols(string $uri, string $text, string $source, PhpDocument $php, array $formDataClasses): array
     {
         $symbols = [];
         $dataClasses = [];
@@ -101,8 +103,7 @@ final class FormMetadataExtractor
             foreach ($php->methodCalls as $call) {
                 if ('add' !== $call->method
                     || $method->className !== $call->className
-                    || $method->name !== $call->enclosingMethod
-                    || !\in_array($builder, $this->formBuilderReceiverVariables($php, $call), true)
+                    || !\in_array($builder, $this->formBuilderReceiverVariables($source, $php, $call), true)
                     || !$this->isDirectFormBuilderReceiver($call->receiver, $builder->name)
                 ) {
                     continue;
@@ -129,7 +130,7 @@ final class FormMetadataExtractor
     public function options(string $text, string $source, PhpDocument $php): array
     {
         $options = [];
-        foreach ($this->formCalls($php) as $call) {
+        foreach ($this->formCalls($source, $php) as $call) {
             $typeIndex = 'createNamed' === $call->method ? 1 : ('add' === $call->method ? 1 : 0);
             $optionsIndex = 'createNamed' === $call->method ? 3 : 2;
             $type = $this->leadingClassReferenceArgument($source, $php, $call->positionalArgument($typeIndex));
@@ -193,14 +194,14 @@ final class FormMetadataExtractor
     }
 
     /** @return list<PhpMethodCall> */
-    private function formCalls(PhpDocument $php): array
+    private function formCalls(string $source, PhpDocument $php): array
     {
         $calls = [];
         foreach ($php->methodCalls as $call) {
             if (!\in_array($call->method, ['createForm', 'createNamed', 'add'], true)) {
                 continue;
             }
-            if ('add' === $call->method && null === $this->formBuilderVariableForCall($php, $call)) {
+            if ('add' === $call->method && null === $this->formBuilderVariableForCall($source, $php, $call)) {
                 continue;
             }
             $calls[] = $call;
@@ -209,9 +210,9 @@ final class FormMetadataExtractor
         return $calls;
     }
 
-    private function formBuilderVariableForCall(PhpDocument $php, PhpMethodCall $call): ?PhpTypedVariable
+    private function formBuilderVariableForCall(string $source, PhpDocument $php, PhpMethodCall $call): ?PhpTypedVariable
     {
-        foreach ($this->formBuilderReceiverVariables($php, $call) as $variable) {
+        foreach ($this->formBuilderReceiverVariables($source, $php, $call) as $variable) {
             if (PhpTypedVariableKind::Parameter !== $variable->kind
                 || !\in_array('Symfony\\Component\\Form\\FormBuilderInterface', $variable->types, true)
                 || 1 !== preg_match('/^\s*\\$'.preg_quote($variable->name, '/').'\b/', $call->receiver)
@@ -226,16 +227,16 @@ final class FormMetadataExtractor
     }
 
     /** @return list<PhpTypedVariable> */
-    private function formBuilderReceiverVariables(PhpDocument $php, PhpMethodCall $call): array
+    private function formBuilderReceiverVariables(string $source, PhpDocument $php, PhpMethodCall $call): array
     {
-        if ([] !== $variables = $php->receiverVariables($call)) {
+        if ([] !== $variables = $this->capturedReceivers->variables($source, $php, $call)) {
             return $variables;
         }
         foreach ($php->methodCalls as $receiverCall) {
             if ($call === $receiverCall
                 || $call->startOffset !== $receiverCall->startOffset
                 || $receiverCall->endOffset > $call->receiverContext->endOffset
-                || [] === $variables = $php->receiverVariables($receiverCall)
+                || [] === $variables = $this->capturedReceivers->variables($source, $php, $receiverCall)
             ) {
                 continue;
             }

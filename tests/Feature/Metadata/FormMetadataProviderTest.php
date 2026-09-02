@@ -261,6 +261,47 @@ final class FormMetadataProviderTest extends MetadataTestCase
         self::assertSame(strpos($text, "'title'") + 1, $converter->toByteOffset($text, $references[0]->range->start));
     }
 
+    public function testLinksFormFieldsAddedInsideClosuresCapturingTheBuilder(): void
+    {
+        $extractor = $this->createExtractor(new PositionConverter());
+        $text = <<<'PHP'
+            <?php
+            namespace App\Form;
+
+            use App\Dto\Article;
+            use Symfony\Component\Form\FormBuilderInterface;
+            use Symfony\Component\OptionsResolver\OptionsResolver;
+
+            final class ArticleType
+            {
+                public function buildForm(FormBuilderInterface $builder): void
+                {
+                    $closure = function () use ($builder): void {
+                        $builder->add('closure');
+                    };
+                    $arrow = fn () => $builder->add('arrow');
+                    $uncaptured = function (): void {
+                        $builder->add('uncaptured');
+                    };
+                    $shadowed = fn ($builder) => $builder->add('shadowed');
+                }
+
+                public function configureOptions(OptionsResolver $resolver): void
+                {
+                    $resolver->setDefaults(['data_class' => Article::class]);
+                }
+            }
+            PHP;
+
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Form/ArticleType.php', 'php', $text));
+        $references = array_values(array_filter(
+            $facts->symbols,
+            static fn ($symbol): bool => MetadataSymbolKind::Property === $symbol->kind && !$symbol->declaration,
+        ));
+
+        self::assertSame(['App\Dto\Article::$closure', 'App\Dto\Article::$arrow'], array_map(static fn ($symbol): string => $symbol->name, $references));
+    }
+
     public function testKeepsOptionsAfterClosingBracketsInNestedStrings(): void
     {
         $converter = new PositionConverter();

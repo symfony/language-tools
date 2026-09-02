@@ -9,6 +9,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Console\CapturedReceiverResolver;
 use Symfony\Lsp\Feature\Console\ConsoleCommandMetadata;
 use Symfony\Lsp\Feature\Console\ConsoleDefinitionExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleExtractor;
@@ -167,7 +168,7 @@ final class ConsoleProviderTest extends TestCase
             new PhpCommentParser(),
             new ConsoleDefinitionExtractor(new PhpExpressionParser(new TolerantPhpParser(new Parser())), $delimiters),
             new ConsoleInvokableParameterExtractor($delimiters),
-            new ConsoleInputReceiverResolver($delimiters),
+            new ConsoleInputReceiverResolver(new CapturedReceiverResolver($delimiters)),
         );
         $sourceIndexes = new ConsoleSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($uri, 'php', $text)));

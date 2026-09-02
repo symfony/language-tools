@@ -2,12 +2,17 @@
 
 namespace Symfony\Lsp\Feature\Doctrine;
 
+use Symfony\Lsp\Feature\Console\CapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 
 final class DoctrineRepositoryReceiverResolver
 {
+    public function __construct(private readonly CapturedReceiverResolver $capturedReceivers)
+    {
+    }
+
     /**
      * @param list<PhpMethodCall> $calls
      * @param array<string, true> $localRepositoryClasses
@@ -19,7 +24,7 @@ final class DoctrineRepositoryReceiverResolver
         $assignments = $this->repositoryAssignmentEntities($source, $php);
         $receivers = [];
         foreach ($calls as $call) {
-            $receiver = $this->resolve($php, $call, $localRepositoryClasses, $assignments);
+            $receiver = $this->resolve($source, $php, $call, $localRepositoryClasses, $assignments);
             if (null !== $receiver) {
                 $receivers[spl_object_id($call)] = $receiver;
             }
@@ -35,16 +40,16 @@ final class DoctrineRepositoryReceiverResolver
      */
     public function resolveCall(string $source, PhpDocument $php, PhpMethodCall $call, array $localRepositoryClasses): ?array
     {
-        return $this->resolve($php, $call, $localRepositoryClasses, $this->repositoryAssignmentEntities($source, $php));
+        return $this->resolve($source, $php, $call, $localRepositoryClasses, $this->repositoryAssignmentEntities($source, $php));
     }
 
     /**
-     * @param array<string, true>   $localRepositoryClasses
-     * @param array<string, string> $assignments
+     * @param array<string, true>                                                                     $localRepositoryClasses
+     * @param array<string, array{entityClass: string, variable: string, scopeStartOffset: int|null}> $assignments
      *
      * @return array{entityClass: ?string, repositoryClass: ?string}|null
      */
-    private function resolve(PhpDocument $php, PhpMethodCall $call, array $localRepositoryClasses, array $assignments): ?array
+    private function resolve(string $source, PhpDocument $php, PhpMethodCall $call, array $localRepositoryClasses, array $assignments): ?array
     {
         $receiver = $call->receiverContext;
         if (PhpMethodReceiverKind::This === $receiver->kind) {
@@ -55,14 +60,27 @@ final class DoctrineRepositoryReceiverResolver
             }
         }
         if (null !== $receiver->name) {
-            foreach ($php->receiverVariables($call) as $variable) {
+            foreach ($this->capturedReceivers->variables($source, $php, $call) as $variable) {
                 if (1 === \count($variable->types) && str_ends_with($variable->types[0], 'Repository')) {
                     return ['entityClass' => null, 'repositoryClass' => $variable->types[0]];
                 }
             }
-            $entity = $assignments[$this->variableScopeKey($call, $receiver->name)] ?? null;
-            if (null !== $entity) {
-                return ['entityClass' => $entity, 'repositoryClass' => null];
+            $assignment = $assignments[$this->variableScopeKey($call, $receiver->name)] ?? null;
+            if (null !== $assignment) {
+                return ['entityClass' => $assignment['entityClass'], 'repositoryClass' => null];
+            }
+            $entities = [];
+            foreach ($assignments as $assignment) {
+                if ($receiver->name !== $assignment['variable']
+                    || !\is_int($assignment['scopeStartOffset'])
+                    || !$this->capturedReceivers->isCapturedFromScope($source, $call, $receiver->name, $assignment['scopeStartOffset'])
+                ) {
+                    continue;
+                }
+                $entities[$assignment['entityClass']] = true;
+            }
+            if (1 === \count($entities)) {
+                return ['entityClass' => array_key_first($entities), 'repositoryClass' => null];
             }
         }
         if (PhpMethodReceiverKind::Other !== $receiver->kind || 1 !== preg_match('/->\s*getRepository\s*\(/', $call->receiver)) {
@@ -78,7 +96,7 @@ final class DoctrineRepositoryReceiverResolver
         return 1 === \count($references) ? ['entityClass' => $references[0]->className, 'repositoryClass' => null] : null;
     }
 
-    /** @return array<string, string> */
+    /** @return array<string, array{entityClass: string, variable: string, scopeStartOffset: int|null}> */
     private function repositoryAssignmentEntities(string $source, PhpDocument $php): array
     {
         $entities = [];
@@ -89,7 +107,11 @@ final class DoctrineRepositoryReceiverResolver
             $before = substr($source, 0, $call->startOffset);
             $boundary = max((int) strrpos($before, ';'), (int) strrpos($before, '{'));
             if (preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*$/', substr($before, $boundary + 1), $assignment)) {
-                $entities[$this->variableScopeKey($call, $assignment[1])] = $reference->className;
+                $entities[$this->variableScopeKey($call, $assignment[1])] = [
+                    'entityClass' => $reference->className,
+                    'variable' => $assignment[1],
+                    'scopeStartOffset' => $call->scopeStartOffset,
+                ];
             }
         }
 

@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Feature\Console;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Console\CapturedReceiverResolver;
 use Symfony\Lsp\Feature\Console\ConsoleDefinitionExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleInputKind;
@@ -369,7 +370,7 @@ final class ConsoleExtractorTest extends TestCase
             new PhpCommentParser(),
             new ConsoleDefinitionExtractor(new PhpExpressionParser($expressionParser), $delimiters),
             new ConsoleInvokableParameterExtractor($delimiters),
-            new ConsoleInputReceiverResolver($delimiters),
+            new ConsoleInputReceiverResolver(new CapturedReceiverResolver($delimiters)),
         );
 
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Command/ReportCommand.php', 'php', $text));
@@ -393,7 +394,7 @@ final class ConsoleExtractorTest extends TestCase
             new PhpCommentParser(),
             new ConsoleDefinitionExtractor(new PhpExpressionParser(new TolerantPhpParser(new Parser())), $delimiters),
             new ConsoleInvokableParameterExtractor($delimiters),
-            new ConsoleInputReceiverResolver($delimiters),
+            new ConsoleInputReceiverResolver(new CapturedReceiverResolver($delimiters)),
         );
     }
 }

@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\Console\CapturedReceiverResolver;
 use Symfony\Lsp\Feature\Doctrine\DoctrineCompletionProvider;
 use Symfony\Lsp\Feature\Doctrine\DoctrineEntity;
 use Symfony\Lsp\Feature\Doctrine\DoctrineExtractor;
@@ -22,6 +23,7 @@ use Symfony\Lsp\Feature\Doctrine\DoctrineRepositoryReceiverResolver;
 use Symfony\Lsp\Feature\Doctrine\DoctrineSymbolKind;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -251,6 +253,49 @@ final class DoctrineProviderTest extends TestCase
         ));
         self::assertSame(['name'], array_map(static fn ($symbol): string => $symbol->name, $fieldReferences));
         self::assertSame(strpos($usageText, "'name'") + 1, $converter->toByteOffset($usageText, $fieldReferences[0]->range->start));
+    }
+
+    public function testIndexesRepositoryCriteriaCapturedInsideClosures(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Service/ProductFinder.php', 'php', <<<'PHP'
+            <?php
+            namespace App\Service;
+
+            use App\Entity\Product;
+            use App\Repository\ProductRepository;
+
+            final class ProductFinder
+            {
+                public function find(ProductRepository $products, object $manager): void
+                {
+                    $closure = function () use ($products): void {
+                        $products->findBy(['closure' => true]);
+                    };
+                    $arrow = fn () => $products->findBy(['arrow' => true]);
+                    $repository = $manager->getRepository(Product::class);
+                    $assignedClosure = function () use ($repository): void {
+                        $repository->findBy(['assigned_closure' => true]);
+                    };
+                    $assignedArrow = fn () => $repository->findBy(['assigned_arrow' => true]);
+                    $uncaptured = function (): void {
+                        $products->findBy(['uncaptured' => true]);
+                    };
+                    $shadowed = fn ($products) => $products->findBy(['shadowed' => true]);
+                }
+            }
+            PHP));
+
+        $references = array_values(array_filter(
+            $facts->symbols,
+            static fn ($symbol): bool => DoctrineSymbolKind::Field === $symbol->kind,
+        ));
+        self::assertSame(['closure', 'arrow', 'assigned_closure', 'assigned_arrow'], array_map(static fn ($symbol): string => $symbol->name, $references));
+        self::assertSame([
+            'App\Repository\ProductRepository',
+            'App\Repository\ProductRepository',
+            'App\Entity\Product',
+            'App\Entity\Product',
+        ], array_map(static fn ($symbol): ?string => $symbol->owner, $references));
     }
 
     public function testRecognizesPromotedMappedFields(): void
@@ -548,7 +593,7 @@ final class DoctrineProviderTest extends TestCase
             $converter ?? new PositionConverter(),
             new TolerantPhpParser(new Parser()),
             new PhpCommentParser(),
-            new DoctrineRepositoryReceiverResolver(),
+            new DoctrineRepositoryReceiverResolver(new CapturedReceiverResolver(new BalancedDelimiterMatcher())),
             new PhpLiteralArrayKeyParser(),
         );
     }

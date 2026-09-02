@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Event;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\Console\CapturedReceiverResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
@@ -25,6 +26,7 @@ final class EventExtractor
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $parser,
         private readonly PhpCommentParser $phpComments,
+        private readonly CapturedReceiverResolver $capturedReceivers,
         private readonly EventYamlListenerAnalyzer $yamlListenerAnalyzer,
         private readonly EventSubscriberMapAnalyzer $subscriberMapAnalyzer,
     ) {
@@ -112,7 +114,7 @@ final class EventExtractor
         }
 
         foreach ($php->methodCalls as $call) {
-            if (!array_any($php->receiverVariables($call), static fn ($variable): bool => [] !== array_intersect(self::DISPATCHER_TYPES, $variable->types))) {
+            if (!array_any($this->capturedReceivers->variables($source, $php, $call), static fn ($variable): bool => [] !== array_intersect(self::DISPATCHER_TYPES, $variable->types))) {
                 continue;
             }
             if ('dispatch' === $call->method) {

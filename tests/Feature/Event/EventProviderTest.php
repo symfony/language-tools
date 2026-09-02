@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Console\CapturedReceiverResolver;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
@@ -157,6 +158,33 @@ YAML;
             PHP));
 
         self::assertSame(['App\ExpectedEvent'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
+    }
+
+    public function testIndexesEventReferencesCapturedInsideClosures(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Dispatch.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+
+            final class Dispatch
+            {
+                public function dispatch(EventDispatcherInterface $dispatcher): void
+                {
+                    $closure = function () use ($dispatcher): void {
+                        $dispatcher->dispatch(new ClosureEvent());
+                    };
+                    $arrow = fn () => $dispatcher->dispatch(new ArrowEvent());
+                    $uncaptured = function (): void {
+                        $dispatcher->dispatch(new UncapturedEvent());
+                    };
+                    $shadowed = fn ($dispatcher) => $dispatcher->dispatch(new ShadowedEvent());
+                }
+            }
+            PHP));
+
+        self::assertSame(['App\ClosureEvent', 'App\ArrowEvent'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
     }
 
     public function testIndexesOnlyDirectPositionalEventCreations(): void
@@ -327,6 +355,7 @@ PHP;
             $converter,
             new TolerantPhpParser(new Parser()),
             new PhpCommentParser(),
+            new CapturedReceiverResolver(new BalancedDelimiterMatcher()),
             new EventYamlListenerAnalyzer($converter),
             new EventSubscriberMapAnalyzer($converter, new BalancedDelimiterMatcher()),
         );

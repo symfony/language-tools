@@ -102,7 +102,7 @@ final class MetadataExtractor
                 $property->description,
             );
         }
-        array_push($symbols, ...$this->forms->symbols($uri, $text, $php, $formDataClasses));
+        array_push($symbols, ...$this->forms->symbols($uri, $text, $source, $php, $formDataClasses));
         array_push($symbols, ...$this->serializer->symbols($uri, $text, $source, $php));
         array_push($symbols, ...$this->validation->referenceSymbols($uri, $text, $php));
 
