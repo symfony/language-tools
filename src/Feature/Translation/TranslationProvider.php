@@ -172,9 +172,14 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
             // extra parameters are legal and dynamic parameters are unknown,
             // so only placeholders the message expects but a literal parameter
             // list does not provide are proven mistakes
-            $expected = ($messages[0] ?? $declarations[0])->placeholders();
+            $message = $messages[0] ?? $declarations[0];
+            $expected = $message->placeholders();
             $provided = $reference->placeholders;
             $global = $index->globalParameters();
+            if ($message->icu) {
+                $provided = null === $provided ? null : $this->normalizeIcuParameterNames($provided);
+                $global = null === $global ? null : $this->normalizeIcuParameterNames($global);
+            }
             if (null !== $provided && null !== $global && [] !== array_diff($expected, $provided, $global)) {
                 $diagnostics[] = $this->diagnostic(
                     $reference,
@@ -202,6 +207,19 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         $item = $index->messages($domain, $key)[0] ?? $index->declarations($domain, $key)[0] ?? null;
 
         return null === $item ? [] : $item->placeholders();
+    }
+
+    /**
+     * @param list<string> $parameters
+     *
+     * @return list<string>
+     */
+    private function normalizeIcuParameterNames(array $parameters): array
+    {
+        return array_map(
+            static fn (string $parameter): string => \in_array($parameter[0] ?? null, ['%', '{'], true) ? trim($parameter, '%{ }') : $parameter,
+            $parameters,
+        );
     }
 
     /** @return array<array-key, mixed> */

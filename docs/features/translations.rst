@@ -47,12 +47,13 @@ Diagnostics
 
 Placeholders the message expects but a supplied literal parameter map doesn't
 provide are reported. Extra parameters and literal global parameters registered
-with ``addGlobalParameter()`` are accepted. If a global parameter name is
-dynamic, placeholder diagnostics are suppressed because the available names
-can't be determined. Calls without a parameter map, with dynamic expressions or
-with unpacked parameter arrays aren't diagnosed. Missing-key diagnostics are
-disabled by default because external translation providers can make the runtime
-catalogue incomplete.
+with ``addGlobalParameter()`` are accepted. ICU parameter names may be bare,
+such as ``name``, or brace-wrapped, such as ``{name}``. If a global parameter
+name is dynamic, placeholder diagnostics are suppressed because the available
+names can't be determined. Calls without a parameter map, with dynamic
+expressions or with unpacked parameter arrays aren't diagnosed. Missing-key
+diagnostics are disabled by default because external translation providers can
+make the runtime catalogue incomplete.
 
 Enable missing-key diagnostics in ``.symfony-lsp.json``:
 

@@ -345,6 +345,24 @@ final class TranslationProviderTest extends TestCase
         self::assertSame([], $phpProvider->diagnostics(['textDocument' => ['uri' => 'file:///workspace/src/Controller.php']]));
     }
 
+    public function testAcceptsWrappedIcuPlaceholderParameters(): void
+    {
+        $uri = 'file:///workspace/templates/showcase.html.twig';
+        $text = <<<'TWIG'
+            {{ 'showcase.manifesto'|trans({
+                '{openUnderline}': openUnderline,
+                '{closeUnderline}': closeUnderline,
+            }) }}
+            TWIG;
+        [$provider] = $this->provider($uri, $text, 'twig', [[
+            'file:///workspace/translations/messages+intl-icu.en.yaml',
+            'yaml',
+            'showcase.manifesto: "{openUnderline}Teaching raises questions.{closeUnderline}"',
+        ]]);
+
+        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
     public function testAccountsForGlobalTranslationParameters(): void
     {
         $uri = 'file:///workspace/templates/product.html.twig';
