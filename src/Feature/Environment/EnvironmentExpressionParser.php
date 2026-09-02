@@ -11,29 +11,17 @@ final class EnvironmentExpressionParser
         }
 
         $body = $match[1];
-        $bodyOffset = $sourceOffset + 5;
-        $segments = [];
-        $segmentOffset = 0;
-        foreach (explode(':', $body) as $value) {
-            $startByte = $bodyOffset + $segmentOffset;
-            $segments[] = new EnvironmentExpressionSegment(
-                $value,
-                new EnvironmentExpressionRange($startByte, $startByte + \strlen($value)),
-            );
-            $segmentOffset += \strlen($value) + 1;
-        }
-
-        $variable = array_pop($segments);
-        if (1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $variable->value)) {
+        $segments = explode(':', $body);
+        $variableName = array_pop($segments);
+        if (1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $variableName)) {
             return null;
         }
+        $variableStart = $sourceOffset + 5 + \strlen($body) - \strlen($variableName);
 
         return new EnvironmentExpression(
-            $variable->value,
-            array_map(static fn (EnvironmentExpressionSegment $segment): string => $segment->value, $segments),
+            $variableName,
             $segments,
-            new EnvironmentExpressionRange($sourceOffset, $sourceOffset + \strlen($expression)),
-            $variable->range,
+            new EnvironmentExpressionRange($variableStart, $variableStart + \strlen($variableName)),
         );
     }
 
