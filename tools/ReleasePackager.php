@@ -49,7 +49,7 @@ final class ReleasePackager
             $smokeCommand[] = '--socket';
         }
         $smokeCommand[] = $packageDirectory.'/'.$packagedExecutable;
-        $smokeCommand[] = $reference->embeddedVersion();
+        $smokeCommand[] = $reference->embeddedVersion;
         if (0 !== $this->processes->run($smokeCommand, $this->root)) {
             throw new \RuntimeException('The packaged server smoke test failed.');
         }

@@ -36,6 +36,7 @@ jobs:
         name: ${{ matrix.platform }}
         needs: reference
         runs-on: ${{ matrix.runner }}
+        timeout-minutes: 45
         strategy:
             fail-fast: false
             matrix:
@@ -77,8 +78,10 @@ jobs:
                   fi
             - name: Download static-php-cli
               working-directory: var/build/release
+              run: curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 https://github.com/crazywhalecc/static-php-cli/releases/download/2.8.5/spc-${{ matrix.spc }}.tar.gz -o spc.tar.gz
+            - name: Verify static-php-cli
+              working-directory: var/build/release
               run: |
-                  curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 https://github.com/crazywhalecc/static-php-cli/releases/download/2.8.5/spc-${{ matrix.spc }}.tar.gz -o spc.tar.gz
                   echo '${{ matrix.spc_checksum }}  spc.tar.gz' | shasum -a 256 -c
                   tar -xzf spc.tar.gz
             - name: Build the standalone Linux server
@@ -125,6 +128,7 @@ jobs:
                   ./spc micro:combine ../../../build/symfony-lsp.phar -O ../../../build/symfony-lsp
                   chmod +x ../../../build/symfony-lsp
             - name: Package and smoke-test
+              timeout-minutes: 2
               env:
                   PLATFORM: ${{ matrix.platform }}
               run: php tools/package-release "$PLATFORM" "$REFERENCE_TYPE" "$VERSION"
@@ -147,6 +151,7 @@ jobs:
         needs: reference
         # spc 2.8.5 only detects Visual Studio 2022/2019; windows-latest ships VS 2026.
         runs-on: windows-2022
+        timeout-minutes: 45
         env:
             REFERENCE_TYPE: ${{ needs.reference.outputs.type }}
             VERSION: ${{ inputs.version }}
@@ -163,8 +168,11 @@ jobs:
             - name: Download static-php-cli
               shell: pwsh
               working-directory: var/build/release
+              run: Invoke-WebRequest https://github.com/crazywhalecc/static-php-cli/releases/download/2.8.5/spc-windows-x64.exe -OutFile spc.exe
+            - name: Verify static-php-cli
+              shell: pwsh
+              working-directory: var/build/release
               run: |
-                  Invoke-WebRequest https://github.com/crazywhalecc/static-php-cli/releases/download/2.8.5/spc-windows-x64.exe -OutFile spc.exe
                   if ((Get-FileHash spc.exe -Algorithm SHA256).Hash.ToLower() -ne '425b54ab857e21409c1fd9b818899ffebabd1e2817ef0a0ed5ae8a3d9f5b463b') { throw 'Invalid static-php-cli checksum.' }
             - name: Download PHP sources
               shell: pwsh
@@ -210,6 +218,7 @@ jobs:
         name: VS Code extension (${{ matrix.target }})
         needs: [unix-binaries, windows-binary]
         runs-on: ubuntu-latest
+        timeout-minutes: 15
         strategy:
             fail-fast: false
             matrix:
@@ -304,6 +313,7 @@ jobs:
         name: Bundle release candidate
         needs: vscode-extension
         runs-on: ubuntu-latest
+        timeout-minutes: 5
         env:
             VERSION: ${{ inputs.version }}
         steps:
@@ -338,12 +348,15 @@ jobs:
                       sha256sum "${assets[@]}" | sort -k2
                   ) > release-candidate/SHA256SUMS
                   if [[ "$VERSION" = dev ]]; then
-                      awk '
-                          /^## Unreleased$/ { found = 1 }
-                          found && count > 0 && /^## / { exit }
-                          found { print; ++count }
-                          END { if (!found) exit 1 }
-                      ' CHANGELOG.md > release-candidate/RELEASE_NOTES.md
+                      if grep -Fqx '## Unreleased' CHANGELOG.md; then
+                          awk '
+                              /^## Unreleased$/ { found = 1 }
+                              found && count > 0 && /^## / { exit }
+                              found { print; ++count }
+                          ' CHANGELOG.md > release-candidate/RELEASE_NOTES.md
+                      else
+                          printf '%s\n' 'Development release candidate' > release-candidate/RELEASE_NOTES.md
+                      fi
                   else
                       ./tools/release-notes "$VERSION" > release-candidate/RELEASE_NOTES.md
                   fi

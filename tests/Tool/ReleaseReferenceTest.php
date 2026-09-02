@@ -15,7 +15,7 @@ final class ReleaseReferenceTest extends TestCase
 
         self::assertSame($type, $reference->type);
         self::assertSame($name, $reference->name);
-        self::assertSame($embeddedVersion, $reference->embeddedVersion());
+        self::assertSame($embeddedVersion, $reference->embeddedVersion);
     }
 
     /** @return iterable<string, array{string, string, string}> */

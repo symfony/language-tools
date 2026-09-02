@@ -1,6 +1,7 @@
 /.php-cs-fixer.cache
 /.phpunit.cache/
 /build/
+/dist/
 /log/
 /vendor/
 /var/

@@ -31,6 +31,7 @@ final class ReleaseGitHub
         }
 
         $failures = [];
+        $seen = [];
         foreach ($runs as $run) {
             if (!\is_array($run)
                 || !\is_string($run['workflowName'] ?? null)
@@ -39,12 +40,18 @@ final class ReleaseGitHub
             ) {
                 throw new \RuntimeException('Unable to inspect current main workflows.');
             }
+            if (isset($seen[$run['workflowName']])) {
+                continue;
+            }
+            $seen[$run['workflowName']] = true;
             if ('completed' === $run['status'] && !\in_array($run['conclusion'], ['neutral', 'skipped', 'success'], true)) {
                 $failures[] = $run['workflowName'];
             }
         }
 
-        return array_values(array_unique($failures));
+        sort($failures);
+
+        return $failures;
     }
 
     public function workflowRunId(string $workflow, string $commit, ?string $event = null, ?string $title = null): string
@@ -53,7 +60,7 @@ final class ReleaseGitHub
         if (null !== $event) {
             $command[] = '--event='.$event;
         }
-        $command[] = '--limit=20';
+        $command[] = '--limit=100';
         $command[] = '--json=databaseId,headSha,displayTitle';
 
         $runs = json_decode($this->processes->capture($command, $this->root), true, flags: \JSON_THROW_ON_ERROR);
@@ -87,6 +94,11 @@ final class ReleaseGitHub
             $command[] = '--raw-field='.$name.'='.$value;
         }
         $this->processes->run($command, $this->root);
+    }
+
+    public function workflowConclusion(string $runId): string
+    {
+        return $this->processes->capture(['gh', 'run', 'view', $runId, '--json=conclusion', '--jq=.conclusion'], $this->root);
     }
 
     /** @return list<string> */

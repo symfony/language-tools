@@ -12,6 +12,10 @@ on:
                 default: dev
                 type: string
 
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.version || 'dev' }}-${{ github.sha }}
+    cancel-in-progress: false
+
 permissions:
     contents: read
 
@@ -29,7 +33,6 @@ jobs:
             contents: read
             id-token: write
         uses: ./.github/workflows/publish-vscode.yaml
-        secrets: inherit
         with:
             tag: ${{ github.event_name == 'workflow_dispatch' && inputs.version || 'dev' }}
             verify_only: true

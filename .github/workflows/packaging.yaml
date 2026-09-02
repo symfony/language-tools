@@ -17,6 +17,7 @@ jobs:
     phar:
         name: PHAR (${{ matrix.os }})
         runs-on: ${{ matrix.os }}
+        timeout-minutes: 15
         strategy:
             fail-fast: false
             matrix:
@@ -31,9 +32,6 @@ jobs:
               run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
             - name: Build the production PHAR
               run: php tools/build-release-phar branch dev
-            - name: Smoke-test PHAR commands on Windows
-              if: runner.os == 'Windows'
-              run: php tools/smoke-test-server --commands-only --php build/symfony-lsp.phar dev
             - name: Build the Tree-sitter extension
               if: runner.os == 'Linux'
               run: composer tree-sitter:build

@@ -18,6 +18,7 @@ final class ReleasePharBuilderTest extends TestCase
     {
         $this->workspace = new TestWorkspace('symfony-lsp-release-phar-');
         $this->workspace->mkdir('resources', 'tools', 'vendor');
+        $this->workspace->write('resources/version', "dev\n");
         $root = \dirname(__DIR__, 2);
         foreach (['smoke-test-server', 'ContentLengthProcessClient.php', 'ContentLengthMessageCodec.php', 'ContentLengthMessageException.php'] as $file) {
             copy($root.'/tools/'.$file, $this->workspace->path('tools/'.$file));
@@ -60,7 +61,7 @@ final class ReleasePharBuilderTest extends TestCase
 
         self::assertSame($this->workspace->path('build/symfony-lsp.phar'), $phar);
         self::assertFileExists($phar);
-        self::assertSame($embeddedVersion."\n", file_get_contents($this->workspace->path('resources/version')));
+        self::assertSame("dev\n", file_get_contents($this->workspace->path('resources/version')));
         self::assertSame("compile\n--no-parallel", file_get_contents($this->workspace->path('box-arguments')));
         self::assertSame(file_get_contents($boxSource), file_get_contents($this->workspace->path('var/build/release/box.phar')));
     }

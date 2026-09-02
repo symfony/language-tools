@@ -4,10 +4,19 @@ namespace Symfony\Lsp\Tests\Tool;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Finder\Finder;
+use Symfony\Component\Yaml\Yaml;
+use Symfony\Lsp\Tools\ReleaseCommand;
 
 final class ReleaseWorkflowTest extends TestCase
 {
     private const ROOT = __DIR__.'/../..';
+
+    public function testWorkflowYamlParses(): void
+    {
+        foreach ((new Finder())->files()->in(self::ROOT.'/.github/workflows')->name('*.yaml') as $workflow) {
+            self::assertIsArray(Yaml::parseFile($workflow->getPathname()), $workflow->getRelativePathname());
+        }
+    }
 
     public function testReusableWorkflowBuildsAndBundlesEveryReleasePlatform(): void
     {
@@ -20,7 +29,9 @@ final class ReleaseWorkflowTest extends TestCase
         self::assertSame(2, substr_count($workflow, 'tools/build-release-phar'));
         self::assertSame(2, substr_count($workflow, 'tools/package-release'));
         self::assertSame(4, substr_count($workflow, 'spc_checksum:'));
+        self::assertSame(2, substr_count($workflow, '- name: Verify static-php-cli'));
         self::assertStringContainsString('name: windows-x64', $workflow);
+        self::assertStringContainsString('timeout-minutes: 45', $workflow);
         self::assertStringContainsString('test "$(find dist -maxdepth 1 -type f | wc -l)" -eq "${#assets[@]}"', $workflow);
         self::assertStringContainsString("'{commit: \$commit, version: \$version}'", $workflow);
         self::assertStringContainsString('name: symfony-lsp-release-candidate-${{ inputs.version }}-${{ github.sha }}', $workflow);
@@ -44,7 +55,9 @@ final class ReleaseWorkflowTest extends TestCase
         self::assertStringContainsString("version: \${{ github.event_name == 'workflow_dispatch' && inputs.version || 'dev' }}", $workflow);
         self::assertStringContainsString('uses: ./.github/workflows/publish-vscode.yaml', $workflow);
         self::assertStringContainsString('needs: build', $workflow);
-        self::assertStringContainsString('secrets: inherit', $workflow);
+        self::assertStringContainsString('cancel-in-progress: false', $workflow);
+        self::assertStringContainsString("'Development release candidate'", $this->workflow('build-release.yaml'));
+        self::assertStringNotContainsString('secrets: inherit', $workflow);
         self::assertStringContainsString('verify_only: true', $workflow);
     }
 
@@ -58,7 +71,7 @@ final class ReleaseWorkflowTest extends TestCase
         self::assertStringContainsString('os: [ubuntu-latest, windows-2022]', $workflow);
         self::assertStringContainsString('composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader', $workflow);
         self::assertStringContainsString('php tools/build-release-phar branch dev', $workflow);
-        self::assertStringContainsString('php tools/smoke-test-server --commands-only --php build/symfony-lsp.phar dev', $workflow);
+        self::assertStringNotContainsString('Smoke-test PHAR commands on Windows', $workflow);
         self::assertStringContainsString('php tools/smoke-test-server --php --php-option="extension=$GITHUB_WORKSPACE/var/build/tree_sitter/modules/symfony_lsp_tree_sitter.so" build/symfony-lsp.phar dev', $workflow);
     }
 
@@ -70,6 +83,8 @@ final class ReleaseWorkflowTest extends TestCase
         self::assertStringContainsString('--commit="$GITHUB_SHA"', $workflow);
         self::assertStringContainsString('--event=workflow_dispatch', $workflow);
         self::assertStringContainsString('--status=success', $workflow);
+        self::assertStringContainsString('GH_REPO: ${{ github.repository }}', $workflow);
+        self::assertStringContainsString('cancel-in-progress: false', $workflow);
         self::assertStringContainsString('first(.[] | select(.headSha == \\"$GITHUB_SHA\\" and .displayTitle == \\"Release candidate $GITHUB_REF_NAME\\") | .databaseId) // empty', $workflow);
         self::assertStringNotContainsString('| head -1', $workflow);
         self::assertStringContainsString('name: ${{ env.CANDIDATE_ARTIFACT }}', $workflow);
@@ -78,7 +93,7 @@ final class ReleaseWorkflowTest extends TestCase
         self::assertStringContainsString('sha256sum --check --strict SHA256SUMS', $workflow);
         self::assertStringContainsString('body_path: candidate/RELEASE_NOTES.md', $workflow);
         self::assertSame(1, substr_count($workflow, 'candidate/RELEASE_MANIFEST.json'));
-        self::assertStringContainsString('secrets: inherit', $workflow);
+        self::assertStringNotContainsString('secrets: inherit', $workflow);
         self::assertStringNotContainsString('build-release-phar', $workflow);
         self::assertStringNotContainsString('package-release', $workflow);
         self::assertStringNotContainsString('static-php-cli', $workflow);
@@ -91,6 +106,27 @@ final class ReleaseWorkflowTest extends TestCase
     public function testQualityValidatesComposerAutoloading(): void
     {
         self::assertStringContainsString('run: composer autoload-check', $this->workflow('quality.yaml'));
+    }
+
+    public function testTransientRetryStepsMatchTheWorkflows(): void
+    {
+        $available = ['Set up job'];
+        foreach ((new Finder())->files()->in(self::ROOT.'/.github/workflows')->name('*.yaml') as $workflow) {
+            preg_match_all('/^\s+- name: (.+)$/m', $workflow->getContents(), $names);
+            array_push($available, ...$names[1]);
+            preg_match_all('/^\s+- uses: ([^\s]+)$/m', $workflow->getContents(), $actions);
+            foreach ($actions[1] as $action) {
+                $available[] = 'Run '.$action;
+            }
+        }
+
+        $constant = (new \ReflectionClass(ReleaseCommand::class))->getReflectionConstant('TRANSIENT_WORKFLOW_STEPS');
+        self::assertNotFalse($constant);
+        /** @var list<string> $steps */
+        $steps = $constant->getValue();
+        foreach ($steps as $step) {
+            self::assertContains($step, $available);
+        }
     }
 
     public function testWorkflowsUseTheApprovedActionMajors(): void

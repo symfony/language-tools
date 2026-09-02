@@ -5,6 +5,10 @@ on:
         tags: ['v*']
     workflow_dispatch:
 
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: false
+
 permissions:
     actions: read
     contents: write
@@ -15,6 +19,7 @@ jobs:
         runs-on: ubuntu-latest
         env:
             CANDIDATE_ARTIFACT: symfony-lsp-release-candidate-${{ github.ref_name }}-${{ github.sha }}
+            GH_REPO: ${{ github.repository }}
         steps:
             - name: Find the exact release candidate
               id: candidate
@@ -99,6 +104,5 @@ jobs:
             contents: read
             id-token: write
         uses: ./.github/workflows/publish-vscode.yaml
-        secrets: inherit
         with:
             tag: ${{ github.ref_name }}

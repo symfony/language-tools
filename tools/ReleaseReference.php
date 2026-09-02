@@ -6,7 +6,7 @@ require_once __DIR__.'/ReleaseVersion.php';
 
 final class ReleaseReference
 {
-    private readonly string $embeddedVersion;
+    public readonly string $embeddedVersion;
 
     public function __construct(
         public readonly string $type,
@@ -33,10 +33,5 @@ final class ReleaseReference
         } catch (\InvalidArgumentException $exception) {
             throw new \InvalidArgumentException('A release tag must use the vX.Y.Z or vX.Y.Z-PRERELEASE format.', 0, $exception);
         }
-    }
-
-    public function embeddedVersion(): string
-    {
-        return $this->embeddedVersion;
     }
 }

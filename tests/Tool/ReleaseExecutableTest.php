@@ -58,7 +58,7 @@ final class ReleaseExecutableTest extends TestCase
 
     /** @param list<string> $expectedCalls */
     #[DataProvider('workflowRetryProvider')]
-    public function testRetriesOnlyWhitelistedTransientWorkflowSteps(int $watchFailures, string $failedSteps, string $failedLog, bool $expectedRetry, ?string $expectedError, array $expectedCalls): void
+    public function testRetriesOnlyWhitelistedTransientWorkflowSteps(int $watchFailures, string $failedSteps, string $conclusion, string $failedLog, ?string $retryReason, ?string $expectedError, array $expectedCalls): void
     {
         $root = \dirname(__DIR__, 2);
         $workspace = new TestWorkspace();
@@ -73,6 +73,7 @@ final class ReleaseExecutableTest extends TestCase
             case "$1 $2 $4" in
                 "run list --commit=commit") echo '[{"databaseId":123,"headSha":"commit","displayTitle":"Release"}]' ;;
                 "run view --json=jobs") echo "$GH_FAILED_STEPS" ;;
+                "run view --json=conclusion") echo "$GH_CONCLUSION" ;;
                 "run view --log-failed") echo "$GH_FAILED_LOG" ;;
             esac
             if [[ "$1 $2" == "run watch" ]]; then
@@ -87,13 +88,16 @@ final class ReleaseExecutableTest extends TestCase
             $root = $argv[1];
             require $root.'/vendor/autoload.php';
             $processes = new Symfony\Lsp\Tools\ReleaseProcessRunner(new Symfony\Lsp\Tools\InteractiveProcessRunner());
+            $sleeper = new class implements Symfony\Lsp\Tools\ReleaseSleeperInterface {
+                public function sleep(int $seconds): void {}
+            };
             $command = new Symfony\Lsp\Tools\ReleaseCommand(
                 $root,
                 new Symfony\Lsp\Tools\ReleaseMetadataUpdater(),
                 $processes,
                 new Symfony\Lsp\Tools\ReleaseGit($root, $processes),
                 new Symfony\Lsp\Tools\ReleaseGitHub($root, $processes),
-                new Symfony\Lsp\Tools\NativeReleaseSleeper(),
+                $sleeper,
             );
             $method = (new ReflectionClass($command))->getMethod('waitForWorkflow');
             try {
@@ -110,14 +114,15 @@ final class ReleaseExecutableTest extends TestCase
             $environment['GH_WATCHES'] = $watches;
             $environment['GH_WATCH_FAILURES'] = (string) $watchFailures;
             $environment['GH_FAILED_STEPS'] = $failedSteps;
+            $environment['GH_CONCLUSION'] = $conclusion;
             $environment['GH_FAILED_LOG'] = $failedLog;
             $result = $this->runProcess([\PHP_BINARY, '-r', $php, $root], $environment);
 
             self::assertSame(0, $result->exitCode, $result->stderr);
             self::assertStringContainsString($failedLog, $result->stdout);
             self::assertStringContainsString("Failed workflow logs:\n", $result->stderr);
-            if ($expectedRetry) {
-                self::assertStringContainsString("Rerunning transient workflow jobs once: Download static-php-cli.\n", $result->stderr);
+            if (null !== $retryReason) {
+                self::assertStringContainsString("Rerunning transient workflow jobs once: {$retryReason}.\n", $result->stderr);
             } else {
                 self::assertStringNotContainsString('Rerunning', $result->stderr);
             }
@@ -180,9 +185,9 @@ final class ReleaseExecutableTest extends TestCase
             self::assertSame(0, $result->exitCode, $result->stderr);
             self::assertStringContainsString("Dispatching quality.yaml for commit...\n", $result->stdout);
             self::assertSame([
-                ...array_fill(0, 6, 'run list --workflow=quality.yaml --commit=commit --limit=20 --json=databaseId,headSha,displayTitle'),
+                ...array_fill(0, 6, 'run list --workflow=quality.yaml --commit=commit --limit=100 --json=databaseId,headSha,displayTitle'),
                 'workflow run quality.yaml --ref main',
-                'run list --workflow=quality.yaml --commit=commit --limit=20 --json=databaseId,headSha,displayTitle',
+                'run list --workflow=quality.yaml --commit=commit --limit=100 --json=databaseId,headSha,displayTitle',
                 'run watch 456 --exit-status',
             ], file($calls, \FILE_IGNORE_NEW_LINES | \FILE_SKIP_EMPTY_LINES));
         } finally {
@@ -326,8 +331,8 @@ final class ReleaseExecutableTest extends TestCase
             self::assertSame(0, $result->exitCode, $result->stderr);
             $workflowCalls = file($calls, \FILE_IGNORE_NEW_LINES | \FILE_SKIP_EMPTY_LINES);
             self::assertIsArray($workflowCalls);
-            self::assertContains('run list --workflow=packaging.yaml --commit=releasecommit --limit=20 --json=databaseId,headSha,displayTitle', $workflowCalls);
-            self::assertContains('run list --workflow=dogfood.yaml --commit=releasecommit --limit=20 --json=databaseId,headSha,displayTitle', $workflowCalls);
+            self::assertContains('run list --workflow=packaging.yaml --commit=releasecommit --limit=100 --json=databaseId,headSha,displayTitle', $workflowCalls);
+            self::assertContains('run list --workflow=dogfood.yaml --commit=releasecommit --limit=100 --json=databaseId,headSha,displayTitle', $workflowCalls);
             self::assertSame(7, \count(array_filter($workflowCalls, static fn (string $call): bool => str_starts_with($call, 'run watch '))));
         } finally {
             $workspace->cleanup();
@@ -392,7 +397,7 @@ final class ReleaseExecutableTest extends TestCase
     /** @return iterable<string, array{bool, list<string>}> */
     public static function candidateResumeProvider(): iterable
     {
-        $runList = 'run list --workflow=release-candidate.yaml --commit=releasecommit --event=workflow_dispatch --limit=20 --json=databaseId,headSha,displayTitle';
+        $runList = 'run list --workflow=release-candidate.yaml --commit=releasecommit --event=workflow_dispatch --limit=100 --json=databaseId,headSha,displayTitle';
 
         yield 'dispatch missing candidate' => [
             false,
@@ -432,34 +437,47 @@ final class ReleaseExecutableTest extends TestCase
         ];
     }
 
-    /** @return iterable<string, array{int, string, string, bool, string|null, list<string>}> */
+    /** @return iterable<string, array{int, string, string, string, string|null, string|null, list<string>}> */
     public static function workflowRetryProvider(): iterable
     {
-        $runList = 'run list --workflow=packaging.yaml --commit=commit --event=push --limit=20 --json=databaseId,headSha,displayTitle';
+        $runList = 'run list --workflow=packaging.yaml --commit=commit --event=push --limit=100 --json=databaseId,headSha,displayTitle';
         $transientSteps = '{"jobs":[{"steps":[{"name":"Download static-php-cli","conclusion":"failure"}]}]}';
         $failedStepsCall = 'run view 123 --json=jobs';
+        $conclusionCall = 'run view 123 --json=conclusion --jq=.conclusion';
 
         yield 'whitelisted transient step' => [
             1,
             $transientSteps,
+            'failure',
             'The download service failed.',
-            true,
+            'Download static-php-cli',
             null,
             [$runList, 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed', 'run rerun 123 --failed', 'run watch 123 --exit-status'],
         ];
         yield 'repeated whitelisted transient step' => [
             2,
             $transientSteps,
+            'failure',
             'The download service failed.',
-            true,
+            'Download static-php-cli',
             'Workflow packaging.yaml failed after one automatic rerun. Inspect it with "gh run view 123 --web" before resuming the release.',
             [$runList, 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed', 'run rerun 123 --failed', 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed'],
+        ];
+        yield 'job timeout without a failed step' => [
+            1,
+            '{"jobs":[{"steps":[]}]}',
+            'timed_out',
+            'The hosted runner timed out.',
+            'timed_out',
+            null,
+            [$runList, 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed', $conclusionCall, 'run rerun 123 --failed', 'run watch 123 --exit-status'],
         ];
         yield 'mixed transient and deterministic steps' => [
             1,
             '{"jobs":[{"steps":[{"name":"Download static-php-cli","conclusion":"failure"},{"name":"Package and smoke-test","conclusion":"failure"}]}]}',
+            'failure',
             'Several steps failed.',
-            false,
+            null,
             'Workflow packaging.yaml failed without an automatic rerun. Inspect it with "gh run view 123 --web" before resuming the release.',
             [$runList, 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed'],
         ];
@@ -467,8 +485,9 @@ final class ReleaseExecutableTest extends TestCase
             yield 'deterministic '.$step => [
                 1,
                 \sprintf('{"jobs":[{"steps":[{"name":"%s","conclusion":"failure"}]}]}', $step),
+                'failure',
                 $step.' failed.',
-                false,
+                null,
                 'Workflow packaging.yaml failed without an automatic rerun. Inspect it with "gh run view 123 --web" before resuming the release.',
                 [$runList, 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed'],
             ];

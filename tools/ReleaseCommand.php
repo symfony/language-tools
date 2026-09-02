@@ -27,9 +27,13 @@ final class ReleaseCommand
         'Run actions/checkout@v7',
         'Run actions/download-artifact@v8',
         'Run actions/setup-node@v7',
-        'Run actions/upload-artifact@v7',
         'Run shivammathur/setup-php@v2',
         'Set up job',
+    ];
+    private const TRANSIENT_WORKFLOW_CONCLUSIONS = [
+        'stale',
+        'startup_failure',
+        'timed_out',
     ];
 
     public function __construct(
@@ -292,9 +296,17 @@ final class ReleaseCommand
             fwrite(\STDERR, "\nFailed workflow logs:\n");
             $this->github->showFailedLogs($runId);
 
-            if (0 === $attempt && [] !== $failedSteps && [] === array_diff($failedSteps, self::TRANSIENT_WORKFLOW_STEPS)) {
-                fwrite(\STDERR, \sprintf("\nRerunning transient workflow jobs once: %s.\n", implode(', ', $failedSteps)));
+            $transientReason = null;
+            if ([] !== $failedSteps && [] === array_diff($failedSteps, self::TRANSIENT_WORKFLOW_STEPS)) {
+                $transientReason = implode(', ', $failedSteps);
+            } elseif ([] === $failedSteps && \in_array($conclusion = $this->github->workflowConclusion($runId), self::TRANSIENT_WORKFLOW_CONCLUSIONS, true)) {
+                $transientReason = $conclusion;
+            }
+
+            if (0 === $attempt && null !== $transientReason) {
+                fwrite(\STDERR, \sprintf("\nRerunning transient workflow jobs once: %s.\n", $transientReason));
                 $this->github->rerunFailedJobs($runId);
+                $this->sleeper->sleep(5);
                 $reran = true;
                 continue;
             }

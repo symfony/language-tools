@@ -146,7 +146,7 @@ while (isset($arguments[0]) && str_starts_with($arguments[0], '--')) {
         exit(2);
     }
 }
-if (!isset($arguments[0]) || 2 < \count($arguments) || ([] !== $phpOptions && !$phpMode)) {
+if (!isset($arguments[0]) || 2 < \count($arguments) || ([] !== $phpOptions && !$phpMode) || ($socketMode && $commandsOnly)) {
     fwrite(\STDERR, "Usage: smoke-test-server [--socket] [--php] [--php-option=SETTING] [--commands-only] <server> [expected-version]\n");
     exit(2);
 }

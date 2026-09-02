@@ -31,6 +31,15 @@ final class SmokeTestServerExecutableTest extends TestCase
         self::assertSame('', $result->stderr);
     }
 
+    public function testRejectsSocketModeForCommandOnlyChecks(): void
+    {
+        $result = $this->runSmoke(['--socket', '--commands-only', $this->server()]);
+
+        self::assertSame(2, $result->exitCode);
+        self::assertSame('', $result->stdout);
+        self::assertStringStartsWith('Usage: smoke-test-server ', $result->stderr);
+    }
+
     #[DataProvider('transportProvider')]
     public function testPreservesTheCompleteServerSmokeTest(bool $socketMode): void
     {

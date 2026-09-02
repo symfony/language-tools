@@ -81,6 +81,8 @@ final class ReleasePackagerTest extends TestCase
         );
         if (!$socketMode) {
             self::assertSame(0755, fileperms($this->workspace->path('dist/'.$packageName.'/'.$executable)) & 0777);
+            $archivedExecutable = (new \PharData($archive))[$packageName.'/'.$executable];
+            self::assertSame(0755, $archivedExecutable->getPerms() & 0777);
         }
     }
 
