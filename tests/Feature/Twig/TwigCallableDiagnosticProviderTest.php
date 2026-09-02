@@ -103,6 +103,7 @@ final class TwigCallableDiagnosticProviderTest extends TwigCallableProviderTestC
         );
         self::assertSame([], $diagnostics("{{ image(name: 'x, wdith: 3') }}"));
         self::assertSame([], $diagnostics('{{ object.image(wdith: 3) }}'));
+        self::assertSame([], $diagnostics('{{ object. image(wdith: 3) }}'));
         self::assertSame([], $diagnostics("{{ attrs('div', data_test: 'x') }}"));
         self::assertSame([], $diagnostics("{{ attribute_variadic(name: 'a', unknown: 1) }}"));
         self::assertSame([], $diagnostics('{{ dynamic_image(unknown: 1) }}'));

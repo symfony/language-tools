@@ -134,6 +134,7 @@ final class TwigCallableArgumentAnalyzer
             ];
         }
         if (1 !== preg_match('/(?<![\w.|])([A-Za-z_][A-Za-z0-9_]*)\s*$/', $head, $match, \PREG_OFFSET_CAPTURE)
+            || str_ends_with(rtrim(substr($head, 0, $match[1][1])), '.')
             || $this->isMacroDeclaration($head, $match[1][1])) {
             return null;
         }
