@@ -21,15 +21,17 @@ const referenceRows = [...referenceSection.matchAll(/^    \* - (.+)\n((?:      -
     name: match[1].replace(/^`(.+)`_$/, '$1'),
     support: [...match[2].matchAll(/^      - (Yes|No)$/gm)].map((cell) => 'Yes' === cell[1]),
 }));
-const pageTable = page.split('| Integration | Completion | Hover | Definition | References | Rename | Diagnostics |')[1]?.split('\n\n')[0];
-if (!pageTable) {
+const pageSection = page.split('## Supported integrations')[1]?.split('A dot marks')[0];
+if (!pageSection) {
     throw new Error('Unable to find the integration matrix in the Marketplace overview');
 }
 
-const pageRows = [...pageTable.matchAll(/^\| ([^|:-][^|]*) \|(.+)\|$/gm)].map((match) => ({
-    name: match[1].trim(),
-    support: match[2].split('|').map((cell) => '✓' === cell.trim()),
-}));
+const pageRows = [...pageSection.matchAll(/^\| ([^|:-][^|]*) \|(.+)\|$/gm)]
+    .map((match) => ({
+        name: match[1].trim(),
+        support: match[2].split('|').map((cell) => '✓' === cell.trim()),
+    }))
+    .filter((row) => 'Integration' !== row.name);
 if (0 === referenceRows.length || referenceRows.length !== pageRows.length) {
     throw new Error(`Expected matching integration rows, found ${referenceRows.length} reference and ${pageRows.length} overview rows`);
 }
