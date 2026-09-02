@@ -12,6 +12,7 @@ use Symfony\Lsp\Tools\ReleasePharBuilder;
 use Symfony\Lsp\Tools\ReleasePharDownloader;
 use Symfony\Lsp\Tools\ReleaseReference;
 
+// Box 4.7.0 cannot compile on Windows
 const BOX_URL = 'https://github.com/box-project/box/releases/download/4.6.7/box.phar';
 const BOX_CHECKSUM = 'f49a711985219c9e0ef9faa49a95d8ab47385b8b8966dc5ac0ca10f9ac318e6b';
 
