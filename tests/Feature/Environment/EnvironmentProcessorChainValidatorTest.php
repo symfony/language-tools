@@ -26,6 +26,17 @@ final class EnvironmentProcessorChainValidatorTest extends TestCase
         yield 'custom processor argument' => [['custom', 'option']];
     }
 
+    public function testReportsArgumentProcessorWithoutAnArgumentAndVariable(): void
+    {
+        $index = new EnvironmentIndex();
+        $index->replaceProcessors(['default' => 'string']);
+
+        $issues = (new EnvironmentProcessorChainValidator())->validate(['default'], $index);
+
+        self::assertSame(['env.malformed_chain'], array_map(static fn ($issue): string => $issue->code, $issues));
+        self::assertSame('Environment processor "default" requires an argument followed by an environment variable.', $issues[0]->message);
+    }
+
     public function testReportsMalformedAndUnknownProcessorSegments(): void
     {
         $index = new EnvironmentIndex();

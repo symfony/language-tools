@@ -37,6 +37,9 @@ final class EnvironmentProcessorChainValidator
             }
             $previousProcessor = $processor;
         }
+        if ($skipNext && null !== $previousProcessor) {
+            $issues[] = new EnvironmentProcessorChainIssue('env.malformed_chain', \sprintf('Environment processor "%s" requires an argument followed by an environment variable.', $previousProcessor));
+        }
 
         return $issues;
     }
