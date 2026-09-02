@@ -35,7 +35,7 @@ final class RouteHoverHandler implements HoverProviderInterface
         }
 
         $offset = $this->positionConverter->toByteOffset($request->document->text, $request->position);
-        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
+        $document = SourceDocument::fromDocument($request->document);
         $reference = 'twig' === $request->document->languageId
             ? $this->twigReferenceExtractor->at($document, $offset)
             : $this->phpReferenceExtractor->at($document, $offset, $this->classIndexes->forProject($request->project));

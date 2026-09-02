@@ -112,7 +112,7 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
             return null;
         }
         $symbol = $this->symbolResolver->resolve(
-            new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text),
+            SourceDocument::fromDocument($request->document),
             $request->position,
         );
 

@@ -34,7 +34,7 @@ final class StimulusDiagnosticProvider implements DiagnosticProviderInterface
         }
         $known = array_fill_keys($this->stimulus->controllerNames($request->project), true);
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->project, new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->references as $reference) {
+        foreach ($this->extractor->extract($request->project, SourceDocument::fromDocument($request->document))->references as $reference) {
             if (null !== $reference->kind || isset($known[$reference->controller])) {
                 continue;
             }

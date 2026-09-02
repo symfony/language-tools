@@ -38,7 +38,7 @@ final class TwigComponentDiagnosticProvider implements DiagnosticProviderInterfa
             return null;
         }
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->project, new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->references as $reference) {
+        foreach ($this->extractor->extract($request->project, SourceDocument::fromDocument($request->document))->references as $reference) {
             $name = $reference->name;
             if (null !== $index->get($name) || $index->hasRuntimeName($name) || $this->components->anonymousTemplateExists($request->project, $name)) {
                 continue;

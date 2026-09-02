@@ -29,7 +29,7 @@ final class RouteDefinitionHandler implements DefinitionProviderInterface
             return null;
         }
 
-        $symbol = $this->symbolResolver->resolve($request->project, new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text), $request->position);
+        $symbol = $this->symbolResolver->resolve($request->project, SourceDocument::fromDocument($request->document), $request->position);
         if (null === $symbol) {
             return null;
         }

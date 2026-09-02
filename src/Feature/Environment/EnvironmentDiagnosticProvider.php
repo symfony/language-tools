@@ -38,7 +38,7 @@ final class EnvironmentDiagnosticProvider implements DiagnosticProviderInterface
         }
         $index = $this->indexes->forProject($request->project);
         $diagnostics = [];
-        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->references as $reference) {
+        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document))->references as $reference) {
             foreach ($this->processorChainValidator->validate($reference->processors, $index) as $issue) {
                 $diagnostics[] = $this->protocol->diagnostic($reference->range, 1, $issue->code, $issue->message);
             }

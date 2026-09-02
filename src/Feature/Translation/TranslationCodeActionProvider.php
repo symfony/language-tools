@@ -36,7 +36,7 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
             return null;
         }
 
-        $references = $this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->references;
+        $references = $this->extractor->extract(SourceDocument::fromDocument($request->document))->references;
         $actions = [];
         foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
             if (!\is_array($diagnostic) || 'translation.not_found' !== ($diagnostic['code'] ?? null)) {

@@ -113,7 +113,7 @@ final class TwigComponentResolver
         if (null === $request) {
             return null;
         }
-        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
+        $document = SourceDocument::fromDocument($request->document);
         $facts = $this->extractor->extract($request->project, $document);
         $reference = $this->positionedSymbols->resolve($document, $request->position, $facts->actionReferences);
         if (null !== $reference) {
@@ -148,7 +148,7 @@ final class TwigComponentResolver
         if (null === $request) {
             return null;
         }
-        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
+        $document = SourceDocument::fromDocument($request->document);
         $facts = $this->extractor->extract($request->project, $document);
         $reference = $this->positionedSymbols->resolve($document, $request->position, $facts->references);
         if (null !== $reference) {

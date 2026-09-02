@@ -68,7 +68,7 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
             return null;
         }
         $links = [];
-        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text)) as $reference) {
+        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document)) as $reference) {
             $template = $this->indexes->forProject($request->project)->get($reference->name);
             if (null !== $template) {
                 $links[] = ['range' => $this->protocol->range($reference->range), 'target' => $template->uri];
@@ -97,7 +97,7 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
             return [];
         }
         $diagnostics = [];
-        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text)) as $reference) {
+        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document)) as $reference) {
             if (null === $index->get($reference->name)) {
                 $diagnostics[] = $this->protocol->diagnostic($reference->range, 1, 'template.not_found', \sprintf('Template "%s" does not exist in the selected environment.', $reference->name));
             }
@@ -117,7 +117,7 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
         if (null === $request) {
             return null;
         }
-        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
+        $document = SourceDocument::fromDocument($request->document);
         $reference = $this->positionedSymbols->resolve($document, $request->position, $this->extractor->extract($document));
         if (null === $reference) {
             return null;

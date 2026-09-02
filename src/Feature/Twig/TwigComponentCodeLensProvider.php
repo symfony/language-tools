@@ -24,7 +24,7 @@ final class TwigComponentCodeLensProvider implements CodeLensProviderInterface
             return null;
         }
         $lenses = [];
-        foreach ($this->extractor->extract($request->project, new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->components as $component) {
+        foreach ($this->extractor->extract($request->project, SourceDocument::fromDocument($request->document))->components as $component) {
             $locations = [];
             foreach ($this->indexes->forProject($request->project)->references($component->name) as $reference) {
                 $locations[] = $this->protocol->location($reference->uri, $reference->range);

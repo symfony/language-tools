@@ -50,7 +50,7 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
         }
 
         $diagnostics = [];
-        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
+        $document = SourceDocument::fromDocument($request->document);
         $references = 'twig' === $request->document->languageId
             ? $this->twigReferenceExtractor->extract($document)
             : $this->phpReferenceExtractor->extract($document, $this->classIndexes->forProject($request->project));

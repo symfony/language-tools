@@ -27,7 +27,7 @@ final class EnvironmentSymbolResolver
         if (null === $request) {
             return null;
         }
-        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
+        $document = SourceDocument::fromDocument($request->document);
         $facts = $this->extractor->extract($document);
         $declaration = $this->positionedSymbols->resolve($document, $request->position, $facts->declarations);
         if (null !== $declaration) {

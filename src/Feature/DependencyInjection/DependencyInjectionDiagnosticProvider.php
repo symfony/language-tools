@@ -32,7 +32,7 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
             return null;
         }
         $facts = $this->extractor->extractForInteractive(
-            new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text),
+            SourceDocument::fromDocument($request->document),
             $this->runtimeConfiguration->environment($request->project),
         );
         if (null === $facts) {

@@ -37,7 +37,7 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
         ) {
             return null;
         }
-        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
+        $document = SourceDocument::fromDocument($request->document);
         $references = 'twig' === $request->document->languageId
             ? $this->twigExtractor->extract($document)
             : $this->phpExtractor->extract($document, $this->classIndexes->forProject($request->project));

@@ -76,7 +76,7 @@ final class StimulusResolver
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        $facts = $this->extractor->extract($request->project, new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text));
+        $facts = $this->extractor->extract($request->project, SourceDocument::fromDocument($request->document));
         foreach ($facts->references as $reference) {
             if ($this->converter->containsByteOffset($request->document->text, $reference->range, $offset, inclusiveEnd: true)) {
                 return [$reference, $request->project];

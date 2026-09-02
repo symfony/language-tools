@@ -25,7 +25,7 @@ final readonly class TranslationReferenceResolver
 
         $text = $request->document->text;
         $offset = $this->positions->toByteOffset($text, $request->position);
-        $facts = $this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $text));
+        $facts = $this->extractor->extract(SourceDocument::fromDocument($request->document));
         foreach ($facts->declarations as $declaration) {
             if ($this->positions->containsByteOffset($text, $declaration->range, $offset, inclusiveEnd: true)) {
                 return new ResolvedTranslationReference(

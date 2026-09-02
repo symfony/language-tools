@@ -73,7 +73,7 @@ abstract class AbstractSourceIndexer implements SourceIndexProviderInterface, Pr
     final public function overlay(Project $project, Document $document): void
     {
         if ($this->supportsOverlay($project, $document)) {
-            $facts = $this->extract($project, new SourceDocument($document->uri, $document->languageId, $document->text));
+            $facts = $this->extract($project, SourceDocument::fromDocument($document));
             if (null !== $facts) {
                 $this->sourceIndex($project)->overlay($facts);
 

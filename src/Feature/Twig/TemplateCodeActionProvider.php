@@ -30,7 +30,7 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
             return null;
         }
 
-        $references = $this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text));
+        $references = $this->extractor->extract(SourceDocument::fromDocument($request->document));
         $actions = [];
         foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
             if (!\is_array($diagnostic) || 'template.not_found' !== ($diagnostic['code'] ?? null)) {

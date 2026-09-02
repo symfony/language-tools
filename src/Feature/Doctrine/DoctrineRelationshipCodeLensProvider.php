@@ -24,7 +24,7 @@ final class DoctrineRelationshipCodeLensProvider implements CodeLensProviderInte
             return null;
         }
         $index = $this->indexes->forProject($request->project);
-        $facts = $this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text));
+        $facts = $this->extractor->extract(SourceDocument::fromDocument($request->document));
         $lenses = [];
         foreach ($facts->entities as $entity) {
             $repository = null === $entity->repositoryClass ? null : $index->repository($entity->repositoryClass);

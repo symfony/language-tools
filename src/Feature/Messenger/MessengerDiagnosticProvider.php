@@ -40,7 +40,7 @@ final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
             return [];
         }
         $diagnostics = [];
-        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->symbols as $symbol) {
+        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document))->symbols as $symbol) {
             if ($symbol->declaration || MessengerSymbolKind::Message === $symbol->kind) {
                 continue;
             }

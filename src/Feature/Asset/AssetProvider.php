@@ -149,7 +149,7 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
             return null;
         }
         $links = [];
-        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->symbols as $symbol) {
+        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document))->symbols as $symbol) {
             $target = $this->target($request->project, $symbol);
             if (null !== $target) {
                 $links[] = ['range' => $this->protocol->range($symbol->range), 'target' => $target];
@@ -176,7 +176,7 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         }
         $known = array_fill_keys($this->entrypointNames($request->project), true);
         $diagnostics = [];
-        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->symbols as $symbol) {
+        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document))->symbols as $symbol) {
             if (AssetSymbolKind::Entrypoint !== $symbol->kind || isset($known[$symbol->name])) {
                 continue;
             }
@@ -217,7 +217,7 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         if (null === $request) {
             return null;
         }
-        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
+        $document = SourceDocument::fromDocument($request->document);
         $symbol = $this->positionedSymbols->resolve($document, $request->position, $this->extractor->extract($document)->symbols);
 
         return null === $symbol ? null : [$symbol, $request->project];

@@ -35,7 +35,7 @@ final class SecurityDiagnosticProvider implements DiagnosticProviderInterface
         }
         $sourceIndex = $this->sourceIndexes->forProject($request->project);
         $diagnostics = [];
-        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->symbols as $symbol) {
+        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document))->symbols as $symbol) {
             if ($symbol->declaration || SecuritySymbolKind::Role === $symbol->kind) {
                 continue;
             }

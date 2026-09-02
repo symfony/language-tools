@@ -112,7 +112,7 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
         if (null === $request) {
             return null;
         }
-        $document = new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text);
+        $document = SourceDocument::fromDocument($request->document);
         $event = $this->positionedSymbols->resolve($document, $request->position, $this->extractor->extract($request->project, $document)->events);
 
         return null === $event ? null : [$event, $request->project];

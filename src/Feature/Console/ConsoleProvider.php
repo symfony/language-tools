@@ -80,7 +80,7 @@ final class ConsoleProvider implements CompletionProviderInterface, DiagnosticPr
         }
         $sourceIndex = $this->sourceIndexes->forProject($request->project);
         $diagnostics = [];
-        foreach ($this->extractor->extract(new SourceDocument($request->document->uri, $request->document->languageId, $request->document->text))->references as $reference) {
+        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document))->references as $reference) {
             $runtimeDefinition = $runtimeIndex->command($reference->commandClass);
             $sourceDefinition = $sourceIndex->definition($reference->commandClass);
             if (null === $runtimeDefinition
