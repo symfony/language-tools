@@ -57,30 +57,32 @@ function executeServerCommand(array $command): array
     }
 }
 
-function checkCommandDispatch(string $server, ?string $expectedVersion): void
+/** @param list<string> $serverCommand */
+function checkCommandDispatch(array $serverCommand, ?string $expectedVersion): void
 {
     progress('Checking executable command dispatch');
-    $version = executeServerCommand([$server, '--version']);
-    $expectedOutput = null === $expectedVersion ? null : 'Symfony Language Tools '.$expectedVersion."\n";
+    $version = executeServerCommand([...$serverCommand, '--version']);
+    $expectedOutput = null === $expectedVersion ? null : 'Symfony Language Tools '.$expectedVersion;
     if (0 !== $version['exitCode']
         || '' !== $version['stderr']
-        || (null !== $expectedOutput && $expectedOutput !== $version['stdout'])
-        || (null === $expectedOutput && 1 !== preg_match('/^Symfony Language Tools (?:dev|\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\n$/D', $version['stdout']))
+        || (null !== $expectedOutput && !\in_array($version['stdout'], [$expectedOutput."\n", $expectedOutput."\r\n"], true))
+        || (null === $expectedOutput && 1 !== preg_match('/^Symfony Language Tools (?:dev|\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\r?\n$/D', $version['stdout']))
     ) {
         throw new RuntimeException('The executable returned an unexpected version contract.');
     }
 
-    $unknown = executeServerCommand([$server, 'unknown-command']);
+    $unknown = executeServerCommand([...$serverCommand, 'unknown-command']);
     if (INVOCATION_EXIT !== $unknown['exitCode']
         || '' !== $unknown['stdout']
-        || 'Unknown command "unknown-command".'.\PHP_EOL !== $unknown['stderr']
+        || !\in_array($unknown['stderr'], ["Unknown command \"unknown-command\".\n", "Unknown command \"unknown-command\".\r\n"], true)
     ) {
         throw new RuntimeException('The executable accepted an unknown top-level command.');
     }
     progress('Executable command dispatch passed');
 }
 
-function checkSavedDiagnostics(string $server, ?string $expectedVersion): void
+/** @param list<string> $serverCommand */
+function checkSavedDiagnostics(array $serverCommand, ?string $expectedVersion): void
 {
     $directory = sys_get_temp_dir().'/symfony-lsp-smoke-'.bin2hex(random_bytes(6));
     mkdir($directory.'/config', 0777, true);
@@ -89,7 +91,7 @@ function checkSavedDiagnostics(string $server, ?string $expectedVersion): void
 
     try {
         progress('Starting the headless diagnostics check');
-        $execution = executeServerCommand([$server, 'check', '--source-only', '--format=json', '--workspace='.$directory]);
+        $execution = executeServerCommand([...$serverCommand, 'check', '--source-only', '--format=json', '--workspace='.$directory]);
         if (CHECK_DIAGNOSTICS_EXIT !== $execution['exitCode']) {
             throw new RuntimeException('The headless diagnostics check exited with status '.$execution['exitCode'].":\n".$execution['stderr']);
         }
@@ -125,19 +127,36 @@ function removeTree(string $path): void
 }
 
 $arguments = array_slice($argv, 1);
-$socketMode = '--socket' === ($arguments[0] ?? null);
-if ($socketMode) {
-    array_shift($arguments);
+$socketMode = false;
+$phpMode = false;
+$commandsOnly = false;
+while (isset($arguments[0]) && str_starts_with($arguments[0], '--')) {
+    $option = array_shift($arguments);
+    if ('--socket' === $option) {
+        $socketMode = true;
+    } elseif ('--php' === $option) {
+        $phpMode = true;
+    } elseif ('--commands-only' === $option) {
+        $commandsOnly = true;
+    } else {
+        fwrite(\STDERR, "Usage: smoke-test-server [--socket] [--php] [--commands-only] <server> [expected-version]\n");
+        exit(2);
+    }
 }
-if (!isset($arguments[0])) {
-    fwrite(\STDERR, "Usage: smoke-test-server [--socket] <server> [expected-version]\n");
+if (!isset($arguments[0]) || 2 < \count($arguments)) {
+    fwrite(\STDERR, "Usage: smoke-test-server [--socket] [--php] [--commands-only] <server> [expected-version]\n");
     exit(2);
 }
 
-checkCommandDispatch($arguments[0], $arguments[1] ?? null);
+$serverCommand = [...($phpMode ? [\PHP_BINARY] : []), $arguments[0]];
+checkCommandDispatch($serverCommand, $arguments[1] ?? null);
+if ($commandsOnly) {
+    fwrite(\STDOUT, "Symfony Language Tools command smoke test passed.\n");
+    exit(0);
+}
 
 progress('Starting Symfony Language Tools');
-$connection = new ContentLengthProcessClient([$arguments[0]], READ_DEADLINE_SECONDS, socketMode: $socketMode);
+$connection = new ContentLengthProcessClient($serverCommand, READ_DEADLINE_SECONDS, socketMode: $socketMode);
 try {
     progress('Initializing');
     $initialize = $connection->request(1, 'initialize', [
@@ -169,5 +188,5 @@ if (2 !== ($shutdown['id'] ?? null) || !array_key_exists('result', $shutdown)) {
     throw new RuntimeException('Symfony Language Tools did not shut down successfully.');
 }
 
-checkSavedDiagnostics($arguments[0], $arguments[1] ?? null);
+checkSavedDiagnostics($serverCommand, $arguments[1] ?? null);
 fwrite(\STDOUT, "Symfony Language Tools smoke test passed.\n");
