@@ -4,5 +4,10 @@
     "revision": "d4e452365f8125b7cacf046b7eef56dbef5f92d5",
     "setup": "composer-no-scripts",
     "ci": true,
+    "environmentVariables": {
+        "APP_SECRET": "dogfood-not-a-secret",
+        "COMPOSER_PLUGIN_LOADER": "1",
+        "DATABASE_URL": "mysql://shopware:shopware@127.0.0.1:9/shopware"
+    },
     "indexTimeout": 900
 }

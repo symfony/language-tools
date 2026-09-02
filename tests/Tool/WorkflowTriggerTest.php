@@ -4,6 +4,8 @@ namespace Symfony\Lsp\Tests\Tool;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Tools\Dogfood\ConfigurationLoader;
+use Symfony\Lsp\Tools\Dogfood\ProjectConfiguration;
 
 final class WorkflowTriggerTest extends TestCase
 {
@@ -29,14 +31,24 @@ final class WorkflowTriggerTest extends TestCase
         self::assertStringContainsString('            - CHANGELOG.md', $push);
     }
 
-    public function testSyliusDogfoodDoesNotRequireALiveDatabase(): void
+    public function testDogfoodProjectsConfigureTheirNonsecretEnvironmentLocally(): void
     {
-        $contents = file_get_contents(self::ROOT.'/.github/workflows/dogfood.yaml');
-        self::assertIsString($contents);
-        self::assertStringContainsString('DATABASE_URL=mysql://root:root@127.0.0.1:9/dogfood?serverVersion=8.0.32&charset=utf8mb4', $contents);
-        self::assertStringNotContainsString('mysql: true', $contents);
-        self::assertStringNotContainsString('Start MySQL', $contents);
-        self::assertStringNotContainsString('dogfood-mysql', $contents);
+        $workflow = file_get_contents(self::ROOT.'/.github/workflows/dogfood.yaml');
+        self::assertIsString($workflow);
+        self::assertStringNotContainsString('matrix.environment', $workflow);
+        self::assertStringNotContainsString('mysql: true', $workflow);
+        self::assertStringNotContainsString('Start MySQL', $workflow);
+        self::assertStringNotContainsString('dogfood-mysql', $workflow);
+
+        self::assertSame([
+            'DATABASE_URL' => 'mysql://root:root@127.0.0.1:9/dogfood?serverVersion=8.0.32&charset=utf8mb4',
+        ], $this->dogfoodConfiguration('sylius')->environmentVariables);
+
+        self::assertSame([
+            'APP_SECRET' => 'dogfood-not-a-secret',
+            'COMPOSER_PLUGIN_LOADER' => '1',
+            'DATABASE_URL' => 'mysql://shopware:shopware@127.0.0.1:9/shopware',
+        ], $this->dogfoodConfiguration('shopware')->environmentVariables);
     }
 
     public function testReleaseBodyUsesOnlyTheCurrentChangelogSection(): void
@@ -79,5 +91,19 @@ final class WorkflowTriggerTest extends TestCase
         yield 'Neovim integration' => ['neovim.yaml'];
         yield 'VS Code integration' => ['vscode.yaml'];
         yield 'Zed integration' => ['zed.yaml'];
+    }
+
+    private function dogfoodConfiguration(string $project): ProjectConfiguration
+    {
+        $configurations = (new ConfigurationLoader())->load([
+            self::ROOT.'/tools/dogfood/projects',
+        ], ['composer', 'composer-no-scripts']);
+        foreach ($configurations as $configuration) {
+            if ($project === $configuration->name) {
+                return $configuration;
+            }
+        }
+
+        self::fail(\sprintf('Dogfood project "%s" is not configured.', $project));
     }
 }

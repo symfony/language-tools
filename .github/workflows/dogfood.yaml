@@ -70,13 +70,7 @@ jobs:
                     - project: sulu-skeleton
                     - project: symfony-demo
                     - project: sylius
-                      environment: |
-                          DATABASE_URL=mysql://root:root@127.0.0.1:9/dogfood?serverVersion=8.0.32&charset=utf8mb4
                     - project: shopware
-                      environment: |
-                          DATABASE_URL=mysql://shopware:shopware@127.0.0.1:9/shopware
-                          COMPOSER_PLUGIN_LOADER=1
-                          APP_SECRET=dogfood-not-a-secret
         name: ${{ matrix.project }}
         steps:
             - uses: actions/checkout@v7
@@ -101,9 +95,6 @@ jobs:
             - name: Build the Tree-sitter extension
               if: env.DOGFOOD_SELECTED == 'true'
               run: composer tree-sitter:build
-            - name: Configure the project environment
-              if: env.DOGFOOD_SELECTED == 'true' && matrix.environment
-              run: echo "${{ matrix.environment }}" >> "$GITHUB_ENV"
             - name: Run the project through the matrix
               if: env.DOGFOOD_SELECTED == 'true'
               run: ./tools/dogfood-matrix ${{ matrix.project }}
