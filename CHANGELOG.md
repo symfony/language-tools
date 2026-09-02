@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Gate releases on green main, public dogfooding and exact candidates with safe retries
 - Share release PHAR building and package validation across platforms
 - Validate Composer PSR-4 mappings with a strict autoload check
 

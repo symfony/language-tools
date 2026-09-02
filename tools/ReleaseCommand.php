@@ -16,6 +16,15 @@ final class ReleaseCommand
         'vscode.yaml',
         'zed.yaml',
     ];
+    private const PRE_TAG_WORKFLOWS = [
+        ...self::REGULAR_WORKFLOWS,
+        'dogfood.yaml',
+    ];
+    private const TRANSIENT_WORKFLOW_CONCLUSIONS = [
+        'stale',
+        'startup_failure',
+        'timed_out',
+    ];
 
     public function __construct(
         private string $root,
@@ -44,7 +53,7 @@ final class ReleaseCommand
         }
 
         $releaseCommit = $this->git->remoteTagCommit($tag);
-        $this->waitForWorkflow('release.yaml', $releaseCommit);
+        $this->waitForWorkflow('packaging.yaml', $releaseCommit);
         $this->finishRelease($releaseCommit);
 
         $url = $this->github->releaseUrl($tag);
@@ -67,6 +76,11 @@ final class ReleaseCommand
             }
             if ($this->git->localTagExists($tag)) {
                 throw new \RuntimeException(\sprintf('Local tag %s already exists.', $tag));
+            }
+
+            $failures = $this->github->currentMainWorkflowFailures($originMain);
+            if ([] !== $failures) {
+                throw new \RuntimeException(\sprintf('Current main has failed workflows: %s.', implode(', ', $failures)));
             }
 
             $this->validateLocally();
@@ -92,7 +106,8 @@ final class ReleaseCommand
         }
 
         $releaseCommit = $this->git->revision('HEAD');
-        $this->waitForRegularWorkflows($releaseCommit);
+        $this->waitForPreTagWorkflows($releaseCommit);
+        $this->waitForReleaseCandidate($tag, $releaseCommit);
 
         if ($this->git->localTagExists($tag)) {
             if ($this->git->revision('refs/tags/'.$tag) !== $releaseCommit) {
@@ -198,6 +213,36 @@ final class ReleaseCommand
         }
     }
 
+    private function waitForPreTagWorkflows(string $commit): void
+    {
+        foreach (self::PRE_TAG_WORKFLOWS as $workflow) {
+            $this->waitForWorkflow($workflow, $commit, true);
+        }
+    }
+
+    private function waitForReleaseCandidate(string $version, string $commit): void
+    {
+        $workflow = 'release-candidate.yaml';
+        fwrite(\STDOUT, \sprintf("Waiting for %s %s on %s...\n", $workflow, $version, $commit));
+        $runId = $this->github->workflowRunId($workflow, $commit, 'workflow_dispatch', $version);
+        if ('' === $runId) {
+            fwrite(\STDOUT, \sprintf("Dispatching %s %s for %s...\n", $workflow, $version, $commit));
+            $this->github->dispatchWorkflow($workflow, ['version' => $version]);
+            for ($attempt = 0; $attempt < 120; ++$attempt) {
+                $runId = $this->github->workflowRunId($workflow, $commit, 'workflow_dispatch', $version);
+                if ('' !== $runId) {
+                    break;
+                }
+                $this->sleeper->sleep(5);
+            }
+        }
+        if ('' === $runId) {
+            throw new \RuntimeException(\sprintf('No exact %s %s workflow appeared for %s.', $workflow, $version, $commit));
+        }
+
+        $this->waitForWorkflowRun($workflow, $runId);
+    }
+
     private function waitForWorkflow(string $workflow, string $commit, bool $dispatchMissing = false): void
     {
         fwrite(\STDOUT, \sprintf("Waiting for %s on %s...\n", $workflow, $commit));
@@ -224,21 +269,31 @@ final class ReleaseCommand
             throw new \RuntimeException(\sprintf('No %s workflow appeared for %s.', $workflow, $commit));
         }
 
+        $this->waitForWorkflowRun($workflow, $runId);
+    }
+
+    private function waitForWorkflowRun(string $workflow, string $runId): void
+    {
+        $reran = false;
         for ($attempt = 0; $attempt < 2; ++$attempt) {
             if ($this->github->watchRun($runId)) {
                 return;
             }
 
+            $conclusion = $this->github->workflowConclusion($runId);
             fwrite(\STDERR, "\nFailed workflow logs:\n");
             $this->github->showFailedLogs($runId);
 
-            if (0 === $attempt) {
-                fwrite(\STDERR, "\nRerunning failed workflow jobs once...\n");
+            if (0 === $attempt && \in_array($conclusion, self::TRANSIENT_WORKFLOW_CONCLUSIONS, true)) {
+                fwrite(\STDERR, \sprintf("\nRerunning transient %s workflow jobs once...\n", $conclusion));
                 $this->github->rerunFailedJobs($runId);
+                $reran = true;
+                continue;
             }
-        }
 
-        throw new \RuntimeException(\sprintf('Workflow %s failed after one automatic rerun. Inspect it with "gh run view %s --web" before resuming the release.', $workflow, $runId));
+            $reason = $reran ? 'failed after one automatic rerun' : \sprintf('failed with conclusion %s without an automatic rerun', '' === $conclusion ? 'unknown' : $conclusion);
+            throw new \RuntimeException(\sprintf('Workflow %s %s. Inspect it with "gh run view %s --web" before resuming the release.', $workflow, $reason, $runId));
+        }
     }
 
     private function assertRequirements(): void
