@@ -25,7 +25,7 @@ final class SourceFactsStore
         foreach ($facts as $item) {
             $saved[$item->uri] = $item;
         }
-        if ($this->saved === $saved) {
+        if ($this->sameFacts($this->saved, $saved)) {
             return false;
         }
 
@@ -39,7 +39,7 @@ final class SourceFactsStore
     public function replaceSavedFact(SourceFactsInterface $facts): bool
     {
         $uri = $facts->uri;
-        if (($this->saved[$uri] ?? null) === $facts) {
+        if (isset($this->saved[$uri]) && $this->saved[$uri] == $facts) {
             return false;
         }
 
@@ -65,7 +65,7 @@ final class SourceFactsStore
     public function replaceOverlay(SourceFactsInterface $facts): bool
     {
         $uri = $facts->uri;
-        if (($this->overlays[$uri] ?? null) === $facts) {
+        if (isset($this->overlays[$uri]) && $this->overlays[$uri] == $facts) {
             return false;
         }
 
@@ -93,5 +93,23 @@ final class SourceFactsStore
         return $this->effective ??= SourceFactsOverlayOrder::PreserveSavedPosition === $this->overlayOrder
             ? array_values(array_replace($this->saved, $this->overlays))
             : [...array_values(array_diff_key($this->saved, $this->overlays)), ...array_values($this->overlays)];
+    }
+
+    /**
+     * @param array<string, TFacts> $left
+     * @param array<string, TFacts> $right
+     */
+    private function sameFacts(array $left, array $right): bool
+    {
+        if (array_keys($left) !== array_keys($right)) {
+            return false;
+        }
+        foreach ($left as $uri => $facts) {
+            if ($facts != $right[$uri]) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

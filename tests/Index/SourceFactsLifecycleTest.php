@@ -49,10 +49,12 @@ final class SourceFactsLifecycleTest extends TestCase
         $index->overlay(new LifecycleSourceFacts('file:///source.php', 'overlay'));
 
         self::assertSame(['overlay'], $index->values());
+        self::assertSame(1, $index->builds());
 
         $index->overlay(new LifecycleSourceFacts('file:///source.php', 'overlay'));
 
         self::assertSame(['overlay'], $index->values());
+        self::assertSame(1, $index->builds());
     }
 
     #[DataProvider('documentWithoutFactsProvider')]

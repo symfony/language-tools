@@ -47,6 +47,19 @@ final class SourceFactsStoreTest extends TestCase
         self::assertSame(['saved-first'], array_map(static fn (StoreSourceFacts $facts): string => $facts->value, $store->effective()));
     }
 
+    public function testTreatsFreshFactsWithTheSameValuesAsUnchanged(): void
+    {
+        /** @var SourceFactsStore<StoreSourceFacts> $store */
+        $store = new SourceFactsStore();
+
+        self::assertTrue($store->replaceSaved(new StoreSourceFacts('first', 'saved-first'), new StoreSourceFacts('second', 'saved-second')));
+        self::assertFalse($store->replaceSaved(new StoreSourceFacts('first', 'saved-first'), new StoreSourceFacts('second', 'saved-second')));
+        self::assertTrue($store->replaceSaved(new StoreSourceFacts('second', 'saved-second'), new StoreSourceFacts('first', 'saved-first')));
+        self::assertFalse($store->replaceSavedFact(new StoreSourceFacts('first', 'saved-first')));
+        self::assertTrue($store->replaceOverlay(new StoreSourceFacts('first', 'overlay-first')));
+        self::assertFalse($store->replaceOverlay(new StoreSourceFacts('first', 'overlay-first')));
+    }
+
     public function testRestoresSavedFactsAfterRemovingAnOverlay(): void
     {
         /** @var SourceFactsStore<StoreSourceFacts> $store */
