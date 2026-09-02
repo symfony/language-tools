@@ -100,7 +100,7 @@ final class TwigCallableCompletionProviderTest extends TwigCallableProviderTestC
                     ];
                 }
 
-                public function render(\Twig\Environment $environment, array $context, string $name, int $width = 200, bool $lazy = false): string
+                public function render(\Twig\Environment $environment, array $context, string $name, int $width = 200, bool $lazy = false, string $pattern = "prefix {$phantom}"): string
                 {
                     return $name;
                 }
@@ -173,10 +173,10 @@ final class TwigCallableCompletionProviderTest extends TwigCallableProviderTestC
             return null === $items ? null : array_column($items, 'label');
         };
 
-        self::assertSame(['name', 'width', 'lazy'], $completions('{{ image('));
+        self::assertSame(['name', 'width', 'lazy', 'pattern'], $completions('{{ image('));
         self::assertSame(['width'], $completions("{{ image(name: 'a', w"));
         self::assertSame(['width'], $completions("{{ image(name: 'a, lazy: false', w"));
-        self::assertSame(['width', 'lazy'], $completions("{{ image(name: 'a', "));
+        self::assertSame(['width', 'lazy', 'pattern'], $completions("{{ image(name: 'a', "));
         self::assertSame(['tag'], $completions('{{ attrs('));
         self::assertSame(['name'], $completions('{{ dynamic_image('));
         self::assertSame(['length'], $completions('{{ text|shorten('));

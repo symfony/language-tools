@@ -4,7 +4,10 @@ namespace Symfony\Lsp\Parser\Php;
 
 final class PhpMethodDeclaration
 {
-    /** @param list<PhpAttribute> $attributes */
+    /**
+     * @param list<PhpAttribute> $attributes
+     * @param list<PhpParameter> $parameters
+     */
     public function __construct(
         public readonly string $className,
         public readonly string $name,
@@ -13,9 +16,7 @@ final class PhpMethodDeclaration
         public readonly string $signature,
         public readonly ?string $description,
         public readonly array $attributes = [],
-        public readonly ?string $firstParameterType = null,
-        public readonly bool $firstParameterVariadic = false,
-        public readonly bool $variadic = false,
+        public readonly array $parameters = [],
         public readonly bool $public = true,
     ) {
     }

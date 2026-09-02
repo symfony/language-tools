@@ -217,7 +217,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
 
             final class ArticleType
             {
-                public function configureOptions(OptionsResolver $resolver): void
+                public function configureOptions(OptionsResolver|\Stringable $resolver): void
                 {
                     $resolver->setDefault('data_class', Article::class);
                 }
@@ -227,7 +227,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
                     $resolver->setDefault('data_class', Ignored::class);
                 }
 
-                public function buildForm(FormBuilderInterface $builder): void
+                public function buildForm(FormBuilderInterface|\Stringable $builder): void
                 {
                     $builder->add('title', /* type */ NestedArticleType::class, ['active_option' => true]);
                 }

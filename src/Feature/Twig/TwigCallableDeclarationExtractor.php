@@ -79,7 +79,7 @@ final class TwigCallableDeclarationExtractor
                     method: $method->name,
                     needsEnvironment: $options['needsEnvironment'],
                     needsContext: $options['needsContext'],
-                    variadic: $method->variadic,
+                    variadic: array_any($method->parameters, static fn ($parameter): bool => $parameter->variadic),
                     optionsKnown: $options['known'],
                     needsCharset: $options['needsCharset'],
                     needsIsSandboxed: $options['needsIsSandboxed'],
@@ -119,11 +119,12 @@ final class TwigCallableDeclarationExtractor
     private function attributeOptions(PhpAttribute $attribute, PhpMethodDeclaration $method): array
     {
         [$needsCharset, $charsetKnown] = $this->attributeOption($attribute, 'needsCharset', 1, false);
+        $firstParameter = $method->parameters[0] ?? null;
         [$needsEnvironment, $environmentKnown] = $this->attributeOption(
             $attribute,
             'needsEnvironment',
             2,
-            'Twig\Environment' === $method->firstParameterType && !$method->firstParameterVariadic,
+            null !== $firstParameter && \in_array('Twig\Environment', $firstParameter->types, true) && !$firstParameter->variadic,
         );
         [$needsContext, $contextKnown] = $this->attributeOption($attribute, 'needsContext', 3, false);
         [$needsIsSandboxed, $sandboxKnown] = $this->attributeSandboxOption($attribute);

@@ -9,6 +9,7 @@ use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpConstantKind;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
+use Symfony\Lsp\Parser\Php\PhpParameter;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 use Symfony\Lsp\Parser\Php\PhpTypeKind;
@@ -558,12 +559,12 @@ final class TolerantPhpParserTest extends TestCase
             final class AppExtension
             {
                 #[FunctionAttribute('format')]
-                public function format(TwigEnvironment $environment, string $value, mixed ...$options): string
+                public function format(TwigEnvironment $environment, string $value = "prefix {$notAParameter}", mixed ...$options): string
                 {
                     return $value;
                 }
 
-                public function union(TwigEnvironment|null $environment): void {}
+                public function union((TwigEnvironment&\Stringable)|\stdClass $environment, TwigEnvironment|string $fallback): void {}
 
                 #[FunctionAttribute('hidden')]
                 private function hidden(): void {}
@@ -590,15 +591,19 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame($document->attributes[0], $methods[0]->attributes[0]);
         self::assertSame('Twig\Attribute\AsTwigFunction', $methods[0]->attributes[0]->name);
         self::assertSame('format', $methods[0]->attributes[0]->positionalArgument(0)?->stringLiteral?->value);
-        self::assertSame('Twig\Environment', $methods[0]->firstParameterType);
-        self::assertFalse($methods[0]->firstParameterVariadic);
-        self::assertTrue($methods[0]->variadic);
+        self::assertSame(['environment', 'value', 'options'], array_map(static fn (PhpParameter $parameter): string => $parameter->name, $methods[0]->parameters));
+        self::assertSame([['Twig\Environment'], ['string'], ['mixed']], array_map(static fn (PhpParameter $parameter): array => $parameter->types, $methods[0]->parameters));
+        self::assertSame([false, false, true], array_map(static fn (PhpParameter $parameter): bool => $parameter->variadic, $methods[0]->parameters));
+        self::assertSame(['environment', 'value', 'options'], array_map(static fn (PhpParameter $parameter): string => substr($source, $parameter->nameStartOffset, $parameter->nameEndOffset - $parameter->nameStartOffset), $methods[0]->parameters));
         self::assertTrue($methods[0]->public);
         self::assertStringStartsWith('public function format', $methods[0]->signature);
-        self::assertNull($methods[1]->firstParameterType);
+        self::assertSame([
+            ['Twig\Environment', 'Stringable', 'stdClass'],
+            ['Twig\Environment', 'string'],
+        ], array_map(static fn (PhpParameter $parameter): array => $parameter->types, $methods[1]->parameters));
         self::assertFalse($methods[2]->public);
         self::assertSame([], $methods[3]->attributes);
-        self::assertSame('string', $methods[3]->firstParameterType);
+        self::assertSame(['string'], $methods[3]->parameters[0]->types);
     }
 
     public function testDoesNotUsePlainCommentsAsMethodDescriptions(): void

@@ -87,10 +87,7 @@ final class TwigCallableMethodResolver
                 if (null === $method) {
                     continue;
                 }
-                $methodParameters = $this->methodParameters($method, $declaration, $callable['kind']);
-                if (null !== $methodParameters) {
-                    $parameters[$key] = $methodParameters;
-                }
+                $parameters[$key] = $this->methodParameters($method, $declaration, $callable['kind']);
                 break;
             }
         }
@@ -98,42 +95,31 @@ final class TwigCallableMethodResolver
         return $parameters;
     }
 
-    private function methodParameters(TwigCallableResolvedMethod $method, TwigCallableDeclaration $callable, TwigCallableKind $kind): ?TwigCallableParameters
+    private function methodParameters(TwigCallableResolvedMethod $method, TwigCallableDeclaration $callable, TwigCallableKind $kind): TwigCallableParameters
     {
-        $open = strpos($method->declaration->signature, '(');
-        $close = strrpos($method->declaration->signature, ')');
-        if (false === $open || false === $close || $close < $open) {
-            return null;
-        }
-        $parameterList = substr($method->declaration->signature, $open + 1, $close - $open - 1);
-        preg_match_all('/(?:([\\\\\w|?]+)\s+)?(?:\.\.\.)?\$([A-Za-z_][A-Za-z0-9_]*)/', $parameterList, $matches, \PREG_SET_ORDER);
-        $all = [];
-        $types = [];
-        foreach ($matches as $match) {
-            $all[] = $match[2];
-            $types[] = $match[1];
-        }
+        $parameters = $method->declaration->parameters;
+        $all = array_map(static fn ($parameter): string => $parameter->name, $parameters);
         if ($callable->optionsKnown) {
             $skip = (int) $callable->needsCharset
                 + (int) $callable->needsEnvironment
                 + (int) $callable->needsContext
                 + (int) $callable->needsIsSandboxed;
         } else {
-            $skip = 'charset' === ($all[0] ?? '') ? 1 : 0;
-            if (str_contains($types[$skip] ?? '', 'Environment')) {
+            $skip = 'charset' === ($parameters[0]->name ?? null) ? 1 : 0;
+            if (\in_array('Twig\\Environment', $parameters[$skip]->types ?? [], true)) {
                 ++$skip;
             }
-            if ('array' === ($types[$skip] ?? '') && 'context' === ($all[$skip] ?? '')) {
+            if ('context' === ($parameters[$skip]->name ?? null) && \in_array('array', $parameters[$skip]->types ?? [], true)) {
                 ++$skip;
             }
-            if ('isSandboxed' === ($all[$skip] ?? '')) {
+            if ('isSandboxed' === ($parameters[$skip]->name ?? null)) {
                 ++$skip;
             }
         }
         if (TwigCallableKind::Filter === $kind) {
             ++$skip;
         }
-        $variadic = $method->declaration->variadic || $callable->variadic;
+        $variadic = $callable->variadic || array_any($parameters, static fn ($parameter): bool => $parameter->variadic);
         $nameable = \array_slice($all, $skip);
         if ($variadic) {
             array_pop($nameable);

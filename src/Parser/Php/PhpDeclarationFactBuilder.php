@@ -374,12 +374,19 @@ final class PhpDeclarationFactBuilder
         foreach ($declaration->modifiers as $modifier) {
             $signatureStart = min($signatureStart, $modifier->getStartPosition());
         }
-        $parameters = $this->nodes->methodParameters($declaration);
-        $firstParameterType = null;
-        $firstTypeDeclaration = $parameters[0]->typeDeclarationList ?? null;
-        if ($firstTypeDeclaration instanceof QualifiedNameList && 1 !== preg_match('/[|&()]/', $firstTypeDeclaration->getText($source))) {
-            $firstParameterTypes = $this->resolvedTypes($firstTypeDeclaration, $source, $names);
-            $firstParameterType = 1 === \count($firstParameterTypes) ? $firstParameterTypes[0] : null;
+        $parameters = [];
+        foreach ($this->nodes->methodParameters($declaration) as $parameter) {
+            $parameterName = $this->scopes->variableName($parameter->variableName, $source);
+            if (null === $parameterName) {
+                continue;
+            }
+            $parameters[] = new PhpParameter(
+                $parameterName,
+                $this->resolvedTypes($parameter->typeDeclarationList, $source, $names),
+                $parameter->variableName->getStartPosition() + 1,
+                $parameter->variableName->getEndPosition(),
+                $parameter->dotDotDotToken instanceof Token,
+            );
         }
 
         return new PhpMethodDeclaration(
@@ -390,9 +397,7 @@ final class PhpDeclarationFactBuilder
             trim(substr($source, $signatureStart, $signatureEnd - $signatureStart)),
             $this->description($declaration),
             $attributes,
-            $firstParameterType,
-            isset($parameters[0]) && $parameters[0]->dotDotDotToken instanceof Token,
-            array_any($parameters, static fn (Parameter $parameter): bool => $parameter->dotDotDotToken instanceof Token),
+            $parameters,
             !$declaration->hasModifier(TokenKind::ProtectedKeyword) && !$declaration->hasModifier(TokenKind::PrivateKeyword),
         );
     }

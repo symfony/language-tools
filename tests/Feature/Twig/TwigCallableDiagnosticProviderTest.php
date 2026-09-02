@@ -37,7 +37,7 @@ final class TwigCallableDiagnosticProviderTest extends TwigCallableProviderTestC
                     ];
                 }
 
-                public function render(\Twig\Environment $environment, array $context, string $name, int $width = 200, bool $lazy = false): string
+                public function render(\Twig\Environment $environment, array $context, string $name, int $width = 200, bool $lazy = false, string $pattern = "prefix {$phantom}"): string
                 {
                     return $name;
                 }
@@ -92,6 +92,10 @@ final class TwigCallableDiagnosticProviderTest extends TwigCallableProviderTestC
             array_column($unknown ?? [], 'message'),
         );
         self::assertSame([], $diagnostics("{{ image(name: 'a', width: 3, lazy: true) }}"));
+        self::assertSame(
+            ['Unknown argument "phantom" for Twig function "image".'],
+            array_column($diagnostics("{{ image(name: 'a', phantom: true) }}") ?? [], 'message'),
+        );
         self::assertSame([], $diagnostics("{{ image(name = 'a', width = 3, lazy = true) }}"));
         self::assertSame(
             ['Unknown argument "wdith" for Twig function "image".'],

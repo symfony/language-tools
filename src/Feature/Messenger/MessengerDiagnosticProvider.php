@@ -8,8 +8,6 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
-use Symfony\Lsp\Parser\Php\PhpTypedVariable;
-use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
@@ -55,18 +53,8 @@ final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
         $scalarTypes = ['array', 'bool', 'callable', 'float', 'int', 'never', 'resource', 'string', 'void'];
         $php = $this->phpParser->parse($request->document->text);
         foreach ($php->methodDeclarations as $method) {
-            if (!\in_array(strtolower((string) $method->firstParameterType), $scalarTypes, true)) {
-                continue;
-            }
-            $parameters = array_values(array_filter(
-                $php->typedVariables,
-                static fn (PhpTypedVariable $variable): bool => PhpTypedVariableKind::Parameter === $variable->kind
-                    && $method->className === $variable->className
-                    && $method->name === $variable->methodName,
-            ));
-            usort($parameters, static fn (PhpTypedVariable $left, PhpTypedVariable $right): int => $left->nameStartOffset <=> $right->nameStartOffset);
-            $parameter = $parameters[0] ?? null;
-            if (null === $parameter) {
+            $parameter = $method->parameters[0] ?? null;
+            if (null === $parameter || [] === $parameter->types || !array_all($parameter->types, static fn (string $type): bool => \in_array(strtolower($type), $scalarTypes, true))) {
                 continue;
             }
             foreach ($index->handlersByClass($method->className) as $handler) {

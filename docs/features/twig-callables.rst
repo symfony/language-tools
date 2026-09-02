@@ -45,12 +45,15 @@ Function names are completed in Twig expressions, and filter names after a
 and replace the identifier being typed.
 
 Inside a recognized call, argument names are completed from the resolved
-PHP callable. Registration options such as ``needs_environment``,
-``needs_context`` and ``is_variadic`` determine which names Twig injects or
-accepts dynamically. When options come from a constant or variable, injected
-parameters are inferred from the callable signature and argument diagnostics
-are suppressed. Injected parameters and the filtered value are never suggested,
-and names already used in the call are omitted.
+PHP callable. Union, intersection and disjunctive normal form (DNF) parameter
+types are supported. Variable-like text inside default expressions is not
+treated as a parameter.
+Registration options such as ``needs_environment``, ``needs_context`` and
+``is_variadic`` determine which names Twig injects or accepts dynamically. When
+options come from a constant or variable, injected parameters are inferred from
+the callable signature and argument diagnostics are suppressed. Injected
+parameters and the filtered value are never suggested, and names already used
+in the call are omitted.
 
 .. code-block:: twig
 

@@ -11,6 +11,7 @@ use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
+use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpTypedVariable;
 use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
@@ -30,8 +31,7 @@ final class FormMetadataExtractor
         $classes = [];
         foreach ($php->methodDeclarations as $method) {
             if ('configureOptions' !== $method->name
-                || 'Symfony\\Component\\OptionsResolver\\OptionsResolver' !== $method->firstParameterType
-                || null === ($resolver = $this->typedMethodParameter($php, $method->className, $method->name, 'Symfony\\Component\\OptionsResolver\\OptionsResolver'))
+                || null === ($resolver = $this->typedMethodParameter($php, $method, 'Symfony\\Component\\OptionsResolver\\OptionsResolver'))
             ) {
                 continue;
             }
@@ -95,8 +95,7 @@ final class FormMetadataExtractor
             $dataClass = $dataClasses[strtolower(ltrim($method->className, '\\'))] ?? null;
             if (null === $dataClass
                 || 'buildForm' !== $method->name
-                || 'Symfony\\Component\\Form\\FormBuilderInterface' !== $method->firstParameterType
-                || null === ($builder = $this->typedMethodParameter($php, $method->className, $method->name, 'Symfony\\Component\\Form\\FormBuilderInterface'))
+                || null === ($builder = $this->typedMethodParameter($php, $method, 'Symfony\\Component\\Form\\FormBuilderInterface'))
             ) {
                 continue;
             }
@@ -322,21 +321,23 @@ final class FormMetadataExtractor
         return $variables;
     }
 
-    private function typedMethodParameter(PhpDocument $php, string $className, string $methodName, string $type): ?PhpTypedVariable
+    private function typedMethodParameter(PhpDocument $php, PhpMethodDeclaration $method, string $type): ?PhpTypedVariable
     {
-        $parameters = [];
+        $parameter = $method->parameters[0] ?? null;
+        if (null === $parameter || !\in_array($type, $parameter->types, true)) {
+            return null;
+        }
         foreach ($php->typedVariables as $variable) {
             if (PhpTypedVariableKind::Parameter === $variable->kind
-                && $className === $variable->className
-                && $methodName === $variable->methodName
-                && \in_array($type, $variable->types, true)
+                && $method->className === $variable->className
+                && $method->name === $variable->methodName
+                && $parameter->nameStartOffset === $variable->nameStartOffset
             ) {
-                $parameters[] = $variable;
+                return $variable;
             }
         }
-        usort($parameters, static fn (PhpTypedVariable $left, PhpTypedVariable $right): int => $left->nameStartOffset <=> $right->nameStartOffset);
 
-        return $parameters[0] ?? null;
+        return null;
     }
 
     /** @param array{text: string, offset: int} $expression */

@@ -318,7 +318,7 @@ YAML;
         $messageUri = 'file:///workspace/src/Message/Ping.php';
         $message = "<?php\nnamespace App\\Message;\ninterface DomainEvent {}\nfinal class Ping implements DomainEvent {}\n";
         $handlerUri = 'file:///workspace/src/MessageHandler/PingHandler.php';
-        $handler = "<?php\nnamespace App\\MessageHandler;\nuse App\\Message\\Ping;\nfinal class UnrelatedHandler { public function __invoke(string \$message): void {} }\nfinal class PingHandler { public function __invoke(Ping \$message): void {} }\nfinal class StringHandler { public function handle(string \$message): void {} }\n";
+        $handler = "<?php\nnamespace App\\MessageHandler;\nuse App\\Message\\Ping;\nfinal class UnrelatedHandler { public function __invoke(string \$message): void {} }\nfinal class PingHandler { public function __invoke(Ping \$message): void {} }\nfinal class StringHandler { public function handle(string|int \$message): void {} }\n";
         $controllerUri = 'file:///workspace/src/Controller/PingController.php';
         $controller = "<?php\nnamespace App\\Controller;\nuse App\\Message\\{Ping};\nuse Symfony\\Component\\Messenger\\{MessageBusInterface};\nfinal class PingController { public function __construct(private MessageBusInterface \$bus) {} public function send(): void { \$this->bus->dispatch(new Ping()); } }\n";
         $documents = new DocumentStore();
