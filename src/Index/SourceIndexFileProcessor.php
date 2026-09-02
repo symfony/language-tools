@@ -2,8 +2,6 @@
 
 namespace Symfony\Lsp\Index;
 
-use Symfony\Lsp\Project\Project;
-
 /**
  * @phpstan-import-type SourceIndexMetadata from SourceIndexStoreInterface
  * @phpstan-import-type SourceIndexRecord from SourceIndexReaderInterface
@@ -18,15 +16,15 @@ final class SourceIndexFileProcessor
     }
 
     /** @param ?SourceIndexRecord $cached */
-    public function scan(Project $project, string $relativePath, string $uri, string $path, string $languageId, ?array $cached): ?ProcessedSourceIndexFile
+    public function scan(SourceIndexFileLocation $location, string $languageId, ?array $cached): ?ProcessedSourceIndexFile
     {
-        $source = $this->read($path);
+        $source = $this->read($location->path);
         if (null === $source) {
             return null;
         }
-        if (null !== $cached && $this->isFresh($path, $languageId, $source['hash'], $cached['metadata'])) {
+        if (null !== $cached && $this->isFresh($location->path, $languageId, $source['hash'], $cached['metadata'])) {
             try {
-                $this->providers->restore($project, $cached['payloads']);
+                $this->providers->restore($location->project, $cached['payloads']);
             } catch (\Throwable $error) {
                 throw new InvalidSourceIndexEntry(previous: $error);
             }
@@ -34,19 +32,19 @@ final class SourceIndexFileProcessor
             return new ProcessedSourceIndexFile($cached['metadata'], $cached['payloads'], false);
         }
 
-        [$document, $runtimeStructure, $metadata] = $this->analyze($relativePath, $uri, $path, $languageId, $source);
+        [$document, $runtimeStructure, $metadata] = $this->analyze($location, $languageId, $source);
 
         return new ProcessedSourceIndexFile(
             $metadata,
-            $this->providers->index($project, $document),
+            $this->providers->index($location->project, $document),
             true,
         );
     }
 
     /** @param ?SourceIndexMetadata $cached */
-    public function update(Project $project, string $relativePath, string $uri, string $path, string $languageId, ?array $cached, bool $indexed): ?UpdatedSourceIndexFile
+    public function update(SourceIndexFileLocation $location, string $languageId, ?array $cached, bool $indexed): ?UpdatedSourceIndexFile
     {
-        $source = $this->read($path);
+        $source = $this->read($location->path);
         if (null === $source) {
             return null;
         }
@@ -57,12 +55,12 @@ final class SourceIndexFileProcessor
         $previousPayloads = [];
         if (null !== $cached) {
             try {
-                $previousPayloads = $this->store->loadPayloads($project, $relativePath);
+                $previousPayloads = $this->store->loadPayloads($location->project, $location->relativePath);
             } catch (\UnexpectedValueException) {
             }
         }
-        [$document, $runtimeStructure, $metadata] = $this->analyze($relativePath, $uri, $path, $languageId, $source);
-        $replacement = $this->providers->replace($project, $document, $previousPayloads);
+        [$document, $runtimeStructure, $metadata] = $this->analyze($location, $languageId, $source);
+        $replacement = $this->providers->replace($location->project, $document, $previousPayloads);
         if (null === $cached) {
             $change = SourceFileChange::untracked();
         } elseif (null !== $runtimeStructure->hash && $runtimeStructure->hash === $cached['runtimeStructure']) {
@@ -92,12 +90,12 @@ final class SourceIndexFileProcessor
      *
      * @return array{SourceDocument, PhpRuntimeStructureAnalysis, SourceIndexMetadata}
      */
-    private function analyze(string $relativePath, string $uri, string $path, string $languageId, array $source): array
+    private function analyze(SourceIndexFileLocation $location, string $languageId, array $source): array
     {
-        $document = new SourceDocument($uri, $languageId, $source['text']);
-        $runtimeStructure = $this->runtimeStructureHasher->analyze($relativePath, $source['text']);
+        $document = new SourceDocument($location->uri, $languageId, $source['text']);
+        $runtimeStructure = $this->runtimeStructureHasher->analyze($location->relativePath, $source['text']);
 
-        return [$document, $runtimeStructure, $this->metadata($path, $languageId, $source['hash'], $runtimeStructure->hash)];
+        return [$document, $runtimeStructure, $this->metadata($location->path, $languageId, $source['hash'], $runtimeStructure->hash)];
     }
 
     /** @param SourceIndexMetadata $entry */

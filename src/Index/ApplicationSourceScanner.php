@@ -196,10 +196,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
             return SourceFileChange::untracked();
         } else {
             $updated = $this->processor->update(
-                $project,
-                $location->relativePath,
-                $this->uri($project, $location->relativePath),
-                $location->path,
+                $location,
                 $languageId,
                 $entries[$location->relativePath] ?? null,
                 $indexed,
@@ -265,7 +262,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         $parsedCount = 0;
         if (null === $reader || !$reader->hasRecords()) {
             foreach ($this->sourceFiles($project, $cancellation) as $relativePath => $source) {
-                $processed = $this->processor->scan($project, $relativePath, $source['uri'], $source['path'], $source['languageId'], null);
+                $processed = $this->processor->scan($source['location'], $source['languageId'], null);
                 if (null === $processed) {
                     continue;
                 }
@@ -291,7 +288,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
                 continue;
             }
             unset($sources[$relativePath]);
-            $processed = $this->processor->scan($project, $relativePath, $source['uri'], $source['path'], $source['languageId'], $cached);
+            $processed = $this->processor->scan($source['location'], $source['languageId'], $cached);
             if (null === $processed) {
                 continue;
             }
@@ -306,7 +303,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
                 delay(0, cancellation: $cancellation);
             }
             $cancellation->throwIfRequested();
-            $processed = $this->processor->scan($project, $relativePath, $source['uri'], $source['path'], $source['languageId'], null);
+            $processed = $this->processor->scan($source['location'], $source['languageId'], null);
             if (null === $processed) {
                 continue;
             }
@@ -320,7 +317,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         return $entries;
     }
 
-    /** @return \Generator<string, array{uri: string, path: string, languageId: string}> */
+    /** @return \Generator<string, array{location: SourceIndexFileLocation, languageId: string}> */
     private function sourceFiles(Project $project, Cancellation $cancellation): \Generator
     {
         $fileCount = 0;
@@ -333,14 +330,14 @@ final class ApplicationSourceScanner implements ProjectStateInterface
             if (null === $relativePath) {
                 continue;
             }
-            $uri = $this->uri($project, $relativePath);
-            $owner = $this->projects->forDocumentUri($uri);
+            $location = new SourceIndexFileLocation($project, $this->uri($project, $relativePath), $path, $relativePath);
+            $owner = $this->projects->forDocumentUri($location->uri);
             if (null !== $owner && $owner->rootPath !== $project->rootPath) {
                 continue;
             }
-            $languageId = $this->files->languageId($path);
+            $languageId = $this->files->languageId($location->path);
             if (null !== $languageId) {
-                yield $relativePath => ['uri' => $uri, 'path' => $path, 'languageId' => $languageId];
+                yield $location->relativePath => ['location' => $location, 'languageId' => $languageId];
             }
         }
     }

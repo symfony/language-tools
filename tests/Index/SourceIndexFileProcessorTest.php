@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceFactsInterface;
+use Symfony\Lsp\Index\SourceIndexFileLocation;
 use Symfony\Lsp\Index\SourceIndexFileProcessor;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
@@ -27,20 +28,21 @@ final class SourceIndexFileProcessorTest extends TestCase
         $provider = new ProcessorRecordingProvider();
         $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), [$provider]);
         $processor = new SourceIndexFileProcessor($store, $pipeline, new PhpRuntimeStructureHasher());
+        $location = new SourceIndexFileLocation($project, 'file://'.$path, $path, 'src/Service.php');
 
         try {
             file_put_contents($path, '<?php final class Service { public function value(): int { return 1; } }');
-            $processed = $processor->scan($project, 'src/Service.php', 'file://'.$path, $path, 'php', null);
+            $processed = $processor->scan($location, 'php', null);
             self::assertNotNull($processed);
             $store->append($project, 'src/Service.php', $processed->metadata, $processed->payloads);
 
             file_put_contents($path, '<?php final class Service { public function value(): int { return 2; } }');
-            $bodyChange = $processor->update($project, 'src/Service.php', 'file://'.$path, $path, 'php', $processed->metadata, true);
+            $bodyChange = $processor->update($location, 'php', $processed->metadata, true);
             self::assertNotNull($bodyChange);
             self::assertSame([], $bodyChange->change->domains());
 
             file_put_contents($path, '<?php final class RenamedService { public function value(): int { return 2; } }');
-            $declarationChange = $processor->update($project, 'src/Service.php', 'file://'.$path, $path, 'php', $processed->metadata, true);
+            $declarationChange = $processor->update($location, 'php', $processed->metadata, true);
             self::assertNotNull($declarationChange);
             self::assertSame(['processor'], $declarationChange->change->domains());
         } finally {
