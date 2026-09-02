@@ -33,7 +33,11 @@
             "Symfony\\Lsp\\Tests\\": "tests/",
             "Symfony\\Lsp\\Tools\\Dogfood\\": "tools/dogfood/",
             "Symfony\\Lsp\\Tools\\": "tools/"
-        }
+        },
+        "exclude-from-classmap": [
+            "/tests/Fixtures/RuntimeApplication/",
+            "/tools/vscode-guide-scenarios/"
+        ]
     },
     "bin": [
         "bin/symfony-lsp"
@@ -49,6 +53,7 @@
         "server:benchmark": "./tools/benchmark-server bin/symfony-lsp tests/Fixtures/RuntimeApplication",
         "runtime-refresh:benchmark": "./tools/benchmark-runtime-refresh bin/symfony-lsp tests/Fixtures/RuntimeApplication",
         "source-index:benchmark": "./tools/php-with-tree-sitter tools/benchmark-source-index",
+        "autoload-check": "@composer dump-autoload --optimize --strict-psr",
         "test": "./tools/php-with-tree-sitter vendor/bin/phpunit --no-progress",
         "phpstan": "phpstan analyze --no-progress",
         "cs-check": "php-cs-fixer fix --show-progress=none --dry-run --diff",

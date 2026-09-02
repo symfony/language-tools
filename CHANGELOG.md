@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Validate Composer PSR-4 mappings with a strict autoload check
+
 ## 0.18.1 (2026-09-02)
 
 - Load Content-Length tool dependencies without Composer dev autoloading
