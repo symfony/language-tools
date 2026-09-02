@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Treat CRLF line endings as single terminators in document positions
+- Scope Live Component event completions to their declaring component
+- Scope event name completions to proven dispatcher receivers
+- Resolve the PHP t() helper to Symfony's translation function
+- Preserve dashed security provider and firewall names
+- Report incomplete trailing environment processor arguments
+- Suppress service and parameter completions inside YAML comments
 - Preserve unknown escape sequences in quoted Twig strings
 - Fold multiline YAML flow scalars with correct whitespace
 - Keep nested YAML flow collections intact during recovery parsing

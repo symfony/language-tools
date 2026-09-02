@@ -9,6 +9,8 @@ Completion
 
 Translation key completion is available in recognized PHP ``trans()`` calls,
 ``TranslatableMessage`` objects, the ``t()`` helper and Twig's ``trans`` filter.
+The ``t()`` helper is recognized when it resolves to Symfony's translation
+function through a function import, an alias or a fully qualified call.
 Suggestions are scoped to the selected domain. Literal PHP keys are recognized
 when they are the first argument, either positionally or as ``id:`` for
 ``trans()`` and ``message:`` for ``t()`` and ``TranslatableMessage``. Literal
