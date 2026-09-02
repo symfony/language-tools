@@ -58,7 +58,7 @@ final class ReleaseExecutableTest extends TestCase
 
     /** @param list<string> $expectedCalls */
     #[DataProvider('workflowRetryProvider')]
-    public function testRetriesOnlyTransientWorkflowFailures(int $watchFailures, string $conclusion, string $failedLog, ?string $expectedError, array $expectedCalls): void
+    public function testRetriesOnlyWhitelistedTransientWorkflowSteps(int $watchFailures, string $failedSteps, string $failedLog, bool $expectedRetry, ?string $expectedError, array $expectedCalls): void
     {
         $root = \dirname(__DIR__, 2);
         $workspace = new TestWorkspace();
@@ -72,7 +72,7 @@ final class ReleaseExecutableTest extends TestCase
             echo "$*" >> "$GH_CALLS"
             case "$1 $2 $4" in
                 "run list --commit=commit") echo '[{"databaseId":123,"headSha":"commit","displayTitle":"Release"}]' ;;
-                "run view --json=conclusion") echo "$GH_CONCLUSION" ;;
+                "run view --json=jobs") echo "$GH_FAILED_STEPS" ;;
                 "run view --log-failed") echo "$GH_FAILED_LOG" ;;
             esac
             if [[ "$1 $2" == "run watch" ]]; then
@@ -109,15 +109,15 @@ final class ReleaseExecutableTest extends TestCase
             $environment['GH_CALLS'] = $calls;
             $environment['GH_WATCHES'] = $watches;
             $environment['GH_WATCH_FAILURES'] = (string) $watchFailures;
-            $environment['GH_CONCLUSION'] = $conclusion;
+            $environment['GH_FAILED_STEPS'] = $failedSteps;
             $environment['GH_FAILED_LOG'] = $failedLog;
             $result = $this->runProcess([\PHP_BINARY, '-r', $php, $root], $environment);
 
             self::assertSame(0, $result->exitCode, $result->stderr);
             self::assertStringContainsString($failedLog, $result->stdout);
             self::assertStringContainsString("Failed workflow logs:\n", $result->stderr);
-            if ('timed_out' === $conclusion) {
-                self::assertStringContainsString("Rerunning transient timed_out workflow jobs once...\n", $result->stderr);
+            if ($expectedRetry) {
+                self::assertStringContainsString("Rerunning transient workflow jobs once: Download static-php-cli.\n", $result->stderr);
             } else {
                 self::assertStringNotContainsString('Rerunning', $result->stderr);
             }
@@ -326,8 +326,9 @@ final class ReleaseExecutableTest extends TestCase
             self::assertSame(0, $result->exitCode, $result->stderr);
             $workflowCalls = file($calls, \FILE_IGNORE_NEW_LINES | \FILE_SKIP_EMPTY_LINES);
             self::assertIsArray($workflowCalls);
+            self::assertContains('run list --workflow=packaging.yaml --commit=releasecommit --limit=20 --json=databaseId,headSha,displayTitle', $workflowCalls);
             self::assertContains('run list --workflow=dogfood.yaml --commit=releasecommit --limit=20 --json=databaseId,headSha,displayTitle', $workflowCalls);
-            self::assertSame(6, \count(array_filter($workflowCalls, static fn (string $call): bool => str_starts_with($call, 'run watch '))));
+            self::assertSame(7, \count(array_filter($workflowCalls, static fn (string $call): bool => str_starts_with($call, 'run watch '))));
         } finally {
             $workspace->cleanup();
         }
@@ -431,65 +432,47 @@ final class ReleaseExecutableTest extends TestCase
         ];
     }
 
-    /** @return iterable<string, array{int, string, string, string|null, list<string>}> */
+    /** @return iterable<string, array{int, string, string, bool, string|null, list<string>}> */
     public static function workflowRetryProvider(): iterable
     {
         $runList = 'run list --workflow=packaging.yaml --commit=commit --event=push --limit=20 --json=databaseId,headSha,displayTitle';
+        $transientSteps = '{"jobs":[{"steps":[{"name":"Download static-php-cli","conclusion":"failure"}]}]}';
+        $failedStepsCall = 'run view 123 --json=jobs';
 
-        yield 'transient timeout' => [
+        yield 'whitelisted transient step' => [
             1,
-            'timed_out',
-            'The hosted runner timed out.',
+            $transientSteps,
+            'The download service failed.',
+            true,
             null,
-            [
-                $runList,
-                'run watch 123 --exit-status',
-                'run view 123 --json=conclusion --jq=.conclusion',
-                'run view 123 --log-failed',
-                'run rerun 123 --failed',
-                'run watch 123 --exit-status',
-            ],
+            [$runList, 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed', 'run rerun 123 --failed', 'run watch 123 --exit-status'],
         ];
-        yield 'repeated transient timeout' => [
+        yield 'repeated whitelisted transient step' => [
             2,
-            'timed_out',
-            'The hosted runner timed out.',
+            $transientSteps,
+            'The download service failed.',
+            true,
             'Workflow packaging.yaml failed after one automatic rerun. Inspect it with "gh run view 123 --web" before resuming the release.',
-            [
-                $runList,
-                'run watch 123 --exit-status',
-                'run view 123 --json=conclusion --jq=.conclusion',
-                'run view 123 --log-failed',
-                'run rerun 123 --failed',
-                'run watch 123 --exit-status',
-                'run view 123 --json=conclusion --jq=.conclusion',
-                'run view 123 --log-failed',
-            ],
+            [$runList, 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed', 'run rerun 123 --failed', 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed'],
         ];
-        yield 'deterministic unit test failure' => [
+        yield 'mixed transient and deterministic steps' => [
             1,
-            'failure',
-            'Tests: 1, Failures: 1.',
-            'Workflow packaging.yaml failed with conclusion failure without an automatic rerun. Inspect it with "gh run view 123 --web" before resuming the release.',
-            [
-                $runList,
-                'run watch 123 --exit-status',
-                'run view 123 --json=conclusion --jq=.conclusion',
-                'run view 123 --log-failed',
-            ],
+            '{"jobs":[{"steps":[{"name":"Download static-php-cli","conclusion":"failure"},{"name":"Package and smoke-test","conclusion":"failure"}]}]}',
+            'Several steps failed.',
+            false,
+            'Workflow packaging.yaml failed without an automatic rerun. Inspect it with "gh run view 123 --web" before resuming the release.',
+            [$runList, 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed'],
         ];
-        yield 'deterministic smoke failure' => [
-            1,
-            'failure',
-            'The package smoke test failed.',
-            'Workflow packaging.yaml failed with conclusion failure without an automatic rerun. Inspect it with "gh run view 123 --web" before resuming the release.',
-            [
-                $runList,
-                'run watch 123 --exit-status',
-                'run view 123 --json=conclusion --jq=.conclusion',
-                'run view 123 --log-failed',
-            ],
-        ];
+        foreach (['Build the server PHAR', 'Run unit tests', 'Package and smoke-test'] as $step) {
+            yield 'deterministic '.$step => [
+                1,
+                \sprintf('{"jobs":[{"steps":[{"name":"%s","conclusion":"failure"}]}]}', $step),
+                $step.' failed.',
+                false,
+                'Workflow packaging.yaml failed without an automatic rerun. Inspect it with "gh run view 123 --web" before resuming the release.',
+                [$runList, 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed'],
+            ];
+        }
     }
 
     /**

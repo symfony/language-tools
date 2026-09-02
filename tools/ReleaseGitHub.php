@@ -89,9 +89,33 @@ final class ReleaseGitHub
         $this->processes->run($command, $this->root);
     }
 
-    public function workflowConclusion(string $runId): string
+    /** @return list<string> */
+    public function failedStepNames(string $runId): array
     {
-        return $this->processes->capture(['gh', 'run', 'view', $runId, '--json=conclusion', '--jq=.conclusion'], $this->root);
+        $output = $this->processes->capture(['gh', 'run', 'view', $runId, '--json=jobs'], $this->root);
+        $run = json_decode($output, true, flags: \JSON_THROW_ON_ERROR);
+        $jobs = \is_array($run) ? ($run['jobs'] ?? null) : null;
+        if (!\is_array($jobs)) {
+            throw new \RuntimeException('Unable to inspect failed workflow steps.');
+        }
+
+        $failedSteps = [];
+        foreach ($jobs as $job) {
+            $steps = \is_array($job) ? ($job['steps'] ?? null) : null;
+            if (!\is_array($steps)) {
+                throw new \RuntimeException('Unable to inspect failed workflow steps.');
+            }
+            foreach ($steps as $step) {
+                if (!\is_array($step) || !\is_string($step['name'] ?? null) || !\is_string($step['conclusion'] ?? null)) {
+                    throw new \RuntimeException('Unable to inspect failed workflow steps.');
+                }
+                if ('failure' === $step['conclusion']) {
+                    $failedSteps[] = $step['name'];
+                }
+            }
+        }
+
+        return array_values(array_unique($failedSteps));
     }
 
     public function watchRun(string $runId): bool

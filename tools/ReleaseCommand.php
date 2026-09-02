@@ -13,6 +13,7 @@ final class ReleaseCommand
         'quality.yaml',
         'compatibility.yaml',
         'neovim.yaml',
+        'packaging.yaml',
         'vscode.yaml',
         'zed.yaml',
     ];
@@ -20,10 +21,15 @@ final class ReleaseCommand
         ...self::REGULAR_WORKFLOWS,
         'dogfood.yaml',
     ];
-    private const TRANSIENT_WORKFLOW_CONCLUSIONS = [
-        'stale',
-        'startup_failure',
-        'timed_out',
+    private const TRANSIENT_WORKFLOW_STEPS = [
+        'Download static-php-cli',
+        'Install production dependencies',
+        'Run actions/checkout@v7',
+        'Run actions/download-artifact@v8',
+        'Run actions/setup-node@v7',
+        'Run ramsey/composer-install@v4',
+        'Run shivammathur/setup-php@v2',
+        'Set up job',
     ];
 
     public function __construct(
@@ -53,7 +59,7 @@ final class ReleaseCommand
         }
 
         $releaseCommit = $this->git->remoteTagCommit($tag);
-        $this->waitForWorkflow('packaging.yaml', $releaseCommit);
+        $this->waitForWorkflow('release.yaml', $releaseCommit);
         $this->finishRelease($releaseCommit);
 
         $url = $this->github->releaseUrl($tag);
@@ -280,18 +286,18 @@ final class ReleaseCommand
                 return;
             }
 
-            $conclusion = $this->github->workflowConclusion($runId);
+            $failedSteps = $this->github->failedStepNames($runId);
             fwrite(\STDERR, "\nFailed workflow logs:\n");
             $this->github->showFailedLogs($runId);
 
-            if (0 === $attempt && \in_array($conclusion, self::TRANSIENT_WORKFLOW_CONCLUSIONS, true)) {
-                fwrite(\STDERR, \sprintf("\nRerunning transient %s workflow jobs once...\n", $conclusion));
+            if (0 === $attempt && [] !== $failedSteps && [] === array_diff($failedSteps, self::TRANSIENT_WORKFLOW_STEPS)) {
+                fwrite(\STDERR, \sprintf("\nRerunning transient workflow jobs once: %s.\n", implode(', ', $failedSteps)));
                 $this->github->rerunFailedJobs($runId);
                 $reran = true;
                 continue;
             }
 
-            $reason = $reran ? 'failed after one automatic rerun' : \sprintf('failed with conclusion %s without an automatic rerun', '' === $conclusion ? 'unknown' : $conclusion);
+            $reason = $reran ? 'failed after one automatic rerun' : 'failed without an automatic rerun';
             throw new \RuntimeException(\sprintf('Workflow %s %s. Inspect it with "gh run view %s --web" before resuming the release.', $workflow, $reason, $runId));
         }
     }
