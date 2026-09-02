@@ -6,10 +6,9 @@ use Microsoft\PhpParser\Node;
 use Microsoft\PhpParser\Node\ArrayElement;
 use Microsoft\PhpParser\Node\ClassBaseClause;
 use Microsoft\PhpParser\Node\DelimitedList\ArrayElementList;
-use Microsoft\PhpParser\Node\DelimitedList\ExpressionList;
 use Microsoft\PhpParser\Node\DelimitedList\ParameterDeclarationList;
+use Microsoft\PhpParser\Node\DelimitedList\PropertyElementList;
 use Microsoft\PhpParser\Node\Expression\ArrayCreationExpression;
-use Microsoft\PhpParser\Node\Expression\AssignmentExpression;
 use Microsoft\PhpParser\Node\Expression\Variable;
 use Microsoft\PhpParser\Node\MethodDeclaration;
 use Microsoft\PhpParser\Node\NamespaceAliasingClause;
@@ -17,6 +16,7 @@ use Microsoft\PhpParser\Node\NamespaceUseClause;
 use Microsoft\PhpParser\Node\NamespaceUseGroupClause;
 use Microsoft\PhpParser\Node\Parameter;
 use Microsoft\PhpParser\Node\PropertyDeclaration;
+use Microsoft\PhpParser\Node\PropertyElement;
 use Microsoft\PhpParser\Node\Statement\ClassDeclaration;
 use Microsoft\PhpParser\Node\Statement\EnumDeclaration;
 use Microsoft\PhpParser\Node\Statement\InterfaceDeclaration;
@@ -34,22 +34,19 @@ final class TolerantPhpNodeAdapter
         }
         $variables = [];
         foreach ($elements->children as $element) {
-            $variable = $element instanceof Variable
-                ? $element
-                : ($element instanceof AssignmentExpression && $element->leftOperand instanceof Variable ? $element->leftOperand : null);
-            if (null !== $variable) {
-                $variables[] = $variable;
+            if ($element instanceof PropertyElement && $element->variable instanceof Variable) {
+                $variables[] = $element->variable;
             }
         }
 
         return $variables;
     }
 
-    public function propertyElements(PropertyDeclaration $declaration): ?ExpressionList
+    public function propertyElements(PropertyDeclaration $declaration): ?PropertyElementList
     {
         $elements = $this->member($declaration, 'propertyElements');
 
-        return $elements instanceof ExpressionList ? $elements : null;
+        return $elements instanceof PropertyElementList ? $elements : null;
     }
 
     public function namespaceAliasingClause(NamespaceUseClause|NamespaceUseGroupClause $clause): ?NamespaceAliasingClause
