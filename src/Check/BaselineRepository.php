@@ -49,6 +49,11 @@ final class BaselineRepository
         );
     }
 
+    public function exists(BaselineFile $file): bool
+    {
+        return is_file($file->path);
+    }
+
     /** @return list<BaselineEntry> */
     public function load(BaselineFile $file): array
     {

@@ -15,14 +15,17 @@ final class BaselineManager
      *
      * @return array{diagnostics: list<CheckDiagnostic>, stale: list<BaselineEntry>, path: string|null}
      */
-    public function apply(string $workspace, CheckOptions $options, array $diagnostics): array
+    public function apply(string $workspace, CheckOptions $options, array $diagnostics, bool $complete = true): array
     {
         if (null === $options->baselinePath) {
             return ['diagnostics' => $diagnostics, 'stale' => [], 'path' => null];
         }
 
         $file = $this->repository->resolve($workspace, $options->baselinePath);
-        if ('none' === $options->baselineMode) {
+        if (!$complete && !$this->repository->exists($file)) {
+            return ['diagnostics' => $diagnostics, 'stale' => [], 'path' => null];
+        }
+        if (!$complete || 'none' === $options->baselineMode) {
             $entries = $this->repository->load($file);
         } else {
             $entries = $this->matcher->entries($diagnostics);
@@ -37,7 +40,7 @@ final class BaselineManager
 
         return [
             'diagnostics' => $result['diagnostics'],
-            'stale' => $result['stale'],
+            'stale' => $complete ? $result['stale'] : [],
             'path' => $file->workspacePath,
         ];
     }

@@ -27,8 +27,9 @@ use function Amp\Future\await;
  * @phpstan-type CheckReport array{
  *     complete: bool,
  *     projects: list<array{environment: string, analysis: array{mode: string, reason: string|null}, runtime: array{state: string}, complete: bool}>,
- *     diagnostics: list<array{code: string, path: string}>,
- *     summary: array{blocking: int, stale: int},
+ *     diagnostics: list<array{code: string, path: string, baseline: string}>,
+ *     baseline: array{stale: list<array<string, mixed>>},
+ *     summary: array{active: int, matched: int, blocking: int, stale: int},
  *     errors: list<array{category: string, message: string, cause?: array{class: string, message: string}}>
  * }
  */
@@ -401,6 +402,125 @@ final class CheckExecutableTest extends TestCase
             'App\\FinalFrame->run (src/FinalFrame.php:99)',
             $verboseReport['errors'][0]['cause']['message'] ?? '',
         );
+    }
+
+    public function testMatchesBaselinesWithoutUpdatingOrEnforcingThemDuringPartialRuntimeAnalysis(): void
+    {
+        if ('Windows' === \PHP_OS_FAMILY) {
+            self::markTestSkipped('The source executable integration requires Unix executable scripts.');
+        }
+
+        mkdir($this->directory.'/src');
+        file_put_contents($this->directory.'/src/ArticleController.php', <<<'PHP'
+            <?php
+            namespace App\Controller;
+
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+
+            final class ArticleController extends AbstractController
+            {
+                public function show(): void
+                {
+                    $this->generateUrl('article_show');
+                }
+            }
+            PHP);
+        $snapshot = [
+            'schemaVersion' => 1,
+            'project' => ['environment' => 'dev'],
+            'configurationValidation' => ['status' => 'valid'],
+            'sections' => [
+                'routes' => [
+                    'complete' => true,
+                    'items' => [[
+                        'name' => 'article_show',
+                        'path' => '/article/{id}',
+                    ]],
+                ],
+            ],
+        ];
+        $symfonyCli = $this->directory.'/partial-runtime-baseline';
+        file_put_contents($symfonyCli, "#!/usr/bin/env php\n<?php\nfwrite(STDOUT, json_encode(".var_export($snapshot, true).", JSON_THROW_ON_ERROR).\"\\n\");\n");
+        chmod($symfonyCli, 0700);
+        $environment = ['SYMFONY_LSP_SYMFONY_CLI' => $symfonyCli];
+        $baselinePath = $this->directory.'/baseline.json';
+
+        $created = $this->execute([
+            'check',
+            '--format=json',
+            '--workspace='.$this->directory,
+            '--baseline=baseline.json',
+            '--generate-baseline',
+            'src/ArticleController.php',
+        ], $environment);
+        self::assertSame(CheckCommand::EXIT_SUCCESS, $created['exitCode'], $created['stderr']);
+        /** @var array{version: int, diagnostics: list<array<string, mixed>>} $baseline */
+        $baseline = json_decode((string) file_get_contents($baselinePath), true, flags: \JSON_THROW_ON_ERROR);
+        $staleEntry = $baseline['diagnostics'][0];
+        $staleEntry['occurrence'] = 2;
+        $baseline['diagnostics'][] = $staleEntry;
+        file_put_contents($baselinePath, json_encode($baseline, \JSON_THROW_ON_ERROR | \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)."\n");
+        $baselineContents = (string) file_get_contents($baselinePath);
+
+        $snapshot['errors'] = [[
+            'section' => 'twig',
+            'message' => 'Runtime section failed.',
+        ]];
+        file_put_contents($symfonyCli, "#!/usr/bin/env php\n<?php\nfwrite(STDOUT, json_encode(".var_export($snapshot, true).", JSON_THROW_ON_ERROR).\"\\n\");\n");
+
+        $partial = $this->execute([
+            'check',
+            '--format=json',
+            '--workspace='.$this->directory,
+            '--baseline=baseline.json',
+            '--strict-baseline',
+            'src/ArticleController.php',
+        ], $environment);
+        $report = $this->decodeReport($partial['stdout']);
+
+        self::assertSame(CheckCommand::EXIT_OPERATIONAL, $partial['exitCode'], $partial['stderr']);
+        self::assertSame('matched', $report['diagnostics'][0]['baseline']);
+        self::assertSame(0, $report['summary']['active']);
+        self::assertSame(1, $report['summary']['matched']);
+        self::assertSame(0, $report['summary']['stale']);
+        self::assertSame(0, $report['summary']['blocking']);
+        self::assertSame([], $report['baseline']['stale']);
+
+        $gitLab = $this->execute([
+            'check',
+            '--format=gitlab',
+            '--workspace='.$this->directory,
+            '--baseline=baseline.json',
+            '--strict-baseline',
+            'src/ArticleController.php',
+        ], $environment);
+        self::assertSame(CheckCommand::EXIT_OPERATIONAL, $gitLab['exitCode'], $gitLab['stderr']);
+        self::assertSame([], json_decode($gitLab['stdout'], true, flags: \JSON_THROW_ON_ERROR));
+
+        $refreshed = $this->execute([
+            'check',
+            '--format=json',
+            '--workspace='.$this->directory,
+            '--baseline=baseline.json',
+            '--refresh-baseline',
+            'src/ArticleController.php',
+        ], $environment);
+        $refreshedReport = $this->decodeReport($refreshed['stdout']);
+        self::assertSame(CheckCommand::EXIT_OPERATIONAL, $refreshed['exitCode'], $refreshed['stderr']);
+        self::assertSame('matched', $refreshedReport['diagnostics'][0]['baseline']);
+        self::assertSame($baselineContents, file_get_contents($baselinePath));
+
+        $generatedPath = $this->directory.'/partial-baseline.json';
+        $generated = $this->execute([
+            'check',
+            '--format=json',
+            '--workspace='.$this->directory,
+            '--baseline=partial-baseline.json',
+            '--generate-baseline',
+            'src/ArticleController.php',
+        ], $environment);
+        self::assertSame(CheckCommand::EXIT_OPERATIONAL, $generated['exitCode'], $generated['stderr']);
+        self::assertFileDoesNotExist($generatedPath);
     }
 
     public function testDoesNotReportACleanResultWhenRuntimeIndexingFails(): void

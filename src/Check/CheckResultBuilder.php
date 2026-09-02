@@ -73,22 +73,20 @@ final class CheckResultBuilder
 
         $stale = [];
         $baselinePath = null;
-        if ([] === $errors) {
-            try {
-                $baseline = $this->baseline->apply($plan->workspace, $options, $diagnostics);
-                $diagnostics = $baseline['diagnostics'];
-                $stale = $baseline['stale'];
-                $baselinePath = $baseline['path'];
-            } catch (InvalidConfigurationException $error) {
-                throw $error;
-            } catch (\Throwable $error) {
-                $errors[] = $this->errors->internal($error, $plan->workspace);
-                $projects = $this->incomplete($projects);
-            }
-            if ($cancellation->expired() && [] === $errors) {
-                $errors[] = $this->errors->timeout($options->timeout, $plan->workspace);
-                $projects = $this->incomplete($projects);
-            }
+        try {
+            $baseline = $this->baseline->apply($plan->workspace, $options, $diagnostics, [] === $errors);
+            $diagnostics = $baseline['diagnostics'];
+            $stale = $baseline['stale'];
+            $baselinePath = $baseline['path'];
+        } catch (InvalidConfigurationException $error) {
+            throw $error;
+        } catch (\Throwable $error) {
+            $errors[] = $this->errors->internal($error, $plan->workspace);
+            $projects = $this->incomplete($projects);
+        }
+        if ($cancellation->expired() && [] === $errors) {
+            $errors[] = $this->errors->timeout($options->timeout, $plan->workspace);
+            $projects = $this->incomplete($projects);
         }
         $blockingCount = $this->blockingCount($diagnostics, $options->blockingCodes)
             + ($options->strictBaseline ? \count($stale) : 0);
