@@ -5,7 +5,7 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -16,7 +16,7 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
         private readonly PositionConverter $positionConverter,
         private readonly LspProtocolMapper $protocol,
         private readonly DependencyInjectionProjectLookup $lookup,
-        private readonly PhpCommentParserInterface $phpComments,
+        private readonly PhpCommentParser $phpComments,
     ) {
     }
 

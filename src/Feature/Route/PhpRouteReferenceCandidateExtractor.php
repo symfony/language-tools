@@ -2,7 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 
@@ -10,7 +10,7 @@ final class PhpRouteReferenceCandidateExtractor
 {
     public function __construct(
         private readonly QuotedArgumentMatcher $matcher,
-        private readonly PhpCommentParserInterface $phpComments,
+        private readonly PhpCommentParser $phpComments,
         private readonly RouteParameterKeyExtractor $parameterKeys,
     ) {
     }

@@ -4,7 +4,7 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
-use Symfony\Lsp\Runtime\RuntimeSnapshotNormalizer;
+use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
 
 final class ProjectServiceSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -39,10 +39,10 @@ final class ProjectServiceSnapshotLoader implements RuntimeSnapshotLoaderInterfa
                 \is_bool($item['public'] ?? null) ? $item['public'] : null,
                 \is_bool($item['lazy'] ?? null) ? $item['lazy'] : null,
                 \is_string($item['deprecation'] ?? null) ? $item['deprecation'] : null,
-                RuntimeSnapshotNormalizer::stringList($item['tags'] ?? null),
+                RuntimeSnapshotValues::stringList($item['tags'] ?? null),
                 \is_string($item['decorates'] ?? null) ? $item['decorates'] : null,
-                RuntimeSnapshotNormalizer::stringList($item['autowiringTypes'] ?? null),
-                RuntimeSnapshotNormalizer::stringList($item['decorationStack'] ?? null),
+                RuntimeSnapshotValues::stringList($item['autowiringTypes'] ?? null),
+                RuntimeSnapshotValues::stringList($item['decorationStack'] ?? null),
             );
         }
 

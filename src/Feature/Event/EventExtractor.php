@@ -7,7 +7,7 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
@@ -24,7 +24,7 @@ final class EventExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $parser,
-        private readonly PhpCommentParserInterface $phpComments,
+        private readonly PhpCommentParser $phpComments,
         private readonly EventYamlListenerAnalyzer $yamlListenerAnalyzer,
         private readonly EventSubscriberMapAnalyzer $subscriberMapAnalyzer,
     ) {

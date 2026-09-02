@@ -8,7 +8,7 @@ use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpClassReference;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -24,7 +24,7 @@ final class DoctrineExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $phpParser,
-        private readonly PhpCommentParserInterface $phpComments,
+        private readonly PhpCommentParser $phpComments,
         private readonly DoctrineRepositoryReceiverResolver $repositoryReceivers,
         private readonly PhpLiteralArrayKeyParser $arrayKeys,
     ) {

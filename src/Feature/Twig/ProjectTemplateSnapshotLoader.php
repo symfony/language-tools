@@ -10,7 +10,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
-use Symfony\Lsp\Runtime\RuntimeSnapshotNormalizer;
+use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
 
 final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -31,7 +31,7 @@ final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterf
         if (!\is_array($section['paths'] ?? null)) {
             return;
         }
-        $globals = RuntimeSnapshotNormalizer::stringList($section['globals'] ?? null);
+        $globals = RuntimeSnapshotValues::stringList($section['globals'] ?? null);
         $this->indexes->forProject($project)->replaceGlobals($globals);
         $templates = [];
         foreach ($section['paths'] as $loaderPath) {

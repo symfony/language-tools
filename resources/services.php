@@ -60,7 +60,6 @@ use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpExpressionParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -197,7 +196,7 @@ return static function (ContainerConfigurator $container): void {
     $services->set(TwigCallArgumentResolver::class);
     $services->set(CommentParserRegistry::class)
         ->arg('$parsers', [
-            'php' => service(PhpCommentParserInterface::class),
+            'php' => service(PhpCommentParser::class),
             'twig' => service(TwigCommentParser::class),
             'yaml' => service(YamlCommentParser::class),
             'xml' => service(XmlCommentParser::class),
@@ -221,7 +220,6 @@ return static function (ContainerConfigurator $container): void {
         ->arg('$parser', service(LastResultPhpParser::class.'.inner'));
     $services->get(PhpExpressionParser::class)
         ->arg('$parser', service(TolerantPhpParser::class));
-    $services->alias(PhpCommentParserInterface::class, PhpCommentParser::class);
     $services->alias(TreeSitterParserInterface::class, NativeTreeSitterParser::class);
     $services->get(LastResultTreeSitterParser::class)
         ->decorate(TreeSitterParserInterface::class)

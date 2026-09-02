@@ -5,7 +5,7 @@ namespace Symfony\Lsp\Feature\Console;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
-use Symfony\Lsp\Runtime\RuntimeSnapshotNormalizer;
+use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
 
 final class ProjectConsoleSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -42,7 +42,7 @@ final class ProjectConsoleSnapshotLoader implements RuntimeSnapshotLoaderInterfa
     /** @return list<string> */
     private function strings(mixed $values): array
     {
-        $values = array_values(array_unique(RuntimeSnapshotNormalizer::stringList($values)));
+        $values = array_values(array_unique(RuntimeSnapshotValues::stringList($values)));
         sort($values);
 
         return $values;

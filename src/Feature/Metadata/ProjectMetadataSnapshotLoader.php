@@ -4,7 +4,7 @@ namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
-use Symfony\Lsp\Runtime\RuntimeSnapshotNormalizer;
+use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
 
 final class ProjectMetadataSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -27,8 +27,8 @@ final class ProjectMetadataSnapshotLoader implements RuntimeSnapshotLoaderInterf
             $forms[] = new FormType(
                 $item['class'],
                 \is_string($item['blockPrefix'] ?? null) ? $item['blockPrefix'] : null,
-                RuntimeSnapshotNormalizer::stringList($item['options'] ?? null),
-                RuntimeSnapshotNormalizer::stringList($item['requiredOptions'] ?? null),
+                RuntimeSnapshotValues::stringList($item['options'] ?? null),
+                RuntimeSnapshotValues::stringList($item['requiredOptions'] ?? null),
             );
         }
         $constraints = [];
@@ -39,7 +39,7 @@ final class ProjectMetadataSnapshotLoader implements RuntimeSnapshotLoaderInterf
             $constraints[] = new ValidationConstraint(
                 $item['name'],
                 $item['class'],
-                RuntimeSnapshotNormalizer::stringList($item['options'] ?? null),
+                RuntimeSnapshotValues::stringList($item['options'] ?? null),
             );
         }
         $this->indexes->forProject($project)->replace(

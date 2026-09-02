@@ -11,7 +11,7 @@ use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -24,7 +24,7 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
         private readonly LspProtocolMapper $protocol,
         private readonly TwigComponentIndexRegistry $indexes,
         private readonly TwigComponentExtractor $extractor,
-        private readonly PhpCommentParserInterface $phpComments,
+        private readonly PhpCommentParser $phpComments,
     ) {
     }
 

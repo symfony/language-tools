@@ -4,7 +4,7 @@ namespace Symfony\Lsp\Feature\Configuration;
 
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
-use Symfony\Lsp\Runtime\RuntimeSnapshotNormalizer;
+use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
 
 final class ProjectConfigurationSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -49,7 +49,7 @@ final class ProjectConfigurationSnapshotLoader implements RuntimeSnapshotLoaderI
                 $allowed[] = $value;
             }
         }
-        $allowedEnumCases = RuntimeSnapshotNormalizer::stringList($data['allowedEnumCases'] ?? null);
+        $allowedEnumCases = RuntimeSnapshotValues::stringList($data['allowedEnumCases'] ?? null);
         $accepts = [];
         foreach (\is_array($data['accepts'] ?? null) ? $data['accepts'] : [] as $kind => $accepted) {
             if (\is_string($kind) && \is_bool($accepted)) {

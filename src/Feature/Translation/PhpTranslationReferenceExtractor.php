@@ -4,7 +4,7 @@ namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\Php\PhpArgument;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpObjectCreation;
@@ -24,7 +24,7 @@ final class PhpTranslationReferenceExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $parser,
-        private readonly PhpCommentParserInterface $comments,
+        private readonly PhpCommentParser $comments,
         private readonly TranslationParameterAnalyzer $parameters,
     ) {
     }

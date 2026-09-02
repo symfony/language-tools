@@ -38,9 +38,11 @@ use Symfony\Lsp\Project\ProjectStateInterface;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Project\WorkspaceTrustManager;
 use Symfony\Lsp\Runtime\DebouncedRuntimeRefreshScheduler;
+use Symfony\Lsp\Runtime\RuntimeBridgeTimingNormalizer;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
 use Symfony\Lsp\Runtime\RuntimeSnapshotState;
+use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
 
 final class ServiceConfigurationTest extends TestCase
 {
@@ -88,6 +90,7 @@ final class ServiceConfigurationTest extends TestCase
             SourceFactsStore::class,
             PhpStringLiteralDecoder::class,
             TwigStringDecoder::class,
+            RuntimeSnapshotValues::class,
         ] as $class) {
             self::assertFalse($container->hasDefinition($class), \sprintf('The manually constructed class "%s" is registered as a service.', $class));
         }
@@ -97,6 +100,7 @@ final class ServiceConfigurationTest extends TestCase
             TranslationParameterAnalyzer::class,
             TreeSitterResultDecoder::class,
             YamlScalarDecoder::class,
+            RuntimeBridgeTimingNormalizer::class,
         ] as $class) {
             self::assertTrue($container->hasDefinition($class), \sprintf('The injected collaborator "%s" is not registered as a service.', $class));
         }

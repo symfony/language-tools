@@ -5,7 +5,7 @@ namespace Symfony\Lsp\Feature\Metadata;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
@@ -14,7 +14,7 @@ final class MetadataExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $phpParser,
-        private readonly PhpCommentParserInterface $phpComments,
+        private readonly PhpCommentParser $phpComments,
         private readonly FormMetadataExtractor $forms,
         private readonly ValidationMetadataExtractor $validation,
         private readonly SerializerMetadataExtractor $serializer,

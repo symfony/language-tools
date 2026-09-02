@@ -8,7 +8,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
-use Symfony\Lsp\Runtime\RuntimeSnapshotNormalizer;
+use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
 
 final class ProjectTwigComponentSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -29,8 +29,8 @@ final class ProjectTwigComponentSnapshotLoader implements RuntimeSnapshotLoaderI
         if (!\is_array($section['names'] ?? null)) {
             return;
         }
-        $names = RuntimeSnapshotNormalizer::stringList($section['names']);
-        $caseInsensitiveNames = RuntimeSnapshotNormalizer::stringList($section['caseInsensitiveNames'] ?? null);
+        $names = RuntimeSnapshotValues::stringList($section['names']);
+        $caseInsensitiveNames = RuntimeSnapshotValues::stringList($section['caseInsensitiveNames'] ?? null);
         $directory = \is_string($section['anonymousTemplateDirectory'] ?? null) && '' !== $section['anonymousTemplateDirectory']
             ? $section['anonymousTemplateDirectory']
             : 'components';

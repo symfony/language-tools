@@ -6,7 +6,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
@@ -25,7 +25,7 @@ final class TemplateReferenceExtractor
         private readonly TwigDocumentParser $twigParser,
         private readonly TwigCallArgumentResolver $twigArguments,
         private readonly QuotedArgumentMatcher $matcher,
-        private readonly PhpCommentParserInterface $phpComments,
+        private readonly PhpCommentParser $phpComments,
         private readonly PhpParserInterface $phpParser,
         private readonly PhpLiteralArrayKeyParser $arrayKeys,
         private readonly BalancedDelimiterMatcher $delimiters,

@@ -5,7 +5,7 @@ namespace Symfony\Lsp\Feature\Stimulus;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
-use Symfony\Lsp\Runtime\RuntimeSnapshotNormalizer;
+use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
 
 final class ProjectStimulusSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -45,7 +45,7 @@ final class ProjectStimulusSnapshotLoader implements RuntimeSnapshotLoaderInterf
     /** @return list<string> */
     private function strings(mixed $values): array
     {
-        $values = RuntimeSnapshotNormalizer::stringList($values);
+        $values = RuntimeSnapshotValues::stringList($values);
         sort($values);
 
         return $values;

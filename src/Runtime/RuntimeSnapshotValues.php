@@ -2,7 +2,7 @@
 
 namespace Symfony\Lsp\Runtime;
 
-final class RuntimeSnapshotNormalizer
+final class RuntimeSnapshotValues
 {
     /** @return list<string> */
     public static function stringList(mixed $value): array

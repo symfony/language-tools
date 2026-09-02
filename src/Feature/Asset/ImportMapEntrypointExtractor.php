@@ -4,13 +4,13 @@ namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 
 final class ImportMapEntrypointExtractor
 {
     public function __construct(
         private readonly PositionConverter $converter,
-        private readonly PhpCommentParserInterface $commentParser,
+        private readonly PhpCommentParser $commentParser,
         private readonly BalancedDelimiterMatcher $delimiters,
     ) {
     }

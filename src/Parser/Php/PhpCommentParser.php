@@ -13,7 +13,7 @@ use Symfony\Lsp\Parser\SourceComment;
  * byte length and UTF-16 unit count, so positions measured on the masked
  * text always match the original document.
  */
-final class PhpCommentParser extends AbstractCommentParser implements PhpCommentParserInterface
+final class PhpCommentParser extends AbstractCommentParser
 {
     protected function parseSource(string $source): CommentParseResult
     {

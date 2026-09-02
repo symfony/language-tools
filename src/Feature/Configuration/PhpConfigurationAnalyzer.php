@@ -2,7 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Configuration;
 
-use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -11,7 +11,7 @@ final class PhpConfigurationAnalyzer
 {
     public function __construct(
         private readonly PhpParserInterface $parser,
-        private readonly PhpCommentParserInterface $comments,
+        private readonly PhpCommentParser $comments,
     ) {
     }
 
