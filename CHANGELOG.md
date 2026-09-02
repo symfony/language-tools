@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Clarify whether runtime timings cover full or targeted refreshes
-- Preserve bounded sanitized frames in verbose server errors
+- Preserve bounded sanitized frames without absolute closure paths in verbose server errors
 - Accept the next Symfony development branch across major boundaries
 - Allow release metadata network access to be disabled
 - Persist healthy runtime sections and report partial indexes accurately

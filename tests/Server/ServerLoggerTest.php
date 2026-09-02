@@ -86,6 +86,26 @@ final class ServerLoggerTest extends TestCase
         }
     }
 
+    public function testVerboseErrorTraceNormalizesAbsoluteClosureFunctionPaths(): void
+    {
+        $output = new CapturingWritableStream();
+        $logger = new ServerLogger($output, new SensitiveDataRedactor());
+        $logger->configure('verbose');
+        /** @var \Closure(): never $throw */
+        $throw = require __DIR__.'/../Fixtures/Server/throwing-closure.php';
+
+        try {
+            $throw();
+        } catch (\Throwable $error) {
+            $logger->error($error);
+        }
+
+        $contents = $output->contents();
+        self::assertStringContainsString('{closure}()', $contents);
+        self::assertStringNotContainsString(\dirname(__DIR__, 2), $contents);
+        self::assertStringNotContainsString(str_replace('/', '\\', \dirname(__DIR__, 2)), $contents);
+    }
+
     public function testVerboseErrorTraceFrameCountIsBounded(): void
     {
         $output = new CapturingWritableStream();

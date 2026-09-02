@@ -79,7 +79,7 @@ final class ServerLogger implements TrafficLoggerInterface
             $location = \is_string($frame['file'] ?? null)
                 ? $this->relativeFile($frame['file']).(\is_int($frame['line'] ?? null) ? ':'.$frame['line'] : '')
                 : '[internal function]';
-            $call = ($frame['class'] ?? '').($frame['type'] ?? '').$frame['function'].'()';
+            $call = ($frame['class'] ?? '').($frame['type'] ?? '').$this->traceFunction($frame['function']).'()';
             $lines[] = '#'.$index.' '.$location.' '.$call;
         }
         if (\count($trace) > self::MAX_TRACE_FRAMES) {
@@ -87,6 +87,15 @@ final class ServerLogger implements TrafficLoggerInterface
         }
 
         return $lines;
+    }
+
+    private function traceFunction(string $function): string
+    {
+        if (1 === preg_match('/^\{closure:(.+):[0-9]+\}$/D', $function, $matches) && Path::isAbsolute($matches[1])) {
+            return '{closure}';
+        }
+
+        return $function;
     }
 
     private function traffic(string $direction, string $line): void
