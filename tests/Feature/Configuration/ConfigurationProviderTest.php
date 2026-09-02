@@ -385,6 +385,79 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
+    public function testValidatesYamlMergeKeysInsidePrototypeSequences(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = <<<'YAML'
+            defaults: &defaults
+                handlers:
+                    - type: stream
+                      nested: invalid
+            framework:
+                items:
+                    - <<: *defaults
+            YAML;
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
+        self::assertSame(['Expected boolean for "framework.items.handlers.nested".'], array_column($diagnostics, 'message'));
+        self::assertSame(
+            [$this->protocolRange($fixture->converter, $text, (int) strpos($text, '<<'), 2)],
+            array_column($diagnostics, 'range'),
+        );
+    }
+
+    public function testValidatesYamlMappingAliasesInsidePrototypeSequences(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = <<<'YAML'
+            handlers: &handlers
+                - type: stream
+                  nested: invalid
+            framework:
+                items:
+                    - handlers: *handlers
+            YAML;
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
+        self::assertSame(['Expected boolean for "framework.items.handlers.nested".'], array_column($diagnostics, 'message'));
+        self::assertSame(
+            [$this->protocolRange($fixture->converter, $text, (int) strpos($text, '*handlers'), \strlen('*handlers'))],
+            array_column($diagnostics, 'range'),
+        );
+    }
+
+    public function testValidatesYamlListAliasesAtPrototypeNodes(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = <<<'YAML'
+            items: &items
+                - handlers:
+                    - type: stream
+                      nested: true
+                - handlers:
+                    - type: stream
+                      nested: invalid
+            framework:
+                items: *items
+            YAML;
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
+        self::assertSame(['Expected boolean for "framework.items.handlers.nested".'], array_column($diagnostics, 'message'));
+        self::assertSame(
+            [$this->protocolRange($fixture->converter, $text, (int) strpos($text, '*items'), \strlen('*items'))],
+            array_column($diagnostics, 'range'),
+        );
+    }
+
     public function testValidatesResolvedYamlAliasValues(): void
     {
         $fixture = $this->providers();

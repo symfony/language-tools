@@ -60,7 +60,7 @@ final class YamlConfigurationParser
             if ($resolveAliasesAndMerges && null !== $index && ($this->isAlias($value) || $this->isAnchor($value))) {
                 $value = '';
                 if (null !== $resolved) {
-                    [$hasResolvedValue, $resolvedValue] = $this->resolvedSubtree($resolved, $mapping->scope, $mapping->path);
+                    [$hasResolvedValue, $resolvedValue] = $this->resolvedSubtree($resolved, $mapping->scope, $mapping->path, $mapping->sequenceDepths);
                 }
             }
             $occurrence = $this->occurrence($text, $mapping, $path, $literalDepths, $value, $hasResolvedValue, $resolvedValue);
@@ -143,11 +143,8 @@ final class YamlConfigurationParser
         $occurrences = [];
         $processed = [];
         foreach ($merges as $merge) {
-            if ($merge->isSequenceItem()) {
-                continue;
-            }
             $targetPath = \array_slice($merge->path, 0, -1);
-            [$found, $target] = $this->resolvedSubtree($resolved, $merge->scope, $targetPath);
+            [$found, $target] = $this->resolvedSubtree($resolved, $merge->scope, $targetPath, $merge->sequenceDepths);
             if (!$found || !\is_array($target)) {
                 continue;
             }
@@ -175,11 +172,8 @@ final class YamlConfigurationParser
         $occurrences = [];
         $processed = [];
         foreach ($aliases as $alias) {
-            if ($alias->isSequenceItem()) {
-                continue;
-            }
-            [$found, $target] = $this->resolvedSubtree($resolved, $alias->scope, $alias->path);
-            if (!$found || !\is_array($target) || array_is_list($target)) {
+            [$found, $target] = $this->resolvedSubtree($resolved, $alias->scope, $alias->path, $alias->sequenceDepths);
+            if (!$found || !\is_array($target)) {
                 continue;
             }
             $targetIdentity = $this->identity($alias->scope, $alias->path);
@@ -203,6 +197,21 @@ final class YamlConfigurationParser
      */
     private function appendResolvedOccurrences(ConfigurationIndex $index, array $resolved, array $path, array $sequenceDepths, string $scope, Range $range, array &$known, array &$occurrences): void
     {
+        if (array_is_list($resolved)) {
+            $sequenceDepths[] = \count($path);
+            $sequenceDepths = array_values(array_unique($sequenceDepths));
+            sort($sequenceDepths);
+            foreach ($resolved as $value) {
+                if (!\is_array($value)) {
+                    continue;
+                }
+                $itemKnown = $known;
+                $this->appendResolvedOccurrences($index, $value, $path, $sequenceDepths, $scope, $range, $itemKnown, $occurrences);
+            }
+
+            return;
+        }
+
         foreach ($resolved as $name => $value) {
             $childPath = [...$path, (string) $name];
             $normalizedPath = $index->normalizePath($childPath, $sequenceDepths);
@@ -221,7 +230,7 @@ final class YamlConfigurationParser
                 hasResolvedValue: true,
                 resolvedValue: $value,
             );
-            if (\is_array($value) && !array_is_list($value) && null !== $index->find($normalizedPath, $sequenceDepths)) {
+            if (\is_array($value) && null !== $index->find($normalizedPath, $sequenceDepths)) {
                 $this->appendResolvedOccurrences($index, $value, $childPath, $sequenceDepths, $scope, $range, $known, $occurrences);
             }
         }
@@ -240,21 +249,61 @@ final class YamlConfigurationParser
     /**
      * @param array<array-key, mixed> $resolved
      * @param list<string>            $path
+     * @param list<int>               $sequenceDepths
      *
      * @return array{bool, mixed}
      */
-    private function resolvedSubtree(array $resolved, string $scope, array $path): array
+    private function resolvedSubtree(array $resolved, string $scope, array $path, array $sequenceDepths = []): array
     {
-        $current = $resolved;
-        $path = 'base' === $scope ? $path : [$scope, ...$path];
-        foreach ($path as $part) {
-            if (!\is_array($current) || !\array_key_exists($part, $current)) {
+        if ('base' !== $scope) {
+            if (!\array_key_exists($scope, $resolved) || !\is_array($resolved[$scope])) {
                 return [false, null];
             }
-            $current = $current[$part];
+            $resolved = $resolved[$scope];
+        }
+        $targets = $this->resolvedTargets($resolved, $path, $sequenceDepths);
+        if ([] === $targets) {
+            return [false, null];
+        }
+        $target = $targets[0];
+        foreach (\array_slice($targets, 1) as $candidate) {
+            if ($target != $candidate) {
+                return [false, null];
+            }
         }
 
-        return [true, $current];
+        return [true, $target];
+    }
+
+    /**
+     * @param list<string> $path
+     * @param list<int>    $sequenceDepths
+     *
+     * @return list<mixed>
+     */
+    private function resolvedTargets(mixed $resolved, array $path, array $sequenceDepths, int $depth = 0): array
+    {
+        if (\in_array($depth, $sequenceDepths, true)) {
+            if (!\is_array($resolved) || !array_is_list($resolved)) {
+                return [];
+            }
+            $sequenceDepths = array_values(array_diff($sequenceDepths, [$depth]));
+            $targets = [];
+            foreach ($resolved as $value) {
+                array_push($targets, ...$this->resolvedTargets($value, $path, $sequenceDepths, $depth));
+            }
+
+            return $targets;
+        }
+        if ($depth === \count($path)) {
+            return [$resolved];
+        }
+        $part = $path[$depth];
+        if (!\is_array($resolved) || !\array_key_exists($part, $resolved)) {
+            return [];
+        }
+
+        return $this->resolvedTargets($resolved[$part], $path, $sequenceDepths, $depth + 1);
     }
 
     /** @param list<string> $path */
