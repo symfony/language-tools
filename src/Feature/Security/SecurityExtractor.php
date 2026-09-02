@@ -13,6 +13,7 @@ use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 
 final class SecurityExtractor
 {
@@ -29,6 +30,7 @@ final class SecurityExtractor
         private readonly YamlConfigurationParser $yaml,
         private readonly CommentParserRegistry $comments,
         private readonly PhpParserInterface $phpParser,
+        private readonly ?YamlDocumentParser $yamlParser = null,
     ) {
     }
 
@@ -107,18 +109,20 @@ final class SecurityExtractor
     /** @return list<SecuritySourceSymbol> */
     private function yamlSymbols(string $uri, string $text): array
     {
+        $rawNames = $this->rawYamlNames($text);
         $symbols = [];
         foreach ($this->yaml->parse($text) as $occurrence) {
             $path = $occurrence->path;
+            $name = $rawNames[$this->converter->toByteOffset($text, $occurrence->keyRange->start)] ?? $this->rangeText($text, $occurrence->keyRange);
             if (3 === \count($path) && 'security' === $path[0] && 'providers' === $path[1]) {
-                $symbols[] = new SecuritySourceSymbol(SecuritySymbolKind::Provider, $path[2], $uri, $occurrence->keyRange, true);
+                $symbols[] = new SecuritySourceSymbol(SecuritySymbolKind::Provider, $name, $uri, $occurrence->keyRange, true);
             } elseif (3 === \count($path) && 'security' === $path[0] && 'firewalls' === $path[1]) {
-                $symbols[] = new SecuritySourceSymbol(SecuritySymbolKind::Firewall, $path[2], $uri, $occurrence->keyRange, true);
+                $symbols[] = new SecuritySourceSymbol(SecuritySymbolKind::Firewall, $name, $uri, $occurrence->keyRange, true);
             } elseif (4 === \count($path) && 'security' === $path[0] && 'firewalls' === $path[1] && 'provider' === $path[3]) {
                 array_push($symbols, ...$this->valueSymbols(SecuritySymbolKind::Provider, '/[A-Za-z_][A-Za-z0-9_.-]*/', $uri, $text, $occurrence));
             }
             if (3 === \count($path) && 'security' === $path[0] && 'role_hierarchy' === $path[1] && str_starts_with($path[2], 'ROLE_')) {
-                $symbols[] = new SecuritySourceSymbol(SecuritySymbolKind::Role, $path[2], $uri, $occurrence->keyRange, true);
+                $symbols[] = new SecuritySourceSymbol(SecuritySymbolKind::Role, $name, $uri, $occurrence->keyRange, true);
                 array_push($symbols, ...$this->valueSymbols(SecuritySymbolKind::Role, '/ROLE_[A-Z0-9_]+/', $uri, $text, $occurrence));
             } elseif ('security' === ($path[0] ?? null) && 'roles' === ($path[array_key_last($path)] ?? null)) {
                 array_push($symbols, ...$this->valueSymbols(SecuritySymbolKind::Role, '/ROLE_[A-Z0-9_]+/', $uri, $text, $occurrence));
@@ -183,6 +187,31 @@ final class SecurityExtractor
         }
 
         return $symbols;
+    }
+
+    private function rangeText(string $text, Range $range): string
+    {
+        $start = $this->converter->toByteOffset($text, $range->start);
+        $end = $this->converter->toByteOffset($text, $range->end);
+
+        return substr($text, $start, $end - $start);
+    }
+
+    /** @return array<int, string> */
+    private function rawYamlNames(string $text): array
+    {
+        if (null === $this->yamlParser) {
+            return [];
+        }
+
+        $names = [];
+        foreach ($this->yamlParser->parseDocument($text)->mappings as $mapping) {
+            if ([] !== $mapping->path) {
+                $names[$mapping->keyStartByte] = $mapping->path[\count($mapping->path) - 1];
+            }
+        }
+
+        return $names;
     }
 
     /**

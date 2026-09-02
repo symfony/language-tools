@@ -38,8 +38,7 @@ final class SecurityProviderTest extends TestCase
 {
     public function testExtractsOnlyRecognizedSecuritySymbols(): void
     {
-        $converter = new PositionConverter();
-        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]), new TolerantPhpParser(new Parser()));
+        $extractor = $this->extractor();
         $php = <<<'PHP'
 <?php
 namespace App;
@@ -216,8 +215,7 @@ YAML;
 
     public function testIgnoresCommentedPhpSecurityConstructs(): void
     {
-        $converter = new PositionConverter();
-        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]), new TolerantPhpParser(new Parser()));
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App;
@@ -244,8 +242,7 @@ YAML;
 
     public function testOffersNoSecurityCompletionsInsidePhpComments(): void
     {
-        $converter = new PositionConverter();
-        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]), new TolerantPhpParser(new Parser()));
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -296,7 +293,7 @@ PHP;
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $converter = new PositionConverter();
-        $extractor = new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]), new TolerantPhpParser(new Parser()));
+        $extractor = $this->extractor($converter);
         $indexes = new SecurityIndexRegistry();
         $indexes->forProject($project)->replace(
             [new SecurityFirewall('main', 'users', true, false, true, ['App\\Security\\Authenticator'])],
@@ -330,6 +327,58 @@ PHP;
         self::assertContains($twigUri, array_column($relationshipProvider->references($this->params($phpUri, $rolePosition)) ?? [], 'uri'));
         self::assertSame(['security.unknown_provider'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $yamlUri]]) ?? [], 'code'));
         self::assertSame(['security.unknown_firewall'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $twigUri]]) ?? [], 'code'));
+    }
+
+    public function testPreservesDashedProviderAndFirewallNames(): void
+    {
+        $yamlUri = 'file:///workspace/config/packages/security.yaml';
+        $yaml = <<<'YAML'
+            security:
+              providers:
+                in-memory:
+                  memory: ~
+              firewalls:
+                main-area:
+                  provider: in-memory
+            YAML;
+        $twigUri = 'file:///workspace/templates/logout.html.twig';
+        $twig = "{{ logout_path('main-area') }}";
+        $documents = new DocumentStore();
+        $documents->open(new Document($yamlUri, 'yaml', 1, $yaml));
+        $documents->open(new Document($twigUri, 'twig', 1, $twig));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $converter = new PositionConverter();
+        $extractor = $this->extractor($converter);
+        $indexes = new SecurityIndexRegistry();
+        $indexes->forProject($project)->replace([], [], [], [], true);
+        $sourceIndexes = new SecuritySourceIndexRegistry();
+        $sourceIndexes->forProject($project)->replace(
+            $yamlFacts = $extractor->extract(new SourceDocument($yamlUri, 'yaml', $yaml)),
+            $extractor->extract(new SourceDocument($twigUri, 'twig', $twig)),
+        );
+        $documentResolver = new DocumentContextResolver($documents, $projects);
+        $protocol = new LspProtocolMapper();
+        $relationshipProvider = new SecurityRelationshipProvider(
+            $protocol,
+            $indexes,
+            $sourceIndexes,
+            new SecuritySymbolResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $extractor),
+        );
+        $diagnosticProvider = new SecurityDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $extractor);
+
+        self::assertSame(['in-memory', 'main-area', 'in-memory'], array_map(static fn ($symbol): string => $symbol->name, $yamlFacts->symbols));
+
+        $providerPosition = $converter->toPosition($yaml, (int) strpos($yaml, 'provider: in-memory') + \strlen('provider: in-me'));
+        self::assertSame([$yamlUri], array_column($relationshipProvider->definition($this->params($yamlUri, $providerPosition)) ?? [], 'uri'));
+        self::assertSame([$yamlUri, $yamlUri], array_column($relationshipProvider->references($this->params($yamlUri, $providerPosition)) ?? [], 'uri'));
+
+        $firewallPosition = $converter->toPosition($twig, (int) strpos($twig, 'main-area') + 2);
+        self::assertSame([$yamlUri], array_column($relationshipProvider->definition($this->params($twigUri, $firewallPosition)) ?? [], 'uri'));
+        self::assertSame([$yamlUri, $twigUri], array_column($relationshipProvider->references($this->params($twigUri, $firewallPosition)) ?? [], 'uri'));
+
+        self::assertSame([], $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $yamlUri]]));
+        self::assertSame([], $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $twigUri]]));
     }
 
     public function testResolvesSymbolAtRangeEnd(): void
@@ -367,8 +416,9 @@ PHP;
     private function extractor(?PositionConverter $converter = null): SecurityExtractor
     {
         $converter ??= new PositionConverter();
+        $yamlParser = new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()));
 
-        return new SecurityExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]), new TolerantPhpParser(new Parser()));
+        return new SecurityExtractor($converter, new YamlConfigurationParser($converter, $yamlParser), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]), new TolerantPhpParser(new Parser()), $yamlParser);
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
