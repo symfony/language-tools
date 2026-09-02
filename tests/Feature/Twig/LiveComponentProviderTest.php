@@ -176,7 +176,7 @@ final class LiveComponentProviderTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new TwigComponentIndexRegistry();
         $indexes->forProject($project)->replace($extractor->extract($project, new SourceDocument($uri, 'php', $text)));
         $provider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));

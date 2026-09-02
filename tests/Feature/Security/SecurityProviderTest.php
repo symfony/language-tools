@@ -347,7 +347,7 @@ PHP;
         $documents->open(new Document($yamlUri, 'yaml', 1, $yaml));
         $documents->open(new Document($twigUri, 'twig', 1, $twig));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $converter = new PositionConverter();
         $extractor = $this->extractor($converter);
         $indexes = new SecurityIndexRegistry();

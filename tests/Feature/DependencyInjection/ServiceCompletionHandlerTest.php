@@ -168,7 +168,7 @@ final class ServiceCompletionHandlerTest extends TestCase
     {
         $documents = new DocumentStore();
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $serviceIndexes = new ServiceIndexRegistry();
         $serviceIndexes->forProject($project)->replace(true, new Service(
             'app.mailer',
