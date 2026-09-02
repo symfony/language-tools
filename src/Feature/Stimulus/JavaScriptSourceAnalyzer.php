@@ -36,6 +36,11 @@ final class JavaScriptSourceAnalyzer
                     $this->maskByte($masked, $text, $offset);
                     $this->maskByte($masked, $text, ++$offset);
                     $state = 'block_comment';
+                } elseif ('/' === $character && null !== $end = $this->regularExpressionEnd($text, $offset)) {
+                    while ($offset <= $end) {
+                        $this->maskByte($masked, $text, $offset++);
+                    }
+                    --$offset;
                 } elseif ('\'' === $character || '"' === $character || '`' === $character) {
                     $quote = $character;
                     $stringOffset = $offset + 1;
@@ -77,6 +82,44 @@ final class JavaScriptSourceAnalyzer
         }
 
         return [$masked, $strings];
+    }
+
+    private function regularExpressionEnd(string $text, int $offset): ?int
+    {
+        $before = rtrim(substr($text, 0, $offset));
+        if ('' !== $before) {
+            $previous = $before[\strlen($before) - 1];
+            if (!str_contains('([{:;,=?&|%^~<', $previous)
+                && !str_ends_with($before, '=>')
+                && 1 !== preg_match('/(?:^|[^A-Za-z0-9_$])(?:await|case|delete|do|else|in|instanceof|new|of|return|throw|typeof|void|yield)$/', $before)) {
+                return null;
+            }
+        }
+
+        $characterClass = false;
+        for ($end = $offset + 1, $length = \strlen($text); $end < $length; ++$end) {
+            $character = $text[$end];
+            if ("\r" === $character || "\n" === $character) {
+                return null;
+            }
+            if ('\\' === $character) {
+                ++$end;
+                continue;
+            }
+            if ('[' === $character) {
+                $characterClass = true;
+            } elseif (']' === $character) {
+                $characterClass = false;
+            } elseif ('/' === $character && !$characterClass) {
+                while (isset($text[$end + 1]) && str_contains('dgimsuvy', $text[$end + 1])) {
+                    ++$end;
+                }
+
+                return $end;
+            }
+        }
+
+        return null;
     }
 
     private function maskByte(string &$masked, string $text, int $offset): void

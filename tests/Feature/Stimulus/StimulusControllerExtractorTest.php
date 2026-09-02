@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\Stimulus;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Stimulus\JavaScriptSourceAnalyzer;
@@ -50,6 +51,23 @@ final class StimulusControllerExtractorTest extends TestCase
         self::assertSame(['open'], array_map(static fn ($member): string => $member->name, $declaration->members));
     }
 
+    #[DataProvider('regularExpressionProvider')]
+    public function testIgnoresRegularExpressionContentsWhenFindingTheClassBoundary(string $regularExpression): void
+    {
+        $declaration = $this->extract(<<<JS
+            export default class extends Controller {
+                open() {
+                    const pattern = {$regularExpression};
+                }
+
+                close() {
+                }
+            }
+            JS);
+
+        self::assertSame(['open', 'close'], array_map(static fn ($member): string => $member->name, $declaration->members));
+    }
+
     public function testIgnoresMembersInsideCommentsAndStrings(): void
     {
         $declaration = $this->extract(<<<'JS'
@@ -88,6 +106,13 @@ final class StimulusControllerExtractorTest extends TestCase
         $declaration = $this->extract('export default class extends Controller');
 
         self::assertSame([], $declaration->members);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function regularExpressionProvider(): iterable
+    {
+        yield 'closing brace' => ['/}/'];
+        yield 'quotes' => ['/[\'\"]/'];
     }
 
     private function extract(string $text): StimulusControllerDeclaration

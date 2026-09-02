@@ -68,6 +68,20 @@ final class StimulusExtractorTest extends TestCase
         );
     }
 
+    public function testDoesNotMaskTypeScriptDivisionAsRegularExpressions(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/assets/controllers/example_controller.ts', 'typescript', <<<'TS'
+            const ratio = value! / application.register('registered', Controller) / divisor;
+            const genericRatio = factory<Type> / this.application.getControllerForElementAndIdentifier(element, 'resolved') / divisor;
+            TS));
+
+        self::assertSame(
+            ['registered', 'resolved'],
+            array_map(static fn ($reference): string => $reference->controller, $facts->references),
+        );
+    }
+
     public function testIgnoresTwigReferencesInsideDocumentationComments(): void
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');
