@@ -22,6 +22,7 @@
 - Index environment-scoped YAML routes by their route names
 - Omit baseline-matched diagnostics from GitLab Code Quality reports
 - Match recursive headless check selectors wherever `**` appears
+- Match recursive project exclusions wherever `**` appears
 - Preserve form options after nested strings containing closing brackets
 - Recognize Console input references and definitions inside closures and arrow functions
 - Show clean PHP method summaries in Twig callable hover

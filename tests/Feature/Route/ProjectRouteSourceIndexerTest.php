@@ -40,6 +40,7 @@ use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\GitignoreMatcher;
+use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -234,7 +235,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
     private function scanner(ProjectRegistry $projects, DocumentStore $documents, array $providers): ApplicationSourceScanner
     {
         $store = new InMemorySourceIndexStore();
-        $files = new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry());
+        $files = new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry(new GlobPatternCompiler()));
         $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), $providers);
 
         return new ApplicationSourceScanner(

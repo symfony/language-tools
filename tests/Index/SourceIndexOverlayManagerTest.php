@@ -14,6 +14,7 @@ use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Project\GitignoreMatcher;
+use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -41,7 +42,7 @@ final class SourceIndexOverlayManagerTest extends TestCase
                 $projects,
                 $documents,
                 new UriToPathConverter(),
-                new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry()),
+                new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry(new GlobPatternCompiler())),
                 $pipeline,
             );
 

@@ -29,6 +29,7 @@ use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\GitignoreMatcher;
+use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -70,7 +71,7 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
         $indexes = new DependencyInjectionSourceIndexRegistry();
         $converter = new PositionConverter();
         $store = new InMemorySourceIndexStore();
-        $files = new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry());
+        $files = new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry(new GlobPatternCompiler()));
         $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), [new DependencyInjectionSourceIndexer(
             $indexes,
             new YamlDependencyInjectionExtractor(

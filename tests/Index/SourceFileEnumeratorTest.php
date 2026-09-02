@@ -2,11 +2,13 @@
 
 namespace Symfony\Lsp\Tests\Index;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Project\GitignoreMatcher;
+use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 
@@ -21,7 +23,7 @@ final class SourceFileEnumeratorTest extends TestCase
         $this->directory = sys_get_temp_dir().'/symfony-lsp-enumerator-'.bin2hex(random_bytes(6));
         mkdir($this->directory.'/src', 0777, true);
         $this->project = new Project($this->directory, 'file://'.$this->directory, '^8.0');
-        $this->fileScope = new ProjectFileScopeRegistry();
+        $this->fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
     }
 
     protected function tearDown(): void
@@ -65,6 +67,53 @@ final class SourceFileEnumeratorTest extends TestCase
             [['directory' => Path::canonicalize($this->directory.'/linked'), 'error' => 'outside']],
             array_values(iterator_to_array($this->enumerator()->entries($this->project, true))),
         );
+    }
+
+    /** @param list<string> $excluded */
+    #[DataProvider('recursiveExcludePatterns')]
+    public function testMatchesRecursiveExcludePatternsEverywhere(string $pattern, array $excluded): void
+    {
+        $files = [
+            'page.twig',
+            'src/Controller.php',
+            'src/Admin/Controller.php',
+            'templates/page.twig',
+            'templates/admin/page.twig',
+        ];
+        foreach ($files as $file) {
+            $directory = \dirname($this->directory.'/'.$file);
+            if (!is_dir($directory)) {
+                mkdir($directory, 0777, true);
+            }
+            file_put_contents($this->directory.'/'.$file, '');
+        }
+        $this->fileScope->configure($this->project, [$pattern]);
+
+        $included = [];
+        foreach ($this->enumerator()->files($this->project) as $path) {
+            $included[] = str_replace('\\', '/', Path::makeRelative($path, $this->directory));
+        }
+        $expected = array_values(array_diff($files, $excluded));
+
+        self::assertSame($this->sorted($expected), $this->sorted($included));
+    }
+
+    /** @return iterable<string, array{string, list<string>}> */
+    public static function recursiveExcludePatterns(): iterable
+    {
+        yield 'leading double star crosses directories' => ['**.twig', [
+            'page.twig',
+            'templates/page.twig',
+            'templates/admin/page.twig',
+        ]];
+        yield 'embedded double star crosses directories' => ['src/**.php', [
+            'src/Controller.php',
+            'src/Admin/Controller.php',
+        ]];
+        yield 'double star path segment matches zero or more directories' => ['templates/**/page.twig', [
+            'templates/page.twig',
+            'templates/admin/page.twig',
+        ]];
     }
 
     public function testKeepsRootDotenvFilesWhileApplyingGitignoreAndFileScopeRules(): void

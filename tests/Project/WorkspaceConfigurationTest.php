@@ -10,6 +10,7 @@ use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\AnalysisSettings;
 use Symfony\Lsp\Project\GitignoreMatcher;
+use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectConfiguration;
@@ -159,7 +160,7 @@ final class WorkspaceConfigurationTest extends TestCase
             $registry,
             new WorkspaceTrustManager($this->client(), new WorkspaceTrust(), $this->runtimeInitializer(), new ProjectIndexStatusRegistry(), $runtimeConfiguration, $registry),
             $runtimeConfiguration,
-            new ProjectSettings($this->client(), $registry, new TranslationConfigurationRegistry(), $runtimeConfiguration, $projectConfiguration, new ProjectFileScopeRegistry(), $analysisSettings),
+            new ProjectSettings($this->client(), $registry, new TranslationConfigurationRegistry(), $runtimeConfiguration, $projectConfiguration, new ProjectFileScopeRegistry(new GlobPatternCompiler()), $analysisSettings),
             $projectConfiguration,
             new PositionConverter(),
             $uriToPathConverter,

@@ -3,8 +3,8 @@
 namespace Symfony\Lsp\Check;
 
 use Symfony\Component\Filesystem\Path;
-use Symfony\Component\Finder\Glob;
 use Symfony\Lsp\Index\SourceFileEnumerator;
+use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectConfiguration;
@@ -19,6 +19,7 @@ final class CheckFileSelector
         private readonly SourceFileEnumerator $files,
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly ProjectConfiguration $projectConfiguration,
+        private readonly GlobPatternCompiler $globPatterns,
     ) {
     }
 
@@ -120,11 +121,10 @@ final class CheckFileSelector
         $compiled = [];
         foreach ($selectors as $selector) {
             if ($this->isPattern($selector)) {
-                $pattern = str_replace('\\', '/', $selector);
                 $compiled[] = [
                     'selector' => $selector,
                     'type' => 'pattern',
-                    'regex' => $this->patternRegex($pattern),
+                    'regex' => $this->globPatterns->compile($selector),
                 ];
 
                 continue;
@@ -237,28 +237,6 @@ final class CheckFileSelector
         return 'outside' === $error
             ? \sprintf('The application directory "%s" resolves outside its Symfony project.', $path)
             : \sprintf('The application directory "%s" is unreadable.', $path);
-    }
-
-    private function patternRegex(string $pattern): string
-    {
-        $compiled = '';
-        $length = \strlen($pattern);
-        for ($index = 0; $index < $length; ++$index) {
-            if ('*' !== $pattern[$index] || '*' !== ($pattern[$index + 1] ?? null)) {
-                $compiled .= $pattern[$index];
-
-                continue;
-            }
-
-            $previous = $pattern[$index - 1] ?? null;
-            $next = $pattern[$index + 2] ?? null;
-            $compiled .= (0 === $index && '/' === $next) || ('/' === $previous && (null === $next || '/' === $next))
-                ? '**'
-                : "\0";
-            ++$index;
-        }
-
-        return str_replace("\0", '.*', Glob::toRegex($compiled, false, true, '~'));
     }
 
     private function isPattern(string $selector): bool

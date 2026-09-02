@@ -3,20 +3,24 @@
 namespace Symfony\Lsp\Project;
 
 use Symfony\Component\Filesystem\Path;
-use Symfony\Component\Finder\Glob;
 
 final class ProjectFileScopeRegistry implements ProjectStateInterface
 {
     /** @var array<string, list<string>> */
     private array $patterns = [];
 
+    public function __construct(private readonly GlobPatternCompiler $patternCompiler)
+    {
+    }
+
     /** @param list<string> $patterns */
     public function configure(Project $project, array $patterns): void
     {
-        $this->patterns[$project->rootPath] = array_map(
-            static fn (string $pattern): string => Glob::toRegex($pattern, false, true, '~'),
-            $patterns,
-        );
+        $compiled = [];
+        foreach ($patterns as $pattern) {
+            $compiled[] = $this->patternCompiler->compile($pattern);
+        }
+        $this->patterns[$project->rootPath] = $compiled;
     }
 
     public function isExcluded(Project $project, string $path): bool

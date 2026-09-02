@@ -7,6 +7,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
 use Symfony\Lsp\Project\AnalysisSettings;
+use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectConfiguration;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
@@ -25,7 +26,7 @@ final class ProjectSettingsTest extends TestCase
         $client = new ProjectSettingsClient();
         $runtime = new RuntimeConfiguration();
         $analysisSettings = new AnalysisSettings();
-        $fileScope = new ProjectFileScopeRegistry();
+        $fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
         $settings = new ProjectSettings(
             $client,
             $projects,
@@ -72,7 +73,7 @@ final class ProjectSettingsTest extends TestCase
                 new TranslationConfigurationRegistry(),
                 $runtime,
                 $projectConfiguration,
-                new ProjectFileScopeRegistry(),
+                new ProjectFileScopeRegistry(new GlobPatternCompiler()),
                 $analysisSettings,
             );
 
@@ -111,7 +112,7 @@ final class ProjectSettingsTest extends TestCase
             $analysisSettings = new AnalysisSettings();
             $projectConfiguration = new ProjectConfiguration(new UriToPathConverter(), $analysisSettings);
             $projectConfiguration->load([['uri' => 'file://'.$directory]]);
-            $fileScope = new ProjectFileScopeRegistry();
+            $fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
             $settings = new ProjectSettings(
                 new ProjectSettingsClient([['environment' => 'resource', 'translationDiagnostics' => false, 'excludePaths' => ['fixtures/**']]]),
                 $projects,

@@ -49,6 +49,7 @@ use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\GitignoreMatcher;
+use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -76,7 +77,7 @@ final class ApplicationSourceScannerTest extends TestCase
         $this->project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory, '^8.0');
         $this->projects = new ProjectRegistry();
         $this->projects->replace([$this->project]);
-        $this->fileScope = new ProjectFileScopeRegistry();
+        $this->fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
     }
 
     protected function tearDown(): void

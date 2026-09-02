@@ -32,6 +32,7 @@ use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
+use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -310,7 +311,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $documents,
             $projects,
             new ProjectPathResolver($uriConverter),
-            new ProjectFileScopeRegistry(),
+            new ProjectFileScopeRegistry(new GlobPatternCompiler()),
             $uriConverter,
             $this->suppressor($positionConverter),
             [new RouteDiagnosticPublisher(
@@ -413,7 +414,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $documents,
             $projects,
             new ProjectPathResolver($uriConverter),
-            new ProjectFileScopeRegistry(),
+            new ProjectFileScopeRegistry(new GlobPatternCompiler()),
             $uriConverter,
             $this->suppressor($positionConverter),
             [new RouteDiagnosticPublisher(

@@ -9,6 +9,7 @@ use Symfony\Lsp\Check\CheckFileSelector;
 use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Project\AnalysisSettings;
 use Symfony\Lsp\Project\GitignoreMatcher;
+use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectConfiguration;
@@ -38,11 +39,13 @@ final class CheckFileSelectorTest extends TestCase
         $projectConfiguration->load([['uri' => $uriToPathConverter->toUri($this->directory)]]);
         $projects = new ProjectRegistry();
         $projects->replace([new Project($this->directory, $uriToPathConverter->toUri($this->directory), '^8.0')]);
+        $globPatterns = new GlobPatternCompiler();
         $this->selector = new CheckFileSelector(
             $projects,
-            new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry()),
+            new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry($globPatterns)),
             $uriToPathConverter,
             $projectConfiguration,
+            $globPatterns,
         );
     }
 

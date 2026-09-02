@@ -20,6 +20,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
+use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -194,7 +195,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
         $documents->open(new Document($uri, $languageId, 1, $text));
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace', '^8.0')]);
-        $fileScope = new ProjectFileScopeRegistry();
+        $fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
         $fileScope->configure($project, $excludePaths);
 
         $converter = new UriToPathConverter();

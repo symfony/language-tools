@@ -97,9 +97,11 @@ that don't belong to the running application:
         ]
     }
 
-Patterns are relative to each Symfony project root. ``*`` and ``?`` match
-within one path segment. Use ``**`` as a complete path segment to cross
-directories. A pattern ending in ``/`` excludes the complete directory.
+Patterns are relative to each Symfony project root. ``*`` and ``?`` stay
+within one path segment, while ``**`` crosses directories wherever it appears.
+For example, ``**.twig`` excludes Twig files at every depth and ``src/**.php``
+excludes PHP files directly or recursively under ``src/``. A pattern ending in
+``/`` excludes the complete directory.
 
 Excluded files don't contribute source facts and don't receive editor
 diagnostics. A path passed explicitly to ``symfony-lsp check`` remains
