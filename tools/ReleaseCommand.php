@@ -31,8 +31,6 @@ final class ReleaseCommand
         'Set up job',
     ];
     private const TRANSIENT_WORKFLOW_CONCLUSIONS = [
-        'stale',
-        'startup_failure',
         'timed_out',
     ];
 
@@ -306,7 +304,15 @@ final class ReleaseCommand
             if (0 === $attempt && null !== $transientReason) {
                 fwrite(\STDERR, \sprintf("\nRerunning transient workflow jobs once: %s.\n", $transientReason));
                 $this->github->rerunFailedJobs($runId);
-                $this->sleeper->sleep(5);
+                for ($poll = 0; $poll < 60; ++$poll) {
+                    if ('completed' !== $this->github->workflowStatus($runId)) {
+                        break;
+                    }
+                    $this->sleeper->sleep(1);
+                }
+                if (60 === $poll) {
+                    throw new \RuntimeException(\sprintf('Workflow %s rerun did not start. Inspect it with "gh run view %s --web" before resuming the release.', $workflow, $runId));
+                }
                 $reran = true;
                 continue;
             }

@@ -101,6 +101,11 @@ final class ReleaseGitHub
         return $this->processes->capture(['gh', 'run', 'view', $runId, '--json=conclusion', '--jq=.conclusion'], $this->root);
     }
 
+    public function workflowStatus(string $runId): string
+    {
+        return $this->processes->capture(['gh', 'run', 'view', $runId, '--json=status', '--jq=.status'], $this->root);
+    }
+
     /** @return list<string> */
     public function failedStepNames(string $runId): array
     {

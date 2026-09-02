@@ -17,6 +17,7 @@ jobs:
     release:
         name: Promote release candidate
         runs-on: ubuntu-latest
+        timeout-minutes: 10
         env:
             CANDIDATE_ARTIFACT: symfony-lsp-release-candidate-${{ github.ref_name }}-${{ github.sha }}
             GH_REPO: ${{ github.repository }}

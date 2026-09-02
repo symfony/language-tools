@@ -74,6 +74,7 @@ final class ReleaseExecutableTest extends TestCase
                 "run list --commit=commit") echo '[{"databaseId":123,"headSha":"commit","displayTitle":"Release"}]' ;;
                 "run view --json=jobs") echo "$GH_FAILED_STEPS" ;;
                 "run view --json=conclusion") echo "$GH_CONCLUSION" ;;
+                "run view --json=status") echo in_progress ;;
                 "run view --log-failed") echo "$GH_FAILED_LOG" ;;
             esac
             if [[ "$1 $2" == "run watch" ]]; then
@@ -444,6 +445,7 @@ final class ReleaseExecutableTest extends TestCase
         $transientSteps = '{"jobs":[{"steps":[{"name":"Download static-php-cli","conclusion":"failure"}]}]}';
         $failedStepsCall = 'run view 123 --json=jobs';
         $conclusionCall = 'run view 123 --json=conclusion --jq=.conclusion';
+        $statusCall = 'run view 123 --json=status --jq=.status';
 
         yield 'whitelisted transient step' => [
             1,
@@ -452,7 +454,7 @@ final class ReleaseExecutableTest extends TestCase
             'The download service failed.',
             'Download static-php-cli',
             null,
-            [$runList, 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed', 'run rerun 123 --failed', 'run watch 123 --exit-status'],
+            [$runList, 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed', 'run rerun 123 --failed', $statusCall, 'run watch 123 --exit-status'],
         ];
         yield 'repeated whitelisted transient step' => [
             2,
@@ -461,7 +463,7 @@ final class ReleaseExecutableTest extends TestCase
             'The download service failed.',
             'Download static-php-cli',
             'Workflow packaging.yaml failed after one automatic rerun. Inspect it with "gh run view 123 --web" before resuming the release.',
-            [$runList, 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed', 'run rerun 123 --failed', 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed'],
+            [$runList, 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed', 'run rerun 123 --failed', $statusCall, 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed'],
         ];
         yield 'job timeout without a failed step' => [
             1,
@@ -470,7 +472,7 @@ final class ReleaseExecutableTest extends TestCase
             'The hosted runner timed out.',
             'timed_out',
             null,
-            [$runList, 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed', $conclusionCall, 'run rerun 123 --failed', 'run watch 123 --exit-status'],
+            [$runList, 'run watch 123 --exit-status', $failedStepsCall, 'run view 123 --log-failed', $conclusionCall, 'run rerun 123 --failed', $statusCall, 'run watch 123 --exit-status'],
         ];
         yield 'mixed transient and deterministic steps' => [
             1,
