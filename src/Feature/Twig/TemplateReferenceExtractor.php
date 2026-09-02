@@ -9,6 +9,7 @@ use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParserInterface;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\QuotedArgument;
 use Symfony\Lsp\Parser\QuotedArgumentMatcher;
@@ -51,13 +52,22 @@ final class TemplateReferenceExtractor
             if (null === $template || '' === $template->value) {
                 continue;
             }
+            $parameters = $call->namedOrPositionalArgument('parameters', 1);
+            $parametersExpression = $parameters?->expression;
+            $parametersOffset = $parameters?->expressionStartOffset;
+            $variables = !\is_string($parametersExpression) || !\is_int($parametersOffset) ? [] : $this->literalArrayKeyValues($this->arrayKeys->parseExpression(
+                $parametersExpression,
+                allowNestedUnpacking: true,
+                collectPartialLiteralKeys: true,
+                sourceOffset: $parametersOffset,
+            ));
             $references[] = $this->reference(
                 $template->value,
                 $document->uri,
                 $document->text,
                 $template->startOffset,
                 $template->endOffset,
-                $this->literalArrayKeys($call->namedOrPositionalArgument('parameters', 1)?->expression),
+                $variables,
             );
         }
 
@@ -128,23 +138,14 @@ final class TemplateReferenceExtractor
         return $this->sorted($references);
     }
 
-    /** @return list<string> */
-    private function literalArrayKeys(?string $expression): array
+    /**
+     * @param list<PhpStringLiteral>|null $keys
+     *
+     * @return list<string>
+     */
+    private function literalArrayKeyValues(?array $keys): array
     {
-        $expression = trim((string) $expression);
-        if (str_starts_with($expression, '[') && str_ends_with($expression, ']')) {
-            $items = substr($expression, 1, -1);
-        } elseif (preg_match('/^array\s*\((.*)\)$/is', $expression, $match)) {
-            $items = $match[1];
-        } else {
-            return [];
-        }
-        $keys = $this->arrayKeys->parse($items, allowNestedUnpacking: true, collectPartialLiteralKeys: true);
-        if (null === $keys) {
-            return [];
-        }
-
-        return array_values(array_unique(array_filter(array_map(static fn ($key): string => $key->value, $keys), static fn (string $key): bool => '' !== $key)));
+        return array_values(array_unique(array_filter(array_map(static fn (PhpStringLiteral $key): string => $key->value, $keys ?? []), static fn (string $key): bool => '' !== $key)));
     }
 
     /** @return list<string> */
@@ -163,7 +164,12 @@ final class TemplateReferenceExtractor
             return [];
         }
 
-        return $this->literalArrayKeys(substr($text, $expressionOffset, $close - $expressionOffset + 1));
+        return $this->literalArrayKeyValues($this->arrayKeys->parseExpression(
+            substr($text, $expressionOffset, $close - $expressionOffset + 1),
+            allowNestedUnpacking: true,
+            collectPartialLiteralKeys: true,
+            sourceOffset: $expressionOffset,
+        ));
     }
 
     /** @return list<string> */

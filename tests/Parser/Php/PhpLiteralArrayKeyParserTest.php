@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Parser\Php;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 
@@ -55,6 +56,55 @@ final class PhpLiteralArrayKeyParserTest extends TestCase
 
         self::assertNull($parser->parse($items, allowNestedUnpacking: true));
         self::assertSame(['before', 'after'], $this->values($parser->parse($items, allowNestedUnpacking: true, collectPartialLiteralKeys: true)));
+    }
+
+    public function testParsesArrayExpressionsWithSyntaxPolicyAndOffsets(): void
+    {
+        $parser = new PhpLiteralArrayKeyParser();
+        $prefix = 'before ';
+        $expression = "  ArRaY ( 'legacy' => 1, \$dynamic => 2, ...\$values, 'after' => 3 )  ";
+        $source = $prefix.$expression;
+
+        self::assertSame(['short'], $this->values($parser->parseExpression("['short' => 1]", allowNestedUnpacking: true)));
+        self::assertNull($parser->parseExpression("['incomplete' => 1", allowNestedUnpacking: true));
+        $keys = $parser->parseExpression(
+            $expression,
+            allowNestedUnpacking: true,
+            collectPartialLiteralKeys: true,
+            sourceOffset: \strlen($prefix),
+        );
+
+        self::assertSame(['legacy', 'after'], $this->values($keys));
+        self::assertSame(['legacy', 'after'], array_map(
+            static fn (PhpStringLiteral $key): string => substr($source, $key->startOffset, $key->endOffset - $key->startOffset),
+            $keys ?? [],
+        ));
+    }
+
+    public function testParsesPhpArgumentWithoutChangingConservativeEntryHandling(): void
+    {
+        $parser = new PhpLiteralArrayKeyParser();
+        $prefix = 'before ';
+        $expression = " [ 'before' => 1, \$dynamic => 2, ...\$values, 'after' => 3 ] ";
+        $argument = new PhpArgument(
+            name: null,
+            nameStartOffset: null,
+            nameEndOffset: null,
+            stringLiteral: null,
+            callable: null,
+            expression: $expression,
+            startOffset: \strlen($prefix),
+            endOffset: \strlen($prefix.$expression),
+            expressionStartOffset: \strlen($prefix),
+            expressionEndOffset: \strlen($prefix.$expression),
+            unpacked: false,
+        );
+
+        self::assertNull($parser->parseArgument($argument, allowNestedUnpacking: true));
+        self::assertSame(
+            ['before', 'after'],
+            $this->values($parser->parseArgument($argument, allowNestedUnpacking: true, collectPartialLiteralKeys: true)),
+        );
     }
 
     /**

@@ -252,7 +252,7 @@ final class DoctrineExtractor
                 $this->converter->toRange($text, $entity->startOffset, $entity->endOffset - $entity->startOffset),
                 false,
             );
-            foreach ($this->literalArrayKeys($options, collectPartialLiteralKeys: true) ?? [] as $key) {
+            foreach ($this->arrayKeys->parseArgument($options, allowNestedUnpacking: true, collectPartialLiteralKeys: true) ?? [] as $key) {
                 if (!\in_array($key->value, ['choice_label', 'choice_value', 'group_by'], true)
                     || null === ($field = $this->literalArrayStringValue($source, $key))
                     || 1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $field->value)
@@ -310,7 +310,7 @@ final class DoctrineExtractor
             return [];
         }
         $symbols = [];
-        foreach ($this->literalArrayKeys($argument, collectPartialLiteralKeys: true) ?? [] as $key) {
+        foreach ($this->arrayKeys->parseArgument($argument, allowNestedUnpacking: true, collectPartialLiteralKeys: true) ?? [] as $key) {
             if (1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $key->value)) {
                 continue;
             }
@@ -394,7 +394,7 @@ final class DoctrineExtractor
         if (!\is_int($start) || !\is_int($end)) {
             return null;
         }
-        foreach ($this->literalArrayKeys($argument, collectPartialLiteralKeys: true) ?? [] as $literalKey) {
+        foreach ($this->arrayKeys->parseArgument($argument, allowNestedUnpacking: true, collectPartialLiteralKeys: true) ?? [] as $literalKey) {
             if ($key !== $literalKey->value) {
                 continue;
             }
@@ -409,28 +409,6 @@ final class DoctrineExtractor
         }
 
         return null;
-    }
-
-    /** @return list<PhpStringLiteral>|null */
-    private function literalArrayKeys(PhpArgument $argument, bool $collectPartialLiteralKeys = false): ?array
-    {
-        $expression = $argument->expression;
-        $offset = $argument->expressionStartOffset;
-        if (!\is_string($expression) || !\is_int($offset) || !preg_match('/^\\s*\\[/', $expression, $open, \PREG_OFFSET_CAPTURE)) {
-            return null;
-        }
-        $itemsOffset = $open[0][1] + \strlen($open[0][0]);
-        $items = rtrim(substr($expression, $itemsOffset));
-        if (str_ends_with($items, ']')) {
-            $items = substr($items, 0, -1);
-        }
-
-        return $this->arrayKeys->parse(
-            $items,
-            allowNestedUnpacking: true,
-            collectPartialLiteralKeys: $collectPartialLiteralKeys,
-            sourceOffset: $offset + $itemsOffset,
-        );
     }
 
     private function literalArrayStringValue(string $source, PhpStringLiteral $key): ?PhpStringLiteral

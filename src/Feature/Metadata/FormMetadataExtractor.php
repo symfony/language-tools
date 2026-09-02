@@ -10,7 +10,6 @@ use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
-use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 use Symfony\Lsp\Parser\Php\PhpTypedVariable;
 use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
@@ -138,7 +137,7 @@ final class FormMetadataExtractor
             if (null === $type || null === $argument) {
                 continue;
             }
-            foreach ($this->literalArrayKeys($argument, collectPartialLiteralKeys: true) ?? [] as $key) {
+            foreach ($this->arrayKeys->parseArgument($argument, allowNestedUnpacking: true, collectPartialLiteralKeys: true) ?? [] as $key) {
                 $options[] = [
                     'class' => $type->className,
                     'option' => $key->value,
@@ -523,28 +522,6 @@ final class FormMetadataExtractor
         $arguments[] = ['text' => substr($text, $start), 'offset' => $base + $start];
 
         return $arguments;
-    }
-
-    /** @return list<PhpStringLiteral>|null */
-    private function literalArrayKeys(PhpArgument $argument, bool $collectPartialLiteralKeys = false): ?array
-    {
-        $expression = $argument->expression;
-        $offset = $argument->expressionStartOffset;
-        if (!\is_string($expression) || !\is_int($offset) || !preg_match('/^\\s*\\[/', $expression, $open, \PREG_OFFSET_CAPTURE)) {
-            return null;
-        }
-        $itemsOffset = $open[0][1] + \strlen($open[0][0]);
-        $items = rtrim(substr($expression, $itemsOffset));
-        if (str_ends_with($items, ']')) {
-            $items = substr($items, 0, -1);
-        }
-
-        return $this->arrayKeys->parse(
-            $items,
-            allowNestedUnpacking: true,
-            collectPartialLiteralKeys: $collectPartialLiteralKeys,
-            sourceOffset: $offset + $itemsOffset,
-        );
     }
 
     private function context(MetadataCompletionKind $kind, string $prefix, string $text, int $offset, ?string $owner = null): MetadataCompletionContext

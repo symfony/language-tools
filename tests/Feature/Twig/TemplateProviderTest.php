@@ -122,23 +122,24 @@ final class TemplateProviderTest extends TestCase
                 parameters: [
                     'user' => ['name' => $name],
                     $dynamic => false,
+                    ...$shared,
                     "can\"edit" => true,
                     'after' => true,
                 ],
                 view: 'named.html.twig',
             );
-            $controller->renderView('view.html.twig', array('item' => $item));
+            $controller->renderView('view.html.twig', array('item' => $item, $dynamic => false, ...$shared, 'after_view' => true));
             Controller::render('static.html.twig', ['static' => ['inner' => 1], 'after_static' => $value]);
-            Controller::render('static-long.html.twig', array('long' => $value));
+            Controller::render('static-long.html.twig', array('long' => $value, $dynamic => false, ...$shared, 'after_long' => true));
             $this->render('incomplete.html.twig'
             PHP));
 
         self::assertSame(
             [
                 ['named.html.twig', ['user', 'can"edit', 'after']],
-                ['view.html.twig', ['item']],
+                ['view.html.twig', ['item', 'after_view']],
                 ['static.html.twig', ['static', 'after_static']],
-                ['static-long.html.twig', ['long']],
+                ['static-long.html.twig', ['long', 'after_long']],
                 ['incomplete.html.twig', []],
             ],
             array_map(static fn (TemplateReference $reference): array => [$reference->name, $reference->variables], $references),

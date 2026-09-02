@@ -5,6 +5,36 @@ namespace Symfony\Lsp\Parser\Php;
 final class PhpLiteralArrayKeyParser
 {
     /** @return list<PhpStringLiteral>|null */
+    public function parseArgument(PhpArgument $argument, bool $allowNestedUnpacking, bool $collectPartialLiteralKeys = false): ?array
+    {
+        if (!\is_string($argument->expression) || !\is_int($argument->expressionStartOffset)) {
+            return null;
+        }
+
+        return $this->parseArrayExpression(
+            $argument->expression,
+            $allowNestedUnpacking,
+            $collectPartialLiteralKeys,
+            $argument->expressionStartOffset,
+            allowLegacyArraySyntax: false,
+            requireClosingDelimiter: false,
+        );
+    }
+
+    /** @return list<PhpStringLiteral>|null */
+    public function parseExpression(string $expression, bool $allowNestedUnpacking, bool $collectPartialLiteralKeys = false, int $sourceOffset = 0): ?array
+    {
+        return $this->parseArrayExpression(
+            $expression,
+            $allowNestedUnpacking,
+            $collectPartialLiteralKeys,
+            $sourceOffset,
+            allowLegacyArraySyntax: true,
+            requireClosingDelimiter: true,
+        );
+    }
+
+    /** @return list<PhpStringLiteral>|null */
     public function parse(string $items, bool $allowNestedUnpacking, bool $collectPartialLiteralKeys = false, int $sourceOffset = 0): ?array
     {
         $prefix = '<?php ';
@@ -73,5 +103,31 @@ final class PhpLiteralArrayKeyParser
         }
 
         return $keys;
+    }
+
+    /** @return list<PhpStringLiteral>|null */
+    private function parseArrayExpression(string $expression, bool $allowNestedUnpacking, bool $collectPartialLiteralKeys, int $sourceOffset, bool $allowLegacyArraySyntax, bool $requireClosingDelimiter): ?array
+    {
+        if (preg_match('/^\\s*\\[/', $expression, $open, \PREG_OFFSET_CAPTURE)) {
+            $closingDelimiter = ']';
+        } elseif ($allowLegacyArraySyntax && preg_match('/^\\s*array\\s*\\(/i', $expression, $open, \PREG_OFFSET_CAPTURE)) {
+            $closingDelimiter = ')';
+        } else {
+            return null;
+        }
+        $itemsOffset = $open[0][1] + \strlen($open[0][0]);
+        $items = rtrim(substr($expression, $itemsOffset));
+        if (str_ends_with($items, $closingDelimiter)) {
+            $items = substr($items, 0, -1);
+        } elseif ($requireClosingDelimiter) {
+            return null;
+        }
+
+        return $this->parse(
+            $items,
+            $allowNestedUnpacking,
+            $collectPartialLiteralKeys,
+            $sourceOffset + $itemsOffset,
+        );
     }
 }
