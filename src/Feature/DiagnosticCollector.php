@@ -110,7 +110,7 @@ final class DiagnosticCollector
             array_push($diagnostics, ...$provided);
         }
 
-        $diagnostics = $this->partialParseFilter->filterCollected($document, $diagnostics);
+        // Headless checks never track parse health, so partial-parse filtering does not apply here
         $diagnostics = $this->suppressor->suppressCollected($document, $diagnostics);
 
         return new DetailedDiagnosticCollection($matched || [] !== $diagnostics, $diagnostics, $failures);

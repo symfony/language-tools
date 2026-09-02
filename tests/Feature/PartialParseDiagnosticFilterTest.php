@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Tests\Feature;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Feature\CollectedDiagnostic;
 use Symfony\Lsp\Feature\PartialParseDiagnosticFilter;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Index\SourceParseHealth;
@@ -32,18 +31,6 @@ final class PartialParseDiagnosticFilterTest extends TestCase
         self::assertSame(
             ['service.not_found', 'route.missing_parameters'],
             array_column($filter->filter($document, $diagnostics), 'code'),
-        );
-
-        $collected = array_map(
-            static fn (array $diagnostic): CollectedDiagnostic => new CollectedDiagnostic('provider', $diagnostic),
-            $diagnostics,
-        );
-        self::assertSame(
-            ['service.not_found', 'route.missing_parameters'],
-            array_column(array_map(
-                static fn (CollectedDiagnostic $diagnostic): array => $diagnostic->diagnostic,
-                $filter->filterCollected($document, $collected),
-            ), 'code'),
         );
     }
 

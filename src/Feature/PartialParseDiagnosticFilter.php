@@ -35,22 +35,4 @@ final class PartialParseDiagnosticFilter
             return !\is_string($code) || !isset(self::FILTERED_CODES[$code]);
         }));
     }
-
-    /**
-     * @param list<CollectedDiagnostic> $diagnostics
-     *
-     * @return list<CollectedDiagnostic>
-     */
-    public function filterCollected(Document $document, array $diagnostics): array
-    {
-        if ('php' !== $document->languageId || !$this->health->isDegraded($document->uri)) {
-            return $diagnostics;
-        }
-
-        return array_values(array_filter($diagnostics, static function (CollectedDiagnostic $diagnostic): bool {
-            $code = $diagnostic->diagnostic['code'] ?? null;
-
-            return !\is_string($code) || !isset(self::FILTERED_CODES[$code]);
-        }));
-    }
 }
