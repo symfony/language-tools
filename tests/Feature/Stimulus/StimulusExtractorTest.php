@@ -82,6 +82,23 @@ final class StimulusExtractorTest extends TestCase
         );
     }
 
+    public function testExtractsJavaScriptReferencesInsideTemplateInterpolations(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', '^8.0');
+        $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/assets/controllers/example_controller.js', 'javascript', <<<'JS'
+            const template = `
+                application.register('template-text', Controller)
+                ${application.register('registered', Controller)}
+                ${this.application.getControllerForElementAndIdentifier(element, 'resolved')}
+            `;
+            JS));
+
+        self::assertSame(
+            ['registered', 'resolved'],
+            array_map(static fn ($reference): string => $reference->controller, $facts->references),
+        );
+    }
+
     public function testIgnoresTwigReferencesInsideDocumentationComments(): void
     {
         $project = new Project('/workspace', 'file:///workspace', '^8.0');

@@ -24,11 +24,23 @@ final class JavaScriptSourceAnalyzer
         $state = 'code';
         $quote = null;
         $stringOffset = 0;
+        $templateInterpolations = [];
 
         for ($offset = 0; $offset < $length; ++$offset) {
             $character = $text[$offset];
             if ('code' === $state) {
-                if ('//' === substr($text, $offset, 2)) {
+                if ([] !== $templateInterpolations && '}' === $character) {
+                    $interpolation = array_key_last($templateInterpolations);
+                    if (0 === $templateInterpolations[$interpolation]) {
+                        array_pop($templateInterpolations);
+                        $quote = '`';
+                        $state = 'string';
+                    } else {
+                        --$templateInterpolations[$interpolation];
+                    }
+                } elseif ([] !== $templateInterpolations && '{' === $character) {
+                    ++$templateInterpolations[array_key_last($templateInterpolations)];
+                } elseif ('//' === substr($text, $offset, 2)) {
                     $this->maskByte($masked, $text, $offset);
                     $this->maskByte($masked, $text, ++$offset);
                     $state = 'line_comment';
@@ -72,8 +84,13 @@ final class JavaScriptSourceAnalyzer
                 if (++$offset < $length) {
                     $this->maskByte($masked, $text, $offset);
                 }
+            } elseif ('`' === $quote && '${' === substr($text, $offset, 2)) {
+                ++$offset;
+                $templateInterpolations[] = 0;
+                $quote = null;
+                $state = 'code';
             } elseif ($character === $quote) {
-                if ('`' !== $quote) {
+                if ('`' !== $quote && [] === $templateInterpolations) {
                     $strings[] = [substr($text, $stringOffset, $offset - $stringOffset), $stringOffset];
                 }
                 $quote = null;
