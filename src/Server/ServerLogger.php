@@ -48,9 +48,9 @@ final class ServerLogger implements TrafficLoggerInterface
         $this->traffic('outbound', $line);
     }
 
-    public function error(\Throwable $error): void
+    public function error(\Throwable $error, ?string $context = null): void
     {
-        $message = $this->redactor->redact($error->getMessage());
+        $message = $this->redactor->redact(null === $context ? $error->getMessage() : $context.': '.$error->getMessage());
         if ($this->isVerbose()) {
             foreach ($this->trace($error) as $line) {
                 $message .= "\n".$this->redactor->redact($line);

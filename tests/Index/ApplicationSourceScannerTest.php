@@ -230,7 +230,7 @@ final class ApplicationSourceScannerTest extends TestCase
         )->indexAll();
 
         $log->close();
-        self::assertSame("[error] secret=[redacted]\n", $log->buffer());
+        self::assertSame("[error] Source file \"src/Controller.php\": secret=[redacted]\n", $log->buffer());
         self::assertSame(
             ['state' => 'failed', 'error' => 'Source indexing failed.'],
             $statuses->status($this->project)['source'],

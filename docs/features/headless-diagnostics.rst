@@ -180,7 +180,8 @@ notifications, but don't upload reports from exit status ``11`` or ``12``
 because their result set may be incomplete.
 
 Standard output contains only the selected report format. Operational details
-go to standard error. The Symfony CLI wrapper also keeps release-management
+go to standard error. Failures while processing a source file identify its
+project-relative path. The Symfony CLI wrapper also keeps release-management
 and cache messages on standard error, so JSON, GitHub Actions, GitLab and SARIF
 output remain safe to pipe from standard output. Add ``--verbose`` to include
 sanitized runtime section causes in JSON and SARIF reports and show exception

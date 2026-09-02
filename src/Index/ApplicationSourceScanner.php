@@ -17,6 +17,7 @@ use function Amp\delay;
 
 /**
  * @phpstan-import-type SourceIndexMetadata from SourceIndexStoreInterface
+ * @phpstan-import-type SourceIndexRecord from SourceIndexReaderInterface
  */
 final class ApplicationSourceScanner implements ProjectStateInterface
 {
@@ -153,6 +154,9 @@ final class ApplicationSourceScanner implements ProjectStateInterface
             $progressMessage = 'Source indexing canceled';
 
             throw $error;
+        } catch (SourceIndexFileException) {
+            $progressMessage = 'Source indexing failed';
+            $this->statuses->sourceFailed($project);
         } catch (\Throwable $error) {
             $progressMessage = 'Source indexing failed';
             $this->logger->error($error);
@@ -262,7 +266,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         $parsedCount = 0;
         if (null === $reader || !$reader->hasRecords()) {
             foreach ($this->sourceFiles($project, $cancellation) as $relativePath => $source) {
-                $processed = $this->processor->scan($source['location'], $source['languageId'], null);
+                $processed = $this->scanSourceFile($source['location'], $source['languageId'], null);
                 if (null === $processed) {
                     continue;
                 }
@@ -288,7 +292,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
                 continue;
             }
             unset($sources[$relativePath]);
-            $processed = $this->processor->scan($source['location'], $source['languageId'], $cached);
+            $processed = $this->scanSourceFile($source['location'], $source['languageId'], $cached);
             if (null === $processed) {
                 continue;
             }
@@ -303,7 +307,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
                 delay(0, cancellation: $cancellation);
             }
             $cancellation->throwIfRequested();
-            $processed = $this->processor->scan($source['location'], $source['languageId'], null);
+            $processed = $this->scanSourceFile($source['location'], $source['languageId'], null);
             if (null === $processed) {
                 continue;
             }
@@ -315,6 +319,20 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         }
 
         return $entries;
+    }
+
+    /** @param ?SourceIndexRecord $cached */
+    private function scanSourceFile(SourceIndexFileLocation $location, string $languageId, ?array $cached): ?ProcessedSourceIndexFile
+    {
+        try {
+            return $this->processor->scan($location, $languageId, $cached);
+        } catch (InvalidSourceIndexEntry $error) {
+            throw $error;
+        } catch (\Throwable $error) {
+            $this->logger->error($error, \sprintf('Source file "%s"', $location->relativePath));
+
+            throw new SourceIndexFileException($location->relativePath, $error);
+        }
     }
 
     /** @return \Generator<string, array{location: SourceIndexFileLocation, languageId: string}> */
