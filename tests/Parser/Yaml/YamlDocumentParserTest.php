@@ -13,6 +13,8 @@ use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Parser\Yaml\YamlMapping;
 use Symfony\Lsp\Parser\Yaml\YamlRecoveryParser;
 use Symfony\Lsp\Parser\Yaml\YamlScalar;
+use Symfony\Lsp\Parser\Yaml\YamlScalarDecoder;
+use Symfony\Lsp\Parser\Yaml\YamlScalarStyle;
 use Symfony\Lsp\Parser\Yaml\YamlSequenceItem;
 
 final class YamlDocumentParserTest extends TestCase
@@ -139,6 +141,21 @@ final class YamlDocumentParserTest extends TestCase
         self::assertSame([], $scalar->path);
         self::assertSame([[1, 0]], array_map(static fn (YamlSequenceItem $item): array => [$item->pathDepth, $item->index], $recovered->sequence));
         self::assertSame([], $scalar->sequence);
+    }
+
+    #[DataProvider('flowScalarProvider')]
+    public function testFoldsFlowScalarLines(string $raw, YamlScalarStyle $style, string $expected): void
+    {
+        self::assertSame($expected, (new YamlScalarDecoder())->decode($raw, $style));
+    }
+
+    /** @return iterable<string, array{string, YamlScalarStyle, string}> */
+    public static function flowScalarProvider(): iterable
+    {
+        yield 'plain trailing spaces' => ["one  \n  two", YamlScalarStyle::Plain, 'one two'];
+        yield 'single quoted trailing spaces and blank line' => ["'one  \n\n  two'", YamlScalarStyle::SingleQuoted, "one\ntwo"];
+        yield 'double quoted blank line' => ["\"one\n\n  two\"", YamlScalarStyle::DoubleQuoted, "one\ntwo"];
+        yield 'double quoted escaped line break before blank line' => ["\"one\\\n\n  two\"", YamlScalarStyle::DoubleQuoted, "one\ntwo"];
     }
 
     #[DataProvider('blockScalarProvider')]

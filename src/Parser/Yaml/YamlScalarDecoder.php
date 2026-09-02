@@ -54,24 +54,38 @@ final class YamlScalarDecoder
 
     private function foldFlowLines(string $value): string
     {
-        $lines = preg_split('/\R/', $value);
-        if (false === $lines || 1 === \count($lines)) {
-            return $value;
-        }
-        $result = array_shift($lines);
-        $empty = 0;
-        foreach ($lines as $line) {
-            $line = ltrim($line, " \t");
-            if ('' === $line) {
-                ++$empty;
+        $result = '';
+        for ($index = 0, $length = \strlen($value); $index < $length; ++$index) {
+            if (!\in_array($value[$index], ["\r", "\n"], true)) {
+                $result .= $value[$index];
                 continue;
             }
-            $result .= 0 === $empty ? ' ' : str_repeat("\n", $empty);
-            $result .= $line;
-            $empty = 0;
+
+            $result = rtrim($result, " \t").$this->foldFlowBreak($value, $index);
         }
 
-        return $result.str_repeat("\n", $empty);
+        return $result;
+    }
+
+    private function foldFlowBreak(string $value, int &$index, bool $escaped = false): string
+    {
+        $breaks = 0;
+        $length = \strlen($value);
+        while ($index < $length && \in_array($value[$index], ["\r", "\n"], true)) {
+            if ("\r" === $value[$index] && "\n" === ($value[$index + 1] ?? null)) {
+                ++$index;
+            }
+            ++$breaks;
+            while (isset($value[$index + 1]) && \in_array($value[$index + 1], [' ', "\t"], true)) {
+                ++$index;
+            }
+            if (!isset($value[$index + 1]) || !\in_array($value[$index + 1], ["\r", "\n"], true)) {
+                break;
+            }
+            ++$index;
+        }
+
+        return 1 === $breaks && !$escaped ? ' ' : str_repeat("\n", $breaks - 1);
     }
 
     private function decodeDoubleQuoted(string $value): string
@@ -81,12 +95,7 @@ final class YamlScalarDecoder
             $character = $value[$index];
             if ('\\' !== $character) {
                 if ("\r" === $character || "\n" === $character) {
-                    $lineBreakLength = "\r" === $character && "\n" === ($value[$index + 1] ?? null) ? 2 : 1;
-                    $index += $lineBreakLength - 1;
-                    while (isset($value[$index + 1]) && \in_array($value[$index + 1], [' ', "\t"], true)) {
-                        ++$index;
-                    }
-                    $result .= ' ';
+                    $result = rtrim($result, " \t").$this->foldFlowBreak($value, $index);
                 } else {
                     $result .= $character;
                 }
@@ -94,12 +103,7 @@ final class YamlScalarDecoder
             }
             $escape = $value[++$index] ?? '';
             if ("\r" === $escape || "\n" === $escape) {
-                if ("\r" === $escape && "\n" === ($value[$index + 1] ?? null)) {
-                    ++$index;
-                }
-                while (isset($value[$index + 1]) && \in_array($value[$index + 1], [' ', "\t"], true)) {
-                    ++$index;
-                }
+                $result .= $this->foldFlowBreak($value, $index, true);
                 continue;
             }
             $decoded = match ($escape) {
