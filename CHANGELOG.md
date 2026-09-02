@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.18.1 (2026-09-02)
 
 - Load Content-Length tool dependencies without Composer dev autoloading
