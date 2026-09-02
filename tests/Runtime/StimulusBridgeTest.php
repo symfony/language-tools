@@ -22,7 +22,7 @@ final class StimulusBridgeTest extends TestCase
     }
 
     #[DataProvider('lazyCommentProvider')]
-    public function testDetectsLazyControllersOnlyWhenTheCommentIsAttachedToTheClass(string $text, bool $expected): void
+    public function testDetectsLazyControllersFromCommentsAnywhereInTheFile(string $text, bool $expected): void
     {
         $sourcePath = $this->temporaryDirectory.'/example_controller.js';
         file_put_contents($sourcePath, $text);
@@ -47,6 +47,9 @@ final class StimulusBridgeTest extends TestCase
     {
         yield 'double-quoted block comment' => ["/* stimulusFetch: \"lazy\" */\nexport default class extends Controller {}", true];
         yield 'line comment' => ["// stimulusFetch: 'lazy'\nexport default class extends Controller {}", true];
-        yield 'detached comment' => ["/* stimulusFetch: 'lazy' */\nconst mode = 'eager';\nexport default class extends Controller {}", false];
+        yield 'detached comment' => ["/* stimulusFetch: 'lazy' */\nconst mode = 'eager';\nexport default class extends Controller {}", true];
+        yield 'comment inside class' => ["export default class extends Controller {\n    // stimulusFetch: 'lazy'\n}", true];
+        yield 'controller without class' => ["/* stimulusFetch: 'lazy' */\nexport default 'csrf-protection-controller'", true];
+        yield 'eager comment' => ["/* stimulusFetch: 'eager' */\nexport default class extends Controller {}", false];
     }
 }

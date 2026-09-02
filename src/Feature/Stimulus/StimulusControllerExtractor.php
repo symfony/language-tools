@@ -8,7 +8,7 @@ use Symfony\Lsp\Project\ProjectPathResolver;
 
 final class StimulusControllerExtractor
 {
-    private const LAZY_COMMENT_PATTERN = '/(?:\/\*!?\s*stimulusFetch:\s*[\'"]lazy[\'"]\s*\*\/|\/\/\s*stimulusFetch:\s*[\'"]lazy[\'"])\s*(?:export\s+(?:default\s+)?)?(?:abstract\s+)?class\b/i';
+    private const LAZY_COMMENT_PATTERN = '/\/\*!?\s*stimulusFetch:\s*[\'"]lazy[\'"]\s*\*\/|\/\/\s*stimulusFetch:\s*[\'"]lazy[\'"]/i';
     private const LIFECYCLE_METHODS = ['connect', 'constructor', 'disconnect', 'initialize'];
 
     public function __construct(

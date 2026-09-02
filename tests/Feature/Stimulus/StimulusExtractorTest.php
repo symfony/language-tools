@@ -19,7 +19,7 @@ use Symfony\Lsp\Project\UriToPathConverter;
 final class StimulusExtractorTest extends TestCase
 {
     #[DataProvider('lazyCommentProvider')]
-    public function testDetectsLazyControllersOnlyWhenTheCommentIsAttachedToTheClass(string $languageId, string $text, bool $expected): void
+    public function testDetectsLazyControllersFromCommentsAnywhereInTheFile(string $languageId, string $text, bool $expected): void
     {
         $project = new Project('/workspace', 'file:///workspace');
         $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/assets/controllers/example_controller.js', $languageId, $text));
@@ -153,9 +153,11 @@ final class StimulusExtractorTest extends TestCase
         yield 'single-quoted line comment' => ['javascript', "// stimulusFetch: 'lazy'\nexport default class extends Controller {}", true];
         yield 'double-quoted line comment' => ['javascript', "// stimulusFetch: \"lazy\"\nexport default class extends Controller {}", true];
         yield 'exported abstract TypeScript class' => ['typescript', "// stimulusFetch: 'lazy'\nexport default abstract class extends Controller {}", true];
-        yield 'detached block comment' => ['javascript', "/* stimulusFetch: 'lazy' */\nconst mode = 'eager';\nexport default class extends Controller {}", false];
-        yield 'comment inside the class' => ['javascript', "export default class extends Controller {\n    // stimulusFetch: 'lazy'\n}", false];
+        yield 'detached block comment' => ['javascript', "/* stimulusFetch: 'lazy' */\nconst mode = 'eager';\nexport default class extends Controller {}", true];
+        yield 'comment inside the class' => ['javascript', "export default class extends Controller {\n    // stimulusFetch: 'lazy'\n}", true];
+        yield 'controller without class' => ['javascript', "/* stimulusFetch: 'lazy' */\nexport default 'csrf-protection-controller'", true];
+        yield 'incomplete declaration' => ['javascript', "// stimulusFetch: 'lazy'\nexport default", true];
         yield 'eager comment' => ['javascript', "/* stimulusFetch: 'eager' */\nexport default class extends Controller {}", false];
-        yield 'incomplete declaration' => ['javascript', "// stimulusFetch: 'lazy'\nexport default", false];
+        yield 'no lazy marker' => ['javascript', 'export default class extends Controller {}', false];
     }
 }

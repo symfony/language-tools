@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Detect lazy Stimulus markers anywhere in controller files
 - Treat CRLF line endings as single terminators in document positions
 - Scope Live Component event completions to their declaring component
 - Scope event name completions to proven dispatcher receivers
