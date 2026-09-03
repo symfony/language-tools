@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Remove the container cache before front controller kernels boot during a full refresh
 - Boot through the Symfony Runtime front controller when the conventional kernel cannot boot on its own
 - Report an application kernel boot failure once instead of per runtime section
 - Load complete runtime metadata despite subsequent bridge shutdown failures

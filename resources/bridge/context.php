@@ -148,6 +148,10 @@ final class SymfonyLspBridgeContext
     private function boot(object $kernel): object
     {
         if ($this->rebuildContainer) {
+            // application runtimes may boot the kernel themselves; shut it down so the cache removal precedes the boot below
+            if (method_exists($kernel, 'shutdown')) {
+                $kernel->shutdown();
+            }
             $directories = [];
             foreach (['getCacheDir', 'getBuildDir'] as $method) {
                 if (method_exists($kernel, $method) && is_string($directory = $kernel->$method())) {
