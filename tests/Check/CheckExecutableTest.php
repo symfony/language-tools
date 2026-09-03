@@ -106,6 +106,68 @@ final class CheckExecutableTest extends TestCase
         self::assertStringEndsWith('/bridge.php', str_replace('\\', '/', $command[1]));
     }
 
+    public function testSkipsDependencyInjectionDiagnosticsFromInactiveEnvironmentFiles(): void
+    {
+        if ('Windows' === \PHP_OS_FAMILY) {
+            self::markTestSkipped('The source executable integration requires Unix executable scripts.');
+        }
+
+        file_put_contents($this->directory.'/config/services_test.yaml', <<<'YAML'
+            services:
+                app.test_client:
+                    arguments:
+                        $parameters: '%test.client.parameters%'
+            YAML);
+        $symfonyCli = $this->directory.'/environment-bridge';
+        file_put_contents($symfonyCli, <<<'PHP'
+            #!/usr/bin/env php
+            <?php
+
+            $environment = 'dev';
+            foreach ($argv as $argument) {
+                if (str_starts_with($argument, '--environment=')) {
+                    $environment = substr($argument, strlen('--environment='));
+                }
+            }
+            fwrite(STDOUT, json_encode([
+                'schemaVersion' => 1,
+                'project' => ['environment' => $environment],
+                'configurationValidation' => ['status' => 'valid'],
+                'sections' => [
+                    'container' => [
+                        'complete' => true,
+                        'servicesComplete' => false,
+                        'parametersComplete' => true,
+                        'items' => [],
+                        'parameters' => 'test' === $environment ? [['name' => 'test.client.parameters']] : [],
+                    ],
+                ],
+                'errors' => [],
+            ], JSON_THROW_ON_ERROR)."\n");
+            PHP);
+        chmod($symfonyCli, 0700);
+        $environment = ['SYMFONY_LSP_SYMFONY_CLI' => $symfonyCli];
+
+        $dev = $this->execute([
+            'check',
+            '--format=json',
+            '--workspace='.$this->directory,
+            'config/services_test.yaml',
+        ], $environment);
+        $test = $this->execute([
+            'check',
+            '--format=json',
+            '--workspace='.$this->directory,
+            '--environment=test',
+            'config/services_test.yaml',
+        ], $environment);
+
+        self::assertSame(CheckCommand::EXIT_SUCCESS, $dev['exitCode'], $dev['stderr']);
+        self::assertSame([], $this->decodeReport($dev['stdout'])['diagnostics']);
+        self::assertSame(CheckCommand::EXIT_SUCCESS, $test['exitCode'], $test['stderr']);
+        self::assertSame([], $this->decodeReport($test['stdout'])['diagnostics']);
+    }
+
     public function testReportsSavedFileDiagnosticsWithoutAnLspClient(): void
     {
         $result = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->directory, 'config/**/*.yaml']);

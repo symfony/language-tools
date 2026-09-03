@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
@@ -16,6 +17,7 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
         private readonly ServiceIndexRegistry $serviceIndexes,
         private readonly ParameterIndexRegistry $parameterIndexes,
         private readonly DependencyInjectionDocumentExtractor $extractor,
+        private readonly ProjectPathResolver $projectPaths,
         private readonly RuntimeConfiguration $runtimeConfiguration,
     ) {
     }
@@ -31,12 +33,17 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
         if (null === $request) {
             return null;
         }
+        $environment = $this->runtimeConfiguration->environment($request->project);
         $facts = $this->extractor->extractForInteractive(
             SourceDocument::fromDocument($request->document),
-            $this->runtimeConfiguration->environment($request->project),
+            $environment,
         );
         if (null === $facts) {
             return null;
+        }
+        $relativePath = $this->projectPaths->relative($request->project, $request->document->uri);
+        if (null !== $relativePath && !$this->includesEnvironment($relativePath, $environment)) {
+            return [];
         }
 
         $localServices = array_fill_keys(array_map(static fn (ServiceDeclaration $declaration): string => $declaration->id, $facts->services), true);
@@ -76,5 +83,17 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
         }
 
         return $diagnostics;
+    }
+
+    private function includesEnvironment(string $relativePath, string $environment): bool
+    {
+        if (preg_match('#^config/(?:packages|routes)/([^/]+)/#D', $relativePath, $matches)) {
+            return $environment === $matches[1];
+        }
+        if (preg_match('#^config/services_([^/]+)\.(?:php|ya?ml)$#iD', $relativePath, $matches)) {
+            return $environment === $matches[1];
+        }
+
+        return true;
     }
 }

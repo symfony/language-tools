@@ -27,8 +27,11 @@ and ``services`` sections in configuration files, such as
 a literal percent, and references in YAML comments are ignored.
 
 Symfony Language Tools also recognizes service and parameter references in PHP
-``#[Autowire]`` attributes. YAML references under ``when@...`` are validated
-only for the selected environment. Dynamic references aren't recognized.
+``#[Autowire]`` attributes. YAML references under ``when@...`` and in
+conventional environment-specific files such as
+``config/services_<environment>.yaml`` and
+``config/packages/<environment>/`` are validated only when that environment is
+selected. Dynamic references aren't recognized.
 
 Completion
 ----------
@@ -116,6 +119,9 @@ Limitations
 
 XML service definitions are indexed for navigation, but in-file diagnostics
 and cursor features aren't available in XML files.
+
+Environment-specific file detection follows Symfony's conventional ``config/``
+layout. Custom conditional imports aren't inferred from application code.
 
 Privacy
 -------
