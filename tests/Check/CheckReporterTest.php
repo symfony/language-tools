@@ -198,7 +198,9 @@ final class CheckReporterTest extends TestCase
         self::assertSame('template', $json['errors'][0]['provider'] ?? null);
         self::assertSame('Invalid diagnostic.', $json['errors'][0]['cause']['message'] ?? null);
         self::assertStringNotContainsString('Invalid diagnostic.', $human);
+        self::assertStringContainsString("ERROR [apps/api]: Diagnostic collection failed.\n  Add --verbose to show the cause.\n", $human);
         self::assertStringContainsString('Cause: UnexpectedValueException: Invalid diagnostic.', $verbose);
+        self::assertStringNotContainsString('Add --verbose', $verbose);
         self::assertStringNotContainsString('Invalid diagnostic.', $github);
     }
 

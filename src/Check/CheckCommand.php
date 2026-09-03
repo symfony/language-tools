@@ -112,8 +112,10 @@ final class CheckCommand
     private function errorOutput(array $error, bool $verbose): string
     {
         $output = (isset($error['project']) ? '['.$error['project'].'] ' : '').$error['message']."\n";
-        if ($verbose && isset($error['cause'])) {
-            $output .= \sprintf('Cause: %s: %s', $error['cause']['class'], $error['cause']['message'])."\n";
+        if (isset($error['cause'])) {
+            $output .= $verbose
+                ? \sprintf('Cause: %s: %s', $error['cause']['class'], $error['cause']['message'])."\n"
+                : "Add --verbose to show the cause.\n";
         }
 
         return $output;

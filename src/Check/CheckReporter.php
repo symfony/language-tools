@@ -123,8 +123,10 @@ HELP;
                 isset($error['project']) ? ' ['.$error['project'].']' : '',
                 $error['message'],
             );
-            if ($verbose && isset($error['cause'])) {
-                $lines[] = \sprintf('  Cause: %s: %s', $error['cause']['class'], $error['cause']['message']);
+            if (isset($error['cause'])) {
+                $lines[] = $verbose
+                    ? \sprintf('  Cause: %s: %s', $error['cause']['class'], $error['cause']['message'])
+                    : '  Add --verbose to show the cause.';
             }
         }
 

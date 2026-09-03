@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Point human check output at --verbose when a failure cause is hidden
 - Remove the container cache before front controller kernels boot during a full refresh
 - Boot through the Symfony Runtime front controller when the conventional kernel cannot boot on its own
 - Report an application kernel boot failure once instead of per runtime section
