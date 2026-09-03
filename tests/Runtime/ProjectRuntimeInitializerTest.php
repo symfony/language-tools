@@ -35,6 +35,7 @@ use Symfony\Lsp\Runtime\UnsupportedSymfonyVersionException;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\Bridge\ProjectRuntimeInitializerFixtureBuilder;
+use Symfony\Lsp\Tests\Support\CapturingWritableStream;
 
 final class ProjectRuntimeInitializerTest extends TestCase
 {
@@ -752,6 +753,39 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame('configuration', $statuses->status($project)['runtime']['stage'] ?? null);
     }
 
+    public function testLoadsCompleteSnapshotWhenBridgeExitsAfterReturningIt(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $payload = json_encode([
+            'schemaVersion' => 1,
+            'sections' => [
+                'routes' => ['complete' => true, 'items' => [['name' => 'homepage', 'path' => '/']]],
+            ],
+        ], \JSON_THROW_ON_ERROR);
+        $indexes = new RouteIndexRegistry();
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $output = new CapturingWritableStream();
+        $logger = new ServerLogger($output, new SensitiveDataRedactor());
+        $logger->configure('verbose');
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
+            new CapturingProcessRunner(new ProcessResult(
+                255,
+                $payload."\nCANARY_SHUTDOWN_OUTPUT\n",
+                "CANARY_SECRET_RUNTIME_OUTPUT\n",
+            )),
+            new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($indexes)]),
+            self::projects($project),
+            configuration: new RuntimeConfiguration(),
+            logger: $logger,
+        );
+
+        $initializer->initialize($project);
+
+        self::assertSame('homepage', $indexes->forProject($project)->get('homepage')?->name);
+        self::assertSame("[debug] The project bridge exited with status 255 after returning runtime metadata.\n", $output->contents());
+    }
+
     public function testRejectsFailedBridgeExecutionWithoutExposingErrorOutput(): void
     {
         $source = $this->temporaryDirectory.'/source.php';
@@ -769,7 +803,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         try {
             $initializer->initialize($project);
             self::fail('The failed bridge execution was accepted.');
-        } catch (\RuntimeException $error) {
+        } catch (BridgeExecutionException $error) {
             self::assertSame('The project bridge failed with status 1.', $error->getMessage());
         }
     }

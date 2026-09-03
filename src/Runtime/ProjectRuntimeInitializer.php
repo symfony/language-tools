@@ -68,13 +68,23 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                 throw new CancelledException();
             }
 
-            if (0 !== $result->exitCode) {
-                throw new BridgeExecutionException(\sprintf('The project bridge failed with status %d.', $result->exitCode));
-            }
+            try {
+                $snapshot = $this->decodeSnapshot($result);
+                if (1 !== ($snapshot['schemaVersion'] ?? null)) {
+                    throw new \RuntimeException('The project bridge returned an unsupported snapshot.');
+                }
+            } catch (\RuntimeException $error) {
+                if (0 !== $result->exitCode) {
+                    throw new BridgeExecutionException(\sprintf('The project bridge failed with status %d.', $result->exitCode), previous: $error);
+                }
 
-            $snapshot = $this->decodeSnapshot($result);
-            if (1 !== ($snapshot['schemaVersion'] ?? null)) {
-                throw new \RuntimeException('The project bridge returned an unsupported snapshot.');
+                throw $error;
+            }
+            if (0 !== $result->exitCode) {
+                $this->logger->verbose(\sprintf(
+                    'The project bridge exited with status %d after returning runtime metadata.',
+                    $result->exitCode,
+                ), [$project->rootPath]);
             }
             if (true === ($snapshot['unsupportedSymfonyVersion'] ?? null)) {
                 $symfonyBranch = $this->symfonyBranch($snapshot);
