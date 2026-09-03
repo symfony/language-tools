@@ -97,7 +97,12 @@ final class ConfigurationNode
         if ($name === $this->entryKeyNode?->name) {
             return $this->entryKeyNode;
         }
-        $name = $this->aliases[$name] ?? $name;
+        if (isset($this->aliases[$name])) {
+            $name = $this->aliases[$name];
+            if (null !== $child = $this->definedChild($name)) {
+                return $child->prototype ?? $child;
+            }
+        }
         if (null !== $child = $this->definedChild($name)) {
             return $child;
         }

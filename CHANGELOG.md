@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Accept scalar values for singular bundle configuration aliases
 - Accept brace-wrapped ICU parameter names in translation diagnostics
 - Recognize promoted and by-reference PHP property hooks
 - Report rename refusals for partially parsed PHP documents

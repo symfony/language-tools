@@ -10,7 +10,9 @@ preserved when a bundle disables key normalization, including inside sequence
 entries, and converted to underscores elsewhere, matching Symfony's
 configuration processing; keys that mix dashes and underscores, or whose
 underscore twin exists in the same mapping, stay literal, as in Symfony.
-Extensible sections allow custom keys while validating their known children.
+Singular aliases that expand into array entries accept scalar values, such as
+``custom_authenticator``. Extensible sections allow custom keys while validating
+their known children.
 
 Completion
 ----------

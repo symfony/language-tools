@@ -74,6 +74,22 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
+    public function testAcceptsSingularAliasesForArrayEntries(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/security.yaml';
+        $text = "security:\n    firewalls:\n        main:\n            custom_authenticator: App\\Security\\AppAuthenticator\n";
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+
+        $fixture->documents->update($uri, 2, str_replace('custom_authenticator:', 'custom_authenticators:', $text));
+        self::assertSame(
+            ['config.invalid_type'],
+            array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]), 'code'),
+        );
+    }
+
     public function testAcceptsBackedEnumScalarAndTaggedValues(): void
     {
         $fixture = $this->providers();
@@ -978,7 +994,8 @@ final class ConfigurationProviderTest extends TestCase
                             $this->node('name', 'scalar'),
                             $this->node('always_remember_me', 'boolean'),
                         ]),
-                    ]), keyAttribute: 'name'),
+                        $this->node('custom_authenticators', 'array', prototype: $this->node('custom_authenticator', 'scalar')),
+                    ], aliases: ['custom_authenticator' => 'custom_authenticators']), keyAttribute: 'name'),
                 ]),
             ],
             [
