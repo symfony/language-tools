@@ -105,4 +105,14 @@ final class NativeProcessRunnerTest extends TestCase
 
         $runner->run([\PHP_BINARY, '-r', 'sleep(10);'], __DIR__, timeout: 0.01);
     }
+
+    public function testReportsATimeoutThatExpiresWhileTheProcessStarts(): void
+    {
+        $runner = new NativeProcessRunner();
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('The project bridge timed out after 1.0E-6 seconds.');
+
+        $runner->run([\PHP_BINARY, '-r', 'sleep(10);'], __DIR__, timeout: 0.000001);
+    }
 }

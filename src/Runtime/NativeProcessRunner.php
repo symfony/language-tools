@@ -50,6 +50,8 @@ final class NativeProcessRunner implements ProcessRunnerInterface
             );
         } catch (ProcessException $error) {
             throw new \RuntimeException('Unable to start the project bridge.', previous: $error);
+        } catch (\Throwable $error) {
+            throw $this->operationFailure($error, $timeoutCancellation, $outputLimit, $timeout);
         }
 
         $process->getStdin()->close();
@@ -70,17 +72,22 @@ final class NativeProcessRunner implements ProcessRunnerInterface
             $process->kill();
             awaitAll($futures);
 
-            if ($outputLimit->isCancelled()) {
-                throw new \RuntimeException('The project bridge exceeded the output limit.', previous: $error);
-            }
-            if ($timeoutCancellation->isRequested()) {
-                throw new \RuntimeException(\sprintf('The project bridge timed out after %s seconds.', $timeout), previous: $error);
-            }
-
-            throw $error;
+            throw $this->operationFailure($error, $timeoutCancellation, $outputLimit, $timeout);
         }
 
         return new ProcessResult($result['exitCode'], $result['stdout'], $result['stderr']);
+    }
+
+    private function operationFailure(\Throwable $error, TimeoutCancellation $timeoutCancellation, DeferredCancellation $outputLimit, float $timeout): \Throwable
+    {
+        if ($outputLimit->isCancelled()) {
+            return new \RuntimeException('The project bridge exceeded the output limit.', previous: $error);
+        }
+        if ($timeoutCancellation->isRequested()) {
+            return new \RuntimeException(\sprintf('The project bridge timed out after %s seconds.', $timeout), previous: $error);
+        }
+
+        return $error;
     }
 
     private function read(ReadableStream $stream, Cancellation $cancellation, int $maximumBytes, ?DeferredCancellation $outputLimit = null): string

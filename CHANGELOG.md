@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Report bridge timeouts that expire while the process starts
 - Point human check output at --verbose when a failure cause is hidden
 - Remove the container cache before front controller kernels boot during a full refresh
 - Boot through the Symfony Runtime front controller when the conventional kernel cannot boot on its own
