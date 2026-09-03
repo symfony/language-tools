@@ -385,7 +385,7 @@ final class CheckExecutableTest extends TestCase
         self::assertSame(1, $report['summary']['blocking']);
 
         $verbose = $this->execute(
-            ['check', '--verbose', '--format=json', '--workspace='.$this->directory, 'src/ArticleController.php'],
+            ['check', '-vvv', '--format=json', '--workspace='.$this->directory, 'src/ArticleController.php'],
             ['SYMFONY_LSP_SYMFONY_CLI' => $symfonyCli],
         );
         $verboseReport = $this->decodeReport($verbose['stdout']);
@@ -788,6 +788,24 @@ final class CheckExecutableTest extends TestCase
         self::assertStringContainsString('does not exist', $result['stderr']);
     }
 
+    #[DataProvider('unknownCheckFlags')]
+    public function testReportsUnknownCheckFlags(string $flag): void
+    {
+        $result = $this->execute(['check', $flag]);
+
+        self::assertSame(CheckCommand::EXIT_INVOCATION, $result['exitCode']);
+        self::assertSame(\sprintf('Unknown check option "%s".%s', $flag, \PHP_EOL), $result['stderr']);
+    }
+
+    #[DataProvider('verboseAliases')]
+    public function testAcceptsVerboseAliasesWhenOptionParsingFails(string $alias): void
+    {
+        $result = $this->execute(['check', $alias, '--unknown']);
+
+        self::assertSame(CheckCommand::EXIT_INVOCATION, $result['exitCode']);
+        self::assertSame('Unknown check option "--unknown".'.\PHP_EOL, $result['stderr']);
+    }
+
     #[DataProvider('machineFormats')]
     public function testRendersOptionParseFailuresInTheRequestedMachineFormat(string $format): void
     {
@@ -805,6 +823,22 @@ final class CheckExecutableTest extends TestCase
             $report = json_decode($result['stdout'], true, flags: \JSON_THROW_ON_ERROR);
             self::assertSame('symfony.check.invocation', $report['runs'][0]['invocations'][0]['toolConfigurationNotifications'][0]['descriptor']['id'] ?? null);
         }
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function unknownCheckFlags(): iterable
+    {
+        yield 'long flag' => ['--unknown'];
+        yield 'short flag' => ['-x'];
+        yield 'unsupported verbosity flag' => ['-vvvv'];
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function verboseAliases(): iterable
+    {
+        yield '-v' => ['-v'];
+        yield '-vv' => ['-vv'];
+        yield '-vvv' => ['-vvv'];
     }
 
     /** @return iterable<string, array{string}> */

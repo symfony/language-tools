@@ -62,7 +62,7 @@ Options:
   --no-runtime-indexing            Disable runtime indexing
   --bridge-timeout=SECONDS         Set each project bridge deadline
   --timeout=SECONDS                Set the complete check deadline; defaults to 600
-  --verbose                        Show sanitized operational failure causes
+  --verbose, -v, -vv, -vvv         Show sanitized operational failure causes
   --translation-diagnostics        Enable missing-translation diagnostics
   --no-translation-diagnostics     Disable missing-translation diagnostics
   --fail-on=CODE,...               Restrict blocking diagnostics to selected codes

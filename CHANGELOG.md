@@ -8,6 +8,8 @@
 - Boot through the Symfony Runtime front controller when the conventional kernel cannot boot on its own
 - Report an application kernel boot failure once instead of per runtime section
 - Load complete runtime metadata despite subsequent bridge shutdown failures
+- Report unknown headless check flags as unknown options
+- Accept `-v`, `-vv` and `-vvv` as headless check verbosity aliases
 - Accept scalar values for singular bundle configuration aliases
 - Accept brace-wrapped ICU parameter names in translation diagnostics
 - Recognize promoted and by-reference PHP property hooks

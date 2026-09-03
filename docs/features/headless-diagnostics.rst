@@ -186,7 +186,9 @@ and cache messages on standard error, so JSON, GitHub Actions, GitLab and SARIF
 output remain safe to pipe from standard output. Add ``--verbose`` to include
 sanitized runtime section causes in JSON and SARIF reports and show exception
 classes, messages, relative code locations and argument-free frames in human
-output. GitHub annotations remain generic.
+output. GitHub annotations remain generic. Use ``-v``, ``-vv`` or ``-vvv`` as
+short aliases for ``--verbose``.
+
 Once JSON, GitLab or SARIF is selected successfully, later invocation,
 configuration, indexing and internal failures still produce a valid structured
 report.

@@ -14,6 +14,8 @@ final class CheckCommand
     public const EXIT_INVOCATION = 11;
     public const EXIT_OPERATIONAL = 12;
 
+    private const VERBOSE_OPTIONS = ['--verbose', '-v', '-vv', '-vvv'];
+
     public function __construct(
         private readonly CheckOptionsParser $optionsParser,
         private readonly CheckRunner $runner,
@@ -29,7 +31,7 @@ final class CheckCommand
     public function run(array $arguments): CheckExecution
     {
         $format = 'human';
-        $verbose = \in_array('--verbose', $arguments, true);
+        $verbose = [] !== array_intersect(self::VERBOSE_OPTIONS, $arguments);
         try {
             $parsed = $this->optionsParser->parse($arguments);
             $format = $parsed->format;

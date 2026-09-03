@@ -55,6 +55,12 @@ final class CheckOptionsParserTest extends TestCase
         self::assertTrue($options->verbose);
     }
 
+    #[DataProvider('verboseAliases')]
+    public function testAcceptsVerboseAliases(string $alias): void
+    {
+        self::assertTrue($this->options([$alias])->verbose);
+    }
+
     public function testPreservesAliasesRepeatedFormatsAndTheOptionSeparator(): void
     {
         $options = $this->options([
@@ -115,6 +121,14 @@ final class CheckOptionsParserTest extends TestCase
         self::assertSame($message, $result->value->getMessage());
     }
 
+    /** @return iterable<string, array{string}> */
+    public static function verboseAliases(): iterable
+    {
+        yield '-v' => ['-v'];
+        yield '-vv' => ['-vv'];
+        yield '-vvv' => ['-vvv'];
+    }
+
     /** @return iterable<string, array{list<string>, string, string}> */
     public static function invalidArguments(): iterable
     {
@@ -127,6 +141,21 @@ final class CheckOptionsParserTest extends TestCase
             ['--unknown=value', '--format=sarif'],
             'sarif',
             'Unknown check option "--unknown".',
+        ];
+        yield 'unknown long flag' => [
+            ['--unknown'],
+            'human',
+            'Unknown check option "--unknown".',
+        ];
+        yield 'unknown short flag' => [
+            ['-x'],
+            'human',
+            'Unknown check option "-x".',
+        ];
+        yield 'unsupported verbosity flag' => [
+            ['-vvvv'],
+            'human',
+            'Unknown check option "-vvvv".',
         ];
         yield 'invalid format' => [
             ['--format=xml'],
@@ -148,11 +177,25 @@ final class CheckOptionsParserTest extends TestCase
             'human',
             'The check option "--workspace=" requires a value.',
         ];
-        yield 'missing value' => [
-            ['--workspace'],
-            'human',
-            'The check option "--workspace" requires a value.',
-        ];
+        foreach ([
+            '--workspace',
+            '--config',
+            '--project-root',
+            '--container-project-root',
+            '--environment',
+            '--bridge-timeout',
+            '--timeout',
+            '--php-command',
+            '--fail-on',
+            '--baseline',
+            '--format',
+        ] as $option) {
+            yield 'missing value for '.$option => [
+                [$option],
+                'human',
+                \sprintf('The check option "%s" requires a value.', $option),
+            ];
+        }
         yield 'unknown diagnostic code' => [
             ['--fail-on=route.removed'],
             'human',

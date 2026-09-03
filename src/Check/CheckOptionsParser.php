@@ -10,6 +10,20 @@ final class CheckOptionsParser
 {
     private const FORMATS = ['human', 'json', 'github', 'gitlab', 'sarif'];
 
+    private const VALUE_OPTIONS = [
+        '--workspace',
+        '--config',
+        '--project-root',
+        '--container-project-root',
+        '--environment',
+        '--bridge-timeout',
+        '--timeout',
+        '--php-command',
+        '--fail-on',
+        '--baseline',
+        '--format',
+    ];
+
     public function __construct(
         private readonly DiagnosticCodeRegistry $diagnosticCodes,
         private readonly AnalysisSettings $analysisSettings,
@@ -92,7 +106,7 @@ final class CheckOptionsParser
     {
         match ($option) {
             '--help', '-h' => $draft->help = true,
-            '--verbose' => $draft->verbose = true,
+            '--verbose', '-v', '-vv', '-vvv' => $draft->verbose = true,
             '--list-codes' => $draft->listCodes = true,
             '--source-only', '--no-runtime-indexing' => $draft->overrides['runtimeIndexing'] = false,
             '--runtime-indexing' => $draft->overrides['runtimeIndexing'] = true,
@@ -104,8 +118,17 @@ final class CheckOptionsParser
             '--generate-baseline' => $draft->baselineMode = $this->baselineMode($draft->baselineMode, 'create'),
             '--refresh-baseline' => $draft->baselineMode = $this->baselineMode($draft->baselineMode, 'refresh'),
             '--strict-baseline' => $draft->strictBaseline = true,
-            default => throw new InvalidConfigurationException(\sprintf('The check option "%s" requires a value.', $option)),
+            default => throw new InvalidConfigurationException($this->flagErrorMessage($option)),
         };
+    }
+
+    private function flagErrorMessage(string $option): string
+    {
+        if (\in_array($option, self::VALUE_OPTIONS, true)) {
+            return \sprintf('The check option "%s" requires a value.', $option);
+        }
+
+        return \sprintf('Unknown check option "%s".', $option);
     }
 
     private function applyValue(CheckOptionsDraft $draft, string $name, string $value): void
