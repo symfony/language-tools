@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Preserve PHP declarations after standalone asymmetric visibility
 - Add Pimcore Skeleton to the public dogfooding matrix
 - Report bridge timeouts that expire while the process starts
 - Point human check output at --verbose when a failure cause is hidden

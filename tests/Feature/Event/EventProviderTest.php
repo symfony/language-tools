@@ -83,6 +83,30 @@ YAML;
         self::assertSame('legacy.order_placed', $extractor->extract(new SourceDocument('file:///workspace/config/services.yaml', 'yaml', $yaml))->symbols[0]->name);
     }
 
+    public function testAcceptsListenerMethodsAfterStandaloneAsymmetricVisibility(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Listener.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+            use Symfony\Component\HttpKernel\Event\RequestEvent;
+
+            #[AsEventListener(event: RequestEvent::class, method: 'onRequest')]
+            final class Listener
+            {
+                private(set) bool $active = false;
+
+                public function onRequest(RequestEvent $event): void
+                {
+                }
+            }
+            PHP));
+
+        self::assertSame([], $facts->invalidListenerMethods);
+        self::assertSame(['Symfony\Component\HttpKernel\Event\RequestEvent'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
+    }
+
     public function testIgnoresClassReferencesEmbeddedInListenerEventExpressions(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Listener.php', 'php', <<<'PHP'

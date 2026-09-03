@@ -59,6 +59,7 @@ Diagnostics
 -----------
 
 A class-level ``AsEventListener`` attribute that explicitly names a method is
-reported when that method doesn't exist in the class. Unknown event names aren't
-diagnosed because the event dispatcher accepts events without registered
-listeners.
+reported when that method doesn't exist in the class. Valid listener methods
+remain recognized when the class uses PHP asymmetric property visibility.
+Unknown event names aren't diagnosed because the event dispatcher accepts events
+without registered listeners.

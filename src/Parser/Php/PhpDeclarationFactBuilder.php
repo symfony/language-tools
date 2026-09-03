@@ -92,7 +92,7 @@ final class PhpDeclarationFactBuilder
                     continue;
                 }
                 $methodName = $scope instanceof MethodDeclaration && $scope->name instanceof Token ? $scope->name->getText($source) : null;
-                $promoted = \is_string($methodName) && '__construct' === strtolower($methodName) && $declaration->visibilityToken instanceof Token;
+                $promoted = $this->isPromotedProperty($declaration, $methodName);
                 $variables[] = new PhpTypedVariable(
                     $name,
                     $types,
@@ -142,7 +142,7 @@ final class PhpDeclarationFactBuilder
             if ($declaration instanceof Parameter) {
                 $method = $declaration->getFirstAncestor(MethodDeclaration::class);
                 $methodName = $method instanceof MethodDeclaration && $method->name instanceof Token ? $method->name->getText($source) : null;
-                if (!\is_string($methodName) || '__construct' !== strtolower($methodName) || !$declaration->visibilityToken instanceof Token) {
+                if (!$this->isPromotedProperty($declaration, $methodName)) {
                     continue;
                 }
                 $owner = $declaration->getFirstAncestor(ObjectCreationExpression::class, ClassDeclaration::class, TraitDeclaration::class);
@@ -183,7 +183,7 @@ final class PhpDeclarationFactBuilder
                 continue;
             }
             $signatureStart = $elements->getStartPosition();
-            foreach ([...$declaration->modifiers, $declaration->questionToken, $declaration->typeDeclarationList] as $part) {
+            foreach ([$declaration->setVisibilityToken, ...$declaration->modifiers, $declaration->questionToken, $declaration->typeDeclarationList] as $part) {
                 if ($part instanceof Node || $part instanceof Token) {
                     $signatureStart = min($signatureStart, $part->getStartPosition());
                 }
@@ -212,6 +212,13 @@ final class PhpDeclarationFactBuilder
         }
 
         return $properties;
+    }
+
+    private function isPromotedProperty(Parameter $declaration, bool|string|null $methodName): bool
+    {
+        return \is_string($methodName)
+            && '__construct' === strtolower($methodName)
+            && ($declaration->visibilityToken instanceof Token || $declaration->setVisibilityToken instanceof Token);
     }
 
     private function propertyVisibility(Parameter|PropertyDeclaration $declaration): string
@@ -467,7 +474,7 @@ final class PhpDeclarationFactBuilder
             $method = $declaration->getFirstAncestor(MethodDeclaration::class);
             $methodName = $method instanceof MethodDeclaration && $method->name instanceof Token ? $method->name->getText($source) : null;
             $name = $this->scopes->variableName($declaration->variableName, $source);
-            if (!\is_string($methodName) || '__construct' !== strtolower($methodName) || !$declaration->visibilityToken instanceof Token || null === $name) {
+            if (!$this->isPromotedProperty($declaration, $methodName) || null === $name) {
                 return [];
             }
 

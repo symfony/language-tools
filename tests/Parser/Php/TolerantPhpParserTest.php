@@ -439,6 +439,44 @@ final class TolerantPhpParserTest extends TestCase
         }
     }
 
+    public function testPreservesDeclarationsWithStandaloneAsymmetricVisibility(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+
+            use Vendor\Service;
+
+            final class Listener
+            {
+                #[PropertyAttribute]
+                private(set) Service $service;
+
+                public function __construct(
+                    #[PromotedAttribute]
+                    protected(set) string $name = '',
+                ) {
+                }
+
+                public function onEvent(): void
+                {
+                }
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+
+        self::assertSame([], $document->diagnostics);
+        self::assertSame(['__construct', 'onEvent'], array_map(static fn ($method): string => $method->name, $document->methodDeclarations));
+        self::assertSame(['service', 'name'], array_map(static fn ($property): string => $property->name, $document->propertyDeclarations));
+        self::assertSame(['private(set) Service $service', 'protected(set) string $name'], array_map(static fn ($property): string => $property->signature, $document->propertyDeclarations));
+        self::assertSame(['public', 'public'], array_map(static fn ($property): string => $property->visibility, $document->propertyDeclarations));
+        self::assertSame([false, true], array_map(static fn ($property): bool => $property->promoted, $document->propertyDeclarations));
+        self::assertSame([PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], array_map(static fn ($variable): PhpTypedVariableKind => $variable->kind, $document->typedVariables));
+        self::assertSame([PhpAttributeTargetKind::Property, PhpAttributeTargetKind::Property], array_map(static fn ($attribute): PhpAttributeTargetKind => $attribute->targets[0]->kind, $document->attributes));
+        self::assertSame(['service', 'name'], array_map(static fn ($attribute): ?string => $attribute->targets[0]->memberName, $document->attributes));
+    }
+
     public function testKeepsPropertyDeclarationsFromIncompleteSource(): void
     {
         $source = <<<'PHP'
