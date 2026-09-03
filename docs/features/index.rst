@@ -249,8 +249,12 @@ Symfony Language Tools has these general limitations:
 
 * custom kernel bootstraps must follow a recognized convention: ``App\Kernel``,
   a ``Kernel`` class at a Composer PSR-4 autoload root, legacy
-  ``app/AppKernel.php`` or a Symfony Runtime front controller. Symfony Runtime
-  options under ``extra.runtime`` and ``APP_RUNTIME_OPTIONS`` are supported;
+  ``app/AppKernel.php`` or a Symfony Runtime front controller (``bin/console``
+  or ``public/index.php``). When the conventional kernel cannot boot on its
+  own, for example because the distribution's front controller defines
+  constants before creating it, the front controller is used instead. Symfony
+  Runtime options under ``extra.runtime`` and ``APP_RUNTIME_OPTIONS`` are
+  supported;
 * one Symfony environment is active at a time for each application root;
 * references and rename cover only statically recognized values.
 
@@ -277,6 +281,9 @@ If a runtime-backed feature returns no results, verify that:
 * ``containerProjectRoot`` matches the container-side project path when the
   PHP command runs in Docker (see `Docker support`_);
 * runtime indexing is enabled and the workspace is trusted.
+
+Run ``symfony-lsp check --verbose`` to see the sanitized cause of a kernel boot
+failure.
 
 .. _`headless diagnostics checker`: headless-diagnostics.rst
 .. _`release metadata`: https://symfony.com/releases.json

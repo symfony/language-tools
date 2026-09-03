@@ -107,6 +107,103 @@ final class BridgeSectionsTest extends TestCase
         ], $result['sections']['events']['listeners'] ?? null);
     }
 
+    public function testFallsBackToTheFrontControllerWhenTheConventionalKernelCannotBoot(): void
+    {
+        (new RuntimeFrontControllerFixtureBuilder($this->workspace))->writeBootstrapDependentKernelApplication();
+
+        $process = $this->bridge->run(['--sections=events']);
+
+        $snapshot = $process->stdout;
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$snapshot);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null, $snapshot);
+        self::assertSame(['status' => 'valid'], $result['configurationValidation'] ?? null);
+        self::assertIsArray($result['sections'] ?? null);
+        self::assertIsArray($result['sections']['events'] ?? null);
+        self::assertSame([
+            ['event' => 'App\\Event\\OrderPlaced', 'class' => 'App\\EventListener\\NotifyCustomer', 'method' => 'onOrderPlaced', 'priority' => 10],
+        ], $result['sections']['events']['listeners'] ?? null);
+        self::assertSame(['boot-1'], $this->cacheEntries());
+    }
+
+    public function testReportsTheFrontControllerFailureWhenBothBootstrapsFail(): void
+    {
+        (new RuntimeFrontControllerFixtureBuilder($this->workspace))->writeBootstrapDependentKernelApplication(failingFrontController: true);
+
+        $process = $this->bridge->run(['--sections=events,routes', '--error-details=1']);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        self::assertSame(['status' => 'unavailable'], $result['configurationValidation'] ?? null);
+        $errors = $this->errors($result);
+        self::assertSame(['runtime', 'events', 'routes'], array_column($errors, 'section'));
+        self::assertSame([true, false, false], array_map(static fn (array $error): bool => isset($error['cause']), $errors));
+        self::assertSame('The application kernel could not be booted.', $errors[0]['message'] ?? null);
+        self::assertSame(\RuntimeException::class, $this->kernelBootCause($errors)['class']);
+        self::assertSame('CANARY_FRONT_CONTROLLER_FAILURE', $this->kernelBootCause($errors)['message']);
+    }
+
+    public function testReportsTheConventionalKernelFailureWithoutARuntimeFrontController(): void
+    {
+        (new RuntimeFrontControllerFixtureBuilder($this->workspace))->writeBootstrapDependentKernelApplication(frontController: false);
+
+        $process = $this->bridge->run(['--sections=events', '--error-details=1']);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        $errors = $this->errors($result);
+        self::assertSame(['runtime', 'events'], array_column($errors, 'section'));
+        self::assertSame(\Error::class, $this->kernelBootCause($errors)['class']);
+        self::assertSame('Undefined constant "DISTRIBUTION_PROJECT_ROOT"', $this->kernelBootCause($errors)['message']);
+    }
+
+    /**
+     * @param array<array-key, mixed> $result
+     *
+     * @return list<array<array-key, mixed>>
+     */
+    private function errors(array $result): array
+    {
+        $errors = $result['errors'] ?? null;
+        self::assertIsArray($errors);
+        $entries = [];
+        foreach ($errors as $error) {
+            self::assertIsArray($error);
+            $entries[] = $error;
+        }
+
+        return $entries;
+    }
+
+    /**
+     * @param list<array<array-key, mixed>> $errors
+     *
+     * @return array{class: mixed, message: mixed}
+     */
+    private function kernelBootCause(array $errors): array
+    {
+        $cause = $errors[0]['cause'] ?? null;
+        self::assertIsArray($cause);
+        $chain = $cause['chain'] ?? null;
+        self::assertIsArray($chain);
+        $first = $chain[0] ?? null;
+        self::assertIsArray($first);
+
+        return ['class' => $first['class'] ?? null, 'message' => $first['message'] ?? null];
+    }
+
+    /** @return list<string> */
+    private function cacheEntries(): array
+    {
+        $entries = array_values(array_diff(scandir($this->workspace->path('var/cache')) ?: [], ['.', '..']));
+        $this->workspace->remove('var');
+
+        return $entries;
+    }
+
     public function testNormalizesSecurityMetadataWithoutExportingProviderValues(): void
     {
         (new SecurityFixtureBuilder($this->workspace))->writeSecurityApplication();

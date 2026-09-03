@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Boot through the Symfony Runtime front controller when the conventional kernel cannot boot on its own
 - Report an application kernel boot failure once instead of per runtime section
 - Load complete runtime metadata despite subsequent bridge shutdown failures
 - Accept scalar values for singular bundle configuration aliases

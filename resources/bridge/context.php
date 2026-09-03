@@ -92,21 +92,7 @@ final class SymfonyLspBridgeContext
                 }
             }
             try {
-                $kernel = $this->createKernel();
-                if ($this->rebuildContainer) {
-                    $directories = [];
-                    foreach (['getCacheDir', 'getBuildDir'] as $method) {
-                        if (method_exists($kernel, $method) && is_string($directory = $kernel->$method())) {
-                            $directories[] = $directory;
-                        }
-                    }
-                    foreach (array_unique($directories) as $directory) {
-                        $this->removeDirectory($directory);
-                    }
-                }
-                if (method_exists($kernel, 'boot')) {
-                    $kernel->boot();
-                }
+                $kernel = $this->bootKernel();
             } finally {
                 if (null === $tracking) {
                     unset($_SERVER['SYMFONY_DISABLE_RESOURCE_TRACKING']);
@@ -134,19 +120,49 @@ final class SymfonyLspBridgeContext
         }
     }
 
-    private function createKernel(): object
+    private function bootKernel(): object
     {
         $kernelClass = $this->conventionalKernelClass();
-        if (null !== $kernelClass) {
-            return new $kernelClass($this->environment, $this->debug);
+        if (null === $kernelClass) {
+            $kernel = $this->frontControllerKernel();
+            if (null === $kernel) {
+                throw new RuntimeException('No kernel was found. Expected App\\Kernel, a Kernel class at a Composer PSR-4 autoload root, app/AppKernel.php or a front controller using the Symfony Runtime.');
+            }
+
+            return $this->boot($kernel);
         }
 
-        $kernel = $this->frontControllerKernel();
-        if (null !== $kernel) {
-            return $kernel;
+        try {
+            return $this->boot(new $kernelClass($this->environment, $this->debug));
+        } catch (Throwable $error) {
+            // distributions such as Pimcore ship a conventional kernel that only boots after their front controller's bootstrap
+            $kernel = $this->frontControllerKernel();
+            if (null === $kernel) {
+                throw $error;
+            }
+
+            return $this->boot($kernel);
+        }
+    }
+
+    private function boot(object $kernel): object
+    {
+        if ($this->rebuildContainer) {
+            $directories = [];
+            foreach (['getCacheDir', 'getBuildDir'] as $method) {
+                if (method_exists($kernel, $method) && is_string($directory = $kernel->$method())) {
+                    $directories[] = $directory;
+                }
+            }
+            foreach (array_unique($directories) as $directory) {
+                $this->removeDirectory($directory);
+            }
+        }
+        if (method_exists($kernel, 'boot')) {
+            $kernel->boot();
         }
 
-        throw new RuntimeException('No kernel was found. Expected App\\Kernel, a Kernel class at a Composer PSR-4 autoload root, app/AppKernel.php or a front controller using the Symfony Runtime.');
+        return $kernel;
     }
 
     private function conventionalKernelClass(): ?string
