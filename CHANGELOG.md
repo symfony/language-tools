@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.19.0 (2026-09-03)
 
 - Recognize PHP template render calls only on Symfony controllers, controller helpers and Twig environments
