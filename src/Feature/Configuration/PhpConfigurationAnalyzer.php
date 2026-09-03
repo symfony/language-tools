@@ -28,7 +28,7 @@ final class PhpConfigurationAnalyzer
         /** @var array<int, PhpConfigurationOccurrence|null> $resolved */
         $resolved = [];
         foreach ($document->methodCalls as $call) {
-            $this->resolveCall($call, $source, $masked, $callsByRange, $resolved);
+            $this->resolveCall($call, $source, $masked, $index, $callsByRange, $resolved);
         }
 
         $occurrences = array_values(array_filter($resolved));
@@ -84,7 +84,7 @@ final class PhpConfigurationAnalyzer
      * @param array<string, PhpMethodCall>                $callsByRange
      * @param array<int, PhpConfigurationOccurrence|null> $resolved
      */
-    private function resolveCall(PhpMethodCall $call, string $source, string $masked, array $callsByRange, array &$resolved): ?PhpConfigurationOccurrence
+    private function resolveCall(PhpMethodCall $call, string $source, string $masked, ConfigurationIndex $index, array $callsByRange, array &$resolved): ?PhpConfigurationOccurrence
     {
         $id = spl_object_id($call);
         if (\array_key_exists($id, $resolved)) {
@@ -100,10 +100,14 @@ final class PhpConfigurationAnalyzer
             $path = [$this->root(substr($masked, 0, $call->receiverContext->startOffset + 1), $call->receiverContext->name)];
         } else {
             $receiver = $callsByRange[$call->receiverContext->startOffset.':'.$call->receiverContext->endOffset] ?? null;
-            if (null === $receiver || null === $parent = $this->resolveCall($receiver, $source, $masked, $callsByRange, $resolved)) {
+            if (null === $receiver || null === $parent = $this->resolveCall($receiver, $source, $masked, $index, $callsByRange, $resolved)) {
                 return null;
             }
             $path = $parent->path;
+            $parentNode = $index->find($path);
+            if (null !== $parentNode && $this->returnsCurrentBuilder($parentNode)) {
+                array_pop($path);
+            }
         }
         $path[] = $this->methodName($call->method);
 
@@ -156,6 +160,19 @@ final class PhpConfigurationAnalyzer
         $shortName = substr($class, (int) strrpos('\\'.$class, '\\'));
 
         return $this->methodName(substr($shortName, 0, -\strlen('Config')));
+    }
+
+    private function returnsCurrentBuilder(ConfigurationNode $node): bool
+    {
+        if ('array' !== $node->type) {
+            return true;
+        }
+        if (null === $node->prototype) {
+            return false;
+        }
+
+        return 'array' !== $node->prototype->type
+            || (null !== $node->prototype->prototype && 'array' !== $node->prototype->prototype->type);
     }
 
     private function methodName(string $name): string

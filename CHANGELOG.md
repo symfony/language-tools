@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep chained PHP configuration leaf setters at the current level
 - Preserve PHP declarations after standalone asymmetric visibility
 - Add Pimcore Skeleton to the public dogfooding matrix
 - Report bridge timeouts that expire while the process starts

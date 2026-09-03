@@ -726,6 +726,33 @@ final class ConfigurationProviderTest extends TestCase
         }
     }
 
+    public function testTreatsFluentPhpConfigurationLeafSettersAsSiblings(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/twig.php';
+        $text = <<<'PHP'
+            <?php
+
+            function configure(TwigConfig $twigConfig): void
+            {
+                $twigConfig
+                    ->defaultPath('%kernel.project_dir%/templates')
+                    ->path('%kernel.project_dir%/public', 'static_assets')
+                    ->extensions(['App\\Twig\\Extension'])
+                    ->debug(true);
+            }
+            PHP;
+        $fixture->documents->open(new Document($uri, 'php', 1, $text));
+
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+
+        $text = str_replace('debug(true)', "debug('invalid')", $text);
+        $fixture->documents->update($uri, 2, $text);
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+        self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
+        self::assertSame(['Expected boolean for "twig.debug".'], array_column($diagnostics, 'message'));
+    }
+
     public function testCompletesEnumValuesAndPhpAndXmlDsl(): void
     {
         $fixture = $this->providers();
@@ -979,6 +1006,15 @@ final class ConfigurationProviderTest extends TestCase
                         $this->node('nested', 'boolean'),
                     ]), keyAttribute: 'name'),
                 ]),
+            ],
+            [
+                'alias' => 'twig',
+                'tree' => $this->node('twig', 'array', children: [
+                    $this->node('default_path', 'scalar'),
+                    $this->node('paths', 'array', prototype: $this->node('path', 'scalar')),
+                    $this->node('extensions', 'array', prototype: $this->node('extension', 'scalar')),
+                    $this->node('debug', 'boolean'),
+                ], aliases: ['path' => 'paths']),
             ],
             [
                 'alias' => 'security',
