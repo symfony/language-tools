@@ -19,7 +19,9 @@ export const twigTests: TestCase[] = [
 async function testTemplateLanguageFeatures(): Promise<void> {
     const contents = `<?php
 
-final class TemplateConsumer
+use Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController;
+
+final class TemplateConsumer extends AbstractController
 {
     public function test(): void
     {
