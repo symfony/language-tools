@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add Pimcore Skeleton to the public dogfooding matrix
 - Report bridge timeouts that expire while the process starts
 - Point human check output at --verbose when a failure cause is hidden
 - Remove the container cache before front controller kernels boot during a full refresh

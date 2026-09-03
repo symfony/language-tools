@@ -1,0 +1,12 @@
+{
+    "version": 1,
+    "repository": "https://github.com/pimcore/skeleton.git",
+    "revision": "3826b828b412739a38af9f12bb97f55b380b7dce",
+    "setup": "composer",
+    "ci": true,
+    "environmentVariables": {
+        "DATABASE_URL": "mysql://root:root@127.0.0.1:9/dogfood?serverVersion=8.4.7&charset=utf8mb4"
+    },
+    "ignorePlatformRequirements": ["ext-amqp"],
+    "indexTimeout": 300
+}

@@ -15,7 +15,8 @@ Symfony Language Tools is continuously tested with real applications including
 [Sulu Demo](https://github.com/sulu/sulu-demo),
 [Sulu Skeleton](https://github.com/sulu/skeleton),
 [Sylius](https://github.com/Sylius/Sylius),
-[Shopware](https://github.com/shopware/shopware) and
+[Shopware](https://github.com/shopware/shopware),
+[Pimcore Skeleton](https://github.com/pimcore/skeleton) and
 [Symfony Demo](https://github.com/symfony/demo) across supported Symfony
 versions.
 

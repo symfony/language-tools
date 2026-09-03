@@ -52,11 +52,12 @@ Symfony Language Tools is continuously tested with real open-source projects
 across supported Symfony versions:
 
 * `Kimai`_ and `Mautic`_ on Symfony 6.4;
-* `Sulu Demo`_, `Sulu Skeleton`_, `Sylius`_ and `Shopware`_ on Symfony 7.4;
+* `Sulu Demo`_, `Sulu Skeleton`_, `Sylius`_, `Shopware`_ and
+  `Pimcore Skeleton`_ on Symfony 7.4;
 * `Symfony Demo`_ on Symfony 8.1.
 
-These applications cover conventional and legacy layouts, large codebases,
-bundle ecosystems and different Symfony features.
+These applications cover conventional, legacy and distribution-specific
+bootstraps, large codebases, bundle ecosystems and different Symfony features.
 
 Requirements
 ------------
@@ -179,4 +180,5 @@ extension configuration is required. Verify that it starts:
 .. _`Sulu Skeleton`: https://github.com/sulu/skeleton
 .. _`Sylius`: https://github.com/Sylius/Sylius
 .. _`Shopware`: https://github.com/shopware/shopware
+.. _`Pimcore Skeleton`: https://github.com/pimcore/skeleton
 .. _`Symfony Demo`: https://github.com/symfony/demo

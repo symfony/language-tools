@@ -41,6 +41,7 @@ on:
                     - all
                     - kimai
                     - mautic
+                    - pimcore
                     - shopware
                     - sulu-demo
                     - sulu-skeleton
@@ -71,6 +72,7 @@ jobs:
                     - project: symfony-demo
                     - project: sylius
                     - project: shopware
+                    - project: pimcore
         name: ${{ matrix.project }}
         steps:
             - uses: actions/checkout@v7
