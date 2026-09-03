@@ -4,15 +4,13 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
-use Symfony\Lsp\Parser\QuotedArgument;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
@@ -24,16 +22,14 @@ final class TemplateReferenceExtractor
         private readonly PositionConverter $positionConverter,
         private readonly TwigDocumentParser $twigParser,
         private readonly TwigCallArgumentResolver $twigArguments,
-        private readonly QuotedArgumentMatcher $matcher,
-        private readonly PhpCommentParser $phpComments,
         private readonly PhpParserInterface $phpParser,
         private readonly PhpLiteralArrayKeyParser $arrayKeys,
-        private readonly BalancedDelimiterMatcher $delimiters,
+        private readonly TemplatePhpReferenceResolver $phpReferences,
     ) {
     }
 
     /** @return list<TemplateReference> */
-    public function extract(SourceDocument $document): array
+    public function extract(SourceDocument $document, ?DependencyInjectionSourceIndex $classIndex = null): array
     {
         if ('twig' === $document->languageId) {
             return $this->twigReferences($document->uri, $document->text);
@@ -43,16 +39,66 @@ final class TemplateReferenceExtractor
         }
 
         $php = $this->phpParser->parse($document->text);
+
+        return array_values(array_filter(
+            $this->phpReferences($document, $php),
+            static fn (TemplateReference $reference): bool => TemplatePhpReferenceResolver::supports($reference, $classIndex, $php),
+        ));
+    }
+
+    public function supportsPhpRenderAt(string $source, int $offset, ?DependencyInjectionSourceIndex $classIndex = null): bool
+    {
+        $php = $this->phpParser->parse($source);
+        $candidate = null;
+        foreach ($php->methodCalls as $call) {
+            if (!\in_array($call->method, ['render', 'renderView'], true) || $call->startOffset > $offset || $call->endOffset < $offset) {
+                continue;
+            }
+            if (null === $candidate || $call->startOffset > $candidate->startOffset) {
+                $candidate = $call;
+            }
+        }
+        if (null === $candidate) {
+            return false;
+        }
+        $receiver = $this->phpReferences->receiver($source, $php, $candidate);
+        if (null === $receiver || null === $candidate->namedOrPositionalArgument($receiver['templateArgumentName'], 0)) {
+            return false;
+        }
+
+        return TemplatePhpReferenceResolver::supportsReceiver($receiver['className'], $receiver['requiredParentClassNames'], $classIndex, $php);
+    }
+
+    /** @return list<TemplateReference> */
+    public function extractCandidates(SourceDocument $document): array
+    {
+        if ('twig' === $document->languageId) {
+            return $this->twigReferences($document->uri, $document->text);
+        }
+        if ('php' !== $document->languageId) {
+            return [];
+        }
+
+        return $this->phpReferences($document, $this->phpParser->parse($document->text));
+    }
+
+    /** @return list<TemplateReference> */
+    private function phpReferences(SourceDocument $document, PhpDocument $php): array
+    {
         $references = [];
         foreach ($php->methodCalls as $call) {
             if (!\in_array($call->method, ['render', 'renderView'], true)) {
                 continue;
             }
-            $template = $call->namedOrPositionalArgument('view', 0)?->stringLiteral;
+            $receiver = $this->phpReferences->receiver($document->text, $php, $call);
+            if (null === $receiver) {
+                continue;
+            }
+            $template = $call->namedOrPositionalArgument($receiver['templateArgumentName'], 0)?->stringLiteral;
             if (null === $template || '' === $template->value) {
                 continue;
             }
-            $parameters = $call->namedOrPositionalArgument('parameters', 1);
+            $parameters = $call->namedOrPositionalArgument($receiver['variablesArgumentName'], 1);
             $parametersExpression = $parameters?->expression;
             $parametersOffset = $parameters?->expressionStartOffset;
             $variables = !\is_string($parametersExpression) || !\is_int($parametersOffset) ? [] : $this->literalArrayKeyValues($this->arrayKeys->parseExpression(
@@ -68,19 +114,8 @@ final class TemplateReferenceExtractor
                 $template->startOffset,
                 $template->endOffset,
                 $variables,
-            );
-        }
-
-        $masked = $this->phpComments->mask($document->text);
-        foreach ($this->matcher->methodCalls($masked, ['render', 'renderView']) as $call) {
-            if ('::' !== substr($masked, max(0, $call->nameOffset - 2), 2)) {
-                continue;
-            }
-            $references[] = new TemplateReference(
-                $call->value,
-                $document->uri,
-                $call->range,
-                $this->staticVariables($document->text, $masked, $call),
+                $receiver['className'],
+                $receiver['requiredParentClassNames'],
             );
         }
         foreach ($php->attributes as $attribute) {
@@ -149,30 +184,6 @@ final class TemplateReferenceExtractor
     }
 
     /** @return list<string> */
-    private function staticVariables(string $text, string $masked, QuotedArgument $call): array
-    {
-        $tailOffset = $call->end();
-        $tail = substr($masked, $tailOffset);
-        if (1 !== preg_match('/^\s*,\s*(\[|array\s*\()/i', $tail, $match, \PREG_OFFSET_CAPTURE)) {
-            return [];
-        }
-        $expressionOffset = $tailOffset + $match[1][1];
-        $opening = str_starts_with($match[1][0], '[') ? '[' : '(';
-        $open = '[' === $opening ? $expressionOffset : $expressionOffset + (int) strrpos($match[1][0], '(');
-        $close = $this->delimiters->matching($masked, $open, $opening, '[' === $opening ? ']' : ')');
-        if (null === $close) {
-            return [];
-        }
-
-        return $this->literalArrayKeyValues($this->arrayKeys->parseExpression(
-            substr($text, $expressionOffset, $close - $expressionOffset + 1),
-            allowNestedUnpacking: true,
-            collectPartialLiteralKeys: true,
-            sourceOffset: $expressionOffset,
-        ));
-    }
-
-    /** @return list<string> */
     private function attributeVariables(?string $expression): array
     {
         if (null === $expression) {
@@ -218,9 +229,20 @@ final class TemplateReferenceExtractor
         return $references;
     }
 
-    /** @param list<string> $variables */
-    private function reference(string $name, string $uri, string $text, int $startOffset, int $endOffset, array $variables = []): TemplateReference
-    {
+    /**
+     * @param list<string> $variables
+     * @param list<string> $requiredParentClassNames
+     */
+    private function reference(
+        string $name,
+        string $uri,
+        string $text,
+        int $startOffset,
+        int $endOffset,
+        array $variables = [],
+        ?string $receiverClassName = null,
+        array $requiredParentClassNames = [],
+    ): TemplateReference {
         return new TemplateReference(
             $name,
             $uri,
@@ -229,6 +251,8 @@ final class TemplateReferenceExtractor
                 $this->positionConverter->toPosition($text, $endOffset),
             ),
             $variables,
+            $receiverClassName,
+            $requiredParentClassNames,
         );
     }
 }

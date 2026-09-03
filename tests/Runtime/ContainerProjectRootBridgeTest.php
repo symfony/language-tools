@@ -8,6 +8,7 @@ use Symfony\Lsp\Feature\Asset\AssetIndexRegistry;
 use Symfony\Lsp\Feature\Asset\ProjectAssetSnapshotLoader;
 use Symfony\Lsp\Feature\Configuration\ConfigurationValidationRegistry;
 use Symfony\Lsp\Feature\Configuration\ProjectConfigurationValidationSnapshotLoader;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\Stimulus\ProjectStimulusSnapshotLoader;
 use Symfony\Lsp\Feature\Stimulus\StimulusIndexRegistry;
 use Symfony\Lsp\Feature\Twig\ProjectTemplateSnapshotLoader;
@@ -62,7 +63,7 @@ final class ContainerProjectRootBridgeTest extends TestCase
             'containerProjectRoot' => $containerRoot,
         ]);
         $pathMapper = new ContainerPathMapper($configuration);
-        $templateIndexes = new TemplateIndexRegistry();
+        $templateIndexes = new TemplateIndexRegistry(new DependencyInjectionSourceIndexRegistry());
         $assetIndexes = new AssetIndexRegistry();
         $stimulusIndexes = new StimulusIndexRegistry();
         $truncator = new Utf8StringTruncator();

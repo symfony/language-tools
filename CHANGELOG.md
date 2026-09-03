@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recognize PHP template render calls only on Symfony controllers, controller helpers and Twig environments
 - Recognize Stimulus controllers in feature controller directories
 - Skip service and parameter diagnostics in configuration files for inactive environments
 - Add opt-in timing profiles to headless checks

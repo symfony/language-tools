@@ -8,9 +8,11 @@ editor.
 Completion
 ----------
 
-Template completion is available in PHP ``render()`` and ``renderView()``
-calls using positional or named ``view`` arguments, in the ``#[Template]``
-attribute and in these Twig contexts:
+Template completion is available in PHP ``render()`` calls on receivers with
+a native ``Twig\Environment`` type, in ``render()`` and ``renderView()`` calls
+on ``ControllerHelper`` receivers, in the same calls on ``$this`` in Symfony
+controller subclasses, in the ``#[Template]`` attribute and in these Twig
+contexts:
 
 * ``extends``;
 * ``include``;
@@ -19,6 +21,9 @@ attribute and in these Twig contexts:
 * ``use``;
 * the ``include()`` and ``source()`` functions.
 
+Controller and controller-helper calls recognize named ``view`` and
+``parameters`` arguments; Twig environment calls recognize named ``name`` and
+``context`` arguments.
 Both regular names such as ``article/show.html.twig`` and namespaced names such
 as ``@Admin/dashboard.html.twig`` are supported. The ``include()`` and
 ``source()`` functions recognize positional and named template arguments.
@@ -39,11 +44,11 @@ Variables
 ---------
 
 Variable completion and hover are available in Twig templates for Twig globals,
-outer literal keys passed in short or long arrays to PHP ``render()`` and
-``renderView()`` calls and literal names listed in the ``vars`` argument of the
-``#[Template]`` attribute. Render calls recognize positional and named
-``parameters`` arguments. Twig component templates also expose public component
-properties.
+outer literal keys passed in short or long arrays to recognized PHP render
+calls and literal names listed in the ``vars`` argument of the ``#[Template]``
+attribute. Render calls recognize positional context arrays and the named
+``parameters`` or ``context`` arguments described above. Twig component
+templates also expose public component properties.
 
 Variables declared by Twig's ``types`` tag are completed with their declared
 type and required or optional status. Documentation comments attached to type
@@ -88,6 +93,10 @@ the ``templates/`` directory; namespaced ``@Bundle`` names are excluded.
 Limitations
 -----------
 
+PHP receiver recognition uses native types and controller inheritance visible
+in project source files. Untyped Twig environment variables, inherited receiver
+properties, calls written in traits and controller ancestry available only
+through dependencies aren't recognized.
 Completion inside the ``#[Template]`` attribute expects the template name as
 the attribute's first argument and doesn't recognize aliased attribute
 imports; navigation and diagnostics don't have these restrictions.

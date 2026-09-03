@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\Twig\LiveComponentEventProvider;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TemplateNameResolver;
@@ -92,7 +93,7 @@ final class LiveComponentProviderTest extends TestCase
         );
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
-        $componentResolver = new TwigComponentResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $indexes, new TemplateIndexRegistry(), $extractor);
+        $componentResolver = new TwigComponentResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $indexes, new TemplateIndexRegistry(new DependencyInjectionSourceIndexRegistry()), $extractor);
         $completionProvider = new TwigComponentCompletionProvider($documentResolver, $converter, $protocol, $indexes, $componentResolver, $commentParser);
         $relationshipProvider = new TwigComponentRelationshipProvider($protocol, $indexes, $componentResolver);
 

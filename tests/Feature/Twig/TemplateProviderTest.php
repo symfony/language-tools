@@ -12,6 +12,9 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
 use Symfony\Lsp\Feature\Twig\ProjectTemplateSnapshotLoader;
 use Symfony\Lsp\Feature\Twig\TemplateCodeActionProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCompletionContext;
@@ -20,6 +23,7 @@ use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TemplateNameResolver;
 use Symfony\Lsp\Feature\Twig\TemplateNavigationProvider;
+use Symfony\Lsp\Feature\Twig\TemplatePhpReferenceResolver;
 use Symfony\Lsp\Feature\Twig\TemplateReference;
 use Symfony\Lsp\Feature\Twig\TemplateReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TemplateSourceIndexer;
@@ -40,10 +44,11 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceParseHealth;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\CommentParserRegistry;
+use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
@@ -64,7 +69,7 @@ final class TemplateProviderTest extends TestCase
     public function testExtractsValidReferencesAroundMalformedTwigWithoutMatchingComments(): void
     {
         $converter = new PositionConverter();
-        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser()), new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()), new PhpLiteralArrayKeyParser(), new BalancedDelimiterMatcher());
+        $extractor = $this->templateReferenceExtractor($converter);
         $references = $extractor->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
             {# {% include 'ignored.html.twig' %} #}
             {## {% include 'documented-outer.html.twig' %} ##}
@@ -92,7 +97,7 @@ final class TemplateProviderTest extends TestCase
     public function testDecodesEscapedTwigTemplateNames(): void
     {
         $converter = new PositionConverter();
-        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser()), new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()), new PhpLiteralArrayKeyParser(), new BalancedDelimiterMatcher());
+        $extractor = $this->templateReferenceExtractor($converter);
         $text = <<<'TWIG'
             {% extends "layout \"wide\".html.twig" %}
             {{ source("fragment \"compact\".html.twig") }}
@@ -118,27 +123,26 @@ final class TemplateProviderTest extends TestCase
     {
         $converter = new PositionConverter();
         $parser = new TolerantPhpParser(new Parser());
-        $indexes = new TemplateIndexRegistry();
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $indexes = $this->templateIndexes($classIndexes);
         $indexer = new TemplateSourceIndexer(
             $indexes,
-            new TemplateReferenceExtractor(
-                $converter,
-                new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()),
-                new TwigCallArgumentResolver(new TwigArgumentParser()),
-                new QuotedArgumentMatcher($converter),
-                new PhpCommentParser(),
-                $parser,
-                new PhpLiteralArrayKeyParser(),
-                new BalancedDelimiterMatcher(),
-            ),
+            $this->templateReferenceExtractor($converter, parser: $parser),
             new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())),
         );
         $project = new Project('/workspace', 'file:///workspace');
         $uri = 'file:///workspace/src/Controller.php';
+        $classIndexes->forProject($project)->replace(new DependencyInjectionSourceFacts($uri, classes: [new PhpClassDeclaration(
+            'Controller',
+            $uri,
+            new Range(new Position(0, 0), new Position(0, 0)),
+            'Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController',
+        )]));
 
         $indexer->overlay($project, new Document($uri, 'php', 1, <<<'PHP'
             <?php
-            final class Controller
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+            final class Controller extends AbstractController
             {
                 public function index(): void
                 {
@@ -148,7 +152,8 @@ final class TemplateProviderTest extends TestCase
             PHP), SourceParseHealth::Healthy);
         $indexer->overlay($project, new Document($uri, 'php', 2, <<<'PHP'
             <?php
-            final class Controller
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+            final class Controller extends AbstractController
             {
                 public function index(): void
                 {
@@ -162,45 +167,234 @@ final class TemplateProviderTest extends TestCase
     public function testExtractsPhpRenderCallsFromParserFacts(): void
     {
         $converter = new PositionConverter();
-        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser()), new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()), new PhpLiteralArrayKeyParser(), new BalancedDelimiterMatcher());
+        $extractor = $this->templateReferenceExtractor($converter);
         $references = $extractor->extract(new SourceDocument('file:///workspace/src/Controller.php', 'php', <<<'PHP'
             <?php
-            $this->render(
-                parameters: [
-                    'user' => ['name' => $name],
-                    $dynamic => false,
-                    ...$shared,
-                    "can\"edit" => true,
-                    'after' => true,
-                ],
-                view: 'named.html.twig',
-            );
-            $controller->renderView('view.html.twig', array('item' => $item, $dynamic => false, ...$shared, 'after_view' => true));
-            Controller::render('static.html.twig', ['static' => ['inner' => 1], 'after_static' => $value]);
-            Controller::render('static-long.html.twig', array('long' => $value, $dynamic => false, ...$shared, 'after_long' => true));
-            $this->render('incomplete.html.twig'
+            namespace App;
+
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+            use Symfony\Bundle\FrameworkBundle\Controller\ControllerHelper;
+            use Twig\Environment;
+
+            class CustomEnvironment extends Environment
+            {
+            }
+
+            final class Controller extends AbstractController
+            {
+                public function __construct(private Environment $twig)
+                {
+                }
+
+                public function show(Environment $environment, CustomEnvironment $customEnvironment, ControllerHelper $helper, Renderer $renderer): void
+                {
+                    $this->render(
+                        parameters: [
+                            'user' => ['name' => $name],
+                            $dynamic => false,
+                            ...$shared,
+                            "can\"edit" => true,
+                            'after' => true,
+                        ],
+                        view: 'named.html.twig',
+                    );
+                    $this->renderView('view.html.twig', array('item' => $item, $dynamic => false, ...$shared, 'after_view' => true));
+                    $environment->render(context: ['environment' => true], name: 'environment.html.twig');
+                    $environment->renderView('not-an-environment-method.html.twig');
+                    $customEnvironment->render('custom-environment.html.twig', ['custom_environment' => true]);
+                    $helper->render(parameters: ['helper' => true], view: 'helper.html.twig');
+                    $helper->renderView('helper-view.html.twig', ['helper_view' => true]);
+                    $this->twig->render('property.html.twig', ['property' => true]);
+                    $renderer->render('unrelated.html.twig');
+                    Controller::render('static.html.twig');
+                    $this->render('incomplete.html.twig'
+                }
+            }
             PHP));
 
         self::assertSame(
             [
                 ['named.html.twig', ['user', 'can"edit', 'after']],
                 ['view.html.twig', ['item', 'after_view']],
-                ['static.html.twig', ['static', 'after_static']],
-                ['static-long.html.twig', ['long', 'after_long']],
+                ['environment.html.twig', ['environment']],
+                ['custom-environment.html.twig', ['custom_environment']],
+                ['helper.html.twig', ['helper']],
+                ['helper-view.html.twig', ['helper_view']],
+                ['property.html.twig', ['property']],
                 ['incomplete.html.twig', []],
             ],
             array_map(static fn (TemplateReference $reference): array => [$reference->name, $reference->variables], $references),
         );
     }
 
+    public function testIgnoresRenderCallsOnUnrelatedReceivers(): void
+    {
+        $uri = 'file:///workspace/src/MarkdownRenderer.php';
+        $text = <<<'PHP'
+            <?php
+
+            namespace App\Demo;
+
+            class MarkdownRenderer
+            {
+                public function __construct(private \Twig\Environment $twig)
+                {
+                }
+
+                public function headline(): string
+                {
+                    return $this->render('**A headline.**');
+                }
+
+                public function plainText(): string
+                {
+                    return $this->renderView('A plain headline.');
+                }
+
+                public function twig(): void
+                {
+                    $this->twig->render('article/show.html.twig');
+                }
+
+                private function render(string $markdown): string
+                {
+                    return $markdown;
+                }
+
+                private function renderView(string $text): string
+                {
+                    return $text;
+                }
+            }
+
+            class CompatibleArityRenderer
+            {
+                public function headline(): string
+                {
+                    return $this->render('**Another headline.**');
+                }
+
+                private function render(string $markdown, array $options = [], mixed $response = null): string
+                {
+                    return $markdown;
+                }
+            }
+            PHP;
+        [, $navigation] = $this->providers($uri, 'php', $text);
+
+        self::assertSame([], $navigation->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame(
+            ['file:///workspace/templates/article/show.html.twig'],
+            array_column($navigation->links(['textDocument' => ['uri' => $uri]]) ?? [], 'target'),
+        );
+    }
+
+    public function testRecognizesRenderCallsOnControllerSubclasses(): void
+    {
+        $uri = 'file:///workspace/src/ArticleController.php';
+        $text = <<<'PHP'
+            <?php
+
+            namespace App\Controller;
+
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+            use Symfony\Component\HttpFoundation\Response;
+
+            class ArticleController extends AbstractController
+            {
+                public function show(): Response
+                {
+                    return $this->render('article/missing.html.twig');
+                }
+
+                protected function render(string $view, array $parameters = [], ?Response $response = null): Response
+                {
+                    return parent::render($view, $parameters, $response);
+                }
+            }
+
+            class VariadicController extends AbstractController
+            {
+                public function show(): Response
+                {
+                    return $this->render('article/variadic.html.twig');
+                }
+
+                protected function render(...$arguments): Response
+                {
+                    return parent::render(...$arguments);
+                }
+            }
+            PHP;
+        [, $navigation] = $this->providers($uri, 'php', $text);
+
+        self::assertSame(
+            [
+                'Template "article/missing.html.twig" does not exist in the selected environment.',
+                'Template "article/variadic.html.twig" does not exist in the selected environment.',
+            ],
+            array_column($navigation->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'message'),
+        );
+    }
+
+    public function testFiltersIndexedControllerReferencesThroughClassHierarchy(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $classes = $classIndexes->forProject($project);
+        $range = new Range(new Position(0, 0), new Position(0, 0));
+        $classes->replace(
+            new DependencyInjectionSourceFacts('file:///workspace/src/ArticleController.php', classes: [
+                new PhpClassDeclaration('App\\Controller\\ArticleController', 'file:///workspace/src/ArticleController.php', $range, 'App\\Controller\\BaseController'),
+            ]),
+            new DependencyInjectionSourceFacts('file:///workspace/src/BaseController.php', classes: [
+                new PhpClassDeclaration('App\\Controller\\BaseController', 'file:///workspace/src/BaseController.php', $range, 'Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController'),
+            ]),
+        );
+        $indexes = $this->templateIndexes($classIndexes);
+        $extractor = $this->templateReferenceExtractor(new PositionConverter());
+        $document = new SourceDocument(
+            'file:///workspace/src/ArticleController.php',
+            'php',
+            <<<'PHP'
+                <?php
+                namespace App\Controller;
+                class ArticleController extends BaseController
+                {
+                    public function show(): void
+                    {
+                        $this->render('article/show.html.twig', ['article' => true]);
+                    }
+                }
+                PHP,
+        );
+        $references = $extractor->extractCandidates($document);
+        $indexes->forProject($project)->replaceReferences(...$references);
+
+        self::assertCount(1, $extractor->extract($document, $classes));
+        self::assertCount(1, $indexes->forProject($project)->references('article/show.html.twig'));
+        self::assertSame(['article'], $indexes->forProject($project)->variables('article/show.html.twig'));
+
+        $classes->overlay(new DependencyInjectionSourceFacts('file:///workspace/src/BaseController.php', classes: [
+            new PhpClassDeclaration('App\\Controller\\BaseController', 'file:///workspace/src/BaseController.php', $range),
+        ]));
+
+        self::assertSame([], $indexes->forProject($project)->references('article/show.html.twig'));
+        self::assertSame([], $indexes->forProject($project)->variables('article/show.html.twig'));
+
+        $classes->removeOverlay('file:///workspace/src/BaseController.php');
+
+        self::assertCount(1, $indexes->forProject($project)->references('article/show.html.twig'));
+    }
+
     public function testCompletesRenderContextVariablesAndTwigGlobals(): void
     {
         $converter = new PositionConverter();
-        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser()), new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()), new PhpLiteralArrayKeyParser(), new BalancedDelimiterMatcher());
+        $extractor = $this->templateReferenceExtractor($converter);
         $reference = $extractor->extract(
-            new SourceDocument('file:///workspace/src/Controller.php',
+            new SourceDocument('file:///workspace/src/Renderer.php',
                 'php',
-                "<?php \$this->render('article/show.html.twig', ['article' => \$article, 'can_edit' => true]);"),
+                "<?php function render(\\Twig\\Environment \$twig): void { \$twig->render('article/show.html.twig', ['article' => \$article, 'can_edit' => true]); }"),
         )[0];
         self::assertSame(['article', 'can_edit'], $reference->variables);
 
@@ -210,7 +404,7 @@ final class TemplateProviderTest extends TestCase
         $documents->open(new Document($uri, 'twig', 1, $text));
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $indexes = new TemplateIndexRegistry();
+        $indexes = $this->templateIndexes();
         $indexes->forProject($project)->replaceReferences($reference);
         $indexes->forProject($project)->replaceGlobals(['app']);
         $commentParser = new TwigCommentParser();
@@ -267,7 +461,7 @@ final class TemplateProviderTest extends TestCase
             new DocumentContextResolver($documents, $projects),
             $converter,
             new LspProtocolMapper(),
-            new TemplateIndexRegistry(),
+            $this->templateIndexes(),
             new TwigComponentIndexRegistry(),
             $this->templateNameResolver(),
             new TwigTypeDeclarationParser($commentParser),
@@ -367,7 +561,7 @@ final class TemplateProviderTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
         $indexes->forProject($project)->replaceRuntime(true, [], 'components');
-        $templateIndexes = new TemplateIndexRegistry();
+        $templateIndexes = $this->templateIndexes();
         $templateIndexes->forProject($project)->replaceRuntime(true);
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
@@ -413,7 +607,7 @@ final class TemplateProviderTest extends TestCase
             new DocumentContextResolver($documents, $projects),
             $converter,
             new LspProtocolMapper(),
-            new TemplateIndexRegistry(),
+            $this->templateIndexes(),
             $indexes,
             $this->templateNameResolver(),
             new TwigTypeDeclarationParser($commentParser),
@@ -442,7 +636,7 @@ final class TemplateProviderTest extends TestCase
         $indexes->forProject($project)->replace(
             $extractor->extract($project, new SourceDocument($usageUri, 'twig', $usageText)),
         );
-        $templateIndexes = new TemplateIndexRegistry();
+        $templateIndexes = $this->templateIndexes();
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $componentResolver = new TwigComponentResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
@@ -492,7 +686,7 @@ final class TemplateProviderTest extends TestCase
         $projects->replace([$project]);
         $indexes = new TwigComponentIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true, ['ux:icon'], 'components');
-        $templateIndexes = new TemplateIndexRegistry();
+        $templateIndexes = $this->templateIndexes();
         $range = new Range(new Position(0, 0), new Position(0, 0));
         $templateIndexes->forProject($project)->replaceRuntime(
             true,
@@ -552,7 +746,7 @@ final class TemplateProviderTest extends TestCase
         mkdir($root.'/templates', 0777, true);
         file_put_contents($root.'/templates/index.html', 'Hello');
         $project = new Project($root, 'file://'.$root);
-        $indexes = new TemplateIndexRegistry();
+        $indexes = $this->templateIndexes();
 
         try {
             (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper(new RuntimeConfiguration())))->load($project, [
@@ -576,7 +770,7 @@ final class TemplateProviderTest extends TestCase
         $project = new Project($root, 'file://'.$root);
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['containerProjectRoot' => '/app']);
-        $indexes = new TemplateIndexRegistry();
+        $indexes = $this->templateIndexes();
 
         try {
             (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper($configuration)))->load($project, [
@@ -603,7 +797,7 @@ final class TemplateProviderTest extends TestCase
         file_put_contents($root.'/templates/index.html.twig', 'Hello');
         chmod($root.'/templates/admin', 0000);
         $project = new Project($root, 'file://'.$root);
-        $indexes = new TemplateIndexRegistry();
+        $indexes = $this->templateIndexes();
 
         try {
             (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper(new RuntimeConfiguration())))->load($project, [
@@ -624,19 +818,20 @@ final class TemplateProviderTest extends TestCase
     public function testCreatesMissingApplicationTemplate(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
-        $text = "<?php \$this->render('missing.html.twig');";
+        $text = "<?php class Controller extends \\Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController { public function show(): void { \$this->render('missing.html.twig'); } }";
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $indexes = new TemplateIndexRegistry();
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $indexes = $this->templateIndexes($classIndexes);
         $indexes->forProject($project)->replaceRuntime(true);
         $converter = new PositionConverter();
-        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser()), new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()), new PhpLiteralArrayKeyParser(), new BalancedDelimiterMatcher());
-        $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes);
+        $extractor = $this->templateReferenceExtractor($converter);
+        $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes);
         $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
         self::assertIsArray($diagnostics);
-        $provider = new TemplateCodeActionProvider(new DocumentContextResolver($documents, $projects), $extractor, $indexes, new UriToPathConverter(), new ProjectPathResolver(new UriToPathConverter()), new LspProtocolMapper());
+        $provider = new TemplateCodeActionProvider(new DocumentContextResolver($documents, $projects), $extractor, $indexes, new UriToPathConverter(), new ProjectPathResolver(new UriToPathConverter()), new LspProtocolMapper(), $classIndexes);
 
         $actions = $provider->actions([
             'textDocument' => ['uri' => $uri],
@@ -664,21 +859,22 @@ final class TemplateProviderTest extends TestCase
         symlink($directory.'/external', $root.'/templates/external');
         $converter = new UriToPathConverter();
         $uri = $converter->toUri($root.'/src/Controller.php');
-        $text = "<?php \$this->render('external/missing.html.twig');";
+        $text = "<?php class Controller extends \\Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController { public function show(): void { \$this->render('external/missing.html.twig'); } }";
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project($root, $converter->toUri($root))]);
-        $indexes = new TemplateIndexRegistry();
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $indexes = $this->templateIndexes($classIndexes);
         $indexes->forProject($project)->replaceRuntime(true);
         $positionConverter = new PositionConverter();
-        $extractor = new TemplateReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser()), new QuotedArgumentMatcher($positionConverter), new PhpCommentParser(), new TolerantPhpParser(new Parser()), new PhpLiteralArrayKeyParser(), new BalancedDelimiterMatcher());
-        $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($positionConverter), new LspProtocolMapper(), $extractor, $indexes);
+        $extractor = $this->templateReferenceExtractor($positionConverter);
+        $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($positionConverter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes);
 
         try {
             $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
-            $provider = new TemplateCodeActionProvider(new DocumentContextResolver($documents, $projects), $extractor, $indexes, $converter, new ProjectPathResolver($converter), new LspProtocolMapper());
+            $provider = new TemplateCodeActionProvider(new DocumentContextResolver($documents, $projects), $extractor, $indexes, $converter, new ProjectPathResolver($converter), new LspProtocolMapper(), $classIndexes);
 
             self::assertSame([], $provider->actions([
                 'textDocument' => ['uri' => $uri],
@@ -693,7 +889,7 @@ final class TemplateProviderTest extends TestCase
     public function testCompletesAndLinksTemplateNames(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
-        $text = "<?php \$this->render('article/show.html.twig');";
+        $text = "<?php class Controller extends \\Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController { public function show(): void { \$this->render('article/show.html.twig'); } }";
         [$completion, $navigation, $converter] = $this->providers($uri, 'php', $text);
         $position = $converter->toPosition($text, strpos($text, 'article/sh') + \strlen('article/sh'));
         $params = ['textDocument' => ['uri' => $uri], 'position' => [
@@ -705,6 +901,32 @@ final class TemplateProviderTest extends TestCase
             'file:///workspace/templates/article/show.html.twig',
             $navigation->links(['textDocument' => ['uri' => $uri]])[0]['target'] ?? null,
         );
+    }
+
+    public function testCompletesTemplateNamesForTwigEnvironmentReceivers(): void
+    {
+        $uri = 'file:///workspace/src/Renderer.php';
+        $text = "<?php function show(\\Twig\\Environment \$twig): string { return \$twig->render(name: 'article/sh";
+        [$completion, , $converter] = $this->providers($uri, 'php', $text);
+        $position = $converter->toPosition($text, \strlen($text));
+
+        self::assertSame(['article/show.html.twig'], array_column($completion->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ]) ?? [], 'label'));
+    }
+
+    public function testDoesNotCompleteTemplateNamesForUnrelatedRenderMethods(): void
+    {
+        $uri = 'file:///workspace/src/MarkdownRenderer.php';
+        $text = "<?php class MarkdownRenderer { public function show(): string { return \$this->render('article/sh";
+        [$completion, , $converter] = $this->providers($uri, 'php', $text);
+        $position = $converter->toPosition($text, \strlen($text));
+
+        self::assertNull($completion->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ]));
     }
 
     public function testIgnoresTemplateCompletionInsideDocumentationComments(): void
@@ -823,7 +1045,8 @@ final class TemplateProviderTest extends TestCase
         $documents->open(new Document($uri, $languageId, 1, $text));
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $indexes = new TemplateIndexRegistry();
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $indexes = $this->templateIndexes($classIndexes);
         $indexes->forProject($project)->replaceRuntime(
             true,
             new TemplateDeclaration(
@@ -849,15 +1072,15 @@ final class TemplateProviderTest extends TestCase
         );
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser), new TwigCallArgumentResolver(new TwigArgumentParser()), new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()), new PhpLiteralArrayKeyParser(), new BalancedDelimiterMatcher());
+        $extractor = $this->templateReferenceExtractor($converter, $commentParser);
         if ($indexReferences) {
-            $indexes->forProject($project)->replaceReferences(...$extractor->extract(new SourceDocument($uri, $languageId, $text)));
+            $indexes->forProject($project)->replaceReferences(...$extractor->extractCandidates(new SourceDocument($uri, $languageId, $text)));
         }
         $resolver = new DocumentContextResolver($documents, $projects);
 
         return [
-            new TemplateCompletionHandler($resolver, $converter, new LspProtocolMapper(), $indexes, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()])),
-            new TemplateNavigationProvider($resolver, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes),
+            new TemplateCompletionHandler($resolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $classIndexes, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()])),
+            new TemplateNavigationProvider($resolver, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes),
             $converter,
         ];
     }
@@ -870,10 +1093,11 @@ final class TemplateProviderTest extends TestCase
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $indexes = new TemplateIndexRegistry();
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $indexes = $this->templateIndexes($classIndexes);
         $converter = new PositionConverter();
         $indexes->forProject($project)->replaceSources(new TemplateDeclaration('article/show.html.twig', 'file:///workspace/templates/article/show.html.twig', new Range(new Position(0, 0), new Position(0, 0))));
-        $handler = new TemplateCompletionHandler(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]));
+        $handler = new TemplateCompletionHandler(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $this->templateReferenceExtractor($converter), $classIndexes, new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]));
         $position = $converter->toPosition($text, \strlen($text));
 
         self::assertNull($handler->complete([
@@ -885,13 +1109,20 @@ final class TemplateProviderTest extends TestCase
     public function testIgnoresRenderCallsInPhpComments(): void
     {
         $converter = new PositionConverter();
-        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser()), new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()), new PhpLiteralArrayKeyParser(), new BalancedDelimiterMatcher());
+        $extractor = $this->templateReferenceExtractor($converter);
 
         $references = $extractor->extract(new SourceDocument('file:///workspace/src/Controller.php', 'php', <<<'PHP'
             <?php
-            // $this->render('commented.html.twig');
-            /* $this->renderView('blocked.html.twig'); */
-            $this->render('live.html.twig');
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+            class Controller extends AbstractController
+            {
+                public function show(): void
+                {
+                    // $this->render('commented.html.twig');
+                    /* $this->renderView('blocked.html.twig'); */
+                    $this->render('live.html.twig');
+                }
+            }
             PHP));
 
         self::assertSame(['live.html.twig'], array_map(static fn ($reference): string => $reference->name, $references));
@@ -900,7 +1131,7 @@ final class TemplateProviderTest extends TestCase
     public function testExtractsTemplateAttributeReferences(): void
     {
         $converter = new PositionConverter();
-        $extractor = new TemplateReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser()), new QuotedArgumentMatcher($converter), new PhpCommentParser(), new TolerantPhpParser(new Parser()), new PhpLiteralArrayKeyParser(), new BalancedDelimiterMatcher());
+        $extractor = $this->templateReferenceExtractor($converter);
 
         $references = $extractor->extract(new SourceDocument('file:///workspace/src/Controller.php', 'php', <<<'PHP'
             <?php
@@ -908,8 +1139,9 @@ final class TemplateProviderTest extends TestCase
 
             use Symfony\Bridge\Twig\Attribute\Template;
             use Symfony\Bridge\Twig\Attribute\Template as View;
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 
-            class Controller
+            class Controller extends AbstractController
             {
                 #[Template('product/index.html.twig', vars: ['products', 'category'])]
                 public function index() {}
@@ -968,7 +1200,9 @@ final class TemplateProviderTest extends TestCase
     public static function providePhpCompletionContexts(): iterable
     {
         yield 'render call' => ["<?php \$this->render('article/sh", 'article/sh'];
-        yield 'named render argument' => ["<?php \$this->render(view: 'article/sh", 'article/sh'];
+        yield 'named controller render argument' => ["<?php \$this->render(view: 'article/sh", 'article/sh'];
+        yield 'named environment render argument' => ["<?php \$twig->render(name: 'article/sh", 'article/sh'];
+        yield 'static render call' => ["<?php Controller::render('article/sh", null];
         yield 'attribute' => ["<?php #[Template('article/sh", 'article/sh'];
         yield 'named template argument' => ["<?php #[Template(template: 'article/sh", 'article/sh'];
         yield 'fully qualified attribute' => ["<?php #[\\Symfony\\Bridge\\Twig\\Attribute\\Template('article/sh", 'article/sh'];
@@ -1004,5 +1238,22 @@ final class TemplateProviderTest extends TestCase
             ['template.not_found'],
             array_column($navigation->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'),
         );
+    }
+
+    private function templateReferenceExtractor(PositionConverter $converter, ?TwigCommentParser $comments = null, ?PhpParserInterface $parser = null): TemplateReferenceExtractor
+    {
+        return new TemplateReferenceExtractor(
+            $converter,
+            new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments ?? new TwigCommentParser()),
+            new TwigCallArgumentResolver(new TwigArgumentParser()),
+            $parser ?? new TolerantPhpParser(new Parser()),
+            new PhpLiteralArrayKeyParser(),
+            new TemplatePhpReferenceResolver(new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher())),
+        );
+    }
+
+    private function templateIndexes(?DependencyInjectionSourceIndexRegistry $classIndexes = null): TemplateIndexRegistry
+    {
+        return new TemplateIndexRegistry($classIndexes ?? new DependencyInjectionSourceIndexRegistry());
     }
 }

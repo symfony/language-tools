@@ -235,7 +235,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $classIndexes = new DependencyInjectionSourceIndexRegistry();
             $phpExtractor = RouteReferenceExtractorFactory::create($converter);
             $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser()));
-            $templateIndexes = new TemplateIndexRegistry();
+            $templateIndexes = new TemplateIndexRegistry($classIndexes);
             $templateIndexes->forProject($project)->replaceRuntime(true, new TemplateDeclaration('page.html.twig', $uri, new Range(new Position(0, 0), new Position(0, 0))));
             $diagnosticProvider = new RouteDiagnosticPublisher(new DocumentContextResolver($documents, $projects), new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor, $templateIndexes);
             $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -327,7 +327,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 new DependencyInjectionSourceIndexRegistry(),
                 RouteReferenceExtractorFactory::create($positionConverter),
                 new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser())),
-                new TemplateIndexRegistry(),
+                new TemplateIndexRegistry(new DependencyInjectionSourceIndexRegistry()),
             )],
         );
         $publisher = new DiagnosticProviderRegistry($client, $documents, $projects, $collector);
@@ -409,7 +409,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $route ?? new Route('article_show', '/article', ['GET'], [], null, null),
         ]));
         $positionConverter = new PositionConverter();
-        $templateIndexes = new TemplateIndexRegistry();
+        $templateIndexes = new TemplateIndexRegistry(new DependencyInjectionSourceIndexRegistry());
         $templateIndexes->forProject($project)->replaceRuntime(
             true,
             ...('twig' === $languageId && $runtimeTemplate ? [new TemplateDeclaration(basename($uri), $uri, new Range(new Position(0, 0), new Position(0, 0)))] : []),

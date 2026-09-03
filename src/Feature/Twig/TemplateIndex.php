@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
+
 final class TemplateIndex
 {
     /** @var array<string, TemplateDeclaration> */
@@ -15,6 +17,10 @@ final class TemplateIndex
     private bool $complete = false;
     /** @var list<string> */
     private array $globals = [];
+
+    public function __construct(private readonly DependencyInjectionSourceIndex $classes)
+    {
+    }
 
     /** @param list<string> $globals */
     public function replaceGlobals(array $globals): void
@@ -123,14 +129,14 @@ final class TemplateIndex
                 continue;
             }
             foreach ($indexed as $reference) {
-                if ($this->normalize($reference->name) === $name) {
+                if ($this->normalize($reference->name) === $name && TemplatePhpReferenceResolver::supports($reference, $this->classes)) {
                     $references[] = $reference;
                 }
             }
         }
         foreach ($this->overlays as $overlay) {
             foreach ($overlay['references'] as $reference) {
-                if ($this->normalize($reference->name) === $name) {
+                if ($this->normalize($reference->name) === $name && TemplatePhpReferenceResolver::supports($reference, $this->classes)) {
                     $references[] = $reference;
                 }
             }

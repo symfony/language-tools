@@ -54,7 +54,7 @@ final class TemplateSourceIndexer extends AbstractSourceIndexer
         return new TemplateSourceFacts(
             $document->uri,
             $this->declaration($project, $document->uri),
-            $this->extractor->extract($document),
+            $this->extractor->extractCandidates($document),
         );
     }
 
