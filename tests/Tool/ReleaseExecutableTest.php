@@ -343,6 +343,11 @@ final class ReleaseExecutableTest extends TestCase
     public function testRefusesReleasePreparationWhenCurrentMainHasFailedWorkflows(): void
     {
         $root = \dirname(__DIR__, 2);
+        $package = json_decode(file_get_contents(Path::join($root, 'editor/vscode/package.json')) ?: throw new \RuntimeException('Unable to read the VS Code package.'), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertIsArray($package);
+        self::assertIsString($package['version'] ?? null);
+        $version = \sprintf('%d.0.0', 1 + (int) explode('.', $package['version'])[0]);
+
         $workspace = new TestWorkspace();
         $workspace->mkdir('bin');
         $bin = $workspace->path('bin');
@@ -360,9 +365,9 @@ final class ReleaseExecutableTest extends TestCase
             echo "git $*" >> "$TOOL_CALLS"
             case "$*" in
                 "branch --show-current") echo main ;;
-                "ls-remote --exit-code --tags origin refs/tags/v0.19.0") exit 2 ;;
+                "ls-remote --exit-code --tags origin refs/tags/$RELEASE_TAG") exit 2 ;;
                 "rev-parse HEAD"|"rev-parse refs/remotes/origin/main") echo aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ;;
-                "rev-parse --verify --quiet refs/tags/v0.19.0") exit 1 ;;
+                "rev-parse --verify --quiet refs/tags/$RELEASE_TAG") exit 1 ;;
             esac
             BASH);
         $workspace->executable('bin/gh', <<<'BASH'
@@ -377,9 +382,10 @@ final class ReleaseExecutableTest extends TestCase
         try {
             $environment = getenv();
             $environment['PATH'] = $bin;
+            $environment['RELEASE_TAG'] = 'v'.$version;
             $environment['TOOL_CALLS'] = $calls;
             $result = $this->runProcess(
-                [\PHP_BINARY, Path::join($root, 'tools/release'), '0.19.0', '--yes'],
+                [\PHP_BINARY, Path::join($root, 'tools/release'), $version, '--yes'],
                 $environment,
             );
 
@@ -389,7 +395,7 @@ final class ReleaseExecutableTest extends TestCase
             self::assertIsArray($toolCalls);
             self::assertContains('gh run list --branch=main --commit=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --limit=100 --json=workflowName,status,conclusion', $toolCalls);
             self::assertNotContains('composer test', $toolCalls);
-            self::assertNotContains('npm version 0.19.0 --no-git-tag-version', $toolCalls);
+            self::assertNotContains('npm version '.$version.' --no-git-tag-version', $toolCalls);
         } finally {
             $workspace->cleanup();
         }
