@@ -22,6 +22,7 @@ final class CheckResult
         public readonly bool $strictBaseline,
         public readonly array $errors,
         public readonly int $blockingCount,
+        public readonly ?CheckProfile $profile = null,
     ) {
     }
 }

@@ -20,6 +20,8 @@ final class CheckCommand
         private readonly CheckOptionsParser $optionsParser,
         private readonly CheckRunner $runner,
         private readonly CheckReporter $reporter,
+        private readonly CheckProfiler $profiler,
+        private readonly CheckProfileReporter $profileReporter,
         private readonly DiagnosticCodeRegistry $diagnosticCodes,
         private readonly SensitiveDataRedactor $redactor,
         private readonly ServerLogger $logger,
@@ -28,7 +30,7 @@ final class CheckCommand
     }
 
     /** @param list<string> $arguments */
-    public function run(array $arguments): CheckExecution
+    public function run(array $arguments, int|float|null $processStartedAt = null): CheckExecution
     {
         $format = 'human';
         $verbose = [] !== array_intersect(self::VERBOSE_OPTIONS, $arguments);
@@ -47,6 +49,7 @@ final class CheckCommand
                 return new CheckExecution(self::EXIT_SUCCESS, $this->reporter->codes($this->diagnosticCodes->all(), $format));
             }
 
+            $this->profiler->start($options->profile, $processStartedAt);
             $result = $this->runner->run($options);
             $exitCode = !$result->complete
                 ? self::EXIT_OPERATIONAL
@@ -55,6 +58,7 @@ final class CheckCommand
                 fn (array $error): string => $this->errorOutput($error, $options->verbose),
                 $result->errors,
             ));
+            $stderr .= $this->profileReporter->render($result);
 
             return new CheckExecution($exitCode, $this->reporter->render($result, $format, $options->verbose, $exitCode), $stderr);
         } catch (InvalidConfigurationException $error) {
@@ -63,7 +67,7 @@ final class CheckCommand
             return new CheckExecution(
                 self::EXIT_INVOCATION,
                 $this->reporter->render($result, $format, $verbose, self::EXIT_INVOCATION),
-                $error->getMessage()."\n",
+                $error->getMessage()."\n".$this->profileReporter->render($result),
             );
         } catch (CheckOperationalException $error) {
             $result = $this->errorResult('operational', $error->getMessage());
@@ -71,7 +75,7 @@ final class CheckCommand
             return new CheckExecution(
                 self::EXIT_OPERATIONAL,
                 $this->reporter->render($result, $format, $verbose, self::EXIT_OPERATIONAL),
-                $error->getMessage()."\n",
+                $error->getMessage()."\n".$this->profileReporter->render($result),
             );
         } catch (\Throwable $error) {
             $message = 'The diagnostics check failed because of an internal error.';
@@ -80,7 +84,7 @@ final class CheckCommand
             return new CheckExecution(
                 self::EXIT_OPERATIONAL,
                 $this->reporter->render($result, $format, $verbose, self::EXIT_OPERATIONAL),
-                $this->errorOutput($result->errors[0], $verbose),
+                $this->errorOutput($result->errors[0], $verbose).$this->profileReporter->render($result),
             );
         }
     }
@@ -107,6 +111,7 @@ final class CheckCommand
             false,
             [$error],
             0,
+            $this->profiler->finish(),
         );
     }
 

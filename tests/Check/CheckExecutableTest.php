@@ -27,6 +27,7 @@ use function Amp\Future\await;
  * @phpstan-type CheckReport array{
  *     complete: bool,
  *     projects: list<array{environment: string, analysis: array{mode: string, reason: string|null}, runtime: array{state: string}, complete: bool}>,
+ *     profile?: array{totalMilliseconds: int|float, phasesMilliseconds: array<string, int|float|null>, projects: list<array{files: int, phasesMilliseconds: array<string, int|float|null>, diagnosticProvidersMilliseconds: array<string, int|float>, slowestFilesMilliseconds: array<string, int|float>}>},
  *     diagnostics: list<array{code: string, path: string, baseline: string}>,
  *     baseline: array{stale: list<array<string, mixed>>},
  *     summary: array{active: int, matched: int, blocking: int, stale: int},
@@ -113,11 +114,62 @@ final class CheckExecutableTest extends TestCase
         self::assertSame(CheckCommand::EXIT_DIAGNOSTICS, $result['exitCode'], $result['stderr']);
         self::assertSame('', $result['stderr']);
         self::assertTrue($report['complete']);
+        self::assertArrayNotHasKey('profile', $report);
         self::assertSame('source-only', $report['projects'][0]['analysis']['mode']);
         self::assertSame('runtime-indexing-disabled', $report['projects'][0]['analysis']['reason']);
         self::assertSame('env.malformed_chain', $report['diagnostics'][0]['code']);
         self::assertSame('config/services.yaml', $report['diagnostics'][0]['path']);
         self::assertSame(1, $report['summary']['blocking']);
+    }
+
+    public function testProfilesCheckerPhasesProjectsProvidersAndFiles(): void
+    {
+        $result = $this->execute([
+            'check',
+            '--profile',
+            '--source-only',
+            '--format=json',
+            '--workspace='.$this->directory,
+            'config/services.yaml',
+        ]);
+        $report = $this->decodeReport($result['stdout']);
+        $profile = $report['profile'] ?? null;
+
+        self::assertSame(CheckCommand::EXIT_DIAGNOSTICS, $result['exitCode'], $result['stderr']);
+        self::assertIsArray($profile);
+        self::assertSame([
+            'startup',
+            'configuration',
+            'projectDiscovery',
+            'fileSelection',
+            'projectAnalysis',
+            'diagnostics',
+            'resultProcessing',
+        ], array_keys($profile['phasesMilliseconds']));
+        self::assertGreaterThanOrEqual(0.0, (float) $profile['totalMilliseconds']);
+        self::assertSame(1, $profile['projects'][0]['files']);
+        self::assertSame([
+            'sourceIndex',
+            'filePreparation',
+            'runtimeIndex',
+            'diagnostics',
+        ], array_keys($profile['projects'][0]['phasesMilliseconds']));
+        self::assertNull($profile['projects'][0]['phasesMilliseconds']['runtimeIndex']);
+        self::assertArrayHasKey('environment', $profile['projects'][0]['diagnosticProvidersMilliseconds']);
+        self::assertSame(['config/services.yaml'], array_keys($profile['projects'][0]['slowestFilesMilliseconds']));
+        self::assertStringContainsString("Timing profile:\n", $result['stderr']);
+        self::assertStringContainsString('Diagnostic providers:', $result['stderr']);
+        self::assertStringContainsString('Slowest diagnostic files:', $result['stderr']);
+
+        $human = $this->execute([
+            'check',
+            '--profile',
+            '--source-only',
+            '--workspace='.$this->directory,
+            'config/services.yaml',
+        ]);
+        self::assertStringNotContainsString('Timing profile:', $human['stdout']);
+        self::assertStringContainsString('Timing profile:', $human['stderr']);
     }
 
     public function testRendersSarifForDiagnosticsAndCodeLists(): void
@@ -691,6 +743,7 @@ final class CheckExecutableTest extends TestCase
     {
         $result = $this->execute([
             'check',
+            '--profile',
             '--source-only',
             '--format=json',
             '--workspace='.$this->directory,
@@ -700,7 +753,9 @@ final class CheckExecutableTest extends TestCase
 
         self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode']);
         self::assertFalse($report['complete']);
+        self::assertIsArray($report['profile'] ?? null);
         self::assertStringContainsString('timed out', $result['stderr']);
+        self::assertStringContainsString('Timing profile:', $result['stderr']);
     }
 
     public function testCancelsDuringSourceRefreshBeforeDiagnostics(): void

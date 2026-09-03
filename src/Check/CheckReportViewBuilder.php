@@ -58,6 +58,7 @@ final class CheckReportViewBuilder
                 $result->blockingCount,
             ),
             $exitCode,
+            $result->profile,
         );
     }
 }

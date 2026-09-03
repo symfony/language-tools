@@ -21,34 +21,52 @@ final class CheckPlanFactory
         private readonly ProjectSettings $projectSettings,
         private readonly RuntimeConfiguration $runtimeConfiguration,
         private readonly CheckFileSelector $fileSelector,
+        private readonly CheckProfiler $profiler,
         private readonly UriToPathConverter $uriToPathConverter,
     ) {
     }
 
     public function create(CheckOptions $options, float $deadline): CheckPlan
     {
-        $workspace = $this->workspace($options->workspace);
-        $folder = ['uri' => $this->uriToPathConverter->toUri($workspace)];
-        $this->projectConfiguration->load([$folder], $options->configurationPath);
-        $this->runtimeConfiguration->configure($options->overrides);
-        $this->assertBeforeDeadline($deadline, $options->timeout);
+        $configurationStartedAt = $this->profiler->measurement();
+        try {
+            $workspace = $this->workspace($options->workspace);
+            $folder = ['uri' => $this->uriToPathConverter->toUri($workspace)];
+            $this->projectConfiguration->load([$folder], $options->configurationPath);
+            $this->runtimeConfiguration->configure($options->overrides);
+            $this->assertBeforeDeadline($deadline, $options->timeout);
 
-        $projectRoots = [] !== $options->projectRoots
-            ? $this->projectRoots($workspace, $options->projectRoots)
-            : ($this->projectConfiguration->projectRoots($workspace) ?? []);
-        $projects = $this->projectDiscovery->discover([$folder], $projectRoots);
-        if ([] !== $options->projectRoots) {
-            $this->validateProjectRoots($projectRoots, $projects);
+            $projectRoots = [] !== $options->projectRoots
+                ? $this->projectRoots($workspace, $options->projectRoots)
+                : ($this->projectConfiguration->projectRoots($workspace) ?? []);
+        } finally {
+            $this->profiler->recordPhase('configuration', $configurationStartedAt);
         }
-        $this->projectConfiguration->validateProjects($projects);
-        $this->projects->replace($projects);
-        if ([] === $projects) {
-            throw new InvalidConfigurationException('No Symfony project was discovered in the workspace.');
+
+        $discoveryStartedAt = $this->profiler->measurement();
+        try {
+            $projects = $this->projectDiscovery->discover([$folder], $projectRoots);
+            if ([] !== $options->projectRoots) {
+                $this->validateProjectRoots($projectRoots, $projects);
+            }
+            $this->projectConfiguration->validateProjects($projects);
+            $this->projects->replace($projects);
+            if ([] === $projects) {
+                throw new InvalidConfigurationException('No Symfony project was discovered in the workspace.');
+            }
+            $this->projectSettings->applyFileSettings($options->overrides);
+            $this->assertBeforeDeadline($deadline, $options->timeout);
+        } finally {
+            $this->profiler->recordPhase('projectDiscovery', $discoveryStartedAt);
         }
-        $this->projectSettings->applyFileSettings($options->overrides);
-        $this->assertBeforeDeadline($deadline, $options->timeout);
-        $files = $this->fileSelector->select($workspace, $options->selectors);
-        $this->assertBeforeDeadline($deadline, $options->timeout);
+
+        $selectionStartedAt = $this->profiler->measurement();
+        try {
+            $files = $this->fileSelector->select($workspace, $options->selectors);
+            $this->assertBeforeDeadline($deadline, $options->timeout);
+        } finally {
+            $this->profiler->recordPhase('fileSelection', $selectionStartedAt);
+        }
 
         $filesByProject = [];
         $selectedProjects = [];
@@ -56,6 +74,9 @@ final class CheckPlanFactory
             $root = $file->project->rootPath;
             $filesByProject[$root][] = $file;
             $selectedProjects[$root] = $file->project;
+        }
+        foreach ($selectedProjects as $root => $project) {
+            $this->profiler->recordProjectFiles($project, \count($filesByProject[$root]));
         }
 
         return new CheckPlan($workspace, $files, $filesByProject, $selectedProjects);

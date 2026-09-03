@@ -17,6 +17,7 @@ final class CheckResultBuilder
         private readonly ProjectConfiguration $projectConfiguration,
         private readonly RuntimeConfiguration $runtimeConfiguration,
         private readonly CheckErrorFactory $errors,
+        private readonly CheckProfiler $profiler,
         private readonly string $version,
     ) {
     }
@@ -28,6 +29,7 @@ final class CheckResultBuilder
         CheckDiagnosticExecution $execution,
         CheckRunCancellation $cancellation,
     ): CheckResult {
+        $resultStartedAt = $this->profiler->measurement();
         $errors = [...$analysis->errors, ...$execution->errors];
         if ($analysis->canceled || $execution->canceled) {
             $errors[] = $this->errors->cancellation($cancellation, $plan->workspace);
@@ -73,16 +75,21 @@ final class CheckResultBuilder
 
         $stale = [];
         $baselinePath = null;
+        $baselineStartedAt = $this->profiler->measurement();
         try {
             $baseline = $this->baseline->apply($plan->workspace, $options, $diagnostics, [] === $errors);
             $diagnostics = $baseline['diagnostics'];
             $stale = $baseline['stale'];
             $baselinePath = $baseline['path'];
         } catch (InvalidConfigurationException $error) {
+            $this->profiler->recordPhase('resultProcessing', $resultStartedAt);
+
             throw $error;
         } catch (\Throwable $error) {
             $errors[] = $this->errors->internal($error, $plan->workspace);
             $projects = $this->incomplete($projects);
+        } finally {
+            $this->profiler->recordBaselineMatching($baselineStartedAt);
         }
         if ($cancellation->expired() && [] === $errors) {
             $errors[] = $this->errors->timeout($options->timeout, $plan->workspace);
@@ -90,6 +97,8 @@ final class CheckResultBuilder
         }
         $blockingCount = $this->blockingCount($diagnostics, $options->blockingCodes)
             + ($options->strictBaseline ? \count($stale) : 0);
+        $this->profiler->recordPhase('resultProcessing', $resultStartedAt);
+        $profile = $this->profiler->finish();
 
         return new CheckResult(
             $this->version,
@@ -102,6 +111,7 @@ final class CheckResultBuilder
             $options->strictBaseline,
             $errors,
             $blockingCount,
+            $profile,
         );
     }
 

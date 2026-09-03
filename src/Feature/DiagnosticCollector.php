@@ -65,7 +65,7 @@ final class DiagnosticCollector
     /**
      * @param array<array-key, mixed> $params
      */
-    public function collectDetailed(array $params, bool $includeExcluded = false): ?DetailedDiagnosticCollection
+    public function collectDetailed(array $params, bool $includeExcluded = false, bool $measureProviders = false): ?DetailedDiagnosticCollection
     {
         $textDocument = $params['textDocument'] ?? null;
         if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
@@ -82,38 +82,48 @@ final class DiagnosticCollector
 
         $diagnostics = [];
         $failures = [];
+        $providerNanoseconds = [];
         $matched = false;
         foreach ($this->providers as $provider) {
+            $providerName = $measureProviders ? $provider->name() : null;
+            $providerStartedAt = $measureProviders ? (float) hrtime(true) : null;
             try {
-                $providedDiagnostics = $provider->diagnostics($params);
-            } catch (\Throwable $error) {
-                $failures[] = new DiagnosticProviderFailure($provider->name(), $error);
+                try {
+                    $providedDiagnostics = $provider->diagnostics($params);
+                } catch (\Throwable $error) {
+                    $failures[] = new DiagnosticProviderFailure($providerName ?? $provider->name(), $error);
 
-                continue;
-            }
-            if (null === $providedDiagnostics) {
-                continue;
-            }
-
-            $provided = [];
-            try {
-                foreach ($providedDiagnostics as $diagnostic) {
-                    $provided[] = $this->collectedDiagnostic($provider->name(), $diagnostic);
+                    continue;
                 }
-            } catch (\Throwable $error) {
-                $failures[] = new DiagnosticProviderFailure($provider->name(), $error);
+                if (null === $providedDiagnostics) {
+                    continue;
+                }
 
-                continue;
+                $providerName ??= $provider->name();
+                $provided = [];
+                try {
+                    foreach ($providedDiagnostics as $diagnostic) {
+                        $provided[] = $this->collectedDiagnostic($providerName, $diagnostic);
+                    }
+                } catch (\Throwable $error) {
+                    $failures[] = new DiagnosticProviderFailure($providerName, $error);
+
+                    continue;
+                }
+
+                $matched = true;
+                array_push($diagnostics, ...$provided);
+            } finally {
+                if (null !== $providerStartedAt && null !== $providerName) {
+                    $providerNanoseconds[$providerName] = ($providerNanoseconds[$providerName] ?? 0.0) + max(0.0, (float) hrtime(true) - $providerStartedAt);
+                }
             }
-
-            $matched = true;
-            array_push($diagnostics, ...$provided);
         }
 
         // Headless checks never track parse health, so partial-parse filtering does not apply here
         $diagnostics = $this->suppressor->suppressCollected($document, $diagnostics);
 
-        return new DetailedDiagnosticCollection($matched || [] !== $diagnostics, $diagnostics, $failures);
+        return new DetailedDiagnosticCollection($matched || [] !== $diagnostics, $diagnostics, $failures, $providerNanoseconds);
     }
 
     private function collectedDiagnostic(string $provider, mixed $diagnostic): CollectedDiagnostic

@@ -112,6 +112,34 @@ load, diagnostics backed by the healthy sections are still reported and the
 runtime state is ``partial``. Last successful metadata for the failed section
 remains active when available; otherwise diagnostics that need it are omitted.
 
+Profiling a Slow Check
+----------------------
+
+Add ``--profile`` to understand where a check spends its time:
+
+.. code-block:: terminal
+
+    $ symfony lsp:check --profile
+
+The checker writes a timing profile to standard error, so standard output keeps
+containing only the selected report format. With ``--format=json``, checker
+phase and diagnostic timings are also available in the top-level ``profile``
+field. The application bridge breakdown remains under each project's
+``runtime.timings`` field and is combined with the checker timings in the
+standard error profile.
+
+The profile separates executable startup, configuration, project discovery,
+file selection, project analysis, diagnostics and result processing. Each
+project reports source indexing, file preparation, runtime indexing and
+diagnostic collection separately. Runtime profiles include the application
+bridge and its slowest metadata sections. Diagnostic profiles show the slowest
+providers and the ten slowest files.
+
+Timing values depend on the machine, application cache and persistent source
+index state, so compare runs under equivalent conditions. A source-only check
+has a ``null`` runtime indexing time. Baseline matching time is included in
+result processing and also reported separately.
+
 Configuring the Check
 ---------------------
 

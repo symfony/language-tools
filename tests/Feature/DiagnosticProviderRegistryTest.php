@@ -83,9 +83,16 @@ final class DiagnosticProviderRegistryTest extends TestCase
             new StubDiagnosticProvider([$this->diagnostic('third')], 'third-provider'),
         );
 
-        $collection = $collector->collectDetailed(['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']]);
+        $collection = $collector->collectDetailed(
+            ['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']],
+            measureProviders: true,
+        );
 
         self::assertNotNull($collection);
+        self::assertSame(['first-provider', 'broken-provider', 'malformed-provider', 'third-provider'], array_keys($collection->providerNanoseconds));
+        foreach ($collection->providerNanoseconds as $nanoseconds) {
+            self::assertGreaterThanOrEqual(0, $nanoseconds);
+        }
         self::assertSame(['first-provider', 'third-provider'], array_map(static fn ($diagnostic): string => $diagnostic->provider, $collection->diagnostics));
         self::assertSame(['first', 'third'], array_column(array_map(static fn ($diagnostic): array => $diagnostic->diagnostic, $collection->diagnostics), 'code'));
         self::assertSame(['broken-provider', 'malformed-provider'], array_map(static fn ($failure): string => $failure->provider, $collection->failures));

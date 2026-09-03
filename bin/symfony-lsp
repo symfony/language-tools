@@ -17,6 +17,8 @@ use function Amp\ByteStream\getStderr;
 use function Amp\ByteStream\getStdin;
 use function Amp\ByteStream\getStdout;
 
+$processStartedAt = hrtime(true);
+
 // Keep PHP errors off stdout (the JSON-RPC channel); the micro SAPI ignores display_errors=stderr
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
@@ -70,7 +72,7 @@ $factory = new LanguageServerFactory(
     releaseMetadataUrl: $releaseMetadataUrl,
 );
 if ('check' === $command) {
-    $execution = $factory->createCheck($errorOutput)->run(array_values(array_slice($argv, 2)));
+    $execution = $factory->createCheck($errorOutput)->run(array_values(array_slice($argv, 2)), $processStartedAt);
     $writer = new CheckOutputWriter();
     if (!$writer->write(\STDOUT, $execution->stdout)) {
         $writer->write(\STDERR, "Unable to write the diagnostics report to standard output.\n");

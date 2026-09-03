@@ -37,6 +37,7 @@ final class CheckOptionsParserTest extends TestCase
             '--baseline=diagnostics.json',
             '--strict-baseline',
             '--verbose',
+            '--profile',
             'src',
         ]);
 
@@ -53,6 +54,7 @@ final class CheckOptionsParserTest extends TestCase
         self::assertSame('diagnostics.json', $options->baselinePath);
         self::assertTrue($options->strictBaseline);
         self::assertTrue($options->verbose);
+        self::assertTrue($options->profile);
     }
 
     #[DataProvider('verboseAliases')]

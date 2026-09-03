@@ -20,6 +20,7 @@ final class CheckOptionsDraft
     public bool $strictBaseline = false;
     public float $timeout = 600.0;
     public bool $verbose = false;
+    public bool $profile = false;
     public bool $listCodes = false;
     public bool $help = false;
 

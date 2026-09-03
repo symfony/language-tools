@@ -63,6 +63,7 @@ Options:
   --bridge-timeout=SECONDS         Set each project bridge deadline
   --timeout=SECONDS                Set the complete check deadline; defaults to 600
   --verbose, -v, -vv, -vvv         Show sanitized operational failure causes
+  --profile                        Report phase and diagnostic timing details
   --translation-diagnostics        Enable missing-translation diagnostics
   --no-translation-diagnostics     Disable missing-translation diagnostics
   --fail-on=CODE,...               Restrict blocking diagnostics to selected codes
@@ -168,6 +169,7 @@ HELP;
                 'runtime' => $project->runtime,
                 'complete' => $project->complete,
             ], $view->projects),
+            ...(null === $view->profile ? [] : ['profile' => $view->profile->toArray()]),
             'diagnostics' => array_map(static fn (CheckReportDiagnosticView $diagnosticView): array => [
                 'project' => $diagnosticView->diagnostic->project,
                 'path' => $diagnosticView->diagnostic->path,

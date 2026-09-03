@@ -218,6 +218,7 @@ final class BaselineManagerTest extends TestCase
             false,
             false,
             false,
+            false,
         );
     }
 }

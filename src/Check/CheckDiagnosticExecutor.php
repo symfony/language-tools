@@ -21,6 +21,7 @@ final class CheckDiagnosticExecutor
         private readonly PositionConverter $positions,
         private readonly ProjectConfiguration $projectConfiguration,
         private readonly CheckErrorFactory $errors,
+        private readonly CheckProfiler $profiler,
     ) {
     }
 
@@ -52,69 +53,79 @@ final class CheckDiagnosticExecutor
                 if (!isset($analysis->diagnosableProjects[$root])) {
                     continue;
                 }
-                $cancellation->checkpoint();
-                $text = file_get_contents($file->path);
-                if (false === $text) {
-                    $errors[] = $this->errors->selectedFileUnreadable($file, $plan->workspace);
-                    $incompleteProjects[$root] = true;
-
-                    continue;
-                }
-                if (hash('sha256', $text) !== ($analysis->preparedHashes[$file->path] ?? null)) {
-                    $errors[] = $this->errors->fileChanged($file, $plan->workspace);
-                    $incompleteProjects[$root] = true;
-
-                    continue;
-                }
-
-                if (!$file->excluded) {
-                    $this->documents->open(new Document($file->uri, $file->languageId, 0, $text));
-                    $openDocuments[$file->uri] = true;
-                }
+                $fileStartedAt = $this->profiler->measurement();
                 try {
-                    $collection = $this->diagnostics->collectDetailed(['textDocument' => ['uri' => $file->uri]], $file->excluded);
-                    if (null !== $collection) {
-                        $failedProviders = [];
-                        foreach ($collection->failures as $failure) {
-                            $errors[] = $this->errors->diagnosticProvider($failure->provider, $failure->error, $file, $plan->workspace);
-                            $failedProviders[$failure->provider] = true;
-                            $incompleteProjects[$root] = true;
-                        }
-                        foreach ($collection->diagnostics as $diagnostic) {
-                            $cancellation->checkpoint();
-                            try {
-                                $collected = CheckDiagnostic::fromProtocol(
-                                    $file,
-                                    $this->projectConfiguration->projectId($file->project),
-                                    $text,
-                                    $diagnostic->diagnostic,
-                                    $this->positions,
-                                    $diagnostic->provider,
-                                );
-                                if (!$this->diagnosticCodes->contains($collected->code)) {
-                                    throw new \UnexpectedValueException(\sprintf('Diagnostic code "%s" is not registered.', $collected->code));
-                                }
-                                $diagnostics[] = $collected;
-                            } catch (CancelledException $error) {
-                                throw $error;
-                            } catch (\Throwable $error) {
-                                if (!isset($failedProviders[$diagnostic->provider])) {
-                                    $errors[] = $this->errors->diagnosticProvider($diagnostic->provider, $error, $file, $plan->workspace);
-                                    $failedProviders[$diagnostic->provider] = true;
-                                }
+                    $cancellation->checkpoint();
+                    $text = file_get_contents($file->path);
+                    if (false === $text) {
+                        $errors[] = $this->errors->selectedFileUnreadable($file, $plan->workspace);
+                        $incompleteProjects[$root] = true;
+
+                        continue;
+                    }
+                    if (hash('sha256', $text) !== ($analysis->preparedHashes[$file->path] ?? null)) {
+                        $errors[] = $this->errors->fileChanged($file, $plan->workspace);
+                        $incompleteProjects[$root] = true;
+
+                        continue;
+                    }
+
+                    if (!$file->excluded) {
+                        $this->documents->open(new Document($file->uri, $file->languageId, 0, $text));
+                        $openDocuments[$file->uri] = true;
+                    }
+                    try {
+                        $collection = $this->diagnostics->collectDetailed(
+                            ['textDocument' => ['uri' => $file->uri]],
+                            $file->excluded,
+                            $this->profiler->enabled(),
+                        );
+                        if (null !== $collection) {
+                            $this->profiler->recordDiagnosticProviders($file->project, $collection->providerNanoseconds);
+                            $failedProviders = [];
+                            foreach ($collection->failures as $failure) {
+                                $errors[] = $this->errors->diagnosticProvider($failure->provider, $failure->error, $file, $plan->workspace);
+                                $failedProviders[$failure->provider] = true;
                                 $incompleteProjects[$root] = true;
                             }
+                            foreach ($collection->diagnostics as $diagnostic) {
+                                $cancellation->checkpoint();
+                                try {
+                                    $collected = CheckDiagnostic::fromProtocol(
+                                        $file,
+                                        $this->projectConfiguration->projectId($file->project),
+                                        $text,
+                                        $diagnostic->diagnostic,
+                                        $this->positions,
+                                        $diagnostic->provider,
+                                    );
+                                    if (!$this->diagnosticCodes->contains($collected->code)) {
+                                        throw new \UnexpectedValueException(\sprintf('Diagnostic code "%s" is not registered.', $collected->code));
+                                    }
+                                    $diagnostics[] = $collected;
+                                } catch (CancelledException $error) {
+                                    throw $error;
+                                } catch (\Throwable $error) {
+                                    if (!isset($failedProviders[$diagnostic->provider])) {
+                                        $errors[] = $this->errors->diagnosticProvider($diagnostic->provider, $error, $file, $plan->workspace);
+                                        $failedProviders[$diagnostic->provider] = true;
+                                    }
+                                    $incompleteProjects[$root] = true;
+                                }
+                            }
                         }
+                    } catch (CancelledException $error) {
+                        throw $error;
+                    } catch (\Throwable $error) {
+                        $errors[] = $this->errors->diagnosticProcessing($error, $file, $plan->workspace);
+                        $incompleteProjects[$root] = true;
                     }
-                } catch (CancelledException $error) {
-                    throw $error;
-                } catch (\Throwable $error) {
-                    $errors[] = $this->errors->diagnosticProcessing($error, $file, $plan->workspace);
-                    $incompleteProjects[$root] = true;
-                }
-                if (!$file->excluded) {
-                    $this->documents->close($file->uri);
-                    unset($openDocuments[$file->uri]);
+                    if (!$file->excluded) {
+                        $this->documents->close($file->uri);
+                        unset($openDocuments[$file->uri]);
+                    }
+                } finally {
+                    $this->profiler->recordDiagnosticFile($file->project, $file->projectPath, $fileStartedAt);
                 }
             }
             $cancellation->checkpoint();

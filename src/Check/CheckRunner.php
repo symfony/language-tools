@@ -12,6 +12,7 @@ final class CheckRunner
         private readonly CheckDiagnosticExecutor $diagnostics,
         private readonly CheckResultBuilder $results,
         private readonly CheckErrorFactory $errors,
+        private readonly CheckProfiler $profiler,
     ) {
     }
 
@@ -29,9 +30,19 @@ final class CheckRunner
         $this->installSignalHandlers($cancellation->signal());
 
         try {
-            $analysis = $this->projects->analyze($plan, $cancellation, $options->verbose);
+            $analysisStartedAt = $this->profiler->measurement();
+            try {
+                $analysis = $this->projects->analyze($plan, $cancellation, $options->verbose);
+            } finally {
+                $this->profiler->recordPhase('projectAnalysis', $analysisStartedAt);
+            }
             if (!$analysis->canceled) {
-                $execution = $this->diagnostics->execute($plan, $analysis, $cancellation);
+                $diagnosticsStartedAt = $this->profiler->measurement();
+                try {
+                    $execution = $this->diagnostics->execute($plan, $analysis, $cancellation);
+                } finally {
+                    $this->profiler->recordPhase('diagnostics', $diagnosticsStartedAt);
+                }
             }
         } catch (\Throwable $error) {
             $execution = new CheckDiagnosticExecution(

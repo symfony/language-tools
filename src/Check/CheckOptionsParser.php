@@ -97,6 +97,7 @@ final class CheckOptionsParser
             $draft->strictBaseline,
             $draft->timeout,
             $draft->verbose,
+            $draft->profile,
             $draft->listCodes,
             $draft->help,
         );
@@ -107,6 +108,7 @@ final class CheckOptionsParser
         match ($option) {
             '--help', '-h' => $draft->help = true,
             '--verbose', '-v', '-vv', '-vvv' => $draft->verbose = true,
+            '--profile' => $draft->profile = true,
             '--list-codes' => $draft->listCodes = true,
             '--source-only', '--no-runtime-indexing' => $draft->overrides['runtimeIndexing'] = false,
             '--runtime-indexing' => $draft->overrides['runtimeIndexing'] = true,

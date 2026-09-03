@@ -23,6 +23,7 @@ final class CheckReportView
         public readonly array $errors,
         public readonly CheckReportSummary $summary,
         public readonly int $exitCode,
+        public readonly ?CheckProfile $profile,
     ) {
     }
 }
