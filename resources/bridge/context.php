@@ -12,6 +12,7 @@ final class SymfonyLspBridgeContext
     private ?object $kernel = null;
     private ?object $application = null;
     private ?Throwable $kernelError = null;
+    private bool $kernelErrorReported = false;
     private array $errors = [];
 
     public function __construct(
@@ -475,14 +476,24 @@ final class SymfonyLspBridgeContext
 
     public function addError(string $section, ?Throwable $error = null): void
     {
-        $entry = [
-            'section' => $section,
-            'message' => sprintf('Unable to load the "%s" runtime metadata section.', $section),
-        ];
+        if ($error instanceof Throwable && $error === $this->kernelError) {
+            if (!$this->kernelErrorReported) {
+                $this->kernelErrorReported = true;
+                $this->errors[] = $this->errorEntry('runtime', 'The application kernel could not be booted.', $error);
+            }
+            $error = null;
+        }
+        $this->errors[] = $this->errorEntry($section, sprintf('Unable to load the "%s" runtime metadata section.', $section), $error);
+    }
+
+    private function errorEntry(string $section, string $message, ?Throwable $error): array
+    {
+        $entry = ['section' => $section, 'message' => $message];
         if ($this->errorDetails && $error instanceof Throwable) {
             $entry['cause'] = $this->errorCause($error);
         }
-        $this->errors[] = $entry;
+
+        return $entry;
     }
 
     private function errorCause(Throwable $error): array

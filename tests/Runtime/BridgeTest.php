@@ -239,18 +239,20 @@ final class BridgeTest extends TestCase
         $result = $process->snapshot;
         self::assertIsArray($result);
         self::assertSame(['status' => 'unavailable'], $result['configurationValidation'] ?? null);
-        self::assertSame([[
-            'section' => 'routes',
-            'message' => 'Unable to load the "routes" runtime metadata section.',
-        ]], $result['errors']);
+        self::assertSame([
+            ['section' => 'runtime', 'message' => 'The application kernel could not be booted.'],
+            ['section' => 'routes', 'message' => 'Unable to load the "routes" runtime metadata section.'],
+        ], $result['errors']);
 
-        $process = $this->bridge->run(['--sections=routes', '--error-details=1']);
+        $process = $this->bridge->run(['--sections=routes,container', '--error-details=1']);
 
         self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
         $result = $process->snapshot;
         self::assertIsArray($result);
         $errors = $result['errors'] ?? null;
         self::assertIsArray($errors);
+        self::assertSame(['runtime', 'routes', 'container'], array_column($errors, 'section'));
+        self::assertSame([true, false, false], array_map(static fn (mixed $error): bool => \is_array($error) && isset($error['cause']), $errors));
         $error = $errors[0] ?? null;
         self::assertIsArray($error);
         $cause = $error['cause'] ?? null;

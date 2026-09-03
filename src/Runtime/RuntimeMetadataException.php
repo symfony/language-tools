@@ -16,7 +16,9 @@ class RuntimeMetadataException extends \RuntimeException
         public readonly array $sections,
         public readonly array $sectionErrors = [],
     ) {
-        parent::__construct('The project bridge could not load runtime metadata'.([] === $sections ? '' : ': '.implode(', ', $sections)).'.');
+        parent::__construct(\in_array('runtime', $sections, true)
+            ? 'The project bridge could not boot the application kernel.'
+            : 'The project bridge could not load runtime metadata'.([] === $sections ? '' : ': '.implode(', ', $sections)).'.');
     }
 
     /** @return list<string> */
@@ -25,9 +27,11 @@ class RuntimeMetadataException extends \RuntimeException
         $lines = [];
         foreach ($this->sectionErrors as $sectionError) {
             foreach ($sectionError['chain'] as $index => $cause) {
-                $prefix = 0 === $index
-                    ? \sprintf('Runtime section "%s"', $sectionError['section'])
-                    : 'Caused by';
+                $prefix = match (true) {
+                    0 !== $index => 'Caused by',
+                    'runtime' === $sectionError['section'] => 'Kernel boot',
+                    default => \sprintf('Runtime section "%s"', $sectionError['section']),
+                };
                 $lines[] = \sprintf(
                     '%s: %s%s: %s',
                     $prefix,

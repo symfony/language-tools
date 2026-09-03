@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Report an application kernel boot failure once instead of per runtime section
 - Load complete runtime metadata despite subsequent bridge shutdown failures
 - Accept scalar values for singular bundle configuration aliases
 - Accept brace-wrapped ICU parameter names in translation diagnostics
