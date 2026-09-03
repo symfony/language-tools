@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathPolicy;
 use Symfony\Lsp\Project\ProjectPathResolver;
 
 final class StimulusControllerExtractor
@@ -150,11 +151,10 @@ final class StimulusControllerExtractor
     private function controllerName(Project $project, string $uri): ?string
     {
         $path = $this->pathResolver->relative($project, $uri);
-        if (null === $path || !str_starts_with($path, 'assets/controllers/')) {
+        if (null === $path || !preg_match('#^assets/(?:[^/]+/)*?controllers/(.*?)(?:_|-)controller\.[jt]s$#', $path, $match)) {
             return null;
         }
-        $relative = substr($path, \strlen('assets/controllers/'));
-        if (!preg_match('/^(.*?)(?:_|-)controller\.[jt]s$/', $relative, $match)) {
+        if ([] !== array_intersect(explode('/', $path), ProjectPathPolicy::EXCLUDED_DIRECTORIES)) {
             return null;
         }
 

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recognize Stimulus controllers in feature controller directories
 - Skip service and parameter diagnostics in configuration files for inactive environments
 - Add opt-in timing profiles to headless checks
 - Keep chained PHP configuration leaf setters at the current level

@@ -108,6 +108,26 @@ final class StimulusControllerExtractorTest extends TestCase
         self::assertSame([], $declaration->members);
     }
 
+    #[DataProvider('ignoredControllerPathProvider')]
+    public function testIgnoresControllerNamedAssetsOutsideIndexableControllerDirectories(string $uri): void
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+        $extractor = new StimulusControllerExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new JavaScriptSourceAnalyzer());
+
+        self::assertSame([], $extractor->extract(
+            $project,
+            $uri,
+            'export default class extends Controller {}',
+        ));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function ignoredControllerPathProvider(): iterable
+    {
+        yield 'outside a controller directory' => ['file:///workspace/assets/Feature/scripts/feature_widget_controller.ts'];
+        yield 'inside an excluded directory' => ['file:///workspace/assets/vendor/controllers/feature_widget_controller.ts'];
+    }
+
     /** @return iterable<string, array{string}> */
     public static function regularExpressionProvider(): iterable
     {

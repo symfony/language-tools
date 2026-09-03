@@ -65,9 +65,10 @@ listeners.
 Limitations
 -----------
 
-Project controllers using the conventional ``*_controller.js`` and
-``*_controller.ts`` names are recognized. Runtime indexing adds custom paths,
-installed Symfony UX controllers and bundle ``controllers.json`` registries.
+Project controllers in ``controllers/`` directories anywhere under ``assets/``
+are recognized when they use the conventional ``*_controller.js`` and
+``*_controller.ts`` names. Runtime indexing adds custom paths, installed
+Symfony UX controllers and bundle ``controllers.json`` registries.
 Only members inside the exported default controller class are recognized;
 helper classes in the same file are ignored. Dynamic controller registration,
 computed action names, inherited actions and dynamic Live Component event names

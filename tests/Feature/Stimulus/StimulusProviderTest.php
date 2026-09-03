@@ -58,9 +58,11 @@ final class StimulusProviderTest extends TestCase
                 }
             }
             JS;
+        $featureControllerUri = 'file:///workspace/assets/Feature/controllers/feature-widget_controller.js';
+        $featureControllerText = 'export default class extends Controller {}';
         $usageUri = 'file:///workspace/templates/search.html.twig';
         $usageText = <<<'TWIG'
-            <div data-controller="search missing"
+            <div data-controller="search feature-widget missing"
                  data-action="click->search#open"
                  data-search-target="results">
             </div>
@@ -72,6 +74,7 @@ final class StimulusProviderTest extends TestCase
             TWIG;
         $documents = new DocumentStore();
         $documents->open(new Document($controllerUri, 'javascript', 1, $controllerText));
+        $documents->open(new Document($featureControllerUri, 'javascript', 1, $featureControllerText));
         $documents->open(new Document($usageUri, 'twig', 1, $usageText));
         $controllerCompletionUri = 'file:///workspace/templates/controller_completion.html.twig';
         $controllerCompletionText = '<div data-controller="sea';
@@ -102,6 +105,7 @@ final class StimulusProviderTest extends TestCase
         $sourceIndexes = new StimulusSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace(
             $extractor->extract($project, new SourceDocument($controllerUri, 'javascript', $controllerText)),
+            $extractor->extract($project, new SourceDocument($featureControllerUri, 'javascript', $featureControllerText)),
             $extractor->extract($project, new SourceDocument($usageUri, 'twig', $usageText)),
         );
         $documentResolver = new DocumentContextResolver($documents, $projects);
