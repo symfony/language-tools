@@ -15,7 +15,7 @@ final class SourceIndexJsonLinesCodecTest extends TestCase
     {
         $codec = new SourceIndexJsonLinesCodec('test');
 
-        self::assertSame("{\"schemaVersion\":8,\"serverVersion\":\"test\"}\n", $codec->encodeHeader());
+        self::assertSame("{\"schemaVersion\":9,\"serverVersion\":\"test\"}\n", $codec->encodeHeader());
         self::assertSame(
             '{"path":"src/A.php","size":1,"modifiedAt":1700000001,"hash":"'.str_repeat('a', 64)."\",\"languageId\":\"php\",\"runtimeStructure\":null,\"providers\":{\"routes\":\"payload\"}}\n",
             $codec->encodeRecord('src/A.php', $this->metadata(), ['routes' => 'payload']),
@@ -29,7 +29,7 @@ final class SourceIndexJsonLinesCodecTest extends TestCase
 
         self::assertTrue($codec->validHeader($codec->encodeHeader()));
         self::assertFalse($codec->validHeader("{\"schemaVersion\":7,\"serverVersion\":\"test\"}\n"));
-        self::assertFalse($codec->validHeader("{\"schemaVersion\":8,\"serverVersion\":\"other\"}\n"));
+        self::assertFalse($codec->validHeader("{\"schemaVersion\":9,\"serverVersion\":\"other\"}\n"));
     }
 
     public function testDefersProviderPayloadValidationUntilPayloadDecoding(): void
