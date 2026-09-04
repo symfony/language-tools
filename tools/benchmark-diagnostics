@@ -1,0 +1,170 @@
+#!/usr/bin/env php
+<?php
+
+use Amp\ByteStream\ReadableBuffer;
+use Amp\ByteStream\WritableBuffer;
+use Fabpot\JsonRpc\ContentLengthJsonRpcTransport;
+use Fabpot\JsonRpc\JsonRpcDispatcher;
+use Fabpot\JsonRpc\JsonRpcPeer;
+use Fabpot\JsonRpc\JsonRpcValueDecoding;
+use Symfony\Component\Config\FileLocator;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
+use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Lsp\Document\Document;
+use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\Position;
+use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\DiagnosticCollector;
+use Symfony\Lsp\Feature\Route\Route;
+use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
+use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
+use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
+use Symfony\Lsp\Index\ApplicationSourceScanner;
+use Symfony\Lsp\Index\SourceFileEnumerator;
+use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Server\SensitiveDataRedactor;
+use Symfony\Lsp\Server\ServerLogger;
+
+require dirname(__DIR__).'/vendor/autoload.php';
+
+if (!\function_exists('symfony_lsp_tree_sitter_parse')) {
+    fwrite(\STDERR, "The Tree-sitter extension is not loaded. Run through: composer source-index:benchmark\n");
+    exit(1);
+}
+
+final class DiagnosticParseCounter
+{
+    public int $calls = 0;
+    public int $bytes = 0;
+
+    public function record(string $source): void
+    {
+        ++$this->calls;
+        $this->bytes += \strlen($source);
+    }
+
+    public function reset(): void
+    {
+        $this->calls = 0;
+        $this->bytes = 0;
+    }
+}
+
+final class CountingDiagnosticPhpParser implements PhpParserInterface
+{
+    public function __construct(private readonly PhpParserInterface $parser, private readonly DiagnosticParseCounter $counter)
+    {
+    }
+
+    public function parse(string $source): PhpDocument
+    {
+        $this->counter->record($source);
+
+        return $this->parser->parse($source);
+    }
+}
+
+$projectRoot = realpath(dirname(__DIR__).'/var/build/source-index-benchmark/1500');
+if (false === $projectRoot) {
+    fwrite(\STDERR, "The source-index benchmark project is unavailable. Run: composer source-index:benchmark\n");
+    exit(1);
+}
+
+$resources = dirname(__DIR__).'/resources';
+$container = new ContainerBuilder();
+$container->setParameter('server.version', 'diagnostic-benchmark');
+$container->setParameter('bridge.source', $resources.'/bridge.php');
+(new PhpFileLoader($container, new FileLocator($resources)))->load('services.php');
+$container->register(DiagnosticParseCounter::class)->setSynthetic(true)->setPublic(true);
+$container->register(CountingDiagnosticPhpParser::class, CountingDiagnosticPhpParser::class)
+    ->setDecoratedService(TolerantPhpParser::class)
+    ->setArgument('$parser', new Reference(CountingDiagnosticPhpParser::class.'.inner'))
+    ->setArgument('$counter', new Reference(DiagnosticParseCounter::class));
+foreach ([
+    ApplicationSourceScanner::class,
+    DiagnosticCollector::class,
+    DocumentStore::class,
+    ProjectRegistry::class,
+    RouteIndexRegistry::class,
+    SourceFileEnumerator::class,
+    TemplateIndexRegistry::class,
+] as $service) {
+    $container->getDefinition($service)->setPublic(true);
+}
+$container->compile();
+$peer = new JsonRpcPeer(
+    new ContentLengthJsonRpcTransport(new ReadableBuffer(''), new WritableBuffer()),
+    valueDecoding: JsonRpcValueDecoding::AssociativeArrays,
+);
+$container->set(JsonRpcPeer::class, $peer);
+$container->set(JsonRpcDispatcher::class, new JsonRpcDispatcher($peer));
+$container->set(ServerLogger::class, new ServerLogger(null, new SensitiveDataRedactor()));
+$counter = new DiagnosticParseCounter();
+$container->set(DiagnosticParseCounter::class, $counter);
+
+$project = new Project($projectRoot, 'file://'.$projectRoot);
+$container->get(ProjectRegistry::class)->replace([$project]);
+$container->get(ApplicationSourceScanner::class)->refreshProject($project);
+
+$routes = [];
+for ($index = 0; $index < 374; ++$index) {
+    $name = 'app_page_'.str_pad((string) $index, 5, '0', \STR_PAD_LEFT);
+    $routes[] = new Route($name, '/'.$index, [], [], null, null);
+}
+$container->get(RouteIndexRegistry::class)->forProject($project)->replace(...$routes);
+
+$files = $container->get(SourceFileEnumerator::class);
+$documents = [];
+$templates = [];
+$zeroRange = new Range(new Position(0, 0), new Position(0, 0));
+foreach ($files->files($project) as $path) {
+    $languageId = $files->languageId($path);
+    $relativePath = $files->relativePath($project, $path);
+    if (null === $languageId || null === $relativePath) {
+        continue;
+    }
+    $uri = rtrim($project->rootUri, '/').'/'.implode('/', array_map('rawurlencode', explode('/', $relativePath)));
+    $documents[] = [$uri, $languageId, $path];
+    if ('twig' === $languageId) {
+        $templates[] = new TemplateDeclaration($relativePath, $uri, $zeroRange);
+    }
+}
+$container->get(TemplateIndexRegistry::class)->forProject($project)->replaceRuntime(true, ...$templates);
+
+$counter->reset();
+$documentStore = $container->get(DocumentStore::class);
+$collector = $container->get(DiagnosticCollector::class);
+$diagnosticCount = 0;
+$startedAt = hrtime(true);
+foreach ($documents as [$uri, $languageId, $path]) {
+    $text = file_get_contents($path);
+    if (false === $text) {
+        throw new RuntimeException('Unable to read the diagnostic benchmark source.');
+    }
+    $documentStore->open(new Document($uri, $languageId, 0, $text));
+    $collection = $collector->collectDetailed(['textDocument' => ['uri' => $uri]]);
+    $diagnosticCount += \count($collection?->diagnostics ?? []);
+    $documentStore->close($uri);
+}
+$milliseconds = (hrtime(true) - $startedAt) / 1_000_000;
+
+$result = [
+    'files' => \count($documents),
+    'diagnostics' => $diagnosticCount,
+    'milliseconds' => round($milliseconds, 1),
+    'phpParseCallsAfterIndexing' => $counter->calls,
+    'phpParsedBytesAfterIndexing' => $counter->bytes,
+    'targets' => [
+        'diagnosticsProduced' => $diagnosticCount > 0,
+        'diagnosticsUnderOneSecond' => $milliseconds < 1000,
+        'noRepeatedPhpParsing' => 0 === $counter->calls,
+    ],
+];
+
+echo json_encode($result, \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR)."\n";
+exit(\in_array(false, $result['targets'], true) ? 1 : 0);

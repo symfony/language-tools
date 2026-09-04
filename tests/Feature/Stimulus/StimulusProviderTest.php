@@ -114,7 +114,7 @@ final class StimulusProviderTest extends TestCase
         $stimulus = new StimulusResolver($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
         $completionProvider = new StimulusCompletionProvider($documentResolver, $converter, $protocol, $extractor, $stimulus);
         $relationshipProvider = new StimulusRelationshipProvider($uriConverter, $protocol, $indexes, $sourceIndexes, $stimulus);
-        $diagnosticProvider = new StimulusDiagnosticProvider($documentResolver, $protocol, $indexes, $extractor, $stimulus);
+        $diagnosticProvider = new StimulusDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $stimulus);
         $documentLinkProvider = new StimulusDocumentLinkProvider($documentResolver, $uriConverter, $protocol, $indexes, $extractor, $stimulus);
         $codeLensProvider = new StimulusCodeLensProvider($documentResolver, $protocol, $sourceIndexes, $extractor);
 

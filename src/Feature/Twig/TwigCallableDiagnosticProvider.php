@@ -3,23 +3,16 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TwigCallableDiagnosticProvider implements DiagnosticProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documents,
-        private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly TwigCallableIndexRegistry $indexes,
-        private readonly TwigCallableReferenceExtractor $references,
         private readonly TwigCallableMethodResolver $methods,
-        private readonly TwigCallableArgumentAnalyzer $arguments,
-        private readonly TwigCommentParser $comments,
     ) {
     }
 
@@ -34,18 +27,19 @@ final class TwigCallableDiagnosticProvider implements DiagnosticProviderInterfac
         if (null === $request || 'twig' !== $request->document->languageId) {
             return null;
         }
-        $masked = $this->comments->mask($request->document->text);
+        $index = $this->indexes->forProject($request->project);
+        $facts = $index->factsForUri($request->document->uri);
+        if (!$facts instanceof TwigCallableSourceFacts) {
+            return [];
+        }
         $calls = [];
         $callables = [];
-        foreach ($this->arguments->completeCalls($masked) as $call) {
-            if (!$this->references->insideDirective($masked, $call->calleeOffset)) {
-                continue;
-            }
-            $key = $call->kind->value."\0".$call->callee;
+        foreach ($facts->calls as $call) {
+            $key = $call->kind->value."\0".$call->name;
             $calls[] = [$key, $call];
             $callables[$key] ??= [
                 'kind' => $call->kind,
-                'declarations' => $this->indexes->forProject($request->project)->declarations($call->kind, $call->callee),
+                'declarations' => $index->declarations($call->kind, $call->name),
             ];
         }
         $parameters = $this->methods->parameters($request->project, $callables);
@@ -56,17 +50,14 @@ final class TwigCallableDiagnosticProvider implements DiagnosticProviderInterfac
                 continue;
             }
             foreach ($call->arguments as $argument) {
-                if (null === $argument->name || null === $argument->nameOffset || \in_array($argument->name, $callableParameters->all, true)) {
+                if (\in_array($argument->name, $callableParameters->all, true)) {
                     continue;
                 }
                 $diagnostics[] = $this->protocol->diagnostic(
-                    new Range(
-                        $this->converter->toPosition($request->document->text, $argument->nameOffset),
-                        $this->converter->toPosition($request->document->text, $argument->nameOffset + \strlen($argument->name)),
-                    ),
+                    $argument->range,
                     1,
                     'twig_callable.unknown_argument',
-                    \sprintf('Unknown argument "%s" for Twig %s "%s".', $argument->name, $call->kind->value, $call->callee),
+                    \sprintf('Unknown argument "%s" for Twig %s "%s".', $argument->name, $call->kind->value, $call->name),
                 );
             }
         }

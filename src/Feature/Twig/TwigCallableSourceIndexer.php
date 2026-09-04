@@ -14,6 +14,7 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
         private readonly TwigCallableIndexRegistry $indexes,
         private readonly TwigCallableDeclarationExtractor $extractor,
         private readonly TwigCallableReferenceExtractor $references,
+        private readonly TwigCallableCallExtractor $calls,
     ) {
     }
 
@@ -24,7 +25,7 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
 
     public function payloadClasses(): array
     {
-        return [TwigCallableDeclaration::class, TwigCallableKind::class, TwigCallableSourceFacts::class, TwigCallableUsage::class];
+        return [TwigCallableArgumentReference::class, TwigCallableCallReference::class, TwigCallableDeclaration::class, TwigCallableKind::class, TwigCallableSourceFacts::class, TwigCallableUsage::class];
     }
 
     public function runtimeDeclarations(mixed $data): array
@@ -55,7 +56,7 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
             return $this->extractor->extract($document);
         }
         if ('twig' === $document->languageId) {
-            return new TwigCallableSourceFacts($document->uri, [], $this->references->all($document));
+            return new TwigCallableSourceFacts($document->uri, [], $this->references->all($document), $this->calls->extract($document));
         }
 
         return null;
@@ -63,6 +64,6 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
 
     protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): TwigCallableSourceFacts
     {
-        return new TwigCallableSourceFacts($current->uri, $healthy->declarations, $current->usages);
+        return new TwigCallableSourceFacts($current->uri, $healthy->declarations, $current->usages, $current->calls);
     }
 }

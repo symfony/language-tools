@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class StimulusDiagnosticProvider implements DiagnosticProviderInterface
@@ -13,7 +12,7 @@ final class StimulusDiagnosticProvider implements DiagnosticProviderInterface
         private readonly DocumentContextResolver $documents,
         private readonly LspProtocolMapper $protocol,
         private readonly StimulusIndexRegistry $indexes,
-        private readonly StimulusExtractor $extractor,
+        private readonly StimulusSourceIndexRegistry $sourceIndexes,
         private readonly StimulusResolver $stimulus,
     ) {
     }
@@ -33,8 +32,9 @@ final class StimulusDiagnosticProvider implements DiagnosticProviderInterface
             return [];
         }
         $known = array_fill_keys($this->stimulus->controllerNames($request->project), true);
+        $facts = $this->sourceIndexes->forProject($request->project)->factsForUri($request->document->uri);
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->project, SourceDocument::fromDocument($request->document))->references as $reference) {
+        foreach ($facts instanceof StimulusSourceFacts ? $facts->references : [] as $reference) {
             if (null !== $reference->kind || isset($known[$reference->controller])) {
                 continue;
             }

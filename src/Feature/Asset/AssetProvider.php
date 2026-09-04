@@ -175,8 +175,9 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
             return [];
         }
         $known = array_fill_keys($this->entrypointNames($request->project), true);
+        $facts = $this->sourceIndexes->forProject($request->project)->factsForUri($request->document->uri);
         $diagnostics = [];
-        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document))->symbols as $symbol) {
+        foreach ($facts instanceof AssetSourceFacts ? $facts->symbols : [] as $symbol) {
             if (AssetSymbolKind::Entrypoint !== $symbol->kind || isset($known[$symbol->name])) {
                 continue;
             }

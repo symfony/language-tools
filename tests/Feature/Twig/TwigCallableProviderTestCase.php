@@ -13,6 +13,7 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableArgumentAnalyzer;
+use Symfony\Lsp\Feature\Twig\TwigCallableCallExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableCompletionProvider;
 use Symfony\Lsp\Feature\Twig\TwigCallableDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableDiagnosticProvider;
@@ -58,6 +59,8 @@ class TwigCallableProviderTestCase extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $referenceExtractor = new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()), $commentParser, $converter, new TwigDirectiveLocator());
+        $argumentAnalyzer = new TwigCallableArgumentAnalyzer(new TwigArgumentParser());
+        $callExtractor = new TwigCallableCallExtractor($converter, $referenceExtractor, $argumentAnalyzer, $commentParser);
         $callableFacts = [];
         $classFacts = [];
         $declarationExtractor = new TwigCallableDeclarationExtractor($converter, $phpParser);
@@ -69,7 +72,8 @@ class TwigCallableProviderTestCase extends TestCase
         }
         foreach ($twigDocuments as $uri => $text) {
             $documents->open(new Document($uri, 'twig', 1, $text));
-            $callableFacts[] = new TwigCallableSourceFacts($uri, [], $referenceExtractor->all(new SourceDocument($uri, 'twig', $text)));
+            $source = new SourceDocument($uri, 'twig', $text);
+            $callableFacts[] = new TwigCallableSourceFacts($uri, [], $referenceExtractor->all($source), $callExtractor->extract($source));
         }
         $indexes = new TwigCallableIndexRegistry();
         $indexes->forProject($project)->replace(...$callableFacts);
@@ -82,14 +86,13 @@ class TwigCallableProviderTestCase extends TestCase
             new ProjectDocumentReader($documents, new ProjectPathResolver(new UriToPathConverter())),
             $phpParser,
         );
-        $argumentAnalyzer = new TwigCallableArgumentAnalyzer(new TwigArgumentParser());
 
         return [
             'documents' => $documents,
             'converter' => $converter,
             'protocol' => $protocol,
             'completion' => new TwigCallableCompletionProvider($documentResolver, $converter, $protocol, $indexes, $referenceExtractor, $methodResolver, $argumentAnalyzer, $commentParser),
-            'diagnostic' => new TwigCallableDiagnosticProvider($documentResolver, $converter, $protocol, $indexes, $referenceExtractor, $methodResolver, $argumentAnalyzer, $commentParser),
+            'diagnostic' => new TwigCallableDiagnosticProvider($documentResolver, $protocol, $indexes, $methodResolver),
             'relationship' => new TwigCallableRelationshipProvider($documentResolver, $converter, $protocol, $indexes, $referenceExtractor, $methodResolver, $phpParser),
         ];
     }

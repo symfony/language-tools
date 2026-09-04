@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Reuse indexed source facts when collecting diagnostics
 - Compile effective runtime configuration once per bridge run
 
 ## 0.19.0 (2026-09-03)

@@ -2,8 +2,6 @@
 
 namespace Symfony\Lsp\Tests\Feature\Twig;
 
-use Symfony\Lsp\Document\Document;
-
 final class TwigCallableDiagnosticProviderTest extends TwigCallableProviderTestCase
 {
     public function testValidatesNamedArguments(): void
@@ -76,14 +74,11 @@ final class TwigCallableDiagnosticProviderTest extends TwigCallableProviderTestC
                 }
             }
             PHP;
-        $environment = $this->providers([$extensionUri => $extensionText]);
-        $provider = $environment['diagnostic'];
-        $documents = $environment['documents'];
-        $diagnostics = static function (string $text) use ($provider, $documents): ?array {
+        $diagnostics = function (string $text) use ($extensionUri, $extensionText): ?array {
             $uri = 'file:///workspace/templates/diagnostics.html.twig';
-            $documents->open(new Document($uri, 'twig', 2, $text));
+            $environment = $this->providers([$extensionUri => $extensionText], [$uri => $text]);
 
-            return $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
+            return $environment['diagnostic']->diagnostics(['textDocument' => ['uri' => $uri]]);
         };
 
         $unknown = $diagnostics("{{ image(name: 'a', wdith: 3) }}\n{{ text|shorten(size: 5) }}\n");

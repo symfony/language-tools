@@ -569,7 +569,7 @@ final class TemplateProviderTest extends TestCase
         $componentResolver = new TwigComponentResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
         $completionProvider = new TwigComponentCompletionProvider($documentResolver, $converter, $protocol, $indexes, $componentResolver, $commentParser);
         $relationshipProvider = new TwigComponentRelationshipProvider($protocol, $indexes, $componentResolver);
-        $diagnosticProvider = new TwigComponentDiagnosticProvider($documentResolver, $protocol, $indexes, $templateIndexes, $extractor, $componentResolver);
+        $diagnosticProvider = new TwigComponentDiagnosticProvider($documentResolver, $protocol, $indexes, $templateIndexes, $componentResolver);
         $codeLensProvider = new TwigComponentCodeLensProvider($documentResolver, $protocol, $indexes, $extractor);
         $completionPosition = $converter->toPosition($completionText, \strlen($completionText));
         self::assertSame(['Alert'], array_column($completionProvider->complete([
@@ -641,7 +641,7 @@ final class TemplateProviderTest extends TestCase
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $componentResolver = new TwigComponentResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
-        $provider = new TwigComponentDiagnosticProvider($documentResolver, $protocol, $indexes, $templateIndexes, $extractor, $componentResolver);
+        $provider = new TwigComponentDiagnosticProvider($documentResolver, $protocol, $indexes, $templateIndexes, $componentResolver);
         $params = ['textDocument' => ['uri' => $usageUri]];
 
         $withoutRuntimeMetadata = $provider->diagnostics($params);

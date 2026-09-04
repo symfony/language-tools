@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TwigComponentDiagnosticProvider implements DiagnosticProviderInterface
@@ -14,7 +13,6 @@ final class TwigComponentDiagnosticProvider implements DiagnosticProviderInterfa
         private readonly LspProtocolMapper $protocol,
         private readonly TwigComponentIndexRegistry $indexes,
         private readonly TemplateIndexRegistry $templates,
-        private readonly TwigComponentExtractor $extractor,
         private readonly TwigComponentResolver $components,
     ) {
     }
@@ -37,8 +35,9 @@ final class TwigComponentDiagnosticProvider implements DiagnosticProviderInterfa
         if (!$this->templates->forProject($request->project)->isComplete()) {
             return null;
         }
+        $facts = $index->factsForUri($request->document->uri);
         $diagnostics = [];
-        foreach ($this->extractor->extract($request->project, SourceDocument::fromDocument($request->document))->references as $reference) {
+        foreach ($facts instanceof TwigComponentSourceFacts ? $facts->references : [] as $reference) {
             $name = $reference->name;
             if (null !== $index->get($name) || $index->hasRuntimeName($name) || $this->components->anonymousTemplateExists($request->project, $name)) {
                 continue;
