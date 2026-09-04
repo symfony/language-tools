@@ -79,6 +79,19 @@ final class ConfigurationNode
         return $this->normalizeKeys ? self::normalizeKey($name) : $name;
     }
 
+    public static function phpMethodName(string $name): string
+    {
+        $method = lcfirst(str_replace(' ', '', ucwords(str_replace('_', ' ', $name))));
+
+        return (string) preg_replace('#\W#', '', $method);
+    }
+
+    /** @return list<string> */
+    public function childNames(): array
+    {
+        return [...array_keys($this->aliases), ...array_map(static fn (self $child): string => $child->name, $this->children)];
+    }
+
     // Symfony's ArrayNode::preNormalize keeps keys that mix dashes and underscores
     public static function normalizeKey(string $name): string
     {

@@ -65,16 +65,16 @@ final class PhpConfigurationAnalyzer
     }
 
     /** @return array{path: list<string>, prefix: string, start: int}|null */
-    public function completionContext(string $source, int $cursor): ?array
+    public function completionContext(string $source, ConfigurationIndex $index, int $cursor): ?array
     {
         $before = substr($this->comments->mask($source), 0, $cursor);
         if (1 !== preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)((?:->[A-Za-z_][A-Za-z0-9_]*\(\))*)->([A-Za-z_][A-Za-z0-9_]*)?$/', $before, $match)) {
             return null;
         }
-        $path = [$this->root($before, $match[1])];
+        $path = [$this->root($before, $match[1], $index)];
         preg_match_all('/->([A-Za-z_][A-Za-z0-9_]*)\(\)/', $match[2], $methods);
         foreach ($methods[1] as $method) {
-            $path[] = $this->methodName($method);
+            $path[] = $this->configurationName($method, $index->find($path));
         }
         $prefix = $match[3] ?? '';
 
@@ -98,7 +98,7 @@ final class PhpConfigurationAnalyzer
         }
 
         if (PhpMethodReceiverKind::Variable === $call->receiverContext->kind && null !== $call->receiverContext->name) {
-            $builderPath = $builderSchemaPath = [$this->root(substr($masked, 0, $call->receiverContext->startOffset + 1), $call->receiverContext->name)];
+            $builderPath = $builderSchemaPath = [$this->root(substr($masked, 0, $call->receiverContext->startOffset + 1), $call->receiverContext->name, $index)];
         } else {
             $receiver = $callsByRange[$call->receiverContext->startOffset.':'.$call->receiverContext->endOffset] ?? null;
             if (null === $receiver || null === $parent = $this->resolveCall($receiver, $source, $masked, $index, $callsByRange, $resolved)) {
@@ -108,7 +108,7 @@ final class PhpConfigurationAnalyzer
             $builderSchemaPath = $parent->builderSchemaPath;
         }
         $receiverNode = $index->find($builderSchemaPath);
-        $method = $this->methodName($call->method);
+        $method = $this->configurationName($call->method, $receiverNode);
         $keyedChild = $receiverNode?->keyedChild($method);
         $keyAttribute = $keyedChild?->keyAttribute();
         $keyArgument = null === $keyAttribute
@@ -189,16 +189,23 @@ final class PhpConfigurationAnalyzer
         return substr($masked, $argument->expressionStartOffset, $argument->expressionEndOffset - $argument->expressionStartOffset);
     }
 
-    private function root(string $before, string $variable): string
+    private function root(string $before, string $variable, ConfigurationIndex $index): string
     {
         preg_match_all('/([A-Za-z_\\\\][A-Za-z0-9_\\\\]*Config)\s+\$'.preg_quote($variable, '/').'\b/', $before, $matches);
         $class = end($matches[1]);
         if (false === $class) {
-            return $this->methodName($variable);
+            $name = $variable;
+        } else {
+            $shortName = substr($class, (int) strrpos('\\'.$class, '\\'));
+            $name = substr($shortName, 0, -\strlen('Config'));
         }
-        $shortName = substr($class, (int) strrpos('\\'.$class, '\\'));
+        foreach (array_keys($index->roots()) as $root) {
+            if (lcfirst($name) === ConfigurationNode::phpMethodName($root)) {
+                return $root;
+            }
+        }
 
-        return $this->methodName(substr($shortName, 0, -\strlen('Config')));
+        return $this->inferredConfigurationName($name);
     }
 
     private function returnsCurrentBuilder(ConfigurationNode $node): bool
@@ -214,7 +221,21 @@ final class PhpConfigurationAnalyzer
             || (null !== $node->prototype->prototype && 'array' !== $node->prototype->prototype->type);
     }
 
-    private function methodName(string $name): string
+    private function configurationName(string $method, ?ConfigurationNode $parent): string
+    {
+        if (null !== $parent) {
+            $candidate = [] !== $parent->children ? $parent : $parent->prototype;
+            foreach ($candidate?->childNames() ?? [] as $name) {
+                if ($method === ConfigurationNode::phpMethodName($name)) {
+                    return $name;
+                }
+            }
+        }
+
+        return $this->inferredConfigurationName($method);
+    }
+
+    private function inferredConfigurationName(string $name): string
     {
         return strtolower((string) preg_replace('/(?<!^)[A-Z]/', '_$0', $name));
     }

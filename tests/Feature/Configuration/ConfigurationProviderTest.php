@@ -753,6 +753,64 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame(['Expected boolean for "twig.debug".'], array_column($diagnostics, 'message'));
     }
 
+    public function testMapsPhpConfigurationBuilderMethodsWithDigitsToKnownKeys(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/monolog.php';
+        $text = <<<'PHP'
+            <?php
+
+            function configure(MonologConfig $monologConfig): void
+            {
+                $monologConfig
+                    ->handler('main')
+                    ->processPsr3Messages(true);
+            }
+            PHP;
+        $fixture->documents->open(new Document($uri, 'php', 1, $text));
+
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+
+        $text = str_replace('true', "'invalid'", $text);
+        $fixture->documents->update($uri, 2, $text);
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+        self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
+        self::assertSame(['Expected boolean for "monolog.handler.main.process_psr_3_messages".'], array_column($diagnostics, 'message'));
+
+        $position = $fixture->converter->toPosition($text, strpos($text, 'processPsr3Messages') + 1);
+        $hover = $fixture->hover->hover([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ]);
+        self::assertIsArray($hover);
+        self::assertIsArray($hover['contents'] ?? null);
+        self::assertIsString($hover['contents']['value'] ?? null);
+        self::assertStringContainsString('`monolog.handler.main.process_psr_3_messages`', $hover['contents']['value']);
+
+        $text = str_replace("processPsr3Messages('invalid')", 'processPsr4Messages(true)', $text);
+        $fixture->documents->update($uri, 3, $text);
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+        self::assertSame(['config.unknown_key'], array_column($diagnostics, 'code'));
+        self::assertSame(['Unknown configuration key "monolog.handler.main.process_psr4_messages".'], array_column($diagnostics, 'message'));
+        $fixture->documents->close($uri);
+
+        $uri = 'file:///workspace/config/packages/framework.php';
+        $text = <<<'PHP'
+            <?php
+
+            function configure(FrameworkConfig $frameworkConfig): void
+            {
+                $frameworkConfig
+                    ->psr3Handler('main')
+                    ->enabled('invalid');
+            }
+            PHP;
+        $fixture->documents->open(new Document($uri, 'php', 1, $text));
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
+        self::assertSame(['Expected boolean for "framework.psr_3_handler.main.enabled".'], array_column($diagnostics, 'message'));
+    }
+
     public function testRecognizesNamedEntriesInPhpConfigurationBuilderChains(): void
     {
         $fixture = $this->providers();
@@ -852,6 +910,7 @@ final class ConfigurationProviderTest extends TestCase
             ['file:///workspace/config/framework.yaml', 'yaml', "framework:\n    router:\n        mode: ", ['dev', 'prod']],
             ['file:///workspace/config/framework.php', 'php', '<?php $framework->router()->ut', ['utf8']],
             ['file:///workspace/config/framework-typed.php', 'php', '<?php function configure(FrameworkConfig $options) { $options->router()->ut', ['utf8']],
+            ['file:///workspace/config/framework-digit.php', 'php', '<?php function configure(FrameworkConfig $options) { $options->psr3()->en', ['enabled']],
             ['file:///workspace/config/framework.xml', 'xml', '<container><framework:config><framework:ro', ['router']],
             ['file:///workspace/config/framework-attribute.xml', 'xml', '<container><framework:config><framework:router ut', ['utf8']],
         ];
@@ -1084,6 +1143,12 @@ final class ConfigurationProviderTest extends TestCase
                             $this->node('nested', 'boolean'),
                         ]), keyAttribute: 'name'),
                     ], aliases: ['handler' => 'handlers'])),
+                    $this->node('psr_3', 'array', children: [
+                        $this->node('enabled', 'boolean'),
+                    ]),
+                    $this->node('psr_3_handlers', 'array', prototype: $this->node('psr_3_handler', 'array', children: [
+                        $this->node('enabled', 'boolean'),
+                    ]), keyAttribute: 'name'),
                     $this->node('assets', 'array', accepts: ['null' => true, 'true' => true, 'false' => true, 'scalar' => false, 'unknownKeys' => false], children: [
                         $this->node('enabled', 'boolean'),
                     ]),
@@ -1096,7 +1161,7 @@ final class ConfigurationProviderTest extends TestCase
                     $this->node('dispatch', 'array', prototype: $this->node('sender', 'array', accepts: ['scalar' => true], children: [
                         $this->node('senders', 'array'),
                     ])),
-                ]),
+                ], aliases: ['psr_3_handler' => 'psr_3_handlers']),
             ],
             [
                 'alias' => 'monolog',
@@ -1107,8 +1172,9 @@ final class ConfigurationProviderTest extends TestCase
                         $this->node('path', 'scalar'),
                         $this->node('level', 'enum', allowedValues: ['debug', 'info']),
                         $this->node('nested', 'boolean'),
+                        $this->node('process_psr_3_messages', 'boolean'),
                     ]), keyAttribute: 'name'),
-                ]),
+                ], aliases: ['handler' => 'handlers']),
             ],
             [
                 'alias' => 'twig',

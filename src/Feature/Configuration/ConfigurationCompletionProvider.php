@@ -102,17 +102,18 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
     private function completePhp(Document $document, Project $project, Position $position): ?array
     {
         $offset = $this->converter->toByteOffset($document->text, $position);
-        $context = $this->php->completionContext($document->text, $offset);
+        $index = $this->indexes->forProject($project);
+        $context = $this->php->completionContext($document->text, $index, $offset);
         if (null === $context) {
             return null;
         }
-        $parent = $this->indexes->forProject($project)->find($context['path']);
+        $parent = $index->find($context['path']);
         if (null === $parent) {
             return null;
         }
         $items = [];
         foreach ($this->completionChildren($parent) as $node) {
-            $method = lcfirst(str_replace(' ', '', ucwords(str_replace('_', ' ', $node->name))));
+            $method = ConfigurationNode::phpMethodName($node->name);
             if (str_starts_with($method, $context['prefix'])) {
                 $items[] = $this->completion($method, $method.'('.$this->phpSnippet($node).')', $this->shortDescription($node), $document->text, $context['start'], $position);
             }

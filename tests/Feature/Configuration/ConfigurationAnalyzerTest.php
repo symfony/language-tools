@@ -32,7 +32,24 @@ final class ConfigurationAnalyzerTest extends TestCase
         $incomplete = '<?php function configure(FrameworkConfig $options) { $options->router()->ut';
         self::assertSame(
             ['path' => ['framework', 'router'], 'prefix' => 'ut', 'start' => \strlen($incomplete) - 2],
-            $analyzer->completionContext($incomplete, \strlen($incomplete)),
+            $analyzer->completionContext($incomplete, $index, \strlen($incomplete)),
+        );
+
+        $withDigit = '<?php function configure(FrameworkConfig $options) { $options->psr3()->en';
+        self::assertSame(
+            ['path' => ['framework', 'psr_3'], 'prefix' => 'en', 'start' => \strlen($withDigit) - 2],
+            $analyzer->completionContext($withDigit, $index, \strlen($withDigit)),
+        );
+
+        $rootWithDigit = '<?php function configure(Psr3Config $options) { $options->enabled(true); }';
+        self::assertSame(
+            [['path' => ['psr_3', 'enabled'], 'argument' => 'true']],
+            array_map(static fn (PhpConfigurationOccurrence $occurrence): array => ['path' => $occurrence->path, 'argument' => $occurrence->argument], $analyzer->occurrences($rootWithDigit, $index)),
+        );
+        $incompleteRootWithDigit = '<?php function configure(Psr3Config $options) { $options->en';
+        self::assertSame(
+            ['path' => ['psr_3'], 'prefix' => 'en', 'start' => \strlen($incompleteRootWithDigit) - 2],
+            $analyzer->completionContext($incompleteRootWithDigit, $index, \strlen($incompleteRootWithDigit)),
         );
     }
 
@@ -68,11 +85,19 @@ final class ConfigurationAnalyzerTest extends TestCase
     private function index(): ConfigurationIndex
     {
         $index = new ConfigurationIndex();
-        $index->replace(['framework' => $this->node('framework', [
-            $this->node('router', [
-                $this->node('utf8'),
+        $index->replace([
+            'framework' => $this->node('framework', [
+                $this->node('router', [
+                    $this->node('utf8'),
+                ]),
+                $this->node('psr_3', [
+                    $this->node('enabled'),
+                ]),
             ]),
-        ])]);
+            'psr_3' => $this->node('psr_3', [
+                $this->node('enabled'),
+            ]),
+        ]);
 
         return $index;
     }

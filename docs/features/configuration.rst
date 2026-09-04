@@ -12,7 +12,9 @@ configuration processing; keys that mix dashes and underscores, or whose
 underscore twin exists in the same mapping, stay literal, as in Symfony.
 Singular aliases that expand into array entries accept scalar values, such as
 ``custom_authenticator``. Extensible sections allow custom keys while validating
-their known children.
+their known children. Generated PHP builder methods resolve to their exact
+configuration keys, so ``processPsr3Messages()`` matches
+``process_psr_3_messages``.
 
 Completion
 ----------
