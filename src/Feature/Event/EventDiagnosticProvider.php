@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Feature\Event;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class EventDiagnosticProvider implements DiagnosticProviderInterface
@@ -12,7 +11,7 @@ final class EventDiagnosticProvider implements DiagnosticProviderInterface
     public function __construct(
         private readonly DocumentContextResolver $documents,
         private readonly LspProtocolMapper $protocol,
-        private readonly EventExtractor $extractor,
+        private readonly EventSourceIndexRegistry $sourceIndexes,
     ) {
     }
 
@@ -27,8 +26,9 @@ final class EventDiagnosticProvider implements DiagnosticProviderInterface
         if (null === $request || 'php' !== $request->document->languageId) {
             return null;
         }
+        $facts = $this->sourceIndexes->forProject($request->project)->factsForUri($request->document->uri);
         $diagnostics = [];
-        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document))->invalidListenerMethods as $listener) {
+        foreach ($facts instanceof EventSourceFacts ? $facts->invalidListenerMethods : [] as $listener) {
             $diagnostics[] = $this->protocol->diagnostic(
                 $listener->range,
                 1,

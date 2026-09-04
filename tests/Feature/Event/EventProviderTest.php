@@ -326,6 +326,7 @@ PHP;
         $sourceIndexes->forProject($project)->replace(
             $extractor->extract(new SourceDocument($listenerUri, 'php', $listener)),
             $extractor->extract(new SourceDocument($dispatcherUri, 'php', $dispatcher)),
+            $extractor->extract(new SourceDocument($invalidUri, 'php', $invalid)),
         );
         $classExtractor = new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser()));
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
@@ -339,7 +340,7 @@ PHP;
         $relationshipResolver = new EventRelationshipResolver($documentResolver, $converter, $protocol, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
         $completionProvider = new EventCompletionProvider($documentResolver, $converter, $protocol, $indexes, $extractor);
         $relationshipProvider = new EventRelationshipProvider($protocol, $indexes, $relationshipResolver);
-        $diagnosticProvider = new EventDiagnosticProvider($documentResolver, $protocol, $extractor);
+        $diagnosticProvider = new EventDiagnosticProvider($documentResolver, $protocol, $sourceIndexes);
         $codeLensProvider = new EventCodeLensProvider($documentResolver, $protocol, $indexes, $classExtractor, $relationshipResolver);
 
         $completionOffset = strpos($dispatcher, "App\\Event\\Ord');") + \strlen('App\\Event\\Ord');

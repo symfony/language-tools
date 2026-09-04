@@ -163,11 +163,14 @@ final class TranslationProviderTest extends TestCase
         $extractor = TranslationExtractorTestFactory::create($converter, $commentParser);
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true);
-        $indexes->forProject($project)->replaceSources($extractor->extract(new SourceDocument('file://'.$translationPath, 'yaml', "existing: Existing\n")));
+        $indexes->forProject($project)->replaceSources(
+            $extractor->extract(new SourceDocument('file://'.$translationPath, 'yaml', "existing: Existing\n")),
+            $extractor->extract(new SourceDocument($uri, 'php', $text)),
+        );
         $configuration = new TranslationConfigurationRegistry();
         $configuration->configure($project, true);
         $documentResolver = new DocumentContextResolver($documents, $projects);
-        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor));
+        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor));
 
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -220,11 +223,14 @@ final class TranslationProviderTest extends TestCase
         $extractor = TranslationExtractorTestFactory::create($converter, $commentParser);
         $indexes = new TranslationIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true);
-        $indexes->forProject($project)->replaceSources($extractor->extract(new SourceDocument('file://'.$translationPath, 'yaml', "existing: Existing\n")));
+        $indexes->forProject($project)->replaceSources(
+            $extractor->extract(new SourceDocument('file://'.$translationPath, 'yaml', "existing: Existing\n")),
+            $extractor->extract(new SourceDocument($uri, 'php', $text)),
+        );
         $configuration = new TranslationConfigurationRegistry();
         $configuration->configure($project, true);
         $documentResolver = new DocumentContextResolver($documents, $projects);
-        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor));
+        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor));
 
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -482,7 +488,7 @@ final class TranslationProviderTest extends TestCase
             new TranslationMessage("line\nkey", 'messages', 'en', 'Line key'),
             new TranslationMessage('panel.title', 'admin', 'en', 'Panel title'),
         );
-        $sourceFacts = [];
+        $sourceFacts = [$extractor->extract(new SourceDocument($uri, $languageId, $text))];
         foreach ($sources as [$sourceUri, $sourceLanguageId, $source]) {
             $sourceFacts[] = $extractor->extract(new SourceDocument($sourceUri, $sourceLanguageId, $source));
         }
@@ -490,6 +496,6 @@ final class TranslationProviderTest extends TestCase
         $configuration = new TranslationConfigurationRegistry();
         $documentResolver = new DocumentContextResolver($documents, $projects);
 
-        return [new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor)), $converter, $configuration, $project];
+        return [new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor)), $converter, $configuration, $project];
     }
 }

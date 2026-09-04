@@ -312,7 +312,7 @@ PHP;
         $protocol = new LspProtocolMapper();
         $completionProvider = new SecurityCompletionProvider($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
         $relationshipProvider = new SecurityRelationshipProvider($protocol, $indexes, $sourceIndexes, new SecuritySymbolResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $extractor));
-        $diagnosticProvider = new SecurityDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $extractor);
+        $diagnosticProvider = new SecurityDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes);
 
         $completionPosition = $converter->toPosition($completion, strpos($completion, "ROLE_A')") + \strlen('ROLE_A'));
         self::assertSame(['ROLE_ADMIN'], array_column($completionProvider->complete($this->params($completionUri, $completionPosition)) ?? [], 'label'));
@@ -365,7 +365,7 @@ PHP;
             $sourceIndexes,
             new SecuritySymbolResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $extractor),
         );
-        $diagnosticProvider = new SecurityDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $extractor);
+        $diagnosticProvider = new SecurityDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes);
 
         self::assertSame(['in-memory', 'main-area', 'in-memory'], array_map(static fn ($symbol): string => $symbol->name, $yamlFacts->symbols));
 

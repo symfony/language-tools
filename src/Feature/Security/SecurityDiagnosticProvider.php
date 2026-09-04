@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Feature\Security;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class SecurityDiagnosticProvider implements DiagnosticProviderInterface
@@ -14,7 +13,6 @@ final class SecurityDiagnosticProvider implements DiagnosticProviderInterface
         private readonly LspProtocolMapper $protocol,
         private readonly SecurityIndexRegistry $indexes,
         private readonly SecuritySourceIndexRegistry $sourceIndexes,
-        private readonly SecurityExtractor $extractor,
     ) {
     }
 
@@ -34,8 +32,9 @@ final class SecurityDiagnosticProvider implements DiagnosticProviderInterface
             return [];
         }
         $sourceIndex = $this->sourceIndexes->forProject($request->project);
+        $facts = $sourceIndex->factsForUri($request->document->uri);
         $diagnostics = [];
-        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document))->symbols as $symbol) {
+        foreach ($facts instanceof SecuritySourceFacts ? $facts->symbols : [] as $symbol) {
             if ($symbol->declaration || SecuritySymbolKind::Role === $symbol->kind) {
                 continue;
             }

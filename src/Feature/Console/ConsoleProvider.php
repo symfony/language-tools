@@ -6,7 +6,6 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class ConsoleProvider implements CompletionProviderInterface, DiagnosticProviderInterface
@@ -79,8 +78,9 @@ final class ConsoleProvider implements CompletionProviderInterface, DiagnosticPr
             return [];
         }
         $sourceIndex = $this->sourceIndexes->forProject($request->project);
+        $facts = $sourceIndex->factsForUri($request->document->uri);
         $diagnostics = [];
-        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document))->references as $reference) {
+        foreach ($facts instanceof ConsoleSourceFacts ? $facts->references : [] as $reference) {
             $runtimeDefinition = $runtimeIndex->command($reference->commandClass);
             $sourceDefinition = $sourceIndex->definition($reference->commandClass);
             if (null === $runtimeDefinition

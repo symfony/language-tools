@@ -99,7 +99,7 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
             return [];
         }
         $diagnostics = [];
-        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document), $this->classIndexes->forProject($request->project)) as $reference) {
+        foreach ($index->referencesForUri($request->document->uri) as $reference) {
             if (null === $index->get($reference->name)) {
                 $diagnostics[] = $this->protocol->diagnostic($reference->range, 1, 'template.not_found', \sprintf('Template "%s" does not exist in the selected environment.', $reference->name));
             }

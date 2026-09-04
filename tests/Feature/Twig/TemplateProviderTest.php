@@ -15,6 +15,7 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\ProjectTemplateSnapshotLoader;
 use Symfony\Lsp\Feature\Twig\TemplateCodeActionProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCompletionContext;
@@ -827,7 +828,13 @@ final class TemplateProviderTest extends TestCase
         $indexes = $this->templateIndexes($classIndexes);
         $indexes->forProject($project)->replaceRuntime(true);
         $converter = new PositionConverter();
-        $extractor = $this->templateReferenceExtractor($converter);
+        $phpParser = new TolerantPhpParser(new Parser());
+        $extractor = $this->templateReferenceExtractor($converter, parser: $phpParser);
+        $classIndexes->forProject($project)->replace(new DependencyInjectionSourceFacts(
+            $uri,
+            classes: (new PhpClassDeclarationExtractor($converter, $phpParser))->extract($uri, $text),
+        ));
+        $indexes->forProject($project)->replaceReferences(...$extractor->extractCandidates(new SourceDocument($uri, 'php', $text)));
         $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes);
         $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
         self::assertIsArray($diagnostics);
@@ -868,7 +875,13 @@ final class TemplateProviderTest extends TestCase
         $indexes = $this->templateIndexes($classIndexes);
         $indexes->forProject($project)->replaceRuntime(true);
         $positionConverter = new PositionConverter();
-        $extractor = $this->templateReferenceExtractor($positionConverter);
+        $phpParser = new TolerantPhpParser(new Parser());
+        $extractor = $this->templateReferenceExtractor($positionConverter, parser: $phpParser);
+        $classIndexes->forProject($project)->replace(new DependencyInjectionSourceFacts(
+            $uri,
+            classes: (new PhpClassDeclarationExtractor($positionConverter, $phpParser))->extract($uri, $text),
+        ));
+        $indexes->forProject($project)->replaceReferences(...$extractor->extractCandidates(new SourceDocument($uri, 'php', $text)));
         $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($positionConverter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes);
 
         try {
@@ -1072,7 +1085,14 @@ final class TemplateProviderTest extends TestCase
         );
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $extractor = $this->templateReferenceExtractor($converter, $commentParser);
+        $phpParser = new TolerantPhpParser(new Parser());
+        $extractor = $this->templateReferenceExtractor($converter, $commentParser, $phpParser);
+        if ('php' === $languageId) {
+            $classIndexes->forProject($project)->replace(new DependencyInjectionSourceFacts(
+                $uri,
+                classes: (new PhpClassDeclarationExtractor($converter, $phpParser))->extract($uri, $text),
+            ));
+        }
         if ($indexReferences) {
             $indexes->forProject($project)->replaceReferences(...$extractor->extractCandidates(new SourceDocument($uri, $languageId, $text)));
         }

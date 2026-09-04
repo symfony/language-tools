@@ -9,7 +9,6 @@ use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -20,7 +19,6 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly TranslationIndexRegistry $indexes,
-        private readonly TranslationExtractor $extractor,
         private readonly TranslationConfigurationRegistry $configuration,
         private readonly CommentParserRegistry $comments,
         private readonly TranslationReferenceResolver $referenceResolver,
@@ -141,8 +139,9 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         }
 
         $index = $this->indexes->forProject($request->project);
+        $facts = $index->factsForUri($request->document->uri);
         $diagnostics = [];
-        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document))->references as $reference) {
+        foreach ($facts instanceof TranslationSourceFacts ? $facts->references : [] as $reference) {
             if ($index->isComplete() && !\in_array($reference->domain, $index->domains(), true)) {
                 if ($this->configuration->missingKeyDiagnostics($request->project)) {
                     $diagnostics[] = $this->diagnostic(
