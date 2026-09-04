@@ -29,6 +29,25 @@ final class SourceFactsStoreTest extends TestCase
         yield 'overlays last' => [SourceFactsOverlayOrder::OverlaysLast, ['saved-second', 'overlay-first']];
     }
 
+    public function testReturnsTheEffectiveFactsForAUri(): void
+    {
+        /** @var SourceFactsStore<StoreSourceFacts> $store */
+        $store = new SourceFactsStore();
+        $store->replaceSaved(new StoreSourceFacts('first', 'saved-first'), new StoreSourceFacts('second', 'saved-second'));
+
+        $facts = $store->forUri('first');
+        self::assertSame('saved-first', $facts instanceof StoreSourceFacts ? $facts->value : null);
+        self::assertNull($store->forUri('missing'));
+
+        $store->replaceOverlay(new StoreSourceFacts('first', 'overlay-first'));
+        $facts = $store->forUri('first');
+        self::assertSame('overlay-first', $facts instanceof StoreSourceFacts ? $facts->value : null);
+
+        $store->removeOverlay('first');
+        $facts = $store->forUri('first');
+        self::assertSame('saved-first', $facts instanceof StoreSourceFacts ? $facts->value : null);
+    }
+
     public function testInvalidatesEffectiveFactsAfterEveryMutation(): void
     {
         /** @var SourceFactsStore<StoreSourceFacts> $store */

@@ -64,6 +64,12 @@ abstract class AbstractSourceFactsIndex implements SourceFactsIndexInterface
     {
     }
 
+    /** @return TFacts|null */
+    final public function factsForUri(string $uri): ?SourceFactsInterface
+    {
+        return $this->facts->forUri($uri);
+    }
+
     /** @return list<TFacts> */
     final protected function facts(): array
     {

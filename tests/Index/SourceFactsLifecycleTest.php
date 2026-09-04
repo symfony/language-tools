@@ -58,6 +58,18 @@ final class SourceFactsLifecycleTest extends TestCase
         self::assertSame(1, $index->builds());
     }
 
+    public function testExposesEffectiveFactsByUri(): void
+    {
+        $index = new CountingSourceFactsIndex();
+        $uri = 'file:///source.php';
+        $index->replace(new LifecycleSourceFacts($uri, 'saved'));
+
+        self::assertSame('saved', $index->factsForUri($uri)?->declaration);
+
+        $index->overlay(new LifecycleSourceFacts($uri, 'overlay'));
+        self::assertSame('overlay', $index->factsForUri($uri)?->declaration);
+    }
+
     #[DataProvider('documentWithoutFactsProvider')]
     public function testOverlayMirrorsTheCurrentDocumentOrIsRemoved(Document $currentDocument): void
     {

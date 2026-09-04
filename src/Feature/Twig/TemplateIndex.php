@@ -145,6 +145,19 @@ final class TemplateIndex
         return $references;
     }
 
+    /** @return list<TemplateReference> */
+    public function referencesForUri(string $uri): array
+    {
+        $references = \array_key_exists($uri, $this->overlays)
+            ? $this->overlays[$uri]['references']
+            : $this->references[$uri] ?? [];
+
+        return array_values(array_filter(
+            $references,
+            fn (TemplateReference $reference): bool => TemplatePhpReferenceResolver::supports($reference, $this->classes),
+        ));
+    }
+
     public function isComplete(): bool
     {
         return $this->complete;

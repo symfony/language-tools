@@ -87,6 +87,12 @@ final class SourceFactsStore
         return true;
     }
 
+    /** @return TFacts|null */
+    public function forUri(string $uri): ?SourceFactsInterface
+    {
+        return $this->overlays[$uri] ?? $this->saved[$uri] ?? null;
+    }
+
     /** @return list<TFacts> */
     public function effective(): array
     {
