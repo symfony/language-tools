@@ -38,6 +38,7 @@ use Symfony\Lsp\Feature\ReferencesProviderRegistry;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Feature\Stimulus\StimulusCodeLensProvider;
+use Symfony\Lsp\Feature\Stimulus\StimulusControllerNameNormalizer;
 use Symfony\Lsp\Feature\Twig\LiveComponentEventProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCodeActionProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCompletionHandler;
@@ -135,6 +136,7 @@ return static function (ContainerConfigurator $container): void {
     }
 
     $services->load('Symfony\\Lsp\\Feature\\', '../src/Feature/*Registry.php');
+    $services->set(StimulusControllerNameNormalizer::class);
     $services->set(DiagnosticCollector::class);
     $services->set(DiagnosticSuppressor::class);
     $services->set(PartialParseDiagnosticFilter::class);

@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Stimulus\JavaScriptSourceAnalyzer;
 use Symfony\Lsp\Feature\Stimulus\StimulusCompletionContextResolver;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerExtractor;
+use Symfony\Lsp\Feature\Stimulus\StimulusControllerNameNormalizer;
 use Symfony\Lsp\Feature\Stimulus\StimulusExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusReferenceExtractor;
 use Symfony\Lsp\Index\SourceDocument;
@@ -136,11 +137,12 @@ final class StimulusExtractorTest extends TestCase
         $converter = new PositionConverter();
         $comments = new TwigCommentParser();
         $codeMasker = new JavaScriptSourceAnalyzer();
+        $controllerNameNormalizer = new StimulusControllerNameNormalizer();
 
         return new StimulusExtractor(
-            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $codeMasker),
-            new StimulusReferenceExtractor($converter, $comments, $codeMasker),
-            new StimulusCompletionContextResolver($converter, $comments),
+            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $codeMasker, $controllerNameNormalizer),
+            new StimulusReferenceExtractor($converter, $comments, $codeMasker, $controllerNameNormalizer),
+            new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer),
         );
     }
 

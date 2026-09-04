@@ -16,6 +16,7 @@ final class StimulusControllerExtractor
         private readonly PositionConverter $converter,
         private readonly ProjectPathResolver $pathResolver,
         private readonly JavaScriptSourceAnalyzer $codeMasker,
+        private readonly StimulusControllerNameNormalizer $controllerNameNormalizer,
     ) {
     }
 
@@ -158,6 +159,6 @@ final class StimulusControllerExtractor
             return null;
         }
 
-        return str_replace(['_', '/'], ['-', '--'], $match[1]);
+        return $this->controllerNameNormalizer->normalize($match[1]);
     }
 }

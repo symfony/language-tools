@@ -12,6 +12,7 @@ final class StimulusReferenceExtractor
         private readonly PositionConverter $converter,
         private readonly TwigCommentParser $commentParser,
         private readonly JavaScriptSourceAnalyzer $codeMasker,
+        private readonly StimulusControllerNameNormalizer $controllerNameNormalizer,
     ) {
     }
 
@@ -74,14 +75,14 @@ final class StimulusReferenceExtractor
         }
         preg_match_all('/\bstimulus_controller\s*\(\s*([\'"])((?:\\\\.|[^\'"])+)\1/', $source, $controllers, \PREG_OFFSET_CAPTURE);
         foreach ($controllers[2] as [$rawName, $offset]) {
-            $references[] = new StimulusReference(TwigStringDecoder::decode($rawName), null, null, $uri, $this->converter->toRange($text, $offset, \strlen($rawName)));
+            $references[] = new StimulusReference($this->controllerNameNormalizer->normalize(TwigStringDecoder::decode($rawName)), null, null, $uri, $this->converter->toRange($text, $offset, \strlen($rawName)));
         }
         foreach (['action' => StimulusMemberKind::Action, 'target' => StimulusMemberKind::Target] as $function => $kind) {
             preg_match_all('/\bstimulus_'.$function.'\s*\(\s*([\'"])((?:\\\\.|[^\'"])+)\1\s*,\s*([\'"])((?:\\\\.|[^\'"])+)\3/', $source, $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
             foreach ($calls as $call) {
                 $rawController = $call[2][0];
                 $rawMember = $call[4][0];
-                $controller = TwigStringDecoder::decode($rawController);
+                $controller = $this->controllerNameNormalizer->normalize(TwigStringDecoder::decode($rawController));
                 $member = TwigStringDecoder::decode($rawMember);
                 $references[] = new StimulusReference($controller, null, null, $uri, $this->converter->toRange($text, $call[2][1], \strlen($rawController)));
                 $references[] = new StimulusReference($controller, $kind, $member, $uri, $this->converter->toRange($text, $call[4][1], \strlen($rawMember)));

@@ -10,6 +10,7 @@ final class StimulusCompletionContextResolver
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly TwigCommentParser $commentParser,
+        private readonly StimulusControllerNameNormalizer $controllerNameNormalizer,
     ) {
     }
 
@@ -22,13 +23,13 @@ final class StimulusCompletionContextResolver
         if (preg_match('/\bstimulus_(?:action|target)\s*\(\s*([\'"])([^\'"]+)\1\s*,\s*([\'"])([^\'"]*)$/s', $before, $match)) {
             return new StimulusCompletionContext(
                 str_contains($match[0], 'stimulus_action') ? StimulusMemberKind::Action : StimulusMemberKind::Target,
-                $match[2],
+                $this->controllerNameNormalizer->normalize($match[2]),
                 $match[4],
                 $this->converter->toRange($text, $offset - \strlen($match[4]), \strlen($match[4])),
             );
         }
         if (preg_match('/\bstimulus_(?:controller|action|target)\s*\(\s*([\'"])([^\'"]*)$/s', $before, $match)) {
-            return new StimulusCompletionContext(null, null, $match[2], $this->converter->toRange($text, $offset - \strlen($match[2]), \strlen($match[2])));
+            return new StimulusCompletionContext(null, null, $this->controllerNameNormalizer->normalize($match[2]), $this->converter->toRange($text, $offset - \strlen($match[2]), \strlen($match[2])));
         }
         if (preg_match('/\bdata-action\s*=\s*([\'"])([^\'"]*)$/s', $before, $match)) {
             $token = preg_replace('/^.*\s/s', '', $match[2]);

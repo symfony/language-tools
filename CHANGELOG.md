@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Normalize Symfony UX package names in Stimulus Twig helpers
 - Resolve PHP configuration methods to exact digit-separated keys
 - Preserve named entries in PHP configuration builder chains
 - Document development installation for the unpublished Zed extension

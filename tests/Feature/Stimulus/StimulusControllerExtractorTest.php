@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Stimulus\JavaScriptSourceAnalyzer;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerDeclaration;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerExtractor;
+use Symfony\Lsp\Feature\Stimulus\StimulusControllerNameNormalizer;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -112,7 +113,7 @@ final class StimulusControllerExtractorTest extends TestCase
     public function testIgnoresControllerNamedAssetsOutsideIndexableControllerDirectories(string $uri): void
     {
         $project = new Project('/workspace', 'file:///workspace');
-        $extractor = new StimulusControllerExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new JavaScriptSourceAnalyzer());
+        $extractor = new StimulusControllerExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new JavaScriptSourceAnalyzer(), new StimulusControllerNameNormalizer());
 
         self::assertSame([], $extractor->extract(
             $project,
@@ -138,7 +139,7 @@ final class StimulusControllerExtractorTest extends TestCase
     private function extract(string $text): StimulusControllerDeclaration
     {
         $project = new Project('/workspace', 'file:///workspace');
-        $extractor = new StimulusControllerExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new JavaScriptSourceAnalyzer());
+        $extractor = new StimulusControllerExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new JavaScriptSourceAnalyzer(), new StimulusControllerNameNormalizer());
 
         return $extractor->extract($project, 'file:///workspace/assets/controllers/example_controller.js', $text)[0];
     }
