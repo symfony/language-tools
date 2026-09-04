@@ -55,6 +55,8 @@ jobs:
               run: composer runtime-refresh:benchmark
             - name: Benchmark source index scaling
               run: composer source-index:benchmark
+            - name: Benchmark diagnostic collection
+              run: composer diagnostics:benchmark
             - name: Run static analysis
               run: composer phpstan
             - name: Check coding standards
