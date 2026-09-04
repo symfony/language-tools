@@ -52,12 +52,10 @@ trust, configuration and troubleshooting.
 
 ### Zed
 
-Install the Symfony Language Tools extension from Zed's Extensions page. The
-extension downloads the latest stable server automatically and runs alongside
-a general PHP language server on Linux and macOS. Windows is not supported.
-
-See the [Zed guide](docs/editors/zed.rst) for installation, workspace trust,
-configuration and troubleshooting.
+The extension isn't published in Zed's registry yet. Install it from source as
+a development extension by following the [Zed guide](docs/editors/zed.rst).
+It downloads the latest stable server automatically and runs alongside a
+general PHP language server on Linux and macOS. Windows is not supported.
 
 ### OpenCode
 

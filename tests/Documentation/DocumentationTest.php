@@ -57,6 +57,22 @@ final class DocumentationTest extends TestCase
         self::assertSame($documentationRows, $marketplaceRows);
     }
 
+    public function testZedInstallationDocumentsDevelopmentExtension(): void
+    {
+        foreach (['README.md', 'docs/index.rst', 'docs/editors/zed.rst'] as $path) {
+            self::assertStringContainsString(
+                'development extension',
+                (string) file_get_contents(self::ROOT.'/'.$path),
+                $path,
+            );
+        }
+
+        $guide = (string) file_get_contents(self::ROOT.'/docs/editors/zed.rst');
+        self::assertStringContainsString('rustup target add wasm32-wasip2', $guide);
+        self::assertStringContainsString('zed: install dev extension', $guide);
+        self::assertStringContainsString('editor/zed/', $guide);
+    }
+
     public function testDocumentationUsesGitHubCompatibleRst(): void
     {
         foreach ((new Finder())->files()->in(self::ROOT.'/docs')->name('*.rst') as $file) {

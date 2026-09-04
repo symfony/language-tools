@@ -19,9 +19,33 @@ The Zed integration supports Linux and macOS on x86-64 and ARM64 systems.
 Installing the Extension
 ------------------------
 
-Install the Symfony Language Tools extension from Zed's Extensions page. Also
-install Zed's PHP extension for PHP syntax and general PHP language features.
-Install the Twig and XML extensions when you edit those file types.
+The extension isn't published in Zed's registry yet. Until it is listed,
+install it from source as a development extension:
+
+#. Install `Rust with rustup`_.
+#. Add the WebAssembly target used by Zed extensions:
+
+   .. code-block:: terminal
+
+       $ rustup target add wasm32-wasip2
+
+#. Clone the repository:
+
+   .. code-block:: terminal
+
+       $ git clone https://github.com/symfony/language-tools.git
+
+#. In Zed, open the command palette and run
+   ``zed: install dev extension``.
+#. Select the clone's ``editor/zed/`` directory. Zed compiles and loads the
+   extension.
+
+Open Zed's Extensions page and confirm that Symfony Language Tools is marked as
+``DEV``. Open a PHP or Twig file, then run
+``dev: open language server logs`` to confirm that the server starts.
+
+Also install Zed's PHP extension for PHP syntax and general PHP language
+features. Install the Twig and XML extensions when you edit those file types.
 
 The extension uses ``symfony-lsp`` from ``PATH`` when available. Otherwise, it
 downloads the matching server archive from the latest stable GitHub release.
@@ -135,3 +159,4 @@ Restore it to ``off`` after troubleshooting.
 
 .. _`Docker support`: ../docker.rst
 .. _`project configuration`: ../project-configuration.rst
+.. _`Rust with rustup`: https://rust-lang.org/tools/install/

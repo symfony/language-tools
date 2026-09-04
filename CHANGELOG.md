@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Document development installation for the unpublished Zed extension
 - Reuse indexed source facts when collecting diagnostics
 - Compile effective runtime configuration once per bridge run
 

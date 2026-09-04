@@ -18,7 +18,8 @@ corresponding page for installation, configuration and troubleshooting:
   is needed;
 * `Neovim`_: install the server with Mason or from a standalone release, then
   enable it through ``nvim-lspconfig``;
-* `Zed`_: install the extension to download and run the server automatically on
+* `Zed`_: install the development extension from source while registry
+  publication is pending. It downloads and runs the server automatically on
   Linux and macOS;
 * `OpenCode`_: install the standalone server, then configure it as a custom
   language server for Symfony-aware diagnostics and navigation.
