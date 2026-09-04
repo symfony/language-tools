@@ -25,6 +25,9 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
     /** @var array<string, list<TwigCallableDeclaration>> */
     private array $declarationsByUri = [];
 
+    /** @var array<string, TwigCallableSourceMethod> */
+    private array $methods = [];
+
     /** @return list<string> */
     public function names(TwigCallableKind $kind): array
     {
@@ -64,6 +67,13 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
         return [] !== $this->declarationsByCallable;
     }
 
+    public function method(string $className, string $method): ?TwigCallableSourceMethod
+    {
+        $this->index();
+
+        return $this->methods[TwigCallableKey::from($className, $method)] ?? null;
+    }
+
     public function declarationAt(string $uri, Position $position): ?TwigCallableDeclaration
     {
         $this->index();
@@ -99,6 +109,7 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
         $this->declarations = [];
         $this->declarationsByCallable = [];
         $this->declarationsByUri = [];
+        $this->methods = [];
         foreach ($this->facts() as $facts) {
             foreach ($facts->declarations as $declaration) {
                 $kind = $declaration->kind->value;
@@ -112,6 +123,9 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
             }
             foreach ($facts->usages as $usage) {
                 $this->usages[$usage->kind->value][$usage->name][] = $usage;
+            }
+            foreach ($facts->methods as $method) {
+                $this->methods[TwigCallableKey::from($method->className, $method->name)] = $method;
             }
         }
 

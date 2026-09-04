@@ -85,6 +85,7 @@ class TwigCallableProviderTestCase extends TestCase
             $classIndexes,
             new ProjectDocumentReader($documents, new ProjectPathResolver(new UriToPathConverter())),
             $phpParser,
+            $indexes,
         );
 
         return [

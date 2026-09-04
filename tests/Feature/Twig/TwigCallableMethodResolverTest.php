@@ -14,8 +14,11 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableDeclaration;
+use Symfony\Lsp\Feature\Twig\TwigCallableDeclarationExtractor;
+use Symfony\Lsp\Feature\Twig\TwigCallableIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigCallableKind;
 use Symfony\Lsp\Feature\Twig\TwigCallableMethodResolver;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -25,15 +28,33 @@ use Symfony\Lsp\Project\UriToPathConverter;
 
 final class TwigCallableMethodResolverTest extends TestCase
 {
-    public function testParsesEachCallableSourceOnceWhenResolvingRequestParameters(): void
+    public function testUsesIndexedMethodsWhenResolvingRequestParameters(): void
     {
         $uri = 'file:///workspace/src/Twig/MediaExtension.php';
         $source = <<<'PHP'
             <?php
             namespace App\Twig;
 
+            use Twig\TwigFilter;
+            use Twig\TwigFunction;
+
             final class MediaExtension
             {
+                public function getFilters(): array
+                {
+                    return [new TwigFilter('shorten', [self::class, 'shorten'])];
+                }
+
+                public function getFunctions(): array
+                {
+                    return [
+                        new TwigFunction('image', [self::class, 'render']),
+                        new TwigFunction('attrs', [self::class, 'attrs']),
+                        new TwigFunction('dynamic', [self::class, 'dynamic']),
+                        new TwigFunction('nullable', [self::class, 'nullable']),
+                    ];
+                }
+
                 public function render(\Twig\Environment $environment, array $context, string $name, int $width = 200): string
                 {
                     return $name;
@@ -83,10 +104,13 @@ final class TwigCallableMethodResolverTest extends TestCase
                 return $this->parser->parse($source);
             }
         };
+        $callableIndexes = new TwigCallableIndexRegistry();
+        $callableIndexes->forProject($project)->replace((new TwigCallableDeclarationExtractor(new PositionConverter(), $parser))->extract(new SourceDocument($uri, 'php', $source)));
         $resolver = new TwigCallableMethodResolver(
             $classIndexes,
             new ProjectDocumentReader($documents, new ProjectPathResolver(new UriToPathConverter())),
             $countingParser,
+            $callableIndexes,
         );
         $range = new Range(new Position(0, 0), new Position(0, 1));
         $image = new TwigCallableDeclaration(
@@ -153,7 +177,7 @@ final class TwigCallableMethodResolverTest extends TestCase
             'nullable' => ['kind' => TwigCallableKind::Function, 'declarations' => [$nullable]],
         ]);
 
-        self::assertSame(1, $countingParser->calls);
+        self::assertSame(0, $countingParser->calls);
         self::assertSame(['name', 'width'], $parameters['image']->nameable);
         self::assertFalse($parameters['image']->variadic);
         self::assertTrue($parameters['image']->reliable);
@@ -170,6 +194,7 @@ final class TwigCallableMethodResolverTest extends TestCase
         self::assertSame(['name'], $parameters['nullable']->nameable);
         self::assertFalse($parameters['nullable']->reliable);
         $methods = $resolver->resolve($project, [$image]);
+        self::assertSame(1, $countingParser->calls);
         self::assertCount(1, $methods);
         self::assertSame($uri, $methods[0]->uri);
         self::assertSame($source, $methods[0]->source);
@@ -197,10 +222,13 @@ final class TwigCallableMethodResolverTest extends TestCase
             $uri,
             classes: (new PhpClassDeclarationExtractor(new PositionConverter(), $parser))->extract($uri, $source),
         ));
+        $callableIndexes = new TwigCallableIndexRegistry();
+        $callableIndexes->forProject($project)->replace((new TwigCallableDeclarationExtractor(new PositionConverter(), $parser))->extract(new SourceDocument($uri, 'php', $source)));
         $resolver = new TwigCallableMethodResolver(
             $classIndexes,
             new ProjectDocumentReader($documents, new ProjectPathResolver(new UriToPathConverter())),
             $parser,
+            $callableIndexes,
         );
         $declaration = new TwigCallableDeclaration(
             TwigCallableKind::Function,

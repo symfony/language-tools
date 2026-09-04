@@ -22,6 +22,7 @@ final class TwigCallableDeclarationExtractor
     public function extract(SourceDocument $document): TwigCallableSourceFacts
     {
         $declarations = [];
+        $methods = [];
         $php = $this->parser->parse($document->text);
         foreach ($php->objectCreations as $creation) {
             $kind = $this->objectKind($creation);
@@ -87,7 +88,28 @@ final class TwigCallableDeclarationExtractor
             }
         }
 
-        return new TwigCallableSourceFacts($document->uri, $declarations);
+        $targets = [];
+        foreach ($declarations as $declaration) {
+            if (null !== $declaration->className && null !== $declaration->method) {
+                $targets[TwigCallableKey::from($declaration->className, $declaration->method)] = true;
+            }
+        }
+        foreach ($php->methodDeclarations as $method) {
+            if (!$method->public || !isset($targets[TwigCallableKey::from($method->className, $method->name)])) {
+                continue;
+            }
+            $methods[] = new TwigCallableSourceMethod(
+                $method->className,
+                $method->name,
+                array_map(
+                    static fn ($parameter): TwigCallableMethodParameter => new TwigCallableMethodParameter($parameter->name, $parameter->types, $parameter->variadic),
+                    $method->parameters,
+                ),
+                [] === $php->diagnostics,
+            );
+        }
+
+        return new TwigCallableSourceFacts($document->uri, $declarations, methods: $methods);
     }
 
     private function literalName(?PhpStringLiteral $name): ?PhpStringLiteral

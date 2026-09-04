@@ -74,6 +74,27 @@ if (false === $projectRoot) {
     fwrite(\STDERR, "The source-index benchmark project is unavailable. Run: composer source-index:benchmark\n");
     exit(1);
 }
+$extensionDirectory = $projectRoot.'/src/Twig';
+if (!is_dir($extensionDirectory)) {
+    mkdir($extensionDirectory, 0777, true);
+}
+file_put_contents($extensionDirectory.'/BenchmarkExtension.php', <<<'PHP'
+    <?php
+
+    namespace App\Twig;
+
+    use Twig\Attribute\AsTwigFunction;
+
+    final class BenchmarkExtension
+    {
+        #[AsTwigFunction('benchmark')]
+        public function benchmark(string $name, int $width = 100): string
+        {
+            return $name;
+        }
+    }
+    PHP);
+file_put_contents($projectRoot.'/templates/benchmark-callable.html.twig', "{{ benchmark(name: 'value', typo: 1) }}\n");
 
 $resources = dirname(__DIR__).'/resources';
 $container = new ContainerBuilder();
@@ -96,6 +117,7 @@ foreach ([
 ] as $service) {
     $container->getDefinition($service)->setPublic(true);
 }
+$container->getAlias(PhpParserInterface::class)->setPublic(true);
 $container->compile();
 $peer = new JsonRpcPeer(
     new ContentLengthJsonRpcTransport(new ReadableBuffer(''), new WritableBuffer()),
@@ -136,6 +158,7 @@ foreach ($files->files($project) as $path) {
 }
 $container->get(TemplateIndexRegistry::class)->forProject($project)->replaceRuntime(true, ...$templates);
 
+$container->get(PhpParserInterface::class)->parse('<?php final class DiagnosticCacheEviction {}');
 $counter->reset();
 $documentStore = $container->get(DocumentStore::class);
 $collector = $container->get(DiagnosticCollector::class);
@@ -160,7 +183,7 @@ $result = [
     'phpParseCallsAfterIndexing' => $counter->calls,
     'phpParsedBytesAfterIndexing' => $counter->bytes,
     'targets' => [
-        'diagnosticsProduced' => $diagnosticCount > 0,
+        'diagnosticsProduced' => $diagnosticCount >= 2,
         'diagnosticsUnderOneSecond' => $milliseconds < 1000,
         'noRepeatedPhpParsing' => 0 === $counter->calls,
     ],

@@ -14,6 +14,7 @@ final class TwigCallableMethodResolver
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly ProjectDocumentReader $reader,
         private readonly PhpParserInterface $phpParser,
+        private readonly TwigCallableIndexRegistry $callableIndexes,
     ) {
     }
 
@@ -68,13 +69,21 @@ final class TwigCallableMethodResolver
      */
     public function parameters(Project $project, array $callables): array
     {
-        $declarations = [];
+        $index = $this->callableIndexes->forProject($project);
+        $fallbackDeclarations = [];
         foreach ($callables as $callable) {
-            array_push($declarations, ...$callable['declarations']);
+            foreach ($callable['declarations'] as $declaration) {
+                if (null !== $declaration->className
+                    && null !== $declaration->method
+                    && null === $index->method($declaration->className, $declaration->method)
+                ) {
+                    $fallbackDeclarations[] = $declaration;
+                }
+            }
         }
-        $methods = [];
-        foreach ($this->resolve($project, $declarations) as $method) {
-            $methods[TwigCallableKey::from($method->declaration->className, $method->declaration->name)][] = $method;
+        $fallbackMethods = [];
+        foreach ($this->resolve($project, $fallbackDeclarations) as $method) {
+            $fallbackMethods[TwigCallableKey::from($method->declaration->className, $method->declaration->name)] ??= $method;
         }
 
         $parameters = [];
@@ -83,11 +92,22 @@ final class TwigCallableMethodResolver
                 if (null === $declaration->className || null === $declaration->method) {
                     continue;
                 }
-                $method = $methods[TwigCallableKey::from($declaration->className, $declaration->method)][0] ?? null;
-                if (null === $method) {
-                    continue;
+                $method = $index->method($declaration->className, $declaration->method);
+                if (null !== $method) {
+                    $methodParameters = $method->parameters;
+                    $reliable = $method->reliable;
+                } else {
+                    $fallback = $fallbackMethods[TwigCallableKey::from($declaration->className, $declaration->method)] ?? null;
+                    if (null === $fallback) {
+                        continue;
+                    }
+                    $methodParameters = array_map(
+                        static fn ($parameter): TwigCallableMethodParameter => new TwigCallableMethodParameter($parameter->name, $parameter->types, $parameter->variadic),
+                        $fallback->declaration->parameters,
+                    );
+                    $reliable = $fallback->reliable;
                 }
-                $parameters[$key] = $this->methodParameters($method, $declaration, $callable['kind']);
+                $parameters[$key] = $this->methodParameters($methodParameters, $reliable, $declaration, $callable['kind']);
                 break;
             }
         }
@@ -95,9 +115,9 @@ final class TwigCallableMethodResolver
         return $parameters;
     }
 
-    private function methodParameters(TwigCallableResolvedMethod $method, TwigCallableDeclaration $callable, TwigCallableKind $kind): TwigCallableParameters
+    /** @param list<TwigCallableMethodParameter> $parameters */
+    private function methodParameters(array $parameters, bool $reliable, TwigCallableDeclaration $callable, TwigCallableKind $kind): TwigCallableParameters
     {
-        $parameters = $method->declaration->parameters;
         $all = array_map(static fn ($parameter): string => $parameter->name, $parameters);
         if ($callable->optionsKnown) {
             $skip = (int) $callable->needsCharset
@@ -125,6 +145,6 @@ final class TwigCallableMethodResolver
             array_pop($nameable);
         }
 
-        return new TwigCallableParameters($all, $nameable, $variadic, $callable->optionsKnown && $method->reliable);
+        return new TwigCallableParameters($all, $nameable, $variadic, $callable->optionsKnown && $reliable);
     }
 }

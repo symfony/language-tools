@@ -25,7 +25,7 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
 
     public function payloadClasses(): array
     {
-        return [TwigCallableArgumentReference::class, TwigCallableCallReference::class, TwigCallableDeclaration::class, TwigCallableKind::class, TwigCallableSourceFacts::class, TwigCallableUsage::class];
+        return [TwigCallableArgumentReference::class, TwigCallableCallReference::class, TwigCallableDeclaration::class, TwigCallableKind::class, TwigCallableMethodParameter::class, TwigCallableSourceFacts::class, TwigCallableSourceMethod::class, TwigCallableUsage::class];
     }
 
     public function runtimeDeclarations(mixed $data): array
@@ -64,6 +64,6 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
 
     protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): TwigCallableSourceFacts
     {
-        return new TwigCallableSourceFacts($current->uri, $healthy->declarations, $current->usages, $current->calls);
+        return new TwigCallableSourceFacts($current->uri, $healthy->declarations, $current->usages, $current->calls, $healthy->methods);
     }
 }
