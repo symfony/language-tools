@@ -21,7 +21,7 @@ final class MessengerSourceIndexer extends AbstractSourceIndexer
 
     public function payloadClasses(): array
     {
-        return [MessengerSourceFacts::class, MessengerSourceSymbol::class, MessengerSymbolKind::class];
+        return [MessengerHandlerSignature::class, MessengerSourceFacts::class, MessengerSourceSymbol::class, MessengerSymbolKind::class];
     }
 
     public function runtimeDeclarations(mixed $data): array
@@ -57,6 +57,6 @@ final class MessengerSourceIndexer extends AbstractSourceIndexer
         return new MessengerSourceFacts($current->uri, [
             ...array_filter($healthy->symbols, static fn (MessengerSourceSymbol $symbol): bool => $symbol->declaration),
             ...array_filter($current->symbols, static fn (MessengerSourceSymbol $symbol): bool => !$symbol->declaration),
-        ], $healthy->parents, $healthy->handlers);
+        ], $healthy->parents, $healthy->handlers, $healthy->handlerSignatures);
     }
 }

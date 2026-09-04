@@ -16,6 +16,7 @@ final class PendingServiceDeclaration
     public function __construct(
         public readonly string $id,
         public readonly Range $range,
+        public readonly ?string $environment = null,
     ) {
     }
 
@@ -29,6 +30,7 @@ final class PendingServiceDeclaration
             $this->alias,
             $this->decorates,
             array_values(array_unique($this->tags)),
+            $this->environment,
         );
     }
 }

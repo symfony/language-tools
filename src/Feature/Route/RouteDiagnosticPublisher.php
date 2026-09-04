@@ -3,10 +3,8 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
@@ -15,9 +13,7 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
         private readonly DocumentContextResolver $documentContextResolver,
         private readonly LspProtocolMapper $protocol,
         private readonly RouteIndexRegistry $routeIndexes,
-        private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
-        private readonly RouteReferenceExtractor $phpReferenceExtractor,
-        private readonly TwigRouteReferenceExtractor $twigReferenceExtractor,
+        private readonly RouteReferenceIndexRegistry $referenceIndexes,
         private readonly TemplateIndexRegistry $templateIndexes,
     ) {
     }
@@ -50,11 +46,7 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
         }
 
         $diagnostics = [];
-        $document = SourceDocument::fromDocument($request->document);
-        $references = 'twig' === $request->document->languageId
-            ? $this->twigReferenceExtractor->extract($document)
-            : $this->phpReferenceExtractor->extract($document, $this->classIndexes->forProject($request->project));
-        foreach ($references as $reference) {
+        foreach ($this->referenceIndexes->forProject($request->project)->forUri($request->document->uri) as $reference) {
             $route = $routeIndex->get($reference->name);
             if (null === $route) {
                 $diagnostics[] = $this->protocol->diagnostic($reference->range, 1, 'route.not_found', \sprintf('Route "%s" does not exist in the selected environment.', $reference->name));

@@ -16,6 +16,7 @@ final class FormMetadataProvider implements DiagnosticProviderInterface, HoverPr
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly MetadataIndexRegistry $indexes,
+        private readonly MetadataSourceIndexRegistry $sourceIndexes,
         private readonly MetadataExtractor $extractor,
     ) {
     }
@@ -55,11 +56,12 @@ final class FormMetadataProvider implements DiagnosticProviderInterface, HoverPr
             return null;
         }
         $index = $this->indexes->forProject($request->project);
+        $facts = $this->sourceIndexes->forProject($request->project)->factsForUri($request->document->uri);
         $diagnostics = [];
-        foreach ($this->extractor->formOptions($request->document->text) as $option) {
-            $type = $index->formType($option['class']);
-            if (null !== $type && !\in_array($option['option'], $type->options, true)) {
-                $diagnostics[] = $this->diagnostic($option['range'], 'form.unknown_option', \sprintf('Unknown option "%s" for form type "%s".', $option['option'], $type->className));
+        foreach ($facts instanceof MetadataSourceFacts ? $facts->formOptions : [] as $option) {
+            $type = $index->formType($option->className);
+            if (null !== $type && !\in_array($option->option, $type->options, true)) {
+                $diagnostics[] = $this->diagnostic($option->range, 'form.unknown_option', \sprintf('Unknown option "%s" for form type "%s".', $option->option, $type->className));
             }
         }
 

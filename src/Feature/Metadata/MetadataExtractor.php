@@ -33,10 +33,28 @@ final class MetadataExtractor
                 $document->uri,
                 $this->unique($this->phpSymbols($document->uri, $document->text, $source, $php, $formDataClasses)),
                 $formDataClasses,
+                array_map(
+                    static fn (array $option): FormOptionReference => new FormOptionReference($option['class'], $option['option'], $option['range']),
+                    $this->forms->options($document->text, $source, $php),
+                ),
+                array_map(
+                    static fn (array $option): ConstraintOptionReference => new ConstraintOptionReference($option['constraint'], $option['option'], $option['range']),
+                    $this->validation->options($document->text, $php),
+                ),
+            );
+        }
+        if ('yaml' === $document->languageId) {
+            return new MetadataSourceFacts(
+                $document->uri,
+                $this->unique($this->yaml->symbols($document->uri, $document->text)),
+                constraintOptions: array_map(
+                    static fn (array $option): ConstraintOptionReference => new ConstraintOptionReference($option['constraint'], $option['option'], $option['range']),
+                    $this->yaml->constraintOptions($document->text),
+                ),
             );
         }
 
-        return new MetadataSourceFacts($document->uri, 'yaml' === $document->languageId ? $this->unique($this->yaml->symbols($document->uri, $document->text)) : []);
+        return new MetadataSourceFacts($document->uri, []);
     }
 
     public function completionContext(string $languageId, string $text, int $offset): ?MetadataCompletionContext

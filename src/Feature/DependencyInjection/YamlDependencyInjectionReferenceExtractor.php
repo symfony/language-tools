@@ -38,11 +38,11 @@ final class YamlDependencyInjectionReferenceExtractor
                 $line = rtrim($rawLine, "\r\n");
                 if ($inSection) {
                     $sectionLines[$lineNumber] ??= [[], [], []];
-                    array_push($sectionLines[$lineNumber][0], ...$this->serviceReferences($uri, $text, $line, $lineOffset));
-                    array_push($sectionLines[$lineNumber][1], ...$this->parameterReferences($uri, $text, $line, $lineOffset));
+                    array_push($sectionLines[$lineNumber][0], ...$this->serviceReferences($uri, $text, $line, $lineOffset, $scalar->environment));
+                    array_push($sectionLines[$lineNumber][1], ...$this->parameterReferences($uri, $text, $line, $lineOffset, $scalar->environment));
                 } else {
                     $configurationLines[$lineNumber] ??= [];
-                    array_push($configurationLines[$lineNumber], ...$this->parameterReferences($uri, $text, $line, $lineOffset));
+                    array_push($configurationLines[$lineNumber], ...$this->parameterReferences($uri, $text, $line, $lineOffset, $scalar->environment));
                 }
             }
             if ($inSection && $this->isUnprefixedAlias($scalar, $nestedServices)) {
@@ -56,6 +56,7 @@ final class YamlDependencyInjectionReferenceExtractor
                         ltrim($target, '@?'),
                         $uri,
                         $this->positionConverter->toRange($text, $start, \strlen(ltrim($target, '@?'))),
+                        environment: $scalar->environment,
                     );
                 }
             }
@@ -101,7 +102,7 @@ final class YamlDependencyInjectionReferenceExtractor
     }
 
     /** @return list<DependencyInjectionReference> */
-    private function serviceReferences(string $uri, string $text, string $line, int $lineOffset): array
+    private function serviceReferences(string $uri, string $text, string $line, int $lineOffset, ?string $environment): array
     {
         preg_match_all('/(?<![A-Za-z0-9_@])@(\?)?([.A-Za-z_\\\\][A-Za-z0-9_.\\\\:$-]*)/', $line, $matches, \PREG_OFFSET_CAPTURE);
         $references = [];
@@ -112,6 +113,7 @@ final class YamlDependencyInjectionReferenceExtractor
                 $uri,
                 $this->positionConverter->toRange($text, $lineOffset + $offset, \strlen($name)),
                 '' !== $matches[1][$index][0],
+                $environment,
             );
         }
 
@@ -119,7 +121,7 @@ final class YamlDependencyInjectionReferenceExtractor
     }
 
     /** @return list<DependencyInjectionReference> */
-    private function parameterReferences(string $uri, string $text, string $line, int $lineOffset): array
+    private function parameterReferences(string $uri, string $text, string $line, int $lineOffset, ?string $environment): array
     {
         preg_match_all('/%([^%\s]+)%/', str_replace('%%', "\0\0", $line), $matches, \PREG_OFFSET_CAPTURE);
         $references = [];
@@ -130,6 +132,7 @@ final class YamlDependencyInjectionReferenceExtractor
                     $name,
                     $uri,
                     $this->positionConverter->toRange($text, $lineOffset + $offset, \strlen($name)),
+                    environment: $environment,
                 );
             }
         }

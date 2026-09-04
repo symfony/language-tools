@@ -10,6 +10,7 @@ final class ParameterDeclaration
         public readonly string $name,
         public readonly string $uri,
         public readonly Range $range,
+        public readonly ?string $environment = null,
     ) {
     }
 }

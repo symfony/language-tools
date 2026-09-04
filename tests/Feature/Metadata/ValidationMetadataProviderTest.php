@@ -32,7 +32,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $completionProvider = new MetadataCompletionProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
-        $validationProvider = new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $extractor);
+        $validationProvider = new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
         $constraintUri = 'file:///workspace/src/Dto/Input.php';
         $constraintText = <<<'PHP'
             <?php
@@ -54,6 +54,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
             }
             PHP;
         $documents->open(new Document($constraintUri, 'php', 1, $constraintText));
+        $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($constraintUri, 'php', $constraintText)));
 
         $dependencyInjectionWhen = strpos($constraintText, 'exp)]');
         self::assertIsInt($dependencyInjectionWhen);
@@ -115,7 +116,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $completionProvider = new MetadataCompletionProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
-        $validationProvider = new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $extractor);
+        $validationProvider = new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
         $validationUri = 'file:///workspace/config/validator/User.yaml';
         $validationText = <<<'YAML'
             App\Entity\User:
@@ -126,6 +127,10 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
                             maximum: 200
             YAML;
         $documents->open(new Document($validationUri, 'yaml', 1, $validationText));
+        $sourceIndexes->forProject($project)->replace(
+            $extractor->extract(new SourceDocument('file:///workspace/src/Validator/Slug.php', 'php', $constraintDeclarationText)),
+            $extractor->extract(new SourceDocument($validationUri, 'yaml', $validationText)),
+        );
 
         self::assertSame(['max'], $this->completionLabels($completionProvider, $converter, $validationUri, $validationText, strpos($validationText, 'max:') + 3));
         self::assertSame(['validation.unknown_constraint_option'], array_column($this->diagnostics([$validationProvider], $validationUri), 'code'));

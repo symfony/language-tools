@@ -16,6 +16,7 @@ final class ValidationMetadataProvider implements DiagnosticProviderInterface, H
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly MetadataIndexRegistry $indexes,
+        private readonly MetadataSourceIndexRegistry $sourceIndexes,
         private readonly MetadataExtractor $extractor,
     ) {
     }
@@ -54,14 +55,12 @@ final class ValidationMetadataProvider implements DiagnosticProviderInterface, H
             return null;
         }
         $index = $this->indexes->forProject($request->project);
-        $constraintOptions = 'yaml' === $request->document->languageId
-            ? $this->extractor->yamlConstraintOptions($request->document->text)
-            : $this->extractor->constraintOptions($request->document->text);
+        $facts = $this->sourceIndexes->forProject($request->project)->factsForUri($request->document->uri);
         $diagnostics = [];
-        foreach ($constraintOptions as $option) {
-            $constraint = $index->constraint($option['constraint']);
-            if (null !== $constraint && !\in_array($option['option'], $constraint->options, true)) {
-                $diagnostics[] = $this->diagnostic($option['range'], 'validation.unknown_constraint_option', \sprintf('Unknown option "%s" for constraint "%s".', $option['option'], $constraint->name));
+        foreach ($facts instanceof MetadataSourceFacts ? $facts->constraintOptions : [] as $option) {
+            $constraint = $index->constraint($option->constraint);
+            if (null !== $constraint && !\in_array($option->option, $constraint->options, true)) {
+                $diagnostics[] = $this->diagnostic($option->range, 'validation.unknown_constraint_option', \sprintf('Unknown option "%s" for constraint "%s".', $option->option, $constraint->name));
             }
         }
 

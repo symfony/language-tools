@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 
-use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
@@ -10,16 +9,12 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDiagnosticProvider;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
-use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
-use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
-use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
-use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
@@ -112,7 +107,8 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
             new YamlDependencyInjectionDeclarationExtractor($converter),
             new YamlDependencyInjectionReferenceExtractor($converter),
         );
-        $phpParser = new TolerantPhpParser(new Parser());
+        $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
+        $sourceIndexes->forProject($project)->replace($yamlExtractor->extract($uri, $text));
         $runtimeConfiguration = new RuntimeConfiguration();
         $runtimeConfiguration->configure(['environment' => $environment]);
 
@@ -121,12 +117,7 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
             new LspProtocolMapper(),
             $serviceIndexes,
             $parameterIndexes,
-            new DependencyInjectionDocumentExtractor(
-                $yamlExtractor,
-                new XmlDependencyInjectionExtractor($converter),
-                new PhpAutowireReferenceExtractor($converter, $phpParser),
-                new PhpClassDeclarationExtractor($converter, $phpParser),
-            ),
+            $sourceIndexes,
             new ProjectPathResolver(new UriToPathConverter()),
             $runtimeConfiguration,
         );

@@ -148,6 +148,7 @@ final class EnvironmentProviderTest extends TestCase
         $commentUri = 'file:///workspace/templates/comment.html.twig';
         $commentText = "{## %env(APP_UR) %env(APP_URL% #}\n{{ '%env(APP_URL%' }}";
         $documents->open(new Document($commentUri, 'twig', 1, $commentText));
+        $indexes->forProject($project)->replaceSource($extractor->extract(new SourceDocument($commentUri, 'twig', $commentText)));
         $commentPosition = $converter->toPosition($commentText, strpos($commentText, 'APP_UR') + \strlen('APP_UR'));
         self::assertNull($completionProvider->complete(['textDocument' => ['uri' => $commentUri], 'position' => ['line' => $commentPosition->line, 'character' => $commentPosition->character]]));
         $malformedOffset = (int) strrpos($commentText, '%env(APP_URL%');
@@ -267,13 +268,19 @@ final class EnvironmentProviderTest extends TestCase
     /** @return array{EnvironmentCompletionProvider, EnvironmentRelationshipProvider, EnvironmentDiagnosticProvider} */
     private function providers(DocumentStore $documents, ProjectRegistry $projects, PositionConverter $converter, EnvironmentIndexRegistry $indexes, EnvironmentExtractor $extractor, CommentParserRegistry $comments, YamlDocumentParser $yamlParser): array
     {
+        foreach ($documents->all() as $document) {
+            $project = $projects->forDocumentUri($document->uri);
+            if (null !== $project) {
+                $indexes->forProject($project)->replaceSource($extractor->extract(SourceDocument::fromDocument($document)));
+            }
+        }
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
 
         return [
             new EnvironmentCompletionProvider($resolver, $converter, $protocol, $indexes, $comments, $yamlParser),
             new EnvironmentRelationshipProvider($protocol, $indexes, new EnvironmentSymbolResolver($resolver, new PositionedSourceSymbolResolver($converter), $extractor)),
-            new EnvironmentDiagnosticProvider($resolver, $converter, $protocol, $indexes, $extractor, new EnvironmentProcessorChainValidator(), $comments, $yamlParser),
+            new EnvironmentDiagnosticProvider($resolver, $protocol, $indexes, new EnvironmentProcessorChainValidator()),
         ];
     }
 

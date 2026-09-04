@@ -15,6 +15,7 @@ final class ServiceDeclaration
         public readonly ?string $alias = null,
         public readonly ?string $decorates = null,
         public readonly array $tags = [],
+        public readonly ?string $environment = null,
     ) {
     }
 }

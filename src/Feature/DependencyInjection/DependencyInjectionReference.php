@@ -12,6 +12,7 @@ final class DependencyInjectionReference
         public readonly string $uri,
         public readonly Range $range,
         public readonly bool $optional = false,
+        public readonly ?string $environment = null,
     ) {
     }
 }

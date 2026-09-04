@@ -346,7 +346,12 @@ YAML;
             true,
         );
         $sourceIndexes = new MessengerSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($yamlUri, 'yaml', $yaml)), $extractor->extract(new SourceDocument($messageUri, 'php', $message)), $extractor->extract(new SourceDocument($controllerUri, 'php', $controller)));
+        $sourceIndexes->forProject($project)->replace(
+            $extractor->extract(new SourceDocument($yamlUri, 'yaml', $yaml)),
+            $extractor->extract(new SourceDocument($messageUri, 'php', $message)),
+            $extractor->extract(new SourceDocument($handlerUri, 'php', $handler)),
+            $extractor->extract(new SourceDocument($controllerUri, 'php', $controller)),
+        );
         $classExtractor = new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser()));
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
         $classIndexes->forProject($project)->replace(
@@ -358,7 +363,7 @@ YAML;
         $relationshipResolver = new MessengerRelationshipResolver($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
         $completionProvider = new MessengerCompletionProvider($documentResolver, $converter, $protocol, $indexes, $yamlParser, $comments, new TolerantPhpParser(new Parser()));
         $relationshipProvider = new MessengerRelationshipProvider($protocol, $indexes, $relationshipResolver);
-        $diagnosticProvider = new MessengerDiagnosticProvider($documentResolver, $converter, $protocol, $indexes, $extractor, new TolerantPhpParser(new Parser()));
+        $diagnosticProvider = new MessengerDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes);
         $codeLensProvider = new MessengerCodeLensProvider($documentResolver, $protocol, $indexes, $classExtractor, $relationshipResolver);
 
         $completionParams = $this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'command.bus }') + 4));

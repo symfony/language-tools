@@ -28,7 +28,12 @@ final class YamlDependencyInjectionDeclarationExtractor
                 continue;
             }
             if (2 === \count($mapping->path) && 'parameters' === $mapping->path[0]) {
-                $parameters[] = new ParameterDeclaration($mapping->path[1], $uri, $this->range($text, $mapping->keyStartByte, $mapping->keyEndByte));
+                $parameters[] = new ParameterDeclaration(
+                    $mapping->path[1],
+                    $uri,
+                    $this->range($text, $mapping->keyStartByte, $mapping->keyEndByte),
+                    $this->environment($mapping->scope),
+                );
                 continue;
             }
             if (2 === \count($mapping->path) && 'services' === $mapping->path[0]) {
@@ -36,7 +41,11 @@ final class YamlDependencyInjectionDeclarationExtractor
                 if (str_starts_with($id, '_')) {
                     continue;
                 }
-                $service = new PendingServiceDeclaration($id, $this->range($text, $mapping->keyStartByte, $mapping->keyEndByte));
+                $service = new PendingServiceDeclaration(
+                    $id,
+                    $this->range($text, $mapping->keyStartByte, $mapping->keyEndByte),
+                    $this->environment($mapping->scope),
+                );
                 $services[] = $service;
                 $currentServices[$this->key($mapping->scope, $id)] = [$service, '' === $mapping->value];
                 $target = $this->scalar($mapping->value);
@@ -112,6 +121,11 @@ final class YamlDependencyInjectionDeclarationExtractor
     private function key(string $scope, string $id): string
     {
         return $scope."\0".$id;
+    }
+
+    private function environment(string $scope): ?string
+    {
+        return 'base' === $scope ? null : substr($scope, \strlen('when@'));
     }
 
     private function range(string $text, int $start, int $end): Range

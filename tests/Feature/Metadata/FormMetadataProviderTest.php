@@ -40,7 +40,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
         $protocol = new LspProtocolMapper();
         $sourceIndexes = new MetadataSourceIndexRegistry();
         $completionProvider = new MetadataCompletionProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
-        $formProvider = new FormMetadataProvider($resolver, $converter, $protocol, $indexes, $extractor);
+        $formProvider = new FormMetadataProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
         $formUri = 'file:///workspace/src/Controller/EventController.php';
         $formText = <<<'PHP'
             <?php
@@ -62,6 +62,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
             }
             PHP;
         $documents->open(new Document($formUri, 'php', 1, $formText));
+        $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($formUri, 'php', $formText)));
 
         $firstRequired = strpos($formText, 'required');
         self::assertSame(['required'], $this->completionLabels($completionProvider, $converter, $formUri, $formText, $firstRequired + 4));
@@ -494,7 +495,9 @@ final class FormMetadataProviderTest extends MetadataTestCase
         );
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
+        $sourceIndexes = new MetadataSourceIndexRegistry();
+        $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($uri, 'php', $text)));
         $resolver = new DocumentContextResolver($documents, $projects);
-        self::assertSame([], (new FormMetadataProvider($resolver, $converter, new LspProtocolMapper(), $indexes, $extractor))->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], (new FormMetadataProvider($resolver, $converter, new LspProtocolMapper(), $indexes, $sourceIndexes, $extractor))->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 }

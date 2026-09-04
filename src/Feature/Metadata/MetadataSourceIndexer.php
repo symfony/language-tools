@@ -21,7 +21,7 @@ final class MetadataSourceIndexer extends AbstractSourceIndexer
 
     public function payloadClasses(): array
     {
-        return [FormDataClass::class, MetadataSourceFacts::class, MetadataSourceSymbol::class, MetadataSymbolKind::class];
+        return [ConstraintOptionReference::class, FormDataClass::class, FormOptionReference::class, MetadataSourceFacts::class, MetadataSourceSymbol::class, MetadataSymbolKind::class];
     }
 
     public function runtimeDeclarations(mixed $data): array
@@ -56,6 +56,6 @@ final class MetadataSourceIndexer extends AbstractSourceIndexer
         return new MetadataSourceFacts($current->uri, [
             ...array_filter($healthy->symbols, static fn (MetadataSourceSymbol $symbol): bool => $symbol->declaration),
             ...array_filter($current->symbols, static fn (MetadataSourceSymbol $symbol): bool => !$symbol->declaration),
-        ], $healthy->formDataClasses);
+        ], $healthy->formDataClasses, $current->formOptions, $current->constraintOptions);
     }
 }

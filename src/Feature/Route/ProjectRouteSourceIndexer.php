@@ -77,6 +77,7 @@ final class ProjectRouteSourceIndexer extends AbstractSourceIndexer
                 $document->uri,
                 $reference->range,
                 $reference->controllerClass,
+                $reference->providedParameters,
             ),
             $references,
         ));

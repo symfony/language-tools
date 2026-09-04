@@ -21,7 +21,7 @@ final class EnvironmentSourceIndexer extends AbstractSourceIndexer
 
     public function payloadClasses(): array
     {
-        return [EnvironmentDeclaration::class, EnvironmentReference::class, EnvironmentSourceFacts::class];
+        return [EnvironmentDeclaration::class, EnvironmentReference::class, EnvironmentSourceFacts::class, MalformedEnvironmentExpression::class];
     }
 
     public function runtimeDeclarations(mixed $data): array

@@ -37,6 +37,7 @@ final class MessengerExtractor
         $symbols = [];
         $parents = [];
         $handlers = [];
+        $handlerSignatures = [];
         if ('yaml' === $document->languageId) {
             array_push($symbols, ...$this->yamlSymbols($document->uri, $document->text));
             $source = $this->comments->mask('yaml', $document->text);
@@ -79,6 +80,21 @@ final class MessengerExtractor
                 $symbols[] = $this->symbol(MessengerSymbolKind::Bus, $name, $document->uri, $document->text, $offset, false);
             }
             $parents = $this->phpParents($source, $php);
+            $scalarTypes = ['array', 'bool', 'callable', 'float', 'int', 'never', 'resource', 'string', 'void'];
+            foreach ($php->methodDeclarations as $method) {
+                $parameter = $method->parameters[0] ?? null;
+                if (null === $parameter || [] === $parameter->types || !array_all($parameter->types, static fn (string $type): bool => \in_array(strtolower($type), $scalarTypes, true))) {
+                    continue;
+                }
+                $handlerSignatures[] = new MessengerHandlerSignature(
+                    $method->className,
+                    $method->name,
+                    new Range(
+                        $this->converter->toPosition($document->text, $parameter->nameStartOffset),
+                        $this->converter->toPosition($document->text, $parameter->nameEndOffset),
+                    ),
+                );
+            }
             foreach ($php->methodCalls as $call) {
                 if ('dispatch' !== $call->method || !array_any($this->capturedReceivers->variables($source, $php, $call), static fn ($variable): bool => [] !== array_intersect(self::BUS_TYPES, $variable->types))) {
                     continue;
@@ -101,7 +117,7 @@ final class MessengerExtractor
             }
         }
 
-        return new MessengerSourceFacts($document->uri, $this->unique($symbols), $parents, $handlers);
+        return new MessengerSourceFacts($document->uri, $this->unique($symbols), $parents, $handlers, $handlerSignatures);
     }
 
     private function directClassReference(string $source, PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference

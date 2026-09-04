@@ -10,7 +10,9 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
 use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
@@ -20,9 +22,14 @@ use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteCodeActionProvider;
 use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
+use Symfony\Lsp\Feature\Route\RouteReference;
+use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
+use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
+use Symfony\Lsp\Feature\Route\RouteReferenceLocation;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
@@ -237,7 +244,8 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser()));
             $templateIndexes = new TemplateIndexRegistry($classIndexes);
             $templateIndexes->forProject($project)->replaceRuntime(true, new TemplateDeclaration('page.html.twig', $uri, new Range(new Position(0, 0), new Position(0, 0))));
-            $diagnosticProvider = new RouteDiagnosticPublisher(new DocumentContextResolver($documents, $projects), new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor, $templateIndexes);
+            $referenceIndexes = $this->referenceIndexes($project, $uri, $languageId, $text, $classIndexes, $phpExtractor, $twigExtractor);
+            $diagnosticProvider = new RouteDiagnosticPublisher(new DocumentContextResolver($documents, $projects), new LspProtocolMapper(), $indexes, $referenceIndexes, $templateIndexes);
             $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
             $provider = new RouteCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor, new ProjectPathResolver(new UriToPathConverter()));
@@ -312,6 +320,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
         $projects->replace([new Project('/workspace', 'file:///workspace')]);
         $positionConverter = new PositionConverter();
         $uriConverter = new UriToPathConverter();
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
         $collector = new DiagnosticCollector(
             $documents,
             $projects,
@@ -324,10 +333,8 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 new DocumentContextResolver($documents, $projects),
                 new LspProtocolMapper(),
                 new RouteIndexRegistry(),
-                new DependencyInjectionSourceIndexRegistry(),
-                RouteReferenceExtractorFactory::create($positionConverter),
-                new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser())),
-                new TemplateIndexRegistry(new DependencyInjectionSourceIndexRegistry()),
+                new RouteReferenceIndexRegistry($classIndexes),
+                new TemplateIndexRegistry($classIndexes),
             )],
         );
         $publisher = new DiagnosticProviderRegistry($client, $documents, $projects, $collector);
@@ -370,6 +377,47 @@ final class RouteDiagnosticPublisherTest extends TestCase
         ], $client->notifications[0]['params']);
     }
 
+    private function referenceIndexes(
+        Project $project,
+        string $uri,
+        string $languageId,
+        string $text,
+        DependencyInjectionSourceIndexRegistry $classIndexes,
+        RouteReferenceExtractor $phpExtractor,
+        TwigRouteReferenceExtractor $twigExtractor,
+    ): RouteReferenceIndexRegistry {
+        $document = new SourceDocument($uri, $languageId, $text);
+        $references = 'twig' === $languageId ? $twigExtractor->extract($document) : $phpExtractor->extractCandidates($document);
+        $range = new Range(new Position(0, 0), new Position(0, 0));
+        $classes = [];
+        foreach ($references as $reference) {
+            if (null !== $reference->controllerClass) {
+                $classes[$reference->controllerClass] = new PhpClassDeclaration(
+                    $reference->controllerClass,
+                    $uri,
+                    $range,
+                    'Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController',
+                );
+            }
+        }
+        if ([] !== $classes) {
+            $classIndexes->forProject($project)->replace(new DependencyInjectionSourceFacts($uri, classes: array_values($classes)));
+        }
+        $indexes = new RouteReferenceIndexRegistry($classIndexes);
+        $indexes->forProject($project)->replace(...array_map(
+            static fn (RouteReference $reference): RouteReferenceLocation => new RouteReferenceLocation(
+                $reference->name,
+                $uri,
+                $reference->range,
+                $reference->controllerClass,
+                $reference->providedParameters,
+            ),
+            $references,
+        ));
+
+        return $indexes;
+    }
+
     private function suppressor(PositionConverter $positions): DiagnosticSuppressor
     {
         return new DiagnosticSuppressor(
@@ -409,11 +457,15 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $route ?? new Route('article_show', '/article', ['GET'], [], null, null),
         ]));
         $positionConverter = new PositionConverter();
-        $templateIndexes = new TemplateIndexRegistry(new DependencyInjectionSourceIndexRegistry());
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $templateIndexes = new TemplateIndexRegistry($classIndexes);
         $templateIndexes->forProject($project)->replaceRuntime(
             true,
             ...('twig' === $languageId && $runtimeTemplate ? [new TemplateDeclaration(basename($uri), $uri, new Range(new Position(0, 0), new Position(0, 0)))] : []),
         );
+        $phpExtractor = RouteReferenceExtractorFactory::create($positionConverter);
+        $twigExtractor = new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser()));
+        $referenceIndexes = $this->referenceIndexes($project, $uri, $languageId, $text, $classIndexes, $phpExtractor, $twigExtractor);
 
         $uriConverter = new UriToPathConverter();
         $collector = new DiagnosticCollector(
@@ -428,9 +480,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 new DocumentContextResolver($documents, $projects),
                 new LspProtocolMapper(),
                 $routeIndexes,
-                new DependencyInjectionSourceIndexRegistry(),
-                RouteReferenceExtractorFactory::create($positionConverter),
-                new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser())),
+                $referenceIndexes,
                 $templateIndexes,
             )],
         );
