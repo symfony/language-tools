@@ -23,8 +23,11 @@ Completion is only available in YAML and PHP files.
 
 ``%parameter%`` references are also recognized outside the ``parameters``
 and ``services`` sections in configuration files, such as
-``%kernel.project_dir%`` in a ``config/packages`` file. Double percents escape
-a literal percent, and references in YAML comments are ignored.
+``%kernel.project_dir%`` in a ``config/packages`` file. In YAML, double
+percents escape a literal percent unless they are the closing and opening
+delimiters of adjacent references. For example,
+``%root_dir%%document_folder%`` contains two independent references.
+References in YAML comments are ignored.
 
 Symfony Language Tools also recognizes service and parameter references in PHP
 ``#[Autowire]`` attributes. YAML references under ``when@...`` and in

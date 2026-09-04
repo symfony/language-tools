@@ -41,6 +41,21 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
                         formatter: "[%%datetime%%] %%message%% in %kernel.environment%"
             YAML);
         self::assertSame(['kernel.environment'], array_map(static fn ($reference): string => $reference->name, $monolog->references));
+
+        $adjacent = $extractor->extract('file:///workspace/config/packages/liip_imagine.yaml', <<<'YAML'
+            liip.storage:
+                visibility: 'public'
+                directory_visibility: 'public'
+                local:
+                    directory: "[%%datetime%%] %root_dir%%document_folder%"
+            YAML);
+        self::assertSame([
+            ['root_dir', '4:36-4:44'],
+            ['document_folder', '4:46-4:61'],
+        ], array_map(
+            static fn ($reference): array => [$reference->name, self::rangeData($reference->range)],
+            $adjacent->references,
+        ));
     }
 
     public function testExtractsDeclarationsMetadataAndStaticReferencesWithoutValues(): void

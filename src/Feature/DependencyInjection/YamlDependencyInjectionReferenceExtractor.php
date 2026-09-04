@@ -123,9 +123,13 @@ final class YamlDependencyInjectionReferenceExtractor
     /** @return list<DependencyInjectionReference> */
     private function parameterReferences(string $uri, string $text, string $line, int $lineOffset, ?string $environment): array
     {
-        preg_match_all('/%([^%\s]+)%/', str_replace('%%', "\0\0", $line), $matches, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/%%|%([^%\s]+)%/', $line, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         $references = [];
-        foreach ($matches[1] as [$name, $offset]) {
+        foreach ($matches as $match) {
+            if (!isset($match[1])) {
+                continue;
+            }
+            [$name, $offset] = $match[1];
             if (!str_starts_with($name, 'env(')) {
                 $references[] = new DependencyInjectionReference(
                     DependencyInjectionSymbolKind::Parameter,

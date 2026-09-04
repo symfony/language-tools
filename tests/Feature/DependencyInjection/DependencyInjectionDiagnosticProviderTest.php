@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDiagnosticProvider;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\Parameter;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
@@ -59,6 +60,21 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
         ], array_column($diagnostics ?? [], 'message'));
     }
 
+    public function testAcceptsAdjacentParameterReferences(): void
+    {
+        $uri = 'file:///workspace/config/packages/liip_imagine.yaml';
+        $text = <<<'YAML'
+            liip.storage:
+                visibility: 'public'
+                directory_visibility: 'public'
+                local:
+                    directory: "%root_dir%%document_folder%"
+            YAML;
+        $provider = $this->provider($uri, $text, parameters: ['root_dir', 'document_folder']);
+
+        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
     /** @param list<string> $expectedCodes */
     #[DataProvider('environmentScopedFileProvider')]
     public function testScopesConventionalEnvironmentFiles(string $uri, string $environment, array $expectedCodes): void
@@ -91,7 +107,8 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
         yield 'service file outside config' => ['file:///workspace/src/services_test.yaml', 'dev', $diagnostics];
     }
 
-    private function provider(string $uri, string $text, string $environment = 'dev'): DependencyInjectionDiagnosticProvider
+    /** @param list<string> $parameters */
+    private function provider(string $uri, string $text, string $environment = 'dev', array $parameters = []): DependencyInjectionDiagnosticProvider
     {
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'yaml', 1, $text));
@@ -100,7 +117,10 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
         $serviceIndexes = new ServiceIndexRegistry();
         $serviceIndexes->forProject($project)->replace(true);
         $parameterIndexes = new ParameterIndexRegistry();
-        $parameterIndexes->forProject($project)->replace(true);
+        $parameterIndexes->forProject($project)->replace(
+            true,
+            ...array_map(static fn (string $name): Parameter => new Parameter($name, null), $parameters),
+        );
         $converter = new PositionConverter();
         $yamlExtractor = new YamlDependencyInjectionExtractor(
             new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
