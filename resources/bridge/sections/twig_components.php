@@ -22,15 +22,7 @@ function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context)
         try {
             $application = $context->application();
             $commandOptions = $context->commandOptions();
-            $configuration = symfonyLspBridgeRunJsonCommand($application, [
-                'command' => 'debug:config',
-                'name' => 'twig_component',
-                '--format' => 'json',
-                ...$commandOptions,
-            ]);
-            $configuration = is_array($configuration['twig_component'] ?? null)
-                ? $configuration['twig_component']
-                : $configuration;
+            $configuration = $context->configuration('twig_component');
             $defaults = [];
             foreach (is_array($configuration['defaults'] ?? null) ? $configuration['defaults'] : [] as $namespace => $default) {
                 if (!is_string($namespace)) {

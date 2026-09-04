@@ -27,13 +27,7 @@ function symfonyLspBridgeSecuritySection(SymfonyLspBridgeContext $context): ?arr
         try {
             $application = $context->application();
             $commandOptions = $context->commandOptions();
-            $configuration = symfonyLspBridgeRunJsonCommand($application, [
-                'command' => 'debug:config',
-                'name' => 'security',
-                '--format' => 'json',
-                ...$commandOptions,
-            ]);
-            $configuration = is_array($configuration['security'] ?? null) ? $configuration['security'] : $configuration;
+            $configuration = $context->configuration('security');
             foreach (is_array($configuration['providers'] ?? null) ? $configuration['providers'] : [] as $name => $options) {
                 if (!is_string($name) || !is_array($options)) {
                     continue;

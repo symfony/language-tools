@@ -15,7 +15,7 @@ function symfonyLspBridgeMessengerSection(SymfonyLspBridgeContext $context): ?ar
             $definitions = symfonyLspBridgeMessengerDefinitions($application, $commandOptions);
             [$buses, $transports] = symfonyLspBridgeMessengerTaggedTopology($definitions);
             try {
-                [$configuredBuses, $configuredTransports, $configuredMessages] = symfonyLspBridgeMessengerConfiguration($application, $commandOptions);
+                [$configuredBuses, $configuredTransports, $configuredMessages] = symfonyLspBridgeMessengerConfiguration($context);
                 $buses = array_replace($buses, $configuredBuses);
                 $transports = array_replace($transports, $configuredTransports);
                 $messages = array_replace($messages, $configuredMessages);
@@ -109,15 +109,9 @@ function symfonyLspBridgeMessengerTaggedTopology(array $definitions): array
     return [$buses, $transports];
 }
 
-function symfonyLspBridgeMessengerConfiguration(object $application, array $commandOptions): array
+function symfonyLspBridgeMessengerConfiguration(SymfonyLspBridgeContext $context): array
 {
-    $configuration = symfonyLspBridgeRunJsonCommand($application, [
-        'command' => 'debug:config',
-        'name' => 'framework',
-        'path' => 'messenger',
-        '--format' => 'json',
-        ...$commandOptions,
-    ]);
+    $configuration = $context->configuration('framework', 'messenger');
     $buses = [];
     $defaultBus = is_string($configuration['default_bus'] ?? null) ? $configuration['default_bus'] : null;
     foreach (is_array($configuration['buses'] ?? null) ? $configuration['buses'] : [] as $name => $options) {

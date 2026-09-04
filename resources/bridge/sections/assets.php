@@ -12,13 +12,7 @@ function symfonyLspBridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
         try {
             $application = $context->application();
             $commandOptions = ['--format' => 'json', ...$context->commandOptions()];
-            $configuration = symfonyLspBridgeRunJsonCommand($application, [
-                'command' => 'debug:config',
-                'name' => 'framework',
-                'path' => 'asset_mapper',
-                ...$commandOptions,
-            ]);
-            $configuration = is_array($configuration['asset_mapper'] ?? null) ? $configuration['asset_mapper'] : $configuration;
+            $configuration = $context->configuration('framework', 'asset_mapper');
             $paths = is_array($configuration['paths'] ?? null) ? $configuration['paths'] : [];
             $projectRoot = Symfony\Component\Filesystem\Path::canonicalize(realpath($context->project()) ?: $context->project());
             $excludedPatterns = [];

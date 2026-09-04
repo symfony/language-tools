@@ -18,14 +18,7 @@ function symfonyLspBridgeStimulusSection(SymfonyLspBridgeContext $context): ?arr
                 }
             }
             if ($enabled) {
-                $application = $context->application();
-                $configuration = symfonyLspBridgeRunJsonCommand($application, [
-                    'command' => 'debug:config',
-                    'name' => 'stimulus',
-                    '--format' => 'json',
-                    ...$context->commandOptions(),
-                ]);
-                $configuration = is_array($configuration['stimulus'] ?? null) ? $configuration['stimulus'] : $configuration;
+                $configuration = $context->configuration('stimulus');
                 $controllerPaths = array_values(array_filter(is_array($configuration['controller_paths'] ?? null) ? $configuration['controller_paths'] : [], 'is_string'));
                 $controllersJson = is_string($configuration['controllers_json'] ?? null) ? $configuration['controllers_json'] : null;
                 if (null !== $controllersJson && is_file($controllersJson)) {

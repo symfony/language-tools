@@ -1,5 +1,138 @@
 <?php
 
+use Symfony\Component\Config\Definition\ConfigurationInterface;
+use Symfony\Component\Config\Definition\Processor;
+use Symfony\Component\DependencyInjection\Compiler\ValidateEnvPlaceholdersPass;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Extension\ConfigurationExtensionInterface;
+use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
+
+final class SymfonyLspBridgeEffectiveConfiguration
+{
+    private ?ContainerBuilder $container = null;
+    private ?Throwable $containerError = null;
+    private array $configurations = [];
+    private array $configurationErrors = [];
+
+    public function __construct(private readonly object $kernel)
+    {
+    }
+
+    public static function isSupported(): bool
+    {
+        return class_exists(Processor::class)
+            && class_exists(ContainerBuilder::class)
+            && class_exists(ValidateEnvPlaceholdersPass::class)
+            && interface_exists(ConfigurationInterface::class)
+            && interface_exists(ConfigurationExtensionInterface::class)
+            && interface_exists(ExtensionInterface::class);
+    }
+
+    public function prepare(string $name): void
+    {
+        if (array_key_exists($name, $this->configurations) || isset($this->configurationErrors[$name])) {
+            return;
+        }
+
+        try {
+            $this->configurations[$name] = $this->configuration($name);
+        } catch (Throwable $error) {
+            $this->configurationErrors[$name] = $error;
+        }
+    }
+
+    public function get(string $name, ?string $path = null): mixed
+    {
+        $this->prepare($name);
+        if (isset($this->configurationErrors[$name])) {
+            throw $this->configurationErrors[$name];
+        }
+
+        $configuration = $this->configurations[$name];
+        if (null !== $path) {
+            foreach (explode('.', $path) as $step) {
+                if (!is_array($configuration) || !array_key_exists($step, $configuration)) {
+                    throw new LogicException(sprintf('Unable to find configuration for "%s.%s".', $name, $path));
+                }
+                $configuration = $configuration[$step];
+            }
+        }
+
+        return json_decode(
+            json_encode($configuration, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+    }
+
+    private function configuration(string $name): array
+    {
+        $container = $this->container();
+        $extension = $container->getExtension($name);
+        $extensionConfig = [];
+        foreach ($container->getCompilerPassConfig()->getPasses() as $pass) {
+            if ($pass instanceof ValidateEnvPlaceholdersPass) {
+                $extensionConfig = $pass->getExtensionConfig();
+                break;
+            }
+        }
+        if (isset($extensionConfig[$name])) {
+            $configuration = $extensionConfig[$name];
+        } else {
+            $configs = $container->getExtensionConfig($name);
+            $definition = $extension instanceof ConfigurationInterface
+                ? $extension
+                : ($extension instanceof ConfigurationExtensionInterface ? $extension->getConfiguration($configs, $container) : null);
+            if (!$definition instanceof ConfigurationInterface) {
+                throw new LogicException(sprintf('The extension with alias "%s" does not have configuration.', $name));
+            }
+            $configuration = (new Processor())->processConfiguration($definition, $configs);
+        }
+        $configuration = $container->resolveEnvPlaceholders(
+            $container->getParameterBag()->resolveValue($configuration),
+            null,
+        );
+        if (!is_array($configuration)) {
+            throw new LogicException(sprintf('The extension with alias "%s" returned invalid configuration.', $name));
+        }
+
+        return $configuration;
+    }
+
+    private function container(): ContainerBuilder
+    {
+        if (null !== $this->containerError) {
+            throw $this->containerError;
+        }
+        if (null !== $this->container) {
+            return $this->container;
+        }
+
+        try {
+            $kernel = clone $this->kernel;
+            if (!method_exists($kernel, 'boot') || !method_exists($kernel, 'getContainer') || !method_exists($kernel, 'buildContainer')) {
+                throw new LogicException('The application kernel cannot build effective configuration.');
+            }
+            $kernel->boot();
+            $container = (new ReflectionMethod($kernel, 'buildContainer'))->invoke($kernel);
+            if (!$container instanceof ContainerBuilder) {
+                throw new LogicException('The application kernel returned an invalid configuration container.');
+            }
+            $runtimeContainer = $kernel->getContainer();
+            if (is_object($runtimeContainer) && method_exists($runtimeContainer, 'has') && method_exists($runtimeContainer, 'get') && $runtimeContainer->has('container.env_var_processors_locator')) {
+                $container->set('container.env_var_processors_locator', $runtimeContainer->get('container.env_var_processors_locator'));
+            }
+            $container->getCompiler()->compile($container);
+
+            return $this->container = $container;
+        } catch (Throwable $error) {
+            $this->containerError = $error;
+            throw $error;
+        }
+    }
+}
+
 function symfonyLspBridgeConfigNodeType(object $node): string
 {
     $class = basename(str_replace('\\', '/', $node::class));
