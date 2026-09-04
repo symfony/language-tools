@@ -120,11 +120,11 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
     {
         $diagnostics = [];
         foreach ($this->php->occurrences($document->text, $index) as $occurrence) {
-            $node = $index->find($occurrence->path);
+            $node = $index->find($occurrence->schemaPath);
             $range = $this->converter->toRange($document->text, $occurrence->startOffset, $occurrence->endOffset - $occurrence->startOffset);
             $key = implode('.', $occurrence->path);
             if (null === $node) {
-                if (!$index->allowsUnknownKeys($occurrence->path)) {
+                if (!$index->allowsUnknownKeys($occurrence->schemaPath)) {
                     $diagnostics[] = $this->diagnostic($range, 1, 'config.unknown_key', \sprintf('Unknown configuration key "%s".', $key));
                 }
                 continue;

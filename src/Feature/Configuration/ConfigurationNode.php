@@ -116,6 +116,28 @@ final class ConfigurationNode
         return $this->prototype->definedChild($name) ?? $this->prototype;
     }
 
+    public function keyedChild(string $name): ?self
+    {
+        $name = $this->normalizeChildName($name);
+        if ($name === $this->entryKeyNode?->name) {
+            return null;
+        }
+        $child = $this->definedChild($this->aliases[$name] ?? $name);
+        if (null !== $child) {
+            return null !== $child->keyAttribute && null !== $child->prototype ? $child : null;
+        }
+        if (null === $this->prototype || null !== $this->keyAttribute) {
+            return null;
+        }
+
+        return $this->prototype->keyedChild($name);
+    }
+
+    public function keyAttribute(): ?string
+    {
+        return $this->keyAttribute;
+    }
+
     public function definedChild(string $name): ?self
     {
         foreach ($this->children as $child) {

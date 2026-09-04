@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Configuration;
 
+use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
@@ -35,11 +36,11 @@ final class PhpConfigurationAnalyzer
         usort($occurrences, static fn (PhpConfigurationOccurrence $left, PhpConfigurationOccurrence $right): int => $left->startOffset <=> $right->startOffset);
 
         return array_values(array_filter($occurrences, static function (PhpConfigurationOccurrence $occurrence) use ($index): bool {
-            if (!isset($index->roots()[$occurrence->path[0]])) {
+            if (!isset($index->roots()[$occurrence->schemaPath[0]])) {
                 return false;
             }
-            for ($length = 2, $count = \count($occurrence->path); $length < $count; ++$length) {
-                if (null === $index->find(\array_slice($occurrence->path, 0, $length))) {
+            for ($length = 2, $count = \count($occurrence->schemaPath); $length < $count; ++$length) {
+                if (null === $index->find(\array_slice($occurrence->schemaPath, 0, $length))) {
                     return false;
                 }
             }
@@ -55,7 +56,7 @@ final class PhpConfigurationAnalyzer
             if ($cursor < $occurrence->startOffset || $cursor > $occurrence->endOffset) {
                 continue;
             }
-            $node = $index->find($occurrence->path);
+            $node = $index->find($occurrence->schemaPath);
 
             return null === $node ? null : [$occurrence->path, $node];
         }
@@ -97,23 +98,52 @@ final class PhpConfigurationAnalyzer
         }
 
         if (PhpMethodReceiverKind::Variable === $call->receiverContext->kind && null !== $call->receiverContext->name) {
-            $path = [$this->root(substr($masked, 0, $call->receiverContext->startOffset + 1), $call->receiverContext->name)];
+            $builderPath = $builderSchemaPath = [$this->root(substr($masked, 0, $call->receiverContext->startOffset + 1), $call->receiverContext->name)];
         } else {
             $receiver = $callsByRange[$call->receiverContext->startOffset.':'.$call->receiverContext->endOffset] ?? null;
             if (null === $receiver || null === $parent = $this->resolveCall($receiver, $source, $masked, $index, $callsByRange, $resolved)) {
                 return null;
             }
-            $path = $parent->path;
-            $parentNode = $index->find($path);
-            if (null !== $parentNode && $this->returnsCurrentBuilder($parentNode)) {
-                array_pop($path);
-            }
+            $builderPath = $parent->builderPath;
+            $builderSchemaPath = $parent->builderSchemaPath;
         }
-        $path[] = $this->methodName($call->method);
+        $receiverNode = $index->find($builderSchemaPath);
+        $method = $this->methodName($call->method);
+        $keyedChild = $receiverNode?->keyedChild($method);
+        $keyAttribute = $keyedChild?->keyAttribute();
+        $keyArgument = null === $keyAttribute
+            ? null
+            : $call->namedOrPositionalArgument('' === $keyAttribute ? 'key' : $keyAttribute, 0);
+        if (null !== $keyedChild && null !== $keyArgument) {
+            $path = [...$builderPath, $method];
+            $key = $keyArgument->stringLiteral?->value;
+            if (null !== $key) {
+                $path[] = $key;
+            }
+            $schemaPath = [...$builderSchemaPath, $keyedChild->name, $key ?? ''];
+            $valueName = 'value' === $keyAttribute ? 'data' : 'value';
+            $valueArgument = $call->namedOrPositionalArgument($valueName, 1);
+            $argument = null === $valueArgument ? '' : $this->argumentValue($valueArgument, $masked);
+        } else {
+            $path = [...$builderPath, $method];
+            $schemaPath = [...$builderSchemaPath, $method];
+            $argument = $this->argument($call, $source, $masked, $methodRange[1]);
+        }
+        $node = $index->find($schemaPath);
+        if (null !== $node && $this->returnsCurrentBuilder($node)) {
+            $returnedBuilderPath = $builderPath;
+            $returnedBuilderSchemaPath = $builderSchemaPath;
+        } else {
+            $returnedBuilderPath = $path;
+            $returnedBuilderSchemaPath = $schemaPath;
+        }
 
         return $resolved[$id] = new PhpConfigurationOccurrence(
             $path,
-            $this->argument($call, $source, $masked, $methodRange[1]),
+            $schemaPath,
+            $returnedBuilderPath,
+            $returnedBuilderSchemaPath,
+            $argument,
             $methodRange[0],
             $methodRange[1],
         );
@@ -139,7 +169,7 @@ final class PhpConfigurationAnalyzer
         if (1 === \count($call->arguments)) {
             $argument = $call->arguments[0];
             if (null !== $argument->expressionStartOffset && null !== $argument->expressionEndOffset && $argument->startOffset === $argument->expressionStartOffset) {
-                return substr($masked, $argument->expressionStartOffset, $argument->expressionEndOffset - $argument->expressionStartOffset);
+                return $this->argumentValue($argument, $masked);
             }
         }
         $open = strpos($source, '(', $methodEnd);
@@ -148,6 +178,15 @@ final class PhpConfigurationAnalyzer
         }
 
         return substr($masked, $open + 1, max(0, $call->endOffset - $open - 2));
+    }
+
+    private function argumentValue(PhpArgument $argument, string $masked): string
+    {
+        if (null === $argument->expressionStartOffset || null === $argument->expressionEndOffset) {
+            return '';
+        }
+
+        return substr($masked, $argument->expressionStartOffset, $argument->expressionEndOffset - $argument->expressionStartOffset);
     }
 
     private function root(string $before, string $variable): string

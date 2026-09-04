@@ -39,7 +39,8 @@ Diagnostics report statically provable configuration errors, including unknown
 or duplicate keys, invalid scalar types, invalid enum values, deprecated nodes
 and malformed structures. Fluent PHP builder calls that set leaf values stay at
 their current configuration level, while child builder calls continue into
-nested options.
+nested options. Calls that select or set named entries, such as
+``firewall('main')``, keep literal entry names in diagnostic and hover paths.
 When a bundle accepts the scalar value of a backed PHP enum case, diagnostics
 recognize that value. YAML values that use the
 ``!php/enum`` tag are matched to the declared cases. Direct ``!php/const``

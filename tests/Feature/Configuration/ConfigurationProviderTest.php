@@ -753,6 +753,98 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame(['Expected boolean for "twig.debug".'], array_column($diagnostics, 'message'));
     }
 
+    public function testRecognizesNamedEntriesInPhpConfigurationBuilderChains(): void
+    {
+        $fixture = $this->providers();
+        $cases = [
+            [
+                'file:///workspace/config/packages/security.php',
+                <<<'PHP'
+                    <?php
+
+                    function configure(SecurityConfig $securityConfig): void
+                    {
+                        $securityConfig
+                            ->firewall('main')
+                            ->stateless('invalid');
+                    }
+                    PHP,
+                'Expected boolean for "security.firewall.main.stateless".',
+                'stateless',
+                'security.firewall.main.stateless',
+            ],
+            [
+                'file:///workspace/config/packages/framework.php',
+                <<<'PHP'
+                    <?php
+
+                    function configure(FrameworkConfig $frameworkConfig): void
+                    {
+                        $frameworkConfig
+                            ->rateLimiter()
+                            ->limiter('api_requests')
+                            ->policy('fixed_window')
+                            ->limit('invalid');
+                    }
+                    PHP,
+                'Expected integer for "framework.rate_limiter.limiter.api_requests.limit".',
+                'limit',
+                'framework.rate_limiter.limiter.api_requests.limit',
+            ],
+            [
+                'file:///workspace/config/packages/roles.php',
+                <<<'PHP'
+                    <?php
+
+                    function configure(SecurityConfig $securityConfig): void
+                    {
+                        $securityConfig
+                            ->roleHierarchy('ROLE_ADMIN', ['ROLE_USER'])
+                            ->roleHierarchy('ROLE_SUPER_ADMIN', 'invalid');
+                    }
+                    PHP,
+                'Expected array for "security.role_hierarchy.ROLE_SUPER_ADMIN".',
+                'roleHierarchy',
+                'security.role_hierarchy.ROLE_SUPER_ADMIN',
+            ],
+            [
+                'file:///workspace/config/packages/groups.php',
+                <<<'PHP'
+                    <?php
+
+                    function configure(FrameworkConfig $frameworkConfig): void
+                    {
+                        $frameworkConfig
+                            ->groups()
+                            ->handler('main')
+                            ->nested('invalid');
+                    }
+                    PHP,
+                'Expected boolean for "framework.groups.handler.main.nested".',
+                'nested',
+                'framework.groups.handler.main.nested',
+            ],
+        ];
+
+        foreach ($cases as [$uri, $text, $message, $hovered, $path]) {
+            $fixture->documents->open(new Document($uri, 'php', 1, $text));
+            $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+
+            self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
+            self::assertSame([$message], array_column($diagnostics, 'message'));
+            $position = $fixture->converter->toPosition($text, (int) strrpos($text, $hovered) + 1);
+            $hover = $fixture->hover->hover([
+                'textDocument' => ['uri' => $uri],
+                'position' => ['line' => $position->line, 'character' => $position->character],
+            ]);
+            self::assertIsArray($hover);
+            self::assertIsArray($hover['contents'] ?? null);
+            self::assertIsString($hover['contents']['value'] ?? null);
+            self::assertStringContainsString('`'.$path.'`', $hover['contents']['value']);
+            $fixture->documents->close($uri);
+        }
+    }
+
     public function testCompletesEnumValuesAndPhpAndXmlDsl(): void
     {
         $fixture = $this->providers();
@@ -948,6 +1040,12 @@ final class ConfigurationProviderTest extends TestCase
                         $this->node('reset_mode', 'enum', allowedValues: ['schema', 'migrate'], allowedEnumCases: ['App\\ResetMode::SCHEMA', 'App\\ResetMode::MIGRATE']),
                         $this->node('strict_reset_mode', 'enum', allowedEnumCases: ['App\\ResetMode::SCHEMA', 'App\\ResetMode::MIGRATE']),
                     ]),
+                    $this->node('rate_limiter', 'array', children: [
+                        $this->node('limiters', 'array', prototype: $this->node('limiter', 'array', children: [
+                            $this->node('policy', 'scalar'),
+                            $this->node('limit', 'integer'),
+                        ]), keyAttribute: 'name'),
+                    ], aliases: ['limiter' => 'limiters']),
                     $this->node('normalized_section', 'array', children: [
                         $this->node('nested_key', 'boolean'),
                         $this->node('mixed_nested_key', 'boolean'),
@@ -981,6 +1079,11 @@ final class ConfigurationProviderTest extends TestCase
                             $this->node('default-src', 'boolean'),
                         ], normalizeKeys: false)),
                     ]), keyAttribute: 'name'),
+                    $this->node('groups', 'array', prototype: $this->node('group', 'array', children: [
+                        $this->node('handlers', 'array', prototype: $this->node('handler', 'array', children: [
+                            $this->node('nested', 'boolean'),
+                        ]), keyAttribute: 'name'),
+                    ], aliases: ['handler' => 'handlers'])),
                     $this->node('assets', 'array', accepts: ['null' => true, 'true' => true, 'false' => true, 'scalar' => false, 'unknownKeys' => false], children: [
                         $this->node('enabled', 'boolean'),
                     ]),
@@ -1025,6 +1128,7 @@ final class ConfigurationProviderTest extends TestCase
                     ]), keyAttribute: 'class'),
                     $this->node('firewalls', 'array', prototype: $this->node('firewall', 'array', children: [
                         $this->node('pattern', 'scalar'),
+                        $this->node('stateless', 'boolean'),
                         $this->node('remember_me', 'array', children: [
                             $this->node('secret', 'scalar'),
                             $this->node('name', 'scalar'),
@@ -1032,7 +1136,8 @@ final class ConfigurationProviderTest extends TestCase
                         ]),
                         $this->node('custom_authenticators', 'array', prototype: $this->node('custom_authenticator', 'scalar')),
                     ], aliases: ['custom_authenticator' => 'custom_authenticators']), keyAttribute: 'name'),
-                ]),
+                    $this->node('role_hierarchy', 'array', prototype: $this->node('role', 'array', prototype: $this->node('inherited_role', 'scalar')), keyAttribute: 'id'),
+                ], aliases: ['firewall' => 'firewalls', 'role' => 'role_hierarchy']),
             ],
             [
                 'alias' => 'services',
