@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Validate only literal PHP configuration arguments
 - Resolve adjacent YAML parameter references independently
 - Normalize Symfony UX package names in Stimulus Twig helpers
 - Resolve PHP configuration methods to exact digit-separated keys

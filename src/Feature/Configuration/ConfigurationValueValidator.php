@@ -43,6 +43,11 @@ final class ConfigurationValueValidator
         return \in_array($expected, $actualTypes, true) || ('float' === $expected && \in_array('int', $actualTypes, true));
     }
 
+    public function acceptsPhpArgument(ConfigurationNode $node, PhpConfigurationArgument $argument): bool
+    {
+        return !$argument->literal || $this->acceptsResolvedValue($node, $argument->value);
+    }
+
     public function acceptsValue(ConfigurationNode $node, string $value): bool
     {
         $source = trim($value);

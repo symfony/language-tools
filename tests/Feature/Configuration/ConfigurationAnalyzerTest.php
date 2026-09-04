@@ -26,7 +26,7 @@ final class ConfigurationAnalyzerTest extends TestCase
         self::assertSame([
             ['path' => ['framework', 'router'], 'argument' => ''],
             ['path' => ['framework', 'router', 'utf8'], 'argument' => 'true'],
-        ], array_map(static fn (PhpConfigurationOccurrence $occurrence): array => ['path' => $occurrence->path, 'argument' => $occurrence->argument], $analyzer->occurrences($text, $index)));
+        ], array_map(static fn (PhpConfigurationOccurrence $occurrence): array => ['path' => $occurrence->path, 'argument' => $occurrence->argument->source], $analyzer->occurrences($text, $index)));
         self::assertSame(['framework', 'router', 'utf8'], $analyzer->resolveNode($text, $index, strpos($text, 'utf8') + 1)[0] ?? null);
 
         $incomplete = '<?php function configure(FrameworkConfig $options) { $options->router()->ut';
@@ -44,7 +44,7 @@ final class ConfigurationAnalyzerTest extends TestCase
         $rootWithDigit = '<?php function configure(Psr3Config $options) { $options->enabled(true); }';
         self::assertSame(
             [['path' => ['psr_3', 'enabled'], 'argument' => 'true']],
-            array_map(static fn (PhpConfigurationOccurrence $occurrence): array => ['path' => $occurrence->path, 'argument' => $occurrence->argument], $analyzer->occurrences($rootWithDigit, $index)),
+            array_map(static fn (PhpConfigurationOccurrence $occurrence): array => ['path' => $occurrence->path, 'argument' => $occurrence->argument->source], $analyzer->occurrences($rootWithDigit, $index)),
         );
         $incompleteRootWithDigit = '<?php function configure(Psr3Config $options) { $options->en';
         self::assertSame(

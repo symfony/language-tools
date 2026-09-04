@@ -123,7 +123,7 @@ final class PhpConfigurationAnalyzer
             $schemaPath = [...$builderSchemaPath, $keyedChild->name, $key ?? ''];
             $valueName = 'value' === $keyAttribute ? 'data' : 'value';
             $valueArgument = $call->namedOrPositionalArgument($valueName, 1);
-            $argument = null === $valueArgument ? '' : $this->argumentValue($valueArgument, $masked);
+            $argument = null === $valueArgument ? new PhpConfigurationArgument('', false) : $this->argumentValue($valueArgument, $masked);
         } else {
             $path = [...$builderPath, $method];
             $schemaPath = [...$builderSchemaPath, $method];
@@ -161,32 +161,62 @@ final class PhpConfigurationAnalyzer
         return [$start, $start + \strlen($match[1][0])];
     }
 
-    private function argument(PhpMethodCall $call, string $source, string $masked, int $methodEnd): string
+    private function argument(PhpMethodCall $call, string $source, string $masked, int $methodEnd): PhpConfigurationArgument
     {
         if ([] === $call->arguments) {
-            return '';
+            return new PhpConfigurationArgument('', false);
         }
         if (1 === \count($call->arguments)) {
-            $argument = $call->arguments[0];
-            if (null !== $argument->expressionStartOffset && null !== $argument->expressionEndOffset && $argument->startOffset === $argument->expressionStartOffset) {
-                return $this->argumentValue($argument, $masked);
-            }
+            return $this->argumentValue($call->arguments[0], $masked);
         }
         $open = strpos($source, '(', $methodEnd);
         if (false === $open || $open >= $call->endOffset) {
-            return '';
+            return new PhpConfigurationArgument('', false);
         }
 
-        return substr($masked, $open + 1, max(0, $call->endOffset - $open - 2));
+        return new PhpConfigurationArgument(substr($masked, $open + 1, max(0, $call->endOffset - $open - 2)), false);
     }
 
-    private function argumentValue(PhpArgument $argument, string $masked): string
+    private function argumentValue(PhpArgument $argument, string $masked): PhpConfigurationArgument
     {
         if (null === $argument->expressionStartOffset || null === $argument->expressionEndOffset) {
-            return '';
+            return new PhpConfigurationArgument('', false);
         }
 
-        return substr($masked, $argument->expressionStartOffset, $argument->expressionEndOffset - $argument->expressionStartOffset);
+        $source = substr($masked, $argument->expressionStartOffset, $argument->expressionEndOffset - $argument->expressionStartOffset);
+        if (null !== $argument->stringLiteral) {
+            return new PhpConfigurationArgument($source, true, $argument->stringLiteral->value);
+        }
+
+        $plain = trim($source);
+
+        return match (strtolower($plain)) {
+            'null' => new PhpConfigurationArgument($source, true),
+            'true' => new PhpConfigurationArgument($source, true, true),
+            'false' => new PhpConfigurationArgument($source, true, false),
+            default => $this->otherArgumentValue($source, $plain),
+        };
+    }
+
+    private function otherArgumentValue(string $source, string $plain): PhpConfigurationArgument
+    {
+        if (1 === preg_match('/^[+-]?(?:0|[1-9](?:_?[0-9])*)$/D', $plain)) {
+            $integer = filter_var(str_replace('_', '', $plain), \FILTER_VALIDATE_INT);
+            if (false !== $integer) {
+                return new PhpConfigurationArgument($source, true, $integer);
+            }
+        }
+        if (1 === preg_match(
+            '/^[+-]?(?:(?:[0-9](?:_?[0-9])*\.(?:[0-9](?:_?[0-9])*)?|\.[0-9](?:_?[0-9])*)(?:[eE][+-]?[0-9](?:_?[0-9])*)?|[0-9](?:_?[0-9])*[eE][+-]?[0-9](?:_?[0-9])*)$/D',
+            $plain,
+        )) {
+            return new PhpConfigurationArgument($source, true, (float) str_replace('_', '', $plain));
+        }
+        if ((str_starts_with($plain, '[') && str_ends_with($plain, ']')) || 1 === preg_match('/^array\s*\(.*\)$/is', $plain)) {
+            return new PhpConfigurationArgument($source, true, []);
+        }
+
+        return new PhpConfigurationArgument($source, false);
     }
 
     private function root(string $before, string $variable, ConfigurationIndex $index): string

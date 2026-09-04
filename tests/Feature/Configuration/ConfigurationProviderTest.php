@@ -726,6 +726,45 @@ final class ConfigurationProviderTest extends TestCase
         }
     }
 
+    public function testValidatesOnlyLiteralPhpConfigurationValues(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.php';
+        $text = <<<'PHP'
+            <?php
+
+            namespace App\Config;
+
+            use App\Limits;
+            use App\ResetMode as Mode;
+
+            const _9 = true;
+
+            function configure(FrameworkConfig $framework, ContainerConfigurator $container): void
+            {
+                $framework->router()
+                    ->utf8('dev' === $container->env())
+                    ->strict('invalid')
+                    ->strict(1_000)
+                    ->strict(_9)
+                    ->resetMode(Mode::SCHEMA)
+                    ->strictResetMode(Mode::UNKNOWN);
+                $framework->rateLimiter()->limiter('api')->limit(Limits::MAX);
+                $framework->rateLimiter()->limiter('octal')->limit(0644);
+                $framework->rateLimiter()->limiter('underscored')->limit(1_000);
+            }
+            PHP;
+        $fixture->documents->open(new Document($uri, 'php', 1, $text));
+
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+        self::assertIsArray($diagnostics);
+        self::assertSame(['config.invalid_type', 'config.invalid_type'], array_column($diagnostics, 'code'));
+        self::assertSame([
+            'Expected boolean for "framework.router.strict".',
+            'Expected boolean for "framework.router.strict".',
+        ], array_column($diagnostics, 'message'));
+    }
+
     public function testTreatsFluentPhpConfigurationLeafSettersAsSiblings(): void
     {
         $fixture = $this->providers();

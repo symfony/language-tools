@@ -45,8 +45,10 @@ nested options. Calls that select or set named entries, such as
 ``firewall('main')``, keep literal entry names in diagnostic and hover paths.
 When a bundle accepts the scalar value of a backed PHP enum case, diagnostics
 recognize that value. YAML values that use the
-``!php/enum`` tag are matched to the declared cases. Direct ``!php/const``
-values stay opaque because their runtime value can't be determined statically.
+``!php/enum`` tag are matched to the declared cases. PHP arguments are checked
+only when they are literals; expressions, enum cases and class constants stay
+opaque because their runtime values can't be determined statically. Direct
+``!php/const`` values stay opaque for the same reason.
 YAML aliases and merge keys are resolved before validation. Direct alias
 diagnostics point to the alias reference. Inherited mapping keys and values are
 checked at their effective configuration paths, with diagnostics pointing to the

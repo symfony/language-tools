@@ -15,7 +15,7 @@ final class PhpConfigurationOccurrence
         public readonly array $schemaPath,
         public readonly array $builderPath,
         public readonly array $builderSchemaPath,
-        public readonly string $argument,
+        public readonly PhpConfigurationArgument $argument,
         public readonly int $startOffset,
         public readonly int $endOffset,
     ) {
