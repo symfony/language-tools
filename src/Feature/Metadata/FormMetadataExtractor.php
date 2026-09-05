@@ -179,13 +179,24 @@ final class FormMetadataExtractor
             if (!preg_match('/^\s*\[/', $current['text']) || !preg_match('/["\']([A-Za-z_][A-Za-z0-9_]*)$/', $current['text'], $prefix, \PREG_OFFSET_CAPTURE)) {
                 continue;
             }
-            if (!preg_match('/^\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*::class\b/', $arguments[$typeIndex]['text'], $type)) {
+            $class = $this->formTypeClassAt($php, $call[2][1], $typeIndex);
+            if (null === $class) {
                 continue;
             }
-            $class = $php->resolveName($type[1]);
             $prefixOffset = $current['offset'] + $prefix[1][1];
 
             return $this->context(MetadataCompletionKind::FormOption, $prefix[1][0], $text, $prefixOffset, $class);
+        }
+
+        return null;
+    }
+
+    private function formTypeClassAt(PhpDocument $php, int $methodOffset, int $typeIndex): ?string
+    {
+        foreach ($php->methodCalls as $call) {
+            if ($methodOffset === $call->methodStartOffset) {
+                return $call->positionalArgument($typeIndex)?->completeClassReference?->className;
+            }
         }
 
         return null;

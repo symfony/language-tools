@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Suppress form option completion for computed form type expressions
 - Recognize case-insensitive PHP `::class` references
 - Ignore Doctrine contexts with computed class arguments
 - Ignore form options of concatenated form type expressions

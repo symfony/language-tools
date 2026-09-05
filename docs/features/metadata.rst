@@ -16,9 +16,10 @@ completion and hover details.
 
 After runtime indexing, definitely unknown literal options are diagnosed for
 known form types. Dynamic option arrays and unresolved form types are ignored.
-A type argument that concatenates or computes a class name is dynamic, even
-when it starts with a ``::class`` reference. Quoted strings in nested option
-values can contain closing brackets without hiding later options.
+A type argument that concatenates, wraps or computes a class name is dynamic,
+even when it contains a ``::class`` reference. It doesn't trigger option
+completion or diagnostics. Quoted strings in nested option values can contain
+closing brackets without hiding later options.
 
 For form types that configure a static ``data_class`` with ``setDefaults()``
 or ``setDefault()``, literal field names passed to

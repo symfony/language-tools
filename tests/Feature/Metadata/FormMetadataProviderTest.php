@@ -73,6 +73,33 @@ final class FormMetadataProviderTest extends MetadataTestCase
         self::assertIsArray($this->hover([$formProvider], $converter, $formUri, $formText, $required));
     }
 
+    public function testCompletesFormOptionsOnlyForCompleteClassReferenceTypeArguments(): void
+    {
+        $extractor = $this->createExtractor(new PositionConverter());
+        $prefix = <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Component\Form\Extension\Core\Type\TextType;
+
+            final class Controller
+            {
+                public function create(string $suffix): void
+                {
+                    $this->createForm(
+            PHP;
+        foreach ([
+            'TextType /* type */ ::CLASS' => 'Symfony\\Component\\Form\\Extension\\Core\\Type\\TextType',
+            'TextType::class . $suffix' => null,
+            '(TextType::class)' => null,
+        ] as $type => $expectedOwner) {
+            $text = $prefix.$type.", null, ['requ";
+            $context = $extractor->completionContext('php', $text, \strlen($text));
+
+            self::assertSame($expectedOwner, $context?->owner, $type);
+        }
+    }
+
     public function testLinksFormFieldsToDataClassProperties(): void
     {
         $converter = new PositionConverter();
