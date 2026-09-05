@@ -20,6 +20,7 @@ use Microsoft\PhpParser\Node\Statement\CompoundStatementNode;
 use Microsoft\PhpParser\Node\Statement\EnumDeclaration;
 use Microsoft\PhpParser\Node\Statement\InterfaceDeclaration;
 use Microsoft\PhpParser\Node\Statement\TraitDeclaration;
+use Microsoft\PhpParser\Node\TraitUseClause;
 use Microsoft\PhpParser\Token;
 use Microsoft\PhpParser\TokenKind;
 
@@ -44,16 +45,22 @@ final class PhpDeclarationFactBuilder
         }
         $typeDeclarations = [];
         foreach ($collection->typeDeclarations as $node) {
-            $typeDeclarations[] = $this->typeDeclaration($node, $source);
+            $typeDeclarations[] = $this->typeDeclaration($node, $source, $names, $collection->typeTraitUses[spl_object_id($node)] ?? []);
         }
         $typedVariables = $this->typedVariables($collection->typedVariableDeclarations, $source, $names);
+        $parameterAttributes = [];
+        foreach ($collection->parameterAttributes as $parameterId => $attributeNodes) {
+            foreach ($attributeNodes as $attributeNode) {
+                $parameterAttributes[$parameterId][] = $attributesByNode[spl_object_id($attributeNode)];
+            }
+        }
         $methodDeclarations = [];
         foreach ($collection->methodDeclarations as $node) {
             $methodAttributes = [];
             foreach ($collection->methodAttributes[spl_object_id($node)] ?? [] as $attributeNode) {
                 $methodAttributes[] = $attributesByNode[spl_object_id($attributeNode)];
             }
-            $declaration = $this->methodDeclaration($node, $source, $names, $methodAttributes);
+            $declaration = $this->methodDeclaration($node, $source, $names, $methodAttributes, $parameterAttributes);
             if (null !== $declaration) {
                 $methodDeclarations[] = $declaration;
             }
@@ -265,7 +272,8 @@ final class PhpDeclarationFactBuilder
         return array_values(array_unique($resolved));
     }
 
-    private function typeDeclaration(ClassDeclaration|InterfaceDeclaration|TraitDeclaration|EnumDeclaration $declaration, string $source): PhpTypeDeclaration
+    /** @param list<TraitUseClause> $traitUses */
+    private function typeDeclaration(ClassDeclaration|InterfaceDeclaration|TraitDeclaration|EnumDeclaration $declaration, string $source, PhpNameContext $names, array $traitUses): PhpTypeDeclaration
     {
         $parentClassName = null;
         if ($declaration instanceof ClassDeclaration) {
@@ -308,7 +316,26 @@ final class PhpDeclarationFactBuilder
             $kind,
             trim(substr($source, $start, $members->getStartPosition() - $start)),
             $this->description($declaration),
+            $this->traitNames($traitUses, $source, $names),
         );
+    }
+
+    /**
+     * @param list<TraitUseClause> $traitUses
+     *
+     * @return list<string>
+     */
+    private function traitNames(array $traitUses, string $source, PhpNameContext $names): array
+    {
+        $traitNames = [];
+        foreach ($traitUses as $traitUse) {
+            foreach ($this->nodes->traitUseNames($traitUse) as $name) {
+                $resolved = $name->getResolvedName();
+                $traitNames[] = ltrim(null === $resolved ? $names->resolve($this->scopes->qualifiedName($name, $source)) : (string) $resolved, '\\');
+            }
+        }
+
+        return array_values(array_filter($traitNames, static fn (string $name): bool => '' !== $name));
     }
 
     /** @return list<PhpConstantDeclaration> */
@@ -368,8 +395,11 @@ final class PhpDeclarationFactBuilder
         );
     }
 
-    /** @param list<PhpAttribute> $attributes */
-    private function methodDeclaration(MethodDeclaration $declaration, string $source, PhpNameContext $names, array $attributes): ?PhpMethodDeclaration
+    /**
+     * @param list<PhpAttribute>             $attributes
+     * @param array<int, list<PhpAttribute>> $parameterAttributes
+     */
+    private function methodDeclaration(MethodDeclaration $declaration, string $source, PhpNameContext $names, array $attributes, array $parameterAttributes): ?PhpMethodDeclaration
     {
         $owner = $declaration->getFirstAncestor(ObjectCreationExpression::class, ClassDeclaration::class, InterfaceDeclaration::class, TraitDeclaration::class, EnumDeclaration::class);
         $nameToken = $declaration->name;
@@ -398,6 +428,7 @@ final class PhpDeclarationFactBuilder
                 $parameter->variableName->getStartPosition() + 1,
                 $parameter->variableName->getEndPosition(),
                 $parameter->dotDotDotToken instanceof Token,
+                $parameterAttributes[spl_object_id($parameter)] ?? [],
             );
         }
 

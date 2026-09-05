@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Parser\Php;
 
 final class PhpTypeDeclaration
 {
+    /** @param list<string> $traitNames */
     public function __construct(
         public readonly string $name,
         public readonly ?string $parentClassName,
@@ -14,6 +15,7 @@ final class PhpTypeDeclaration
         public readonly PhpTypeKind $kind,
         public readonly string $signature,
         public readonly ?string $description,
+        public readonly array $traitNames = [],
     ) {
     }
 

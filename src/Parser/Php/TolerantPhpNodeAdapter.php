@@ -8,6 +8,7 @@ use Microsoft\PhpParser\Node\ClassBaseClause;
 use Microsoft\PhpParser\Node\DelimitedList\ArrayElementList;
 use Microsoft\PhpParser\Node\DelimitedList\ParameterDeclarationList;
 use Microsoft\PhpParser\Node\DelimitedList\PropertyElementList;
+use Microsoft\PhpParser\Node\DelimitedList\QualifiedNameList;
 use Microsoft\PhpParser\Node\Expression\ArrayCreationExpression;
 use Microsoft\PhpParser\Node\Expression\Variable;
 use Microsoft\PhpParser\Node\MethodDeclaration;
@@ -17,10 +18,12 @@ use Microsoft\PhpParser\Node\NamespaceUseGroupClause;
 use Microsoft\PhpParser\Node\Parameter;
 use Microsoft\PhpParser\Node\PropertyDeclaration;
 use Microsoft\PhpParser\Node\PropertyElement;
+use Microsoft\PhpParser\Node\QualifiedName;
 use Microsoft\PhpParser\Node\Statement\ClassDeclaration;
 use Microsoft\PhpParser\Node\Statement\EnumDeclaration;
 use Microsoft\PhpParser\Node\Statement\InterfaceDeclaration;
 use Microsoft\PhpParser\Node\Statement\TraitDeclaration;
+use Microsoft\PhpParser\Node\TraitUseClause;
 use Microsoft\PhpParser\Token;
 
 final class TolerantPhpNodeAdapter
@@ -102,6 +105,17 @@ final class TolerantPhpNodeAdapter
         }
 
         return array_values(array_filter($parameters->children, static fn (mixed $parameter): bool => $parameter instanceof Parameter));
+    }
+
+    /** @return list<QualifiedName> */
+    public function traitUseNames(TraitUseClause $clause): array
+    {
+        $names = $this->member($clause, 'traitNameList');
+        if (!$names instanceof QualifiedNameList) {
+            return [];
+        }
+
+        return array_values(array_filter($names->children, static fn (mixed $name): bool => $name instanceof QualifiedName));
     }
 
     /** @return list<ArrayElement> */

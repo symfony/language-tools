@@ -20,6 +20,7 @@ use Microsoft\PhpParser\Node\Statement\InterfaceDeclaration;
 use Microsoft\PhpParser\Node\Statement\NamespaceDefinition;
 use Microsoft\PhpParser\Node\Statement\NamespaceUseDeclaration;
 use Microsoft\PhpParser\Node\Statement\TraitDeclaration;
+use Microsoft\PhpParser\Node\TraitUseClause;
 
 final class TolerantPhpNodeCollection
 {
@@ -53,6 +54,12 @@ final class TolerantPhpNodeCollection
     /** @var array<int, list<Attribute>> */
     public readonly array $methodAttributes;
 
+    /** @var array<int, list<Attribute>> */
+    public readonly array $parameterAttributes;
+
+    /** @var array<int, list<TraitUseClause>> */
+    public readonly array $typeTraitUses;
+
     /** @param iterable<Node> $descendants */
     public function __construct(iterable $descendants, string $source)
     {
@@ -66,6 +73,8 @@ final class TolerantPhpNodeCollection
         $typeDeclarations = [];
         $nameContextNodes = [];
         $methodAttributes = [];
+        $parameterAttributes = [];
+        $typeTraitUses = [];
 
         foreach ($descendants as $node) {
             if ($node instanceof Attribute) {
@@ -74,6 +83,13 @@ final class TolerantPhpNodeCollection
                 $declaration = $group?->getParent();
                 if ($declaration instanceof MethodDeclaration) {
                     $methodAttributes[spl_object_id($declaration)][] = $node;
+                } elseif ($declaration instanceof Parameter) {
+                    $parameterAttributes[spl_object_id($declaration)][] = $node;
+                }
+            } elseif ($node instanceof TraitUseClause) {
+                $owner = $node->getFirstAncestor(ObjectCreationExpression::class, ClassDeclaration::class, TraitDeclaration::class, EnumDeclaration::class);
+                if ($owner instanceof ClassDeclaration || $owner instanceof TraitDeclaration || $owner instanceof EnumDeclaration) {
+                    $typeTraitUses[spl_object_id($owner)][] = $node;
                 }
             } elseif ($node instanceof CallExpression && $node->callableExpression instanceof MemberAccessExpression) {
                 $methodCalls[] = $node;
@@ -105,5 +121,7 @@ final class TolerantPhpNodeCollection
         $this->typeDeclarations = $typeDeclarations;
         $this->nameContextNodes = $nameContextNodes;
         $this->methodAttributes = $methodAttributes;
+        $this->parameterAttributes = $parameterAttributes;
+        $this->typeTraitUses = $typeTraitUses;
     }
 }

@@ -771,6 +771,85 @@ final class TolerantPhpParserTest extends TestCase
         self::assertFalse($methods[2]->public);
         self::assertSame([], $methods[3]->attributes);
         self::assertSame(['string'], $methods[3]->parameters[0]->types);
+        self::assertSame([$document->attributes[2]], $methods[3]->parameters[0]->attributes);
+    }
+
+    public function testExposesGroupedAndStackedParameterAttributes(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Command;
+
+            use Symfony\Component\Console\Attribute\Option as CommandOption;
+
+            final class ImportCommand
+            {
+                public function __invoke(
+                    #[\SensitiveParameter]
+                    #[CommandOption(name: 'dry-run')]
+                    bool $dryRun,
+                    #[Deprecated, CommandOption('Output format', 'output-format')]
+                    string $format,
+                    #[CommandOption] bool ...$rest,
+                ): int {
+                    return 0;
+                }
+            }
+            PHP;
+
+        $parameters = (new TolerantPhpParser(new Parser()))->parse($source)->methodDeclarations[0]->parameters;
+
+        self::assertSame(['dryRun', 'format', 'rest'], array_map(static fn (PhpParameter $parameter): string => $parameter->name, $parameters));
+        self::assertSame([
+            ['SensitiveParameter', 'Symfony\Component\Console\Attribute\Option'],
+            ['App\Command\Deprecated', 'Symfony\Component\Console\Attribute\Option'],
+            ['Symfony\Component\Console\Attribute\Option'],
+        ], array_map(static fn (PhpParameter $parameter): array => array_map(static fn ($attribute): string => $attribute->name, $parameter->attributes), $parameters));
+        self::assertSame('dry-run', $parameters[0]->attributes[1]->argument('name')?->stringLiteral?->value);
+        self::assertSame('output-format', $parameters[1]->attributes[1]->positionalArgument(1)?->stringLiteral?->value);
+        self::assertSame([], $parameters[2]->attributes[0]->arguments);
+        self::assertTrue($parameters[2]->variadic);
+    }
+
+    public function testExposesResolvedTraitUsesIncludingAdaptations(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Command;
+
+            use App\Shared\Reporting as ReportingTrait;
+
+            trait Adapted
+            {
+                public function helper(): void {}
+            }
+
+            final class ImportCommand
+            {
+                use ReportingTrait, \Vendor\Logging;
+                use Adapted {
+                    Adapted::helper as importHelper;
+                }
+
+                public function run(): object
+                {
+                    return new class {
+                        use Adapted;
+                    };
+                }
+            }
+
+            interface CommandContract
+            {
+            }
+            PHP;
+
+        $types = (new TolerantPhpParser(new Parser()))->parse($source)->typeDeclarations;
+
+        self::assertSame(['App\Command\Adapted', 'App\Command\ImportCommand', 'App\Command\CommandContract'], array_map(static fn ($type): string => $type->name, $types));
+        self::assertSame([], $types[0]->traitNames);
+        self::assertSame(['App\Shared\Reporting', 'Vendor\Logging', 'App\Command\Adapted'], $types[1]->traitNames);
+        self::assertSame([], $types[2]->traitNames);
     }
 
     public function testDoesNotUsePlainCommentsAsMethodDescriptions(): void
