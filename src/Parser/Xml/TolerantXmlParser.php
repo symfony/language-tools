@@ -4,7 +4,7 @@ namespace Symfony\Lsp\Parser\Xml;
 
 final class TolerantXmlParser implements XmlParserInterface
 {
-    private const MAX_EVENTS = 20_000;
+    private const MAX_EVENTS = 100_000;
     private const MAX_DIAGNOSTICS = 100;
     private const NAME_CHARACTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.:-';
 
@@ -20,7 +20,10 @@ final class TolerantXmlParser implements XmlParserInterface
         $terminalMalformed = false;
 
         while ($offset < $length) {
-            if (\count($events) >= self::MAX_EVENTS || \count($diagnostics) >= self::MAX_DIAGNOSTICS) {
+            if (\count($events) >= self::MAX_EVENTS) {
+                if (\count($diagnostics) >= self::MAX_DIAGNOSTICS) {
+                    array_pop($diagnostics);
+                }
                 $diagnostics[] = new XmlDiagnostic('XML analysis stopped after reaching its structural limit.', $offset, $offset);
                 $terminalMalformed = true;
                 break;
@@ -36,7 +39,7 @@ final class TolerantXmlParser implements XmlParserInterface
                 [$event, $diagnostic, $offset] = $this->terminatedOpaque($source, $opening, '-->', XmlOpaqueKind::Comment, 4, 'XML comment is not closed.', $this->parentIdentity($stack));
                 $events[] = $event;
                 if (null !== $diagnostic) {
-                    $diagnostics[] = $diagnostic;
+                    $this->appendDiagnostic($diagnostics, $diagnostic);
                     $terminalMalformed = $offset >= $length;
                 }
                 continue;
@@ -47,7 +50,7 @@ final class TolerantXmlParser implements XmlParserInterface
                     $events[] = $event;
                 }
                 if (null !== $diagnostic) {
-                    $diagnostics[] = $diagnostic;
+                    $this->appendDiagnostic($diagnostics, $diagnostic);
                     $terminalMalformed = $offset >= $length;
                 }
                 continue;
@@ -56,7 +59,7 @@ final class TolerantXmlParser implements XmlParserInterface
                 [$event, $diagnostic, $offset] = $this->terminatedOpaque($source, $opening, '?>', XmlOpaqueKind::ProcessingInstruction, 2, 'XML processing instruction is not closed.', $this->parentIdentity($stack));
                 $events[] = $event;
                 if (null !== $diagnostic) {
-                    $diagnostics[] = $diagnostic;
+                    $this->appendDiagnostic($diagnostics, $diagnostic);
                     $terminalMalformed = $offset >= $length;
                 }
                 continue;
@@ -65,7 +68,7 @@ final class TolerantXmlParser implements XmlParserInterface
                 [$event, $diagnostic, $offset] = $this->doctype($source, $opening, $this->parentIdentity($stack));
                 $events[] = $event;
                 if (null !== $diagnostic) {
-                    $diagnostics[] = $diagnostic;
+                    $this->appendDiagnostic($diagnostics, $diagnostic);
                     $terminalMalformed = $offset >= $length;
                 }
                 continue;
@@ -74,7 +77,7 @@ final class TolerantXmlParser implements XmlParserInterface
                 [$event, $diagnostic, $offset] = $this->declaration($source, $opening, $this->parentIdentity($stack));
                 $events[] = $event;
                 if (null !== $diagnostic) {
-                    $diagnostics[] = $diagnostic;
+                    $this->appendDiagnostic($diagnostics, $diagnostic);
                     $terminalMalformed = $offset >= $length;
                 }
                 continue;
@@ -85,7 +88,7 @@ final class TolerantXmlParser implements XmlParserInterface
                     [$event, $diagnostic, $offset] = $closing;
                     $events[] = $event;
                     if (null !== $diagnostic) {
-                        $diagnostics[] = $diagnostic;
+                        $this->appendDiagnostic($diagnostics, $diagnostic);
                         $terminalMalformed = $offset >= $length;
                     }
                     continue;
@@ -103,7 +106,7 @@ final class TolerantXmlParser implements XmlParserInterface
                         }
                     }
                     if (null !== $diagnostic) {
-                        $diagnostics[] = $diagnostic;
+                        $this->appendDiagnostic($diagnostics, $diagnostic);
                         $terminalMalformed = $offset >= $length;
                     }
                     continue;
@@ -116,10 +119,18 @@ final class TolerantXmlParser implements XmlParserInterface
 
         if ([] !== $stack && !$terminalMalformed) {
             [, $name] = $stack[array_key_last($stack)];
-            $diagnostics[] = new XmlDiagnostic(\sprintf('Element "%s" is not closed.', $name), $length, $length);
+            $this->appendDiagnostic($diagnostics, new XmlDiagnostic(\sprintf('Element "%s" is not closed.', $name), $length, $length));
         }
 
         return new XmlDocument($events, $diagnostics);
+    }
+
+    /** @param list<XmlDiagnostic> $diagnostics */
+    private function appendDiagnostic(array &$diagnostics, XmlDiagnostic $diagnostic): void
+    {
+        if (\count($diagnostics) < self::MAX_DIAGNOSTICS) {
+            $diagnostics[] = $diagnostic;
+        }
     }
 
     /**

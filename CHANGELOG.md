@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Ignore non-builder configuration variables across nested PHP scopes
+- Read large XML catalogs without exhausting the structural event budget
 - Require exact XML services namespace matches
 - Recover XML siblings after unterminated attributes without a closing quote
 - Keep hostile XML parsing linear and bound structural facts and diagnostics

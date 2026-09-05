@@ -199,6 +199,25 @@ final class TranslationExtractorTest extends TestCase
         self::assertSame(16, $facts->declarations[0]->range->end->character);
     }
 
+    public function testExtractsLargeXliffCatalogs(): void
+    {
+        $units = [];
+        for ($index = 0; $index < 3_000; ++$index) {
+            $units[] = \sprintf(
+                "    <trans-unit id=\"%1\$d\" resname=\"key.%1\$d\">\n      <source>key.%1\$d</source>\n      <target>Value %1\$d</target>\n    </trans-unit>",
+                $index,
+            );
+        }
+        $facts = $this->extractor()->extract(new SourceDocument(
+            'file:///workspace/translations/messages.en.xlf',
+            'xml',
+            "<xliff><file><body>\n".implode("\n", $units)."\n</body></file></xliff>",
+        ));
+
+        self::assertCount(3_000, $facts->declarations);
+        self::assertSame('key.2999', $facts->declarations[2_999]->key);
+    }
+
     public function testIgnoresCommentedXliffUnits(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/translations/messages.en.xlf', 'xml', <<<'XLIFF'
