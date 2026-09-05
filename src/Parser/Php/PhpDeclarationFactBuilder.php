@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Parser\Php;
 
+use Microsoft\PhpParser\MissingToken;
 use Microsoft\PhpParser\Node;
 use Microsoft\PhpParser\Node\Attribute;
 use Microsoft\PhpParser\Node\AttributeGroup;
@@ -408,6 +409,7 @@ final class PhpDeclarationFactBuilder
             $parameters,
             $body instanceof CompoundStatementNode ? $body->getStartPosition() : null,
             $body instanceof CompoundStatementNode ? $body->getEndPosition() : null,
+            $body instanceof CompoundStatementNode && !$body->closeBrace instanceof MissingToken,
             !$declaration->hasModifier(TokenKind::ProtectedKeyword) && !$declaration->hasModifier(TokenKind::PrivateKeyword),
         );
     }

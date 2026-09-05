@@ -924,7 +924,32 @@ final class TolerantPhpParserTest extends TestCase
         self::assertInstanceOf(PhpStringLiteral::class, $literal);
         self::assertSame('café', $literal->value);
         self::assertSame('café', substr($source, $literal->startOffset, $literal->endOffset - $literal->startOffset));
+        self::assertSame([true, true, false], array_map(static fn ($method): bool => $method->bodyClosed, $document->methodDeclarations));
         self::assertCount(6, $document->diagnostics);
+    }
+
+    public function testMarksMethodBodiesLeftOpenByTrailingStatements(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            final class Draft
+            {
+                public function closed(): void
+                {
+                    if (true) {
+                    }
+                }
+
+                public function open(): void
+                {
+                    if (true) {
+                    }
+            PHP;
+
+        $methods = (new TolerantPhpParser(new Parser()))->parse($source)->methodDeclarations;
+
+        self::assertSame([true, false], array_map(static fn (PhpMethodDeclaration $method): bool => $method->bodyClosed, $methods));
+        self::assertSame(['closed', 'open'], array_map(static fn (PhpMethodDeclaration $method): string => $method->name, $methods));
     }
 
     public function testRejectsInterpolatedStringsAsLiteralsAndReportsSyntaxDiagnostics(): void
