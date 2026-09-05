@@ -33,10 +33,13 @@ PHP messages can use quoted strings, heredocs or nowdocs. INI catalogs using a
 locale directory, such as ``Translations/en_US/messages.ini``, are recognized
 too; their messages can be quoted or unquoted, and comment lines and trailing
 ``;`` comments are ignored. Escaped quotes and backslashes in quoted messages
-are decoded. XLIFF units inside XML comments are ignored. Source-derived XLIFF
-keys decode XML entities without treating decoded markup as XML tags. Unsaved
-resource changes are available immediately, and changes made by external tools
-are picked up while the server is running.
+are decoded. XLIFF units inside comments, CDATA sections, processing
+instructions and DOCTYPE declarations are ignored. Mixed-content source and
+target values are supported. XLIFF keys and messages decode only predefined and
+numeric XML references; declared and external entities stay literal and aren't
+loaded or expanded. Source-derived keys keep ranges over their exact raw XML
+content. Unsaved resource changes are available immediately, and changes made
+by external tools are picked up while the server is running.
 
 ICU brace placeholders such as ``{name}`` are only interpreted in ICU
 catalogs, identified by the ``+intl-icu`` domain suffix. In plain catalogs,

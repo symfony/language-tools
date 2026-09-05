@@ -35,6 +35,7 @@ final class ProbeFinder
         ['category' => 'console.option.php', 'files' => '{\.php$}', 'pattern' => '{\$input\s*->\s*getOption\s*\(\s*[\'\"]([^\'\"]+)}'],
         ['category' => 'translation.php', 'files' => '{\.php$}', 'pattern' => '{(?:->trans|\bt)\(\s*[\'\"]([^\'\"]+)}'],
         ['category' => 'translation.twig', 'files' => '{\.twig$}', 'pattern' => '{[\'\"]([^\'\"]+)[\'\"]\s*\|\s*trans\b}'],
+        ['category' => 'configuration.xml', 'files' => '{(?:^|/)config/.*\.xml$}', 'pattern' => '{<[A-Za-z_][A-Za-z0-9_.-]*:(config)\b}'],
         ['category' => 'import.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{^[ \t]*(?:-[ \t]*)?(?:\{[ \t]*)?resource[ \t]*:[ \t]*[\'\"]?([A-Za-z0-9_.][^\'\"\s#,\}]*)}m'],
         ['category' => 'service.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{[\'\"]@([A-Za-z_][A-Za-z0-9_.\\\\]*)[\'\"]}'],
         ['category' => 'parameter.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{%([A-Za-z_][A-Za-z0-9_.]*)%}'],

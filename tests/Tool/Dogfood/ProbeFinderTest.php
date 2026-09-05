@@ -84,6 +84,17 @@ final class ProbeFinderTest extends TestCase
         self::assertSame('lib_route', $probes[0]->value);
     }
 
+    public function testFindsBundleConfigurationXmlRoots(): void
+    {
+        $this->write('config/packages/framework.xml', '<container><framework:config/></container>');
+
+        $probes = $this->probes(new ProbeFinder(), 'configuration.xml');
+
+        self::assertCount(1, $probes);
+        self::assertSame('config', $probes[0]->value);
+        $this->assertPositionInsideValue($probes[0]);
+    }
+
     public function testFindsCustomTwigCallables(): void
     {
         $this->write('src/AppExtension.php', "<?php\nuse Twig\\TwigFilter;\nuse Twig\\TwigFunction;\nfinal class AppExtension\n{\n    public function getFunctions(): array\n    {\n        return [\n            new TwigFunction('unused_widget', fn () => ''),\n            new TwigFunction('app_widget', fn () => ''),\n        ];\n    }\n    public function getFilters(): array\n    {\n        return [new TwigFilter('app_short', fn () => '')];\n    }\n}\n");

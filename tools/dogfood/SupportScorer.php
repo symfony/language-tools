@@ -20,6 +20,7 @@ final class SupportScorer
     private const EXPECTED_OVERRIDES = [
         'form.option.php' => ['completion', 'hover'],
         'constraint.option.php' => ['completion', 'hover'],
+        'configuration.xml' => ['completion', 'hover'],
         'twig.function.php' => ['references'],
         'twig.filter.php' => ['references'],
         'console.argument.php' => ['completion'],

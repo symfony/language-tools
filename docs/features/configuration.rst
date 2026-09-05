@@ -26,7 +26,10 @@ across lines, chains separated by comments or nullsafe calls, named entries
 such as ``firewall('main')`` and leaf setters that stay at their current
 level. Their root key comes from the declared builder type of the variable in
 scope, including renamed ``use`` imports. XML suggestions follow the current
-element path. Commented configuration constructs are ignored.
+element path. Commented configuration constructs are ignored. XML structure,
+hover and diagnostics tolerate ``>`` inside quoted attributes and recover valid
+siblings after malformed markup. Comments, CDATA sections, processing
+instructions and DOCTYPE declarations are treated as opaque content.
 
 YAML value completion suggests allowed enum values. Suggested keys include
 type and description details when the bundle provides them.
@@ -98,3 +101,4 @@ Limitations
 Custom validation callbacks and options built dynamically by application code
 may not be diagnosed. YAML alias and merge diagnostics are deferred for
 incomplete documents; aliases and merges inside sequence items aren't resolved.
+XML entity declarations and external identifiers aren't loaded or expanded.
