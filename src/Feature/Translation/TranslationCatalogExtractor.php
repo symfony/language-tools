@@ -224,7 +224,7 @@ final class TranslationCatalogExtractor
             preg_match('/<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?source(?:\s[^>]*)?>(.*?)(?:<\/(?:[A-Za-z_][A-Za-z0-9_.-]*:)?source>|(?=<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?target\b)|$)/is', $content, $source);
             preg_match('/<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?target(?:\s[^>]*)?>(.*?)(?:<\/(?:[A-Za-z_][A-Za-z0-9_.-]*:)?target>|$)/is', $content, $target);
             if (!isset($name[1]) && isset($source[1])) {
-                $name[1] = html_entity_decode(strip_tags($source[1]));
+                $name[1] = $source[1];
             }
             if (!isset($name[1])) {
                 preg_match('/\bid\s*=\s*[\'\"]([^\'\"]+)[\'\"]/i', $units[1][$i][0], $name);
@@ -236,7 +236,7 @@ final class TranslationCatalogExtractor
             $key = html_entity_decode(strip_tags($name[1]));
             $value = html_entity_decode(strip_tags($message));
             $offset = strpos($text, $name[1], $unitOffset);
-            $result[] = $this->declaration($key, $value, $domain, $locale, $uri, $text, false === $offset ? $unitOffset : $offset);
+            $result[] = $this->declaration($key, $value, $domain, $locale, $uri, $text, false === $offset ? $unitOffset : $offset, \strlen($name[1]));
         }
 
         return $result;

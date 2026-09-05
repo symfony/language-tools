@@ -222,6 +222,20 @@ final class TranslationExtractorTest extends TestCase
         );
     }
 
+    public function testDecodesSourceDerivedXliffKeysOnceAndPreservesTheirRawRange(): void
+    {
+        $converter = new PositionConverter();
+        $text = '<xliff><file><unit id="fallback"><segment><source>Some &lt;b&gt; text</source><target>Translated</target></segment></unit></file></xliff>';
+        $declaration = TranslationExtractorTestFactory::create($converter)
+            ->extract(new SourceDocument('file:///workspace/translations/messages.en.xlf', 'xml', $text))
+            ->declarations[0];
+        $start = $converter->toByteOffset($text, $declaration->range->start);
+        $end = $converter->toByteOffset($text, $declaration->range->end);
+
+        self::assertSame('Some <b> text', $declaration->key);
+        self::assertSame('Some &lt;b&gt; text', substr($text, $start, $end - $start));
+    }
+
     public function testPreservesHyphenatedYamlKeys(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/translations/messages.en.yaml', 'yaml', "article-title: Article\n"));
