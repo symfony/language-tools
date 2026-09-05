@@ -60,9 +60,10 @@ From a dispatch site, definition results include the message class and its
 registered handlers. From a message class, definition navigates to handlers and
 references include recognized dispatch sites. Handler classes navigate back to
 the message classes they handle. Handler relationships inherited through
-application-owned parent classes and interfaces are included. Anonymous classes
-don't contribute inherited handler relationships. Commented-out PHP attributes
-and calls are ignored, as are YAML bus and transport options.
+application-owned parent classes and interfaces are included for named classes,
+interfaces and enums. Anonymous classes don't contribute inherited handler
+relationships. Commented-out PHP attributes and calls are ignored, as are YAML
+bus and transport options.
 
 Code Lenses
 -----------
@@ -86,3 +87,8 @@ Limitations
 
 Internal framework messages and handlers can appear when Symfony registers them
 on an application bus.
+
+Inherited handler relationships are available only for parent classes and
+interfaces declared in indexed application source. Relationships that can't be
+identified from an incomplete PHP type declaration are omitted until the
+declaration is completed.
