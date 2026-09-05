@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Require exact XML services namespace matches
 - Recover XML siblings after unterminated attributes without a closing quote
 - Keep hostile XML parsing linear and bound structural facts and diagnostics
 - Ignore invalid UTF-8 XML names

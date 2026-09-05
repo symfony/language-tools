@@ -10,6 +10,8 @@ use Symfony\Lsp\Parser\Xml\XmlText;
 
 final class XmlDependencyInjectionExtractor
 {
+    private const SERVICES_NAMESPACE = 'http://symfony.com/schema/dic/services';
+
     public function __construct(
         private readonly PositionConverter $positionConverter,
         private readonly XmlParserInterface $parser = new TolerantXmlParser(),
@@ -18,7 +20,7 @@ final class XmlDependencyInjectionExtractor
 
     public function extract(string $uri, string $text): ?DependencyInjectionSourceFacts
     {
-        if (!str_contains($text, 'symfony.com/schema/dic/services')) {
+        if (!str_contains($text, self::SERVICES_NAMESPACE)) {
             return null;
         }
         $document = $this->parser->parse($text);
@@ -130,7 +132,7 @@ final class XmlDependencyInjectionExtractor
                 continue;
             }
             $namespace = $element->attribute(null === $element->prefix ? 'xmlns' : 'xmlns:'.$element->prefix);
-            if ('container' === $element->localName && null !== $namespace && str_contains($namespace->value, 'symfony.com/schema/dic/services')) {
+            if ('container' === $element->localName && self::SERVICES_NAMESPACE === $namespace?->value) {
                 $prefix = $element->prefix;
                 $documentElement = $element;
             }
@@ -146,7 +148,7 @@ final class XmlDependencyInjectionExtractor
         foreach ($elements as $element) {
             $isBound = null === $element->parentIdentity ? false : ($bound[$element->parentIdentity] ?? false);
             if (null !== $namespace = $element->attribute($declarationName)) {
-                $isBound = str_contains($namespace->value, 'symfony.com/schema/dic/services');
+                $isBound = self::SERVICES_NAMESPACE === $namespace->value;
             }
             $bound[$element->identity] = $isBound;
             if ($isBound && $element->prefix === $prefix) {

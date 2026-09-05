@@ -130,6 +130,7 @@ final class XmlDependencyInjectionExtractorTest extends TestCase
         self::assertNull($extractor->extract('file:///workspace/comment.xml', '<!-- http://symfony.com/schema/dic/services --><root/>'));
         self::assertNull($extractor->extract('file:///workspace/entity.xml', '<!DOCTYPE root [<!ENTITY schema "http://symfony.com/schema/dic/services">]><root xmlns="&schema;"/>'));
         self::assertNull($extractor->extract('file:///workspace/foreign.xml', '<doctrine-mapping xmlns:x="http://symfony.com/schema/dic/services"><service id="phantom"/></doctrine-mapping>'));
+        self::assertNull($extractor->extract('file:///workspace/spoofed.xml', '<container xmlns="urn:attacker:symfony.com/schema/dic/services:fake"><service id="phantom"/></container>'));
     }
 
     public function testReadsOnlyElementsBoundToTheServicesNamespace(): void
