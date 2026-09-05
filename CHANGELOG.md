@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recover XML siblings after unterminated attributes without a closing quote
 - Keep hostile XML parsing linear and bound structural facts and diagnostics
 - Ignore invalid UTF-8 XML names
 - Index XML dependency injection elements only in the services namespace
