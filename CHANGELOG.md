@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recognize parenthesized Twig callable registration options
 - Validate only literal PHP configuration arguments
 - Resolve adjacent YAML parameter references independently
 - Normalize Symfony UX package names in Stimulus Twig helpers

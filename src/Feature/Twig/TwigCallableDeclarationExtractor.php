@@ -6,6 +6,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
+use Symfony\Lsp\Parser\Php\PhpLiteralKind;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpObjectCreation;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -125,7 +126,7 @@ final class TwigCallableDeclarationExtractor
             return ['needsCharset' => false, 'needsEnvironment' => false, 'needsContext' => false, 'needsIsSandboxed' => false, 'variadic' => false, 'known' => true];
         }
         $expression = trim((string) $argument->expression);
-        $known = str_starts_with($expression, '[') || 1 === preg_match('/^array\s*\(/i', $expression);
+        $known = PhpLiteralKind::Array === $argument->completeLiteral?->kind;
 
         return [
             'needsCharset' => $this->objectOption($expression, 'needs_charset'),
@@ -167,8 +168,7 @@ final class TwigCallableDeclarationExtractor
         if (null === $argument) {
             return [false, true];
         }
-        $expression = trim((string) $argument->expression);
-        if (null === $argument->name && (str_starts_with($expression, '[') || 1 === preg_match('/^array\s*\(/i', $expression))) {
+        if (null === $argument->name && PhpLiteralKind::Array === $argument->completeLiteral?->kind) {
             return [false, true];
         }
 
@@ -183,10 +183,9 @@ final class TwigCallableDeclarationExtractor
             return [$default, true];
         }
 
-        return match (strtolower(trim((string) $argument->expression))) {
-            'true' => [true, true],
-            'false' => [false, true],
-            'null' => [$default, true],
+        return match ($argument->completeLiteral?->kind) {
+            PhpLiteralKind::Boolean => [true === $argument->completeLiteral->scalarValue, true],
+            PhpLiteralKind::Null => [$default, true],
             default => [$default, false],
         };
     }

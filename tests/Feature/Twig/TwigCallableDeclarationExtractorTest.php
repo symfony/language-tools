@@ -42,6 +42,7 @@ final class TwigCallableDeclarationExtractorTest extends TestCase
                 {
                     return [
                         new FunctionDefinition('function_name', [Runtime::class, 'doSomething'], ['needs_charset' => true, 'needs_environment' => true, 'needs_is_sandboxed' => true, 'is_variadic' => true]),
+                        new FunctionDefinition('parenthesized_options', [Runtime::class, 'doSomething'], (['needs_context' => true])),
                         new FunctionDefinition('constant_options', [Runtime::class, 'doSomething'], self::OPTIONS),
                         new FunctionDefinition("f\x6fo", [Runtime::class, 'doSomething']),
                         new FunctionDefinition('dynamic_name', $dynamicCallable),
@@ -60,6 +61,12 @@ final class TwigCallableDeclarationExtractorTest extends TestCase
 
                 #[AsTwigFunction(name: 'attribute_function', needsCharset: true)]
                 public function attributeFunction(string $charset, string $value, mixed ...$options): string { return $value; }
+
+                #[AsTwigFunction('parenthesized_attribute', needsContext: (true))]
+                public function parenthesizedAttribute(array $context, string $value): string { return $value; }
+
+                #[AsTwigFunction('parenthesized_safe', null, null, null, (['html']))]
+                public function parenthesizedSafe(string $value): string { return $value; }
 
                 #[AsTwigFunction('auto_environment')]
                 public function autoEnvironment(Environment $environment, string $value): string { return $value; }
@@ -101,11 +108,14 @@ final class TwigCallableDeclarationExtractorTest extends TestCase
             [TwigCallableKind::Filter, 'filter_name', 'App\Twig\AppExtensionRuntime', 'doSomething', false, false, true, false, false, true],
             [TwigCallableKind::Filter, 'named_filter', 'App\Twig\AppExtension', 'localFilter', false, false, false, false, false, true],
             [TwigCallableKind::Function, 'function_name', 'App\Twig\AppExtensionRuntime', 'doSomething', true, true, false, true, true, true],
+            [TwigCallableKind::Function, 'parenthesized_options', 'App\Twig\AppExtensionRuntime', 'doSomething', false, false, true, false, false, true],
             [TwigCallableKind::Function, 'constant_options', 'App\Twig\AppExtensionRuntime', 'doSomething', false, false, false, false, false, false],
             [TwigCallableKind::Function, 'foo', 'App\Twig\AppExtensionRuntime', 'doSomething', false, false, false, false, false, true],
             [TwigCallableKind::Function, 'dynamic_name', null, null, false, false, false, false, false, true],
             [TwigCallableKind::Filter, 'attribute_filter', 'App\Twig\AppExtension', 'attributeFilter', false, true, true, true, false, true],
             [TwigCallableKind::Function, 'attribute_function', 'App\Twig\AppExtension', 'attributeFunction', true, false, false, false, true, true],
+            [TwigCallableKind::Function, 'parenthesized_attribute', 'App\Twig\AppExtension', 'parenthesizedAttribute', false, false, true, false, false, true],
+            [TwigCallableKind::Function, 'parenthesized_safe', 'App\Twig\AppExtension', 'parenthesizedSafe', false, false, false, false, false, true],
             [TwigCallableKind::Function, 'auto_environment', 'App\Twig\AppExtension', 'autoEnvironment', false, true, false, false, false, true],
             [TwigCallableKind::Function, 'nullable_environment', 'App\Twig\AppExtension', 'nullableEnvironment', false, true, false, false, false, true],
             [TwigCallableKind::Function, 'explicit_nullable_environment', 'App\Twig\AppExtension', 'explicitNullableEnvironment', false, true, false, false, false, true],
