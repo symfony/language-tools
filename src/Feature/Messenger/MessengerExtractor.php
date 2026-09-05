@@ -11,6 +11,7 @@ use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpTypeKind;
 
 final class MessengerExtractor
 {
@@ -77,7 +78,7 @@ final class MessengerExtractor
             foreach ($matches[1] as [$name, $offset]) {
                 $symbols[] = $this->symbol(MessengerSymbolKind::Bus, $name, $document->uri, $document->text, $offset, false);
             }
-            $parents = $this->phpParents($source, $php);
+            $parents = $this->phpParents($php);
             $scalarTypes = ['array', 'bool', 'callable', 'float', 'int', 'never', 'resource', 'string', 'void'];
             foreach ($php->methodDeclarations as $method) {
                 $parameter = $method->parameters[0] ?? null;
@@ -155,39 +156,18 @@ final class MessengerExtractor
     }
 
     /** @return array<string, list<string>> */
-    private function phpParents(string $text, PhpDocument $php): array
+    private function phpParents(PhpDocument $php): array
     {
         $parents = [];
-        $typesByNameOffset = [];
         foreach ($php->typeDeclarations as $type) {
-            $typesByNameOffset[$type->nameStartOffset] = $type;
-        }
-        preg_match_all('/\b(class|interface|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\s*([^{}]*)\{/', $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-        foreach ($matches as $match) {
-            $type = $typesByNameOffset[$match[2][1]] ?? null;
-            if (null === $type) {
+            if (PhpTypeKind::Trait_ === $type->kind) {
                 continue;
             }
-            $className = $type->name;
-            $typeLists = [];
-            if (preg_match('/\bextends\s+([^\s,{]+(?:\s*,\s*[^\s,{]+)*)/', $match[3][0], $extends)) {
-                $typeLists[] = $extends[1];
+            $typeParents = $type->interfaceNames;
+            if (null !== $type->parentClassName) {
+                array_unshift($typeParents, $type->parentClassName);
             }
-            if (preg_match('/\bimplements\s+([^\{]+)/', $match[3][0], $implements)) {
-                $typeLists[] = trim($implements[1]);
-            }
-            $types = [];
-            foreach ($typeLists as $typeList) {
-                $splitTypes = preg_split('/\s*,\s*/', $typeList);
-                if (false !== $splitTypes) {
-                    array_push($types, ...$splitTypes);
-                }
-            }
-            $resolved = [];
-            foreach ($types as $type) {
-                $resolved[] = $php->resolveName($type);
-            }
-            $parents[$className] = array_values(array_unique($resolved));
+            $parents[$type->name] = array_values(array_unique($typeParents));
         }
 
         return $parents;

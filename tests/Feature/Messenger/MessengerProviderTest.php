@@ -195,7 +195,7 @@ YAML;
         self::assertCount(2, $facts->handlers);
     }
 
-    public function testIgnoresAnonymousClassesWhenExtractingMessageInheritance(): void
+    public function testExtractsNamedMessageInheritanceInSourceOrder(): void
     {
         $converter = new PositionConverter();
         $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
@@ -210,6 +210,8 @@ YAML;
             <?php
             namespace App\Message;
 
+            use Vendor\Contracts\{ExternalMessage, Traceable as TraceableMessage};
+
             interface ParentMessage
             {
             }
@@ -218,7 +220,15 @@ YAML;
             {
             }
 
-            final class ChildMessage implements ParentMessage
+            interface ChildContract extends ParentMessage, ExternalMessage
+            {
+            }
+
+            abstract class BaseMessage implements TraceableMessage
+            {
+            }
+
+            final class ChildMessage extends BaseMessage implements ChildContract, Inner
             {
                 public function anonymous(): object
                 {
@@ -226,12 +236,24 @@ YAML;
                     };
                 }
             }
+
+            enum Status implements ChildContract, TraceableMessage
+            {
+                case Ready;
+            }
+
+            trait MessageTrait
+            {
+            }
             PHP));
 
         self::assertSame([
             'App\\Message\\ParentMessage' => [],
             'App\\Message\\Inner' => [],
-            'App\\Message\\ChildMessage' => ['App\\Message\\ParentMessage'],
+            'App\\Message\\ChildContract' => ['App\\Message\\ParentMessage', 'Vendor\\Contracts\\ExternalMessage'],
+            'App\\Message\\BaseMessage' => ['Vendor\\Contracts\\Traceable'],
+            'App\\Message\\ChildMessage' => ['App\\Message\\BaseMessage', 'App\\Message\\ChildContract', 'App\\Message\\Inner'],
+            'App\\Message\\Status' => ['App\\Message\\ChildContract', 'Vendor\\Contracts\\Traceable'],
         ], $facts->parents);
     }
 
@@ -384,7 +406,7 @@ services:
       - { name: messenger.message_handler, bus: missing.bus, from_transport: async }
 YAML;
         $messageUri = 'file:///workspace/src/Message/Ping.php';
-        $message = "<?php\nnamespace App\\Message;\ninterface DomainEvent {}\nfinal class Ping implements DomainEvent {}\n";
+        $message = "<?php\nnamespace App\\Message;\ninterface DomainEvent {}\ninterface IncompleteDeclaration\ninterface MessageContract extends DomainEvent {}\nfinal class Ping implements MessageContract {}\n";
         $handlerUri = 'file:///workspace/src/MessageHandler/PingHandler.php';
         $handler = "<?php\nnamespace App\\MessageHandler;\nuse App\\Message\\Ping;\nfinal class UnrelatedHandler { public function __invoke(string \$message): void {} }\nfinal class PingHandler { public function __invoke(Ping \$message): void {} }\nfinal class NullableStringHandler { public function handle(string|null \$message): void {} }\nfinal class ScalarUnionHandler { public function handle(string|int \$message): void {} }\n";
         $controllerUri = 'file:///workspace/src/Controller/PingController.php';
