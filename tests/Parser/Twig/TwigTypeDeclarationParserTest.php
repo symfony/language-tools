@@ -49,6 +49,26 @@ final class TwigTypeDeclarationParserTest extends TestCase
         ));
     }
 
+    public function testDecodesTypeLiteralsWithTwigQuoteSemantics(): void
+    {
+        $declarations = (new TwigTypeDeclarationParser(new TwigCommentParser()))->parse(<<<'TWIG'
+            {% types {
+                namespaced: 'App\Entity\numbers\Rate',
+                escaped: 'it\'s a \\ type',
+                interpreted: "tab\thex\x41octal\101",
+            } %}
+            TWIG);
+
+        self::assertSame([
+            ['namespaced', 'App\Entity\numbers\Rate'],
+            ['escaped', 'it\'s a \ type'],
+            ['interpreted', "tab\thexAoctalA"],
+        ], array_map(
+            static fn (TwigTypeDeclaration $declaration): array => [$declaration->name, $declaration->type],
+            $declarations,
+        ));
+    }
+
     public function testRecoversAroundUnclosedDirectives(): void
     {
         $parser = new TwigTypeDeclarationParser(new TwigCommentParser());

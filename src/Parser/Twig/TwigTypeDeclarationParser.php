@@ -4,14 +4,6 @@ namespace Symfony\Lsp\Parser\Twig;
 
 final class TwigTypeDeclarationParser
 {
-    private const SPECIAL_CHARACTERS = [
-        'f' => "\f",
-        'n' => "\n",
-        'r' => "\r",
-        't' => "\t",
-        'v' => "\v",
-    ];
-
     public function __construct(private readonly TwigCommentParser $commentParser)
     {
     }
@@ -214,7 +206,7 @@ final class TwigTypeDeclarationParser
                 if ($offset >= $end) {
                     break;
                 }
-                $tokens[] = $this->token('string', $this->decodeString(substr($source, $valueStart, $offset - $valueStart), $quote), $documentation);
+                $tokens[] = $this->token('string', TwigStringDecoder::decode(substr($source, $valueStart, $offset - $valueStart), $quote), $documentation);
                 $documentation = [];
                 ++$offset;
                 continue;
@@ -226,47 +218,6 @@ final class TwigTypeDeclarationParser
         }
 
         return $tokens;
-    }
-
-    private function decodeString(string $value, string $quote): string
-    {
-        $decoded = '';
-        $length = \strlen($value);
-        for ($offset = 0; $offset < $length; ++$offset) {
-            if ('\\' !== $value[$offset] || $offset + 1 >= $length) {
-                $decoded .= $value[$offset];
-                continue;
-            }
-            $character = $value[++$offset];
-            if (isset(self::SPECIAL_CHARACTERS[$character])) {
-                $decoded .= self::SPECIAL_CHARACTERS[$character];
-            } elseif ('\\' === $character || $quote === $character) {
-                $decoded .= $character;
-            } elseif ('#' === $character && '{' === ($value[$offset + 1] ?? null)) {
-                $decoded .= '#{';
-                ++$offset;
-            } elseif ('x' === $character && isset($value[$offset + 1]) && ctype_xdigit($value[$offset + 1])) {
-                $hexadecimal = $value[++$offset];
-                if (isset($value[$offset + 1]) && ctype_xdigit($value[$offset + 1])) {
-                    $hexadecimal .= $value[++$offset];
-                }
-                /** @var int<0, 255> $codepoint */
-                $codepoint = (int) hexdec($hexadecimal);
-                $decoded .= \chr($codepoint);
-            } elseif (ctype_digit($character) && $character < '8') {
-                $octal = $character;
-                while (isset($value[$offset + 1]) && ctype_digit($value[$offset + 1]) && $value[$offset + 1] < '8' && \strlen($octal) < 3) {
-                    $octal .= $value[++$offset];
-                }
-                /** @var int<0, 255> $codepoint */
-                $codepoint = (int) octdec($octal) % 256;
-                $decoded .= \chr($codepoint);
-            } else {
-                $decoded .= '\\'.$character;
-            }
-        }
-
-        return $decoded;
     }
 
     /**

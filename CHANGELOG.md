@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Decode single-quoted Twig type declarations with Twig's string rules
 - Bind PHP service and parameter completion to the `#[Autowire]` argument holding the cursor
 - Ignore anonymous classes in Messenger inheritance relationships
 - Diagnose missing event listener methods in classes with captured closures

@@ -51,8 +51,10 @@ attribute. Render calls recognize positional context arrays and the named
 templates also expose public component properties.
 
 Variables declared by Twig's ``types`` tag are completed with their declared
-type and required or optional status. Documentation comments attached to type
-declarations are included in completion details and hover.
+type and required or optional status. Declared types follow Twig's string
+escape semantics, so single-quoted types keep escape sequences such as ``\n``
+literal. Documentation comments attached to type declarations are included in
+completion details and hover.
 
 Symfony Language Tools doesn't infer values propagated through dynamic arrays,
 includes, inheritance or arbitrary PHP expressions.
