@@ -27,6 +27,7 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
         private readonly ConfigurationValueValidator $values,
         private readonly PhpConfigurationAnalyzer $php,
         private readonly XmlConfigurationAnalyzer $xml,
+        private readonly YamlIndentationAnalyzer $indentation,
         private readonly ConfigurationValidationReconciler $validation,
     ) {
     }
@@ -107,9 +108,8 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
                 $diagnostics[] = $this->diagnostic($occurrence->valueRange, 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $node->type, $key));
             }
         }
-        preg_match_all('/^\t+\S.*$/m', $document->text, $tabbedLines, \PREG_OFFSET_CAPTURE);
-        foreach ($tabbedLines[0] as [$line, $offset]) {
-            $diagnostics[] = $this->diagnostic($this->converter->toRange($document->text, $offset, \strlen($line)), 1, 'config.malformed_structure', 'YAML indentation cannot contain tabs.');
+        foreach ($this->indentation->tabIndentedLines($document->text) as $range) {
+            $diagnostics[] = $this->diagnostic($range, 1, 'config.malformed_structure', 'YAML indentation cannot contain tabs.');
         }
 
         return $diagnostics;

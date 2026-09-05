@@ -22,6 +22,7 @@ use Symfony\Lsp\Feature\Configuration\PhpConfigurationAnalyzer;
 use Symfony\Lsp\Feature\Configuration\ProjectConfigurationSnapshotLoader;
 use Symfony\Lsp\Feature\Configuration\XmlConfigurationAnalyzer;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
+use Symfony\Lsp\Feature\Configuration\YamlIndentationAnalyzer;
 use Symfony\Lsp\Feature\Environment\EnvironmentExpressionParser;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
@@ -1126,6 +1127,24 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame($this->protocolRange($fixture->converter, $text, $resourceOffset, \strlen('../shared.yaml')), $links[0]['range'] ?? null);
     }
 
+    public function testReportsTabbedYamlIndentationOutsideScalarContent(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $structural = "parameters:\n\tapp.name: Demo\n";
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $structural));
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+
+        self::assertSame(['config.malformed_structure'], array_column($diagnostics, 'code'));
+        self::assertSame(
+            $this->protocolRange($fixture->converter, $structural, (int) strpos($structural, "\t"), \strlen("\tapp.name: Demo")),
+            $diagnostics[0]['range'] ?? null,
+        );
+
+        $fixture->documents->update($uri, 2, "parameters:\n    app.script: |\n        all:\n        \techo hi\napp.msg: \"first\n\tsecond\"\n");
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
     public function testLinksOnlyYamlResourceValues(): void
     {
         $fixture = $this->providers();
@@ -1373,7 +1392,7 @@ final class ConfigurationProviderTest extends TestCase
         return new ConfigurationProviderFixture(
             new ConfigurationCompletionProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
             new ConfigurationHoverProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
-            new ConfigurationDiagnosticProvider($resolver, new ProjectPathResolver($uriConverter), $converter, $protocol, $indexes, $routeIndexes, $runtimeConfiguration, $yaml, $values, $php, $xml, $validationReconciler),
+            new ConfigurationDiagnosticProvider($resolver, new ProjectPathResolver($uriConverter), $converter, $protocol, $indexes, $routeIndexes, $runtimeConfiguration, $yaml, $values, $php, $xml, new YamlIndentationAnalyzer($converter, $documentParser), $validationReconciler),
             new ConfigurationDocumentLinkProvider($resolver, $converter, $protocol, $uriConverter, $documentParser),
             $documents,
             $converter,

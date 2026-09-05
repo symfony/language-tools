@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Report tabbed YAML indentation only where it structures the document
 - Link YAML configuration imports from parsed `resource` values only
 - Decode source-derived XLIFF translation keys once
 - Read event listener service tags from parsed YAML, including inline tags

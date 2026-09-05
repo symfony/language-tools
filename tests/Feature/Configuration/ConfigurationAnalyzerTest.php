@@ -3,7 +3,10 @@
 namespace Symfony\Lsp\Tests\Feature\Configuration;
 
 use Microsoft\PhpParser\Parser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\ConfigurationIndex;
 use Symfony\Lsp\Feature\Configuration\ConfigurationNode;
 use Symfony\Lsp\Feature\Configuration\PhpConfigurationAnalyzer;
@@ -11,9 +14,13 @@ use Symfony\Lsp\Feature\Configuration\PhpConfigurationOccurrence;
 use Symfony\Lsp\Feature\Configuration\XmlConfigurationAnalyzer;
 use Symfony\Lsp\Feature\Configuration\XmlConfigurationOccurrence;
 use Symfony\Lsp\Feature\Configuration\XmlConfigurationStructureError;
+use Symfony\Lsp\Feature\Configuration\YamlIndentationAnalyzer;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 
 final class ConfigurationAnalyzerTest extends TestCase
 {
@@ -137,6 +144,31 @@ final class ConfigurationAnalyzerTest extends TestCase
             ['path' => ['framework', 'router'], 'prefix' => 'ut', 'start' => \strlen($incomplete) - 2, 'alias' => '', 'attribute' => true],
             $analyzer->completionContext($incomplete, $index, \strlen($incomplete)),
         );
+    }
+
+    /** @param list<int> $lines */
+    #[DataProvider('yamlTabIndentationProvider')]
+    public function testReportsTabsOnlyInYamlStructuralIndentation(string $text, array $lines): void
+    {
+        $analyzer = new YamlIndentationAnalyzer(new PositionConverter(), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
+
+        self::assertSame($lines, array_map(static fn (Range $range): int => $range->start->line, $analyzer->tabIndentedLines($text)));
+    }
+
+    /** @return iterable<string, array{string, list<int>}> */
+    public static function yamlTabIndentationProvider(): iterable
+    {
+        yield 'tabbed mapping key' => ["parameters:\n\tapp.name: Demo\n", [1]];
+        yield 'tab after leading spaces' => ["parameters:\n  \tapp.name: Demo\n", [1]];
+        yield 'tabbed sequence item' => ["parameters:\n    app.list:\n\t- one\n", [2]];
+        yield 'block literal content' => ["parameters:\n    app.script: |\n        all:\n        \techo hi\n", []];
+        yield 'block folded content' => ["parameters:\n    app.note: >\n        first\n        \tsecond\n", []];
+        yield 'mapping key after a block scalar' => ["parameters:\n    app.script: |\n        line\n\tapp.name: Demo\n", [3]];
+        yield 'quoted continuation' => ["app.msg: \"first\n\tsecond\"\n", []];
+        yield 'quoted continuation at the mapping indentation' => ["parameters:\n    app.msg: \"first\n    \tsecond\"\n", []];
+        yield 'plain continuation at the mapping indentation' => ["parameters:\n    app.msg: first\n    \tsecond\n", [2]];
+        yield 'plain continuation below the mapping' => ["parameters:\n    app.msg: first\n        \tsecond\n", []];
+        yield 'tabbed key separator and value' => ["parameters:\n    app.name:\tDemo\n    app.other: a\tb\n", []];
     }
 
     private function index(): ConfigurationIndex
