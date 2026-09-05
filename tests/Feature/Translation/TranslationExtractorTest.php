@@ -177,6 +177,7 @@ final class TranslationExtractorTest extends TestCase
             mautic.api.noted = Saved  ; keep the note out
             mautic.api.empty =
             mautic.api.quoted = "API authorization denied."
+            mautic.api.escaped = "Say \"hello\" from C:\\Temp."
             mautic.api.invalid = Denied (for now)
             INI));
 
@@ -186,6 +187,7 @@ final class TranslationExtractorTest extends TestCase
                 ['mautic.api.noted', 'Saved', []],
                 ['mautic.api.empty', '', []],
                 ['mautic.api.quoted', 'API authorization denied.', []],
+                ['mautic.api.escaped', 'Say "hello" from C:\\Temp.', []],
             ],
             array_map(
                 static fn ($item): array => [$item->key, $item->message, $item->placeholders()],

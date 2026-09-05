@@ -115,7 +115,8 @@ final class TranslationCatalogExtractor
         foreach ($matches[1] as $i => [$key, $offset]) {
             [$quoted, $quotedOffset] = $matches[2][$i];
             if (-1 !== $quotedOffset) {
-                $result[] = $this->declaration($key, $quoted, $domain, $locale, $uri, $text, $offset);
+                $message = preg_replace('/\\\\(["\\\\])/', '$1', $quoted) ?? $quoted;
+                $result[] = $this->declaration($key, $message, $domain, $locale, $uri, $text, $offset);
                 continue;
             }
             $message = rtrim($matches[3][$i][0]);
