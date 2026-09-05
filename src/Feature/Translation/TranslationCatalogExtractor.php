@@ -223,17 +223,35 @@ final class TranslationCatalogExtractor
         $sources = [];
         $targets = [];
         $nearestUnits = [];
-        foreach ($document->elements() as $element) {
-            $nearestUnit = null === $element->parentIdentity ? null : ($nearestUnits[$element->parentIdentity] ?? null);
-            if (\in_array($element->localName, ['trans-unit', 'unit'], true)) {
-                $nearestUnit = $element->identity;
-                $units[] = $element;
-            } elseif (null !== $nearestUnit && 'source' === $element->localName) {
-                $sources[$nearestUnit] ??= $element;
-            } elseif (null !== $nearestUnit && 'target' === $element->localName) {
-                $targets[$nearestUnit] ??= $element;
+        $textOwners = [];
+        $textValues = [];
+        foreach ($document->events as $event) {
+            if ($event instanceof XmlElementStart) {
+                $nearestUnit = null === $event->parentIdentity ? null : ($nearestUnits[$event->parentIdentity] ?? null);
+                if (\in_array($event->localName, ['trans-unit', 'unit'], true)) {
+                    $nearestUnit = $event->identity;
+                    $units[] = $event;
+                }
+                $nearestUnits[$event->identity] = $nearestUnit;
+
+                $textOwner = null === $event->parentIdentity ? null : ($textOwners[$event->parentIdentity] ?? null);
+                if (null !== $nearestUnit && 'source' === $event->localName) {
+                    $sources[$nearestUnit] ??= $event;
+                    $textOwner = $event->identity;
+                    $textValues[$textOwner] = '';
+                } elseif (null !== $nearestUnit && 'target' === $event->localName) {
+                    $targets[$nearestUnit] ??= $event;
+                    $textOwner = $event->identity;
+                    $textValues[$textOwner] = '';
+                }
+                $textOwners[$event->identity] = $textOwner;
+
+                continue;
             }
-            $nearestUnits[$element->identity] = $nearestUnit;
+            if (!$event instanceof XmlText || null === $event->parentIdentity || null === $textOwner = $textOwners[$event->parentIdentity] ?? null) {
+                continue;
+            }
+            $textValues[$textOwner] .= XmlTextKind::Cdata === $event->kind ? $event->raw : $this->xliffDecoder->decode($event->raw);
         }
 
         $result = [];
@@ -246,7 +264,7 @@ final class TranslationCatalogExtractor
                 $keyOffset = $name->valueStartOffset;
                 $keyLength = $name->valueEndOffset - $name->valueStartOffset;
             } elseif (null !== $source) {
-                $key = $this->xliffText($document, $source, $target);
+                $key = $textValues[$source->identity] ?? '';
                 [$keyOffset, $keyEnd] = $this->xliffContentRange($document, $source, $target, $unit, \strlen($text));
                 $keyLength = $keyEnd - $keyOffset;
             } elseif (null !== $id = $unit->attribute('id')) {
@@ -260,27 +278,10 @@ final class TranslationCatalogExtractor
             if (null === $messageElement) {
                 continue;
             }
-            $message = $this->xliffText($document, $messageElement);
-            $result[] = $this->declaration($key, $message, $domain, $locale, $uri, $text, $keyOffset, $keyLength);
+            $result[] = $this->declaration($key, $textValues[$messageElement->identity] ?? '', $domain, $locale, $uri, $text, $keyOffset, $keyLength);
         }
 
         return $result;
-    }
-
-    private function xliffText(XmlDocument $document, XmlElementStart $element, ?XmlElementStart $excluded = null): string
-    {
-        $value = '';
-        foreach ($document->events as $event) {
-            if (!$event instanceof XmlText || !$document->isDescendantOf($event->parentIdentity, $element->identity)) {
-                continue;
-            }
-            if (null !== $excluded && $document->isDescendantOf($event->parentIdentity, $excluded->identity)) {
-                continue;
-            }
-            $value .= XmlTextKind::Cdata === $event->kind ? $event->raw : $this->xliffDecoder->decode($event->raw);
-        }
-
-        return $value;
     }
 
     /** @return array{int, int} */
