@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Tools\Dogfood;
 
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
+
 final class ProbeFinder
 {
     public const DEFAULT_ROOTS = ['src', 'templates', 'config'];
@@ -15,11 +17,11 @@ final class ProbeFinder
         ['category' => 'template.twig', 'files' => '{\.twig$}', 'pattern' => '{\b(?:extends|include|embed|import|from|use)\s+[\'\"]([^\'\"]+\.twig)}'],
         ['category' => 'twig.constant', 'files' => '{\.twig$}', 'pattern' => '{\bconstant\(\s*[\'\"]App\\\\[A-Za-z0-9_\\\\]+::([A-Za-z_][A-Za-z0-9_]*)}'],
         ['category' => 'twig.enum', 'files' => '{\.twig$}', 'pattern' => '{\benum\(\s*[\'\"]App\\\\[A-Za-z0-9_\\\\]+[\'\"]\s*\)\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)}'],
-        ['category' => 'component.twig', 'files' => '{\.twig$}', 'pattern' => '{<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\b}'],
-        ['category' => 'stimulus.controller.twig', 'files' => '{\.twig$}', 'pattern' => '{\bdata-controller\s*=\s*[\'"][^\'"]*?([A-Za-z0-9_@./-]+)}'],
-        ['category' => 'stimulus.action.twig', 'files' => '{\.twig$}', 'pattern' => '{\bdata-action\s*=\s*[\'"][^\'"]*?(?:[^\s\'"]+->)?[A-Za-z0-9_@./-]+#([A-Za-z_$][A-Za-z0-9_$]*)}'],
+        ['category' => 'component.twig', 'files' => '{\.twig$}', 'markup' => true, 'pattern' => '{<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\b}'],
+        ['category' => 'stimulus.controller.twig', 'files' => '{\.twig$}', 'markup' => true, 'pattern' => '{\bdata-controller\s*=\s*[\'"][^\'"]*?([A-Za-z0-9_@./-]+)}'],
+        ['category' => 'stimulus.action.twig', 'files' => '{\.twig$}', 'markup' => true, 'pattern' => '{\bdata-action\s*=\s*[\'"][^\'"]*?(?:[^\s\'"]+->)?[A-Za-z0-9_@./-]+#([A-Za-z_$][A-Za-z0-9_$]*)}'],
         ['category' => 'stimulus.helper.twig', 'files' => '{\.twig$}', 'pattern' => '{(?<![.\w])stimulus_controller\s*\(\s*[\'"]([A-Za-z0-9_@./-]+)}'],
-        ['category' => 'live.action.twig', 'files' => '{\.twig$}', 'pattern' => '{\bdata-live-action-param\s*=\s*[\'"](?:[^\'"]*\|)?([A-Za-z_][A-Za-z0-9_]*)}'],
+        ['category' => 'live.action.twig', 'files' => '{\.twig$}', 'markup' => true, 'pattern' => '{\bdata-live-action-param\s*=\s*[\'"](?:[^\'"]*\|)?([A-Za-z_][A-Za-z0-9_]*)}'],
         ['category' => 'live.event.php', 'files' => '{\.php$}', 'pattern' => '{\bemit\s*\(\s*[\'"]([^\'"]+)}'],
         ['category' => 'asset.twig', 'files' => '{\.twig$}', 'pattern' => '{\basset\s*\(\s*[\'\"]([A-Za-z0-9_@.-][A-Za-z0-9_@./-]*)[\'\"]\s*\)}'],
         ['category' => 'importmap.twig', 'files' => '{\.twig$}', 'pattern' => '{(?<![.\w])importmap\s*\(\s*(?:\[\s*)?[\'\"]([A-Za-z0-9_@./-]+)}'],
@@ -45,6 +47,7 @@ final class ProbeFinder
     public function __construct(
         private array $roots = self::DEFAULT_ROOTS,
         private int $probesPerCategory = 1,
+        private readonly TwigDirectiveLocator $directives = new TwigDirectiveLocator(),
     ) {
     }
 
@@ -67,7 +70,7 @@ final class ProbeFinder
                 if (isset($definition['requiredText']) && !str_contains($contents, $definition['requiredText'])) {
                     continue;
                 }
-                $probe = $this->match($definition['category'], $definition['pattern'], $path, $contents);
+                $probe = $this->match($definition['category'], $definition['pattern'], $path, $contents, isset($definition['markup']));
                 if (null !== $probe) {
                     $probes[] = $probe;
                     ++$found;
@@ -139,13 +142,16 @@ final class ProbeFinder
         return $probes;
     }
 
-    private function match(string $category, string $pattern, string $path, string $contents): ?Probe
+    private function match(string $category, string $pattern, string $path, string $contents, bool $markup = false): ?Probe
     {
         if (false === preg_match_all($pattern, $contents, $matches, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
         foreach ($matches[1] as [$value, $offset]) {
             if ('' === $value || $this->isCommented($path, $contents, $offset)) {
+                continue;
+            }
+            if ($markup && $this->directives->insideDirective($contents, $offset)) {
                 continue;
             }
 

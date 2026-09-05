@@ -56,6 +56,32 @@ final class TwigComponentExtractorTest extends TestCase
         );
     }
 
+    public function testExtractsComponentMarkupOnlyFromRenderedMarkup(): void
+    {
+        $facts = $this->extractor()->extract(
+            new Project('/workspace', 'file:///workspace'),
+            new SourceDocument('file:///workspace/templates/page.html.twig',
+                'twig',
+                <<<'TWIG'
+                {% if enabled %}<twig:Alert data-live-action-param="save" />{% endif %}
+                {# <twig:Commented data-live-action-param="commented" /> #}
+                {{ '<twig:Stringy data-live-action-param="stringy" />' }}
+                {% set markup = "<twig:Coded data-live-action-param='coded' />" %}
+                {% verbatim %}<twig:Verbatim data-live-action-param="verbatim" />{% endverbatim %}
+                <twig:Dynamic data-live-action-param="{{ action }}" />
+                TWIG),
+        );
+
+        self::assertSame(
+            ['Alert', 'Dynamic'],
+            array_map(static fn ($reference): string => $reference->name, $facts->references),
+        );
+        self::assertSame(
+            [['Alert', 'save']],
+            array_map(static fn ($reference): array => [$reference->component, $reference->action], $facts->actionReferences),
+        );
+    }
+
     public function testDecodesEscapedTwigComponentNames(): void
     {
         $facts = $this->extractor()->extract(
@@ -95,7 +121,6 @@ final class TwigComponentExtractorTest extends TestCase
                 $names,
                 new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
                 new TwigCallArgumentResolver(new TwigArgumentParser()),
-                $comments,
             ),
         );
     }

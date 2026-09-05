@@ -6,7 +6,6 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Twig\TwigStringLiteral;
@@ -21,7 +20,6 @@ final class StimulusReferenceExtractor
 
     public function __construct(
         private readonly PositionConverter $converter,
-        private readonly TwigCommentParser $commentParser,
         private readonly JavaScriptSourceAnalyzer $codeMasker,
         private readonly StimulusControllerNameNormalizer $controllerNameNormalizer,
         private readonly TwigDocumentParser $parser,
@@ -54,12 +52,13 @@ final class StimulusReferenceExtractor
     /** @return list<StimulusReference> */
     public function extractTwig(string $uri, string $text): array
     {
-        $source = $this->commentParser->mask($text);
+        $document = $this->parser->parse($text);
+        $source = $document->markup();
         $references = [];
         preg_match_all('/\bdata-controller\s*=\s*([\'"])(.*?)\1/s', $source, $attributes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($attributes as $attribute) {
             $value = $attribute[2][0];
-            if (str_contains($value, '{{') || str_contains($value, '{%')) {
+            if ($this->interpolated($text, $attribute[2][1], \strlen($value))) {
                 continue;
             }
             $this->appendControllerTokens($references, $uri, $text, $value, $attribute[2][1]);
@@ -86,15 +85,14 @@ final class StimulusReferenceExtractor
                 $references[] = new StimulusReference($controller, StimulusMemberKind::Target, $name, $uri, $this->converter->toRange($text, $valueOffset + $offset, \strlen($name)));
             }
         }
-        array_push($references, ...$this->helperReferences($uri, $text));
+        array_push($references, ...$this->helperReferences($document, $uri, $text));
 
         return $references;
     }
 
     /** @return list<StimulusReference> */
-    private function helperReferences(string $uri, string $text): array
+    private function helperReferences(TwigDocument $document, string $uri, string $text): array
     {
-        $document = $this->parser->parse($text);
         $references = [];
         foreach ($document->nodesOfType('function_call') as $call) {
             $identifier = $document->directChild($call, 'function_identifier');
@@ -129,6 +127,13 @@ final class StimulusReferenceExtractor
     private function range(string $text, TwigStringLiteral $literal): Range
     {
         return $this->converter->toRange($text, $literal->startOffset, $literal->endOffset - $literal->startOffset);
+    }
+
+    private function interpolated(string $text, int $offset, int $length): bool
+    {
+        $raw = substr($text, $offset, $length);
+
+        return str_contains($raw, '{{') || str_contains($raw, '{%');
     }
 
     /** @param list<StimulusReference> $references */

@@ -44,6 +44,10 @@ arguments, including calls chained on the same expression. Look-alike text in
 strings, comments and ``verbatim`` blocks and helper names called on an object
 are ignored.
 
+``data-controller``, ``data-action`` and ``data-*-target`` attributes are
+recognized only where a template renders them as markup, and only when their
+value is static. Attribute values built from a Twig expression are ignored.
+
 An unknown static controller name is reported only after all registered
 controllers are known. Unknown actions and targets aren't diagnosed because
 controllers can inherit or register them dynamically.

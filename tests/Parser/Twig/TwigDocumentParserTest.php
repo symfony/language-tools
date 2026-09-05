@@ -118,6 +118,36 @@ final class TwigDocumentParserTest extends TestCase
         self::assertSame('plain', TwigStringDecoder::decode('plain', '"'));
     }
 
+    public function testKeepsOnlyRenderedMarkupInTheMarkupView(): void
+    {
+        $source = <<<'TWIG'
+            <div data-controller="real"><twig:Alert /></div>
+            {# <twig:Comment data-controller="comment" /> #}
+            {{ '<twig:String data-controller="string" />' }}
+            {% set markup = "<twig:Code data-controller='code' />" %}
+            {% verbatim %}<twig:Verbatim data-controller="verbatim" />{% endverbatim %}
+            {% if enabled %}<twig:Guarded /></div>{% endif %}
+            TWIG;
+
+        $markup = $this->parser()->parse($source)->markup();
+
+        self::assertSame(\strlen($source), \strlen($markup));
+        self::assertSame(substr_count($source, "\n"), substr_count($markup, "\n"));
+        foreach (['real', 'Alert', 'Guarded'] as $rendered) {
+            self::assertStringContainsString($rendered, $markup);
+        }
+        foreach (['comment', 'string', 'code', 'verbatim'] as $hidden) {
+            self::assertStringNotContainsString($hidden, $markup);
+        }
+    }
+
+    public function testKeepsUnrecoverableRegionsReadableInTheMarkupView(): void
+    {
+        $source = "<div data-controller=\"before\">\n{{ unclosed\n<div data-controller=\"after\">";
+
+        self::assertSame($source, $this->parser()->parse($source)->markup());
+    }
+
     public function testLocatesDirectiveContexts(): void
     {
         $locator = new TwigDirectiveLocator();

@@ -79,6 +79,11 @@ and actions are included in completion and navigation. Unknown
 static component names are reported only after all registered components,
 including bundle components, are known.
 
+``<twig:...>`` tags and ``data-live-action-param`` attributes are recognized
+only where a template renders them as markup. Look-alike text in comments,
+strings, Twig statements and ``verbatim`` blocks is ignored, and so are action
+names built from a Twig expression.
+
 Stimulus controllers and Live Component actions and events are documented in
 `Stimulus and Live Components`_.
 

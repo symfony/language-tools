@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 
@@ -15,14 +14,13 @@ final class TwigComponentTemplateExtractor
         private readonly TwigComponentNameResolver $names,
         private readonly TwigDocumentParser $parser,
         private readonly TwigCallArgumentResolver $arguments,
-        private readonly TwigCommentParser $comments,
     ) {
     }
 
     public function extract(Project $project, string $uri, string $text): TwigComponentSourceFacts
     {
         $document = $this->parser->parse($text);
-        $masked = $this->comments->mask($text);
+        $masked = $document->markup();
         $name = $this->names->anonymous($project, $uri);
         $components = [];
         if (null !== $name) {
@@ -45,17 +43,13 @@ final class TwigComponentTemplateExtractor
                 $attributesOffset = $componentTag[2][1];
                 preg_match_all('/\bdata-live-action-param\s*=\s*([\'"])([^\'"]+)\1/', $attributes, $actionAttributes, \PREG_OFFSET_CAPTURE);
                 foreach ($actionAttributes[2] as [$actionValue, $actionOffset]) {
-                    $action = $this->liveActionName($actionValue);
-                    $offset = $attributesOffset + $actionOffset + (int) strrpos($actionValue, $action);
-                    $actionReferences[] = new TwigComponentActionReference($componentTag[1][0], $action, $uri, $this->converter->toRange($text, $offset, \strlen($action)));
+                    $this->appendLiveAction($actionReferences, $componentTag[1][0], $uri, $text, $actionValue, $attributesOffset + $actionOffset);
                 }
             }
         } else {
             preg_match_all('/\bdata-live-action-param\s*=\s*([\'"])([^\'"]+)\1/', $masked, $actionAttributes, \PREG_OFFSET_CAPTURE);
             foreach ($actionAttributes[2] as [$actionValue, $actionOffset]) {
-                $action = $this->liveActionName($actionValue);
-                $offset = $actionOffset + (int) strrpos($actionValue, $action);
-                $actionReferences[] = new TwigComponentActionReference($name, $action, $uri, $this->converter->toRange($text, $offset, \strlen($action)));
+                $this->appendLiveAction($actionReferences, $name, $uri, $text, $actionValue, $actionOffset);
             }
         }
 
@@ -87,6 +81,18 @@ final class TwigComponentTemplateExtractor
         }
 
         return new TwigComponentSourceFacts($uri, $components, $references, $actionReferences);
+    }
+
+    /** @param list<TwigComponentActionReference> $references */
+    private function appendLiveAction(array &$references, string $component, string $uri, string $text, string $value, int $valueOffset): void
+    {
+        $raw = substr($text, $valueOffset, \strlen($value));
+        if (str_contains($raw, '{{') || str_contains($raw, '{%')) {
+            return;
+        }
+        $action = $this->liveActionName($value);
+        $offset = $valueOffset + (int) strrpos($value, $action);
+        $references[] = new TwigComponentActionReference($component, $action, $uri, $this->converter->toRange($text, $offset, \strlen($action)));
     }
 
     private function liveActionName(string $value): string

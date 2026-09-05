@@ -46,7 +46,7 @@ final class StimulusProviderTest extends TestCase
         $controllerNameNormalizer = new StimulusControllerNameNormalizer();
         $extractor = new StimulusExtractor(
             new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $codeMasker, $controllerNameNormalizer),
-            new StimulusReferenceExtractor($converter, $comments, $codeMasker, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser())),
+            new StimulusReferenceExtractor($converter, $codeMasker, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser())),
             new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer),
         );
         $controllerUri = 'file:///workspace/assets/controllers/search_controller.js';

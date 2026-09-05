@@ -731,7 +731,6 @@ final class TemplateProviderTest extends TestCase
                 $names,
                 new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
                 new TwigCallArgumentResolver(new TwigArgumentParser()),
-                $comments,
             ),
         );
     }

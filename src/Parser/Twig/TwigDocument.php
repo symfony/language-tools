@@ -7,6 +7,10 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterTree;
 
 final class TwigDocument
 {
+    private const CODE_NODE_TYPES = ['output_directive', 'statement_directive', 'comment'];
+
+    private ?string $markup = null;
+
     public function __construct(
         private readonly string $source,
         private readonly string $masked,
@@ -17,6 +21,31 @@ final class TwigDocument
     public function hasErrors(): bool
     {
         return $this->tree->hasError;
+    }
+
+    /**
+     * Returns the masked source with every recognized Twig directive blanked,
+     * leaving only the bytes a template renders as markup. Unrecoverable
+     * regions stay readable so partially typed templates keep their markup.
+     */
+    public function markup(): string
+    {
+        if (null !== $this->markup) {
+            return $this->markup;
+        }
+        $markup = $this->masked;
+        foreach (self::CODE_NODE_TYPES as $type) {
+            foreach ($this->tree->nodesOfType($type) as $node) {
+                for ($offset = $node->startByte; $offset < $node->endByte; ++$offset) {
+                    $byte = $markup[$offset];
+                    if ("\r" !== $byte && "\n" !== $byte && \ord($byte) < 0x80) {
+                        $markup[$offset] = ' ';
+                    }
+                }
+            }
+        }
+
+        return $this->markup = $markup;
     }
 
     /** @return list<TreeSitterNode> */

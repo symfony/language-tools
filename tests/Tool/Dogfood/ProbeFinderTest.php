@@ -127,6 +127,17 @@ final class ProbeFinderTest extends TestCase
         $this->assertPositionInsideValue($probes[0]);
     }
 
+    public function testSkipsMarkupMatchesInsideTwigDirectives(): void
+    {
+        $this->write('templates/page.html.twig', <<<'TWIG'
+            {% set snippet = "<twig:Stringy data-controller='stringy' />" %}
+            <twig:Rendered data-controller="rendered" />
+            TWIG);
+
+        self::assertSame('Rendered', $this->probes(new ProbeFinder(), 'component.twig')[0]->value);
+        self::assertSame('rendered', $this->probes(new ProbeFinder(), 'stimulus.controller.twig')[0]->value);
+    }
+
     public function testFindsTwigStimulusHelperControllersOutsideMethodCalls(): void
     {
         $this->write('templates/layout.html.twig', "{{ helpers.stimulus_controller('ignored') }}\n{{ stimulus_controller('search') }}\n");

@@ -116,6 +116,31 @@ final class StimulusExtractorTest extends TestCase
         self::assertSame(['real'], array_map(static fn ($reference): string => $reference->controller, $facts->references));
     }
 
+    public function testExtractsStimulusAttributesOnlyFromRenderedMarkup(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+        $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+            {% if enabled %}
+                <div data-controller="chart" data-action="click->chart#open" data-chart-target="results"></div>
+            {% endif %}
+            {# <div data-controller="comment"></div> #}
+            {{ '<div data-controller="string" data-string-target="hidden"></div>' }}
+            {% set markup = "<div data-controller='code' data-code-target='hidden'></div>" %}
+            {% verbatim %}<div data-controller="verbatim"></div>{% endverbatim %}
+            <div data-controller="{{ dynamic }}" data-dynamic-target="{{ dynamic }}"></div>
+            TWIG));
+
+        self::assertSame(
+            [
+                ['chart', null, null],
+                ['chart', null, null],
+                ['chart', 'action', 'open'],
+                ['chart', 'target', 'results'],
+            ],
+            array_map(static fn ($reference): array => [$reference->controller, $reference->kind?->value, $reference->member], $facts->references),
+        );
+    }
+
     public function testExtractsStaticTwigHelperCallsConservatively(): void
     {
         $project = new Project('/workspace', 'file:///workspace');
@@ -172,7 +197,7 @@ final class StimulusExtractorTest extends TestCase
 
         return new StimulusExtractor(
             new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $codeMasker, $controllerNameNormalizer),
-            new StimulusReferenceExtractor($converter, $comments, $codeMasker, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser())),
+            new StimulusReferenceExtractor($converter, $codeMasker, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser())),
             new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer),
         );
     }
