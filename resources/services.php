@@ -66,7 +66,6 @@ use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpExpressionParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 use Symfony\Lsp\Parser\TreeSitter\LastResultTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
@@ -198,7 +197,6 @@ return static function (ContainerConfigurator $container): void {
     $services->set(YamlScalarDecoder::class);
     $services->set(BalancedDelimiterMatcher::class);
     $services->set(PhpCapturedReceiverResolver::class);
-    $services->set(QuotedArgumentMatcher::class);
     $services->set(TwigCallArgumentResolver::class);
     $services->set(CommentParserRegistry::class)
         ->arg('$parsers', [
