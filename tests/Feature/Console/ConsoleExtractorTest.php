@@ -79,10 +79,18 @@ final class ConsoleExtractorTest extends TestCase
 
             final class ImportCommand extends BaseInvokableCommand
             {
+                use SharedDefinition {
+                    configure as sharedConfigure;
+                }
+
                 public function __invoke(
                     #[Argument] string $sourcePath,
                     #[Option(name: 'dry-run')] bool $dryRun,
                     #[Option('Description', 'output-format')] string $format,
+                    #[\SensitiveParameter]
+                    #[Option] bool $dryRunHTTP,
+                    #[Deprecated, Argument] string $targetPath,
+                    #[Option(description: 'Runs quietly')] bool $quietMode,
                 ): int {
                     return 0;
                 }
@@ -100,8 +108,10 @@ final class ConsoleExtractorTest extends TestCase
         self::assertSame(['color', 'out"put'], $declarations['App\Command\ReportCommand']->options);
         self::assertSame(['App\Command\SharedDefinition'], $declarations['App\Command\ReportCommand']->traits);
         self::assertTrue($declarations['App\Command\ReportCommand']->complete);
-        self::assertSame(['source-path'], $declarations['App\Command\ImportCommand']->arguments);
-        self::assertSame(['dry-run', 'output-format'], $declarations['App\Command\ImportCommand']->options);
+        self::assertSame(['source-path', 'target-path'], $declarations['App\Command\ImportCommand']->arguments);
+        self::assertSame(['dry-run', 'dry-run-http', 'output-format', 'quiet-mode'], $declarations['App\Command\ImportCommand']->options);
+        self::assertSame(['App\Command\SharedDefinition'], $declarations['App\Command\ImportCommand']->traits);
+        self::assertTrue($declarations['App\Command\ImportCommand']->complete);
 
         self::assertSame(['report\name', 'out"put'], array_map(static fn ($reference): string => $reference->name, $facts->references));
         self::assertSame([ConsoleInputKind::Argument, ConsoleInputKind::Option], array_map(static fn ($reference): ConsoleInputKind => $reference->kind, $facts->references));
@@ -290,10 +300,21 @@ final class ConsoleExtractorTest extends TestCase
                     return 0;
                 }
             }
+
+            #[AsCommand]
+            final class SpreadInvokableCommand
+            {
+                public function __invoke(#[Option(...$definition)] bool $enabled = false): int
+                {
+                    return 0;
+                }
+            }
             PHP));
 
         self::assertFalse($facts->declarations[0]->complete);
         self::assertFalse($facts->declarations[1]->complete);
+        self::assertSame([], $facts->declarations[2]->options);
+        self::assertFalse($facts->declarations[2]->complete);
     }
 
     public function testCompletesOnlyInputInterfaceReceiversWithIncompleteSyntax(): void
@@ -362,6 +383,23 @@ final class ConsoleExtractorTest extends TestCase
         self::assertFalse($facts->declarations[0]->complete);
     }
 
+    public function testKeepsInvokableParameterNamesFromIncompleteSource(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/DraftCommand.php', 'php', <<<'PHP'
+            <?php
+            use Symfony\Component\Console\Attribute\AsCommand;
+            use Symfony\Component\Console\Attribute\Option;
+
+            #[AsCommand]
+            final class DraftCommand
+            {
+                public function __invoke(
+                    #[Option] bool $dryRun,
+            PHP));
+
+        self::assertSame(['dry-run'], $facts->declarations[0]->options);
+    }
+
     public function testReadsCommentedDefinitionsFromASingleDocumentParse(): void
     {
         $text = <<<'PHP'
@@ -388,7 +426,7 @@ final class ConsoleExtractorTest extends TestCase
             $parser,
             new PhpCommentParser(),
             new ConsoleDefinitionExtractor(),
-            new ConsoleInvokableParameterExtractor($delimiters),
+            new ConsoleInvokableParameterExtractor(),
             new ConsoleInputReceiverResolver(new PhpCapturedReceiverResolver($delimiters)),
         );
 
@@ -507,7 +545,7 @@ final class ConsoleExtractorTest extends TestCase
             new TolerantPhpParser(new Parser()),
             new PhpCommentParser(),
             new ConsoleDefinitionExtractor(),
-            new ConsoleInvokableParameterExtractor($delimiters),
+            new ConsoleInvokableParameterExtractor(),
             new ConsoleInputReceiverResolver(new PhpCapturedReceiverResolver($delimiters)),
         );
     }

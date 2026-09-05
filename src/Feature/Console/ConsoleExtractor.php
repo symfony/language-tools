@@ -109,7 +109,7 @@ final class ConsoleExtractor
     private function declaration(string $text, PhpDocument $php, PhpTypeDeclaration $type): ConsoleCommandDeclaration
     {
         [$arguments, $options, $complete] = $this->definitionExtractor->extract($text, $php, $type);
-        [$traits, $attributeArguments, $attributeOptions, $attributesComplete] = $this->invokableParameterExtractor->extract($text, $php, $type);
+        [$traits, $attributeArguments, $attributeOptions, $attributesComplete] = $this->invokableParameterExtractor->extract($php, $type);
         $arguments = array_values(array_unique([...$arguments, ...$attributeArguments]));
         $options = array_values(array_unique([...$options, ...$attributeOptions]));
         sort($arguments);

@@ -76,7 +76,7 @@ final class ConsoleSourceIndexerTest extends TestCase
             new TolerantPhpParser(new Parser()),
             new PhpCommentParser(),
             new ConsoleDefinitionExtractor(),
-            new ConsoleInvokableParameterExtractor($delimiters),
+            new ConsoleInvokableParameterExtractor(),
             new ConsoleInputReceiverResolver(new PhpCapturedReceiverResolver($delimiters)),
         ));
     }

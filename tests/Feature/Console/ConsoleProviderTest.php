@@ -127,6 +127,63 @@ final class ConsoleProviderTest extends TestCase
         self::assertSame([], $incompleteSection->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
+    public function testCompletesInvokableAttributeAndAdaptedTraitInputNames(): void
+    {
+        $uri = 'file:///workspace/src/Command/ImportCommand.php';
+        $text = <<<'PHP'
+            <?php
+            namespace App\Command;
+
+            use Symfony\Component\Console\Attribute\Argument;
+            use Symfony\Component\Console\Attribute\AsCommand;
+            use Symfony\Component\Console\Attribute\Option;
+            use Symfony\Component\Console\Input\InputInterface;
+
+            trait SharedDefinition
+            {
+                protected function configure(): void
+                {
+                    $this->addArgument('shared');
+                }
+
+                public function report(): void
+                {
+                }
+            }
+
+            #[AsCommand]
+            final class ImportCommand
+            {
+                use SharedDefinition {
+                    report as importReport;
+                }
+
+                public function __invoke(
+                    InputInterface $input,
+                    #[\SensitiveParameter]
+                    #[Argument]
+                    string $sourcePath,
+                    #[Deprecated, Option(name: 'dry-run')]
+                    bool $dryRun = false,
+                ): int {
+                    $input->getOption('d');
+                    $input->getArgument('s');
+
+                    return 0;
+                }
+            }
+            PHP;
+        [$provider, $converter] = $this->provider($uri, $text);
+        $optionCursor = strpos($text, "getOption('d") + \strlen("getOption('d");
+        $argumentCursor = strpos($text, "getArgument('s") + \strlen("getArgument('s");
+
+        $options = $provider->complete($this->params($uri, $converter->toPosition($text, $optionCursor)));
+        $arguments = $provider->complete($this->params($uri, $converter->toPosition($text, $argumentCursor)));
+
+        self::assertSame(['dry-run'], array_column($options ?? [], 'label'));
+        self::assertSame(['shared', 'source-path'], array_column($arguments ?? [], 'label'));
+    }
+
     public function testReturnsEmptyAndUnrelatedCompletionContextsPrecisely(): void
     {
         $uri = 'file:///workspace/src/Command/EmptyCommand.php';
@@ -166,7 +223,7 @@ final class ConsoleProviderTest extends TestCase
             new TolerantPhpParser(new Parser()),
             new PhpCommentParser(),
             new ConsoleDefinitionExtractor(),
-            new ConsoleInvokableParameterExtractor($delimiters),
+            new ConsoleInvokableParameterExtractor(),
             new ConsoleInputReceiverResolver(new PhpCapturedReceiverResolver($delimiters)),
         );
         $sourceIndexes = new ConsoleSourceIndexRegistry();

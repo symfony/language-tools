@@ -2,9 +2,10 @@
 
 namespace Symfony\Lsp\Feature\Console;
 
-use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
+use Symfony\Lsp\Parser\Php\PhpArgument;
+use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpDocument;
-use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
+use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
 
 final class ConsoleInvokableParameterExtractor
@@ -12,138 +13,69 @@ final class ConsoleInvokableParameterExtractor
     private const ARGUMENT_ATTRIBUTE = 'Symfony\\Component\\Console\\Attribute\\Argument';
     private const OPTION_ATTRIBUTE = 'Symfony\\Component\\Console\\Attribute\\Option';
 
-    public function __construct(private readonly BalancedDelimiterMatcher $delimiters)
-    {
-    }
-
     /** @return array{list<string>, list<string>, list<string>, bool} */
-    public function extract(string $text, PhpDocument $php, PhpTypeDeclaration $type): array
+    public function extract(PhpDocument $php, PhpTypeDeclaration $type): array
     {
-        $range = $this->methodParameterRange($text, $type, '__invoke');
-        if (null === $range) {
-            return [$this->traits($text, $php, $type), [], [], true];
+        $traits = array_values(array_unique($type->traitNames));
+        sort($traits);
+        $invoke = array_find($php->methodDeclarations, static fn (PhpMethodDeclaration $method): bool => $type->name === $method->className && 0 === strcasecmp('__invoke', $method->name));
+        if (null === $invoke) {
+            return [$traits, [], [], true];
         }
-        $parameters = substr($text, $range[0], $range[1] - $range[0]);
-        preg_match_all('/#\[\s*(?<attribute>[\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\b(?<arguments>\s*\((?:[^()\'\"]+|\'(?:\\\\.|[^\'\\\\])*\'|"(?:\\\\.|[^"\\\\])*")*\))?\s*\]\s*(?:(?:public|protected|private|readonly|static)\s+)*(?:[?\\\\A-Za-z_][\\\\A-Za-z0-9_|&?()]*\s+)?\$(?<parameter>[A-Za-z_][A-Za-z0-9_]*)/s', $parameters, $matches, \PREG_SET_ORDER);
         $arguments = [];
         $options = [];
         $complete = true;
-        foreach ($matches as $match) {
-            $attribute = $php->resolveName($match['attribute']);
-            $kind = match ($attribute) {
-                self::ARGUMENT_ATTRIBUTE => ConsoleInputKind::Argument,
-                self::OPTION_ATTRIBUTE => ConsoleInputKind::Option,
-                default => null,
-            };
-            if (null === $kind) {
-                continue;
-            }
-            $name = $this->attributeInputName($match['arguments'], $match['parameter']);
-            if (null === $name) {
-                $complete = false;
-                continue;
-            }
-            if (ConsoleInputKind::Argument === $kind) {
-                $arguments[] = $name;
-            } else {
-                $options[] = $name;
-            }
-        }
-
-        return [$this->traits($text, $php, $type), $arguments, $options, $complete];
-    }
-
-    private function attributeInputName(string $arguments, string $parameter): ?string
-    {
-        if ('' === trim($arguments)) {
-            return strtolower(preg_replace('/(?<!^)[A-Z]/', '-$0', $parameter) ?? $parameter);
-        }
-        $arguments = $this->splitArguments(substr(trim($arguments), 1, -1));
-        foreach ($arguments as $argument) {
-            if (preg_match('/^\s*name\s*:\s*(.*)$/s', $argument, $match)) {
-                return $this->literal($match[1]);
-            }
-        }
-        if (isset($arguments[1])) {
-            return $this->literal($arguments[1]);
-        }
-
-        return strtolower(preg_replace('/(?<!^)[A-Z]/', '-$0', $parameter) ?? $parameter);
-    }
-
-    /** @return list<string> */
-    private function splitArguments(string $arguments): array
-    {
-        $parts = [];
-        $start = 0;
-        $depth = 0;
-        $quote = null;
-        $escaped = false;
-        for ($offset = 0, $length = \strlen($arguments); $offset < $length; ++$offset) {
-            $character = $arguments[$offset];
-            if (null !== $quote) {
-                if ($escaped) {
-                    $escaped = false;
-                } elseif ('\\' === $character) {
-                    $escaped = true;
-                } elseif ($quote === $character) {
-                    $quote = null;
+        foreach ($invoke->parameters as $parameter) {
+            foreach ($parameter->attributes as $attribute) {
+                $kind = match ($attribute->name) {
+                    self::ARGUMENT_ATTRIBUTE => ConsoleInputKind::Argument,
+                    self::OPTION_ATTRIBUTE => ConsoleInputKind::Option,
+                    default => null,
+                };
+                if (null === $kind) {
+                    continue;
                 }
-                continue;
-            }
-            if (\in_array($character, ["'", '"'], true)) {
-                $quote = $character;
-            } elseif (\in_array($character, ['(', '[', '{'], true)) {
-                ++$depth;
-            } elseif (\in_array($character, [')', ']', '}'], true)) {
-                --$depth;
-            } elseif (0 === $depth && ',' === $character) {
-                $parts[] = substr($arguments, $start, $offset - $start);
-                $start = $offset + 1;
+                $name = $this->inputName($attribute, $parameter->name);
+                if (null === $name) {
+                    $complete = false;
+                    continue;
+                }
+                if (ConsoleInputKind::Argument === $kind) {
+                    $arguments[] = $name;
+                } else {
+                    $options[] = $name;
+                }
             }
         }
-        $parts[] = substr($arguments, $start);
 
-        return $parts;
+        return [$traits, $arguments, $options, $complete];
     }
 
-    private function literal(string $expression): ?string
+    private function inputName(PhpAttribute $attribute, string $parameter): ?string
     {
-        $expression = trim($expression);
-        if (\strlen($expression) < 2 || !\in_array($expression[0], ["'", '"'], true) || !str_ends_with($expression, $expression[0])) {
+        if (array_any($attribute->arguments, static fn (PhpArgument $argument): bool => $argument->unpacked)) {
             return null;
         }
+        $name = $attribute->namedOrPositionalArgument('name', 1);
+        if (null === $name) {
+            return $this->parameterName($parameter);
+        }
 
-        return PhpStringLiteralDecoder::decode($expression[0], substr($expression, 1, -1));
+        return $name->stringLiteral?->value;
     }
 
-    /** @return list<string> */
-    private function traits(string $text, PhpDocument $php, PhpTypeDeclaration $type): array
+    /** Infers the input name from the parameter name the way Symfony's UnicodeString::kebab() does. */
+    private function parameterName(string $parameter): string
     {
-        $body = substr($text, $type->startOffset, $type->endOffset - $type->startOffset);
-        preg_match_all('/^\s*use\s+([\\\\A-Za-z_][\\\\A-Za-z0-9_]*(?:\s*,\s*[\\\\A-Za-z_][\\\\A-Za-z0-9_]*)*)\s*;/m', $body, $matches);
-        $traits = [];
-        foreach ($matches[1] as $list) {
-            foreach (preg_split('/\s*,\s*/', $list) ?: [] as $trait) {
-                $traits[] = $php->resolveName($trait);
-            }
-        }
-        $traits = array_values(array_unique($traits));
-        sort($traits);
+        $first = true;
+        $camel = preg_replace_callback('/\b.(?!\p{Lu})/u', static function (array $match) use (&$first): string {
+            $character = $first ? mb_strtolower($match[0]) : mb_convert_case($match[0], \MB_CASE_TITLE);
+            $first = false;
 
-        return $traits;
-    }
+            return $character;
+        }, (string) preg_replace('/[^\pL0-9]++/u', ' ', $parameter));
+        $snake = preg_replace(['/(\p{Lu}+)(\p{Lu}\p{Ll})/u', '/([\p{Ll}0-9])(\p{Lu})/u'], '$1_$2', str_replace(' ', '', (string) $camel));
 
-    /** @return array{int, int}|null */
-    private function methodParameterRange(string $text, PhpTypeDeclaration $type, string $method): ?array
-    {
-        $source = substr($text, $type->startOffset, $type->endOffset - $type->startOffset);
-        if (!preg_match('/\bfunction\s+'.preg_quote($method, '/').'\s*\(/', $source, $match, \PREG_OFFSET_CAPTURE)) {
-            return null;
-        }
-        $open = $type->startOffset + $match[0][1] + strrpos($match[0][0], '(');
-        $close = $this->delimiters->matching($text, $open, '(', ')');
-
-        return null === $close ? null : [$open + 1, $close];
+        return str_replace('_', '-', mb_strtolower((string) $snake));
     }
 }

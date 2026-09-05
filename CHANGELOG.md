@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Recognize Console parameter attributes stacked or grouped with other attributes
+- Recognize Console definitions inherited from traits imported with an adaptation block
+- Infer Console input names from parameter names the way Symfony does
 - Suppress form option completion for computed form type expressions
 - Recognize case-insensitive PHP `::class` references
 - Ignore Doctrine contexts with computed class arguments
