@@ -236,6 +236,57 @@ final class TranslationExtractorTest extends TestCase
         self::assertSame('Some &lt;b&gt; text', substr($text, $start, $end - $start));
     }
 
+    public function testExtractsMixedContentXliffWithSafeXmlReferenceDecodingAndRawRanges(): void
+    {
+        $converter = new PositionConverter();
+        $text = <<<'XLIFF'
+            <!DOCTYPE xliff [
+                <!ENTITY declared "expanded">
+                <!ENTITY external SYSTEM "file:///etc/passwd">
+            ]>
+            <xliff><file>
+                <![CDATA[<unit name="cdata.phantom"><source>ignored</source></unit>]]>
+                <?ignored <unit name="pi.phantom"?>
+                <unit data-name="wrong" id="fallback">
+                    <segment>
+                        <source>before <ph id="placeholder"/> after &lt;x&gt;</source>
+                        <target>Hello <ph id="placeholder"/> <![CDATA[&amp;]]> &#65; &declared; &external;</target>
+                    </segment>
+                </unit>
+                <unit name="named &amp; &#x41; &declared;"><segment><source>ignored</source><target>Named</target></segment></unit>
+            </file></xliff>
+            XLIFF;
+        $declarations = TranslationExtractorTestFactory::create($converter)
+            ->extract(new SourceDocument('file:///workspace/translations/messages.en.xlf', 'xml', $text))
+            ->declarations;
+
+        self::assertSame(
+            [
+                ['before  after <x>', 'Hello  &amp; A &declared; &external;'],
+                ['named & A &declared;', 'Named'],
+            ],
+            array_map(static fn ($declaration): array => [$declaration->key, trim($declaration->message)], $declarations),
+        );
+        $start = $converter->toByteOffset($text, $declarations[0]->range->start);
+        $end = $converter->toByteOffset($text, $declarations[0]->range->end);
+        self::assertSame('before <ph id="placeholder"/> after &lt;x&gt;', substr($text, $start, $end - $start));
+        $start = $converter->toByteOffset($text, $declarations[1]->range->start);
+        $end = $converter->toByteOffset($text, $declarations[1]->range->end);
+        self::assertSame('named &amp; &#x41; &declared;', substr($text, $start, $end - $start));
+    }
+
+    public function testRecoversLaterXliffUnitsAfterMalformedMarkup(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/translations/messages.en.xlf', 'xml', <<<'XLIFF'
+            <xliff><file>
+                <broken value="unfinished
+                <unit name="recovered"><segment><source>ignored</source><target>Recovered</target></segment></unit>
+            </file></xliff>
+            XLIFF));
+
+        self::assertSame([['recovered', 'Recovered']], array_map(static fn ($declaration): array => [$declaration->key, $declaration->message], $facts->declarations));
+    }
+
     public function testPreservesHyphenatedYamlKeys(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/translations/messages.en.yaml', 'yaml', "article-title: Article\n"));

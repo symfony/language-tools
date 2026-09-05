@@ -30,6 +30,7 @@ use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
@@ -1538,11 +1539,12 @@ final class ConfigurationProviderTest extends TestCase
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $phpComments = new PhpCommentParser();
-        $xmlComments = new XmlCommentParser();
+        $xmlParser = new TolerantXmlParser();
+        $xmlComments = new XmlCommentParser($xmlParser);
         $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
         $documentParser = new YamlDocumentParser($treeSitter);
         $php = new PhpConfigurationAnalyzer(new TolerantPhpParser(new Parser()), $phpComments);
-        $xml = new XmlConfigurationAnalyzer($xmlComments);
+        $xml = new XmlConfigurationAnalyzer($xmlParser, $xmlComments);
         $yaml = new YamlConfigurationParser($converter, $documentParser);
         $values = new ConfigurationValueValidator($environmentIndexes, new EnvironmentExpressionParser());
         $validationReconciler = new ConfigurationValidationReconciler(

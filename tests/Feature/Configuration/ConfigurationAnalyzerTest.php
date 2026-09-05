@@ -19,6 +19,7 @@ use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 
@@ -193,7 +194,8 @@ final class ConfigurationAnalyzerTest extends TestCase
 
     public function testAnalyzesXmlElementsAttributesAndIncompleteTags(): void
     {
-        $analyzer = new XmlConfigurationAnalyzer(new XmlCommentParser());
+        $parser = new TolerantXmlParser();
+        $analyzer = new XmlConfigurationAnalyzer($parser, new XmlCommentParser($parser));
         $index = $this->index();
         $text = '<container><framework:config><framework:router utf8="true"><framework:utf8/></framework:router></framework:config></container>';
 
@@ -218,6 +220,38 @@ final class ConfigurationAnalyzerTest extends TestCase
             ['path' => ['framework', 'router'], 'prefix' => 'ut', 'start' => \strlen($incomplete) - 2, 'alias' => '', 'attribute' => true],
             $analyzer->completionContext($incomplete, $index, \strlen($incomplete)),
         );
+    }
+
+    public function testAnalyzesOnlyRealXmlMarkupAndRecoversValidSiblings(): void
+    {
+        $parser = new TolerantXmlParser();
+        $analyzer = new XmlConfigurationAnalyzer($parser, new XmlCommentParser($parser));
+        $index = $this->index();
+        $text = <<<'XML'
+            <!DOCTYPE container [<!ENTITY declared "<framework:utf8/>">]>
+            <?ignored <framework:utf8/>?>
+            <container>
+                <!-- <framework:utf8/> -->
+                <![CDATA[<framework:utf8/>]]>
+                <framework:config>
+                    <framework:router data-utf8="wrong" utf8="1 > 0" marker="<!-- literal -->"/>
+                    <broken value="unfinished
+                    <framework:router><framework:utf8/></framework:router>
+                </framework:config>
+            </container>
+            XML;
+
+        $events = $analyzer->events($text, $index);
+        $occurrences = array_values(array_filter($events, static fn ($event): bool => $event instanceof XmlConfigurationOccurrence));
+        $errors = array_values(array_filter($events, static fn ($event): bool => $event instanceof XmlConfigurationStructureError));
+
+        self::assertSame(
+            [null, ['framework'], ['framework', 'router'], ['framework', 'router'], ['framework', 'router', 'utf8']],
+            array_map(static fn (XmlConfigurationOccurrence $occurrence): ?array => $occurrence->path, $occurrences),
+        );
+        self::assertSame(['data_utf8', 'utf8', 'marker'], array_map(static fn ($attribute): string => $attribute->name, $occurrences[2]->attributes));
+        self::assertSame(['wrong', '1 > 0', '<!-- literal -->'], array_map(static fn ($attribute): string => $attribute->value, $occurrences[2]->attributes));
+        self::assertSame(['Opening element "broken" is not closed.'], array_map(static fn (XmlConfigurationStructureError $error): string => $error->message, $errors));
     }
 
     /** @param list<int> $lines */

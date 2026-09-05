@@ -3,7 +3,11 @@
 namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Parser\Xml\XmlCommentParser;
+use Symfony\Lsp\Parser\Xml\XmlDocument;
+use Symfony\Lsp\Parser\Xml\XmlElementStart;
+use Symfony\Lsp\Parser\Xml\XmlParserInterface;
+use Symfony\Lsp\Parser\Xml\XmlText;
+use Symfony\Lsp\Parser\Xml\XmlTextKind;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Parser\Yaml\YamlMapping;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -15,7 +19,8 @@ final class TranslationCatalogExtractor
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly YamlDocumentParser $yamlParser,
         private readonly PhpTranslationCatalogParser $phpParser,
-        private readonly XmlCommentParser $xmlComments,
+        private readonly XmlParserInterface $xmlParser,
+        private readonly XliffXmlReferenceDecoder $xliffDecoder,
     ) {
     }
 
@@ -213,33 +218,79 @@ final class TranslationCatalogExtractor
     /** @return list<TranslationDeclaration> */
     private function xliffDeclarations(string $uri, string $text, string $domain, string $locale): array
     {
-        $masked = $this->xmlComments->mask($text);
-        preg_match_all('/<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?(?:trans-unit|unit)\b([^>]*)>/i', $masked, $units, \PREG_OFFSET_CAPTURE);
+        $document = $this->xmlParser->parse($text);
+        $units = [];
+        $sources = [];
+        $targets = [];
+        $nearestUnits = [];
+        foreach ($document->elements() as $element) {
+            $nearestUnit = null === $element->parentIdentity ? null : ($nearestUnits[$element->parentIdentity] ?? null);
+            if (\in_array($element->localName, ['trans-unit', 'unit'], true)) {
+                $nearestUnit = $element->identity;
+                $units[] = $element;
+            } elseif (null !== $nearestUnit && 'source' === $element->localName) {
+                $sources[$nearestUnit] ??= $element;
+            } elseif (null !== $nearestUnit && 'target' === $element->localName) {
+                $targets[$nearestUnit] ??= $element;
+            }
+            $nearestUnits[$element->identity] = $nearestUnit;
+        }
+
         $result = [];
-        foreach ($units[0] as $i => [$opening, $unitOffset]) {
-            $contentOffset = $unitOffset + \strlen($opening);
-            $nextOffset = $units[0][$i + 1][1] ?? \strlen($masked);
-            $content = substr($masked, $contentOffset, $nextOffset - $contentOffset);
-            preg_match('/\b(?:resname|name)\s*=\s*[\'\"]([^\'\"]+)[\'\"]/i', $units[1][$i][0], $name);
-            preg_match('/<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?source(?:\s[^>]*)?>(.*?)(?:<\/(?:[A-Za-z_][A-Za-z0-9_.-]*:)?source>|(?=<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?target\b)|$)/is', $content, $source);
-            preg_match('/<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?target(?:\s[^>]*)?>(.*?)(?:<\/(?:[A-Za-z_][A-Za-z0-9_.-]*:)?target>|$)/is', $content, $target);
-            if (!isset($name[1]) && isset($source[1])) {
-                $name[1] = $source[1];
-            }
-            if (!isset($name[1])) {
-                preg_match('/\bid\s*=\s*[\'\"]([^\'\"]+)[\'\"]/i', $units[1][$i][0], $name);
-            }
-            $message = $target[1] ?? $source[1] ?? null;
-            if (!isset($name[1]) || !\is_string($message)) {
+        foreach ($units as $unit) {
+            $source = $sources[$unit->identity] ?? null;
+            $target = $targets[$unit->identity] ?? null;
+            $name = $unit->attribute('resname') ?? $unit->attribute('name');
+            if (null !== $name) {
+                $key = $this->xliffDecoder->decode($name->value);
+                $keyOffset = $name->valueStartOffset;
+                $keyLength = $name->valueEndOffset - $name->valueStartOffset;
+            } elseif (null !== $source) {
+                $key = $this->xliffText($document, $source, $target);
+                [$keyOffset, $keyEnd] = $this->xliffContentRange($document, $source, $target, $unit, \strlen($text));
+                $keyLength = $keyEnd - $keyOffset;
+            } elseif (null !== $id = $unit->attribute('id')) {
+                $key = $this->xliffDecoder->decode($id->value);
+                $keyOffset = $id->valueStartOffset;
+                $keyLength = $id->valueEndOffset - $id->valueStartOffset;
+            } else {
                 continue;
             }
-            $key = html_entity_decode(strip_tags($name[1]));
-            $value = html_entity_decode(strip_tags($message));
-            $offset = strpos($text, $name[1], $unitOffset);
-            $result[] = $this->declaration($key, $value, $domain, $locale, $uri, $text, false === $offset ? $unitOffset : $offset, \strlen($name[1]));
+            $messageElement = $target ?? $source;
+            if (null === $messageElement) {
+                continue;
+            }
+            $message = $this->xliffText($document, $messageElement);
+            $result[] = $this->declaration($key, $message, $domain, $locale, $uri, $text, $keyOffset, $keyLength);
         }
 
         return $result;
+    }
+
+    private function xliffText(XmlDocument $document, XmlElementStart $element, ?XmlElementStart $excluded = null): string
+    {
+        $value = '';
+        foreach ($document->events as $event) {
+            if (!$event instanceof XmlText || !$document->isDescendantOf($event->parentIdentity, $element->identity)) {
+                continue;
+            }
+            if (null !== $excluded && $document->isDescendantOf($event->parentIdentity, $excluded->identity)) {
+                continue;
+            }
+            $value .= XmlTextKind::Cdata === $event->kind ? $event->raw : $this->xliffDecoder->decode($event->raw);
+        }
+
+        return $value;
+    }
+
+    /** @return array{int, int} */
+    private function xliffContentRange(XmlDocument $document, XmlElementStart $element, ?XmlElementStart $following, XmlElementStart $unit, int $sourceLength): array
+    {
+        $elementEnd = $document->end($element->identity);
+        $unitEnd = $document->end($unit->identity);
+        $end = null !== $elementEnd ? $elementEnd->startOffset : (null !== $following ? $following->startOffset : (null === $unitEnd ? $sourceLength : $unitEnd->startOffset));
+
+        return [$element->endOffset, max($element->endOffset, $end)];
     }
 
     private function declaration(string $key, string $message, string $domain, string $locale, string $uri, string $text, int $offset, ?int $rangeLength = null): TranslationDeclaration

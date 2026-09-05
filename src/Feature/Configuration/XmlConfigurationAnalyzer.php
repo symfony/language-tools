@@ -3,10 +3,14 @@
 namespace Symfony\Lsp\Feature\Configuration;
 
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
+use Symfony\Lsp\Parser\Xml\XmlElementEnd;
+use Symfony\Lsp\Parser\Xml\XmlElementStart;
+use Symfony\Lsp\Parser\Xml\XmlParserInterface;
 
 final class XmlConfigurationAnalyzer
 {
     public function __construct(
+        private readonly XmlParserInterface $parser,
         private readonly XmlCommentParser $comments,
     ) {
     }
@@ -14,7 +18,39 @@ final class XmlConfigurationAnalyzer
     /** @return list<XmlConfigurationOccurrence|XmlConfigurationStructureError> */
     public function events(string $source, ConfigurationIndex $index): array
     {
-        [$events] = $this->scan($source, $index);
+        $document = $this->parser->parse($source);
+        $events = [];
+        $contexts = [];
+        foreach ($document->events as $event) {
+            if (!$event instanceof XmlElementStart) {
+                continue;
+            }
+            $context = null === $event->parentIdentity ? [] : ($contexts[$event->parentIdentity] ?? []);
+            $path = $this->elementPath($context, $event->qualifiedName, $index);
+            $contexts[$event->identity] = $path ?? $context;
+            $attributes = [];
+            foreach ($event->attributes as $attribute) {
+                if ('xmlns' === $attribute->qualifiedName || str_starts_with($attribute->qualifiedName, 'xmlns:')) {
+                    continue;
+                }
+                $attributes[] = new XmlConfigurationAttribute(
+                    str_replace('-', '_', $attribute->qualifiedName),
+                    $attribute->value,
+                    $attribute->nameStartOffset,
+                    $attribute->nameEndOffset,
+                );
+            }
+            $events[] = new XmlConfigurationOccurrence(
+                $path,
+                $event->qualifiedName,
+                $event->nameStartOffset,
+                $event->nameEndOffset,
+                $attributes,
+            );
+        }
+        foreach ($document->diagnostics as $diagnostic) {
+            $events[] = new XmlConfigurationStructureError($diagnostic->message, $diagnostic->startOffset, $diagnostic->endOffset);
+        }
 
         return $events;
     }
@@ -41,7 +77,7 @@ final class XmlConfigurationAnalyzer
         if (1 === preg_match('/<(?<element>[A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?)\b[^<>]*\s+(?<prefix>[A-Za-z_][A-Za-z0-9_.-]*)?$/', $before, $match)) {
             $tagOffset = strrpos($before, '<');
             if (false !== $tagOffset) {
-                $parentPath = $this->path(substr($before, 0, $tagOffset), $index);
+                $parentPath = $this->path(substr($source, 0, $tagOffset), $index);
                 $prefix = $match['prefix'] ?? '';
 
                 return [
@@ -60,7 +96,7 @@ final class XmlConfigurationAnalyzer
         $prefix = $match['prefix'] ?? '';
 
         return [
-            'path' => $this->path(substr($before, 0, -\strlen($match[0])), $index),
+            'path' => $this->path(substr($source, 0, $cursor - \strlen($match[0])), $index),
             'prefix' => $prefix,
             'start' => $cursor - \strlen($prefix),
             'alias' => $alias,
@@ -68,73 +104,27 @@ final class XmlConfigurationAnalyzer
         ];
     }
 
-    /** @return array{list<XmlConfigurationOccurrence|XmlConfigurationStructureError>, list<string>} */
-    private function scan(string $source, ConfigurationIndex $index): array
-    {
-        $events = [];
-        $stack = [];
-        $elements = [];
-        $text = $this->comments->mask($source);
-        preg_match_all('/<\s*(\/)?\s*([A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?)([^>]*)>/', $text, $tags, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-        foreach ($tags as $tag) {
-            if ('' !== $tag[1][0]) {
-                $open = array_pop($elements);
-                if ($open !== $tag[2][0]) {
-                    $events[] = new XmlConfigurationStructureError(
-                        \sprintf('Closing element "%s" does not match "%s".', $tag[2][0], $open ?? 'none'),
-                        $tag[2][1],
-                        $tag[2][1] + \strlen($tag[2][0]),
-                    );
-                }
-                if ([] !== $stack) {
-                    array_pop($stack);
-                }
-                continue;
-            }
-            $selfClosing = str_ends_with(rtrim($tag[0][0]), '/>');
-            if (!$selfClosing) {
-                $elements[] = $tag[2][0];
-            }
-            $path = $this->elementPath($stack, $tag[2][0], $index);
-            $attributes = [];
-            preg_match_all('/([A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(["\'])(.*?)\2/', $tag[3][0], $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-            foreach ($matches as $attribute) {
-                $startOffset = $tag[3][1] + $attribute[1][1];
-                $attributes[] = new XmlConfigurationAttribute(
-                    str_replace('-', '_', $attribute[1][0]),
-                    $attribute[3][0],
-                    $startOffset,
-                    $startOffset + \strlen($attribute[1][0]),
-                );
-            }
-            $events[] = new XmlConfigurationOccurrence(
-                $path,
-                $tag[2][0],
-                $tag[2][1],
-                $tag[2][1] + \strlen($tag[2][0]),
-                $attributes,
-            );
-            if (null !== $path && !$selfClosing) {
-                $stack = $path;
-            }
-        }
-        if ([] !== $elements) {
-            $events[] = new XmlConfigurationStructureError(
-                \sprintf('Element "%s" is not closed.', array_pop($elements)),
-                \strlen($source),
-                \strlen($source),
-            );
-        }
-
-        return [$events, $stack];
-    }
-
     /** @return list<string> */
     private function path(string $source, ConfigurationIndex $index): array
     {
-        [, $path] = $this->scan($source, $index);
+        $contexts = [];
+        $stack = [];
+        foreach ($this->parser->parse($source)->events as $event) {
+            if ($event instanceof XmlElementStart) {
+                $context = null === $event->parentIdentity ? [] : ($contexts[$event->parentIdentity] ?? []);
+                $contexts[$event->identity] = $this->elementPath($context, $event->qualifiedName, $index) ?? $context;
+                if (!$event->selfClosing) {
+                    $stack[] = $event->identity;
+                }
+            } elseif ($event instanceof XmlElementEnd && null !== $event->identity) {
+                $position = array_search($event->identity, $stack, true);
+                if (false !== $position) {
+                    $stack = \array_slice($stack, 0, $position);
+                }
+            }
+        }
 
-        return $path;
+        return [] === $stack ? [] : ($contexts[$stack[array_key_last($stack)]] ?? []);
     }
 
     /**
