@@ -118,6 +118,22 @@ final class TolerantPhpNodeAdapter
         return array_values(array_filter($names->children, static fn (mixed $name): bool => $name instanceof QualifiedName));
     }
 
+    /** @return list<QualifiedName> */
+    public function typeInterfaceNames(ClassDeclaration|InterfaceDeclaration|EnumDeclaration $declaration): array
+    {
+        $clause = $this->member($declaration, match (true) {
+            $declaration instanceof ClassDeclaration => 'classInterfaceClause',
+            $declaration instanceof InterfaceDeclaration => 'interfaceBaseClause',
+            default => 'enumInterfaceClause',
+        });
+        $names = \is_object($clause) ? $this->member($clause, 'interfaceNameList') : null;
+        if (!$names instanceof QualifiedNameList) {
+            return [];
+        }
+
+        return array_values(array_filter($names->children, static fn (mixed $name): bool => $name instanceof QualifiedName));
+    }
+
     /** @return list<ArrayElement> */
     public function arrayElements(ArrayCreationExpression $expression): array
     {

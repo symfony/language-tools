@@ -852,6 +852,81 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame([], $types[2]->traitNames);
     }
 
+    public function testExposesResolvedInterfaceRelationshipsInSourceOrder(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Message;
+
+            use Vendor\Contracts\{FirstContract, SecondContract as AliasedContract};
+            use Vendor\Message\BaseMessage as ImportedBaseMessage;
+
+            final class Message extends ImportedBaseMessage implements AliasedContract, FirstContract, \JsonSerializable
+            {
+            }
+
+            interface MessageContract extends FirstContract, AliasedContract, \Stringable
+            {
+            }
+
+            enum Status: string implements AliasedContract, FirstContract
+            {
+                case Ready = 'ready';
+            }
+
+            trait MessageTrait
+            {
+            }
+            PHP;
+
+        $types = (new TolerantPhpParser(new Parser()))->parse($source)->typeDeclarations;
+
+        self::assertSame(['App\Message\Message', 'App\Message\MessageContract', 'App\Message\Status', 'App\Message\MessageTrait'], array_map(static fn ($type): string => $type->name, $types));
+        self::assertSame(['Vendor\Message\BaseMessage', null, null, null], array_map(static fn ($type): ?string => $type->parentClassName, $types));
+        self::assertSame([
+            ['Vendor\Contracts\SecondContract', 'Vendor\Contracts\FirstContract', 'JsonSerializable'],
+            ['Vendor\Contracts\FirstContract', 'Vendor\Contracts\SecondContract', 'Stringable'],
+            ['Vendor\Contracts\SecondContract', 'Vendor\Contracts\FirstContract'],
+            [],
+        ], array_map(static fn ($type): array => $type->interfaceNames, $types));
+    }
+
+    public function testDoesNotLeakTypeRelationshipsAcrossIncompleteOrAnonymousDeclarations(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Message;
+
+            interface DomainEvent
+            {
+            }
+
+            interface IncompleteDeclaration
+            interface MessageContract extends DomainEvent
+            {
+            }
+
+            final class Message implements MessageContract
+            {
+                public function nested(): object
+                {
+                    return new class implements DomainEvent {
+                    };
+                }
+            }
+            PHP;
+
+        $types = (new TolerantPhpParser(new Parser()))->parse($source)->typeDeclarations;
+
+        self::assertSame(['App\Message\DomainEvent', 'App\Message\IncompleteDeclaration', 'App\Message\MessageContract', 'App\Message\Message'], array_map(static fn ($type): string => $type->name, $types));
+        self::assertSame([
+            [],
+            [],
+            ['App\Message\DomainEvent'],
+            ['App\Message\MessageContract'],
+        ], array_map(static fn ($type): array => $type->interfaceNames, $types));
+    }
+
     public function testDoesNotUsePlainCommentsAsMethodDescriptions(): void
     {
         $source = <<<'PHP'

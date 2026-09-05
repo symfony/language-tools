@@ -317,6 +317,7 @@ final class PhpDeclarationFactBuilder
             trim(substr($source, $start, $members->getStartPosition() - $start)),
             $this->description($declaration),
             $this->traitNames($traitUses, $source, $names),
+            $declaration instanceof TraitDeclaration ? [] : $this->interfaceNames($declaration, $source, $names),
         );
     }
 
@@ -336,6 +337,22 @@ final class PhpDeclarationFactBuilder
         }
 
         return array_values(array_filter($traitNames, static fn (string $name): bool => '' !== $name));
+    }
+
+    /** @return list<string> */
+    private function interfaceNames(ClassDeclaration|InterfaceDeclaration|EnumDeclaration $declaration, string $source, PhpNameContext $names): array
+    {
+        $interfaceNames = [];
+        foreach ($this->nodes->typeInterfaceNames($declaration) as $name) {
+            $text = $this->scopes->qualifiedName($name, $source);
+            if ('' === trim($text, '\\')) {
+                continue;
+            }
+            $resolved = $name->getResolvedName();
+            $interfaceNames[] = ltrim(null === $resolved ? $names->resolve($text) : (string) $resolved, '\\');
+        }
+
+        return $interfaceNames;
     }
 
     /** @return list<PhpConstantDeclaration> */
