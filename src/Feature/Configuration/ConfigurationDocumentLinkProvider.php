@@ -7,7 +7,9 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
-use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
+use Symfony\Lsp\Parser\Yaml\YamlScalar;
+use Symfony\Lsp\Parser\Yaml\YamlScalarStyle;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -18,7 +20,7 @@ final class ConfigurationDocumentLinkProvider implements DocumentLinkProviderInt
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly UriToPathConverter $uriToPathConverter,
-        private readonly YamlCommentParser $yamlComments,
+        private readonly YamlDocumentParser $yaml,
     ) {
     }
 
@@ -33,17 +35,28 @@ final class ConfigurationDocumentLinkProvider implements DocumentLinkProviderInt
             return [];
         }
         $links = [];
-        $text = $this->yamlComments->mask($request->document->text);
-        preg_match_all('/\bresource\s*:\s*(["\']?)([^"\'\s#]+)\1/', $text, $matches, \PREG_OFFSET_CAPTURE);
         $basePath = Path::getDirectory($documentPath);
-        foreach ($matches[2] as [$resource, $offset]) {
-            if (str_contains($resource, '*') || str_starts_with($resource, '@')) {
+        foreach ($this->yaml->parseDocument($request->document->text)->scalars as $scalar) {
+            $resource = $scalar->value;
+            if (!$this->isResourceValue($scalar) || '' === $resource || str_contains($resource, '*') || str_starts_with($resource, '@')) {
                 continue;
             }
             $targetPath = Path::isAbsolute($resource) ? Path::canonicalize($resource) : Path::join($basePath, $resource);
-            $links[] = ['range' => $this->protocol->range(new Range($this->converter->toPosition($request->document->text, $offset), $this->converter->toPosition($request->document->text, $offset + \strlen($resource)))), 'target' => $this->uriToPathConverter->toUri($targetPath)];
+            $links[] = [
+                'range' => $this->protocol->range(new Range(
+                    $this->converter->toPosition($request->document->text, $scalar->contentStartByte),
+                    $this->converter->toPosition($request->document->text, $scalar->contentEndByte),
+                )),
+                'target' => $this->uriToPathConverter->toUri($targetPath),
+            ];
         }
 
         return $links;
+    }
+
+    private function isResourceValue(YamlScalar $scalar): bool
+    {
+        return 'resource' === ($scalar->path[\count($scalar->path) - 1] ?? null)
+            && !\in_array($scalar->style, [YamlScalarStyle::BlockLiteral, YamlScalarStyle::BlockFolded], true);
     }
 }

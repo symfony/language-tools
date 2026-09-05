@@ -29,6 +29,7 @@ final class ProbeFinder
         ['category' => 'constraint.option.php', 'files' => '{\.php$}', 'pattern' => '{Assert\\\\[A-Za-z_][A-Za-z0-9_]*\s*\([^\)]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)}s'],
         ['category' => 'translation.php', 'files' => '{\.php$}', 'pattern' => '{(?:->trans|\bt)\(\s*[\'\"]([^\'\"]+)}'],
         ['category' => 'translation.twig', 'files' => '{\.twig$}', 'pattern' => '{[\'\"]([^\'\"]+)[\'\"]\s*\|\s*trans\b}'],
+        ['category' => 'import.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{^[ \t]*(?:-[ \t]*)?(?:\{[ \t]*)?resource[ \t]*:[ \t]*[\'\"]?([A-Za-z0-9_.][^\'\"\s#,\}]*)}m'],
         ['category' => 'service.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{[\'\"]@([A-Za-z_][A-Za-z0-9_.\\\\]*)[\'\"]}'],
         ['category' => 'parameter.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{%([A-Za-z_][A-Za-z0-9_.]*)%}'],
         ['category' => 'environment', 'files' => '{\.(?:php|ya?ml)$}', 'pattern' => '{%env\([^)]*?([A-Z][A-Z0-9_]+)\)%}'],

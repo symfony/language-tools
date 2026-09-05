@@ -83,6 +83,26 @@ final class SupportScorerTest extends TestCase
         self::assertSame(1.0, (float) ($score['score'] ?? -1));
     }
 
+    public function testYamlImportProbesOnlyExpectDocumentLinks(): void
+    {
+        $score = (new SupportScorer())->score(['probes' => [
+            [
+                'category' => 'import.yaml',
+                'file' => 'config/routes.yaml',
+                'value' => 'packages/framework.yaml',
+                'requests' => [
+                    'completion' => ['resultCount' => 0, 'error' => null],
+                    'hover' => ['resultCount' => 0, 'error' => null],
+                    'definition' => ['resultCount' => 0, 'error' => null],
+                    'references' => ['resultCount' => 0, 'error' => null],
+                    'documentLink' => ['resultCount' => 1, 'error' => null],
+                ],
+            ],
+        ]]);
+
+        self::assertSame(1.0, (float) ($score['score'] ?? -1));
+    }
+
     public function testFingerprintTracksTheProbeSetNotTheResults(): void
     {
         $scorer = new SupportScorer();

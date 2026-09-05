@@ -30,7 +30,6 @@ use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
-use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -1127,6 +1126,30 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame($this->protocolRange($fixture->converter, $text, $resourceOffset, \strlen('../shared.yaml')), $links[0]['range'] ?? null);
     }
 
+    public function testLinksOnlyYamlResourceValues(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = <<<'YAML'
+            imports:
+                - resource: '../shared.yaml'
+            controllers:
+                resource:
+                    path: ../src/Controller/
+                    namespace: App\Controller
+            parameters:
+                app.doc: |
+                    Import a file with resource: ../documented.yaml in imports.
+                app.hint: "see resource: ../quoted.yaml for details"
+            YAML;
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        $links = $fixture->links->links(['textDocument' => ['uri' => $uri]]) ?? [];
+        $resourceOffset = (int) strpos($text, '../shared.yaml');
+        self::assertSame(['file:///workspace/config/shared.yaml'], array_column($links, 'target'));
+        self::assertSame($this->protocolRange($fixture->converter, $text, $resourceOffset, \strlen('../shared.yaml')), $links[0]['range'] ?? null);
+    }
+
     public function testUsesVendorAuthorityForSavedConfiguration(): void
     {
         $root = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
@@ -1334,10 +1357,10 @@ final class ConfigurationProviderTest extends TestCase
         $phpComments = new PhpCommentParser();
         $xmlComments = new XmlCommentParser();
         $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
-        $yamlComments = new YamlCommentParser($treeSitter);
+        $documentParser = new YamlDocumentParser($treeSitter);
         $php = new PhpConfigurationAnalyzer(new TolerantPhpParser(new Parser()), $phpComments);
         $xml = new XmlConfigurationAnalyzer($xmlComments);
-        $yaml = new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter));
+        $yaml = new YamlConfigurationParser($converter, $documentParser);
         $values = new ConfigurationValueValidator($environmentIndexes, new EnvironmentExpressionParser());
         $validationReconciler = new ConfigurationValidationReconciler(
             $validations,
@@ -1351,7 +1374,7 @@ final class ConfigurationProviderTest extends TestCase
             new ConfigurationCompletionProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
             new ConfigurationHoverProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
             new ConfigurationDiagnosticProvider($resolver, new ProjectPathResolver($uriConverter), $converter, $protocol, $indexes, $routeIndexes, $runtimeConfiguration, $yaml, $values, $php, $xml, $validationReconciler),
-            new ConfigurationDocumentLinkProvider($resolver, $converter, $protocol, $uriConverter, $yamlComments),
+            new ConfigurationDocumentLinkProvider($resolver, $converter, $protocol, $uriConverter, $documentParser),
             $documents,
             $converter,
         );

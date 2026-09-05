@@ -205,6 +205,24 @@ final class ProbeFinderTest extends TestCase
         self::assertSame('app.fragment', $this->probes(new ProbeFinder(), 'parameter.yaml')[0]->value);
     }
 
+    public function testFindsYamlResourceImports(): void
+    {
+        $this->write('config/routes.yaml', <<<'YAML'
+            controllers:
+                resource:
+                    path: ../src/Controller/
+                    namespace: App\Controller
+                type: attribute
+            imports:
+                - { resource: packages/framework.yaml }
+            YAML);
+
+        $probes = $this->probes(new ProbeFinder(), 'import.yaml');
+
+        self::assertCount(1, $probes);
+        self::assertSame('packages/framework.yaml', $probes[0]->value);
+    }
+
     public function testReportsThePositionInsideTheMatchedValue(): void
     {
         $this->write('src/Controller.php', "<?php\n\$this->redirectToRoute('abcd');\n");

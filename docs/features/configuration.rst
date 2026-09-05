@@ -77,9 +77,11 @@ selected environment can produce confirmed semantic errors.
 Imports and Refreshes
 ---------------------
 
-Relative YAML ``resource`` imports are exposed as document links. Configuration
-changes are picked up after saving, while the current open file continues to
-reflect unsaved edits.
+Relative YAML ``resource`` imports are exposed as document links. Only parsed
+``resource`` values become links, so matching text in comments, block scalars
+and other values is ignored. Glob patterns and bundle-relative ``@Bundle``
+resources are skipped. Configuration changes are picked up after saving, while
+the current open file continues to reflect unsaved edits.
 
 Limitations
 -----------

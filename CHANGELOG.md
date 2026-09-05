@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Link YAML configuration imports from parsed `resource` values only
 - Decode source-derived XLIFF translation keys once
 - Read event listener service tags from parsed YAML, including inline tags
 - Recognize PHP route calls only on Symfony router and controller receivers
