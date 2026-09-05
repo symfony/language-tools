@@ -9,6 +9,7 @@ use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpConstantKind;
 use Symfony\Lsp\Parser\Php\PhpLexicalScopeKind;
+use Symfony\Lsp\Parser\Php\PhpLiteralArray;
 use Symfony\Lsp\Parser\Php\PhpLiteralKind;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
@@ -1421,6 +1422,38 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame([], $document->receiverVariables($calls['missingCapture']));
         self::assertSame([], $document->receiverVariables($calls['shadowed']));
         self::assertSame(['service'], array_map(static fn ($variable): string => $variable->name, $document->receiverVariables($calls['recaptured'])));
+    }
+
+    public function testExposesCompleteLiteralArrayKeysWithExactRangesAndUnknownKeyState(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            $renderer->render('page.html.twig', [
+                'café' => nested(['inside' => true]),
+                "line\nkey" => $value,
+                value(),
+                ...$shared,
+                $dynamic => true,
+                'after' => true,
+            ]
+            );
+            $renderer->render('legacy.html.twig', array('legacy' => true));
+            $renderer->render('incomplete.html.twig', ['missing' => true);
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $outer = $document->literalArray($document->methodCalls[0]->positionalArgument(1));
+        $legacy = $document->literalArray($document->methodCalls[1]->positionalArgument(1));
+
+        self::assertInstanceOf(PhpLiteralArray::class, $outer);
+        self::assertSame(['café', "line\nkey", 'after'], array_map(static fn (PhpStringLiteral $key): string => $key->value, $outer->keys));
+        self::assertSame(['café', 'line\\nkey', 'after'], array_map(static fn (PhpStringLiteral $key): string => substr($source, $key->startOffset, $key->endOffset - $key->startOffset), $outer->keys));
+        self::assertTrue($outer->hasUnknownKeys);
+        self::assertSame("[\n    'café' => nested(['inside' => true]),\n    \"line\\nkey\" => \$value,\n    value(),\n    ...\$shared,\n    \$dynamic => true,\n    'after' => true,\n]", substr($source, $outer->startOffset, $outer->endOffset - $outer->startOffset));
+        self::assertInstanceOf(PhpLiteralArray::class, $legacy);
+        self::assertSame(['legacy'], array_map(static fn (PhpStringLiteral $key): string => $key->value, $legacy->keys));
+        self::assertNull($document->literalArray($document->methodCalls[2]->positionalArgument(1)));
+        self::assertSame(['inside'], array_map(static fn (PhpStringLiteral $key): string => $key->value, $document->literalArrays[1]->keys));
     }
 
     public function testFiltersAttributesByTarget(): void

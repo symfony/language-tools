@@ -6,8 +6,6 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpDocument;
-use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
-use Symfony\Lsp\Parser\Php\PhpLiteralKind;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 
@@ -16,7 +14,6 @@ final class PhpRouteReferenceCandidateExtractor
     public function __construct(
         private readonly PositionConverter $positionConverter,
         private readonly RoutePhpReceiverResolver $receivers,
-        private readonly PhpLiteralArrayKeyParser $arrayKeys,
     ) {
     }
 
@@ -42,7 +39,7 @@ final class PhpRouteReferenceCandidateExtractor
                     $this->positionConverter->toPosition($text, $name->startOffset),
                     $this->positionConverter->toPosition($text, $name->endOffset),
                 ),
-                $this->providedParameters($call, $route),
+                $this->providedParameters($document, $call, $route),
                 $receiver->controllerClass,
             );
         }
@@ -55,23 +52,17 @@ final class PhpRouteReferenceCandidateExtractor
      *
      * @return list<string>|null
      */
-    private function providedParameters(PhpMethodCall $call, PhpArgument $route): ?array
+    private function providedParameters(PhpDocument $document, PhpMethodCall $call, PhpArgument $route): ?array
     {
-        if (null === $route->completeLiteral) {
-            return null;
-        }
         $parameters = $call->arguments[1] ?? null;
         if (null === $parameters) {
-            return [];
+            return null === $route->completeLiteral ? null : [];
         }
-        if (null !== $parameters->name
-            || $parameters->unpacked
-            || PhpLiteralKind::Array !== $parameters->completeLiteral?->kind
-            || null === $keys = $this->arrayKeys->parseArgument($parameters, allowNestedUnpacking: true)
-        ) {
+        $array = $document->literalArray($parameters);
+        if (null !== $parameters->name || $parameters->unpacked || null === $array || $array->hasUnknownKeys) {
             return null;
         }
 
-        return array_values(array_unique(array_map(static fn (PhpStringLiteral $key): string => $key->value, $keys)));
+        return array_values(array_unique(array_map(static fn (PhpStringLiteral $key): string => $key->value, $array->keys)));
     }
 }

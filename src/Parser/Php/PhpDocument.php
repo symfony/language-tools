@@ -18,6 +18,7 @@ final class PhpDocument
      * @param list<PhpPropertyDeclaration> $propertyDeclarations
      * @param list<PhpClassReference>      $classReferences
      * @param list<PhpLexicalScope>        $lexicalScopes
+     * @param list<PhpLiteralArray>        $literalArrays
      */
     public function __construct(
         public readonly array $attributes,
@@ -32,6 +33,7 @@ final class PhpDocument
         public readonly array $propertyDeclarations = [],
         public readonly array $classReferences = [],
         public readonly array $lexicalScopes = [],
+        public readonly array $literalArrays = [],
     ) {
         $this->names = $names ?? new PhpNameContext();
     }
@@ -67,6 +69,22 @@ final class PhpDocument
     public function firstObjectCreation(?PhpArgument $argument): ?PhpObjectCreation
     {
         return $this->objectCreationsWithin($argument)[0] ?? null;
+    }
+
+    public function literalArray(?PhpArgument $argument): ?PhpLiteralArray
+    {
+        $start = $argument?->expressionStartOffset;
+        $end = $argument?->expressionEndOffset;
+        if (!\is_int($start) || !\is_int($end)) {
+            return null;
+        }
+        foreach ($this->literalArrays as $array) {
+            if ($start === $array->startOffset && $end === $array->endOffset) {
+                return $array;
+            }
+        }
+
+        return null;
     }
 
     /**

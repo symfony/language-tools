@@ -8,6 +8,7 @@ use Microsoft\PhpParser\Node\AttributeGroup;
 use Microsoft\PhpParser\Node\ClassConstDeclaration;
 use Microsoft\PhpParser\Node\EnumCaseDeclaration;
 use Microsoft\PhpParser\Node\Expression\AnonymousFunctionCreationExpression;
+use Microsoft\PhpParser\Node\Expression\ArrayCreationExpression;
 use Microsoft\PhpParser\Node\Expression\ArrowFunctionCreationExpression;
 use Microsoft\PhpParser\Node\Expression\CallExpression;
 use Microsoft\PhpParser\Node\Expression\MemberAccessExpression;
@@ -37,6 +38,9 @@ final class TolerantPhpNodeCollection
 
     /** @var list<ObjectCreationExpression> */
     public readonly array $objectCreations;
+
+    /** @var list<ArrayCreationExpression> */
+    public readonly array $literalArrays;
 
     /** @var list<MethodDeclaration> */
     public readonly array $methodDeclarations;
@@ -72,6 +76,7 @@ final class TolerantPhpNodeCollection
         $methodCalls = [];
         $typedVariableDeclarations = [];
         $objectCreations = [];
+        $literalArrays = [];
         $methodDeclarations = [];
         $lexicalScopes = [];
         $classReferences = [];
@@ -103,6 +108,8 @@ final class TolerantPhpNodeCollection
                 $typedVariableDeclarations[] = $node;
             } elseif ($node instanceof ObjectCreationExpression) {
                 $objectCreations[] = $node;
+            } elseif ($node instanceof ArrayCreationExpression) {
+                $literalArrays[] = $node;
             } elseif ($node instanceof MethodDeclaration) {
                 $methodDeclarations[] = $node;
             } elseif ($node instanceof AnonymousFunctionCreationExpression || $node instanceof ArrowFunctionCreationExpression) {
@@ -123,6 +130,7 @@ final class TolerantPhpNodeCollection
         $this->methodCalls = $methodCalls;
         $this->typedVariableDeclarations = $typedVariableDeclarations;
         $this->objectCreations = $objectCreations;
+        $this->literalArrays = $literalArrays;
         $this->methodDeclarations = $methodDeclarations;
         $this->lexicalScopes = $lexicalScopes;
         $this->classReferences = $classReferences;

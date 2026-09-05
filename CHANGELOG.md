@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Read direct string keys from complete PHP arrays in route and template analysis
 - Resolve typed PHP receivers through nested closures and arrow functions
 - Resolve Messenger inheritance for classes, interfaces and enums without leaking across incomplete declarations
 - Recognize Console parameter attributes stacked or grouped with other attributes

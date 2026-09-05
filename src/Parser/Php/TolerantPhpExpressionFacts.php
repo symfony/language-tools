@@ -8,11 +8,13 @@ final class TolerantPhpExpressionFacts
      * @param list<PhpMethodCall>     $methodCalls
      * @param list<PhpObjectCreation> $objectCreations
      * @param list<PhpClassReference> $classReferences
+     * @param list<PhpLiteralArray>   $literalArrays
      */
     public function __construct(
         public readonly array $methodCalls,
         public readonly array $objectCreations,
         public readonly array $classReferences,
+        public readonly array $literalArrays,
     ) {
     }
 }

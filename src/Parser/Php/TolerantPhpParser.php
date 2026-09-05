@@ -54,6 +54,7 @@ final class TolerantPhpParser implements PhpParserInterface
             $declarations->propertyDeclarations,
             $expressions->classReferences,
             $this->lexicalScopes->build($nodes, $source),
+            $expressions->literalArrays,
         );
     }
 }

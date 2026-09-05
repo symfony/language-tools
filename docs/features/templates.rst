@@ -46,8 +46,8 @@ Variables
 ---------
 
 Variable completion and hover are available in Twig templates for Twig globals,
-outer literal keys passed in short or long arrays to recognized PHP render
-calls and literal names listed in the ``vars`` argument of the ``#[Template]``
+outer literal keys passed in complete short or long arrays to recognized PHP
+render calls and literal names listed in the ``vars`` argument of the ``#[Template]``
 attribute. Render calls recognize positional context arrays and the named
 ``parameters`` or ``context`` arguments described above. Twig component
 templates also expose public component properties.
@@ -58,8 +58,9 @@ escape semantics, so single-quoted types keep escape sequences such as ``\n``
 literal. Documentation comments attached to type declarations are included in
 completion details and hover.
 
-Symfony Language Tools doesn't infer values propagated through dynamic arrays,
-includes, inheritance or arbitrary PHP expressions.
+Unknown or unpacked direct entries don't hide other known direct literal keys,
+but Symfony Language Tools doesn't infer values propagated through dynamic
+arrays, includes, inheritance or arbitrary PHP expressions.
 
 Twig Components
 ---------------

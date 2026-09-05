@@ -333,7 +333,8 @@ final class RouteReferenceExtractorTest extends TestCase
         yield 'named parameter list' => [null, ', parameters: [])'];
         yield 'unpacked arguments' => [null, ', ...$arguments)'];
         yield 'dynamic parameter argument' => [null, ', $parameters)'];
-        yield 'legacy array syntax' => [null, ", array('id' => 1))"];
+        yield 'legacy array syntax' => [['id'], ", array('id' => 1))"];
+        yield 'complete parameter array in incomplete call' => [['id'], ", ['id' => 1]"];
         yield 'top-level unpacking' => [null, ', [...$parameters])'];
         yield 'top-level unpacking after a literal key' => [null, ", ['locale' => 'en', ...\$parameters])"];
         yield 'variable top-level key' => [null, ', [$key => 1])'];

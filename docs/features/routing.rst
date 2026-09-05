@@ -59,7 +59,7 @@ Route Parameter Completion
 --------------------------
 
 For a statically known route name, completion is available for string keys in
-the parameter map:
+complete short or long parameter arrays:
 
 .. code-block:: php
 
@@ -111,8 +111,8 @@ Diagnostics
 -----------
 
 A statically known route name that doesn't exist is reported as an error. A
-route call with a complete literal parameter map also reports required path or
-host parameters that are missing. Parameters with route defaults or values
+route call with a complete literal short or long parameter array also reports
+required path or host parameters that are missing. Parameters with route defaults or values
 already configured in the router request context are optional. Parameter maps
 that are variables, contain a dynamic top-level key or use top-level array
 unpacking aren't diagnosed. Nested arrays and unpacking inside a parameter value

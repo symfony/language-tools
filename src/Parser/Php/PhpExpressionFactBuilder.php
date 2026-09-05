@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Parser\Php;
 
 use Microsoft\PhpParser\MissingToken;
 use Microsoft\PhpParser\Node;
+use Microsoft\PhpParser\Node\ArrayElement;
 use Microsoft\PhpParser\Node\Attribute;
 use Microsoft\PhpParser\Node\Expression\ArgumentExpression;
 use Microsoft\PhpParser\Node\Expression\ArrayCreationExpression;
@@ -67,7 +68,15 @@ final class PhpExpressionFactBuilder
             }
         }
 
-        return new TolerantPhpExpressionFacts($methodCalls, $objectCreations, array_values($classReferencesByNode));
+        $literalArrays = [];
+        foreach ($collection->literalArrays as $node) {
+            $array = $this->literalArray($node, $source);
+            if (null !== $array) {
+                $literalArrays[] = $array;
+            }
+        }
+
+        return new TolerantPhpExpressionFacts($methodCalls, $objectCreations, array_values($classReferencesByNode), $literalArrays);
     }
 
     /**
@@ -282,6 +291,46 @@ final class PhpExpressionFactBuilder
         }
 
         return 1 === \count($arguments) && $arguments[0]->dotDotDotToken instanceof Token && null === $arguments[0]->expression;
+    }
+
+    private function literalArray(ArrayCreationExpression $expression, string $source): ?PhpLiteralArray
+    {
+        if ($expression->closeParenOrBracket instanceof MissingToken) {
+            return null;
+        }
+        $keys = [];
+        $hasUnknownKeys = false;
+        foreach ($this->nodes->arrayElements($expression) as $element) {
+            if ($element->dotDotDot instanceof Token) {
+                $hasUnknownKeys = true;
+                continue;
+            }
+            if ($element->arrowToken instanceof Token) {
+                $key = $element->elementKey instanceof StringLiteral ? $this->stringLiteral($element->elementKey, $source) : null;
+                if (null === $key) {
+                    $hasUnknownKeys = true;
+                } else {
+                    $keys[] = $key;
+                }
+                continue;
+            }
+            if (null !== $element->elementKey || $this->hasMissingToken($element)) {
+                $hasUnknownKeys = true;
+            }
+        }
+
+        return new PhpLiteralArray($expression->getStartPosition(), $expression->getEndPosition(), $keys, $hasUnknownKeys);
+    }
+
+    private function hasMissingToken(ArrayElement $element): bool
+    {
+        foreach ($element->getDescendantTokens() as $token) {
+            if ($token instanceof MissingToken) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function stringLiteral(StringLiteral $literal, string $source): ?PhpStringLiteral

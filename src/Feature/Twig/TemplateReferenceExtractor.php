@@ -99,14 +99,19 @@ final class TemplateReferenceExtractor
                 continue;
             }
             $parameters = $call->namedOrPositionalArgument($receiver['variablesArgumentName'], 1);
+            $array = $php->literalArray($parameters);
             $parametersExpression = $parameters?->expression;
             $parametersOffset = $parameters?->expressionStartOffset;
-            $variables = !\is_string($parametersExpression) || !\is_int($parametersOffset) ? [] : $this->literalArrayKeyValues($this->arrayKeys->parseExpression(
-                $parametersExpression,
-                allowNestedUnpacking: true,
-                collectPartialLiteralKeys: true,
-                sourceOffset: $parametersOffset,
-            ));
+            $keys = $array?->keys;
+            if (null === $keys && \is_string($parametersExpression) && \is_int($parametersOffset)) {
+                $keys = $this->arrayKeys->parseExpression(
+                    $parametersExpression,
+                    allowNestedUnpacking: true,
+                    collectPartialLiteralKeys: true,
+                    sourceOffset: $parametersOffset,
+                );
+            }
+            $variables = $this->literalArrayKeyValues($keys);
             $references[] = $this->reference(
                 $template->value,
                 $document->uri,
