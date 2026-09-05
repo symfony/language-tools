@@ -42,6 +42,23 @@ The server recognizes event references in these contexts:
 * ``EventSubscriberInterface::getSubscribedEvents()`` return values;
 * ``kernel.event_listener`` service tags.
 
+Service tags are recognized in both block and inline YAML, and quoted event
+names are read as the values Symfony sees:
+
+.. code-block:: yaml
+
+    # config/services.yaml
+    services:
+        App\EventListener\NotifyCustomer:
+            tags:
+                - name: kernel.event_listener
+                  event: App\Event\OrderPlaced
+                - { name: kernel.event_listener, event: 'legacy.order_placed' }
+
+An ``event`` key is read as an event name only when it belongs to a
+``kernel.event_listener`` tag entry, so keys of other tags, keys nested below a
+tag and commented-out tags are ignored.
+
 Typed parameters are matched only inside their declaring method. Typed
 properties, including promoted properties, remain available across methods.
 Named and unpacked arguments aren't treated as positional event arguments.
@@ -64,3 +81,9 @@ remain recognized when the class uses PHP asymmetric property visibility or a
 trait. Closure variable captures don't suppress missing-method diagnostics.
 Unknown event names aren't diagnosed because the event dispatcher accepts events
 without registered listeners.
+
+Limitations
+-----------
+
+An inline tag entry is read once its closing brace is typed, so event names and
+completion inside an unclosed ``{ ... }`` entry aren't available.

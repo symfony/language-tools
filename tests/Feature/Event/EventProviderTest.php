@@ -30,12 +30,17 @@ use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class EventProviderTest extends TestCase
 {
+    private const CURSOR = '<CURSOR>';
+
     public function testExtractsHighConfidenceEventReferences(): void
     {
         $converter = new PositionConverter();
@@ -179,10 +184,9 @@ YAML;
         self::assertCount(2, $facts->listeners);
     }
 
-    public function testExtractsAndCompletesYamlListenerEventsWithByteExactRanges(): void
+    public function testExtractsYamlListenerEventsFromBlockAndFlowTagsWithByteExactRanges(): void
     {
         $converter = new PositionConverter();
-        $extractor = $this->extractor($converter);
         $text = <<<'YAML'
             services:
               App\InlineListener:
@@ -191,13 +195,18 @@ YAML;
               App\BlockListener:
                 tags:
                   - name: kernel.event_listener
-                    event: App\Event\OrderPlaced
+                    event: \App\Event\OrderPlaced
+              App\FlowListener:
+                tags: [{ name: 'kernel.event_listener', event: flow.first }, { name: kernel.event_listener, event: "App\\Event\\FlowSecond" }]
             YAML;
-        $facts = $extractor->extract(new SourceDocument('file:///workspace/config/services.yaml', 'yaml', $text));
+        $facts = $this->extractor($converter)->extract(new SourceDocument('file:///workspace/config/services.yaml', 'yaml', $text));
 
-        self::assertSame(['legacy.order_placed', 'App\Event\OrderPlaced'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
         self::assertSame(
-            ['legacy.order_placed', 'App\Event\OrderPlaced'],
+            ['legacy.order_placed', 'App\Event\OrderPlaced', 'flow.first', 'App\Event\FlowSecond'],
+            array_map(static fn ($symbol): string => $symbol->name, $facts->symbols),
+        );
+        self::assertSame(
+            ['legacy.order_placed', '\App\Event\OrderPlaced', 'flow.first', 'App\\\\Event\\\\FlowSecond'],
             array_map(static function ($symbol) use ($converter, $text): string {
                 $start = $converter->toByteOffset($text, $symbol->range->start);
                 $end = $converter->toByteOffset($text, $symbol->range->end);
@@ -205,11 +214,57 @@ YAML;
                 return substr($text, $start, $end - $start);
             }, $facts->symbols),
         );
+    }
 
-        $inline = "services:\n  App\\Listener:\n    tags:\n      - { name: kernel.event_listener, event: 'legacy.or";
-        $block = "services:\n  App\\Listener:\n    tags:\n      - name: kernel.event_listener\n        event: App\\Event\\Ord";
-        self::assertSame('legacy.or', $extractor->completionPrefix('yaml', $inline, \strlen($inline)));
-        self::assertSame('App\Event\Ord', $extractor->completionPrefix('yaml', $block, \strlen($block)));
+    public function testIgnoresYamlEventKeysOutsideListenerTags(): void
+    {
+        $text = <<<'YAML'
+            services:
+              App\Listener:
+                arguments:
+                  $event: 'app.constructor_argument'
+                tags:
+                  # - { name: kernel.event_listener, event: commented.listener }
+                  - name: kernel.event_subscriber
+                  - name: other.tag
+                    event: other.tag_event
+                  - { name: kernel.event_listener }
+                  - name: kernel.event_listener
+                    options:
+                      event: nested.option
+                  - name: kernel.event_listener
+                    event: real.event
+            events:
+              - name: kernel.event_listener
+                event: outside.services
+            YAML;
+
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/config/services.yaml', 'yaml', $text));
+
+        self::assertSame(['real.event'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
+    }
+
+    #[DataProvider('yamlListenerCompletionProvider')]
+    public function testCompletesEventNamesOnlyInListenerTagEventValues(string $text, ?string $expectedPrefix): void
+    {
+        $offset = (int) strpos($text, self::CURSOR);
+
+        self::assertSame($expectedPrefix, $this->extractor()->completionPrefix('yaml', str_replace(self::CURSOR, '', $text), $offset));
+    }
+
+    /** @return iterable<string, array{string, ?string}> */
+    public static function yamlListenerCompletionProvider(): iterable
+    {
+        $service = static fn (string $tags): string => "services:\n  App\\Listener:\n".$tags;
+        $blockTags = static fn (string $items): string => $service("    tags:\n".$items);
+        yield 'block event being typed' => [$blockTags("      - name: kernel.event_listener\n        event: App\\Event\\Ord".self::CURSOR), 'App\Event\Ord'];
+        yield 'block event without a value' => [$blockTags("      - name: kernel.event_listener\n        event: ".self::CURSOR), ''];
+        yield 'quoted flow event' => [$blockTags("      - { name: kernel.event_listener, event: 'legacy.or".self::CURSOR."' }\n"), 'legacy.or'];
+        yield 'flow event without a value' => [$blockTags('      - { name: kernel.event_listener, event: '.self::CURSOR."}\n"), ''];
+        yield 'flow sequence event' => [$service('    tags: [{ name: kernel.event_listener, event: flow.or'.self::CURSOR." }]\n"), 'flow.or'];
+        yield 'unrelated tag' => [$blockTags('      - { name: kernel.event_subscriber, event: legacy.or'.self::CURSOR." }\n"), null];
+        yield 'commented tag' => [$blockTags('      # - { name: kernel.event_listener, event: legacy.or'.self::CURSOR." }\n      - name: kernel.event_listener\n        event: real.event\n"), null];
+        yield 'tag name' => [$blockTags('      - { name: kernel.event_lis'.self::CURSOR.", event: legacy.order_placed }\n"), null];
     }
 
     public function testScopesEventDispatcherParametersToTheirMethod(): void
@@ -435,7 +490,7 @@ PHP;
             new TolerantPhpParser(new Parser()),
             new PhpCommentParser(),
             new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher()),
-            new EventYamlListenerAnalyzer($converter),
+            new EventYamlListenerAnalyzer($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
             new EventSubscriberMapAnalyzer($converter, new BalancedDelimiterMatcher()),
         );
     }

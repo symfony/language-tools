@@ -125,7 +125,7 @@ final class YamlDocumentParser
                 $keyEnd,
                 $valueStart,
                 $valueEnd,
-                array_values(array_unique(array_map(static fn (YamlSequenceItem $item): int => $item->pathDepth, $sequence))),
+                $sequence,
                 $mappingScope,
             );
         }

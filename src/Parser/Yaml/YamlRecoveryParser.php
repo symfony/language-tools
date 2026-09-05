@@ -108,7 +108,7 @@ final class YamlRecoveryParser
                 $keyStart + $parsed['keyLength'],
                 $valueStart,
                 $valueStart + \strlen($mappingValue),
-                array_values(array_unique(array_map(static fn (YamlSequenceItem $item): int => $item->pathDepth, $sequence))),
+                $sequence,
                 $scope,
             );
             if (null !== $value) {

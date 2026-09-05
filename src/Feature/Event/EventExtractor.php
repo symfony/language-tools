@@ -49,7 +49,6 @@ final class EventExtractor
 
     public function completionPrefix(string $languageId, string $text, int $offset): ?string
     {
-        $before = substr($text, 0, $offset);
         if ('php' === $languageId) {
             $php = $this->parser->parse($text);
             $masked = $this->phpComments->mask($text);
@@ -80,7 +79,7 @@ final class EventExtractor
             }
         }
         if ('yaml' === $languageId) {
-            return $this->yamlListenerAnalyzer->completionPrefix($before);
+            return $this->yamlListenerAnalyzer->completionPrefix($text, $offset);
         }
 
         return null;

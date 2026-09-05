@@ -4,75 +4,112 @@ namespace Symfony\Lsp\Feature\Event;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
+use Symfony\Lsp\Parser\Yaml\YamlMapping;
+use Symfony\Lsp\Parser\Yaml\YamlScalar;
+use Symfony\Lsp\Parser\Yaml\YamlSequenceItem;
 
 final class EventYamlListenerAnalyzer
 {
-    public function __construct(private readonly PositionConverter $converter)
-    {
+    private const LISTENER_TAG = 'kernel.event_listener';
+
+    public function __construct(
+        private readonly PositionConverter $converter,
+        private readonly YamlDocumentParser $parser,
+    ) {
     }
 
     /** @return list<EventSourceSymbol> */
     public function symbols(string $uri, string $text): array
     {
-        [$events] = $this->analyze($text);
+        $symbols = [];
+        foreach ($this->listenerEvents($text) as [, $scalar]) {
+            if (null === $scalar || '' === $scalar->value) {
+                continue;
+            }
+            $symbols[] = new EventSourceSymbol(
+                ltrim($scalar->value, '\\'),
+                $uri,
+                new Range(
+                    $this->converter->toPosition($text, $scalar->contentStartByte),
+                    $this->converter->toPosition($text, $scalar->contentEndByte),
+                ),
+                true,
+            );
+        }
 
-        return array_map(fn (array $event): EventSourceSymbol => new EventSourceSymbol(
-            ltrim($event['name'], '\\'),
-            $uri,
-            new Range(
-                $this->converter->toPosition($text, $event['offset']),
-                $this->converter->toPosition($text, $event['offset'] + \strlen($event['name'])),
-            ),
-            true,
-        ), $events);
+        return $symbols;
     }
 
-    public function completionPrefix(string $text): ?string
+    public function completionPrefix(string $text, int $offset): ?string
     {
-        [, $prefix] = $this->analyze($text);
-
-        return $prefix;
-    }
-
-    /** @return array{list<array{name: string, offset: int}>, string|null} */
-    private function analyze(string $text): array
-    {
-        $events = [];
-        $completionPrefix = null;
-        $listenerIndent = null;
-        preg_match_all('/^.*(?:\R|$)/m', $text, $lines, \PREG_OFFSET_CAPTURE);
-        $lastLine = array_key_last($lines[0]);
-        foreach ($lines[0] as $index => [$line, $lineOffset]) {
-            $line = rtrim($line, "\r\n");
-            if (preg_match('/^(\s*)-\s*(?:\{\s*)?name\s*:\s*["\']?kernel\.event_listener["\']?(.*)$/', $line, $tag)) {
-                $listenerIndent = \strlen($tag[1]);
-                if (preg_match('/\bevent\s*:\s*["\']?([A-Za-z0-9_.\\\\-]+)/', $tag[2], $event, \PREG_OFFSET_CAPTURE)) {
-                    $events[] = [
-                        'name' => $event[1][0],
-                        'offset' => $lineOffset + (int) strpos($line, $tag[2]) + $event[1][1],
-                    ];
-                }
-                if ($index === $lastLine && preg_match('/\bevent\s*:\s*["\']?([A-Za-z0-9_.\\\\-]*)$/', $tag[2], $event)) {
-                    $completionPrefix = $event[1];
+        foreach ($this->listenerEvents($text) as [$mapping, $scalar]) {
+            if (null === $scalar) {
+                if ($offset === $mapping->valueStartByte && $offset === $mapping->valueEndByte) {
+                    return '';
                 }
                 continue;
             }
-            if (null === $listenerIndent || !preg_match('/^(\s*)/', $line, $indentMatch)) {
-                continue;
-            }
-            $indent = \strlen($indentMatch[1]);
-            if ('' !== trim($line) && $indent <= $listenerIndent) {
-                $listenerIndent = null;
-                continue;
-            }
-            if (preg_match('/^\s*event\s*:\s*["\']?([A-Za-z0-9_.\\\\-]+)/', $line, $event, \PREG_OFFSET_CAPTURE)) {
-                $events[] = ['name' => $event[1][0], 'offset' => $lineOffset + $event[1][1]];
-            }
-            if ($index === $lastLine && preg_match('/^\s*event\s*:\s*["\']?([A-Za-z0-9_.\\\\-]*)$/', $line, $event)) {
-                $completionPrefix = $event[1];
+            if ($offset >= $scalar->contentStartByte && $offset <= $scalar->contentEndByte) {
+                return substr($text, $scalar->contentStartByte, $offset - $scalar->contentStartByte);
             }
         }
 
-        return [$events, $completionPrefix];
+        return null;
+    }
+
+    /**
+     * Event values of `kernel.event_listener` tags, paired with the scalar
+     * holding the value when the tag entry declares one.
+     *
+     * @return list<array{YamlMapping, ?YamlScalar}>
+     */
+    private function listenerEvents(string $text): array
+    {
+        $document = $this->parser->parseDocument($text);
+        $scalars = [];
+        foreach ($document->scalars as $scalar) {
+            $scalars[$scalar->startByte] ??= $scalar;
+        }
+        $listeners = [];
+        $events = [];
+        foreach ($document->mappings as $mapping) {
+            $entry = $this->tagEntry($mapping);
+            if (null === $entry) {
+                continue;
+            }
+            [$identity, $key] = $entry;
+            $scalar = $scalars[$mapping->valueStartByte] ?? null;
+            $scalar = null !== $scalar && null === $scalar->tag && $scalar->path === $mapping->path ? $scalar : null;
+            if ('name' === $key) {
+                $listeners[$identity] = self::LISTENER_TAG === $scalar?->value;
+            } else {
+                $events[$identity] = [$mapping, $scalar];
+            }
+        }
+
+        return array_values(array_intersect_key($events, array_filter($listeners)));
+    }
+
+    /**
+     * The tag entry a `name` or `event` mapping belongs to, as an identity
+     * shared by the keys of that entry only.
+     *
+     * @return array{string, string}|null
+     */
+    private function tagEntry(YamlMapping $mapping): ?array
+    {
+        $depth = \count($mapping->path) - 1;
+        if ($depth < 3
+            || 'services' !== $mapping->path[0]
+            || 'tags' !== $mapping->path[$depth - 1]
+            || !\in_array($key = $mapping->path[$depth], ['name', 'event'], true)
+            || !\in_array($depth, $mapping->sequenceDepths, true)
+        ) {
+            return null;
+        }
+        $items = array_map(static fn (YamlSequenceItem $item): string => $item->pathDepth.':'.$item->index, $mapping->sequence);
+
+        return [implode("\0", [$mapping->scope, ...\array_slice($mapping->path, 0, -1), ...$items]), $key];
     }
 }

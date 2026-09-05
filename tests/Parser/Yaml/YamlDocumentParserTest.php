@@ -74,6 +74,36 @@ final class YamlDocumentParserTest extends TestCase
         );
     }
 
+    public function testDistinguishesSiblingSequenceItemsOnMappings(): void
+    {
+        $source = <<<'YAML'
+            services:
+                App\Listener:
+                    tags:
+                        - name: first
+                          event: first.event
+                        - name: second
+                    calls: [[setLogger, ['@logger']]]
+            YAML;
+        $mappings = (new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))->parse($source);
+
+        self::assertSame(
+            [
+                [['services'], []],
+                [['services', 'App\Listener'], []],
+                [['services', 'App\Listener', 'tags'], []],
+                [['services', 'App\Listener', 'tags', 'name'], [[3, 0]]],
+                [['services', 'App\Listener', 'tags', 'event'], [[3, 0]]],
+                [['services', 'App\Listener', 'tags', 'name'], [[3, 1]]],
+                [['services', 'App\Listener', 'calls'], []],
+            ],
+            array_map(static fn (YamlMapping $mapping): array => [
+                $mapping->path,
+                array_map(static fn (YamlSequenceItem $item): array => [$item->pathDepth, $item->index], $mapping->sequence),
+            ], $mappings),
+        );
+    }
+
     public function testProvidesScalarFactsFromTheTree(): void
     {
         $source = self::scalarSource();
