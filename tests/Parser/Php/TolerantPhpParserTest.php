@@ -1377,14 +1377,22 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame($closure->startOffset, $arrow->parentScopeStartOffset);
         self::assertSame('function (object $shadow) use ('."\n".'            $service,'."\n".'            &$café,'."\n".'        ): void {'."\n".'            $inner = fn (object $service) => $service->run();'."\n".'        }', substr($source, $closure->startOffset, $closure->endOffset - $closure->startOffset));
         self::assertSame('fn (object $service) => $service->run()', substr($source, $arrow->startOffset, $arrow->endOffset - $arrow->startOffset));
-        self::assertTrue($closure->complete);
-        self::assertTrue($arrow->complete);
+        self::assertTrue($closure->captureComplete);
+        self::assertTrue($arrow->captureComplete);
 
         $recovered = (new TolerantPhpParser(new Parser()))->parse('<?php $closure = function ($value) use ($captured) { $captured->run(')->lexicalScopes[0];
 
         self::assertSame(['value'], $recovered->parameterNames);
         self::assertSame(['captured'], $recovered->capturedVariableNames);
-        self::assertFalse($recovered->complete);
+        self::assertTrue($recovered->captureComplete);
+
+        foreach ([
+            '<?php $closure = function ($value use ($captured) {',
+            '<?php $closure = function ($value) use ($captured {',
+            '<?php $arrow = fn ($value) $value->run()',
+        ] as $incomplete) {
+            self::assertFalse((new TolerantPhpParser(new Parser()))->parse($incomplete)->lexicalScopes[0]->captureComplete);
+        }
     }
 
     public function testResolvesCapturedReceiversAcrossEveryNestedBoundary(): void

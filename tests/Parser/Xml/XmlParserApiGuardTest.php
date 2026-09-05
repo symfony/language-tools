@@ -8,7 +8,7 @@ final class XmlParserApiGuardTest extends TestCase
 {
     public function testSourceDoesNotUseGeneralPurposeXmlParserApis(): void
     {
-        $root = \dirname(__DIR__, 3).'/src/Parser/Xml';
+        $root = \dirname(__DIR__, 3).'/src';
         $forbidden = '/\\b(?:DOMDocument|DOMXPath|SimpleXMLElement|XMLReader|Dom\\\\XMLDocument)\\b|\\b(?:simplexml_load_(?:file|string)|libxml_[A-Za-z_]+|xml_parser_create(?:_ns)?|xml_parse(?:_into_struct)?)\\s*\\(/';
         $violations = [];
         $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS));

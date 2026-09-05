@@ -30,7 +30,7 @@ final class PhpLexicalScopeFactBuilder
                 $this->parameterNames($node->parameters, $source),
                 $node instanceof AnonymousFunctionCreationExpression ? $this->capturedVariableNames($node->anonymousFunctionUseClause, $source) : [],
                 $parent?->getStartPosition(),
-                $this->complete($node),
+                $this->captureComplete($node),
             );
         }
 
@@ -68,15 +68,16 @@ final class PhpLexicalScopeFactBuilder
         return $names;
     }
 
-    private function complete(AnonymousFunctionCreationExpression|ArrowFunctionCreationExpression $scope): bool
+    private function captureComplete(AnonymousFunctionCreationExpression|ArrowFunctionCreationExpression $scope): bool
     {
-        foreach ($scope->getDescendantTokens() as $token) {
-            if ($token instanceof MissingToken) {
-                return false;
-            }
+        if ($scope->closeParen instanceof MissingToken) {
+            return false;
         }
+        if ($scope instanceof ArrowFunctionCreationExpression) {
+            return !$scope->arrowToken instanceof MissingToken;
+        }
+        $use = $scope->anonymousFunctionUseClause;
 
-        return !$scope->closeParen instanceof MissingToken
-            && (!$scope instanceof ArrowFunctionCreationExpression || !$scope->arrowToken instanceof MissingToken);
+        return null === $use || (!$use->useVariableNameList instanceof MissingToken && !$use->closeParen instanceof MissingToken);
     }
 }

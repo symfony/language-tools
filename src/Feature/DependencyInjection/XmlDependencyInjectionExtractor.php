@@ -23,7 +23,8 @@ final class XmlDependencyInjectionExtractor
         }
         $document = $this->parser->parse($text);
         $elements = $document->elements();
-        if (!$this->hasServicesSchema($elements)) {
+        $serviceElements = $this->serviceElements($elements);
+        if ([] === $serviceElements) {
             return null;
         }
 
@@ -31,9 +32,10 @@ final class XmlDependencyInjectionExtractor
         $tags = [];
         foreach ($elements as $element) {
             $nearestService = null === $element->parentIdentity ? null : ($nearestServices[$element->parentIdentity] ?? null);
-            if ('service' === $element->localName) {
+            if (isset($serviceElements[$element->identity]) && 'service' === $element->localName) {
                 $nearestService = $element->identity;
-            } elseif ('tag' === $element->localName
+            } elseif (isset($serviceElements[$element->identity])
+                && 'tag' === $element->localName
                 && null !== $nearestService
                 && $element->parentIdentity === $nearestService
                 && null !== $name = $element->attribute('name')
@@ -47,6 +49,9 @@ final class XmlDependencyInjectionExtractor
         $parameters = [];
         $references = [];
         foreach ($elements as $element) {
+            if (!isset($serviceElements[$element->identity])) {
+                continue;
+            }
             if ('service' === $element->localName) {
                 $id = $element->attribute('id');
                 if (null === $id) {
@@ -85,7 +90,7 @@ final class XmlDependencyInjectionExtractor
             }
         }
         foreach ($elements as $element) {
-            if ('argument' !== $element->localName || 'service' !== $element->attribute('type')?->value || null === $id = $element->attribute('id')) {
+            if (!isset($serviceElements[$element->identity]) || 'argument' !== $element->localName || 'service' !== $element->attribute('type')?->value || null === $id = $element->attribute('id')) {
                 continue;
             }
             $onInvalid = $element->attribute('on-invalid');
@@ -99,9 +104,9 @@ final class XmlDependencyInjectionExtractor
         }
 
         foreach ($document->events as $event) {
-            if ($event instanceof XmlText) {
+            if ($event instanceof XmlText && null !== $event->parentIdentity && isset($serviceElements[$event->parentIdentity])) {
                 array_push($references, ...$this->parameterReferences($uri, $text, $event->raw, $event->startOffset));
-            } elseif ($event instanceof XmlElementStart) {
+            } elseif ($event instanceof XmlElementStart && isset($serviceElements[$event->identity])) {
                 foreach ($event->attributes as $attribute) {
                     array_push($references, ...$this->parameterReferences($uri, $text, $attribute->value, $attribute->valueStartOffset));
                 }
@@ -111,20 +116,45 @@ final class XmlDependencyInjectionExtractor
         return new DependencyInjectionSourceFacts($uri, $services, $parameters, $references);
     }
 
-    /** @param list<XmlElementStart> $elements */
-    private function hasServicesSchema(array $elements): bool
+    /**
+     * @param list<XmlElementStart> $elements
+     *
+     * @return array<int, true>
+     */
+    private function serviceElements(array $elements): array
     {
+        $prefix = null;
+        $documentElement = null;
         foreach ($elements as $element) {
-            foreach ($element->attributes as $attribute) {
-                if (('xmlns' === $attribute->qualifiedName || str_starts_with($attribute->qualifiedName, 'xmlns:'))
-                    && str_contains($attribute->value, 'symfony.com/schema/dic/services')
-                ) {
-                    return true;
-                }
+            if (null !== $element->parentIdentity) {
+                continue;
+            }
+            $namespace = $element->attribute(null === $element->prefix ? 'xmlns' : 'xmlns:'.$element->prefix);
+            if ('container' === $element->localName && null !== $namespace && str_contains($namespace->value, 'symfony.com/schema/dic/services')) {
+                $prefix = $element->prefix;
+                $documentElement = $element;
+            }
+            break;
+        }
+        if (null === $documentElement) {
+            return [];
+        }
+
+        $bound = [];
+        $serviceElements = [];
+        $declarationName = null === $prefix ? 'xmlns' : 'xmlns:'.$prefix;
+        foreach ($elements as $element) {
+            $isBound = null === $element->parentIdentity ? false : ($bound[$element->parentIdentity] ?? false);
+            if (null !== $namespace = $element->attribute($declarationName)) {
+                $isBound = str_contains($namespace->value, 'symfony.com/schema/dic/services');
+            }
+            $bound[$element->identity] = $isBound;
+            if ($isBound && $element->prefix === $prefix) {
+                $serviceElements[$element->identity] = true;
             }
         }
 
-        return false;
+        return $serviceElements;
     }
 
     /** @return list<DependencyInjectionReference> */

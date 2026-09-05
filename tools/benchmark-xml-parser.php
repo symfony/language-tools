@@ -54,3 +54,23 @@ foreach ($fixtures as $name => $source) {
         memory_get_peak_usage(true),
     );
 }
+
+$measure = static function (string $source) use ($parser): float {
+    $runs = [];
+    for ($run = 0; $run < 3; ++$run) {
+        $startedAt = hrtime(true);
+        $parser->parse($source);
+        $runs[] = (hrtime(true) - $startedAt) / 1_000_000;
+    }
+    sort($runs);
+
+    return $runs[1];
+};
+$small = $measure(str_repeat('<a>', 4_000).str_repeat('</a>', 4_000));
+$large = $measure(str_repeat('<a>', 8_000).str_repeat('</a>', 8_000));
+$ratio = $large / max($small, 0.001);
+printf("nested_depth,small_ms,large_ms,ratio\n");
+printf("4000_to_8000,%.4f,%.4f,%.2f\n", $small, $large, $ratio);
+if ($ratio > 3.0) {
+    throw new RuntimeException(sprintf('Nested XML scaling ratio %.2f exceeds 3.0.', $ratio));
+}

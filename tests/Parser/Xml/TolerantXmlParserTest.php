@@ -111,4 +111,24 @@ final class TolerantXmlParserTest extends TestCase
 
         self::assertSame(['Element "child" is not closed.'], array_map(static fn ($diagnostic): string => $diagnostic->message, $document->diagnostics));
     }
+
+    public function testCapsMaterializedEventsAndDiagnostics(): void
+    {
+        $events = (new TolerantXmlParser())->parse(str_repeat('<', 21_000));
+        $diagnostics = (new TolerantXmlParser())->parse(str_repeat('</missing>', 200));
+
+        self::assertCount(20_000, $events->events);
+        self::assertSame(['XML analysis stopped after reaching its structural limit.'], array_map(static fn ($diagnostic): string => $diagnostic->message, $events->diagnostics));
+        self::assertCount(101, $diagnostics->diagnostics);
+        self::assertSame('XML analysis stopped after reaching its structural limit.', $diagnostics->diagnostics[100]->message);
+    }
+
+    public function testDoesNotExposeInvalidUtf8Names(): void
+    {
+        $document = (new TolerantXmlParser())->parse("<élément2/><\xFFbad/><real/>");
+        $starts = array_values(array_filter($document->events, static fn ($event): bool => $event instanceof XmlElementStart));
+
+        self::assertSame(['élément2', 'real'], array_map(static fn (XmlElementStart $event): string => $event->qualifiedName, $starts));
+        self::assertSame([], $document->diagnostics);
+    }
 }

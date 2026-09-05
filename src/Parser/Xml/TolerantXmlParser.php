@@ -4,17 +4,27 @@ namespace Symfony\Lsp\Parser\Xml;
 
 final class TolerantXmlParser implements XmlParserInterface
 {
+    private const MAX_EVENTS = 20_000;
+    private const MAX_DIAGNOSTICS = 100;
+    private const NAME_CHARACTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.:-';
+
     public function parse(string $source): XmlDocument
     {
         $events = [];
         $diagnostics = [];
         $stack = [];
+        $openNameCounts = [];
         $length = \strlen($source);
         $offset = 0;
         $identity = 0;
         $terminalMalformed = false;
 
         while ($offset < $length) {
+            if (\count($events) >= self::MAX_EVENTS || \count($diagnostics) >= self::MAX_DIAGNOSTICS) {
+                $diagnostics[] = new XmlDiagnostic('XML analysis stopped after reaching its structural limit.', $offset, $offset);
+                $terminalMalformed = true;
+                break;
+            }
             $opening = strpos($source, '<', $offset);
             if (false === $opening) {
                 $this->appendText($events, $source, $offset, $length, $this->parentIdentity($stack));
@@ -70,9 +80,9 @@ final class TolerantXmlParser implements XmlParserInterface
                 continue;
             }
             if ($this->startsWith($source, '</', $opening)) {
-                $closing = $this->closingElement($source, $opening, $stack);
+                $closing = $this->closingElement($source, $opening, $stack, $openNameCounts);
                 if (null !== $closing) {
-                    [$event, $diagnostic, $offset, $stack] = $closing;
+                    [$event, $diagnostic, $offset] = $closing;
                     $events[] = $event;
                     if (null !== $diagnostic) {
                         $diagnostics[] = $diagnostic;
@@ -89,6 +99,7 @@ final class TolerantXmlParser implements XmlParserInterface
                         $events[] = $event;
                         if (!$event->selfClosing) {
                             $stack[] = [$event->identity, $event->qualifiedName];
+                            $openNameCounts[$event->qualifiedName] = 1 + ($openNameCounts[$event->qualifiedName] ?? 0);
                         }
                     }
                     if (null !== $diagnostic) {
@@ -302,17 +313,18 @@ final class TolerantXmlParser implements XmlParserInterface
                 continue;
             }
             $valueStart = ++$offset;
-            while ($offset < $limit && $source[$offset] !== $quote) {
-                if ('<' === $source[$offset] && $this->isRecoveryMarkup($source, $valueStart, $offset)) {
-                    return [null, new XmlDiagnostic(\sprintf('Opening element "%s" is not closed.', $qualifiedName), $start + 1, $nameEnd), $offset];
-                }
-                ++$offset;
-            }
-            if ($offset >= $limit) {
+            $valueEnd = strpos($source, $quote, $valueStart);
+            if (false === $valueEnd) {
                 break;
             }
-            $valueEnd = $offset;
-            ++$offset;
+            $markup = strpos($source, '<', $valueStart);
+            while (false !== $markup && $markup < $valueEnd) {
+                if ($this->isRecoveryMarkup($source, $valueStart, $markup)) {
+                    return [null, new XmlDiagnostic(\sprintf('Opening element "%s" is not closed.', $qualifiedName), $start + 1, $nameEnd), $markup];
+                }
+                $markup = strpos($source, '<', $markup + 1);
+            }
+            $offset = $valueEnd + 1;
             $attributes[] = new XmlAttribute(
                 $attributeQualifiedName,
                 substr($source, $valueStart, $valueEnd - $valueStart),
@@ -331,10 +343,11 @@ final class TolerantXmlParser implements XmlParserInterface
 
     /**
      * @param list<array{int, string}> $stack
+     * @param array<string, int>       $openNameCounts
      *
-     * @return array{XmlElementEnd, ?XmlDiagnostic, int, list<array{int, string}>}|null
+     * @return array{XmlElementEnd, ?XmlDiagnostic, int}|null
      */
-    private function closingElement(string $source, int $start, array $stack): ?array
+    private function closingElement(string $source, int $start, array &$stack, array &$openNameCounts): ?array
     {
         $name = $this->name($source, $start + 2);
         if (null === $name) {
@@ -348,14 +361,15 @@ final class TolerantXmlParser implements XmlParserInterface
             $next = strpos($source, '<', $offset);
             $end = false === $next || $next > $limit ? $limit : $next;
 
-            return [new XmlElementEnd(null, $qualifiedName, $start, $end, $start + 2, $nameEnd), new XmlDiagnostic(\sprintf('Closing element "%s" is not closed.', $qualifiedName), $start + 2, $nameEnd), $end, $stack];
+            return [new XmlElementEnd(null, $qualifiedName, $start, $end, $start + 2, $nameEnd), new XmlDiagnostic(\sprintf('Closing element "%s" is not closed.', $qualifiedName), $start + 2, $nameEnd), $end];
         }
         $end = $offset + 1;
         $top = [] === $stack ? null : $stack[array_key_last($stack)];
         if (null !== $top && $qualifiedName === $top[1]) {
             array_pop($stack);
+            $this->removeOpenName($openNameCounts, $qualifiedName);
 
-            return [new XmlElementEnd($top[0], $qualifiedName, $start, $end, $start + 2, $nameEnd), null, $end, $stack];
+            return [new XmlElementEnd($top[0], $qualifiedName, $start, $end, $start + 2, $nameEnd), null, $end];
         }
 
         $diagnostic = new XmlDiagnostic(
@@ -363,20 +377,27 @@ final class TolerantXmlParser implements XmlParserInterface
             $start + 2,
             $nameEnd,
         );
-        $match = null;
-        for ($index = \count($stack) - 1; 0 <= $index; --$index) {
-            if ($qualifiedName === $stack[$index][1]) {
-                $match = $index;
-                break;
-            }
+        if (!isset($openNameCounts[$qualifiedName])) {
+            return [new XmlElementEnd(null, $qualifiedName, $start, $end, $start + 2, $nameEnd), $diagnostic, $end];
         }
-        if (null === $match) {
-            return [new XmlElementEnd(null, $qualifiedName, $start, $end, $start + 2, $nameEnd), $diagnostic, $end, $stack];
-        }
-        $identity = $stack[$match][0];
-        $stack = \array_slice($stack, 0, $match);
+        do {
+            /** @var array{int, string} $entry */
+            $entry = array_pop($stack);
+            [$identity, $removedName] = $entry;
+            $this->removeOpenName($openNameCounts, $removedName);
+        } while ($qualifiedName !== $removedName);
 
-        return [new XmlElementEnd($identity, $qualifiedName, $start, $end, $start + 2, $nameEnd), $diagnostic, $end, $stack];
+        return [new XmlElementEnd($identity, $qualifiedName, $start, $end, $start + 2, $nameEnd), $diagnostic, $end];
+    }
+
+    /** @param array<string, int> $openNameCounts */
+    private function removeOpenName(array &$openNameCounts, string $name): void
+    {
+        if (1 === $openNameCounts[$name]) {
+            unset($openNameCounts[$name]);
+        } else {
+            --$openNameCounts[$name];
+        }
     }
 
     /** @return array{string, int}|null */
@@ -386,12 +407,16 @@ final class TolerantXmlParser implements XmlParserInterface
         if ($offset >= $length || !$this->isNameStart($source[$offset])) {
             return null;
         }
-        $start = $offset++;
-        while ($offset < $length && $this->isNameCharacter($source[$offset])) {
-            ++$offset;
-        }
+        $start = $offset;
+        do {
+            $offset += strspn($source, self::NAME_CHARACTERS, $offset);
+            while ($offset < $length && \ord($source[$offset]) >= 0x80) {
+                ++$offset;
+            }
+        } while ($offset < $length && (\ord($source[$offset]) >= 0x80 || str_contains(self::NAME_CHARACTERS, $source[$offset])));
+        $name = substr($source, $start, $offset - $start);
 
-        return [substr($source, $start, $offset - $start), $offset];
+        return 1 === preg_match('//u', $name) ? [$name, $offset] : null;
     }
 
     private function isNameStart(string $byte): bool
@@ -401,16 +426,9 @@ final class TolerantXmlParser implements XmlParserInterface
         return $ord >= 0x80 || '_' === $byte || ':' === $byte || ($byte >= 'A' && $byte <= 'Z') || ($byte >= 'a' && $byte <= 'z');
     }
 
-    private function isNameCharacter(string $byte): bool
-    {
-        return $this->isNameStart($byte) || ($byte >= '0' && $byte <= '9') || '.' === $byte || '-' === $byte;
-    }
-
     private function skipWhitespace(string $source, int &$offset, int $limit): void
     {
-        while ($offset < $limit && $this->isWhitespace($source[$offset])) {
-            ++$offset;
-        }
+        $offset += strspn($source, " \t\r\n", $offset, $limit - $offset);
     }
 
     private function isWhitespace(string $byte): bool

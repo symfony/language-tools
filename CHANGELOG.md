@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Keep hostile XML parsing linear and bound structural facts and diagnostics
+- Ignore invalid UTF-8 XML names
+- Index XML dependency injection elements only in the services namespace
+- Resolve captured PHP receivers when only a callable body is incomplete
+- Report malformed XML attributes and opaque constructs in configuration files
 - Keep long XML opaque constructs from producing phantom source facts
 - Associate XML service tags only with their direct service declaration
 - Parse XML configuration, service definitions and XLIFF resources with tolerant shared syntax facts

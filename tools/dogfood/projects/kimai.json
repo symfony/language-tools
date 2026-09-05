@@ -3,6 +3,5 @@
     "repository": "https://github.com/kimai/kimai.git",
     "revision": "fd8989e9011aeff0a9ed573c294707140b4401b0",
     "setup": "composer",
-    "ci": true,
-    "requestTimeout": 15
+    "ci": true
 }

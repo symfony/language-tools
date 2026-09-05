@@ -157,7 +157,7 @@ final class PhpDocument
         }
         while ($scopeStartOffset !== $declarationScopeStartOffset) {
             $scope = $this->lexicalScopeStartingAt($scopeStartOffset);
-            if (null === $scope || !$scope->complete || \in_array($name, $scope->parameterNames, true)) {
+            if (null === $scope || !$scope->captureComplete || \in_array($name, $scope->parameterNames, true)) {
                 return false;
             }
             if (PhpLexicalScopeKind::Closure === $scope->kind && !\in_array($name, $scope->capturedVariableNames, true)) {

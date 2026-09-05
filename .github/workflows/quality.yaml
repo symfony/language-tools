@@ -51,6 +51,8 @@ jobs:
               run: composer tree-sitter:build
             - name: Run unit tests
               run: composer test
+            - name: Benchmark the XML parser
+              run: composer xml-parser:benchmark
             - name: Benchmark runtime refreshes
               run: composer runtime-refresh:benchmark
             - name: Benchmark source index scaling

@@ -123,12 +123,31 @@ final class XmlDependencyInjectionExtractorTest extends TestCase
         self::assertSame(0, $parser->calls);
     }
 
-    public function testRejectsSchemaMarkersOutsideNamespaceAttributes(): void
+    public function testRejectsSchemaMarkersOutsideTheDocumentElementNamespace(): void
     {
         $extractor = $this->extractor();
 
         self::assertNull($extractor->extract('file:///workspace/comment.xml', '<!-- http://symfony.com/schema/dic/services --><root/>'));
         self::assertNull($extractor->extract('file:///workspace/entity.xml', '<!DOCTYPE root [<!ENTITY schema "http://symfony.com/schema/dic/services">]><root xmlns="&schema;"/>'));
+        self::assertNull($extractor->extract('file:///workspace/foreign.xml', '<doctrine-mapping xmlns:x="http://symfony.com/schema/dic/services"><service id="phantom"/></doctrine-mapping>'));
+    }
+
+    public function testReadsOnlyElementsBoundToTheServicesNamespace(): void
+    {
+        $facts = $this->extractor()->extract('file:///workspace/prefixed.xml', <<<'XML'
+            <s:container xmlns:s="http://symfony.com/schema/dic/services" xmlns:f="urn:foreign">
+                <s:services>
+                    <s:service id="real">
+                        <f:tag name="foreign"/>
+                        <s:tag name="real.tag"/>
+                    </s:service>
+                    <f:service id="foreign"/>
+                </s:services>
+            </s:container>
+            XML);
+
+        self::assertNotNull($facts);
+        self::assertSame([['real', ['real.tag']]], array_map(static fn ($service): array => [$service->id, $service->tags], $facts->services));
     }
 
     private function extractor(): XmlDependencyInjectionExtractor

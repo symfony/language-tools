@@ -15,7 +15,7 @@ final class PhpLexicalScope
         public readonly array $parameterNames,
         public readonly array $capturedVariableNames,
         public readonly ?int $parentScopeStartOffset,
-        public readonly bool $complete,
+        public readonly bool $captureComplete,
     ) {
     }
 }
