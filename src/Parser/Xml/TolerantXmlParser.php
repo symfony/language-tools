@@ -21,10 +21,7 @@ final class TolerantXmlParser implements XmlParserInterface
 
         while ($offset < $length) {
             if (\count($events) >= self::MAX_EVENTS) {
-                if (\count($diagnostics) >= self::MAX_DIAGNOSTICS) {
-                    array_pop($diagnostics);
-                }
-                $diagnostics[] = new XmlDiagnostic('XML analysis stopped after reaching its structural limit.', $offset, $offset);
+                $this->appendStructuralLimitDiagnostic($diagnostics, $offset);
                 $terminalMalformed = true;
                 break;
             }
@@ -117,12 +114,26 @@ final class TolerantXmlParser implements XmlParserInterface
             $offset = $opening + 1;
         }
 
+        if (\count($events) > self::MAX_EVENTS) {
+            array_splice($events, self::MAX_EVENTS);
+            $this->appendStructuralLimitDiagnostic($diagnostics, $offset);
+            $terminalMalformed = true;
+        }
         if ([] !== $stack && !$terminalMalformed) {
             [, $name] = $stack[array_key_last($stack)];
             $this->appendDiagnostic($diagnostics, new XmlDiagnostic(\sprintf('Element "%s" is not closed.', $name), $length, $length));
         }
 
         return new XmlDocument($events, $diagnostics);
+    }
+
+    /** @param list<XmlDiagnostic> $diagnostics */
+    private function appendStructuralLimitDiagnostic(array &$diagnostics, int $offset): void
+    {
+        if (\count($diagnostics) >= self::MAX_DIAGNOSTICS) {
+            array_pop($diagnostics);
+        }
+        $diagnostics[] = new XmlDiagnostic('XML analysis stopped after reaching its structural limit.', $offset, $offset);
     }
 
     /** @param list<XmlDiagnostic> $diagnostics */

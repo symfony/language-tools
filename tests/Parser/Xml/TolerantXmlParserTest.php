@@ -114,7 +114,7 @@ final class TolerantXmlParserTest extends TestCase
 
     public function testCapsMaterializedEventsWithoutStoppingAtTheDiagnosticBudget(): void
     {
-        $events = (new TolerantXmlParser())->parse(str_repeat('<', 100_001));
+        $events = (new TolerantXmlParser())->parse('<root>'.str_repeat('x<a/>', 50_000));
         $diagnostics = (new TolerantXmlParser())->parse(str_repeat('</missing>', 200).'<real/>');
         $starts = array_values(array_filter($diagnostics->events, static fn ($event): bool => $event instanceof XmlElementStart));
 
