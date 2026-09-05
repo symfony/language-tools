@@ -35,24 +35,20 @@ final class ServiceCompletionContext
         );
     }
 
-    public static function fromPhp(string $text, Position $position, PositionConverter $positionConverter): ?self
+    public static function fromPhpAutowire(PhpAutowireArgument $argument, string $text, Position $position, PositionConverter $positionConverter): ?self
     {
-        $cursor = $positionConverter->toByteOffset($text, $position);
-        if (!preg_match(
-            '/#\[\s*(?:\\\\?[A-Za-z_][A-Za-z0-9_\\\\]*\\\\)?Autowire\s*\(.*\bservice\s*:\s*([\'\"])(\??[^\'\"]*)$/s',
-            substr($text, 0, $cursor),
-            $matches,
-            \PREG_OFFSET_CAPTURE,
-        )) {
+        if ('service' !== $argument->name) {
             return null;
         }
 
-        $prefix = ltrim($matches[2][0], '?');
-        $offset = $matches[2][1] + (str_starts_with($matches[2][0], '?') ? 1 : 0);
+        $optional = str_starts_with($argument->value, '?');
 
         return new self(
-            $prefix,
-            new Range($positionConverter->toPosition($text, $offset), $position),
+            $optional ? substr($argument->value, 1) : $argument->value,
+            new Range(
+                $positionConverter->toPosition($text, $argument->valueStartOffset + ($optional ? 1 : 0)),
+                $position,
+            ),
         );
     }
 }

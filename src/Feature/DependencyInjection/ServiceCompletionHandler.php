@@ -4,8 +4,8 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\PositionedDocumentContext;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -17,7 +17,7 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
         private readonly PositionConverter $positionConverter,
         private readonly LspProtocolMapper $protocol,
         private readonly DependencyInjectionProjectLookup $lookup,
-        private readonly PhpCommentParser $phpComments,
+        private readonly PhpAutowireArgumentResolver $autowireArguments,
         private readonly YamlCommentParser $yamlComments,
     ) {
     }
@@ -25,27 +25,48 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
     public function complete(array $params): ?array
     {
         $request = $this->documentContextResolver->resolvePositioned($params);
-        if (null === $request || !\in_array($request->document->languageId, ['php', 'yaml'], true)) {
+        if (null === $request) {
             return null;
         }
 
-        $isYaml = 'yaml' === $request->document->languageId;
-        $text = $isYaml ? $this->yamlComments->mask($request->document->text) : $this->phpComments->mask($request->document->text);
-        $parameterContext = $isYaml
-            ? ParameterCompletionContext::fromYaml($text, $request->position, $this->positionConverter)
-            : ParameterCompletionContext::fromPhp($text, $request->position, $this->positionConverter);
+        return match ($request->document->languageId) {
+            'yaml' => $this->completeYaml($request),
+            'php' => $this->completePhp($request),
+            default => null,
+        };
+    }
+
+    /** @return list<array<array-key, mixed>>|null */
+    private function completeYaml(PositionedDocumentContext $request): ?array
+    {
+        $text = $this->yamlComments->mask($request->document->text);
+        $parameterContext = ParameterCompletionContext::fromYaml($text, $request->position, $this->positionConverter);
         if (null !== $parameterContext) {
             return $this->completeParameters($request->project, $parameterContext);
         }
 
-        $serviceContext = $isYaml
-            ? ServiceCompletionContext::fromYaml($text, $request->position, $this->positionConverter)
-            : ServiceCompletionContext::fromPhp($text, $request->position, $this->positionConverter);
-        if (null === $serviceContext) {
+        $serviceContext = ServiceCompletionContext::fromYaml($text, $request->position, $this->positionConverter);
+
+        return null === $serviceContext ? null : $this->completeServices($request->project, $serviceContext);
+    }
+
+    /** @return list<array<array-key, mixed>>|null */
+    private function completePhp(PositionedDocumentContext $request): ?array
+    {
+        $text = $request->document->text;
+        $argument = $this->autowireArguments->resolve($text, $this->positionConverter->toByteOffset($text, $request->position));
+        if (null === $argument) {
             return null;
         }
 
-        return $this->completeServices($request->project, $serviceContext);
+        $parameterContext = ParameterCompletionContext::fromPhpAutowire($argument, $text, $request->position, $this->positionConverter);
+        if (null !== $parameterContext) {
+            return $this->completeParameters($request->project, $parameterContext);
+        }
+
+        $serviceContext = ServiceCompletionContext::fromPhpAutowire($argument, $text, $request->position, $this->positionConverter);
+
+        return null === $serviceContext ? null : $this->completeServices($request->project, $serviceContext);
     }
 
     /** @return list<array<array-key, mixed>> */

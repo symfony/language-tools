@@ -39,36 +39,29 @@ final class ParameterCompletionContext
         );
     }
 
-    public static function fromPhp(string $text, Position $position, PositionConverter $positionConverter): ?self
+    public static function fromPhpAutowire(PhpAutowireArgument $argument, string $text, Position $position, PositionConverter $positionConverter): ?self
     {
-        $cursor = $positionConverter->toByteOffset($text, $position);
-        $beforeCursor = substr($text, 0, $cursor);
-        if (preg_match(
-            '/#\[\s*(?:\\\\?[A-Za-z_][A-Za-z0-9_\\\\]*\\\\)?Autowire\s*\(.*\bparam\s*:\s*([\'\"])([^\'\"]*)$/s',
-            $beforeCursor,
-            $matches,
-            \PREG_OFFSET_CAPTURE,
-        )) {
+        if ('param' === $argument->name) {
             return new self(
-                $matches[2][0],
-                new Range($positionConverter->toPosition($text, $matches[2][1]), $position),
+                $argument->value,
+                new Range($positionConverter->toPosition($text, $argument->valueStartOffset), $position),
                 false,
             );
         }
 
-        if (!preg_match(
-            '/#\[\s*(?:\\\\?[A-Za-z_][A-Za-z0-9_\\\\]*\\\\)?Autowire\s*\(\s*([\'\"])%([^%\'\"]*)$/s',
-            $beforeCursor,
-            $matches,
-            \PREG_OFFSET_CAPTURE,
-        ) || str_starts_with($matches[2][0], 'env(')) {
+        if (null !== $argument->name || 0 !== $argument->position || !str_starts_with($argument->value, '%')) {
+            return null;
+        }
+
+        $name = substr($argument->value, 1);
+        if (str_contains($name, '%') || str_starts_with($name, 'env(')) {
             return null;
         }
 
         return new self(
-            $matches[2][0],
-            new Range($positionConverter->toPosition($text, $matches[2][1]), $position),
-            '%' !== ($text[$cursor] ?? null),
+            $name,
+            new Range($positionConverter->toPosition($text, $argument->valueStartOffset + 1), $position),
+            '%' !== ($text[$argument->cursorOffset()] ?? null),
         );
     }
 }

@@ -74,6 +74,10 @@ arguments of PHP ``#[Autowire]`` attributes are also supported:
 Parameter placeholders passed as the first ``#[Autowire]`` argument are
 supported too.
 
+Completion is offered only inside the ``#[Autowire]`` argument holding the
+cursor. Arguments of other attributes and of function calls are never
+completed, even when they use the same argument names.
+
 Hover
 -----
 
@@ -125,6 +129,10 @@ and cursor features aren't available in XML files.
 
 Environment-specific file detection follows Symfony's conventional ``config/``
 layout. Custom conditional imports aren't inferred from application code.
+
+PHP completion requires an ``#[Autowire]`` attribute that resolves to Symfony's
+attribute through a ``use`` statement or a fully qualified name. An unimported
+short name isn't completed.
 
 Privacy
 -------

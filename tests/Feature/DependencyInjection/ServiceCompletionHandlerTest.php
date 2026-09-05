@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
@@ -16,12 +17,13 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegist
 use Symfony\Lsp\Feature\DependencyInjection\Parameter;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireArgumentResolver;
 use Symfony\Lsp\Feature\DependencyInjection\ProjectServiceSnapshotLoader;
 use Symfony\Lsp\Feature\DependencyInjection\Service;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceCompletionHandler;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
@@ -73,7 +75,7 @@ final class ServiceCompletionHandlerTest extends TestCase
             $converter,
             new LspProtocolMapper(),
             new DependencyInjectionProjectLookup($indexes, $parameterIndexes, $sourceIndexes),
-            new PhpCommentParser(),
+            $this->autowireArguments(),
             $this->yamlComments(),
         );
 
@@ -136,7 +138,7 @@ final class ServiceCompletionHandlerTest extends TestCase
             $converter,
             new LspProtocolMapper(),
             new DependencyInjectionProjectLookup($serviceIndexes, $parameterIndexes, $sourceIndexes),
-            new PhpCommentParser(),
+            $this->autowireArguments(),
             $this->yamlComments(),
         );
 
@@ -193,7 +195,7 @@ final class ServiceCompletionHandlerTest extends TestCase
                 $parameterIndexes,
                 new DependencyInjectionSourceIndexRegistry(),
             ),
-            new PhpCommentParser(),
+            $this->autowireArguments(),
             $this->yamlComments(),
         );
         $uri = 'file:///workspace/config/services.yaml';
@@ -230,11 +232,11 @@ final class ServiceCompletionHandlerTest extends TestCase
                 $parameterIndexes,
                 new DependencyInjectionSourceIndexRegistry(),
             ),
-            new PhpCommentParser(),
+            $this->autowireArguments(),
             $this->yamlComments(),
         );
         $uri = 'file:///workspace/src/Service.php';
-        $text = "<?php // #[Autowire(param: 'app.a";
+        $text = $this->php("// #[Autowire(param: 'app.a");
         $documents->open(new Document($uri, 'php', 1, $text));
         $position = $converter->toPosition($text, \strlen($text));
 
@@ -277,7 +279,7 @@ final class ServiceCompletionHandlerTest extends TestCase
                 $parameterIndexes,
                 new DependencyInjectionSourceIndexRegistry(),
             ),
-            new PhpCommentParser(),
+            $this->autowireArguments(),
             $this->yamlComments(),
         );
 
@@ -296,7 +298,7 @@ final class ServiceCompletionHandlerTest extends TestCase
         self::assertSame('app.storage_dir%', $yamlResult[0]['textEdit']['newText'] ?? null);
 
         $phpUri = 'file:///workspace/src/Service.php';
-        $php = "<?php #[Autowire(param: 'app.a')] final class Service {}";
+        $php = $this->php("#[Autowire(param: 'app.a')] final class Service {}");
         $documents->open(new Document($phpUri, 'php', 1, $php));
         $phpPosition = $converter->toPosition($php, strpos($php, 'app.a') + \strlen('app.a'));
         $phpResult = $handler->complete([
@@ -310,7 +312,7 @@ final class ServiceCompletionHandlerTest extends TestCase
         self::assertSame('app.api_key', $phpResult[0]['textEdit']['newText'] ?? null);
 
         $servicePhpUri = 'file:///workspace/src/MailerConsumer.php';
-        $servicePhp = "<?php #[Autowire(service: 'app.ma')] final class MailerConsumer {}";
+        $servicePhp = $this->php("#[Autowire(service: 'app.ma')] final class MailerConsumer {}");
         $documents->open(new Document($servicePhpUri, 'php', 1, $servicePhp));
         $servicePhpPosition = $converter->toPosition(
             $servicePhp,
@@ -325,6 +327,108 @@ final class ServiceCompletionHandlerTest extends TestCase
         ]);
 
         self::assertSame('app.mailer', $servicePhpResult[0]['label'] ?? null);
+    }
+
+    /**
+     * @param list<string>|null $labels
+     */
+    #[DataProvider('phpAutowireCompletionProvider')]
+    public function testBindsPhpCompletionToTheAutowireArgumentHoldingTheCursor(string $body, string $cursorAfter, ?array $labels): void
+    {
+        $documents = new DocumentStore();
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
+        $serviceIndexes = new ServiceIndexRegistry();
+        $serviceIndexes->forProject($project)->replace(true, new Service(
+            'app.mailer',
+            'App\\Mailer',
+            null,
+            false,
+            false,
+            null,
+            [],
+            null,
+            [],
+        ));
+        $parameterIndexes = new ParameterIndexRegistry();
+        $parameterIndexes->forProject($project)->replace(
+            true,
+            new Parameter('app.api_key', null),
+            new Parameter('app.storage_dir', null),
+        );
+        $converter = new PositionConverter();
+        $handler = new ServiceCompletionHandler(
+            new DocumentContextResolver($documents, $projects),
+            $converter,
+            new LspProtocolMapper(),
+            new DependencyInjectionProjectLookup(
+                $serviceIndexes,
+                $parameterIndexes,
+                new DependencyInjectionSourceIndexRegistry(),
+            ),
+            $this->autowireArguments(),
+            $this->yamlComments(),
+        );
+        $uri = 'file:///workspace/src/Service.php';
+        $text = $this->php($body);
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $cursor = strrpos($text, $cursorAfter);
+        self::assertIsInt($cursor);
+        $position = $converter->toPosition($text, $cursor + \strlen($cursorAfter));
+
+        $result = $handler->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ]);
+
+        self::assertSame($labels, null === $result ? null : array_column($result, 'label'));
+    }
+
+    /** @return iterable<string, array{string, string, list<string>|null}> */
+    public static function phpAutowireCompletionProvider(): iterable
+    {
+        yield 'incomplete service argument' => ["final class S {\n    #[Autowire(service: 'app.ma\n", 'app.ma', ['app.mailer']];
+        yield 'incomplete optional service argument' => ["#[Autowire(service: '?app.ma", 'app.ma', ['app.mailer']];
+        yield 'incomplete param argument' => ["#[Autowire(param: 'app.api", 'app.api', ['app.api_key']];
+        yield 'incomplete parameter placeholder' => ["#[Autowire('%app.st", 'app.st', ['app.storage_dir']];
+        yield 'incomplete argument of a grouped autowire' => ["#[Other(service: 'x'), Autowire(service: 'app.ma", 'app.ma', ['app.mailer']];
+        yield 'incomplete argument of a fully qualified autowire' => [
+            "#[\\Symfony\\Component\\DependencyInjection\\Attribute\\Autowire(service: 'app.ma",
+            'app.ma',
+            ['app.mailer'],
+        ];
+        yield 'service argument of a later unrelated attribute' => [
+            "#[Autowire(service: 'app.mailer')]\n#[Other(service: 'app.ma",
+            'app.ma',
+            null,
+        ];
+        yield 'param argument of a later unrelated attribute' => [
+            "#[Autowire(param: 'app.api_key')]\n#[Other(param: 'app.api",
+            'app.api',
+            null,
+        ];
+        yield 'placeholder of a later unrelated attribute' => [
+            "#[Autowire('%app.storage_dir%')]\n#[Other('%app.st",
+            'app.st',
+            null,
+        ];
+        yield 'named argument of a later function call' => [
+            "#[Autowire(service: 'app.mailer')]\nfinal class S { public function f() { helper(service: 'app.ma",
+            'app.ma',
+            null,
+        ];
+        yield 'attribute of another namespace' => ["#[\\App\\Autowire(service: 'app.ma", 'app.ma', null];
+        yield 'cursor after a closed service argument' => ["#[Autowire(service: 'app.mailer')]", "'app.mailer'", null];
+    }
+
+    private function php(string $body): string
+    {
+        return "<?php\n\nuse Symfony\\Component\\DependencyInjection\\Attribute\\Autowire;\n\n".$body;
+    }
+
+    private function autowireArguments(): PhpAutowireArgumentResolver
+    {
+        return new PhpAutowireArgumentResolver(new TolerantPhpParser(new Parser()));
     }
 
     private function yamlComments(): YamlCommentParser

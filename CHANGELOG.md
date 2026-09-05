@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Bind PHP service and parameter completion to the `#[Autowire]` argument holding the cursor
 - Ignore anonymous classes in Messenger inheritance relationships
 - Diagnose missing event listener methods in classes with captured closures
 - Recognize parenthesized Twig callable registration options
