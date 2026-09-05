@@ -244,6 +244,28 @@ final class ConsoleExtractorTest extends TestCase
         self::assertFalse($facts->declarations[0]->complete);
     }
 
+    public function testScopesConfigureBodiesAroundBracesInStrings(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/HelpCommand.php', 'php', <<<'PHP'
+            <?php
+            final class HelpCommand
+            {
+                protected function configure(): void
+                {
+                    $this->setHelp(<<<'HELP'
+                        Close the block with a } brace.
+                        HELP);
+                    $deferred = function (): void {
+                        $this->addArgument('deferred');
+                    };
+                }
+            }
+            PHP));
+
+        self::assertSame(['deferred'], $facts->declarations[0]->arguments);
+        self::assertFalse($facts->declarations[0]->complete);
+    }
+
     public function testMarksDynamicDefinitionsIncomplete(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/DynamicCommand.php', 'php', <<<'PHP'
@@ -365,7 +387,7 @@ final class ConsoleExtractorTest extends TestCase
             new PositionConverter(),
             $parser,
             new PhpCommentParser(),
-            new ConsoleDefinitionExtractor($delimiters),
+            new ConsoleDefinitionExtractor(),
             new ConsoleInvokableParameterExtractor($delimiters),
             new ConsoleInputReceiverResolver(new PhpCapturedReceiverResolver($delimiters)),
         );
@@ -484,7 +506,7 @@ final class ConsoleExtractorTest extends TestCase
             new PositionConverter(),
             new TolerantPhpParser(new Parser()),
             new PhpCommentParser(),
-            new ConsoleDefinitionExtractor($delimiters),
+            new ConsoleDefinitionExtractor(),
             new ConsoleInvokableParameterExtractor($delimiters),
             new ConsoleInputReceiverResolver(new PhpCapturedReceiverResolver($delimiters)),
         );

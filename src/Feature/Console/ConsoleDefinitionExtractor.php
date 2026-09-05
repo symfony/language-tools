@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Feature\Console;
 
-use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpLiteralKind;
@@ -15,18 +14,13 @@ final class ConsoleDefinitionExtractor
     private const INPUT_ARGUMENT = 'Symfony\\Component\\Console\\Input\\InputArgument';
     private const INPUT_OPTION = 'Symfony\\Component\\Console\\Input\\InputOption';
 
-    public function __construct(
-        private readonly BalancedDelimiterMatcher $delimiters,
-    ) {
-    }
-
     /** @return array{list<string>, list<string>, bool} */
     public function extract(string $text, PhpDocument $php, PhpTypeDeclaration $type): array
     {
         $arguments = [];
         $options = [];
         $complete = true;
-        $configureRanges = $this->methodBodyRanges($text, $type, 'configure');
+        $configureRanges = $this->methodBodyRanges($php, $type, 'configure');
         foreach ($php->methodCalls as $call) {
             $nested = 'configure' !== $call->enclosingMethod && $this->isWithinMethod($call->startOffset, $call->endOffset, $configureRanges);
             $receiver = substr($text, $call->receiverContext->startOffset, $call->receiverContext->endOffset - $call->receiverContext->startOffset);
@@ -153,15 +147,18 @@ final class ConsoleDefinitionExtractor
     }
 
     /** @return list<array{start: int, end: int, closed: bool}> */
-    private function methodBodyRanges(string $text, PhpTypeDeclaration $type, string $method): array
+    private function methodBodyRanges(PhpDocument $php, PhpTypeDeclaration $type, string $method): array
     {
-        $source = substr($text, $type->startOffset, $type->endOffset - $type->startOffset);
-        preg_match_all('/\bfunction\s+'.preg_quote($method, '/').'\s*\([^)]*\)\s*(?::\s*[^\{;]+)?\s*\{/s', $source, $matches, \PREG_OFFSET_CAPTURE);
         $ranges = [];
-        foreach ($matches[0] as [$matched, $relativeOffset]) {
-            $open = $type->startOffset + $relativeOffset + strrpos($matched, '{');
-            $close = $this->delimiters->matching($text, $open, '{', '}');
-            $ranges[] = ['start' => $open, 'end' => $close ?? $type->endOffset, 'closed' => null !== $close];
+        foreach ($php->methodDeclarations as $declaration) {
+            if ($type->name !== $declaration->className
+                || $method !== $declaration->name
+                || null === $declaration->bodyStartOffset
+                || null === $declaration->bodyEndOffset
+            ) {
+                continue;
+            }
+            $ranges[] = ['start' => $declaration->bodyStartOffset, 'end' => $declaration->bodyEndOffset, 'closed' => $declaration->bodyClosed];
         }
 
         return $ranges;

@@ -165,7 +165,7 @@ final class ConsoleProviderTest extends TestCase
             $converter,
             new TolerantPhpParser(new Parser()),
             new PhpCommentParser(),
-            new ConsoleDefinitionExtractor($delimiters),
+            new ConsoleDefinitionExtractor(),
             new ConsoleInvokableParameterExtractor($delimiters),
             new ConsoleInputReceiverResolver(new PhpCapturedReceiverResolver($delimiters)),
         );
