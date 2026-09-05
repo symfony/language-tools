@@ -213,7 +213,7 @@ final class DoctrineExtractor
             if (!\is_int($start) || !\is_int($end) || $offset < $start || $offset > $end) {
                 continue;
             }
-            $formType = $php->soleClassReference($call->positionalArgument($typeIndex));
+            $formType = $call->positionalArgument($typeIndex)?->completeClassReference;
             if ('Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $formType?->className) {
                 continue;
             }
@@ -234,7 +234,7 @@ final class DoctrineExtractor
             }
             $typeIndex = 'createNamed' === $call->method ? 1 : ('add' === $call->method ? 1 : 0);
             $optionsIndex = 'createNamed' === $call->method ? 3 : 2;
-            $formType = $php->soleClassReference($call->positionalArgument($typeIndex));
+            $formType = $call->positionalArgument($typeIndex)?->completeClassReference;
             $options = $call->positionalArgument($optionsIndex);
             if ('Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $formType?->className || null === $options) {
                 continue;

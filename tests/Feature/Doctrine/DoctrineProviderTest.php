@@ -497,6 +497,37 @@ final class DoctrineProviderTest extends TestCase
         self::assertSame([], $extractor->extract(new SourceDocument('file:///workspace/src/Usage.php', 'php', $text))->symbols);
     }
 
+    public function testIgnoresComputedDoctrineContextClassArguments(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Usage.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            use App\Entity\Product;
+            use Symfony\Bridge\Doctrine\Form\Type\EntityType;
+
+            function configure(object $builder, object $manager, string $suffix): void
+            {
+                $builder->add('accepted', EntityType /* type */ ::class, [
+                    'class' => Product::class,
+                    'choice_label' => 'name',
+                ]);
+                $builder->add('dynamic', EntityType::class . $suffix, [
+                    'class' => Product::class,
+                    'choice_label' => 'ignored_entity_type',
+                ]);
+                $manager->getRepository(Product /* entity */ ::class)->findBy(['accepted_repository' => true]);
+                $manager->getRepository((Product::class))->findBy(['ignored_parenthesized' => true]);
+                $manager->getRepository(Product::class . $suffix)->findBy(['ignored_concatenated' => true]);
+            }
+            PHP));
+
+        self::assertSame(
+            ['App\\Entity\\Product', 'name', 'accepted_repository'],
+            array_map(static fn ($symbol): string => $symbol->name, $facts->symbols),
+        );
+    }
+
     public function testExtractsConservativeDecodedLiteralArrayFacts(): void
     {
         $converter = new PositionConverter();

@@ -92,7 +92,7 @@ final class DoctrineRepositoryReceiverResolver
                 && $receiver->startOffset === $candidate->startOffset
                 && $receiver->endOffset === $candidate->endOffset,
         );
-        $reference = $php->soleClassReference($repositoryCall?->positionalArgument(0));
+        $reference = $repositoryCall?->positionalArgument(0)?->completeClassReference;
 
         return null !== $reference ? ['entityClass' => $reference->className, 'repositoryClass' => null] : null;
     }
@@ -102,7 +102,7 @@ final class DoctrineRepositoryReceiverResolver
     {
         $entities = [];
         foreach ($php->methodCalls as $call) {
-            if ('getRepository' !== $call->method || null === $reference = $php->soleClassReference($call->positionalArgument(0))) {
+            if ('getRepository' !== $call->method || null === $reference = $call->positionalArgument(0)?->completeClassReference) {
                 continue;
             }
             $before = substr($source, 0, $call->startOffset);
