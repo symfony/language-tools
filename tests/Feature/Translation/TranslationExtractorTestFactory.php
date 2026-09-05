@@ -18,6 +18,7 @@ use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
+use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\UriToPathConverter;
 
@@ -31,7 +32,7 @@ final class TranslationExtractorTestFactory
         $parameters = new TranslationParameterAnalyzer(new PhpLiteralArrayKeyParser());
 
         return new TranslationExtractor(
-            new TranslationCatalogExtractor($converter, new UriToPathConverter(), new YamlDocumentParser($treeSitter), new PhpTranslationCatalogParser()),
+            new TranslationCatalogExtractor($converter, new UriToPathConverter(), new YamlDocumentParser($treeSitter), new PhpTranslationCatalogParser(), new XmlCommentParser()),
             new PhpTranslationReferenceExtractor($converter, new TolerantPhpParser(new Parser()), $parameters),
             new TwigTranslationReferenceExtractor($converter, new TwigDocumentParser($treeSitter, $twigComments), new TwigCallArgumentResolver(new TwigArgumentParser()), $twigComments, $parameters),
         );

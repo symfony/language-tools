@@ -33,8 +33,9 @@ PHP messages can use quoted strings, heredocs or nowdocs. INI catalogs using a
 locale directory, such as ``Translations/en_US/messages.ini``, are recognized
 too; their messages can be quoted or unquoted, and comment lines and trailing
 ``;`` comments are ignored. Escaped quotes and backslashes in quoted messages
-are decoded. Unsaved resource changes are available immediately, and changes
-made by external tools are picked up while the server is running.
+are decoded. XLIFF units inside XML comments are ignored. Unsaved resource
+changes are available immediately, and changes made by external tools are picked
+up while the server is running.
 
 ICU brace placeholders such as ``{name}`` are only interpreted in ICU
 catalogs, identified by the ``+intl-icu`` domain suffix. In plain catalogs,

@@ -199,6 +199,29 @@ final class TranslationExtractorTest extends TestCase
         self::assertSame(16, $facts->declarations[0]->range->end->character);
     }
 
+    public function testIgnoresCommentedXliffUnits(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/translations/messages.en.xlf', 'xml', <<<'XLIFF'
+            <xliff><file><body>
+                <!--
+                <trans-unit id="ignored" resname="commented.key">
+                    <source>commented.key</source>
+                    <target>Ignored</target>
+                </trans-unit>
+                -->
+                <trans-unit id="visible" resname="visible.key">
+                    <source>visible.key</source>
+                    <target>Visible</target>
+                </trans-unit>
+            </body></file></xliff>
+            XLIFF));
+
+        self::assertSame(
+            [['visible.key', 'Visible']],
+            array_map(static fn ($declaration): array => [$declaration->key, trim($declaration->message)], $facts->declarations),
+        );
+    }
+
     public function testPreservesHyphenatedYamlKeys(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/translations/messages.en.yaml', 'yaml', "article-title: Article\n"));

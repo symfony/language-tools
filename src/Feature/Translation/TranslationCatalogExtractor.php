@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Parser\Yaml\YamlMapping;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -14,6 +15,7 @@ final class TranslationCatalogExtractor
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly YamlDocumentParser $yamlParser,
         private readonly PhpTranslationCatalogParser $phpParser,
+        private readonly XmlCommentParser $xmlComments,
     ) {
     }
 
@@ -211,12 +213,13 @@ final class TranslationCatalogExtractor
     /** @return list<TranslationDeclaration> */
     private function xliffDeclarations(string $uri, string $text, string $domain, string $locale): array
     {
-        preg_match_all('/<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?(?:trans-unit|unit)\b([^>]*)>/i', $text, $units, \PREG_OFFSET_CAPTURE);
+        $masked = $this->xmlComments->mask($text);
+        preg_match_all('/<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?(?:trans-unit|unit)\b([^>]*)>/i', $masked, $units, \PREG_OFFSET_CAPTURE);
         $result = [];
         foreach ($units[0] as $i => [$opening, $unitOffset]) {
             $contentOffset = $unitOffset + \strlen($opening);
-            $nextOffset = $units[0][$i + 1][1] ?? \strlen($text);
-            $content = substr($text, $contentOffset, $nextOffset - $contentOffset);
+            $nextOffset = $units[0][$i + 1][1] ?? \strlen($masked);
+            $content = substr($masked, $contentOffset, $nextOffset - $contentOffset);
             preg_match('/\b(?:resname|name)\s*=\s*[\'\"]([^\'\"]+)[\'\"]/i', $units[1][$i][0], $name);
             preg_match('/<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?source(?:\s[^>]*)?>(.*?)(?:<\/(?:[A-Za-z_][A-Za-z0-9_.-]*:)?source>|(?=<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?target\b)|$)/is', $content, $source);
             preg_match('/<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?target(?:\s[^>]*)?>(.*?)(?:<\/(?:[A-Za-z_][A-Za-z0-9_.-]*:)?target>|$)/is', $content, $target);

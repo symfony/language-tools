@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ignore XLIFF translation units inside XML comments
 - Follow PHP configuration builder chains through nullsafe calls, comments and renamed imports
 - Decode escaped quoted INI translation messages
 - Read domains and parameters from PHP translation helper calls
