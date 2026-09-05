@@ -5,102 +5,66 @@ namespace Symfony\Lsp\Tests\Feature\Route;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
 use Symfony\Lsp\Feature\Route\RouteCompletionContext;
+use Symfony\Lsp\Feature\Route\RouteParameterCompletionContext;
 
 final class RouteCompletionContextTest extends TestCase
 {
     #[DataProvider('contextProvider')]
-    public function testRecognizesHighConfidenceRouteContexts(string $php, string $prefix): void
+    public function testRecognizesRouteNameContexts(string $php, ?string $prefix): void
     {
         $cursor = strpos($php, '|');
         self::assertIsInt($cursor);
         $php = str_replace('|', '', $php);
         $converter = new PositionConverter();
 
-        $extractor = RouteReferenceExtractorFactory::create($converter);
-        $context = RouteCompletionContext::fromPhp(
-            $php,
-            $converter->toPosition($php, $cursor),
-            $converter,
-            static fn (string $source): bool => $extractor->isSymfonyReceiver($source, new DependencyInjectionSourceIndex()),
-        );
+        $context = RouteCompletionContext::fromPhp($php, $converter->toPosition($php, $cursor), $converter);
 
         self::assertSame($prefix, $context?->prefix);
     }
 
     /**
-     * @return iterable<string, array{string, string}>
+     * @return iterable<string, array{string, string|null}>
      */
     public static function contextProvider(): iterable
     {
         yield 'controller helper' => [<<<'PHP'
             <?php
-            class DemoController extends AbstractController
-            {
-                public function index(): void
-                {
-                    $this->generateUrl('article_|');
-                }
-            }
+            $this->generateUrl('article_|');
             PHP, 'article_'];
-        yield 'typed router' => [<<<'PHP'
+        yield 'redirection' => [<<<'PHP'
             <?php
-            function run(RouterInterface $router): void
-            {
-                $router->generateUrl('home|');
-            }
-            PHP, 'home'];
-        yield 'typed URL generator' => [<<<'PHP'
+            $this->redirectToRoute('article_|');
+            PHP, 'article_'];
+        yield 'router' => [<<<'PHP'
             <?php
-            function run(UrlGeneratorInterface $generator): void
-            {
-                $generator->generate('home|');
-            }
+            $router->generate('home|');
             PHP, 'home'];
-        yield 'typed router property' => [<<<'PHP'
+        yield 'unrelated method' => [<<<'PHP'
             <?php
-            final class Generator
-            {
-                private RouterInterface $router;
-
-                public function run(): void
-                {
-                    $this->router->generate('home|');
-                }
-            }
-            PHP, 'home'];
-        yield 'promoted URL generator property' => [<<<'PHP'
+            $router->url('home|');
+            PHP, null];
+        yield 'completed route name' => [<<<'PHP'
             <?php
-            final class Generator
-            {
-                public function __construct(private UrlGeneratorInterface $generator) {}
-
-                public function run(): void
-                {
-                    $this->generator->generate('home|');
-                }
-            }
-            PHP, 'home'];
+            $router->generate('home')|;
+            PHP, null];
     }
 
-    public function testRejectsGenericMethodNameOnUnknownReceiver(): void
+    public function testRecognizesRouteParameterContexts(): void
     {
         $php = <<<'PHP'
             <?php
-            $unknown->generateUrl('home');
+            $this->generateUrl('article_show', ['section' => 'news', 'sl
             PHP;
         $converter = new PositionConverter();
-
-        $cursor = strpos($php, "')");
+        $cursor = strpos($php, "'sl");
         self::assertIsInt($cursor);
 
-        $extractor = RouteReferenceExtractorFactory::create($converter);
-        self::assertNull(RouteCompletionContext::fromPhp(
-            $php,
-            $converter->toPosition($php, $cursor),
-            $converter,
-            static fn (string $source): bool => $extractor->isSymfonyReceiver($source, new DependencyInjectionSourceIndex()),
-        ));
+        $context = RouteParameterCompletionContext::fromPhp($php, $converter->toPosition($php, $cursor + 3), $converter);
+
+        self::assertNotNull($context);
+        self::assertSame('article_show', $context->routeName);
+        self::assertSame('sl', $context->prefix);
+        self::assertSame(['section'], $context->existingParameters);
     }
 }

@@ -14,8 +14,7 @@ final class RouteCompletionContext
     ) {
     }
 
-    /** @param callable(string): bool $isSymfonyReceiver */
-    public static function fromPhp(string $text, Position $position, PositionConverter $positionConverter, callable $isSymfonyReceiver): ?self
+    public static function fromPhp(string $text, Position $position, PositionConverter $positionConverter): ?self
     {
         $cursor = $positionConverter->toByteOffset($text, $position);
         $beforeCursor = substr($text, 0, $cursor);
@@ -25,12 +24,6 @@ final class RouteCompletionContext
             $matches,
             \PREG_OFFSET_CAPTURE,
         )) {
-            return null;
-        }
-
-        $methodOffset = $matches[1][1];
-        $operatorLength = 2;
-        if (!$isSymfonyReceiver(substr($beforeCursor, 0, $methodOffset - $operatorLength))) {
             return null;
         }
 

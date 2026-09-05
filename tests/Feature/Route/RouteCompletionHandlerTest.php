@@ -256,6 +256,76 @@ final class RouteCompletionHandlerTest extends TestCase
         }
     }
 
+    public function testCompletesRoutesOnSymfonyRouterReceiversBeingTyped(): void
+    {
+        $uri = 'file:///workspace/src/Notifier.php';
+        $text = <<<'PHP'
+            <?php
+            namespace App\Service;
+
+            use Symfony\Component\Routing\RouterInterface;
+
+            final class Notifier
+            {
+                public function __construct(private readonly RouterInterface $router)
+                {
+                }
+
+                public function notify(): string
+                {
+                    return $this->router->generate('article_
+                }
+            }
+            PHP;
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
+        $indexes = new RouteIndexRegistry();
+        $indexes->forProject($project)->replace(new Route('article_show', '/article/{slug}', [], [], null, null));
+        $converter = new PositionConverter();
+        $position = $converter->toPosition($text, strpos($text, 'article_') + \strlen('article_'));
+        $handler = $this->handler($documents, $projects, $converter, $indexes);
+
+        self::assertSame(['article_show'], array_column($handler->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ]) ?? [], 'label'));
+    }
+
+    public function testOffersNoRouteCompletionsOnUnrelatedRouterTypes(): void
+    {
+        $uri = 'file:///workspace/src/Notifier.php';
+        $text = <<<'PHP'
+            <?php
+            namespace App\Service;
+
+            use App\Routing\MyRouterInterface;
+
+            final class Notifier
+            {
+                public function notify(MyRouterInterface $router): string
+                {
+                    return $router->generate('article_');
+                }
+            }
+            PHP;
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
+        $indexes = new RouteIndexRegistry();
+        $indexes->forProject($project)->replace(new Route('article_show', '/article/{slug}', [], [], null, null));
+        $converter = new PositionConverter();
+        $position = $converter->toPosition($text, strpos($text, 'article_') + \strlen('article_'));
+        $handler = $this->handler($documents, $projects, $converter, $indexes);
+
+        self::assertNull($handler->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ]));
+    }
+
     public function testOffersNoRouteCompletionsInsidePhpComments(): void
     {
         $uri = 'file:///workspace/src/Controller.php';

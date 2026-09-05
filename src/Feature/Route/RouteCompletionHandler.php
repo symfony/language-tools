@@ -75,15 +75,26 @@ final class RouteCompletionHandler implements CompletionProviderInterface
                 $routeContext->replacementRange,
             );
         }
-        $classIndex = $this->classIndexes->forProject($request->project);
-        $isSymfonyReceiver = fn (string $source): bool => $this->phpReferenceExtractor->isSymfonyReceiver($source, $classIndex);
         $phpText = $masked;
         $parameterContext = RouteParameterCompletionContext::fromPhp(
             $phpText,
             $request->position,
             $this->positionConverter,
-            $isSymfonyReceiver,
         );
+        $routeContext = null !== $parameterContext ? null : RouteCompletionContext::fromPhp(
+            $phpText,
+            $request->position,
+            $this->positionConverter,
+        );
+        if ((null === $parameterContext && null === $routeContext)
+            || !$this->phpReferenceExtractor->supportsRouteCallAt(
+                $request->document->text,
+                $this->positionConverter->toByteOffset($request->document->text, $request->position),
+                $this->classIndexes->forProject($request->project),
+            )
+        ) {
+            return null;
+        }
         if (null !== $parameterContext) {
             $route = $routeIndex->get($parameterContext->routeName);
             if (null === $route) {
@@ -98,16 +109,6 @@ final class RouteCompletionHandler implements CompletionProviderInterface
                 ),
                 $parameterContext->replacementRange,
             );
-        }
-
-        $routeContext = RouteCompletionContext::fromPhp(
-            $phpText,
-            $request->position,
-            $this->positionConverter,
-            $isSymfonyReceiver,
-        );
-        if (null === $routeContext) {
-            return null;
         }
 
         return $this->withTextEdits(

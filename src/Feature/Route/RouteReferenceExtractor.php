@@ -13,6 +13,7 @@ final class RouteReferenceExtractor
         private readonly PositionConverter $positionConverter,
         private readonly PhpParserInterface $parser,
         private readonly PhpRouteReferenceCandidateExtractor $candidates,
+        private readonly RoutePhpReceiverResolver $receivers,
         private readonly RouteControllerClassifier $controllers,
     ) {
     }
@@ -40,10 +41,22 @@ final class RouteReferenceExtractor
         return $this->candidates->extract($source->text, $document);
     }
 
-    public function isSymfonyReceiver(string $source, DependencyInjectionSourceIndex $classIndex): bool
+    public function supportsRouteCallAt(string $source, int $byteOffset, ?DependencyInjectionSourceIndex $classIndex = null): bool
     {
         $document = $this->parser->parse($source);
-        $receiver = $this->candidates->resolveReceiver($source, \strlen($source), $document);
+        $call = null;
+        foreach ($document->methodCalls as $candidate) {
+            if (!\in_array($candidate->method, RoutePhpMethods::ALL, true)
+                || $candidate->startOffset > $byteOffset
+                || $candidate->endOffset < $byteOffset
+            ) {
+                continue;
+            }
+            if (null === $call || $candidate->startOffset > $call->startOffset) {
+                $call = $candidate;
+            }
+        }
+        $receiver = null === $call ? null : $this->receivers->resolve($source, $document, $call);
 
         return null !== $receiver && $this->controllers->isController($receiver->controllerClass, $document, $classIndex);
     }

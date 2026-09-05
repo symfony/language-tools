@@ -6,27 +6,25 @@ use Microsoft\PhpParser\Parser;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Route\PhpRouteReferenceCandidateExtractor;
 use Symfony\Lsp\Feature\Route\RouteControllerClassifier;
-use Symfony\Lsp\Feature\Route\RouteParameterKeyExtractor;
+use Symfony\Lsp\Feature\Route\RoutePhpReceiverResolver;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\QuotedArgumentMatcher;
 
 final class RouteReferenceExtractorFactory
 {
     public static function create(PositionConverter $converter, ?PhpParserInterface $parser = null): RouteReferenceExtractor
     {
+        $receivers = new RoutePhpReceiverResolver(new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher()));
+
         return new RouteReferenceExtractor(
             $converter,
             $parser ?? new TolerantPhpParser(new Parser()),
-            new PhpRouteReferenceCandidateExtractor(
-                new QuotedArgumentMatcher($converter),
-                new PhpCommentParser(),
-                new RouteParameterKeyExtractor(new BalancedDelimiterMatcher(), new PhpLiteralArrayKeyParser()),
-            ),
+            new PhpRouteReferenceCandidateExtractor($converter, $receivers, new PhpLiteralArrayKeyParser()),
+            $receivers,
             new RouteControllerClassifier(),
         );
     }

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recognize PHP route calls only on Symfony router and controller receivers
 - Ignore XLIFF translation units inside XML comments
 - Follow PHP configuration builder chains through nullsafe calls, comments and renamed imports
 - Decode escaped quoted INI translation messages

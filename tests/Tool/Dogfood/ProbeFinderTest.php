@@ -46,6 +46,21 @@ final class ProbeFinderTest extends TestCase
         self::assertSame(['a_route', 'b_route'], array_map(static fn (Probe $probe): string => $probe->value, $probes));
     }
 
+    public function testFindsRouteProbesOnlyOnSupportedPhpReceivers(): void
+    {
+        $this->write('src/AController.php', "<?php\n\$this->generateUrl('helper_route');\n");
+        $this->write('src/BService.php', "<?php\n\$this->router->generate('router_route');\n");
+        $this->write('src/CService.php', "<?php\n\$urlGenerator->generate('generator_route');\n");
+        $this->write('src/DService.php', "<?php\n\$tokens->generate('unrelated_token');\ngenerate('unrelated_call');\n");
+
+        $probes = $this->probes(new ProbeFinder(probesPerCategory: 4), 'route.php');
+
+        self::assertSame(
+            ['helper_route', 'router_route', 'generator_route'],
+            array_map(static fn (Probe $probe): string => $probe->value, $probes),
+        );
+    }
+
     public function testExcludesDependencyAndGeneratedDirectories(): void
     {
         foreach (['vendor', 'node_modules', 'var', '.git'] as $directory) {

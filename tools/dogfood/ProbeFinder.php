@@ -9,7 +9,7 @@ final class ProbeFinder
     private const EXCLUDED_DIRECTORIES = ['.git', 'node_modules', 'var', 'vendor'];
 
     private const DEFINITIONS = [
-        ['category' => 'route.php', 'files' => '{\.php$}', 'pattern' => '{(?:generate|redirectToRoute)\(\s*[\'\"]([^\'\"]+)}'],
+        ['category' => 'route.php', 'files' => '{\.php$}', 'pattern' => '{(?:->(?:generateUrl|redirectToRoute)|(?<![A-Za-z0-9_])(?i:router|urlgenerator|url_generator)->generate)\s*\(\s*[\'\"]([^\'\"]+)}'],
         ['category' => 'route.twig', 'files' => '{\.twig$}', 'pattern' => '{(?<![.\w|])(?:path|url)\(\s*[\'\"]([^\'\"]+)}'],
         ['category' => 'template.php', 'files' => '{\.php$}', 'pattern' => '{(?:render|renderView)\(\s*[\'\"]([^\'\"]+\.twig)}'],
         ['category' => 'template.twig', 'files' => '{\.twig$}', 'pattern' => '{\b(?:extends|include|embed|import|from|use)\s+[\'\"]([^\'\"]+\.twig)}'],
