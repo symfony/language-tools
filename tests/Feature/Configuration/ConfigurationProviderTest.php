@@ -765,6 +765,27 @@ final class ConfigurationProviderTest extends TestCase
         ], array_column($diagnostics, 'message'));
     }
 
+    public function testSkipsIncompletePhpConfigurationValues(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.php';
+        foreach ([
+            '<?php $framework->router()->utf8([1);',
+            '<?php $framework->router()->utf8(array(1);',
+            '<?php $framework->router()->utf8((true);',
+            '<?php $framework->router()->utf8("dev);',
+        ] as $index => $text) {
+            $version = $index + 1;
+            if (1 === $version) {
+                $fixture->documents->open(new Document($uri, 'php', $version, $text));
+            } else {
+                $fixture->documents->update($uri, $version, $text);
+            }
+
+            self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]), $text);
+        }
+    }
+
     public function testTreatsFluentPhpConfigurationLeafSettersAsSiblings(): void
     {
         $fixture = $this->providers();

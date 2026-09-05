@@ -91,6 +91,7 @@ final class PhpLiteralArrayKeyParserTest extends TestCase
             nameStartOffset: null,
             nameEndOffset: null,
             stringLiteral: null,
+            completeLiteral: null,
             callable: null,
             expression: $expression,
             startOffset: \strlen($prefix),

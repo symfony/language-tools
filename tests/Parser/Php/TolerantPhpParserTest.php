@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpConstantKind;
+use Symfony\Lsp\Parser\Php\PhpLiteralKind;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParameter;
@@ -49,6 +50,110 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame('Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController', $document->typeDeclarations[0]->parentClassName);
         self::assertTrue($document->typeDeclarations[0]->contains((int) strpos($source, 'ArticleController')));
         self::assertSame([], $document->diagnostics);
+    }
+
+    public function testExposesLiteralArgumentValues(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            $values->accept('text');
+            $values->accept(true);
+            $values->accept(false);
+            $values->accept(null);
+            $values->accept(12);
+            $values->accept(0644);
+            $values->accept(0x10);
+            $values->accept(0b10);
+            $values->accept(0o17);
+            $values->accept(1_000);
+            $values->accept(1.5);
+            $values->accept(1e3);
+            $values->accept(-5);
+            $values->accept(+1.5);
+            $values->accept([1, $dynamic]);
+            $values->accept(array(1));
+            $values->accept((true));
+            $values->accept([true, false][0]);
+            $values->accept(Value::OPTION);
+            $values->accept('dev' === $container->env());
+            PHP;
+
+        $calls = array_values(array_filter(
+            (new TolerantPhpParser(new Parser()))->parse($source)->methodCalls,
+            static fn ($call): bool => 'accept' === $call->method,
+        ));
+
+        self::assertSame([
+            [PhpLiteralKind::String, 'text'],
+            [PhpLiteralKind::Boolean, true],
+            [PhpLiteralKind::Boolean, false],
+            [PhpLiteralKind::Null, null],
+            [PhpLiteralKind::Integer, 12],
+            [PhpLiteralKind::Integer, 420],
+            [PhpLiteralKind::Integer, 16],
+            [PhpLiteralKind::Integer, 2],
+            [PhpLiteralKind::Integer, 15],
+            [PhpLiteralKind::Integer, 1000],
+            [PhpLiteralKind::Float, 1.5],
+            [PhpLiteralKind::Float, 1000.0],
+            [PhpLiteralKind::Integer, -5],
+            [PhpLiteralKind::Float, 1.5],
+            [PhpLiteralKind::Array, null],
+            [PhpLiteralKind::Array, null],
+            [PhpLiteralKind::Boolean, true],
+            [null, null],
+            [null, null],
+            [null, null],
+        ], array_map(static function ($call): array {
+            $literal = $call->positionalArgument(0)?->completeLiteral;
+
+            return [$literal?->kind, $literal?->scalarValue];
+        }, $calls));
+    }
+
+    public function testDoesNotExposeDynamicStringLiteralValues(): void
+    {
+        $expressions = [
+            '"hello $name"',
+            "<<<TEXT\nhello\nTEXT",
+            "<<<'TEXT'\nhello\nTEXT",
+            "b'text'",
+            '"unterminated',
+        ];
+        foreach ($expressions as $expression) {
+            $source = '<?php $values->accept('.$expression.');';
+            $argument = (new TolerantPhpParser(new Parser()))->parse($source)->methodCalls[0]->positionalArgument(0);
+
+            self::assertNull($argument?->completeLiteral, $expression);
+        }
+    }
+
+    public function testExposesOverflowNumericLiteralKinds(): void
+    {
+        $expressions = [
+            (string) \PHP_INT_MAX.'0',
+            '0x'.str_repeat('f', 17),
+            '0b1'.str_repeat('0', 64),
+            '0'.str_repeat('7', 22),
+            '0o'.str_repeat('7', 22),
+        ];
+        foreach ($expressions as $expression) {
+            $source = '<?php $values->accept('.$expression.');';
+            $literal = (new TolerantPhpParser(new Parser()))->parse($source)->methodCalls[0]->positionalArgument(0)?->completeLiteral;
+
+            self::assertSame(PhpLiteralKind::Float, $literal?->kind, $expression);
+            self::assertIsFloat($literal->scalarValue, $expression);
+        }
+    }
+
+    public function testDoesNotExposeInvalidOrIncompleteLiteralArgumentValues(): void
+    {
+        foreach (['[', '[1', 'array(', 'array(1', '(true', '08'] as $expression) {
+            $source = '<?php $values->accept('.$expression.');';
+            $argument = (new TolerantPhpParser(new Parser()))->parse($source)->methodCalls[0]->positionalArgument(0);
+
+            self::assertNull($argument?->completeLiteral, $expression);
+        }
     }
 
     public function testDecodesEscapedStringLiteralsWithSourceOffsets(): void

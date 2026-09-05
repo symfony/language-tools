@@ -24,9 +24,9 @@ final class ConfigurationAnalyzerTest extends TestCase
         $text = '<?php function configure(FrameworkConfig $options) { $options->router()->utf8(true); }';
 
         self::assertSame([
-            ['path' => ['framework', 'router'], 'argument' => ''],
-            ['path' => ['framework', 'router', 'utf8'], 'argument' => 'true'],
-        ], array_map(static fn (PhpConfigurationOccurrence $occurrence): array => ['path' => $occurrence->path, 'argument' => $occurrence->argument->source], $analyzer->occurrences($text, $index)));
+            ['path' => ['framework', 'router'], 'literal' => null],
+            ['path' => ['framework', 'router', 'utf8'], 'literal' => true],
+        ], array_map(static fn (PhpConfigurationOccurrence $occurrence): array => ['path' => $occurrence->path, 'literal' => $occurrence->literal?->scalarValue], $analyzer->occurrences($text, $index)));
         self::assertSame(['framework', 'router', 'utf8'], $analyzer->resolveNode($text, $index, strpos($text, 'utf8') + 1)[0] ?? null);
 
         $incomplete = '<?php function configure(FrameworkConfig $options) { $options->router()->ut';
@@ -43,8 +43,8 @@ final class ConfigurationAnalyzerTest extends TestCase
 
         $rootWithDigit = '<?php function configure(Psr3Config $options) { $options->enabled(true); }';
         self::assertSame(
-            [['path' => ['psr_3', 'enabled'], 'argument' => 'true']],
-            array_map(static fn (PhpConfigurationOccurrence $occurrence): array => ['path' => $occurrence->path, 'argument' => $occurrence->argument->source], $analyzer->occurrences($rootWithDigit, $index)),
+            [['path' => ['psr_3', 'enabled'], 'literal' => true]],
+            array_map(static fn (PhpConfigurationOccurrence $occurrence): array => ['path' => $occurrence->path, 'literal' => $occurrence->literal?->scalarValue], $analyzer->occurrences($rootWithDigit, $index)),
         );
         $incompleteRootWithDigit = '<?php function configure(Psr3Config $options) { $options->en';
         self::assertSame(

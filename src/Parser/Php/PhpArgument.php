@@ -9,6 +9,7 @@ final class PhpArgument
         public readonly ?int $nameStartOffset,
         public readonly ?int $nameEndOffset,
         public readonly ?PhpStringLiteral $stringLiteral,
+        public readonly ?PhpLiteral $completeLiteral,
         public readonly ?PhpCallable $callable,
         public readonly ?string $expression,
         public readonly int $startOffset,

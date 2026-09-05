@@ -5,6 +5,8 @@ namespace Symfony\Lsp\Feature\Configuration;
 use Symfony\Component\Yaml\Tag\TaggedValue;
 use Symfony\Lsp\Feature\Environment\EnvironmentExpressionParser;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
+use Symfony\Lsp\Parser\Php\PhpLiteral;
+use Symfony\Lsp\Parser\Php\PhpLiteralKind;
 use Symfony\Lsp\Project\Project;
 
 final class ConfigurationValueValidator
@@ -43,9 +45,16 @@ final class ConfigurationValueValidator
         return \in_array($expected, $actualTypes, true) || ('float' === $expected && \in_array('int', $actualTypes, true));
     }
 
-    public function acceptsPhpArgument(ConfigurationNode $node, PhpConfigurationArgument $argument): bool
+    public function acceptsPhpLiteral(ConfigurationNode $node, ?PhpLiteral $literal): bool
     {
-        return !$argument->literal || $this->acceptsResolvedValue($node, $argument->value);
+        if (null === $literal) {
+            return true;
+        }
+
+        return $this->acceptsResolvedValue(
+            $node,
+            PhpLiteralKind::Array === $literal->kind ? [] : $literal->scalarValue,
+        );
     }
 
     public function acceptsValue(ConfigurationNode $node, string $value): bool

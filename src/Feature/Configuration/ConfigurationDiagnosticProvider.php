@@ -132,8 +132,7 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
             if ($node->deprecated) {
                 $diagnostics[] = $this->diagnostic($range, 2, 'config.deprecated_key', \sprintf('Configuration key "%s" is deprecated.', $key));
             }
-            $argument = trim($occurrence->argument->source);
-            if ('' !== $argument && !$this->values->acceptsPhpArgument($node, $occurrence->argument)) {
+            if (!$this->values->acceptsPhpLiteral($node, $occurrence->literal)) {
                 $diagnostics[] = $this->diagnostic($range, 1, 'config.invalid_type', \sprintf('Expected %s for "%s".', $node->type, $key));
             }
         }

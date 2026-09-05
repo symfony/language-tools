@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Feature\Configuration;
 
+use Symfony\Lsp\Parser\Php\PhpLiteral;
+
 final class PhpConfigurationOccurrence
 {
     /**
@@ -15,7 +17,7 @@ final class PhpConfigurationOccurrence
         public readonly array $schemaPath,
         public readonly array $builderPath,
         public readonly array $builderSchemaPath,
-        public readonly PhpConfigurationArgument $argument,
+        public readonly ?PhpLiteral $literal,
         public readonly int $startOffset,
         public readonly int $endOffset,
     ) {

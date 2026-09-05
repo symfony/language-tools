@@ -2,19 +2,26 @@
 
 namespace Symfony\Lsp\Parser\Php;
 
+use Microsoft\PhpParser\MissingToken;
 use Microsoft\PhpParser\Node;
+use Microsoft\PhpParser\Node\Attribute;
 use Microsoft\PhpParser\Node\Expression\ArgumentExpression;
 use Microsoft\PhpParser\Node\Expression\ArrayCreationExpression;
 use Microsoft\PhpParser\Node\Expression\CallExpression;
 use Microsoft\PhpParser\Node\Expression\MemberAccessExpression;
 use Microsoft\PhpParser\Node\Expression\ObjectCreationExpression;
+use Microsoft\PhpParser\Node\Expression\ParenthesizedExpression;
 use Microsoft\PhpParser\Node\Expression\ScopedPropertyAccessExpression;
+use Microsoft\PhpParser\Node\Expression\UnaryOpExpression;
 use Microsoft\PhpParser\Node\Expression\Variable;
 use Microsoft\PhpParser\Node\MethodDeclaration;
+use Microsoft\PhpParser\Node\NumericLiteral;
 use Microsoft\PhpParser\Node\QualifiedName;
+use Microsoft\PhpParser\Node\ReservedWord;
 use Microsoft\PhpParser\Node\Statement\ClassDeclaration;
 use Microsoft\PhpParser\Node\StringLiteral;
 use Microsoft\PhpParser\Token;
+use Microsoft\PhpParser\TokenKind;
 
 final class PhpExpressionFactBuilder
 {
@@ -66,11 +73,19 @@ final class PhpExpressionFactBuilder
 
             $name = $child->name?->getText($source);
             $expression = $child->expression?->getText($source);
+            $stringLiteral = $child->expression instanceof StringLiteral ? $this->stringLiteral($child->expression, $source) : null;
+            $literal = null;
+            if ($this->argumentListComplete($child)) {
+                $literal = $child->expression instanceof StringLiteral
+                    ? (null === $stringLiteral ? null : new PhpLiteral(PhpLiteralKind::String, $stringLiteral->value))
+                    : $this->literal($child->expression, $source);
+            }
             $arguments[] = new PhpArgument(
                 \is_string($name) ? $name : null,
                 $child->name?->getStartPosition(),
                 $child->name?->getEndPosition(),
-                $child->expression instanceof StringLiteral ? $this->stringLiteral($child->expression, $source) : null,
+                $stringLiteral,
+                $literal,
                 null === $names ? null : $this->phpCallable($child->expression, $source, $names, $owner),
                 \is_string($expression) ? $expression : null,
                 $child->getStartPosition(),
@@ -82,6 +97,19 @@ final class PhpExpressionFactBuilder
         }
 
         return $arguments;
+    }
+
+    private function argumentListComplete(ArgumentExpression $argument): bool
+    {
+        $owner = $argument->getParent()?->getParent();
+        if ($owner instanceof CallExpression) {
+            return !$owner->closeParen instanceof MissingToken;
+        }
+        if ($owner instanceof ObjectCreationExpression || $owner instanceof Attribute) {
+            return null === $owner->openParen || ($owner->closeParen instanceof Token && !$owner->closeParen instanceof MissingToken);
+        }
+
+        return true;
     }
 
     private function objectCreation(ObjectCreationExpression $creation, string $source, PhpNameContext $names): ?PhpObjectCreation
@@ -243,5 +271,89 @@ final class PhpExpressionFactBuilder
         }
 
         return new PhpStringLiteral(PhpStringLiteralDecoder::decode($text[0], substr($text, 1, -1)), $start + 1, $end - 1);
+    }
+
+    private function literal(mixed $expression, string $source): ?PhpLiteral
+    {
+        if ($expression instanceof StringLiteral) {
+            $literal = $this->stringLiteral($expression, $source);
+
+            return null === $literal ? null : new PhpLiteral(PhpLiteralKind::String, $literal->value);
+        }
+        if ($expression instanceof NumericLiteral) {
+            return $this->numericLiteral($expression, $source);
+        }
+        if ($expression instanceof ReservedWord) {
+            return match ($expression->children->kind) {
+                TokenKind::TrueReservedWord => new PhpLiteral(PhpLiteralKind::Boolean, true),
+                TokenKind::FalseReservedWord => new PhpLiteral(PhpLiteralKind::Boolean, false),
+                TokenKind::NullReservedWord => new PhpLiteral(PhpLiteralKind::Null),
+                default => null,
+            };
+        }
+        if ($expression instanceof ArrayCreationExpression) {
+            return $expression->closeParenOrBracket instanceof MissingToken ? null : new PhpLiteral(PhpLiteralKind::Array);
+        }
+        if ($expression instanceof ParenthesizedExpression) {
+            return $expression->closeParen instanceof MissingToken ? null : $this->literal($expression->expression, $source);
+        }
+        if (!$expression instanceof UnaryOpExpression
+            || !\in_array($expression->operator->kind, [TokenKind::PlusToken, TokenKind::MinusToken], true)
+        ) {
+            return null;
+        }
+        $literal = $this->literal($expression->operand, $source);
+        if (null === $literal
+            || !\in_array($literal->kind, [PhpLiteralKind::Integer, PhpLiteralKind::Float], true)
+            || (!\is_int($literal->scalarValue) && !\is_float($literal->scalarValue))
+        ) {
+            return null;
+        }
+
+        $value = TokenKind::MinusToken === $expression->operator->kind ? -$literal->scalarValue : $literal->scalarValue;
+
+        return new PhpLiteral(\is_int($value) ? PhpLiteralKind::Integer : PhpLiteralKind::Float, $value);
+    }
+
+    private function numericLiteral(NumericLiteral $literal, string $source): ?PhpLiteral
+    {
+        $text = strtolower(str_replace('_', '', (string) $literal->children->getText($source)));
+        if (TokenKind::IntegerLiteralToken === $literal->children->kind
+            && 1 < \strlen($text)
+            && '0' === $text[0]
+            && !str_starts_with($text, '0x')
+            && !str_starts_with($text, '0b')
+            && !str_starts_with($text, '0o')
+            && \strlen($text) !== strspn($text, '01234567')
+        ) {
+            return null;
+        }
+
+        return match ($literal->children->kind) {
+            TokenKind::IntegerLiteralToken => new PhpLiteral(
+                PhpLiteralKind::Integer,
+                str_starts_with($text, '0o') ? \intval(substr($text, 2), 8) : \intval($text, 0),
+            ),
+            TokenKind::FloatingLiteralToken => new PhpLiteral(PhpLiteralKind::Float, $this->floatingLiteral($text)),
+            default => null,
+        };
+    }
+
+    private function floatingLiteral(string $text): float
+    {
+        if (str_starts_with($text, '0x')) {
+            return (float) hexdec(substr($text, 2));
+        }
+        if (str_starts_with($text, '0b')) {
+            return (float) bindec(substr($text, 2));
+        }
+        if (str_starts_with($text, '0o')) {
+            return (float) octdec(substr($text, 2));
+        }
+        if (1 < \strlen($text) && '0' === $text[0] && \strlen($text) === strspn($text, '01234567')) {
+            return (float) octdec($text);
+        }
+
+        return (float) $text;
     }
 }
