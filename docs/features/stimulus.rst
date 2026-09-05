@@ -39,6 +39,11 @@ Twig usages. Escaped characters in static helper arguments follow Twig's string
 rules. JavaScript comments and string contents aren't indexed as registrations
 or controller members. Controller files also provide usage code lenses.
 
+The Twig helpers are recognized only as real calls with static string
+arguments, including calls chained on the same expression. Look-alike text in
+strings, comments and ``verbatim`` blocks and helper names called on an object
+are ignored.
+
 An unknown static controller name is reported only after all registered
 controllers are known. Unknown actions and targets aren't diagnosed because
 controllers can inherit or register them dynamically.

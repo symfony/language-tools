@@ -18,6 +18,7 @@ final class ProbeFinder
         ['category' => 'component.twig', 'files' => '{\.twig$}', 'pattern' => '{<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\b}'],
         ['category' => 'stimulus.controller.twig', 'files' => '{\.twig$}', 'pattern' => '{\bdata-controller\s*=\s*[\'"][^\'"]*?([A-Za-z0-9_@./-]+)}'],
         ['category' => 'stimulus.action.twig', 'files' => '{\.twig$}', 'pattern' => '{\bdata-action\s*=\s*[\'"][^\'"]*?(?:[^\s\'"]+->)?[A-Za-z0-9_@./-]+#([A-Za-z_$][A-Za-z0-9_$]*)}'],
+        ['category' => 'stimulus.helper.twig', 'files' => '{\.twig$}', 'pattern' => '{(?<![.\w])stimulus_controller\s*\(\s*[\'"]([A-Za-z0-9_@./-]+)}'],
         ['category' => 'live.action.twig', 'files' => '{\.twig$}', 'pattern' => '{\bdata-live-action-param\s*=\s*[\'"](?:[^\'"]*\|)?([A-Za-z_][A-Za-z0-9_]*)}'],
         ['category' => 'live.event.php', 'files' => '{\.php$}', 'pattern' => '{\bemit\s*\(\s*[\'"]([^\'"]+)}'],
         ['category' => 'asset.twig', 'files' => '{\.twig$}', 'pattern' => '{\basset\s*\(\s*[\'\"]([A-Za-z0-9_@.-][A-Za-z0-9_@./-]*)[\'\"]\s*\)}'],

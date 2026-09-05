@@ -3,16 +3,29 @@
 namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Twig\TwigStringDecoder;
+use Symfony\Lsp\Parser\Twig\TwigDocument;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
+use Symfony\Lsp\Parser\Twig\TwigStringLiteral;
 
 final class StimulusReferenceExtractor
 {
+    private const HELPER_MEMBER_KINDS = [
+        'stimulus_controller' => null,
+        'stimulus_action' => StimulusMemberKind::Action,
+        'stimulus_target' => StimulusMemberKind::Target,
+    ];
+
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly TwigCommentParser $commentParser,
         private readonly JavaScriptSourceAnalyzer $codeMasker,
         private readonly StimulusControllerNameNormalizer $controllerNameNormalizer,
+        private readonly TwigDocumentParser $parser,
+        private readonly TwigCallArgumentResolver $arguments,
     ) {
     }
 
@@ -73,23 +86,49 @@ final class StimulusReferenceExtractor
                 $references[] = new StimulusReference($controller, StimulusMemberKind::Target, $name, $uri, $this->converter->toRange($text, $valueOffset + $offset, \strlen($name)));
             }
         }
-        preg_match_all('/\bstimulus_controller\s*\(\s*([\'"])((?:\\\\.|[^\'"])+)\1/', $source, $controllers, \PREG_OFFSET_CAPTURE);
-        foreach ($controllers[2] as [$rawName, $offset]) {
-            $references[] = new StimulusReference($this->controllerNameNormalizer->normalize(TwigStringDecoder::decode($rawName)), null, null, $uri, $this->converter->toRange($text, $offset, \strlen($rawName)));
-        }
-        foreach (['action' => StimulusMemberKind::Action, 'target' => StimulusMemberKind::Target] as $function => $kind) {
-            preg_match_all('/\bstimulus_'.$function.'\s*\(\s*([\'"])((?:\\\\.|[^\'"])+)\1\s*,\s*([\'"])((?:\\\\.|[^\'"])+)\3/', $source, $calls, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-            foreach ($calls as $call) {
-                $rawController = $call[2][0];
-                $rawMember = $call[4][0];
-                $controller = $this->controllerNameNormalizer->normalize(TwigStringDecoder::decode($rawController));
-                $member = TwigStringDecoder::decode($rawMember);
-                $references[] = new StimulusReference($controller, null, null, $uri, $this->converter->toRange($text, $call[2][1], \strlen($rawController)));
-                $references[] = new StimulusReference($controller, $kind, $member, $uri, $this->converter->toRange($text, $call[4][1], \strlen($rawMember)));
+        array_push($references, ...$this->helperReferences($uri, $text));
+
+        return $references;
+    }
+
+    /** @return list<StimulusReference> */
+    private function helperReferences(string $uri, string $text): array
+    {
+        $document = $this->parser->parse($text);
+        $references = [];
+        foreach ($document->nodesOfType('function_call') as $call) {
+            $identifier = $document->directChild($call, 'function_identifier');
+            $function = null === $identifier ? '' : $document->text($identifier);
+            if (!\array_key_exists($function, self::HELPER_MEMBER_KINDS)) {
+                continue;
+            }
+            $kind = self::HELPER_MEMBER_KINDS[$function];
+            $arguments = $this->arguments->resolve($document, $call);
+            $controller = $this->literal($document, $arguments->get(0));
+            $member = null === $kind ? null : $this->literal($document, $arguments->get(1));
+            if (null === $controller || (null !== $kind && null === $member)) {
+                continue;
+            }
+            $name = $this->controllerNameNormalizer->normalize($controller->value);
+            $references[] = new StimulusReference($name, null, null, $uri, $this->range($text, $controller));
+            if (null !== $member) {
+                $references[] = new StimulusReference($name, $kind, $member->value, $uri, $this->range($text, $member));
             }
         }
 
         return $references;
+    }
+
+    private function literal(TwigDocument $document, ?TreeSitterNode $argument): ?TwigStringLiteral
+    {
+        $literal = null === $argument ? null : $document->soleStringLiteral($argument);
+
+        return null === $literal || '' === $literal->value ? null : $literal;
+    }
+
+    private function range(string $text, TwigStringLiteral $literal): Range
+    {
+        return $this->converter->toRange($text, $literal->startOffset, $literal->endOffset - $literal->startOffset);
     }
 
     /** @param list<StimulusReference> $references */

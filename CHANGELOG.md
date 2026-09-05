@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recognize Stimulus Twig helpers only as real `stimulus_*()` calls
 - Recognize Twig importmap entrypoints only as real `importmap()` call arguments
 - Recognize Twig authorization checks only as real `is_granted()` and `logout_*()` calls
 - Ignore PHP configuration chains on variables declared with a non-builder type

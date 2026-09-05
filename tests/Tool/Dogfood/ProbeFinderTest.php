@@ -127,6 +127,17 @@ final class ProbeFinderTest extends TestCase
         $this->assertPositionInsideValue($probes[0]);
     }
 
+    public function testFindsTwigStimulusHelperControllersOutsideMethodCalls(): void
+    {
+        $this->write('templates/layout.html.twig', "{{ helpers.stimulus_controller('ignored') }}\n{{ stimulus_controller('search') }}\n");
+
+        $probes = $this->probes(new ProbeFinder(), 'stimulus.helper.twig');
+
+        self::assertCount(1, $probes);
+        self::assertSame('search', $probes[0]->value);
+        $this->assertPositionInsideValue($probes[0]);
+    }
+
     public function testFindsTwigImportmapEntrypointsOutsideMethodCalls(): void
     {
         $this->write('templates/layout.html.twig', "{{ app.importmap('ignored') }}\n{{ importmap('app') }}\n");

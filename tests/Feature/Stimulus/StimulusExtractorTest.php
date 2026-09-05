@@ -12,7 +12,12 @@ use Symfony\Lsp\Feature\Stimulus\StimulusControllerNameNormalizer;
 use Symfony\Lsp\Feature\Stimulus\StimulusExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusReferenceExtractor;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -111,6 +116,32 @@ final class StimulusExtractorTest extends TestCase
         self::assertSame(['real'], array_map(static fn ($reference): string => $reference->controller, $facts->references));
     }
 
+    public function testExtractsStaticTwigHelperCallsConservatively(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+        $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+            <div {{ stimulus_controller('chart').stimulus_action('chart', 'open') }}></div>
+            {{ stimulus_target('chart', 'results') }}
+            {{ stimulus_controller({dynamic: values}) }}
+            {{ stimulus_action('chart') }}
+            {{ stimulus_action('chart', name) }}
+            {{ helpers.stimulus_controller('method') }}
+            {% set snippet = "stimulus_controller('string')" %}
+            {% verbatim %}{{ stimulus_controller('verbatim') }}{% endverbatim %}
+            TWIG));
+
+        self::assertSame(
+            [
+                ['chart', null, null],
+                ['chart', null, null],
+                ['chart', 'action', 'open'],
+                ['chart', null, null],
+                ['chart', 'target', 'results'],
+            ],
+            array_map(static fn ($reference): array => [$reference->controller, $reference->kind?->value, $reference->member], $facts->references),
+        );
+    }
+
     public function testDecodesEscapedTwigHelperArguments(): void
     {
         $project = new Project('/workspace', 'file:///workspace');
@@ -141,7 +172,7 @@ final class StimulusExtractorTest extends TestCase
 
         return new StimulusExtractor(
             new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $codeMasker, $controllerNameNormalizer),
-            new StimulusReferenceExtractor($converter, $comments, $codeMasker, $controllerNameNormalizer),
+            new StimulusReferenceExtractor($converter, $comments, $codeMasker, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser())),
             new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer),
         );
     }
