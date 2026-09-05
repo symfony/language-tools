@@ -173,6 +173,29 @@ final class YamlDocumentParserTest extends TestCase
         self::assertSame([], $scalar->sequence);
     }
 
+    public function testRejectsRecoveredScalarsThatOverlapParsedFacts(): void
+    {
+        $parser = new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()));
+        $tabbedBlock = "parameters:\n    script: |\n        line\n\tbad: value\n";
+
+        self::assertSame(
+            [[(int) strpos($tabbedBlock, '|'), \strlen($tabbedBlock)]],
+            array_map(static fn (YamlScalar $scalar): array => [$scalar->startByte, $scalar->endByte], $parser->parseDocument($tabbedBlock)->scalars),
+        );
+
+        $quotedLines = "parameters:\n    msg: \"first\n        second\"\n    broken\n";
+        $scalars = $parser->parseDocument($quotedLines)->scalars;
+
+        self::assertSame(
+            ['parameters', 'first second', 'broken'],
+            array_map(static fn (YamlScalar $scalar): string => $scalar->value, $scalars),
+        );
+        self::assertSame(
+            [(int) strpos($quotedLines, '"'), (int) strpos($quotedLines, 'second"') + \strlen('second"')],
+            [$scalars[1]->startByte, $scalars[1]->endByte],
+        );
+    }
+
     #[DataProvider('flowScalarProvider')]
     public function testFoldsFlowScalarLines(string $raw, YamlScalarStyle $style, string $expected): void
     {

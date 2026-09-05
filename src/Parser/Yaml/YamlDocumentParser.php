@@ -271,6 +271,9 @@ final class YamlDocumentParser
     }
 
     /**
+     * Recovered scalars only fill regions the tree left uncovered, so a
+     * malformed region never yields two facts for the same bytes.
+     *
      * @param list<YamlScalar> $parsed
      * @param list<YamlScalar> $recovered
      *
@@ -278,16 +281,21 @@ final class YamlDocumentParser
      */
     private function mergeScalars(array $parsed, array $recovered): array
     {
-        $merged = [];
-        foreach ($parsed as $scalar) {
-            $merged[$scalar->startByte."\0".$scalar->endByte] = $scalar;
-        }
+        $byStartByte = static fn (YamlScalar $left, YamlScalar $right): int => $left->startByte <=> $right->startByte;
+        usort($parsed, $byStartByte);
+        usort($recovered, $byStartByte);
+        $scalars = $parsed;
+        $index = 0;
+        $count = \count($parsed);
         foreach ($recovered as $scalar) {
-            $key = $scalar->startByte."\0".$scalar->endByte;
-            $merged[$key] ??= $scalar;
+            while ($index < $count && $parsed[$index]->endByte <= $scalar->startByte) {
+                ++$index;
+            }
+            if ($index === $count || $parsed[$index]->startByte >= $scalar->endByte) {
+                $scalars[] = $scalar;
+            }
         }
-        $scalars = array_values($merged);
-        usort($scalars, static fn (YamlScalar $left, YamlScalar $right): int => $left->startByte <=> $right->startByte);
+        usort($scalars, $byStartByte);
 
         return $scalars;
     }

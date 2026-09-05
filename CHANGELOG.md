@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep one YAML scalar fact per source region in malformed documents
 - Report tabbed YAML indentation only where it structures the document
 - Link YAML configuration imports from parsed `resource` values only
 - Decode source-derived XLIFF translation keys once
