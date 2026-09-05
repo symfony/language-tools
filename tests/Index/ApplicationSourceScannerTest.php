@@ -52,6 +52,7 @@ use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
+use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\GitignoreMatcher;
@@ -400,7 +401,7 @@ PHP;
         $indexes = new EnvironmentIndexRegistry();
         $this->scanner(new EnvironmentSourceIndexer(
             $indexes,
-            new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
+            new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser(new TolerantXmlParser())]), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
         ))->indexAll();
 
         self::assertSame(['APP_SECRET'], $indexes->forProject($this->project)->names());

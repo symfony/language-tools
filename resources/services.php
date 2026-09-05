@@ -39,6 +39,7 @@ use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Feature\Stimulus\StimulusCodeLensProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerNameNormalizer;
+use Symfony\Lsp\Feature\Translation\XliffXmlReferenceDecoder;
 use Symfony\Lsp\Feature\Twig\LiveComponentEventProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCodeActionProvider;
 use Symfony\Lsp\Feature\Twig\TemplateCompletionHandler;
@@ -70,7 +71,10 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Xml\LastResultXmlParser;
+use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
+use Symfony\Lsp\Parser\Xml\XmlParserInterface;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlScalarDecoder;
 use Symfony\Lsp\Progress\ProgressReporterInterface;
@@ -193,6 +197,7 @@ return static function (ContainerConfigurator $container): void {
     $services->load('Symfony\\Lsp\\Parser\\', '../src/Parser/**/*{Parser,Locator}.php');
     $services->set(TreeSitterResultDecoder::class);
     $services->set(YamlScalarDecoder::class);
+    $services->set(XliffXmlReferenceDecoder::class);
     $services->set(BalancedDelimiterMatcher::class);
     $services->set(TwigCallArgumentResolver::class);
     $services->set(CommentParserRegistry::class)
@@ -223,6 +228,10 @@ return static function (ContainerConfigurator $container): void {
     $services->get(LastResultTreeSitterParser::class)
         ->decorate(TreeSitterParserInterface::class)
         ->arg('$parser', service(LastResultTreeSitterParser::class.'.inner'));
+    $services->alias(XmlParserInterface::class, TolerantXmlParser::class);
+    $services->get(LastResultXmlParser::class)
+        ->decorate(XmlParserInterface::class)
+        ->arg('$parser', service(LastResultXmlParser::class.'.inner'));
     $services->alias(ProcessRunnerInterface::class, NativeProcessRunner::class);
     $services->alias(ProgressReporterInterface::class, WorkDoneProgressReporter::class);
     $services->alias(RuntimeRefreshObserverInterface::class, DiagnosticProviderRegistry::class);

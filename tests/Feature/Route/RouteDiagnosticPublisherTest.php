@@ -39,6 +39,7 @@ use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
+use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Project\GlobPatternCompiler;
@@ -428,7 +429,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 'php' => new PhpCommentParser(),
                 'twig' => new TwigCommentParser(),
                 'yaml' => new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
-                'xml' => new XmlCommentParser(),
+                'xml' => new XmlCommentParser(new TolerantXmlParser()),
             ]),
         );
     }

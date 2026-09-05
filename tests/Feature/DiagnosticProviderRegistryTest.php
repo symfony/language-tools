@@ -20,6 +20,7 @@ use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Project\GlobPatternCompiler;
@@ -224,7 +225,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
                     'php' => new PhpCommentParser(),
                     'twig' => new TwigCommentParser(),
                     'yaml' => new YamlCommentParser($treeSitter),
-                    'xml' => new XmlCommentParser(),
+                    'xml' => new XmlCommentParser(new TolerantXmlParser()),
                 ]),
             ),
             $providers,

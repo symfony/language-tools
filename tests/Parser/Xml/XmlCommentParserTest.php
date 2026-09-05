@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Parser\Xml;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 
 final class XmlCommentParserTest extends TestCase
@@ -19,14 +20,14 @@ final class XmlCommentParserTest extends TestCase
         $comment = '    <!-- "<service id=\'ignored\'>" -->';
         self::assertSame(
             "<container>\n".str_repeat(' ', \strlen($comment))."\n    <service id=\"real\"/>\n</container>",
-            (new XmlCommentParser())->mask($source),
+            (new XmlCommentParser(new TolerantXmlParser()))->mask($source),
         );
     }
 
     public function testMasksUnterminatedCommentsAndPreservesPositions(): void
     {
         $source = "<container>\n<!-- vérifié ✓\n<ignored/>\n";
-        $masked = (new XmlCommentParser())->mask($source);
+        $masked = (new XmlCommentParser(new TolerantXmlParser()))->mask($source);
 
         self::assertStringStartsWith("<container>\n     ", $masked);
         self::assertSame(\strlen($source), \strlen($masked));
