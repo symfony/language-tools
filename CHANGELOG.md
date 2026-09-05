@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Diagnose missing event listener methods in classes with captured closures
 - Recognize parenthesized Twig callable registration options
 - Validate only literal PHP configuration arguments
 - Resolve adjacent YAML parameter references independently

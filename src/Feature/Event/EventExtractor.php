@@ -180,8 +180,7 @@ final class EventExtractor
         if (!$type->isClass() || null !== $type->parentClassName || str_contains($type->signature, 'extends')) {
             return null;
         }
-        $body = substr($source, $type->startOffset, $type->endOffset - $type->startOffset);
-        if (preg_match('/\buse\s+[^;]+;/', $body)) {
+        if ($this->usesTrait($type, $php, $source)) {
             return null;
         }
         foreach ($php->methodDeclarations as $declaration) {
@@ -195,6 +194,25 @@ final class EventExtractor
             $method->value,
             new Range($this->converter->toPosition($text, $method->startOffset), $this->converter->toPosition($text, $method->endOffset)),
         );
+    }
+
+    private function usesTrait(PhpTypeDeclaration $type, PhpDocument $php, string $source): bool
+    {
+        $body = substr($source, $type->startOffset, $type->endOffset - $type->startOffset);
+        preg_match_all('/\buse\s+[^;]+;/', $body, $matches, \PREG_OFFSET_CAPTURE);
+        foreach ($matches[0] as [, $relativeOffset]) {
+            $offset = $type->startOffset + $relativeOffset;
+            if (!array_any($php->methodDeclarations, static fn ($method): bool => $type->name === $method->className
+                && null !== $method->bodyStartOffset
+                && null !== $method->bodyEndOffset
+                && $offset >= $method->bodyStartOffset
+                && $offset < $method->bodyEndOffset
+            )) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function hasEventDispatcherReceiver(string $source, PhpDocument $php, PhpMethodCall $call): bool

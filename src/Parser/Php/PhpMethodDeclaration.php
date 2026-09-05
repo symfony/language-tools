@@ -17,6 +17,8 @@ final class PhpMethodDeclaration
         public readonly ?string $description,
         public readonly array $attributes = [],
         public readonly array $parameters = [],
+        public readonly ?int $bodyStartOffset = null,
+        public readonly ?int $bodyEndOffset = null,
         public readonly bool $public = true,
     ) {
     }

@@ -107,6 +107,42 @@ YAML;
         self::assertSame(['Symfony\Component\HttpKernel\Event\RequestEvent'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
     }
 
+    public function testDistinguishesTraitUsesFromClosureCapturesWhenDiagnosingListenerMethods(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Listener.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+
+            trait SharedListener
+            {
+            }
+
+            #[AsEventListener(event: 'app.closure', method: 'missingClosure')]
+            final class ClosureListener
+            {
+                public function configure(): void
+                {
+                    $value = null;
+                    $closure = function () use ($value): void {
+                    };
+                }
+            }
+
+            #[AsEventListener(event: 'app.trait', method: 'missingTrait')]
+            final class TraitListener
+            {
+                use SharedListener;
+            }
+            PHP));
+
+        self::assertSame(
+            [['App\\ClosureListener', 'missingClosure']],
+            array_map(static fn ($invalid): array => [$invalid->className, $invalid->method], $facts->invalidListenerMethods),
+        );
+    }
+
     public function testIgnoresClassReferencesEmbeddedInListenerEventExpressions(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Listener.php', 'php', <<<'PHP'

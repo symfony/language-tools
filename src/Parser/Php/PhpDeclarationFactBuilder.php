@@ -15,6 +15,7 @@ use Microsoft\PhpParser\Node\Parameter;
 use Microsoft\PhpParser\Node\PropertyDeclaration;
 use Microsoft\PhpParser\Node\QualifiedName;
 use Microsoft\PhpParser\Node\Statement\ClassDeclaration;
+use Microsoft\PhpParser\Node\Statement\CompoundStatementNode;
 use Microsoft\PhpParser\Node\Statement\EnumDeclaration;
 use Microsoft\PhpParser\Node\Statement\InterfaceDeclaration;
 use Microsoft\PhpParser\Node\Statement\TraitDeclaration;
@@ -405,6 +406,8 @@ final class PhpDeclarationFactBuilder
             $this->description($declaration),
             $attributes,
             $parameters,
+            $body instanceof CompoundStatementNode ? $body->getStartPosition() : null,
+            $body instanceof CompoundStatementNode ? $body->getEndPosition() : null,
             !$declaration->hasModifier(TokenKind::ProtectedKeyword) && !$declaration->hasModifier(TokenKind::PrivateKeyword),
         );
     }
