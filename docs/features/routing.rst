@@ -22,8 +22,9 @@ property declared in the same class or function with Symfony's
 ``RouterInterface`` or ``UrlGeneratorInterface`` type. Explicit closure captures
 and implicit arrow-function captures remain recognized across nested lexical
 scopes. Application types with similar names, untyped receivers and values
-returned by another call aren't recognized. Twig's ``path()`` and ``url()`` functions are also supported. The
-server avoids suggestions when it can't establish that a similarly named method
+returned by another call aren't recognized. Twig's ``path()`` and ``url()``
+functions are also supported. The server avoids suggestions when it can't
+establish that a similarly named method
 belongs to a Symfony API. Twig route functions recognize positional arguments
 and the named ``name`` and ``parameters`` arguments. Completion expects named
 arguments in their declared order and isn't offered inside Twig comments;
@@ -112,8 +113,9 @@ Diagnostics
 
 A statically known route name that doesn't exist is reported as an error. A
 route call with a complete literal short or long parameter array also reports
-required path or host parameters that are missing. Parameters with route defaults or values
-already configured in the router request context are optional. Parameter maps
+required path or host parameters that are missing. Parameters with route
+defaults or values already configured in the router request context are
+optional. Parameter maps
 that are variables, contain a dynamic top-level key or use top-level array
 unpacking aren't diagnosed. Nested arrays and unpacking inside a parameter value
 don't make the parameter map dynamic. A quick fix adds the

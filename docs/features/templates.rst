@@ -47,8 +47,9 @@ Variables
 
 Variable completion and hover are available in Twig templates for Twig globals,
 outer literal keys passed in complete short or long arrays to recognized PHP
-render calls and literal names listed in the ``vars`` argument of the ``#[Template]``
-attribute. Render calls recognize positional context arrays and the named
+render calls and literal names listed in the ``vars`` argument of the
+``#[Template]`` attribute. Render calls recognize positional context arrays and
+the named
 ``parameters`` or ``context`` arguments described above. Twig component
 templates also expose public component properties.
 
