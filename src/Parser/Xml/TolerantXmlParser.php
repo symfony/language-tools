@@ -116,7 +116,9 @@ final class TolerantXmlParser implements XmlParserInterface
 
         if (\count($events) > self::MAX_EVENTS) {
             array_splice($events, self::MAX_EVENTS);
-            $this->appendStructuralLimitDiagnostic($diagnostics, $offset);
+            if (!$terminalMalformed) {
+                $this->appendStructuralLimitDiagnostic($diagnostics, $offset);
+            }
             $terminalMalformed = true;
         }
         if ([] !== $stack && !$terminalMalformed) {
