@@ -105,8 +105,9 @@ final class PhpConfigurationAnalyzer
         if (1 !== preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)$/D', substr($masked, 0, $receiverEnd), $match)) {
             return null;
         }
+        $root = $this->variableRoot($this->declaredVariables($document, $match[1], $receiverEnd), $match[1], $index);
 
-        return [$this->variableRoot($this->declaredVariables($document, $match[1], $receiverEnd), $match[1], $index)];
+        return null === $root ? null : [$root];
     }
 
     /** @param list<SourceComment> $comments */
@@ -139,26 +140,29 @@ final class PhpConfigurationAnalyzer
     }
 
     /**
-     * The nearest declaration a plain variable receiver at the offset can
-     * resolve to, as the enclosing scope of an incomplete chain is unknown.
+     * The declarations a plain variable receiver at the offset can resolve to,
+     * taking the innermost scope holding the offset.
      *
      * @return list<PhpTypedVariable>
      */
     private function declaredVariables(PhpDocument $document, string $name, int $offset): array
     {
-        $nearest = null;
+        $innermost = null;
         foreach ($document->typedVariables as $variable) {
             if ($name !== $variable->name
-                || $offset < $variable->nameEndOffset
                 || !\in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                || (null !== $nearest && $variable->nameStartOffset < $nearest->nameStartOffset)
+                || null === $variable->scopeStartOffset
+                || null === $variable->scopeEndOffset
+                || $offset < $variable->scopeStartOffset
+                || $offset > $variable->scopeEndOffset
+                || (null !== $innermost && $variable->scopeStartOffset < $innermost->scopeStartOffset)
             ) {
                 continue;
             }
-            $nearest = $variable;
+            $innermost = $variable;
         }
 
-        return null === $nearest ? [] : [$nearest];
+        return null === $innermost ? [] : [$innermost];
     }
 
     /** @return array<string, PhpMethodCall> */
@@ -188,7 +192,11 @@ final class PhpConfigurationAnalyzer
         }
 
         if (PhpMethodReceiverKind::Variable === $call->receiverContext->kind && null !== $call->receiverContext->name) {
-            $builderPath = $builderSchemaPath = [$this->variableRoot($document->receiverVariables($call), $call->receiverContext->name, $index)];
+            $root = $this->variableRoot($document->receiverVariables($call), $call->receiverContext->name, $index);
+            if (null === $root) {
+                return null;
+            }
+            $builderPath = $builderSchemaPath = [$root];
         } else {
             $receiver = $callsByRange[$call->receiverContext->startOffset.':'.$call->receiverContext->endOffset] ?? null;
             if (null === $receiver || null === $parent = $this->resolveCall($receiver, $document, $index, $callsByRange, $resolved)) {
@@ -238,8 +246,14 @@ final class PhpConfigurationAnalyzer
         );
     }
 
-    /** @param list<PhpTypedVariable> $variables */
-    private function variableRoot(array $variables, string $name, ConfigurationIndex $index): string
+    /**
+     * The root of a variable receiver, from its declared builder type, or from
+     * its name when it has no declared type. A variable declared with another
+     * type isn't a configuration builder at all.
+     *
+     * @param list<PhpTypedVariable> $variables
+     */
+    private function variableRoot(array $variables, string $name, ConfigurationIndex $index): ?string
     {
         foreach ($variables as $variable) {
             foreach ($variable->types as $type) {
@@ -250,7 +264,7 @@ final class PhpConfigurationAnalyzer
             }
         }
 
-        return $this->matchingRoot($name, $index);
+        return [] === $variables ? $this->matchingRoot($name, $index) : null;
     }
 
     private function builderRootName(string $class): ?string

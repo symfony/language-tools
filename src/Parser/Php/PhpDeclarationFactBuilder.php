@@ -102,6 +102,7 @@ final class PhpDeclarationFactBuilder
                     $className,
                     \is_string($methodName) && '' !== $methodName ? $methodName : null,
                     $scope?->getStartPosition(),
+                    $scope?->getEndPosition(),
                     $declaration->variableName->getStartPosition() + 1,
                     $declaration->variableName->getEndPosition(),
                 );
@@ -121,6 +122,7 @@ final class PhpDeclarationFactBuilder
                     $types,
                     PhpTypedVariableKind::Property,
                     $className,
+                    null,
                     null,
                     null,
                     $variable->getStartPosition() + 1,

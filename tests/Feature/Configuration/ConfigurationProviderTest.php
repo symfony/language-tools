@@ -1118,6 +1118,72 @@ final class ConfigurationProviderTest extends TestCase
         }
     }
 
+    public function testCompletesPhpBuilderChainsForTheVariableDeclaredInScope(): void
+    {
+        $fixture = $this->providers();
+        $cases = [
+            [
+                <<<'PHP'
+                    <?php
+
+                    function first(FrameworkConfig $config): void
+                    {
+                        $config->router()->utf8(true);
+                    }
+
+                    function second(SecurityConfig $config): void
+                    {
+                        $config->fir
+                    PHP,
+                ['firewalls'],
+            ],
+            [
+                <<<'PHP'
+                    <?php
+
+                    return static function (FrameworkConfig $config): void {
+                        $nested = static function (SecurityConfig $config): void {
+                            $config->firewall('main')->stateless(true);
+                        };
+                        $config->ro
+                    PHP,
+                ['router'],
+            ],
+        ];
+        foreach ($cases as $index => [$text, $expected]) {
+            $uri = 'file:///workspace/config/packages/scope'.$index.'.php';
+            $fixture->documents->open(new Document($uri, 'php', 1, $text));
+            $completion = $fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, \strlen($text))) ?? [];
+            self::assertSame($expected, array_column($completion, 'label'), $text);
+            $fixture->documents->close($uri);
+        }
+    }
+
+    public function testIgnoresPhpConfigurationChainsOnVariablesDeclaredWithAnotherType(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.php';
+        $text = <<<'PHP'
+            <?php
+
+            use Psr\Log\LoggerInterface;
+            use Symfony\Config\FrameworkConfig;
+
+            function configure(LoggerInterface $framework, FrameworkConfig $config): void
+            {
+                $framework->router()->utf8('ignored');
+                $config->router()->utf8('invalid');
+            }
+            PHP;
+        $fixture->documents->open(new Document($uri, 'php', 1, $text));
+
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['Expected boolean for "framework.router.utf8".'], array_column($diagnostics, 'message'));
+        self::assertSame($this->protocolRange($fixture->converter, $text, (int) strrpos($text, "utf8('invalid')"), \strlen('utf8')), $diagnostics[0]['range'] ?? null);
+        self::assertNull($fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, (int) strpos($text, 'router') + 1)));
+        self::assertIsArray($fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, (int) strrpos($text, 'router') + 1)));
+    }
+
     public function testRejectsPhpCompletionOutsideConfigurationBuilderChains(): void
     {
         $fixture = $this->providers();
@@ -1128,6 +1194,8 @@ final class ConfigurationProviderTest extends TestCase
             '<?php $framework->router()[0]->ut',
             '<?php class Configurator { public function configure(): void { $this->framework->ro',
             '<?php function configure(LoggerInterface $logger): void { $logger->getRouter()->ut',
+            '<?php function configure(LoggerInterface $framework): void { $framework->ro',
+            '<?php function configure(LoggerInterface $framework): void { $framework->router()->ut',
         ];
         foreach ($texts as $index => $text) {
             $uri = 'file:///workspace/config/packages/unrelated'.$index.'.php';

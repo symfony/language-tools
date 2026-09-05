@@ -88,9 +88,64 @@ final class ConfigurationAnalyzerTest extends TestCase
             '<?php function configure(FrameworkConfig $options) { // $options->router()->ut',
             "<?php function configure(FrameworkConfig \$options) { \$options->router()->\n// \$options->ut",
             '<?php function configure(FrameworkConfig $options) { $options->router()->/* $options->ut',
+            '<?php function configure(LoggerInterface $framework) { $framework->ro',
+            '<?php function configure(LoggerInterface $framework) { $framework->router()->ut',
         ] as $unsupported) {
             self::assertNull($analyzer->completionContext($unsupported, $index, \strlen($unsupported)), $unsupported);
         }
+    }
+
+    public function testIgnoresChainsOnVariablesDeclaredWithAnotherType(): void
+    {
+        $analyzer = new PhpConfigurationAnalyzer(new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $index = $this->index();
+        $text = <<<'PHP'
+            <?php
+            function configure(LoggerInterface $framework, $psr3): void
+            {
+                $framework->router()->utf8(true);
+                $psr3->enabled(true);
+            }
+            PHP;
+
+        self::assertSame(
+            [['psr_3', 'enabled']],
+            array_map(static fn (PhpConfigurationOccurrence $occurrence): array => $occurrence->path, $analyzer->occurrences($text, $index)),
+        );
+    }
+
+    public function testResolvesIncompleteChainsFromTheDeclarationInScope(): void
+    {
+        $analyzer = new PhpConfigurationAnalyzer(new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $index = $this->index();
+        $functions = <<<'PHP'
+            <?php
+            function first(FrameworkConfig $config): void
+            {
+                $config->router()->utf8(true);
+            }
+
+            function second(Psr3Config $config): void
+            {
+                $config->en
+            PHP;
+        self::assertSame(
+            ['path' => ['psr_3'], 'prefix' => 'en', 'start' => \strlen($functions) - 2],
+            $analyzer->completionContext($functions, $index, \strlen($functions)),
+        );
+
+        $closures = <<<'PHP'
+            <?php
+            return static function (FrameworkConfig $config): void {
+                $nested = static function (Psr3Config $config): void {
+                    $config->enabled(true);
+                };
+                $config->ro
+            PHP;
+        self::assertSame(
+            ['path' => ['framework'], 'prefix' => 'ro', 'start' => \strlen($closures) - 2],
+            $analyzer->completionContext($closures, $index, \strlen($closures)),
+        );
     }
 
     public function testAnalyzesChainsWithNullsafeCallsCommentsAndDynamicMethods(): void

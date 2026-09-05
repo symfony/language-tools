@@ -24,9 +24,9 @@ files. YAML suggestions follow the current indentation and mapping path. PHP
 suggestions recognize the bundle configuration DSL, including chains split
 across lines, chains separated by comments or nullsafe calls, named entries
 such as ``firewall('main')`` and leaf setters that stay at their current
-level. Their root key comes from the declared builder type of the variable,
-including renamed ``use`` imports. XML suggestions follow the current element
-path. Commented configuration constructs are ignored.
+level. Their root key comes from the declared builder type of the variable in
+scope, including renamed ``use`` imports. XML suggestions follow the current
+element path. Commented configuration constructs are ignored.
 
 YAML value completion suggests allowed enum values. Suggested keys include
 type and description details when the bundle provides them.
@@ -49,7 +49,9 @@ nested options. Calls that select or set named entries, such as
 ``firewall('main')``, keep literal entry names in diagnostic and hover paths.
 Builder chains are followed through nullsafe calls and comments between calls,
 and their root key comes from the declared builder type of the variable,
-including renamed ``use`` imports.
+including renamed ``use`` imports. Chains on variables declared with a type
+that isn't a configuration builder are ignored, in diagnostics, hover and
+completion alike.
 YAML diagnostics recognize scalar values accepted from backed PHP enum cases
 and match ``!php/enum`` tags to the declared cases. PHP arguments are checked
 only when they are literals; expressions, enum cases and class constants stay

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Ignore PHP configuration chains on variables declared with a non-builder type
+- Resolve incomplete PHP configuration chains from the builder variable in scope
 - Complete PHP configuration builder chains split across lines, comments, nullsafe calls and named entries
 - Scope console `configure()` definitions with PHP method body facts
 - Read console `setDefinition()` lists from resolved Symfony input classes
