@@ -26,8 +26,9 @@ final class TolerantPhpParser implements PhpParserInterface
         $root = $this->parser->parseSourceFile($source);
         $nodes = new TolerantPhpNodeCollection($root->getDescendantNodes(), $source);
         $names = $this->names->build($nodes, $source);
-        $declarations = $this->declarations->build($nodes, $source, $names);
-        $expressions = $this->expressions->build($nodes, $source, $names);
+        $classReferences = $this->expressions->classReferences($nodes, $source, $names);
+        $declarations = $this->declarations->build($nodes, $source, $names, $classReferences);
+        $expressions = $this->expressions->build($nodes, $source, $names, $classReferences);
 
         $diagnostics = [];
         foreach (DiagnosticsProvider::getDiagnostics($root) as $diagnostic) {

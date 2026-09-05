@@ -31,39 +31,52 @@ final class PhpExpressionFactBuilder
     ) {
     }
 
-    public function build(TolerantPhpNodeCollection $collection, string $source, PhpNameContext $names): TolerantPhpExpressionFacts
+    /**
+     * Resolves every `X::class` reference once, keyed by node object id.
+     *
+     * @return array<int, PhpClassReference>
+     */
+    public function classReferences(TolerantPhpNodeCollection $collection, string $source, PhpNameContext $names): array
+    {
+        $references = [];
+        foreach ($collection->classReferences as $node) {
+            $reference = $this->classReference($node, $source, $names);
+            if (null !== $reference) {
+                $references[spl_object_id($node)] = $reference;
+            }
+        }
+
+        return $references;
+    }
+
+    /** @param array<int, PhpClassReference> $classReferencesByNode */
+    public function build(TolerantPhpNodeCollection $collection, string $source, PhpNameContext $names, array $classReferencesByNode): TolerantPhpExpressionFacts
     {
         $methodCalls = [];
         foreach ($collection->methodCalls as $node) {
-            $call = $this->methodCall($node, $source);
+            $call = $this->methodCall($node, $source, $classReferencesByNode);
             if (null !== $call) {
                 $methodCalls[] = $call;
             }
         }
         $objectCreations = [];
         foreach ($collection->objectCreations as $node) {
-            $creation = $this->objectCreation($node, $source, $names);
+            $creation = $this->objectCreation($node, $source, $names, $classReferencesByNode);
             if (null !== $creation) {
                 $objectCreations[] = $creation;
             }
         }
-        $classReferences = [];
-        foreach ($collection->classReferences as $node) {
-            $reference = $this->classReference($node, $source, $names);
-            if (null !== $reference) {
-                $classReferences[] = $reference;
-            }
-        }
 
-        return new TolerantPhpExpressionFacts($methodCalls, $objectCreations, $classReferences);
+        return new TolerantPhpExpressionFacts($methodCalls, $objectCreations, array_values($classReferencesByNode));
     }
 
     /**
-     * @param array<Node|Token> $children
+     * @param array<Node|Token>             $children
+     * @param array<int, PhpClassReference> $classReferencesByNode
      *
      * @return list<PhpArgument>
      */
-    public function arguments(array $children, string $source, ?PhpNameContext $names = null, ?ClassDeclaration $owner = null): array
+    public function arguments(array $children, string $source, array $classReferencesByNode, ?PhpNameContext $names = null, ?ClassDeclaration $owner = null): array
     {
         $arguments = [];
         foreach ($children as $child) {
@@ -93,10 +106,22 @@ final class PhpExpressionFactBuilder
                 $child->expression?->getStartPosition(),
                 $child->expression?->getEndPosition(),
                 $child->dotDotDotToken instanceof Token,
+                $this->completeClassReference($child, $classReferencesByNode),
             );
         }
 
         return $arguments;
+    }
+
+    /** @param array<int, PhpClassReference> $classReferencesByNode */
+    private function completeClassReference(ArgumentExpression $argument, array $classReferencesByNode): ?PhpClassReference
+    {
+        $expression = $argument->expression;
+        if ($argument->dotDotDotToken instanceof Token || !$expression instanceof Node) {
+            return null;
+        }
+
+        return $classReferencesByNode[spl_object_id($expression)] ?? null;
     }
 
     private function argumentListComplete(ArgumentExpression $argument): bool
@@ -112,7 +137,8 @@ final class PhpExpressionFactBuilder
         return true;
     }
 
-    private function objectCreation(ObjectCreationExpression $creation, string $source, PhpNameContext $names): ?PhpObjectCreation
+    /** @param array<int, PhpClassReference> $classReferencesByNode */
+    private function objectCreation(ObjectCreationExpression $creation, string $source, PhpNameContext $names, array $classReferencesByNode): ?PhpObjectCreation
     {
         if (!$creation->classTypeDesignator instanceof QualifiedName) {
             return null;
@@ -130,6 +156,7 @@ final class PhpExpressionFactBuilder
             $this->arguments(
                 $creation->argumentExpressionList->children ?? [],
                 $source,
+                $classReferencesByNode,
                 $names,
                 $owner instanceof ClassDeclaration ? $owner : null,
             ),
@@ -141,7 +168,8 @@ final class PhpExpressionFactBuilder
         );
     }
 
-    private function methodCall(CallExpression $call, string $source): ?PhpMethodCall
+    /** @param array<int, PhpClassReference> $classReferencesByNode */
+    private function methodCall(CallExpression $call, string $source, array $classReferencesByNode): ?PhpMethodCall
     {
         $memberAccess = $call->callableExpression;
         if (!$memberAccess instanceof MemberAccessExpression) {
@@ -165,7 +193,7 @@ final class PhpExpressionFactBuilder
             $call->getEndPosition(),
             $methodNode->getStartPosition(),
             $methodNode->getEndPosition(),
-            $this->arguments($call->argumentExpressionList->children ?? [], $source),
+            $this->arguments($call->argumentExpressionList->children ?? [], $source, $classReferencesByNode),
             null === $owner ? null : (string) $owner->getNamespacedName(),
             \is_string($methodName) && '' !== $methodName ? $methodName : null,
             $scope?->getStartPosition(),

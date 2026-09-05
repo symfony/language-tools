@@ -6,6 +6,7 @@ use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
+use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpConstantKind;
 use Symfony\Lsp\Parser\Php\PhpLiteralKind;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
@@ -1001,6 +1002,103 @@ final class TolerantPhpParserTest extends TestCase
         self::assertNull($call->positionalArgument(0));
         self::assertNull($call->namedOrPositionalArgument('first', 0));
         self::assertSame('second', $call->positionalArgument(1)?->stringLiteral?->value);
+    }
+
+    public function testExposesCompleteClassReferenceArguments(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+            use App\Entity\Article as Post;
+            #[AsListener(event: Post::class)]
+            final class Sample extends Base
+            {
+                public function run(): void
+                {
+                    $values->accept(Post::class);
+                    $values->accept(\App\Entity\Comment::class);
+                    $values->accept(Entity\Comment::class);
+                    $values->accept(self::class);
+                    $values->accept(static::class);
+                    $values->accept(parent::class);
+                    $values->accept(Post /* alias */ :: class);
+                    $values->accept(name: Post::class);
+                }
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $calls = array_values(array_filter($document->methodCalls, static fn ($call): bool => 'accept' === $call->method));
+        $first = $calls[0]->positionalArgument(0)?->completeClassReference;
+        $qualified = $calls[1]->positionalArgument(0)?->completeClassReference;
+        self::assertInstanceOf(PhpClassReference::class, $first);
+        self::assertInstanceOf(PhpClassReference::class, $qualified);
+
+        self::assertSame([
+            'App\Entity\Article',
+            'App\Entity\Comment',
+            'App\Entity\Comment',
+            'App\Sample',
+            'App\Sample',
+            'App\Base',
+            'App\Entity\Article',
+            'App\Entity\Article',
+        ], array_map(
+            static fn ($call): ?string => $call->namedOrPositionalArgument('name', 0)?->completeClassReference?->className,
+            $calls,
+        ));
+        self::assertSame('Post', substr($source, $first->startOffset, $first->endOffset - $first->startOffset));
+        self::assertSame('\App\Entity\Comment', substr($source, $qualified->startOffset, $qualified->endOffset - $qualified->startOffset));
+        self::assertSame('App\Entity\Article', $document->attributes[0]->argument('event')?->completeClassReference?->className);
+    }
+
+    public function testExposesCompleteClassReferenceArgumentsOfUnclosedCalls(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+            $values->accept(Article::class
+            PHP;
+
+        $argument = (new TolerantPhpParser(new Parser()))->parse($source)->methodCalls[0]->positionalArgument(0);
+
+        self::assertSame('App\Article', $argument?->completeClassReference?->className);
+    }
+
+    public function testDoesNotExposeDynamicOrPartialClassReferenceArguments(): void
+    {
+        $expressions = [
+            'Article::class . $suffix',
+            '$prefix . Article::class',
+            '$this->resolve(Article::class)',
+            '(Article::class)',
+            '[Article::class]',
+            '$condition ? Article::class : Comment::class',
+            '$type::class',
+            'Article::NAME',
+            'Article::',
+            'Article::cla',
+        ];
+        foreach ($expressions as $expression) {
+            $source = '<?php namespace App; $values->accept('.$expression.');';
+            $argument = (new TolerantPhpParser(new Parser()))->parse($source)->methodCalls[0]->positionalArgument(0);
+
+            self::assertNull($argument?->completeClassReference, $expression);
+        }
+    }
+
+    public function testDoesNotExposeUnpackedClassReferenceArguments(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+            $values->accept(...Article::class);
+            PHP;
+
+        $argument = (new TolerantPhpParser(new Parser()))->parse($source)->methodCalls[0]->arguments[0];
+
+        self::assertTrue($argument->unpacked);
+        self::assertNull($argument->completeClassReference);
     }
 
     public function testFindsClassReferencesAndObjectCreationsInsideArguments(): void

@@ -17,6 +17,7 @@ final class PhpArgument
         public readonly ?int $expressionStartOffset,
         public readonly ?int $expressionEndOffset,
         public readonly bool $unpacked,
+        public readonly ?PhpClassReference $completeClassReference = null,
     ) {
     }
 }

@@ -32,12 +32,13 @@ final class PhpDeclarationFactBuilder
     ) {
     }
 
-    public function build(TolerantPhpNodeCollection $collection, string $source, PhpNameContext $names): TolerantPhpDeclarationFacts
+    /** @param array<int, PhpClassReference> $classReferencesByNode */
+    public function build(TolerantPhpNodeCollection $collection, string $source, PhpNameContext $names, array $classReferencesByNode): TolerantPhpDeclarationFacts
     {
         $attributes = [];
         $attributesByNode = [];
         foreach ($collection->attributes as $node) {
-            $attribute = $this->attribute($node, $source);
+            $attribute = $this->attribute($node, $source, $classReferencesByNode);
             $attributes[] = $attribute;
             $attributesByNode[spl_object_id($node)] = $attribute;
         }
@@ -416,13 +417,14 @@ final class PhpDeclarationFactBuilder
         );
     }
 
-    private function attribute(Attribute $attribute, string $source): PhpAttribute
+    /** @param array<int, PhpClassReference> $classReferencesByNode */
+    private function attribute(Attribute $attribute, string $source, array $classReferencesByNode): PhpAttribute
     {
         $group = $attribute->getFirstAncestor(AttributeGroup::class);
 
         return new PhpAttribute(
             $this->attributeName($attribute->name, $source),
-            $this->expressions->arguments($attribute->argumentExpressionList->children ?? [], $source),
+            $this->expressions->arguments($attribute->argumentExpressionList->children ?? [], $source, $classReferencesByNode),
             $group instanceof AttributeGroup ? $group->getStartPosition() : $attribute->getStartPosition(),
             $group instanceof AttributeGroup ? $group->getEndPosition() : $attribute->getEndPosition(),
             $attribute->name->getStartPosition(),
