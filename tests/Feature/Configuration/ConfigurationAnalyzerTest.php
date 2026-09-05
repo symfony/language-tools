@@ -51,6 +51,63 @@ final class ConfigurationAnalyzerTest extends TestCase
             ['path' => ['psr_3'], 'prefix' => 'en', 'start' => \strlen($incompleteRootWithDigit) - 2],
             $analyzer->completionContext($incompleteRootWithDigit, $index, \strlen($incompleteRootWithDigit)),
         );
+
+        $aliasedRoot = '<?php use Symfony\Config\FrameworkConfig as WebConfig; function configure(WebConfig $web) { $web->router()->ut';
+        self::assertSame(
+            ['path' => ['web', 'router'], 'prefix' => 'ut', 'start' => \strlen($aliasedRoot) - 2],
+            $analyzer->completionContext($aliasedRoot, $index, \strlen($aliasedRoot)),
+        );
+
+        foreach ([
+            "<?php function configure(FrameworkConfig \$options) { \$options\n    ->router()\n    ->ut",
+            '<?php function configure(FrameworkConfig $options) { $options?->router()->ut',
+            '<?php function configure(FrameworkConfig $options) { $options->router()/* here */->ut',
+        ] as $unsupported) {
+            self::assertNull($analyzer->completionContext($unsupported, $index, \strlen($unsupported)), $unsupported);
+        }
+    }
+
+    public function testAnalyzesChainsWithNullsafeCallsCommentsAndDynamicMethods(): void
+    {
+        $analyzer = new PhpConfigurationAnalyzer(new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $index = $this->index();
+        $text = <<<'PHP'
+            <?php
+            function configure(FrameworkConfig $options): void
+            {
+                $options?->router()
+                    // enable UTF-8
+                    -> /* here */ utf8(true);
+                $options->$dynamic();
+                $options->{'router'}();
+            }
+            PHP;
+
+        $occurrences = $analyzer->occurrences($text, $index);
+        self::assertSame([['framework', 'router'], ['framework', 'router', 'utf8']], array_map(static fn (PhpConfigurationOccurrence $occurrence): array => $occurrence->path, $occurrences));
+        self::assertSame([strpos($text, 'router'), strpos($text, 'utf8')], array_map(static fn (PhpConfigurationOccurrence $occurrence): int => $occurrence->startOffset, $occurrences));
+        self::assertSame(['router', 'utf8'], array_map(static fn (PhpConfigurationOccurrence $occurrence): string => substr($text, $occurrence->startOffset, $occurrence->endOffset - $occurrence->startOffset), $occurrences));
+    }
+
+    public function testResolvesConfigurationRootsFromAliasedBuilderImports(): void
+    {
+        $analyzer = new PhpConfigurationAnalyzer(new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $index = $this->index();
+        $text = <<<'PHP'
+            <?php
+            use Symfony\Config\FrameworkConfig as WebConfig;
+            use Symfony\Config\Psr3Config as FrameworkConfig;
+
+            return static function (WebConfig $web, FrameworkConfig $misleading): void {
+                $web->router()->utf8(true);
+                $misleading->enabled(true);
+            };
+            PHP;
+
+        self::assertSame(
+            [['framework', 'router'], ['framework', 'router', 'utf8'], ['psr_3', 'enabled']],
+            array_map(static fn (PhpConfigurationOccurrence $occurrence): array => $occurrence->path, $analyzer->occurrences($text, $index)),
+        );
     }
 
     public function testAnalyzesXmlElementsAttributesAndIncompleteTags(): void

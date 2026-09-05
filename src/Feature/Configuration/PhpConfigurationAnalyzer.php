@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Configuration;
 
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -19,7 +20,6 @@ final class PhpConfigurationAnalyzer
     public function occurrences(string $source, ConfigurationIndex $index): array
     {
         $document = $this->parser->parse($source);
-        $masked = $this->comments->mask($source);
         $callsByRange = [];
         foreach ($document->methodCalls as $call) {
             $callsByRange[$call->startOffset.':'.$call->endOffset] = $call;
@@ -28,7 +28,7 @@ final class PhpConfigurationAnalyzer
         /** @var array<int, PhpConfigurationOccurrence|null> $resolved */
         $resolved = [];
         foreach ($document->methodCalls as $call) {
-            $this->resolveCall($call, $source, $masked, $index, $callsByRange, $resolved);
+            $this->resolveCall($call, $document, $index, $callsByRange, $resolved);
         }
 
         $occurrences = array_values(array_filter($resolved));
@@ -70,7 +70,7 @@ final class PhpConfigurationAnalyzer
         if (1 !== preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)((?:->[A-Za-z_][A-Za-z0-9_]*\(\))*)->([A-Za-z_][A-Za-z0-9_]*)?$/', $before, $match)) {
             return null;
         }
-        $path = [$this->root($before, $match[1], $index)];
+        $path = [$this->lexicalRoot($before, $match[1], $index)];
         preg_match_all('/->([A-Za-z_][A-Za-z0-9_]*)\(\)/', $match[2], $methods);
         foreach ($methods[1] as $method) {
             $path[] = $this->configurationName($method, $index->find($path));
@@ -84,23 +84,22 @@ final class PhpConfigurationAnalyzer
      * @param array<string, PhpMethodCall>                $callsByRange
      * @param array<int, PhpConfigurationOccurrence|null> $resolved
      */
-    private function resolveCall(PhpMethodCall $call, string $source, string $masked, ConfigurationIndex $index, array $callsByRange, array &$resolved): ?PhpConfigurationOccurrence
+    private function resolveCall(PhpMethodCall $call, PhpDocument $document, ConfigurationIndex $index, array $callsByRange, array &$resolved): ?PhpConfigurationOccurrence
     {
         $id = spl_object_id($call);
         if (\array_key_exists($id, $resolved)) {
             return $resolved[$id];
         }
         $resolved[$id] = null;
-        $methodRange = $this->methodRange($call, $source);
-        if (null === $methodRange) {
+        if (1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $call->method)) {
             return null;
         }
 
         if (PhpMethodReceiverKind::Variable === $call->receiverContext->kind && null !== $call->receiverContext->name) {
-            $builderPath = $builderSchemaPath = [$this->root(substr($masked, 0, $call->receiverContext->startOffset + 1), $call->receiverContext->name, $index)];
+            $builderPath = $builderSchemaPath = [$this->receiverRoot($call, $document, $index)];
         } else {
             $receiver = $callsByRange[$call->receiverContext->startOffset.':'.$call->receiverContext->endOffset] ?? null;
-            if (null === $receiver || null === $parent = $this->resolveCall($receiver, $source, $masked, $index, $callsByRange, $resolved)) {
+            if (null === $receiver || null === $parent = $this->resolveCall($receiver, $document, $index, $callsByRange, $resolved)) {
                 return null;
             }
             $builderPath = $parent->builderPath;
@@ -142,33 +141,46 @@ final class PhpConfigurationAnalyzer
             $returnedBuilderPath,
             $returnedBuilderSchemaPath,
             $literal,
-            $methodRange[0],
-            $methodRange[1],
+            $call->methodStartOffset,
+            $call->methodEndOffset,
         );
     }
 
-    /** @return array{int, int}|null */
-    private function methodRange(PhpMethodCall $call, string $source): ?array
+    private function receiverRoot(PhpMethodCall $call, PhpDocument $document, ConfigurationIndex $index): string
     {
-        $tail = substr($source, $call->receiverContext->endOffset, $call->endOffset - $call->receiverContext->endOffset);
-        if (1 !== preg_match('/^\s*->\s*([A-Za-z_][A-Za-z0-9_]*)/', $tail, $match, \PREG_OFFSET_CAPTURE)) {
-            return null;
+        foreach ($document->receiverVariables($call) as $variable) {
+            foreach ($variable->types as $type) {
+                $name = $this->builderRootName($type);
+                if (null !== $name) {
+                    return $this->matchingRoot($name, $index);
+                }
+            }
         }
-        $start = $call->receiverContext->endOffset + $match[1][1];
 
-        return [$start, $start + \strlen($match[1][0])];
+        return $this->matchingRoot((string) $call->receiverContext->name, $index);
     }
 
-    private function root(string $before, string $variable, ConfigurationIndex $index): string
+    private function lexicalRoot(string $before, string $variable, ConfigurationIndex $index): string
     {
         preg_match_all('/([A-Za-z_\\\\][A-Za-z0-9_\\\\]*Config)\s+\$'.preg_quote($variable, '/').'\b/', $before, $matches);
         $class = end($matches[1]);
-        if (false === $class) {
-            $name = $variable;
-        } else {
-            $shortName = substr($class, (int) strrpos('\\'.$class, '\\'));
-            $name = substr($shortName, 0, -\strlen('Config'));
+
+        return $this->matchingRoot(false === $class ? $variable : ($this->builderRootName($class) ?? $variable), $index);
+    }
+
+    private function builderRootName(string $class): ?string
+    {
+        $shortName = substr($class, (int) strrpos('\\'.$class, '\\'));
+        if (!str_ends_with($shortName, 'Config')) {
+            return null;
         }
+        $name = substr($shortName, 0, -\strlen('Config'));
+
+        return '' === $name ? null : $name;
+    }
+
+    private function matchingRoot(string $name, ConfigurationIndex $index): string
+    {
         foreach (array_keys($index->roots()) as $root) {
             if (lcfirst($name) === ConfigurationNode::phpMethodName($root)) {
                 return $root;

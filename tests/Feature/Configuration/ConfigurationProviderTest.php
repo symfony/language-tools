@@ -871,6 +871,65 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame(['Expected boolean for "framework.psr_3_handler.main.enabled".'], array_column($diagnostics, 'message'));
     }
 
+    public function testRecognizesPhpConfigurationCallsSeparatedByNullsafeArrowsAndComments(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.php';
+        $text = <<<'PHP'
+            <?php
+
+            function configure(FrameworkConfig $framework): void
+            {
+                $framework?->router()
+                    // the router is strict
+                    -> /* here */ strict('invalid');
+            }
+            PHP;
+        $fixture->documents->open(new Document($uri, 'php', 1, $text));
+
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
+        self::assertSame(['Expected boolean for "framework.router.strict".'], array_column($diagnostics, 'message'));
+        self::assertSame($this->protocolRange($fixture->converter, $text, (int) strpos($text, "strict('"), \strlen('strict')), $diagnostics[0]['range'] ?? null);
+
+        $hover = $fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, (int) strpos($text, 'router') + 1));
+        self::assertIsArray($hover);
+        self::assertIsArray($hover['contents'] ?? null);
+        self::assertIsString($hover['contents']['value'] ?? null);
+        self::assertStringContainsString('`framework.router`', $hover['contents']['value']);
+    }
+
+    public function testResolvesPhpConfigurationRootsFromAliasedBuilderImports(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.php';
+        $text = <<<'PHP'
+            <?php
+
+            use Symfony\Config\FrameworkConfig as WebConfig;
+            use Symfony\Config\MonologConfig as FrameworkConfig;
+
+            return static function (WebConfig $web, FrameworkConfig $logs): void {
+                $web->router()->utf8('invalid');
+                $logs->handler('main')->nested('invalid');
+            };
+            PHP;
+        $fixture->documents->open(new Document($uri, 'php', 1, $text));
+
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.invalid_type', 'config.invalid_type'], array_column($diagnostics, 'code'));
+        self::assertSame([
+            'Expected boolean for "framework.router.utf8".',
+            'Expected boolean for "monolog.handler.main.nested".',
+        ], array_column($diagnostics, 'message'));
+
+        $hover = $fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, (int) strpos($text, 'handler') + 1));
+        self::assertIsArray($hover);
+        self::assertIsArray($hover['contents'] ?? null);
+        self::assertIsString($hover['contents']['value'] ?? null);
+        self::assertStringContainsString('`monolog.handler.main`', $hover['contents']['value']);
+    }
+
     public function testRecognizesNamedEntriesInPhpConfigurationBuilderChains(): void
     {
         $fixture = $this->providers();

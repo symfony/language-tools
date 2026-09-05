@@ -43,6 +43,9 @@ and malformed structures. Fluent PHP builder calls that set leaf values stay at
 their current configuration level, while child builder calls continue into
 nested options. Calls that select or set named entries, such as
 ``firewall('main')``, keep literal entry names in diagnostic and hover paths.
+Builder chains are followed through nullsafe calls and comments between calls,
+and their root key comes from the declared builder type of the variable,
+including renamed ``use`` imports.
 YAML diagnostics recognize scalar values accepted from backed PHP enum cases
 and match ``!php/enum`` tags to the declared cases. PHP arguments are checked
 only when they are literals; expressions, enum cases and class constants stay
@@ -84,3 +87,6 @@ Limitations
 Custom validation callbacks and options built dynamically by application code
 may not be diagnosed. YAML alias and merge diagnostics are deferred for
 incomplete documents; aliases and merges inside sequence items aren't resolved.
+PHP completion inside an unfinished builder chain reads the chain as written:
+it suggests nothing for chains split across lines, chains separated by comments
+or nullsafe calls, and renamed ``use`` imports.
