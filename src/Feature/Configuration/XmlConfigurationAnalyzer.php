@@ -77,7 +77,7 @@ final class XmlConfigurationAnalyzer
         if (1 === preg_match('/<(?<element>[A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?)\b[^<>]*\s+(?<prefix>[A-Za-z_][A-Za-z0-9_.-]*)?$/', $before, $match)) {
             $tagOffset = strrpos($before, '<');
             if (false !== $tagOffset) {
-                $parentPath = $this->path(substr($source, 0, $tagOffset), $index);
+                $parentPath = $this->pathAtOffset($source, $index, $tagOffset);
                 $prefix = $match['prefix'] ?? '';
 
                 return [
@@ -96,7 +96,7 @@ final class XmlConfigurationAnalyzer
         $prefix = $match['prefix'] ?? '';
 
         return [
-            'path' => $this->path(substr($source, 0, $cursor - \strlen($match[0])), $index),
+            'path' => $this->pathAtOffset($source, $index, $cursor - \strlen($match[0])),
             'prefix' => $prefix,
             'start' => $cursor - \strlen($prefix),
             'alias' => $alias,
@@ -105,11 +105,14 @@ final class XmlConfigurationAnalyzer
     }
 
     /** @return list<string> */
-    private function path(string $source, ConfigurationIndex $index): array
+    private function pathAtOffset(string $source, ConfigurationIndex $index, int $offset): array
     {
         $contexts = [];
         $stack = [];
         foreach ($this->parser->parse($source)->events as $event) {
+            if ($event->startOffset >= $offset) {
+                break;
+            }
             if ($event instanceof XmlElementStart) {
                 $context = null === $event->parentIdentity ? [] : ($contexts[$event->parentIdentity] ?? []);
                 $contexts[$event->identity] = $this->elementPath($context, $event->qualifiedName, $index) ?? $context;

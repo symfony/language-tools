@@ -7,7 +7,6 @@ final class XmlOpaque
     public function __construct(
         public readonly ?int $parentIdentity,
         public readonly XmlOpaqueKind $kind,
-        public readonly string $raw,
         public readonly int $startOffset,
         public readonly int $endOffset,
         public readonly int $contentStartOffset,

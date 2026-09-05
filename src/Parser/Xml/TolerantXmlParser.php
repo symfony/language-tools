@@ -4,8 +4,6 @@ namespace Symfony\Lsp\Parser\Xml;
 
 final class TolerantXmlParser implements XmlParserInterface
 {
-    private const MAX_CONSTRUCT_BYTES = 65_536;
-
     public function parse(string $source): XmlDocument
     {
         $events = [];
@@ -14,6 +12,7 @@ final class TolerantXmlParser implements XmlParserInterface
         $length = \strlen($source);
         $offset = 0;
         $identity = 0;
+        $terminalMalformed = false;
 
         while ($offset < $length) {
             $opening = strpos($source, '<', $offset);
@@ -28,6 +27,7 @@ final class TolerantXmlParser implements XmlParserInterface
                 $events[] = $event;
                 if (null !== $diagnostic) {
                     $diagnostics[] = $diagnostic;
+                    $terminalMalformed = $offset >= $length;
                 }
                 continue;
             }
@@ -38,6 +38,7 @@ final class TolerantXmlParser implements XmlParserInterface
                 }
                 if (null !== $diagnostic) {
                     $diagnostics[] = $diagnostic;
+                    $terminalMalformed = $offset >= $length;
                 }
                 continue;
             }
@@ -46,6 +47,7 @@ final class TolerantXmlParser implements XmlParserInterface
                 $events[] = $event;
                 if (null !== $diagnostic) {
                     $diagnostics[] = $diagnostic;
+                    $terminalMalformed = $offset >= $length;
                 }
                 continue;
             }
@@ -54,6 +56,7 @@ final class TolerantXmlParser implements XmlParserInterface
                 $events[] = $event;
                 if (null !== $diagnostic) {
                     $diagnostics[] = $diagnostic;
+                    $terminalMalformed = $offset >= $length;
                 }
                 continue;
             }
@@ -62,6 +65,7 @@ final class TolerantXmlParser implements XmlParserInterface
                 $events[] = $event;
                 if (null !== $diagnostic) {
                     $diagnostics[] = $diagnostic;
+                    $terminalMalformed = $offset >= $length;
                 }
                 continue;
             }
@@ -72,6 +76,7 @@ final class TolerantXmlParser implements XmlParserInterface
                     $events[] = $event;
                     if (null !== $diagnostic) {
                         $diagnostics[] = $diagnostic;
+                        $terminalMalformed = $offset >= $length;
                     }
                     continue;
                 }
@@ -88,6 +93,7 @@ final class TolerantXmlParser implements XmlParserInterface
                     }
                     if (null !== $diagnostic) {
                         $diagnostics[] = $diagnostic;
+                        $terminalMalformed = $offset >= $length;
                     }
                     continue;
                 }
@@ -97,8 +103,8 @@ final class TolerantXmlParser implements XmlParserInterface
             $offset = $opening + 1;
         }
 
-        while ([] !== $stack) {
-            [, $name] = array_pop($stack);
+        if ([] !== $stack && !$terminalMalformed) {
+            [, $name] = $stack[array_key_last($stack)];
             $diagnostics[] = new XmlDiagnostic(\sprintf('Element "%s" is not closed.', $name), $length, $length);
         }
 
@@ -132,17 +138,16 @@ final class TolerantXmlParser implements XmlParserInterface
     /** @return array{XmlOpaque, ?XmlDiagnostic, int} */
     private function terminatedOpaque(string $source, int $start, string $terminator, XmlOpaqueKind $kind, int $prefixLength, string $message, ?int $parentIdentity): array
     {
-        $length = \strlen($source);
-        $limit = min($length, $start + self::MAX_CONSTRUCT_BYTES);
+        $limit = \strlen($source);
         $closing = strpos($source, $terminator, $start + $prefixLength);
-        if (false !== $closing && $closing + \strlen($terminator) <= $limit) {
+        if (false !== $closing) {
             $end = $closing + \strlen($terminator);
 
-            return [new XmlOpaque($parentIdentity, $kind, substr($source, $start, $end - $start), $start, $end, $start + $prefixLength, $closing), null, $end];
+            return [new XmlOpaque($parentIdentity, $kind, $start, $end, $start + $prefixLength, $closing), null, $end];
         }
 
         return [
-            new XmlOpaque($parentIdentity, $kind, substr($source, $start, $limit - $start), $start, $limit, $start + $prefixLength, $limit),
+            new XmlOpaque($parentIdentity, $kind, $start, $limit, $start + $prefixLength, $limit),
             new XmlDiagnostic($message, $start, min($limit, $start + $prefixLength)),
             $limit,
         ];
@@ -151,11 +156,10 @@ final class TolerantXmlParser implements XmlParserInterface
     /** @return array{?XmlText, ?XmlDiagnostic, int} */
     private function cdata(string $source, int $start, ?int $parentIdentity): array
     {
-        $length = \strlen($source);
-        $limit = min($length, $start + self::MAX_CONSTRUCT_BYTES);
+        $limit = \strlen($source);
         $contentStart = $start + 9;
         $closing = strpos($source, ']]>', $contentStart);
-        if (false !== $closing && $closing + 3 <= $limit) {
+        if (false !== $closing) {
             return [new XmlText($parentIdentity, substr($source, $contentStart, $closing - $contentStart), $contentStart, $closing, XmlTextKind::Cdata), null, $closing + 3];
         }
 
@@ -169,8 +173,7 @@ final class TolerantXmlParser implements XmlParserInterface
     /** @return array{XmlOpaque, ?XmlDiagnostic, int} */
     private function doctype(string $source, int $start, ?int $parentIdentity): array
     {
-        $length = \strlen($source);
-        $limit = min($length, $start + self::MAX_CONSTRUCT_BYTES);
+        $limit = \strlen($source);
         $quote = null;
         $subsetDepth = 0;
         for ($offset = $start + 9; $offset < $limit; ++$offset) {
@@ -206,12 +209,12 @@ final class TolerantXmlParser implements XmlParserInterface
             } elseif ('>' === $byte && 0 === $subsetDepth) {
                 $end = $offset + 1;
 
-                return [new XmlOpaque($parentIdentity, XmlOpaqueKind::Doctype, substr($source, $start, $end - $start), $start, $end, $start + 9, $offset), null, $end];
+                return [new XmlOpaque($parentIdentity, XmlOpaqueKind::Doctype, $start, $end, $start + 9, $offset), null, $end];
             }
         }
 
         return [
-            new XmlOpaque($parentIdentity, XmlOpaqueKind::Doctype, substr($source, $start, $limit - $start), $start, $limit, $start + 9, $limit),
+            new XmlOpaque($parentIdentity, XmlOpaqueKind::Doctype, $start, $limit, $start + 9, $limit),
             new XmlDiagnostic('XML DOCTYPE is not closed.', $start, min($limit, $start + 9)),
             $limit,
         ];
@@ -220,8 +223,7 @@ final class TolerantXmlParser implements XmlParserInterface
     /** @return array{XmlOpaque, ?XmlDiagnostic, int} */
     private function declaration(string $source, int $start, ?int $parentIdentity): array
     {
-        $length = \strlen($source);
-        $limit = min($length, $start + self::MAX_CONSTRUCT_BYTES);
+        $limit = \strlen($source);
         $quote = null;
         for ($offset = $start + 2; $offset < $limit; ++$offset) {
             $byte = $source[$offset];
@@ -236,12 +238,12 @@ final class TolerantXmlParser implements XmlParserInterface
             } elseif ('>' === $byte) {
                 $end = $offset + 1;
 
-                return [new XmlOpaque($parentIdentity, XmlOpaqueKind::Declaration, substr($source, $start, $end - $start), $start, $end, $start + 2, $offset), null, $end];
+                return [new XmlOpaque($parentIdentity, XmlOpaqueKind::Declaration, $start, $end, $start + 2, $offset), null, $end];
             }
         }
 
         return [
-            new XmlOpaque($parentIdentity, XmlOpaqueKind::Declaration, substr($source, $start, $limit - $start), $start, $limit, $start + 2, $limit),
+            new XmlOpaque($parentIdentity, XmlOpaqueKind::Declaration, $start, $limit, $start + 2, $limit),
             new XmlDiagnostic('XML declaration is not closed.', $start, min($limit, $start + 2)),
             $limit,
         ];
@@ -257,8 +259,7 @@ final class TolerantXmlParser implements XmlParserInterface
         [$qualifiedName, $nameEnd] = $name;
         $attributes = [];
         $diagnostic = null;
-        $length = \strlen($source);
-        $limit = min($length, $start + self::MAX_CONSTRUCT_BYTES);
+        $limit = \strlen($source);
         $offset = $nameEnd;
 
         while ($offset < $limit) {
@@ -340,8 +341,7 @@ final class TolerantXmlParser implements XmlParserInterface
             return null;
         }
         [$qualifiedName, $nameEnd] = $name;
-        $length = \strlen($source);
-        $limit = min($length, $start + self::MAX_CONSTRUCT_BYTES);
+        $limit = \strlen($source);
         $offset = $nameEnd;
         $this->skipWhitespace($source, $offset, $limit);
         if ('>' !== ($source[$offset] ?? null)) {

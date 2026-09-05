@@ -20,8 +20,9 @@ too: service, alias and parameter declarations, ``decorates`` targets,
 tags, and service and parameter references in arguments. Single-quoted and
 double-quoted attributes are supported, including quoted ``>`` characters.
 Comments, CDATA sections, processing instructions and DOCTYPE declarations are
-ignored. Nested service tags stay associated with their nearest service, and
-valid definitions after malformed markup are still indexed. XML entity
+ignored. Tags are read only as direct children of their service, including
+services nested inside another service. Valid definitions after malformed
+markup are still indexed. XML entity
 declarations and external identifiers aren't loaded or expanded. Completion is
 only available in YAML and PHP files.
 

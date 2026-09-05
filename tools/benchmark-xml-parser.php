@@ -30,6 +30,7 @@ $fixtures = [
         <container><broken value="unfinished
         <service id="recovered"><argument type="service" id="logger"/></service>
         XML,
+    'long-opaque' => '<root><!--'.str_repeat('x', 70_000).'<fake/>--><real/></root>',
 ];
 $parser = new TolerantXmlParser();
 $iterations = 1_000;

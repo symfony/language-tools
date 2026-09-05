@@ -19,8 +19,11 @@ use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Xml\LastResultXmlParser;
 use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
+use Symfony\Lsp\Parser\Xml\XmlDocument;
+use Symfony\Lsp\Parser\Xml\XmlParserInterface;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 
 final class ConfigurationAnalyzerTest extends TestCase
@@ -254,6 +257,20 @@ final class ConfigurationAnalyzerTest extends TestCase
         self::assertSame(['Opening element "broken" is not closed.'], array_map(static fn (XmlConfigurationStructureError $error): string => $error->message, $errors));
     }
 
+    public function testXmlCompletionParsesTheCompleteSourceOnce(): void
+    {
+        $inner = new RecordingXmlParser();
+        $parser = new LastResultXmlParser($inner);
+        $analyzer = new XmlConfigurationAnalyzer($parser, new XmlCommentParser($parser));
+        $source = '<container><framework:config><framework:router ut';
+
+        self::assertSame(
+            ['path' => ['framework', 'router'], 'prefix' => 'ut', 'start' => \strlen($source) - 2, 'alias' => '', 'attribute' => true],
+            $analyzer->completionContext($source, $this->index(), \strlen($source)),
+        );
+        self::assertSame([$source], $inner->sources);
+    }
+
     /** @param list<int> $lines */
     #[DataProvider('yamlTabIndentationProvider')]
     public function testReportsTabsOnlyInYamlStructuralIndentation(string $text, array $lines): void
@@ -303,5 +320,18 @@ final class ConfigurationAnalyzerTest extends TestCase
     private function node(string $name, array $children = []): ConfigurationNode
     {
         return new ConfigurationNode($name, [] === $children ? 'boolean' : 'array', false, false, null, null, null, false, [], [], $children, null);
+    }
+}
+
+final class RecordingXmlParser implements XmlParserInterface
+{
+    /** @var list<string> */
+    public array $sources = [];
+
+    public function parse(string $source): XmlDocument
+    {
+        $this->sources[] = $source;
+
+        return (new TolerantXmlParser())->parse($source);
     }
 }

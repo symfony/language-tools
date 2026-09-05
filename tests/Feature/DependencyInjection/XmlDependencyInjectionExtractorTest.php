@@ -85,6 +85,7 @@ final class XmlDependencyInjectionExtractorTest extends TestCase
                     <service data-id="wrong" x:id="also.wrong" id="real > service" marker="<!-- literal -->">
                         <![CDATA[<tag name="cdata.tag"/><argument type="service" id="cdata.reference"/>]]>
                         <service id="nested"><tag name="nested.tag"/></service>
+                        <wrapper><tag name="indirect.tag"/></wrapper>
                         <tag name="outer.tag"/>
                     </service>
                     <broken value="unfinished

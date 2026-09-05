@@ -33,7 +33,11 @@ final class XmlDependencyInjectionExtractor
             $nearestService = null === $element->parentIdentity ? null : ($nearestServices[$element->parentIdentity] ?? null);
             if ('service' === $element->localName) {
                 $nearestService = $element->identity;
-            } elseif ('tag' === $element->localName && null !== $nearestService && null !== $name = $element->attribute('name')) {
+            } elseif ('tag' === $element->localName
+                && null !== $nearestService
+                && $element->parentIdentity === $nearestService
+                && null !== $name = $element->attribute('name')
+            ) {
                 $tags[$nearestService][$name->value] = true;
             }
             $nearestServices[$element->identity] = $nearestService;

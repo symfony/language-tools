@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep long XML opaque constructs from producing phantom source facts
+- Associate XML service tags only with their direct service declaration
 - Parse XML configuration, service definitions and XLIFF resources with tolerant shared syntax facts
 - Read direct string keys from complete PHP arrays in route and template analysis
 - Resolve typed PHP receivers through nested closures and arrow functions

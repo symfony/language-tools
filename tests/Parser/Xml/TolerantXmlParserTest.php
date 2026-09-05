@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Parser\Xml;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlElementEnd;
@@ -50,8 +51,7 @@ final class TolerantXmlParserTest extends TestCase
         }
 
         self::assertSame([XmlOpaqueKind::ProcessingInstruction, XmlOpaqueKind::Doctype, XmlOpaqueKind::Comment, XmlOpaqueKind::ProcessingInstruction], array_map(static fn (XmlOpaque $event): XmlOpaqueKind => $event->kind, $opaque));
-        self::assertStringContainsString('<!ENTITY declared "<phantom/>">', $opaque[1]->raw);
-        self::assertSame($opaque[1]->raw, substr($source, $opaque[1]->startOffset, $opaque[1]->endOffset - $opaque[1]->startOffset));
+        self::assertStringContainsString('<!ENTITY declared "<phantom/>">', substr($source, $opaque[1]->startOffset, $opaque[1]->endOffset - $opaque[1]->startOffset));
 
         $cdata = array_values(array_filter($texts, static fn (XmlText $text): bool => XmlTextKind::Cdata === $text->kind));
         self::assertCount(1, $cdata);
@@ -73,14 +73,42 @@ final class TolerantXmlParserTest extends TestCase
         self::assertSame('Opening element "broken" is not closed.', $document->diagnostics[0]->message);
     }
 
-    public function testBoundsUnclosedOpaqueConstructsAndContinuesScanning(): void
+    #[DataProvider('longOpaqueConstructProvider')]
+    public function testKeepsLongOpaqueConstructsOpaque(string $source): void
     {
-        $source = '<root><!--'.str_repeat('x', 70_000).'<sibling/></root>';
         $document = (new TolerantXmlParser())->parse($source);
         $starts = array_values(array_filter($document->events, static fn ($event): bool => $event instanceof XmlElementStart));
 
-        self::assertSame(['root', 'sibling'], array_map(static fn (XmlElementStart $event): string => $event->qualifiedName, $starts));
-        self::assertLessThan(70_000, $document->events[1]->endOffset);
-        self::assertSame('XML comment is not closed.', $document->diagnostics[0]->message);
+        self::assertSame(['root', 'real'], array_map(static fn (XmlElementStart $event): string => $event->qualifiedName, $starts));
+        self::assertSame([], $document->diagnostics);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function longOpaqueConstructProvider(): iterable
+    {
+        $padding = str_repeat('x', 70_000);
+
+        yield 'comment' => ['<root><!--'.$padding.'<fake/>--><real/></root>'];
+        yield 'CDATA' => ['<root><![CDATA['.$padding.'<fake/>]]><real/></root>'];
+        yield 'processing instruction' => ['<root><?work '.$padding.'<fake/>?><real/></root>'];
+        yield 'DOCTYPE internal subset' => ['<!DOCTYPE root ['.$padding.'<!ENTITY fake "<fake/>">]><root><real/></root>'];
+    }
+
+    public function testKeepsAnUnclosedOpaqueConstructOpaqueToEndOfFile(): void
+    {
+        $source = '<root><!--'.str_repeat('x', 70_000).'<fake/></root>';
+        $document = (new TolerantXmlParser())->parse($source);
+        $starts = array_values(array_filter($document->events, static fn ($event): bool => $event instanceof XmlElementStart));
+
+        self::assertSame(['root'], array_map(static fn (XmlElementStart $event): string => $event->qualifiedName, $starts));
+        self::assertSame(['XML comment is not closed.'], array_map(static fn ($diagnostic): string => $diagnostic->message, $document->diagnostics));
+        self::assertSame(\strlen($source), $document->events[1]->endOffset);
+    }
+
+    public function testReportsOnlyTheInnermostUnclosedElementAtEndOfFile(): void
+    {
+        $document = (new TolerantXmlParser())->parse('<root><child>');
+
+        self::assertSame(['Element "child" is not closed.'], array_map(static fn ($diagnostic): string => $diagnostic->message, $document->diagnostics));
     }
 }
