@@ -49,13 +49,7 @@ final class TranslationCatalogExtractor
     private function declarations(string $uri, string $text, string $domain, string $locale, string $format): array
     {
         if ('ini' === $format) {
-            preg_match_all('/^\s*([\w.\-]+)\s*=\s*"((?:\\\\.|[^"\\\\])*)"/m', $text, $matches, \PREG_OFFSET_CAPTURE);
-            $result = [];
-            foreach ($matches[1] as $i => [$key, $offset]) {
-                $result[] = $this->declaration($key, $matches[2][$i][0], $domain, $locale, $uri, $text, $offset);
-            }
-
-            return $result;
+            return $this->iniDeclarations($uri, $text, $domain, $locale);
         }
         if ('json' === $format) {
             return $this->jsonDeclarations($uri, $text, $domain, $locale);
@@ -108,6 +102,28 @@ final class TranslationCatalogExtractor
                 $mapping->keyStartByte,
                 $mapping->keyEndByte - $mapping->keyStartByte,
             );
+        }
+
+        return $result;
+    }
+
+    /** @return list<TranslationDeclaration> */
+    private function iniDeclarations(string $uri, string $text, string $domain, string $locale): array
+    {
+        preg_match_all('/^[^\S\n]*([\w.\-]+)[^\S\n]*=[^\S\n]*(?:"((?:\\\\.|[^"\\\\])*)"|([^\n;]*))/m', $text, $matches, \PREG_OFFSET_CAPTURE);
+        $result = [];
+        foreach ($matches[1] as $i => [$key, $offset]) {
+            [$quoted, $quotedOffset] = $matches[2][$i];
+            if (-1 !== $quotedOffset) {
+                $result[] = $this->declaration($key, $quoted, $domain, $locale, $uri, $text, $offset);
+                continue;
+            }
+            $message = rtrim($matches[3][$i][0]);
+            // PHP's INI parser reads these characters as quotes or operators instead of message text
+            if (preg_match('/["\'()|&~!^=]/', $message)) {
+                continue;
+            }
+            $result[] = $this->declaration($key, $message, $domain, $locale, $uri, $text, $offset);
         }
 
         return $result;

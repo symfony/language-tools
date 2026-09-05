@@ -168,6 +168,35 @@ final class TranslationExtractorTest extends TestCase
         );
     }
 
+    public function testExtractsUnquotedIniMessagesWithoutCommentsAndInvalidValues(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/app/bundles/ApiBundle/Translations/en_US/messages.ini', 'ini', <<<'INI'
+            ; mautic.api.disabled = Commented out.
+            # mautic.api.legacy = Commented out too.
+            mautic.api.plain = Access granted to %name%.
+            mautic.api.noted = Saved  ; keep the note out
+            mautic.api.empty =
+            mautic.api.quoted = "API authorization denied."
+            mautic.api.invalid = Denied (for now)
+            INI));
+
+        self::assertSame(
+            [
+                ['mautic.api.plain', 'Access granted to %name%.', ['name']],
+                ['mautic.api.noted', 'Saved', []],
+                ['mautic.api.empty', '', []],
+                ['mautic.api.quoted', 'API authorization denied.', []],
+            ],
+            array_map(
+                static fn ($item): array => [$item->key, $item->message, $item->placeholders()],
+                $facts->declarations,
+            ),
+        );
+        self::assertSame(2, $facts->declarations[0]->range->start->line);
+        self::assertSame(0, $facts->declarations[0]->range->start->character);
+        self::assertSame(16, $facts->declarations[0]->range->end->character);
+    }
+
     public function testPreservesHyphenatedYamlKeys(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/translations/messages.en.yaml', 'yaml', "article-title: Article\n"));
