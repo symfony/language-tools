@@ -37,7 +37,8 @@ Field completion is also available for the ``choice_label``, ``choice_value``
 and ``group_by`` options of Symfony's Doctrine ``EntityType`` when the
 ``class`` option is a static ``::class`` reference. The complete entity passed
 to ``getRepository()`` and the complete ``EntityType`` argument must be direct
-static ``::class`` references, not parenthesized or computed expressions. Those
+static ``::class`` references, not parenthesized or computed expressions. PHP's
+case-insensitive ``class`` keyword is recognized in any letter case. Those
 arguments and the options must be positional.
 
 Hover identifies regular fields and associations, including their PHP type and

@@ -1016,6 +1016,7 @@ final class TolerantPhpParserTest extends TestCase
                 public function run(): void
                 {
                     $values->accept(Post::class);
+                    $values->accept(Post::CLASS);
                     $values->accept(\App\Entity\Comment::class);
                     $values->accept(Entity\Comment::class);
                     $values->accept(self::class);
@@ -1030,11 +1031,12 @@ final class TolerantPhpParserTest extends TestCase
         $document = (new TolerantPhpParser(new Parser()))->parse($source);
         $calls = array_values(array_filter($document->methodCalls, static fn ($call): bool => 'accept' === $call->method));
         $first = $calls[0]->positionalArgument(0)?->completeClassReference;
-        $qualified = $calls[1]->positionalArgument(0)?->completeClassReference;
+        $qualified = $calls[2]->positionalArgument(0)?->completeClassReference;
         self::assertInstanceOf(PhpClassReference::class, $first);
         self::assertInstanceOf(PhpClassReference::class, $qualified);
 
         self::assertSame([
+            'App\Entity\Article',
             'App\Entity\Article',
             'App\Entity\Comment',
             'App\Entity\Comment',

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recognize case-insensitive PHP `::class` references
 - Ignore Doctrine contexts with computed class arguments
 - Ignore form options of concatenated form type expressions
 - Recognize Twig component tags and Stimulus attributes only in rendered markup

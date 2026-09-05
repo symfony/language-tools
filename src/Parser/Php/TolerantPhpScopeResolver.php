@@ -99,7 +99,7 @@ final class TolerantPhpScopeResolver
     {
         $member = $reference->memberName->getText($source);
         $qualifier = $reference->scopeResolutionQualifier;
-        if ('class' !== $member || !$qualifier instanceof QualifiedName) {
+        if (0 !== strcasecmp('class', (string) $member) || !$qualifier instanceof QualifiedName) {
             return null;
         }
         $text = trim($this->qualifiedName($qualifier, $source), '\\');

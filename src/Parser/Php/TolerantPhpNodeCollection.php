@@ -83,7 +83,7 @@ final class TolerantPhpNodeCollection
                 $objectCreations[] = $node;
             } elseif ($node instanceof MethodDeclaration) {
                 $methodDeclarations[] = $node;
-            } elseif ($node instanceof ScopedPropertyAccessExpression && 'class' === $node->memberName->getText($source)) {
+            } elseif ($node instanceof ScopedPropertyAccessExpression && 0 === strcasecmp('class', (string) $node->memberName->getText($source))) {
                 $classReferences[] = $node;
             } elseif ($node instanceof ClassConstDeclaration || $node instanceof EnumCaseDeclaration) {
                 $constantDeclarations[] = $node;
