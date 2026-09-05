@@ -1150,6 +1150,16 @@ final class ConfigurationProviderTest extends TestCase
                     PHP,
                 ['router'],
             ],
+            [
+                <<<'PHP'
+                    <?php
+
+                    return static function (LoggerInterface $framework): void {
+                        $nested = static function ($framework): void {
+                            $framework->ro
+                    PHP,
+                ['router'],
+            ],
         ];
         foreach ($cases as $index => [$text, $expected]) {
             $uri = 'file:///workspace/config/packages/scope'.$index.'.php';

@@ -105,7 +105,12 @@ final class PhpConfigurationAnalyzer
         if (1 !== preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)$/D', substr($masked, 0, $receiverEnd), $match)) {
             return null;
         }
-        $root = $this->variableRoot($this->declaredVariables($document, $match[1], $receiverEnd), $match[1], $index);
+        $variables = $this->declaredVariables($document, $match[1], $receiverEnd);
+        $parameterScopeStart = $this->parameterScopeStartAt($document, $match[1], $receiverEnd);
+        if (null !== $parameterScopeStart && $parameterScopeStart !== ($variables[0]->scopeStartOffset ?? null)) {
+            $variables = [];
+        }
+        $root = $this->variableRoot($variables, $match[1], $index);
 
         return null === $root ? null : [$root];
     }
@@ -165,15 +170,21 @@ final class PhpConfigurationAnalyzer
         return null === $innermost ? [] : [$innermost];
     }
 
-    private function scopeDeclaresParameter(PhpDocument $document, PhpMethodCall $call, string $name): bool
+    private function parameterScopeStartAt(PhpDocument $document, string $name, int $offset): ?int
     {
+        $start = null;
         foreach ($document->lexicalScopes as $scope) {
-            if ($call->scopeStartOffset === $scope->startOffset && \in_array($name, $scope->parameterNames, true)) {
-                return true;
+            if ($offset < $scope->startOffset
+                || $offset > $scope->endOffset
+                || !\in_array($name, $scope->parameterNames, true)
+                || (null !== $start && $scope->startOffset < $start)
+            ) {
+                continue;
             }
+            $start = $scope->startOffset;
         }
 
-        return false;
+        return $start;
     }
 
     /** @return array<string, PhpMethodCall> */
@@ -205,7 +216,7 @@ final class PhpConfigurationAnalyzer
         if (PhpMethodReceiverKind::Variable === $call->receiverContext->kind && null !== $call->receiverContext->name) {
             $variables = $document->receiverVariables($call);
             if ([] === $variables
-                && !$this->scopeDeclaresParameter($document, $call, $call->receiverContext->name)
+                && null === $this->parameterScopeStartAt($document, $call->receiverContext->name, $call->methodStartOffset)
                 && [] !== $this->declaredVariables($document, $call->receiverContext->name, $call->methodStartOffset)
             ) {
                 return null;
