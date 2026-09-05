@@ -1173,6 +1173,9 @@ final class ConfigurationProviderTest extends TestCase
             function configure(LoggerInterface $framework, FrameworkConfig $config): void
             {
                 $framework->router()->utf8('ignored');
+                $callback = static function (): void {
+                    $framework->router()->utf8('ignored nested');
+                };
                 $config->router()->utf8('invalid');
             }
             PHP;

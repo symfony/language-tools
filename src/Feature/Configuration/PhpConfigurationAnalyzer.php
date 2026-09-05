@@ -192,7 +192,11 @@ final class PhpConfigurationAnalyzer
         }
 
         if (PhpMethodReceiverKind::Variable === $call->receiverContext->kind && null !== $call->receiverContext->name) {
-            $root = $this->variableRoot($document->receiverVariables($call), $call->receiverContext->name, $index);
+            $variables = $document->receiverVariables($call);
+            if ([] === $variables && [] !== $this->declaredVariables($document, $call->receiverContext->name, $call->methodStartOffset)) {
+                return null;
+            }
+            $root = $this->variableRoot($variables, $call->receiverContext->name, $index);
             if (null === $root) {
                 return null;
             }
