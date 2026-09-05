@@ -7,6 +7,9 @@ use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpTypedVariable;
+use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
+use Symfony\Lsp\Parser\SourceComment;
 
 final class PhpConfigurationAnalyzer
 {
@@ -20,10 +23,7 @@ final class PhpConfigurationAnalyzer
     public function occurrences(string $source, ConfigurationIndex $index): array
     {
         $document = $this->parser->parse($source);
-        $callsByRange = [];
-        foreach ($document->methodCalls as $call) {
-            $callsByRange[$call->startOffset.':'.$call->endOffset] = $call;
-        }
+        $callsByRange = $this->callsByRange($document);
 
         /** @var array<int, PhpConfigurationOccurrence|null> $resolved */
         $resolved = [];
@@ -66,18 +66,110 @@ final class PhpConfigurationAnalyzer
     /** @return array{path: list<string>, prefix: string, start: int}|null */
     public function completionContext(string $source, ConfigurationIndex $index, int $cursor): ?array
     {
-        $before = substr($this->comments->mask($source), 0, $cursor);
-        if (1 !== preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)((?:->[A-Za-z_][A-Za-z0-9_]*\(\))*)->([A-Za-z_][A-Za-z0-9_]*)?$/', $before, $match)) {
+        $masked = $this->comments->mask($source);
+        $comments = $this->comments->comments($source);
+        if ($cursor < 0 || $cursor > \strlen($masked) || $this->withinComment($comments, $cursor)) {
             return null;
         }
-        $path = [$this->lexicalRoot($before, $match[1], $index)];
-        preg_match_all('/->([A-Za-z_][A-Za-z0-9_]*)\(\)/', $match[2], $methods);
-        foreach ($methods[1] as $method) {
-            $path[] = $this->configurationName($method, $index->find($path));
+        $blanks = array_column($comments, 'startOffset', 'endOffset');
+        preg_match('/[A-Za-z_][A-Za-z0-9_]*$/D', substr($masked, 0, $cursor), $match);
+        $prefix = $match[0] ?? '';
+        $arrow = $this->skipBlanks($masked, $blanks, $cursor - \strlen($prefix));
+        if ($arrow < 2 || '->' !== substr($masked, $arrow - 2, 2)) {
+            return null;
         }
-        $prefix = $match[3] ?? '';
+        $nullsafe = $arrow > 2 && '?' === $masked[$arrow - 3];
+        $path = $this->receiverPath($source, $masked, $index, $this->skipBlanks($masked, $blanks, $arrow - ($nullsafe ? 3 : 2)));
 
-        return ['path' => $path, 'prefix' => $prefix, 'start' => $cursor - \strlen($prefix)];
+        return null === $path ? null : ['path' => $path, 'prefix' => $prefix, 'start' => $cursor - \strlen($prefix)];
+    }
+
+    /**
+     * The path the completed part of the chain resolves to, from parser facts
+     * when its receiver is a call, from the receiver variable otherwise.
+     *
+     * @return list<string>|null
+     */
+    private function receiverPath(string $source, string $masked, ConfigurationIndex $index, int $receiverEnd): ?array
+    {
+        $document = $this->parser->parse($source);
+        foreach ($document->methodCalls as $call) {
+            if ($receiverEnd !== $call->endOffset) {
+                continue;
+            }
+            /** @var array<int, PhpConfigurationOccurrence|null> $resolved */
+            $resolved = [];
+
+            return $this->resolveCall($call, $document, $index, $this->callsByRange($document), $resolved)?->builderSchemaPath;
+        }
+        if (1 !== preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)$/D', substr($masked, 0, $receiverEnd), $match)) {
+            return null;
+        }
+
+        return [$this->variableRoot($this->declaredVariables($document, $match[1], $receiverEnd), $match[1], $index)];
+    }
+
+    /** @param list<SourceComment> $comments */
+    private function withinComment(array $comments, int $offset): bool
+    {
+        foreach ($comments as $comment) {
+            // a line comment still holds the cursor at its end, a block comment ends after its delimiter
+            if ($offset > $comment->startOffset && ($offset < $comment->endOffset || $offset <= $comment->contentEndOffset)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param array<int, int> $blanks comment start offsets, keyed by end offset */
+    private function skipBlanks(string $masked, array $blanks, int $offset): int
+    {
+        while ($offset > 0) {
+            if (isset($blanks[$offset])) {
+                $offset = $blanks[$offset];
+            } elseif (ctype_space($masked[$offset - 1])) {
+                --$offset;
+            } else {
+                break;
+            }
+        }
+
+        return $offset;
+    }
+
+    /**
+     * The nearest declaration a plain variable receiver at the offset can
+     * resolve to, as the enclosing scope of an incomplete chain is unknown.
+     *
+     * @return list<PhpTypedVariable>
+     */
+    private function declaredVariables(PhpDocument $document, string $name, int $offset): array
+    {
+        $nearest = null;
+        foreach ($document->typedVariables as $variable) {
+            if ($name !== $variable->name
+                || $offset < $variable->nameEndOffset
+                || !\in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                || (null !== $nearest && $variable->nameStartOffset < $nearest->nameStartOffset)
+            ) {
+                continue;
+            }
+            $nearest = $variable;
+        }
+
+        return null === $nearest ? [] : [$nearest];
+    }
+
+    /** @return array<string, PhpMethodCall> */
+    private function callsByRange(PhpDocument $document): array
+    {
+        $callsByRange = [];
+        foreach ($document->methodCalls as $call) {
+            $callsByRange[$call->startOffset.':'.$call->endOffset] = $call;
+        }
+
+        return $callsByRange;
     }
 
     /**
@@ -96,7 +188,7 @@ final class PhpConfigurationAnalyzer
         }
 
         if (PhpMethodReceiverKind::Variable === $call->receiverContext->kind && null !== $call->receiverContext->name) {
-            $builderPath = $builderSchemaPath = [$this->receiverRoot($call, $document, $index)];
+            $builderPath = $builderSchemaPath = [$this->variableRoot($document->receiverVariables($call), $call->receiverContext->name, $index)];
         } else {
             $receiver = $callsByRange[$call->receiverContext->startOffset.':'.$call->receiverContext->endOffset] ?? null;
             if (null === $receiver || null === $parent = $this->resolveCall($receiver, $document, $index, $callsByRange, $resolved)) {
@@ -146,26 +238,19 @@ final class PhpConfigurationAnalyzer
         );
     }
 
-    private function receiverRoot(PhpMethodCall $call, PhpDocument $document, ConfigurationIndex $index): string
+    /** @param list<PhpTypedVariable> $variables */
+    private function variableRoot(array $variables, string $name, ConfigurationIndex $index): string
     {
-        foreach ($document->receiverVariables($call) as $variable) {
+        foreach ($variables as $variable) {
             foreach ($variable->types as $type) {
-                $name = $this->builderRootName($type);
-                if (null !== $name) {
-                    return $this->matchingRoot($name, $index);
+                $rootName = $this->builderRootName($type);
+                if (null !== $rootName) {
+                    return $this->matchingRoot($rootName, $index);
                 }
             }
         }
 
-        return $this->matchingRoot((string) $call->receiverContext->name, $index);
-    }
-
-    private function lexicalRoot(string $before, string $variable, ConfigurationIndex $index): string
-    {
-        preg_match_all('/([A-Za-z_\\\\][A-Za-z0-9_\\\\]*Config)\s+\$'.preg_quote($variable, '/').'\b/', $before, $matches);
-        $class = end($matches[1]);
-
-        return $this->matchingRoot(false === $class ? $variable : ($this->builderRootName($class) ?? $variable), $index);
+        return $this->matchingRoot($name, $index);
     }
 
     private function builderRootName(string $class): ?string

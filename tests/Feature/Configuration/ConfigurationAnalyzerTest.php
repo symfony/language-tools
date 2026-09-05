@@ -61,7 +61,7 @@ final class ConfigurationAnalyzerTest extends TestCase
 
         $aliasedRoot = '<?php use Symfony\Config\FrameworkConfig as WebConfig; function configure(WebConfig $web) { $web->router()->ut';
         self::assertSame(
-            ['path' => ['web', 'router'], 'prefix' => 'ut', 'start' => \strlen($aliasedRoot) - 2],
+            ['path' => ['framework', 'router'], 'prefix' => 'ut', 'start' => \strlen($aliasedRoot) - 2],
             $analyzer->completionContext($aliasedRoot, $index, \strlen($aliasedRoot)),
         );
 
@@ -69,6 +69,25 @@ final class ConfigurationAnalyzerTest extends TestCase
             "<?php function configure(FrameworkConfig \$options) { \$options\n    ->router()\n    ->ut",
             '<?php function configure(FrameworkConfig $options) { $options?->router()->ut',
             '<?php function configure(FrameworkConfig $options) { $options->router()/* here */->ut',
+            "<?php function configure(FrameworkConfig \$options) { \$options?->router()\n    // enable UTF-8\n    -> /* here */ ut",
+            '<?php function configure(FrameworkConfig $options) { $options->router()->utf8(true)->ut',
+        ] as $formatted) {
+            self::assertSame(
+                ['path' => ['framework', 'router'], 'prefix' => 'ut', 'start' => \strlen($formatted) - 2],
+                $analyzer->completionContext($formatted, $index, \strlen($formatted)),
+                $formatted,
+            );
+        }
+
+        foreach ([
+            '<?php function configure(FrameworkConfig $options) { $options->router()',
+            '<?php function configure(FrameworkConfig $options) { Framework::create()->ut',
+            '<?php function configure(FrameworkConfig $options) { router()->ut',
+            '<?php function configure(FrameworkConfig $options) { $options->router()[0]->ut',
+            '<?php class Configurator { private FrameworkConfig $options; public function configure(): void { $this->options->ut',
+            '<?php function configure(FrameworkConfig $options) { // $options->router()->ut',
+            "<?php function configure(FrameworkConfig \$options) { \$options->router()->\n// \$options->ut",
+            '<?php function configure(FrameworkConfig $options) { $options->router()->/* $options->ut',
         ] as $unsupported) {
             self::assertNull($analyzer->completionContext($unsupported, $index, \strlen($unsupported)), $unsupported);
         }

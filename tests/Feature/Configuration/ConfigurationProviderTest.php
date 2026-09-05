@@ -1041,6 +1041,102 @@ final class ConfigurationProviderTest extends TestCase
         }
     }
 
+    public function testCompletesPhpBuilderChainsAcrossLinesCommentsAndRenamedImports(): void
+    {
+        $fixture = $this->providers();
+        $cases = [
+            [
+                <<<'PHP'
+                    <?php
+
+                    use Symfony\Config\FrameworkConfig as WebConfig;
+
+                    return static function (WebConfig $web): void {
+                        $web
+                            ->router()
+                            ->ut
+                    PHP,
+                'ut',
+                ['utf8'],
+            ],
+            [
+                <<<'PHP'
+                    <?php
+
+                    return static function (FrameworkConfig $framework): void {
+                        $framework?->router()
+                            // the router is strict
+                            -> /* here */ st
+                    PHP,
+                'st',
+                ['strict', 'strictResetMode'],
+            ],
+            [
+                <<<'PHP'
+                    <?php
+
+                    use Symfony\Config\MonologConfig as FrameworkConfig;
+
+                    return static function (FrameworkConfig $framework): void {
+                        $framework
+                            ->handler('main')
+                            ->nes
+                    PHP,
+                'nes',
+                ['nested'],
+            ],
+            [
+                <<<'PHP'
+                    <?php
+
+                    return static function (FrameworkConfig $framework): void {
+                        $framework->router()->utf8(true)->st
+                    PHP,
+                'st',
+                ['strict', 'strictResetMode'],
+            ],
+            [
+                <<<'PHP'
+                    <?php
+
+                    return static function (FrameworkConfig $framework): void {
+                        $framework?->ro
+                    PHP,
+                'ro',
+                ['router'],
+            ],
+        ];
+        foreach ($cases as $index => [$text, $prefix, $expected]) {
+            $uri = 'file:///workspace/config/packages/chain'.$index.'.php';
+            $fixture->documents->open(new Document($uri, 'php', 1, $text));
+            $completion = $fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, \strlen($text))) ?? [];
+            self::assertSame($expected, array_column($completion, 'label'), $text);
+            /** @var array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} $textEdit */
+            $textEdit = $completion[0]['textEdit'];
+            self::assertSame($this->protocolRange($fixture->converter, $text, \strlen($text) - \strlen($prefix), \strlen($prefix)), $textEdit['range'], $text);
+            $fixture->documents->close($uri);
+        }
+    }
+
+    public function testRejectsPhpCompletionOutsideConfigurationBuilderChains(): void
+    {
+        $fixture = $this->providers();
+        $texts = [
+            '<?php $framework->router()',
+            '<?php Framework::create()->ut',
+            '<?php router()->ut',
+            '<?php $framework->router()[0]->ut',
+            '<?php class Configurator { public function configure(): void { $this->framework->ro',
+            '<?php function configure(LoggerInterface $logger): void { $logger->getRouter()->ut',
+        ];
+        foreach ($texts as $index => $text) {
+            $uri = 'file:///workspace/config/packages/unrelated'.$index.'.php';
+            $fixture->documents->open(new Document($uri, 'php', 1, $text));
+            self::assertNull($fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, \strlen($text))), $text);
+            $fixture->documents->close($uri);
+        }
+    }
+
     public function testIgnoresCommentedPhpConfigurationAcrossCapabilities(): void
     {
         $fixture = $this->providers();

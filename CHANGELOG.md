@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Complete PHP configuration builder chains split across lines, comments, nullsafe calls and named entries
 - Scope console `configure()` definitions with PHP method body facts
 - Read console `setDefinition()` lists from resolved Symfony input classes
 - Keep one YAML scalar fact per source region in malformed documents
