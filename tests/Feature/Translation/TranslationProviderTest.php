@@ -287,6 +287,30 @@ final class TranslationProviderTest extends TestCase
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
+    public function testHonorsTranslationHelperDomainsAndParameters(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = <<<'PHP'
+            <?php
+            use function Symfony\Component\Translation\t;
+
+            t('panel.title', [], 'admin');
+            t(message: 'panel.title', domain: 'admin');
+            t('article.title', ['%name%' => $name]);
+            t('article.title', ['%extra%' => $extra]);
+            PHP;
+        [$provider, , $configuration, $project] = $this->provider($uri, $text);
+        $configuration->configure($project, true);
+
+        $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
+
+        self::assertIsArray($diagnostics);
+        self::assertSame(['translation.placeholders'], array_column($diagnostics, 'code'));
+        /** @var array{start: array{line: int}} $range */
+        $range = $diagnostics[0]['range'];
+        self::assertSame(6, $range['start']['line']);
+    }
+
     public function testHonorsNamedTwigTranslationDomainsInsideComponents(): void
     {
         $uri = 'file:///workspace/templates/base.html.twig';

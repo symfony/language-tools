@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Read domains and parameters from PHP translation helper calls
 - Read unquoted INI translation messages
 - Decode single-quoted Twig type declarations with Twig's string rules
 - Bind PHP service and parameter completion to the `#[Autowire]` argument holding the cursor

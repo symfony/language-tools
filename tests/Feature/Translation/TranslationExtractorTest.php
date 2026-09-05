@@ -435,6 +435,37 @@ final class TranslationExtractorTest extends TestCase
         self::assertSame([], $unimported);
     }
 
+    public function testReadsTranslationHelperDomainsAndParameters(): void
+    {
+        $references = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Controller.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            use function Symfony\Component\Translation\t;
+            use function Symfony\Component\Translation\t as translate;
+
+            t('positional.key', ['%name%' => $name], 'admin');
+            t(message: 'named.key', domain: 'admin', parameters: ['%id%' => 1]);
+            translate('aliased.key', [], 'admin');
+            \Symfony\Component\Translation\t('qualified.key', self::PARAMETERS, 'admin');
+            t('nested.key', ['%count%' => \count([1, 2]), '%label%' => match (true) { default => 'x' }], 'admin');
+            t('default.key');
+            t('dynamic.domain.key', [], $domain);
+            PHP))->references;
+
+        self::assertSame(
+            [
+                ['positional.key', 'admin', ['name']],
+                ['named.key', 'admin', ['id']],
+                ['aliased.key', 'admin', []],
+                ['qualified.key', 'admin', null],
+                ['nested.key', 'admin', ['count', 'label']],
+                ['default.key', 'messages', null],
+            ],
+            array_map(static fn ($reference): array => [$reference->key, $reference->domain, $reference->placeholders], $references),
+        );
+    }
+
     public function testPreservesTwigDefaultDomainsAndTranslationTags(): void
     {
         $references = $this->extractor()->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'

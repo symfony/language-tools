@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\Php\PhpArgument;
+use Symfony\Lsp\Parser\Php\PhpArgumentList;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpObjectCreation;
@@ -143,23 +144,22 @@ final class PhpTranslationReferenceExtractor
             if (null !== $previous && $previous->is([\T_OBJECT_OPERATOR, \T_NULLSAFE_OBJECT_OPERATOR, \T_DOUBLE_COLON])) {
                 continue;
             }
-            $literal = $this->helperArgument($tokens, $index);
-            if (null === $literal) {
+            $arguments = $this->helperArguments($tokens, $index, $text);
+            if (null === $arguments) {
                 continue;
             }
-            $quote = $literal->text[0];
-            $raw = substr($literal->text, 1, -1);
-            if (!$this->isSupportedHelperLiteral($quote, $raw)) {
+            $key = $arguments->namedOrPositionalArgument('message', 0)?->stringLiteral;
+            if (null === $key || null === $domain = $this->domain($arguments->namedOrPositionalArgument('domain', 2))) {
                 continue;
             }
-            $offset = $literal->pos + 1;
             $references[] = [
-                'offset' => $offset,
-                'reference' => new TranslationReference(
-                    PhpStringLiteralDecoder::decode($quote, $raw),
-                    'messages',
+                'offset' => $key->startOffset,
+                'reference' => $this->reference(
+                    $key,
+                    $domain,
                     $uri,
-                    $this->converter->toRange($text, $offset, \strlen($raw)),
+                    $text,
+                    $this->parameters->php($arguments->namedOrPositionalArgument('parameters', 1)),
                 ),
             ];
         }
@@ -211,32 +211,108 @@ final class PhpTranslationReferenceExtractor
     }
 
     /** @param list<\PhpToken> $tokens */
-    private function helperArgument(array $tokens, int $callIndex): ?\PhpToken
+    private function helperArguments(array $tokens, int $callIndex, string $text): ?PhpArgumentList
     {
         $openIndex = $this->nextSignificantIndex($tokens, $callIndex);
         if (null === $openIndex || '(' !== $tokens[$openIndex]->text) {
             return null;
         }
-        $argumentIndex = $this->nextSignificantIndex($tokens, $openIndex);
-        if (null === $argumentIndex) {
-            return null;
-        }
-        if (\T_STRING === $tokens[$argumentIndex]->id && 0 === strcasecmp('message', $tokens[$argumentIndex]->text)) {
-            $colonIndex = $this->nextSignificantIndex($tokens, $argumentIndex);
-            if (null === $colonIndex || ':' !== $tokens[$colonIndex]->text) {
-                return null;
+        $arguments = [];
+        $current = [];
+        $depth = 1;
+        for ($index = $openIndex + 1; isset($tokens[$index]); ++$index) {
+            $token = $tokens[$index];
+            if ($token->is([\T_WHITESPACE, \T_COMMENT, \T_DOC_COMMENT])) {
+                continue;
             }
-            $argumentIndex = $this->nextSignificantIndex($tokens, $colonIndex);
-        }
-        if (null === $argumentIndex || \T_CONSTANT_ENCAPSED_STRING !== $tokens[$argumentIndex]->id) {
-            return null;
-        }
-        $endIndex = $this->nextSignificantIndex($tokens, $argumentIndex);
-        if (null === $endIndex || !\in_array($tokens[$endIndex]->text, [',', ')'], true)) {
-            return null;
+            if ($this->opensGroup($token)) {
+                ++$depth;
+            } elseif (\in_array($token->text, [')', ']', '}'], true)) {
+                if (0 === --$depth) {
+                    if ([] !== $current) {
+                        $arguments[] = $this->helperArgument($current, $text);
+                    }
+
+                    return new PhpArgumentList($arguments);
+                }
+            } elseif (1 === $depth && ',' === $token->text) {
+                if ([] === $current) {
+                    return null;
+                }
+                $arguments[] = $this->helperArgument($current, $text);
+                $current = [];
+
+                continue;
+            }
+            $current[] = $token;
         }
 
-        return $tokens[$argumentIndex];
+        return null;
+    }
+
+    /** @param non-empty-list<\PhpToken> $tokens */
+    private function helperArgument(array $tokens, string $text): PhpArgument
+    {
+        $start = $tokens[0]->pos;
+        $end = $this->tokenEnd($tokens[\count($tokens) - 1]);
+        $name = $nameStart = $nameEnd = null;
+        if (isset($tokens[1]) && ':' === $tokens[1]->text && 1 === preg_match('/^[a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*$/', $tokens[0]->text)) {
+            $name = $tokens[0]->text;
+            $nameStart = $tokens[0]->pos;
+            $nameEnd = $this->tokenEnd($tokens[0]);
+            $tokens = \array_slice($tokens, 2);
+        }
+        $unpacked = \T_ELLIPSIS === ($tokens[0]->id ?? null);
+        if ($unpacked) {
+            $tokens = \array_slice($tokens, 1);
+        }
+        if ([] === $tokens) {
+            return new PhpArgument($name, $nameStart, $nameEnd, null, null, null, null, $start, $end, null, null, $unpacked);
+        }
+        $expressionStart = $tokens[0]->pos;
+        $expressionEnd = $this->tokenEnd($tokens[\count($tokens) - 1]);
+
+        return new PhpArgument(
+            $name,
+            $nameStart,
+            $nameEnd,
+            $this->helperStringLiteral($tokens),
+            null,
+            null,
+            substr($text, $expressionStart, $expressionEnd - $expressionStart),
+            $start,
+            $end,
+            $expressionStart,
+            $expressionEnd,
+            $unpacked,
+        );
+    }
+
+    /** @param non-empty-list<\PhpToken> $tokens */
+    private function helperStringLiteral(array $tokens): ?PhpStringLiteral
+    {
+        if (1 !== \count($tokens) || \T_CONSTANT_ENCAPSED_STRING !== $tokens[0]->id) {
+            return null;
+        }
+        $quote = $tokens[0]->text[0];
+        $raw = substr($tokens[0]->text, 1, -1);
+        if (!\in_array($quote, ["'", '"'], true) || !$this->isSupportedHelperLiteral($quote, $raw)) {
+            return null;
+        }
+        $offset = $tokens[0]->pos + 1;
+
+        return new PhpStringLiteral(PhpStringLiteralDecoder::decode($quote, $raw), $offset, $offset + \strlen($raw));
+    }
+
+    private function opensGroup(\PhpToken $token): bool
+    {
+        return \in_array($token->text, ['(', '[', '{'], true)
+            || $token->is([\T_CURLY_OPEN, \T_DOLLAR_OPEN_CURLY_BRACES, \T_ATTRIBUTE]);
+    }
+
+    private function tokenEnd(\PhpToken $token): int
+    {
+        return $token->pos + \strlen($token->text);
     }
 
     private function isSupportedHelperLiteral(string $quote, string $raw): bool
