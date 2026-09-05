@@ -7,7 +7,6 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
-use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
@@ -132,7 +131,7 @@ final class FormMetadataExtractor
         foreach ($this->formCalls($source, $php) as $call) {
             $typeIndex = 'createNamed' === $call->method ? 1 : ('add' === $call->method ? 1 : 0);
             $optionsIndex = 'createNamed' === $call->method ? 3 : 2;
-            $type = $this->leadingClassReferenceArgument($source, $php, $call->positionalArgument($typeIndex));
+            $type = $call->positionalArgument($typeIndex)?->completeClassReference;
             $argument = $call->positionalArgument($optionsIndex);
             if (null === $type || null === $argument) {
                 continue;
@@ -358,20 +357,6 @@ final class FormMetadataExtractor
         $after = preg_replace('/\\s+/', '', substr($source, $reference->endOffset, $end - $reference->endOffset));
 
         return '' === $before && '::class' === $after ? $reference->className : null;
-    }
-
-    private function leadingClassReferenceArgument(string $source, PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
-    {
-        $reference = $php->soleClassReference($argument);
-        $start = $argument?->expressionStartOffset;
-        $end = $argument?->expressionEndOffset;
-        if (null === $reference || !\is_int($start) || !\is_int($end)) {
-            return null;
-        }
-        $before = trim(substr($source, $start, $reference->startOffset - $start));
-        $after = substr($source, $reference->endOffset, $end - $reference->endOffset);
-
-        return '' === $before && 1 === preg_match('/^\s*::\s*class\b/', $after) ? $reference : null;
     }
 
     /** @return array<string, array{text: string, offset: int}>|null */

@@ -46,8 +46,8 @@ final class DoctrineExtractor
             }
             $range = $this->converter->toRange($document->text, $type->nameStartOffset, $type->nameEndOffset - $type->nameStartOffset);
             if ([] !== $this->mappingAttributes($php, PhpAttributeTargetKind::Type, $type->name, null, ['Entity', 'MappedSuperclass'])) {
-                $repositoryReference = $this->repositoryClassReference($source, $php, $type->name);
-                $fields = $this->fields($document->uri, $document->text, $source, $type->name, $php);
+                $repositoryReference = $this->repositoryClassReference($php, $type->name);
+                $fields = $this->fields($document->uri, $document->text, $type->name, $php);
                 $entity = new DoctrineEntity($type->name, $document->uri, $range, $repositoryReference?->className, $fields);
                 $entities[] = $entity;
                 $symbols[] = new DoctrineSourceSymbol(DoctrineSymbolKind::Entity, $entity->className, null, $document->uri, $entity->range, true);
@@ -112,7 +112,7 @@ final class DoctrineExtractor
     }
 
     /** @return list<DoctrineField> */
-    private function fields(string $uri, string $text, string $source, string $className, PhpDocument $php): array
+    private function fields(string $uri, string $text, string $className, PhpDocument $php): array
     {
         $fields = [];
         foreach ($php->propertyDeclarations as $property) {
@@ -140,17 +140,17 @@ final class DoctrineExtractor
                 $this->converter->toRange($text, $property->nameStartOffset, $property->nameEndOffset - $property->nameStartOffset),
                 [] !== $associationAttributes,
                 $type,
-                $this->associationTarget($source, $associationAttributes, $property, $php),
+                $this->associationTarget($associationAttributes, $property),
             );
         }
 
         return $fields;
     }
 
-    private function repositoryClassReference(string $source, PhpDocument $php, string $className): ?PhpClassReference
+    private function repositoryClassReference(PhpDocument $php, string $className): ?PhpClassReference
     {
         foreach ($this->mappingAttributes($php, PhpAttributeTargetKind::Type, $className, null, ['Entity']) as $attribute) {
-            $reference = $this->directClassReference($source, $php, $attribute->argument('repositoryClass'));
+            $reference = $attribute->argument('repositoryClass')?->completeClassReference;
             if (null !== $reference) {
                 return $reference;
             }
@@ -449,25 +449,11 @@ final class DoctrineExtractor
         return $value;
     }
 
-    private function directClassReference(string $source, PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
-    {
-        $reference = $php->soleClassReference($argument);
-        $start = $argument?->expressionStartOffset;
-        $end = $argument?->expressionEndOffset;
-        if (null === $reference || !\is_int($start) || !\is_int($end)) {
-            return null;
-        }
-        $before = trim(substr($source, $start, $reference->startOffset - $start));
-        $after = substr($source, $reference->endOffset, $end - $reference->endOffset);
-
-        return '' === $before && 1 === preg_match('/^\s*::\s*class\s*$/iD', $after) ? $reference : null;
-    }
-
     /** @param list<PhpAttribute> $attributes */
-    private function associationTarget(string $source, array $attributes, PhpPropertyDeclaration $property, PhpDocument $php): ?string
+    private function associationTarget(array $attributes, PhpPropertyDeclaration $property): ?string
     {
         foreach ($attributes as $attribute) {
-            $reference = $this->directClassReference($source, $php, $attribute->argument('targetEntity'));
+            $reference = $attribute->argument('targetEntity')?->completeClassReference;
             if (null !== $reference) {
                 return $reference->className;
             }

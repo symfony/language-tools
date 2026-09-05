@@ -5,11 +5,9 @@ namespace Symfony\Lsp\Feature\Event;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
-use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
@@ -113,7 +111,7 @@ final class EventExtractor
             $event = $eventArgument?->stringLiteral;
             if (null !== $event && '' !== $event->value) {
                 $symbols[] = $this->symbol($event->value, $uri, $text, $event->startOffset, true, $event->endOffset - $event->startOffset);
-            } elseif (null !== $eventReference = $this->directClassReference($source, $php, $eventArgument)) {
+            } elseif (null !== $eventReference = $eventArgument?->completeClassReference) {
                 $symbols[] = $this->symbol($eventReference->className, $uri, $text, $eventReference->startOffset, true, $eventReference->endOffset - $eventReference->startOffset);
             }
             if (null !== $type) {
@@ -149,20 +147,6 @@ final class EventExtractor
         array_push($symbols, ...$this->subscriberMapAnalyzer->symbols($uri, $text, $source, $php));
 
         return new EventSourceFacts($uri, $this->unique($symbols), $invalidListenerMethods, $listeners);
-    }
-
-    private function directClassReference(string $source, PhpDocument $php, ?PhpArgument $argument): ?PhpClassReference
-    {
-        $reference = $php->soleClassReference($argument);
-        $start = $argument?->expressionStartOffset;
-        $end = $argument?->expressionEndOffset;
-        if (null === $reference || !\is_int($start) || !\is_int($end)) {
-            return null;
-        }
-        $before = trim(substr($source, $start, $reference->startOffset - $start));
-        $after = substr($source, $reference->endOffset, $end - $reference->endOffset);
-
-        return '' === $before && 1 === preg_match('/^\s*::\s*class\s*$/iD', $after) ? $reference : null;
     }
 
     private function symbol(string $name, string $uri, string $text, int $offset, bool $declaration, ?int $length = null): EventSourceSymbol

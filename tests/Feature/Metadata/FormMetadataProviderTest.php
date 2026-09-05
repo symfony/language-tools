@@ -455,6 +455,50 @@ final class FormMetadataProviderTest extends MetadataTestCase
         self::assertSame([], $extractor->formOptions($text));
     }
 
+    public function testIgnoresOptionsOfDynamicFormTypeExpressions(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = $this->createExtractor($converter);
+        $project = new Project('/workspace', 'file:///workspace');
+        $projects = new ProjectRegistry();
+        $projects->replace([$project]);
+        $indexes = new MetadataIndexRegistry();
+        $indexes->forProject($project)->replace(
+            [new FormType('App\\Form\\EventType', 'event', ['required'], [])],
+            [],
+            true,
+            true,
+        );
+        $documents = new DocumentStore();
+        $resolver = new DocumentContextResolver($documents, $projects);
+        $sourceIndexes = new MetadataSourceIndexRegistry();
+        $formProvider = new FormMetadataProvider($resolver, $converter, new LspProtocolMapper(), $indexes, $sourceIndexes, $extractor);
+        $uri = 'file:///workspace/src/Controller/EventController.php';
+        $text = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Form\EventType;
+            final class EventController
+            {
+                public function create(string $suffix): void
+                {
+                    $this->createForm(EventType::class . $suffix, null, ['bogus' => true]);
+                    $this->createForm(FORM_PREFIX . EventType::class, null, ['bogus' => true]);
+                    $this->createForm($this->resolve(EventType::class), null, ['bogus' => true]);
+                    $this->createForm(EventType /* type */ ::class, null, ['bogus' => true]);
+                }
+            }
+            PHP;
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($uri, 'php', $text)));
+
+        self::assertSame([['App\\Form\\EventType', 'bogus']], array_map(
+            static fn (array $option): array => [$option['class'], $option['option']],
+            $extractor->formOptions($text),
+        ));
+        self::assertSame(['form.unknown_option'], array_column($this->diagnostics([$formProvider], $uri), 'code'));
+    }
+
     public function testIgnoresCommentedFormMetadataWhilePreservingActiveRanges(): void
     {
         $converter = new PositionConverter();

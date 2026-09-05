@@ -9,14 +9,15 @@ Forms
 
 Form option completion and hover are available in literal option arrays passed
 to ``createForm()``, ``createNamed()``, and form builder ``add()`` calls when
-the form type is a static ``::class`` reference. The form type and options must
-be passed positionally. Required options are identified in completion and hover
-details.
+the whole form type argument is a static ``::class`` reference. The form type
+and options must be passed positionally. Required options are identified in
+completion and hover details.
 
 After runtime indexing, definitely unknown literal options are diagnosed for
 known form types. Dynamic option arrays and unresolved form types are ignored.
-Quoted strings in nested option values can contain closing brackets without
-hiding later options.
+A type argument that concatenates or computes a class name is dynamic, even
+when it starts with a ``::class`` reference. Quoted strings in nested option
+values can contain closing brackets without hiding later options.
 
 For form types that configure a static ``data_class`` with ``setDefaults()``
 or ``setDefault()``, literal field names passed to

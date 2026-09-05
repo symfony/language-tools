@@ -111,6 +111,34 @@ YAML;
         self::assertSame(['command.bus'], array_map(static fn ($symbol): string => $symbol->name, $incompleteFacts->symbols));
     }
 
+    public function testIndexesOnlyCompleteClassReferencesInHandlerMessages(): void
+    {
+        $converter = new PositionConverter();
+        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
+        $extractor = new MessengerExtractor(
+            $converter,
+            new TolerantPhpParser(new Parser()),
+            new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher()),
+            new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
+            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]),
+        );
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Handler.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            use App\Message\Ping;
+            use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+
+            #[AsMessageHandler(handles: Ping /* message */ ::class)]
+            #[AsMessageHandler(handles: (IgnoredParenthesizedMessage::class))]
+            final class Handler
+            {
+            }
+            PHP));
+
+        self::assertSame(['App\Message\Ping'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
+    }
+
     public function testIgnoresClassReferencesEmbeddedInHandlerExpressions(): void
     {
         $converter = new PositionConverter();

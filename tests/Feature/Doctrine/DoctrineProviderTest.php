@@ -186,6 +186,33 @@ final class DoctrineProviderTest extends TestCase
         self::assertSame('Entity: App\\Entity\\Product', $repositoryLenses[0]['command']['title'] ?? null);
     }
 
+    public function testMapsOnlyCompleteClassReferencesInMappingAttributes(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Entity/Product.php', 'php', <<<'PHP'
+            <?php
+            namespace App\Entity;
+
+            use App\Repository\ProductRepository;
+            use Doctrine\ORM\Mapping as ORM;
+
+            #[ORM\Entity(repositoryClass: ProductRepository /* repository */ ::class)]
+            final class Product
+            {
+                #[ORM\ManyToOne(targetEntity: (Category::class))]
+                private mixed $parenthesized;
+
+                #[ORM\ManyToOne(targetEntity: Category::class)]
+                private mixed $category;
+            }
+            PHP));
+
+        self::assertSame('App\Repository\ProductRepository', $facts->entities[0]->repositoryClass);
+        self::assertSame(
+            [null, 'App\Entity\Category'],
+            array_map(static fn ($field): ?string => $field->targetEntity, $facts->entities[0]->fields),
+        );
+    }
+
     public function testIgnoresClassReferencesEmbeddedInMappingExpressions(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Entity/Product.php', 'php', <<<'PHP'

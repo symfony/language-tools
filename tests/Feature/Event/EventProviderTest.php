@@ -148,6 +148,25 @@ YAML;
         );
     }
 
+    public function testIndexesOnlyCompleteClassReferencesInListenerEvents(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Listener.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            use App\Event\OrderPlaced;
+            use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+
+            #[AsEventListener(event: OrderPlaced /* event */ ::class)]
+            #[AsEventListener(event: (IgnoredParenthesizedEvent::class))]
+            final class Listener
+            {
+            }
+            PHP));
+
+        self::assertSame(['App\Event\OrderPlaced'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
+    }
+
     public function testIgnoresClassReferencesEmbeddedInListenerEventExpressions(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Listener.php', 'php', <<<'PHP'
