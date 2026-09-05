@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recognize Twig authorization checks only as real `is_granted()` and `logout_*()` calls
 - Ignore PHP configuration chains on variables declared with a non-builder type
 - Resolve incomplete PHP configuration chains from the builder variable in scope
 - Complete PHP configuration builder chains split across lines, comments, nullsafe calls and named entries

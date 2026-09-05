@@ -116,6 +116,17 @@ final class ProbeFinderTest extends TestCase
         $this->assertPositionInsideValue($enum);
     }
 
+    public function testFindsTwigFirewallNamesOutsideMethodCalls(): void
+    {
+        $this->write('templates/layout.html.twig', "{{ security.logout_path('ignored') }}\n{{ logout_path('main') }}\n");
+
+        $probes = $this->probes(new ProbeFinder(), 'security.firewall.twig');
+
+        self::assertCount(1, $probes);
+        self::assertSame('main', $probes[0]->value);
+        $this->assertPositionInsideValue($probes[0]);
+    }
+
     public function testFindsFormPropertiesOnlyWithAStaticDataClass(): void
     {
         $this->write('src/Form/ArticleType.php', <<<'PHP'

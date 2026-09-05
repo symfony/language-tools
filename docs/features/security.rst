@@ -41,6 +41,11 @@ available. References include recognized PHP and Twig authorization checks and
 SecurityBundle YAML configuration. Commented-out PHP attributes and calls are
 ignored.
 
+Twig ``is_granted()``, ``logout_path()`` and ``logout_url()`` checks are
+recognized only as real calls with a static first argument. Look-alike text in
+strings, comments, ``verbatim`` blocks and method calls on an object is
+ignored.
+
 Diagnostics
 -----------
 

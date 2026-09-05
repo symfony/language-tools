@@ -13,6 +13,9 @@ use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
+use Symfony\Lsp\Parser\Twig\TwigStringLiteral;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 
 final class SecurityExtractor
@@ -24,12 +27,16 @@ final class SecurityExtractor
     ];
     private const IS_GRANTED_ATTRIBUTE = 'Symfony\\Component\\Security\\Http\\Attribute\\IsGranted';
     private const LOGOUT_URL_GENERATOR = 'Symfony\\Component\\Security\\Http\\Logout\\LogoutUrlGenerator';
+    private const ROLE_PATTERN = '/^ROLE_[A-Z0-9_]+$/D';
+    private const FIREWALL_PATTERN = '/^[A-Za-z0-9_.-]+$/D';
 
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly YamlConfigurationParser $yaml,
         private readonly CommentParserRegistry $comments,
         private readonly PhpParserInterface $phpParser,
+        private readonly TwigDocumentParser $twigParser,
+        private readonly TwigCallArgumentResolver $twigArguments,
         private readonly ?YamlDocumentParser $yamlParser = null,
     ) {
     }
@@ -38,7 +45,7 @@ final class SecurityExtractor
     {
         $symbols = match ($document->languageId) {
             'php' => $this->phpSymbols($document->uri, $document->text),
-            'twig' => $this->twigSymbols($document->uri, $this->comments->mask('twig', $document->text)),
+            'twig' => $this->twigSymbols($document->uri, $document->text),
             'yaml' => $this->yamlSymbols($document->uri, $document->text),
             default => [],
         };
@@ -152,18 +159,18 @@ final class SecurityExtractor
                 continue;
             }
             if ('isGranted' === $call->method
-                && preg_match('/^ROLE_[A-Z0-9_]+$/D', $argument->value)
+                && preg_match(self::ROLE_PATTERN, $argument->value)
                 && $this->hasTypedReceiver($call, $php, self::AUTHORIZATION_TYPES)
             ) {
                 $symbols[] = $this->symbol(SecuritySymbolKind::Role, $argument->value, $uri, $text, $argument->startOffset);
             } elseif ('denyAccessUnlessGranted' === $call->method
-                && preg_match('/^ROLE_[A-Z0-9_]+$/D', $argument->value)
+                && preg_match(self::ROLE_PATTERN, $argument->value)
                 && PhpMethodReceiverKind::This === $call->receiverContext->kind
                 && $this->extendsAbstractController($php, $call->className)
             ) {
                 $symbols[] = $this->symbol(SecuritySymbolKind::Role, $argument->value, $uri, $text, $argument->startOffset);
             } elseif (\in_array($call->method, ['getLogoutPath', 'getLogoutUrl'], true)
-                && preg_match('/^[A-Za-z0-9_.-]+$/D', $argument->value)
+                && preg_match(self::FIREWALL_PATTERN, $argument->value)
                 && $this->hasTypedReceiver($call, $php, [self::LOGOUT_URL_GENERATOR])
             ) {
                 $symbols[] = $this->symbol(SecuritySymbolKind::Firewall, $argument->value, $uri, $text, $argument->startOffset);
@@ -176,14 +183,24 @@ final class SecurityExtractor
     /** @return list<SecuritySourceSymbol> */
     private function twigSymbols(string $uri, string $text): array
     {
+        $document = $this->twigParser->parse($text);
         $symbols = [];
-        preg_match_all('/\bis_granted\s*\(\s*["\'](ROLE_[A-Z0-9_]+)["\']/', $text, $roles, \PREG_OFFSET_CAPTURE);
-        foreach ($roles[1] as [$role, $offset]) {
-            $symbols[] = $this->symbol(SecuritySymbolKind::Role, $role, $uri, $text, $offset);
-        }
-        preg_match_all('/\blogout_(?:path|url)\s*\(\s*["\']([A-Za-z0-9_.-]+)["\']/', $text, $firewalls, \PREG_OFFSET_CAPTURE);
-        foreach ($firewalls[1] as [$firewall, $offset]) {
-            $symbols[] = $this->symbol(SecuritySymbolKind::Firewall, $firewall, $uri, $text, $offset);
+        foreach ($document->nodesOfType('function_call') as $call) {
+            $identifier = $document->directChild($call, 'function_identifier');
+            $kind = match (null === $identifier ? null : $document->text($identifier)) {
+                'is_granted' => SecuritySymbolKind::Role,
+                'logout_path', 'logout_url' => SecuritySymbolKind::Firewall,
+                default => null,
+            };
+            if (null === $kind) {
+                continue;
+            }
+            $argument = $this->twigArguments->resolve($document, $call)->get(0);
+            $literal = null === $argument ? null : $document->soleStringLiteral($argument);
+            $pattern = SecuritySymbolKind::Role === $kind ? self::ROLE_PATTERN : self::FIREWALL_PATTERN;
+            if (null !== $literal && 1 === preg_match($pattern, $literal->value)) {
+                $symbols[] = $this->twigSymbol($kind, $literal, $uri, $text);
+            }
         }
 
         return $symbols;
@@ -239,6 +256,11 @@ final class SecurityExtractor
     private function symbol(SecuritySymbolKind $kind, string $name, string $uri, string $text, int $offset): SecuritySourceSymbol
     {
         return new SecuritySourceSymbol($kind, $name, $uri, new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + \strlen($name))), false);
+    }
+
+    private function twigSymbol(SecuritySymbolKind $kind, TwigStringLiteral $literal, string $uri, string $text): SecuritySourceSymbol
+    {
+        return new SecuritySourceSymbol($kind, $literal->value, $uri, $this->converter->toRange($text, $literal->startOffset, $literal->endOffset - $literal->startOffset), false);
     }
 
     /** @param list<string> $acceptedTypes */

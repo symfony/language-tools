@@ -48,7 +48,10 @@ use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\GitignoreMatcher;
@@ -757,17 +760,17 @@ PHP;
     private function securityIndexer(): SecuritySourceIndexer
     {
         $converter = new PositionConverter();
+        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
 
         return new SecuritySourceIndexer(
             new SecuritySourceIndexRegistry(),
             new SecurityExtractor(
                 $converter,
-                new YamlConfigurationParser(
-                    $converter,
-                    new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
-                ),
+                new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
                 new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]),
                 new TolerantPhpParser(new Parser()),
+                new TwigDocumentParser($treeSitter, new TwigCommentParser()),
+                new TwigCallArgumentResolver(new TwigArgumentParser()),
             ),
         );
     }

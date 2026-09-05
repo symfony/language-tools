@@ -28,7 +28,10 @@ use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -76,6 +79,26 @@ YAML;
         self::assertSame(
             ['users', 'main', 'users', 'ROLE_ADMIN', 'ROLE_USER', 'ROLE_EDITOR'],
             array_map(static fn ($symbol): string => $symbol->name, $extractor->extract(new SourceDocument('file:///workspace/config/packages/security.yaml', 'yaml', $yaml))->symbols),
+        );
+    }
+
+    public function testExtractsStaticTwigAuthorizationArgumentsConservatively(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+            {# {{ is_granted('ROLE_COMMENTED') }} #}
+            {% if is_granted('ROLE_ADMIN') %}{{ logout_path('main') }}{% endif %}
+            {{ logout_url('api') }}
+            {{ is_granted('ROLE_SUBJECT', post) }}
+            {{ is_granted(role) }}
+            {{ is_granted('POST_EDIT', post) }}
+            {{ user.is_granted('ROLE_METHOD') }}
+            {% set snippet = 'is_granted(\'ROLE_STRING\') and logout_path(\'string\')' %}
+            {% verbatim %}{{ is_granted('ROLE_VERBATIM') }}{{ logout_path('verbatim') }}{% endverbatim %}
+            TWIG));
+
+        self::assertSame(
+            [['role', 'ROLE_ADMIN'], ['firewall', 'main'], ['firewall', 'api'], ['role', 'ROLE_SUBJECT']],
+            array_map(static fn ($symbol): array => [$symbol->kind->value, $symbol->name], $facts->symbols),
         );
     }
 
@@ -416,9 +439,18 @@ PHP;
     private function extractor(?PositionConverter $converter = null): SecurityExtractor
     {
         $converter ??= new PositionConverter();
-        $yamlParser = new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()));
+        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
+        $yamlParser = new YamlDocumentParser($treeSitter);
 
-        return new SecurityExtractor($converter, new YamlConfigurationParser($converter, $yamlParser), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]), new TolerantPhpParser(new Parser()), $yamlParser);
+        return new SecurityExtractor(
+            $converter,
+            new YamlConfigurationParser($converter, $yamlParser),
+            new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]),
+            new TolerantPhpParser(new Parser()),
+            new TwigDocumentParser($treeSitter, new TwigCommentParser()),
+            new TwigCallArgumentResolver(new TwigArgumentParser()),
+            $yamlParser,
+        );
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
