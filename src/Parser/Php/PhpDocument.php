@@ -64,18 +64,33 @@ final class PhpDocument
 
     public function firstObjectCreation(?PhpArgument $argument): ?PhpObjectCreation
     {
+        return $this->objectCreationsWithin($argument)[0] ?? null;
+    }
+
+    /**
+     * Object creations the argument holds, without the ones nested in the
+     * arguments of another creation.
+     *
+     * @return list<PhpObjectCreation>
+     */
+    public function objectCreationsWithin(?PhpArgument $argument): array
+    {
         $start = $argument?->expressionStartOffset;
         $end = $argument?->expressionEndOffset;
         if (!\is_int($start) || !\is_int($end)) {
-            return null;
+            return [];
         }
+        $creations = [];
         foreach ($this->objectCreations as $creation) {
-            if ($creation->startOffset >= $start && $creation->endOffset <= $end) {
-                return $creation;
+            if ($creation->startOffset < $start || $creation->endOffset > $end
+                || array_any($creations, static fn (PhpObjectCreation $outer): bool => $creation->startOffset >= $outer->startOffset && $creation->endOffset <= $outer->endOffset)
+            ) {
+                continue;
             }
+            $creations[] = $creation;
         }
 
-        return null;
+        return $creations;
     }
 
     /**

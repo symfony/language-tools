@@ -1036,6 +1036,30 @@ final class TolerantPhpParserTest extends TestCase
         self::assertNull($document->firstObjectCreation($single->positionalArgument(0)));
     }
 
+    public function testListsObjectCreationsWithoutTheOnesNestedInTheirArguments(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+            use App\Message\Created;
+            use App\Message\Deleted;
+            use App\Message\Stamp;
+            final class Sample
+            {
+                public function run(Bus $bus): void
+                {
+                    $bus->dispatch([new Created('body', new Stamp()), new Deleted()]);
+                }
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $creations = $document->objectCreationsWithin($document->methodCalls[0]->positionalArgument(0));
+
+        self::assertSame(['App\Message\Created', 'App\Message\Deleted'], array_map(static fn ($creation): string => $creation->className, $creations));
+        self::assertSame([], $document->objectCreationsWithin(null));
+    }
+
     public function testResolvesReceiverVariablesWithinTheirScopes(): void
     {
         $source = <<<'PHP'
