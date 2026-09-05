@@ -63,7 +63,6 @@ use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\PhpExpressionParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\LastResultTreeSitterParser;
@@ -222,8 +221,6 @@ return static function (ContainerConfigurator $container): void {
     $services->get(LastResultPhpParser::class)
         ->decorate(PhpParserInterface::class)
         ->arg('$parser', service(LastResultPhpParser::class.'.inner'));
-    $services->get(PhpExpressionParser::class)
-        ->arg('$parser', service(TolerantPhpParser::class));
     $services->alias(TreeSitterParserInterface::class, NativeTreeSitterParser::class);
     $services->get(LastResultTreeSitterParser::class)
         ->decorate(TreeSitterParserInterface::class)

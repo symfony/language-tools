@@ -21,7 +21,6 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\PhpExpressionParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -166,7 +165,7 @@ final class ConsoleProviderTest extends TestCase
             $converter,
             new TolerantPhpParser(new Parser()),
             new PhpCommentParser(),
-            new ConsoleDefinitionExtractor(new PhpExpressionParser(new TolerantPhpParser(new Parser())), $delimiters),
+            new ConsoleDefinitionExtractor($delimiters),
             new ConsoleInvokableParameterExtractor($delimiters),
             new ConsoleInputReceiverResolver(new PhpCapturedReceiverResolver($delimiters)),
         );

@@ -3,14 +3,19 @@
 namespace Symfony\Lsp\Feature\Console;
 
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
+use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpDocument;
-use Symfony\Lsp\Parser\Php\PhpExpressionParser;
+use Symfony\Lsp\Parser\Php\PhpLiteralKind;
+use Symfony\Lsp\Parser\Php\PhpObjectCreation;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
 
 final class ConsoleDefinitionExtractor
 {
+    private const INPUT_DEFINITION = 'Symfony\\Component\\Console\\Input\\InputDefinition';
+    private const INPUT_ARGUMENT = 'Symfony\\Component\\Console\\Input\\InputArgument';
+    private const INPUT_OPTION = 'Symfony\\Component\\Console\\Input\\InputOption';
+
     public function __construct(
-        private readonly PhpExpressionParser $expressionParser,
         private readonly BalancedDelimiterMatcher $delimiters,
     ) {
     }
@@ -47,12 +52,12 @@ final class ConsoleDefinitionExtractor
             if ('setDefinition' !== $call->method) {
                 continue;
             }
-            $expression = $call->positionalArgument(0)?->expression;
-            if (null === $expression) {
+            $argument = $call->positionalArgument(0);
+            if (null === $argument) {
                 $complete = false;
                 continue;
             }
-            [$definitionArguments, $definitionOptions, $definitionComplete] = $this->setDefinition($expression);
+            [$definitionArguments, $definitionOptions, $definitionComplete] = $this->setDefinition($text, $php, $argument);
             $arguments = [...$arguments, ...$definitionArguments];
             $options = [...$options, ...$definitionOptions];
             $complete = $complete && $definitionComplete;
@@ -75,43 +80,70 @@ final class ConsoleDefinitionExtractor
     }
 
     /** @return array{list<string>, list<string>, bool} */
-    private function setDefinition(string $expression): array
+    private function setDefinition(string $text, PhpDocument $php, PhpArgument $argument): array
     {
-        $document = $this->expressionParser->parse($expression);
+        $creations = $php->objectCreationsWithin($argument);
+        if (1 !== \count($creations)
+            || self::INPUT_DEFINITION !== $creations[0]->className
+            || $creations[0]->startOffset !== $argument->expressionStartOffset
+            || $creations[0]->endOffset !== $argument->expressionEndOffset
+        ) {
+            return $this->definitionList($text, $php, $argument);
+        }
+        $list = $creations[0]->positionalArgument(0);
+
+        return null === $list ? [[], [], true] : $this->definitionList($text, $php, $list);
+    }
+
+    /**
+     * Reads the names of a literal list of input arguments and options, such
+     * as the one `InputDefinition` takes.
+     *
+     * @return array{list<string>, list<string>, bool}
+     */
+    private function definitionList(string $text, PhpDocument $php, PhpArgument $list): array
+    {
+        $creations = $php->objectCreationsWithin($list);
         $arguments = [];
         $options = [];
-        $complete = 1 !== preg_match('/\$|\.\.\./', $expression);
-        $recognized = false;
-        foreach ($document->objectCreations as $creation) {
-            $shortName = substr($creation->className, (int) strrpos('\\'.$creation->className, '\\'));
-            if ('InputDefinition' === $shortName) {
-                $recognized = true;
-                continue;
-            }
-            if (!\in_array($shortName, ['InputArgument', 'InputOption'], true)) {
-                $complete = false;
-                continue;
-            }
-            $recognized = true;
+        $complete = $this->holdsOnlyCreations($text, $list, $creations);
+        foreach ($creations as $creation) {
             $name = $creation->positionalArgument(0)?->stringLiteral?->value;
-            if (null === $name) {
+            if (null === $name || !\in_array($creation->className, [self::INPUT_ARGUMENT, self::INPUT_OPTION], true)) {
                 $complete = false;
                 continue;
             }
-            if ('InputArgument' === $shortName) {
+            if (self::INPUT_ARGUMENT === $creation->className) {
                 $arguments[] = $name;
             } else {
                 $options[] = $name;
             }
         }
-        if (!$recognized && 1 !== preg_match('/^\s*\[.*\]\s*$/s', $expression)) {
-            $complete = false;
+
+        return [$arguments, $options, $complete];
+    }
+
+    /**
+     * Whether the argument is a closed array holding nothing but the given
+     * creations: anything else, such as a key, a spread or a variable, hides
+     * names the list cannot be read from.
+     *
+     * @param list<PhpObjectCreation> $creations
+     */
+    private function holdsOnlyCreations(string $text, PhpArgument $list, array $creations): bool
+    {
+        $start = $list->expressionStartOffset;
+        $end = $list->expressionEndOffset;
+        if (PhpLiteralKind::Array !== $list->completeLiteral?->kind || null === $start || null === $end) {
+            return false;
         }
-        if (preg_match('/(?<!new\s)\b[A-Za-z_][A-Za-z0-9_]*\s*\(/', $expression)) {
-            $complete = false;
+        $between = '';
+        foreach ($creations as $creation) {
+            $between .= substr($text, $start, $creation->startOffset - $start);
+            $start = $creation->endOffset;
         }
 
-        return [array_values(array_unique($arguments)), array_values(array_unique($options)), $complete];
+        return 1 === preg_match('/^[\s\[\],]*$/D', $between.substr($text, $start, $end - $start));
     }
 
     /** @param list<array{start: int, end: int, closed: bool}> $ranges */

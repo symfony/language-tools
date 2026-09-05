@@ -17,7 +17,6 @@ use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\PhpExpressionParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 
@@ -76,7 +75,7 @@ final class ConsoleSourceIndexerTest extends TestCase
             $converter,
             new TolerantPhpParser(new Parser()),
             new PhpCommentParser(),
-            new ConsoleDefinitionExtractor(new PhpExpressionParser(new TolerantPhpParser(new Parser())), $delimiters),
+            new ConsoleDefinitionExtractor($delimiters),
             new ConsoleInvokableParameterExtractor($delimiters),
             new ConsoleInputReceiverResolver(new PhpCapturedReceiverResolver($delimiters)),
         ));

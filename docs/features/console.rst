@@ -50,6 +50,26 @@ recognizes ``#[Argument]`` and ``#[Option]`` parameters on invokable commands.
 Definitions inherited from application-owned parent classes and traits are
 included.
 
+``setDefinition()`` reads literal lists of ``InputArgument`` and ``InputOption``
+objects, alone or wrapped in an ``InputDefinition``:
+
+.. code-block:: php
+
+    use Symfony\Component\Console\Input\InputArgument;
+    use Symfony\Component\Console\Input\InputDefinition;
+    use Symfony\Component\Console\Input\InputOption;
+
+    protected function configure(): void
+    {
+        $this->setDefinition(new InputDefinition([
+            new InputArgument('source'),
+            new InputOption('format'),
+        ]));
+    }
+
+Only the Symfony Console classes are recognized, whichever import, alias or
+fully qualified name they're written with.
+
 Limitations
 -----------
 
@@ -57,6 +77,10 @@ Completion and diagnostics require the receiver to have the
 ``InputInterface`` type. Calls to methods with the same names on other objects
 are ignored. Definitions made inside closures are available for completion,
 but are treated as incomplete so unknown-name diagnostics are omitted.
+
+Definition lists holding variables, spreads, keys or objects of other classes
+are treated as incomplete too. Names written as literals next to them stay
+available for completion.
 
 Hover, navigation, references and validation of argument or option default
 values aren't supported.

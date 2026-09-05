@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Read console `setDefinition()` lists from resolved Symfony input classes
 - Keep one YAML scalar fact per source region in malformed documents
 - Report tabbed YAML indentation only where it structures the document
 - Link YAML configuration imports from parsed `resource` values only

@@ -16,7 +16,6 @@ use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
-use Symfony\Lsp\Parser\Php\PhpExpressionParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 
@@ -341,7 +340,7 @@ final class ConsoleExtractorTest extends TestCase
         self::assertFalse($facts->declarations[0]->complete);
     }
 
-    public function testKeepsDocumentParseCachedWhileParsingDefinitionExpressions(): void
+    public function testReadsCommentedDefinitionsFromASingleDocumentParse(): void
     {
         $text = <<<'PHP'
             <?php
@@ -353,7 +352,7 @@ final class ConsoleExtractorTest extends TestCase
                 protected function configure(): void
                 {
                     $this->setDefinition([
-                        // The expression parser must accept comments.
+                        // Comments cannot hide names, not even buildDefinition().
                         new InputArgument('report'),
                     ]);
                 }
@@ -361,14 +360,12 @@ final class ConsoleExtractorTest extends TestCase
             PHP;
         $inner = new CountingConsolePhpParser(new TolerantPhpParser(new Parser()));
         $parser = new LastResultPhpParser($inner);
-        $expressionParser = new CountingConsolePhpParser(new TolerantPhpParser(new Parser()));
-        $converter = new PositionConverter();
         $delimiters = new BalancedDelimiterMatcher();
         $extractor = new ConsoleExtractor(
-            $converter,
+            new PositionConverter(),
             $parser,
             new PhpCommentParser(),
-            new ConsoleDefinitionExtractor(new PhpExpressionParser($expressionParser), $delimiters),
+            new ConsoleDefinitionExtractor($delimiters),
             new ConsoleInvokableParameterExtractor($delimiters),
             new ConsoleInputReceiverResolver(new PhpCapturedReceiverResolver($delimiters)),
         );
@@ -377,22 +374,117 @@ final class ConsoleExtractorTest extends TestCase
         $parser->parse($text);
 
         self::assertSame(['report'], $facts->declarations[0]->arguments);
+        self::assertTrue($facts->declarations[0]->complete);
         self::assertSame([$text], $inner->sources);
-        self::assertCount(1, $expressionParser->sources);
-        self::assertStringContainsString('// The expression parser must accept comments.', $expressionParser->sources[0]);
+    }
+
+    public function testReadsDefinitionsOnlyFromSymfonyInputClasses(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/ImportCommand.php', 'php', <<<'PHP'
+            <?php
+            namespace App\Command;
+
+            use App\Input\InputArgument;
+            use App\Input\InputOption;
+            use Symfony\Component\Console\Input\InputArgument as Argument;
+
+            final class ImportCommand
+            {
+                protected function configure(): void
+                {
+                    $this->setDefinition([
+                        new InputArgument('unrelated'),
+                        new InputOption('unrelated'),
+                        new Argument('aliased'),
+                        new \Symfony\Component\Console\Input\InputOption('qualified'),
+                    ]);
+                }
+            }
+            PHP));
+
+        self::assertSame(['aliased'], $facts->declarations[0]->arguments);
+        self::assertSame(['qualified'], $facts->declarations[0]->options);
+        self::assertFalse($facts->declarations[0]->complete);
+    }
+
+    public function testMarksDefinitionListsWithHiddenNamesIncomplete(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/HiddenCommand.php', 'php', <<<'PHP'
+            <?php
+            namespace App\Command;
+
+            use Symfony\Component\Console\Input\InputArgument;
+            use Symfony\Component\Console\Input\InputDefinition;
+
+            final class HiddenCommand
+            {
+                protected function configure(): void
+                {
+                    $this->setDefinition(new InputDefinition([
+                        new InputArgument('kept'),
+                        ...$this->extraArguments(),
+                    ]));
+                }
+            }
+            PHP));
+
+        self::assertSame(['kept'], $facts->declarations[0]->arguments);
+        self::assertFalse($facts->declarations[0]->complete);
+    }
+
+    public function testKeepsDefinitionsWrittenWithComputedConstructorArguments(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/DefaultsCommand.php', 'php', <<<'PHP'
+            <?php
+            namespace App\Command;
+
+            use Symfony\Component\Console\Input\InputArgument;
+            use Symfony\Component\Console\Input\InputDefinition;
+
+            final class DefaultsCommand
+            {
+                protected function configure(): void
+                {
+                    $this->setDefinition(new InputDefinition([
+                        new InputArgument('format', InputArgument::OPTIONAL, 'The format', $this->defaultFormat()),
+                    ]));
+                }
+            }
+            PHP));
+
+        self::assertSame(['format'], $facts->declarations[0]->arguments);
+        self::assertTrue($facts->declarations[0]->complete);
+    }
+
+    public function testMarksDefinitionsIncompleteWhileTheListIsBeingTyped(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/TypingCommand.php', 'php', <<<'PHP'
+            <?php
+            namespace App\Command;
+
+            use Symfony\Component\Console\Input\InputArgument;
+
+            final class TypingCommand
+            {
+                protected function configure(): void
+                {
+                    $this->setDefinition([new InputArgument('format'),
+                }
+            }
+            PHP));
+
+        self::assertFalse($facts->declarations[0]->complete);
     }
 
     private function extractor(): ConsoleExtractor
     {
-        $converter = new PositionConverter();
-
         $delimiters = new BalancedDelimiterMatcher();
 
         return new ConsoleExtractor(
-            $converter,
+            new PositionConverter(),
             new TolerantPhpParser(new Parser()),
             new PhpCommentParser(),
-            new ConsoleDefinitionExtractor(new PhpExpressionParser(new TolerantPhpParser(new Parser())), $delimiters),
+            new ConsoleDefinitionExtractor($delimiters),
             new ConsoleInvokableParameterExtractor($delimiters),
             new ConsoleInputReceiverResolver(new PhpCapturedReceiverResolver($delimiters)),
         );
