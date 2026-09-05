@@ -174,14 +174,22 @@ final class MessengerExtractor
     private function phpParents(string $text, PhpDocument $php): array
     {
         $parents = [];
-        preg_match_all('/\b(class|interface|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\s*([^{}]*)\{/', $text, $matches, \PREG_SET_ORDER);
+        $typesByNameOffset = [];
+        foreach ($php->typeDeclarations as $type) {
+            $typesByNameOffset[$type->nameStartOffset] = $type;
+        }
+        preg_match_all('/\b(class|interface|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\s*([^{}]*)\{/', $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($matches as $match) {
-            $className = $php->resolveName($match[2]);
+            $type = $typesByNameOffset[$match[2][1]] ?? null;
+            if (null === $type) {
+                continue;
+            }
+            $className = $type->name;
             $typeLists = [];
-            if (preg_match('/\bextends\s+([^\s,{]+(?:\s*,\s*[^\s,{]+)*)/', $match[3], $extends)) {
+            if (preg_match('/\bextends\s+([^\s,{]+(?:\s*,\s*[^\s,{]+)*)/', $match[3][0], $extends)) {
                 $typeLists[] = $extends[1];
             }
-            if (preg_match('/\bimplements\s+([^\{]+)/', $match[3], $implements)) {
+            if (preg_match('/\bimplements\s+([^\{]+)/', $match[3][0], $implements)) {
                 $typeLists[] = trim($implements[1]);
             }
             $types = [];

@@ -167,6 +167,46 @@ YAML;
         self::assertCount(2, $facts->handlers);
     }
 
+    public function testIgnoresAnonymousClassesWhenExtractingMessageInheritance(): void
+    {
+        $converter = new PositionConverter();
+        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
+        $extractor = new MessengerExtractor(
+            $converter,
+            new TolerantPhpParser(new Parser()),
+            new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher()),
+            new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
+            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]),
+        );
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Message.php', 'php', <<<'PHP'
+            <?php
+            namespace App\Message;
+
+            interface ParentMessage
+            {
+            }
+
+            interface Inner
+            {
+            }
+
+            final class ChildMessage implements ParentMessage
+            {
+                public function anonymous(): object
+                {
+                    return new class implements Inner {
+                    };
+                }
+            }
+            PHP));
+
+        self::assertSame([
+            'App\\Message\\ParentMessage' => [],
+            'App\\Message\\Inner' => [],
+            'App\\Message\\ChildMessage' => ['App\\Message\\ParentMessage'],
+        ], $facts->parents);
+    }
+
     public function testScopesMessageBusParametersToTheirMethod(): void
     {
         $converter = new PositionConverter();
