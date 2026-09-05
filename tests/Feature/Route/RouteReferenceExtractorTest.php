@@ -247,6 +247,24 @@ final class RouteReferenceExtractorTest extends TestCase
                     };
                 }
             PHP];
+        yield 'nested captured router parameter' => [true, <<<'PHP'
+                public function notify(RouterInterface $router): callable
+                {
+                    return function () use ($router): callable {
+                        return fn (): string => $router->generate('article_show');
+                    };
+                }
+            PHP];
+        yield 'missing nested capture' => [false, <<<'PHP'
+                public function notify(RouterInterface $router): callable
+                {
+                    return function () use ($router): callable {
+                        return function (): string {
+                            return $router->generate('article_show');
+                        };
+                    };
+                }
+            PHP];
         yield 'suffixed application interface' => [false, <<<'PHP'
                 public function notify(MyRouterInterface $router): void
                 {

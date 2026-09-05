@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
-use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
@@ -14,10 +13,6 @@ final class TemplatePhpReferenceResolver
     private const CONTROLLER_HELPER = 'Symfony\\Bundle\\FrameworkBundle\\Controller\\ControllerHelper';
     private const TWIG_ENVIRONMENT = 'Twig\\Environment';
 
-    public function __construct(private readonly PhpCapturedReceiverResolver $receivers)
-    {
-    }
-
     /**
      * @return array{
      *     className: string,
@@ -26,7 +21,7 @@ final class TemplatePhpReferenceResolver
      *     variablesArgumentName: string,
      * }|null
      */
-    public function receiver(string $source, PhpDocument $document, PhpMethodCall $call): ?array
+    public function receiver(PhpDocument $document, PhpMethodCall $call): ?array
     {
         if (PhpMethodReceiverKind::This === $call->receiverContext->kind) {
             return null === $call->className ? null : [
@@ -38,7 +33,7 @@ final class TemplatePhpReferenceResolver
         }
 
         $types = [];
-        foreach ($this->receivers->variables($source, $document, $call) as $variable) {
+        foreach ($document->receiverVariables($call) as $variable) {
             if (1 !== \count($variable->types)) {
                 return null;
             }

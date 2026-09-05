@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Feature\Console;
 
-use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpTypedVariable;
@@ -11,13 +10,9 @@ final class ConsoleInputReceiverResolver
 {
     private const INPUT_INTERFACE = 'Symfony\\Component\\Console\\Input\\InputInterface';
 
-    public function __construct(private readonly PhpCapturedReceiverResolver $capturedReceivers)
+    public function hasInputReceiver(PhpDocument $php, PhpMethodCall $call): bool
     {
-    }
-
-    public function hasInputReceiver(string $source, PhpDocument $php, PhpMethodCall $call): bool
-    {
-        return array_any($this->capturedReceivers->variables($source, $php, $call), self::isInputVariable(...));
+        return array_any($php->receiverVariables($call), self::isInputVariable(...));
     }
 
     private static function isInputVariable(PhpTypedVariable $variable): bool

@@ -22,8 +22,6 @@ use Symfony\Lsp\Feature\Doctrine\DoctrineRepositoryReceiverResolver;
 use Symfony\Lsp\Feature\Doctrine\DoctrineSymbolKind;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
-use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -704,7 +702,7 @@ final class DoctrineProviderTest extends TestCase
             $converter ?? new PositionConverter(),
             new TolerantPhpParser(new Parser()),
             new PhpCommentParser(),
-            new DoctrineRepositoryReceiverResolver(new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher())),
+            new DoctrineRepositoryReceiverResolver(),
             new PhpLiteralArrayKeyParser(),
         );
     }

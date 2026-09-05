@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Resolve typed PHP receivers through nested closures and arrow functions
 - Resolve Messenger inheritance for classes, interfaces and enums without leaking across incomplete declarations
 - Recognize Console parameter attributes stacked or grouped with other attributes
 - Recognize Console definitions inherited from traits imported with an adaptation block

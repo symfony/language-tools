@@ -10,6 +10,7 @@ final class TolerantPhpParser implements PhpParserInterface
     private readonly PhpNameContextBuilder $names;
     private readonly PhpDeclarationFactBuilder $declarations;
     private readonly PhpExpressionFactBuilder $expressions;
+    private readonly PhpLexicalScopeFactBuilder $lexicalScopes;
 
     public function __construct(
         private readonly Parser $parser,
@@ -19,6 +20,7 @@ final class TolerantPhpParser implements PhpParserInterface
         $this->names = new PhpNameContextBuilder($nodes, $scopes);
         $this->expressions = new PhpExpressionFactBuilder($nodes, $scopes);
         $this->declarations = new PhpDeclarationFactBuilder($nodes, $scopes, $this->expressions);
+        $this->lexicalScopes = new PhpLexicalScopeFactBuilder($scopes);
     }
 
     public function parse(string $source): PhpDocument
@@ -51,6 +53,7 @@ final class TolerantPhpParser implements PhpParserInterface
             $declarations->constantDeclarations,
             $declarations->propertyDeclarations,
             $expressions->classReferences,
+            $this->lexicalScopes->build($nodes, $source),
         );
     }
 }

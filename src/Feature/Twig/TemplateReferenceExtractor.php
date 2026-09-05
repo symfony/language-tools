@@ -61,7 +61,7 @@ final class TemplateReferenceExtractor
         if (null === $candidate) {
             return false;
         }
-        $receiver = $this->phpReferences->receiver($source, $php, $candidate);
+        $receiver = $this->phpReferences->receiver($php, $candidate);
         if (null === $receiver || null === $candidate->namedOrPositionalArgument($receiver['templateArgumentName'], 0)) {
             return false;
         }
@@ -90,7 +90,7 @@ final class TemplateReferenceExtractor
             if (!\in_array($call->method, ['render', 'renderView'], true)) {
                 continue;
             }
-            $receiver = $this->phpReferences->receiver($document->text, $php, $call);
+            $receiver = $this->phpReferences->receiver($php, $call);
             if (null === $receiver) {
                 continue;
             }

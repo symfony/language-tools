@@ -59,8 +59,10 @@ An ``event`` key is read as an event name only when it belongs to a
 ``kernel.event_listener`` tag entry, so keys of other tags, keys nested below a
 tag and commented-out tags are ignored.
 
-Typed parameters are matched only inside their declaring method. Typed
-properties, including promoted properties, remain available across methods.
+Typed parameters are matched only inside their declaring method or through
+explicit closure captures and implicit arrow-function captures across nested
+lexical scopes. Typed properties, including promoted properties, remain
+available across methods.
 Named and unpacked arguments aren't treated as positional event arguments.
 Quoted listener method names can contain braces and escaped quotes.
 Commented-out PHP attributes and calls are ignored.

@@ -6,7 +6,6 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpArgument;
-use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
@@ -19,7 +18,6 @@ final class FormMetadataExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly BalancedDelimiterMatcher $delimiters,
-        private readonly PhpCapturedReceiverResolver $capturedReceivers,
         private readonly PhpLiteralArrayKeyParser $arrayKeys,
     ) {
     }
@@ -101,7 +99,7 @@ final class FormMetadataExtractor
             foreach ($php->methodCalls as $call) {
                 if ('add' !== $call->method
                     || $method->className !== $call->className
-                    || !\in_array($builder, $this->formBuilderReceiverVariables($source, $php, $call), true)
+                    || !\in_array($builder, $this->formBuilderReceiverVariables($php, $call), true)
                     || !$this->isDirectFormBuilderReceiver($call->receiver, $builder->name)
                 ) {
                     continue;
@@ -221,7 +219,7 @@ final class FormMetadataExtractor
 
     private function formBuilderVariableForCall(string $source, PhpDocument $php, PhpMethodCall $call): ?PhpTypedVariable
     {
-        foreach ($this->formBuilderReceiverVariables($source, $php, $call) as $variable) {
+        foreach ($this->formBuilderReceiverVariables($php, $call) as $variable) {
             if (PhpTypedVariableKind::Parameter !== $variable->kind
                 || !\in_array('Symfony\\Component\\Form\\FormBuilderInterface', $variable->types, true)
                 || 1 !== preg_match('/^\s*\\$'.preg_quote($variable->name, '/').'\b/', $call->receiver)
@@ -236,16 +234,16 @@ final class FormMetadataExtractor
     }
 
     /** @return list<PhpTypedVariable> */
-    private function formBuilderReceiverVariables(string $source, PhpDocument $php, PhpMethodCall $call): array
+    private function formBuilderReceiverVariables(PhpDocument $php, PhpMethodCall $call): array
     {
-        if ([] !== $variables = $this->capturedReceivers->variables($source, $php, $call)) {
+        if ([] !== $variables = $php->receiverVariables($call)) {
             return $variables;
         }
         foreach ($php->methodCalls as $receiverCall) {
             if ($call === $receiverCall
                 || $call->startOffset !== $receiverCall->startOffset
                 || $receiverCall->endOffset > $call->receiverContext->endOffset
-                || [] === $variables = $this->capturedReceivers->variables($source, $php, $receiverCall)
+                || [] === $variables = $php->receiverVariables($receiverCall)
             ) {
                 continue;
             }

@@ -7,6 +7,8 @@ use Microsoft\PhpParser\Node\Attribute;
 use Microsoft\PhpParser\Node\AttributeGroup;
 use Microsoft\PhpParser\Node\ClassConstDeclaration;
 use Microsoft\PhpParser\Node\EnumCaseDeclaration;
+use Microsoft\PhpParser\Node\Expression\AnonymousFunctionCreationExpression;
+use Microsoft\PhpParser\Node\Expression\ArrowFunctionCreationExpression;
 use Microsoft\PhpParser\Node\Expression\CallExpression;
 use Microsoft\PhpParser\Node\Expression\MemberAccessExpression;
 use Microsoft\PhpParser\Node\Expression\ObjectCreationExpression;
@@ -39,6 +41,9 @@ final class TolerantPhpNodeCollection
     /** @var list<MethodDeclaration> */
     public readonly array $methodDeclarations;
 
+    /** @var list<AnonymousFunctionCreationExpression|ArrowFunctionCreationExpression> */
+    public readonly array $lexicalScopes;
+
     /** @var list<ScopedPropertyAccessExpression> */
     public readonly array $classReferences;
 
@@ -68,6 +73,7 @@ final class TolerantPhpNodeCollection
         $typedVariableDeclarations = [];
         $objectCreations = [];
         $methodDeclarations = [];
+        $lexicalScopes = [];
         $classReferences = [];
         $constantDeclarations = [];
         $typeDeclarations = [];
@@ -99,6 +105,8 @@ final class TolerantPhpNodeCollection
                 $objectCreations[] = $node;
             } elseif ($node instanceof MethodDeclaration) {
                 $methodDeclarations[] = $node;
+            } elseif ($node instanceof AnonymousFunctionCreationExpression || $node instanceof ArrowFunctionCreationExpression) {
+                $lexicalScopes[] = $node;
             } elseif ($node instanceof ScopedPropertyAccessExpression && 0 === strcasecmp('class', (string) $node->memberName->getText($source))) {
                 $classReferences[] = $node;
             } elseif ($node instanceof ClassConstDeclaration || $node instanceof EnumCaseDeclaration) {
@@ -116,6 +124,7 @@ final class TolerantPhpNodeCollection
         $this->typedVariableDeclarations = $typedVariableDeclarations;
         $this->objectCreations = $objectCreations;
         $this->methodDeclarations = $methodDeclarations;
+        $this->lexicalScopes = $lexicalScopes;
         $this->classReferences = $classReferences;
         $this->constantDeclarations = $constantDeclarations;
         $this->typeDeclarations = $typeDeclarations;

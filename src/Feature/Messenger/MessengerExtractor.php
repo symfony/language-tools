@@ -8,7 +8,6 @@ use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
-use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpTypeKind;
@@ -24,7 +23,6 @@ final class MessengerExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $parser,
-        private readonly PhpCapturedReceiverResolver $capturedReceivers,
         private readonly YamlConfigurationParser $yaml,
         private readonly CommentParserRegistry $comments,
     ) {
@@ -95,7 +93,7 @@ final class MessengerExtractor
                 );
             }
             foreach ($php->methodCalls as $call) {
-                if ('dispatch' !== $call->method || !array_any($this->capturedReceivers->variables($source, $php, $call), static fn ($variable): bool => [] !== array_intersect(self::BUS_TYPES, $variable->types))) {
+                if ('dispatch' !== $call->method || !array_any($php->receiverVariables($call), static fn ($variable): bool => [] !== array_intersect(self::BUS_TYPES, $variable->types))) {
                     continue;
                 }
                 $messageArgument = $call->positionalArgument(0);

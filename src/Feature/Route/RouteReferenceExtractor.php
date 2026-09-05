@@ -56,7 +56,7 @@ final class RouteReferenceExtractor
                 $call = $candidate;
             }
         }
-        $receiver = null === $call ? null : $this->receivers->resolve($source, $document, $call);
+        $receiver = null === $call ? null : $this->receivers->resolve($document, $call);
 
         return null !== $receiver && $this->controllers->isController($receiver->controllerClass, $document, $classIndex);
     }

@@ -48,7 +48,7 @@ final class ConsoleExtractor
 
         $references = [];
         foreach ($php->methodCalls as $call) {
-            if (!\in_array($call->method, ['getArgument', 'getOption'], true) || !$this->inputReceivers->hasInputReceiver($masked, $php, $call)) {
+            if (!\in_array($call->method, ['getArgument', 'getOption'], true) || !$this->inputReceivers->hasInputReceiver($php, $call)) {
                 continue;
             }
             $name = $call->positionalArgument(0)?->stringLiteral;
@@ -84,7 +84,7 @@ final class ConsoleExtractor
         $receiver = $property ? $match[2][0] : ($match[1][0] ?? null);
         $receiverKind = $property ? PhpMethodReceiverKind::ThisProperty : PhpMethodReceiverKind::Variable;
         $call = \is_string($receiver) ? array_find($php->methodCalls, static fn (PhpMethodCall $call): bool => $match[3][0] === $call->method && $receiver === $call->receiverContext->name && $receiverKind === $call->receiverContext->kind && $methodOffset >= $call->startOffset && $methodOffset < $call->endOffset) : null;
-        if (null === $call || null === $call->className || !$this->inputReceivers->hasInputReceiver($masked, $php, $call)) {
+        if (null === $call || null === $call->className || !$this->inputReceivers->hasInputReceiver($php, $call)) {
             return null;
         }
         $rawPrefix = $match['prefix'][0];

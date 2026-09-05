@@ -2,17 +2,12 @@
 
 namespace Symfony\Lsp\Feature\Doctrine;
 
-use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 
 final class DoctrineRepositoryReceiverResolver
 {
-    public function __construct(private readonly PhpCapturedReceiverResolver $capturedReceivers)
-    {
-    }
-
     /**
      * @param list<PhpMethodCall> $calls
      * @param array<string, true> $localRepositoryClasses
@@ -60,7 +55,7 @@ final class DoctrineRepositoryReceiverResolver
             }
         }
         if (null !== $receiver->name) {
-            foreach ($this->capturedReceivers->variables($source, $php, $call) as $variable) {
+            foreach ($php->receiverVariables($call) as $variable) {
                 if (1 === \count($variable->types) && str_ends_with($variable->types[0], 'Repository')) {
                     return ['entityClass' => null, 'repositoryClass' => $variable->types[0]];
                 }
@@ -73,7 +68,7 @@ final class DoctrineRepositoryReceiverResolver
             foreach ($assignments as $assignment) {
                 if ($receiver->name !== $assignment['variable']
                     || !\is_int($assignment['scopeStartOffset'])
-                    || !$this->capturedReceivers->isCapturedFromScope($source, $call, $receiver->name, $assignment['scopeStartOffset'])
+                    || !$php->isVariableVisible($receiver->name, $assignment['scopeStartOffset'], $call)
                 ) {
                     continue;
                 }

@@ -17,6 +17,7 @@ final class PhpDocument
      * @param list<PhpConstantDeclaration> $constantDeclarations
      * @param list<PhpPropertyDeclaration> $propertyDeclarations
      * @param list<PhpClassReference>      $classReferences
+     * @param list<PhpLexicalScope>        $lexicalScopes
      */
     public function __construct(
         public readonly array $attributes,
@@ -30,6 +31,7 @@ final class PhpDocument
         public readonly array $constantDeclarations = [],
         public readonly array $propertyDeclarations = [],
         public readonly array $classReferences = [],
+        public readonly array $lexicalScopes = [],
     ) {
         $this->names = $names ?? new PhpNameContext();
     }
@@ -94,10 +96,8 @@ final class PhpDocument
     }
 
     /**
-     * Typed variables the call's receiver can resolve to, honoring scope:
-     * a plain variable receiver matches parameters and promoted properties
-     * of the enclosing scope, a `$this->property` receiver matches
-     * properties and promoted properties of the enclosing class.
+     * Typed variables the call's receiver can resolve to, honoring direct and
+     * nested lexical scope boundaries.
      *
      * @return list<PhpTypedVariable>
      */
@@ -113,8 +113,11 @@ final class PhpDocument
                 continue;
             }
             if (PhpMethodReceiverKind::Variable === $receiver->kind
-                && \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                && $call->scopeStartOffset === $variable->scopeStartOffset
+                && (\in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                    && $call->scopeStartOffset === $variable->scopeStartOffset
+                    || PhpTypedVariableKind::Parameter === $variable->kind
+                    && \is_int($variable->scopeStartOffset)
+                    && $this->isVariableVisible($variable->name, $variable->scopeStartOffset, $call))
             ) {
                 $variables[] = $variable;
             } elseif (PhpMethodReceiverKind::ThisProperty === $receiver->kind
@@ -126,6 +129,28 @@ final class PhpDocument
         }
 
         return $variables;
+    }
+
+    public function isVariableVisible(string $name, int $declarationScopeStartOffset, PhpMethodCall $call): bool
+    {
+        $scopeStartOffset = $call->scopeStartOffset;
+        if (!\is_int($scopeStartOffset)) {
+            return false;
+        }
+        while ($scopeStartOffset !== $declarationScopeStartOffset) {
+            $scope = $this->lexicalScopeStartingAt($scopeStartOffset);
+            if (null === $scope || !$scope->complete || \in_array($name, $scope->parameterNames, true)) {
+                return false;
+            }
+            if (PhpLexicalScopeKind::Closure === $scope->kind && !\in_array($name, $scope->capturedVariableNames, true)) {
+                return false;
+            }
+            if (null === $scopeStartOffset = $scope->parentScopeStartOffset) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** @return list<PhpAttribute> */
@@ -148,6 +173,17 @@ final class PhpDocument
         }
 
         return $attributes;
+    }
+
+    private function lexicalScopeStartingAt(int $startOffset): ?PhpLexicalScope
+    {
+        foreach ($this->lexicalScopes as $scope) {
+            if ($startOffset === $scope->startOffset) {
+                return $scope;
+            }
+        }
+
+        return null;
     }
 
     /** @return list<PhpClassReference> */

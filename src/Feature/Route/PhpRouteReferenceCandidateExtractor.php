@@ -31,7 +31,7 @@ final class PhpRouteReferenceCandidateExtractor
             if (null === $route || null === $name = $route->stringLiteral) {
                 continue;
             }
-            $receiver = $this->receivers->resolve($text, $document, $call);
+            $receiver = $this->receivers->resolve($document, $call);
             if (null === $receiver) {
                 continue;
             }

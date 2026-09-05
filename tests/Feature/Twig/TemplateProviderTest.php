@@ -43,9 +43,7 @@ use Symfony\Lsp\Feature\Twig\TwigVariableProvider;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceParseHealth;
-use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\CommentParserRegistry;
-use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -226,6 +224,28 @@ final class TemplateProviderTest extends TestCase
             ],
             array_map(static fn (TemplateReference $reference): array => [$reference->name, $reference->variables], $references),
         );
+    }
+
+    public function testExtractsRenderCallsThroughNestedLexicalCaptures(): void
+    {
+        $references = $this->templateReferenceExtractor(new PositionConverter())->extract(new SourceDocument('file:///workspace/src/Renderer.php', 'php', <<<'PHP'
+            <?php
+            use Twig\Environment;
+
+            function renderTemplates(Environment $twig): void
+            {
+                $closure = function () use ($twig): void {
+                    $twig->render('closure.html.twig');
+                    $nested = fn () => $twig->render('nested.html.twig');
+                };
+                $uncaptured = function (): void {
+                    $twig->render('uncaptured.html.twig');
+                };
+                $shadowed = fn ($twig) => $twig->render('shadowed.html.twig');
+            }
+            PHP));
+
+        self::assertSame(['closure.html.twig', 'nested.html.twig'], array_map(static fn (TemplateReference $reference): string => $reference->name, $references));
     }
 
     public function testIgnoresRenderCallsOnUnrelatedReceivers(): void
@@ -1267,7 +1287,7 @@ final class TemplateProviderTest extends TestCase
             new TwigCallArgumentResolver(new TwigArgumentParser()),
             $parser ?? new TolerantPhpParser(new Parser()),
             new PhpLiteralArrayKeyParser(),
-            new TemplatePhpReferenceResolver(new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher())),
+            new TemplatePhpReferenceResolver(),
         );
     }
 

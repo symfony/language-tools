@@ -7,7 +7,6 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
-use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
@@ -27,7 +26,6 @@ final class EventExtractor
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $parser,
         private readonly PhpCommentParser $phpComments,
-        private readonly PhpCapturedReceiverResolver $capturedReceivers,
         private readonly EventYamlListenerAnalyzer $yamlListenerAnalyzer,
         private readonly EventSubscriberMapAnalyzer $subscriberMapAnalyzer,
     ) {
@@ -67,7 +65,7 @@ final class EventExtractor
                 };
                 $start = $argument?->expressionStartOffset;
                 $end = $argument?->expressionEndOffset;
-                if (null === $start || null === $end || $offset <= $start || $offset > $end || !$this->hasEventDispatcherReceiver($masked, $php, $call)) {
+                if (null === $start || null === $end || $offset <= $start || $offset > $end || !$this->hasEventDispatcherReceiver($php, $call)) {
                     continue;
                 }
                 $argumentBefore = substr($masked, $start, $offset - $start);
@@ -123,7 +121,7 @@ final class EventExtractor
         }
 
         foreach ($php->methodCalls as $call) {
-            if (!$this->hasEventDispatcherReceiver($source, $php, $call)) {
+            if (!$this->hasEventDispatcherReceiver($php, $call)) {
                 continue;
             }
             if ('dispatch' === $call->method) {
@@ -198,9 +196,9 @@ final class EventExtractor
         return false;
     }
 
-    private function hasEventDispatcherReceiver(string $source, PhpDocument $php, PhpMethodCall $call): bool
+    private function hasEventDispatcherReceiver(PhpDocument $php, PhpMethodCall $call): bool
     {
-        return array_any($this->capturedReceivers->variables($source, $php, $call), static fn ($variable): bool => [] !== array_intersect(self::DISPATCHER_TYPES, $variable->types));
+        return array_any($php->receiverVariables($call), static fn ($variable): bool => [] !== array_intersect(self::DISPATCHER_TYPES, $variable->types));
     }
 
     /**

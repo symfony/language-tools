@@ -139,6 +139,6 @@ final class TolerantPhpScopeResolver
     {
         $name = $variable->getText($source);
 
-        return \is_string($name) && 1 === preg_match('/^\\$[A-Za-z_][A-Za-z0-9_]*$/', $name) ? substr($name, 1) : null;
+        return \is_string($name) && 1 === preg_match('/^\\$[A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*$/D', $name) ? substr($name, 1) : null;
     }
 }

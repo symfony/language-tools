@@ -23,7 +23,9 @@ contexts:
 
 Controller and controller-helper calls recognize named ``view`` and
 ``parameters`` arguments; Twig environment calls recognize named ``name`` and
-``context`` arguments.
+``context`` arguments. Typed receivers explicitly captured by closures or
+implicitly captured by arrow functions remain recognized across nested lexical
+scopes.
 Both regular names such as ``article/show.html.twig`` and namespaced names such
 as ``@Admin/dashboard.html.twig`` are supported. The ``include()`` and
 ``source()`` functions recognize positional and named template arguments.

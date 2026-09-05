@@ -25,8 +25,9 @@ calls:
 
 Suggestions include names configured by the command, inherited definitions and
 application-level options such as ``help``, ``verbose``, ``env`` and
-``no-debug``. Input references through typed parameters captured by closures and
-arrow functions are also recognized.
+``no-debug``. Input references through typed parameters explicitly captured by
+closures or implicitly captured by arrow functions are also recognized across
+nested lexical scopes.
 
 Diagnostics
 -----------

@@ -19,9 +19,10 @@ Controller helpers remain recognized when an application controller inherits
 from ``AbstractController`` through one or more project base classes. Router
 and URL generator calls are recognized when the receiver is a parameter or
 property declared in the same class or function with Symfony's
-``RouterInterface`` or ``UrlGeneratorInterface`` type. Application types with
-similar names, untyped receivers and values returned by another call aren't
-recognized. Twig's ``path()`` and ``url()`` functions are also supported. The
+``RouterInterface`` or ``UrlGeneratorInterface`` type. Explicit closure captures
+and implicit arrow-function captures remain recognized across nested lexical
+scopes. Application types with similar names, untyped receivers and values
+returned by another call aren't recognized. Twig's ``path()`` and ``url()`` functions are also supported. The
 server avoids suggestions when it can't establish that a similarly named method
 belongs to a Symfony API. Twig route functions recognize positional arguments
 and the named ``name`` and ``parameters`` arguments. Completion expects named

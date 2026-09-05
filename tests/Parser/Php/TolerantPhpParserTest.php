@@ -8,6 +8,7 @@ use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpConstantKind;
+use Symfony\Lsp\Parser\Php\PhpLexicalScopeKind;
 use Symfony\Lsp\Parser\Php\PhpLiteralKind;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
@@ -1345,6 +1346,81 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame([['Psr\Log\LoggerInterface']], array_map(static fn ($variable): array => $variable->types, $document->receiverVariables($direct)));
         self::assertSame([['Psr\Log\LoggerInterface']], array_map(static fn ($variable): array => $variable->types, $document->receiverVariables($property)));
         self::assertSame([['string']], array_map(static fn ($variable): array => $variable->types, $document->receiverVariables($unrelated)));
+    }
+
+    public function testExposesNestedLexicalScopesWithExactRangesAndRecoveryState(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            final class Handler
+            {
+                public function run(Service $service, Service $café): void
+                {
+                    $outer = function (object $shadow) use (
+                        $service,
+                        &$café,
+                    ): void {
+                        $inner = fn (object $service) => $service->run();
+                    };
+                }
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        [$closure, $arrow] = $document->lexicalScopes;
+
+        self::assertSame([PhpLexicalScopeKind::Closure, PhpLexicalScopeKind::ArrowFunction], array_map(static fn ($scope): PhpLexicalScopeKind => $scope->kind, $document->lexicalScopes));
+        self::assertSame([['shadow'], ['service']], array_map(static fn ($scope): array => $scope->parameterNames, $document->lexicalScopes));
+        self::assertSame([['service', 'café'], []], array_map(static fn ($scope): array => $scope->capturedVariableNames, $document->lexicalScopes));
+        self::assertSame($document->typedVariables[0]->scopeStartOffset, $closure->parentScopeStartOffset);
+        self::assertSame($closure->startOffset, $arrow->parentScopeStartOffset);
+        self::assertSame('function (object $shadow) use ('."\n".'            $service,'."\n".'            &$café,'."\n".'        ): void {'."\n".'            $inner = fn (object $service) => $service->run();'."\n".'        }', substr($source, $closure->startOffset, $closure->endOffset - $closure->startOffset));
+        self::assertSame('fn (object $service) => $service->run()', substr($source, $arrow->startOffset, $arrow->endOffset - $arrow->startOffset));
+        self::assertTrue($closure->complete);
+        self::assertTrue($arrow->complete);
+
+        $recovered = (new TolerantPhpParser(new Parser()))->parse('<?php $closure = function ($value) use ($captured) { $captured->run(')->lexicalScopes[0];
+
+        self::assertSame(['value'], $recovered->parameterNames);
+        self::assertSame(['captured'], $recovered->capturedVariableNames);
+        self::assertFalse($recovered->complete);
+    }
+
+    public function testResolvesCapturedReceiversAcrossEveryNestedBoundary(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            use Vendor\Service;
+
+            function run(Service $service): void
+            {
+                $direct = function () use ($service): void {
+                    $nestedArrow = fn () => $service->accepted();
+                    $missingCapture = function (): void {
+                        $nestedArrow = fn () => $service->missingCapture();
+                    };
+                    $shadowed = function () use ($service): void {
+                        $nestedArrow = fn ($service) => $service->shadowed();
+                    };
+                    $recaptured = function () use ($service): void {
+                        $nested = function () use ($service): void {
+                            $service->recaptured();
+                        };
+                    };
+                };
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $calls = [];
+        foreach ($document->methodCalls as $call) {
+            $calls[$call->method] = $call;
+        }
+
+        self::assertSame(['service'], array_map(static fn ($variable): string => $variable->name, $document->receiverVariables($calls['accepted'])));
+        self::assertSame([], $document->receiverVariables($calls['missingCapture']));
+        self::assertSame([], $document->receiverVariables($calls['shadowed']));
+        self::assertSame(['service'], array_map(static fn ($variable): string => $variable->name, $document->receiverVariables($calls['recaptured'])));
     }
 
     public function testFiltersAttributesByTarget(): void

@@ -13,7 +13,6 @@ use Symfony\Lsp\Feature\Console\ConsoleInvokableParameterExtractor;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\LastResultPhpParser;
-use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -131,16 +130,24 @@ final class ConsoleExtractorTest extends TestCase
                         $input->getArgument('closure');
                     };
                     $arrow = fn (): string => $input->getOption('arrow');
+                    $nested = function () use ($input): void {
+                        $arrow = fn (): string => $input->getOption('nested');
+                    };
                     $uncaptured = function (): void {
                         $input->getOption('uncaptured');
+                    };
+                    $nestedUncaptured = function () use ($input): void {
+                        $closure = function (): void {
+                            $input->getOption('nested_uncaptured');
+                        };
                     };
                     $shadowed = fn ($input): string => $input->getOption('shadowed');
                 }
             }
             PHP));
 
-        self::assertSame(['closure', 'arrow'], array_map(static fn ($reference): string => $reference->name, $facts->references));
-        self::assertSame([ConsoleInputKind::Argument, ConsoleInputKind::Option], array_map(static fn ($reference): ConsoleInputKind => $reference->kind, $facts->references));
+        self::assertSame(['closure', 'arrow', 'nested'], array_map(static fn ($reference): string => $reference->name, $facts->references));
+        self::assertSame([ConsoleInputKind::Argument, ConsoleInputKind::Option, ConsoleInputKind::Option], array_map(static fn ($reference): ConsoleInputKind => $reference->kind, $facts->references));
     }
 
     public function testScopesInputReferencesToTheirOwningMethods(): void
@@ -427,7 +434,7 @@ final class ConsoleExtractorTest extends TestCase
             new PhpCommentParser(),
             new ConsoleDefinitionExtractor(),
             new ConsoleInvokableParameterExtractor(),
-            new ConsoleInputReceiverResolver(new PhpCapturedReceiverResolver($delimiters)),
+            new ConsoleInputReceiverResolver(),
         );
 
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Command/ReportCommand.php', 'php', $text));
@@ -546,7 +553,7 @@ final class ConsoleExtractorTest extends TestCase
             new PhpCommentParser(),
             new ConsoleDefinitionExtractor(),
             new ConsoleInvokableParameterExtractor(),
-            new ConsoleInputReceiverResolver(new PhpCapturedReceiverResolver($delimiters)),
+            new ConsoleInputReceiverResolver(),
         );
     }
 }

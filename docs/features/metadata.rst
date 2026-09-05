@@ -24,8 +24,10 @@ closing brackets without hiding later options.
 For form types that configure a static ``data_class`` with ``setDefaults()``
 or ``setDefault()``, literal field names passed to
 ``FormBuilderInterface::add()`` are linked to the corresponding class property.
-Property completion is available while entering the field name and is scoped to
-the method that declares the typed form builder. Hover shows the PHP property
+Explicit closure captures and implicit arrow-function captures of the typed
+builder remain recognized across nested lexical scopes. Property completion is
+available while entering the field name and is scoped to the method that
+declares the typed form builder. Hover shows the PHP property
 signature and description. Go to Definition opens the declaration.
 Find All References includes the form field and mapped validation or serializer
 metadata.

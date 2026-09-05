@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
-use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
@@ -15,11 +14,7 @@ final class RoutePhpReceiverResolver
         'Symfony\\Component\\Routing\\Generator\\UrlGeneratorInterface',
     ];
 
-    public function __construct(private readonly PhpCapturedReceiverResolver $receivers)
-    {
-    }
-
-    public function resolve(string $source, PhpDocument $document, PhpMethodCall $call): ?RoutePhpReceiver
+    public function resolve(PhpDocument $document, PhpMethodCall $call): ?RoutePhpReceiver
     {
         if (!\in_array($call->method, RoutePhpMethods::ALL, true)) {
             return null;
@@ -31,7 +26,7 @@ final class RoutePhpReceiverResolver
             return null;
         }
 
-        return array_any($this->receivers->variables($source, $document, $call), self::isRouter(...))
+        return array_any($document->receiverVariables($call), self::isRouter(...))
             ? new RoutePhpReceiver(null)
             : null;
     }

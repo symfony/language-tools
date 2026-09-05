@@ -27,9 +27,7 @@ use Symfony\Lsp\Feature\Messenger\MessengerRelationshipResolver;
 use Symfony\Lsp\Feature\Messenger\MessengerSourceIndexRegistry;
 use Symfony\Lsp\Feature\Messenger\MessengerTransport;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\CommentParserRegistry;
-use Symfony\Lsp\Parser\Php\PhpCapturedReceiverResolver;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -61,7 +59,7 @@ YAML;
         $converter = new PositionConverter();
         $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
         $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter));
-        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher()), $yamlParser, new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]));
+        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser, new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]));
         $facts = $extractor->extract(new SourceDocument('file:///workspace/config/packages/messenger.yaml', 'yaml', $text));
 
         $names = [];
@@ -118,7 +116,6 @@ YAML;
         $extractor = new MessengerExtractor(
             $converter,
             new TolerantPhpParser(new Parser()),
-            new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher()),
             new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
             new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]),
         );
@@ -146,7 +143,6 @@ YAML;
         $extractor = new MessengerExtractor(
             $converter,
             new TolerantPhpParser(new Parser()),
-            new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher()),
             new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
             new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]),
         );
@@ -173,7 +169,6 @@ YAML;
         $extractor = new MessengerExtractor(
             $converter,
             new TolerantPhpParser(new Parser()),
-            new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher()),
             new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
             new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]),
         );
@@ -202,7 +197,6 @@ YAML;
         $extractor = new MessengerExtractor(
             $converter,
             new TolerantPhpParser(new Parser()),
-            new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher()),
             new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
             new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]),
         );
@@ -263,7 +257,6 @@ YAML;
         $extractor = new MessengerExtractor(
             $converter,
             new TolerantPhpParser(new Parser()),
-            new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher()),
             new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
             new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))]),
         );
@@ -297,7 +290,6 @@ YAML;
         $extractor = new MessengerExtractor(
             $converter,
             new TolerantPhpParser(new Parser()),
-            new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher()),
             new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
             new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]),
         );
@@ -332,7 +324,6 @@ YAML;
         $extractor = new MessengerExtractor(
             $converter,
             new TolerantPhpParser(new Parser()),
-            new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher()),
             new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
             new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))]),
         );
@@ -422,7 +413,7 @@ YAML;
         $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
         $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter));
         $comments = new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]);
-        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher()), $yamlParser, $comments);
+        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser, $comments);
         $indexes = new MessengerIndexRegistry();
         $indexes->forProject($project)->replace(
             [new MessengerBus('command.bus', true)],
@@ -485,7 +476,6 @@ YAML;
         $extractor = new MessengerExtractor(
             $converter,
             new TolerantPhpParser(new Parser()),
-            new PhpCapturedReceiverResolver(new BalancedDelimiterMatcher()),
             new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
             new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))]),
         );

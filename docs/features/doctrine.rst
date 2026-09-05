@@ -16,7 +16,9 @@ the entity from:
 * a call inside a mapped repository class;
 * ``getRepository(Entity::class)`` chains and local assignments.
 
-Typed repository parameters are scoped to their declaring method, so
+Typed repository parameters and local assignments remain available through
+explicit closure captures and implicit arrow-function captures across nested
+lexical scopes. Typed repository parameters are scoped to their declaring method, so
 same-named parameters with unrelated types in other methods are ignored. Calls
 on ``$this`` use the repository class containing the call, including when one
 file declares several repository classes. Doctrine attributes on promoted
