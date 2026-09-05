@@ -15,6 +15,8 @@ final class PhpMethodCall
         public readonly string $method,
         public readonly int $startOffset,
         public readonly int $endOffset,
+        public readonly int $methodStartOffset,
+        public readonly int $methodEndOffset,
         public readonly array $arguments,
         public readonly ?string $className,
         public readonly ?string $enclosingMethod,

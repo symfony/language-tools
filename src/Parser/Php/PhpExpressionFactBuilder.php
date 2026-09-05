@@ -163,6 +163,8 @@ final class PhpExpressionFactBuilder
             $method,
             $call->getStartPosition(),
             $call->getEndPosition(),
+            $methodNode->getStartPosition(),
+            $methodNode->getEndPosition(),
             $this->arguments($call->argumentExpressionList->children ?? [], $source),
             null === $owner ? null : (string) $owner->getNamespacedName(),
             \is_string($methodName) && '' !== $methodName ? $methodName : null,

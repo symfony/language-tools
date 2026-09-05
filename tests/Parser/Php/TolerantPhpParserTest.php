@@ -52,6 +52,27 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame([], $document->diagnostics);
     }
 
+    public function testExposesMethodNameOffsetsAcrossArrowsAndComments(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            $config->plain();
+            $config?->nullsafe();
+            $config /* between */ -> /* around */ commented();
+            $config
+                // note
+                ->afterComment();
+            $config->$dynamic();
+            $config->{'braced'}();
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $names = ['plain', 'nullsafe', 'commented', 'afterComment', '$dynamic', "{'braced'}"];
+
+        self::assertSame($names, array_map(static fn ($call): string => $call->method, $document->methodCalls));
+        self::assertSame($names, array_map(static fn ($call): string => substr($source, $call->methodStartOffset, $call->methodEndOffset - $call->methodStartOffset), $document->methodCalls));
+    }
+
     public function testExposesLiteralArgumentValues(): void
     {
         $source = <<<'PHP'
