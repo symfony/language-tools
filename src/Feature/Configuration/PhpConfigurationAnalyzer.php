@@ -165,6 +165,17 @@ final class PhpConfigurationAnalyzer
         return null === $innermost ? [] : [$innermost];
     }
 
+    private function scopeDeclaresParameter(PhpDocument $document, PhpMethodCall $call, string $name): bool
+    {
+        foreach ($document->lexicalScopes as $scope) {
+            if ($call->scopeStartOffset === $scope->startOffset && \in_array($name, $scope->parameterNames, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** @return array<string, PhpMethodCall> */
     private function callsByRange(PhpDocument $document): array
     {
@@ -193,7 +204,10 @@ final class PhpConfigurationAnalyzer
 
         if (PhpMethodReceiverKind::Variable === $call->receiverContext->kind && null !== $call->receiverContext->name) {
             $variables = $document->receiverVariables($call);
-            if ([] === $variables && [] !== $this->declaredVariables($document, $call->receiverContext->name, $call->methodStartOffset)) {
+            if ([] === $variables
+                && !$this->scopeDeclaresParameter($document, $call, $call->receiverContext->name)
+                && [] !== $this->declaredVariables($document, $call->receiverContext->name, $call->methodStartOffset)
+            ) {
                 return null;
             }
             $root = $this->variableRoot($variables, $call->receiverContext->name, $index);

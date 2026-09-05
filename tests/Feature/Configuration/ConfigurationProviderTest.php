@@ -1176,14 +1176,21 @@ final class ConfigurationProviderTest extends TestCase
                 $callback = static function (): void {
                     $framework->router()->utf8('ignored nested');
                 };
+                $inferred = static function ($framework): void {
+                    $framework->router()->utf8('invalid inferred');
+                };
                 $config->router()->utf8('invalid');
             }
             PHP;
         $fixture->documents->open(new Document($uri, 'php', 1, $text));
 
         $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
-        self::assertSame(['Expected boolean for "framework.router.utf8".'], array_column($diagnostics, 'message'));
-        self::assertSame($this->protocolRange($fixture->converter, $text, (int) strrpos($text, "utf8('invalid')"), \strlen('utf8')), $diagnostics[0]['range'] ?? null);
+        self::assertSame([
+            'Expected boolean for "framework.router.utf8".',
+            'Expected boolean for "framework.router.utf8".',
+        ], array_column($diagnostics, 'message'));
+        self::assertSame($this->protocolRange($fixture->converter, $text, (int) strpos($text, "utf8('invalid inferred')"), \strlen('utf8')), $diagnostics[0]['range'] ?? null);
+        self::assertSame($this->protocolRange($fixture->converter, $text, (int) strrpos($text, "utf8('invalid')"), \strlen('utf8')), $diagnostics[1]['range'] ?? null);
         self::assertNull($fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, (int) strpos($text, 'router') + 1)));
         self::assertIsArray($fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, (int) strrpos($text, 'router') + 1)));
     }
