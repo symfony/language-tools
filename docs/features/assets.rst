@@ -31,6 +31,12 @@ References lists statically recognized Twig usages for assets and entrypoints.
 Static ``asset()`` references recognize positional and named ``path`` arguments.
 Escaped characters in these static helper arguments follow Twig's string rules.
 
+Static ``importmap()`` references are recognized only as real calls whose first
+argument is a string or a list of strings; script attributes passed as a second
+argument don't prevent recognition. Look-alike text in strings, comments and
+``verbatim`` blocks, method calls on an object and dynamic list entries are
+ignored.
+
 Diagnostics
 -----------
 

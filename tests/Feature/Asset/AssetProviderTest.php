@@ -159,6 +159,30 @@ final class AssetProviderTest extends TestCase
         );
     }
 
+    public function testExtractsStaticTwigImportmapEntrypointsConservatively(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = $this->createExtractor($converter);
+
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+            {# {{ importmap('commented') }} #}
+            {{ importmap('single') }}
+            {{ importmap(['listed', 'other']) }}
+            {{ importmap('attributed', {defer: true}) }}
+            {{ importmap(['static', dynamic]) }}
+            {{ importmap(entrypoint) }}
+            {{ importmap() }}
+            {{ app.importmap('method') }}
+            {% set snippet = "importmap('string')" %}
+            {% verbatim %}{{ importmap('verbatim') }}{% endverbatim %}
+            TWIG));
+
+        self::assertSame(
+            ['single', 'listed', 'other', 'attributed', 'static'],
+            array_map(static fn ($symbol): string => $symbol->name, $facts->symbols),
+        );
+    }
+
     public function testDecodesEscapedTwigAssetPaths(): void
     {
         $converter = new PositionConverter();
@@ -256,7 +280,6 @@ final class AssetProviderTest extends TestCase
                 $converter,
                 new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
                 new TwigCallArgumentResolver(new TwigArgumentParser()),
-                $comments,
             ),
             new ImportMapEntrypointExtractor($converter, new PhpCommentParser(), new BalancedDelimiterMatcher()),
             new AssetCompletionContextResolver($converter, $comments),

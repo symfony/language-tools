@@ -127,6 +127,17 @@ final class ProbeFinderTest extends TestCase
         $this->assertPositionInsideValue($probes[0]);
     }
 
+    public function testFindsTwigImportmapEntrypointsOutsideMethodCalls(): void
+    {
+        $this->write('templates/layout.html.twig', "{{ app.importmap('ignored') }}\n{{ importmap('app') }}\n");
+
+        $probes = $this->probes(new ProbeFinder(), 'importmap.twig');
+
+        self::assertCount(1, $probes);
+        self::assertSame('app', $probes[0]->value);
+        $this->assertPositionInsideValue($probes[0]);
+    }
+
     public function testFindsFormPropertiesOnlyWithAStaticDataClass(): void
     {
         $this->write('src/Form/ArticleType.php', <<<'PHP'

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recognize Twig importmap entrypoints only as real `importmap()` call arguments
 - Recognize Twig authorization checks only as real `is_granted()` and `logout_*()` calls
 - Ignore PHP configuration chains on variables declared with a non-builder type
 - Resolve incomplete PHP configuration chains from the builder variable in scope
