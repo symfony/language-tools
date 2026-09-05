@@ -27,6 +27,8 @@ final class ProbeFinder
         ['category' => 'form.option.php', 'files' => '{\.php$}', 'pattern' => '{createForm\s*\([^,);]+,\s*[^,);]+,\s*\[[^;]+?[\'\"]([A-Za-z_][A-Za-z0-9_]*)[\'\"]\s*=>}s'],
         ['category' => 'form.property.php', 'files' => '{\.php$}', 'requiredText' => 'data_class', 'pattern' => '{(?=.*[\'\"]data_class[\'\"]\s*=>\s*[\\\\A-Za-z_][A-Za-z0-9_\\\\]*::class).*?^[ \t]*(?:\$builder\s*)?->\s*add\s*\(\s*[\'\"]([A-Za-z_][A-Za-z0-9_]*)[\'\"](?!(?:(?!->\s*add\s*\(|;).)*[\'\"]mapped[\'\"]\s*=>\s*false)}sm'],
         ['category' => 'constraint.option.php', 'files' => '{\.php$}', 'pattern' => '{Assert\\\\[A-Za-z_][A-Za-z0-9_]*\s*\([^\)]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)}s'],
+        ['category' => 'console.argument.php', 'files' => '{\.php$}', 'pattern' => '{\$input\s*->\s*getArgument\s*\(\s*[\'\"]([^\'\"]+)}'],
+        ['category' => 'console.option.php', 'files' => '{\.php$}', 'pattern' => '{\$input\s*->\s*getOption\s*\(\s*[\'\"]([^\'\"]+)}'],
         ['category' => 'translation.php', 'files' => '{\.php$}', 'pattern' => '{(?:->trans|\bt)\(\s*[\'\"]([^\'\"]+)}'],
         ['category' => 'translation.twig', 'files' => '{\.twig$}', 'pattern' => '{[\'\"]([^\'\"]+)[\'\"]\s*\|\s*trans\b}'],
         ['category' => 'import.yaml', 'files' => '{\.ya?ml$}', 'pattern' => '{^[ \t]*(?:-[ \t]*)?(?:\{[ \t]*)?resource[ \t]*:[ \t]*[\'\"]?([A-Za-z0-9_.][^\'\"\s#,\}]*)}m'],

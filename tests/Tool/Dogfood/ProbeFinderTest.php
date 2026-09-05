@@ -175,6 +175,33 @@ final class ProbeFinderTest extends TestCase
         $this->assertPositionInsideValue($filterDeclaration);
     }
 
+    public function testFindsConsoleArgumentAndOptionNames(): void
+    {
+        $this->write('src/Command/ImportCommand.php', <<<'PHP'
+            <?php
+            final class ImportCommand extends Command
+            {
+                protected function execute(InputInterface $input, OutputInterface $output): int
+                {
+                    $input->getArgument('source');
+                    $input->getOption('format');
+                    $options->getOption('unrelated');
+
+                    return 0;
+                }
+            }
+            PHP);
+
+        $finder = new ProbeFinder();
+        $argument = $this->probes($finder, 'console.argument.php')[0];
+        $option = $this->probes($finder, 'console.option.php')[0];
+
+        self::assertSame('source', $argument->value);
+        self::assertSame('format', $option->value);
+        $this->assertPositionInsideValue($argument);
+        $this->assertPositionInsideValue($option);
+    }
+
     public function testSkipsMatchesOnCommentedLines(): void
     {
         $this->write('config/packages/assets.yaml', <<<'YAML'

@@ -103,6 +103,36 @@ final class SupportScorerTest extends TestCase
         self::assertSame(1.0, (float) ($score['score'] ?? -1));
     }
 
+    public function testConsoleInputProbesOnlyExpectCompletion(): void
+    {
+        $score = (new SupportScorer())->score(['probes' => [
+            [
+                'category' => 'console.argument.php',
+                'file' => 'src/Command/ImportCommand.php',
+                'value' => 'source',
+                'requests' => [
+                    'completion' => ['resultCount' => 3, 'error' => null],
+                    'hover' => ['resultCount' => 0, 'error' => null],
+                    'definition' => ['resultCount' => 0, 'error' => null],
+                    'references' => ['resultCount' => 0, 'error' => null],
+                ],
+            ],
+            [
+                'category' => 'console.option.php',
+                'file' => 'src/Command/ImportCommand.php',
+                'value' => 'format',
+                'requests' => [
+                    'completion' => ['resultCount' => 2, 'error' => null],
+                    'hover' => ['resultCount' => 0, 'error' => null],
+                    'definition' => ['resultCount' => 0, 'error' => null],
+                    'references' => ['resultCount' => 0, 'error' => null],
+                ],
+            ],
+        ]]);
+
+        self::assertSame(1.0, (float) ($score['score'] ?? -1));
+    }
+
     public function testFingerprintTracksTheProbeSetNotTheResults(): void
     {
         $scorer = new SupportScorer();
