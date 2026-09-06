@@ -35,11 +35,15 @@ final class YamlIndentationAnalyzer
         $scalarIndex = 0;
         $flowDepth = 0;
         $quote = null;
+        $quoteAllowed = true;
         $escaped = false;
         $ranges = [];
         preg_match_all('/^.*(?:\R|$)/m', $text, $lines, \PREG_OFFSET_CAPTURE);
         foreach ($lines[0] as [$rawLine, $lineOffset]) {
             $line = rtrim($rawLine, "\r\n");
+            if (0 === $flowDepth && null === $quote) {
+                $quoteAllowed = true;
+            }
             $indent = strspn($line, " \t");
             if (str_contains(substr($line, 0, $indent), "\t")
                 && 0 === $flowDepth
@@ -51,6 +55,7 @@ final class YamlIndentationAnalyzer
                 $keyEnd = $keys[$offset] ?? $keyEnd;
                 if ($offset < $keyEnd) {
                     $offset = min($end, $keyEnd) - 1;
+                    $quoteAllowed = false;
                     continue;
                 }
                 while (isset($scalars[$scalarIndex]) && $scalars[$scalarIndex]->endByte <= $offset) {
@@ -61,18 +66,21 @@ final class YamlIndentationAnalyzer
                     && (0 === $flowDepth || YamlScalarStyle::Plain !== $scalar->style)
                 ) {
                     $offset = min($end, $scalar->endByte) - 1;
+                    $quoteAllowed = false;
                     continue;
                 }
                 $character = $syntax[$offset];
                 if (null !== $quote) {
-                    if ($escaped) {
+                    if ("'" === $quote && "'" === $character && "'" === ($syntax[$offset + 1] ?? null)) {
+                        ++$offset;
+                    } elseif ($escaped) {
                         $escaped = false;
                     } elseif ('"' === $quote && '\\' === $character) {
                         $escaped = true;
                     } elseif ($quote === $character) {
                         $quote = null;
                     }
-                } elseif (\in_array($character, ['"', "'"], true)
+                } elseif ($quoteAllowed && \in_array($character, ['"', "'"], true)
                     && (null === $scalar || $scalar->startByte > $offset)
                 ) {
                     $quote = $character;
@@ -80,6 +88,9 @@ final class YamlIndentationAnalyzer
                     ++$flowDepth;
                 } elseif ((']' === $character || '}' === $character) && 0 < $flowDepth) {
                     --$flowDepth;
+                }
+                if (null === $quote && !ctype_space($character)) {
+                    $quoteAllowed = \in_array($character, ['[', '{', ',', ':'], true);
                 }
             }
         }

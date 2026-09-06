@@ -289,6 +289,9 @@ final class ConfigurationAnalyzerTest extends TestCase
         yield 'tab after leading spaces' => ["parameters:\n  \tapp.name: Demo\n", [1]];
         yield 'tabbed sequence item' => ["parameters:\n    app.list:\n\t- one\n", [2]];
         yield 'tabs after recovered inline mappings' => ["services:\n    App\\Foo:\n        tags:\n            - { name: x }\n\t        - { name: y }\n    App\\Bar:\n\t    class: X\n", [4, 6]];
+        yield 'apostrophe in a recovered flow key' => ["services:\n    App\\Foo:\n        tags:\n            - { it's: x }\n\t        - { name: y }\n", [4]];
+        yield 'apostrophe in a tabbed flow key' => ["services:\n    App\\Foo:\n        tags:\n            - { name: x }\n\t        - { it's: y }\n    App\\Bar:\n\t    class: X\n", [4, 6]];
+        yield 'escaped quote in a recovered key' => ["services:\n    App\\Foo:\n        tags:\n            - { name: x }\n\t        - { 'it''{s': y }\n    App\\Bar:\n\t    class: X\n", [4, 6]];
         yield 'quoted brace in a recovered mapping' => ["services:\n    App\\Foo:\n        tags:\n            - { name: x }\n\t        - { name: '{' }\n    App\\Bar:\n\t    class: X\n", [4, 6]];
         yield 'tab after a recovered flow continuation' => ["parameters:\n    app.map: {first: one,\n \t\nsecond: two}\n\tapp.other: value\n", [4]];
         yield 'flow sequence continuation' => ["parameters:\n    app.list: [first,\n     \tsecond]\n", []];
