@@ -4,65 +4,30 @@
 
 - Skip diagnostics for gitignored open files consistently
 - Ignore markup-like text on incomplete Twig directive lines
-- Diagnose tabs only where Symfony treats them as YAML indentation
-- Keep normalized Symfony UX controller completions visible in editors
+- Match Symfony YAML indentation while preserving scalar boundaries in malformed documents
+- Normalize Symfony UX package names and keep their controller completions visible
 - Recognize runtime route aliases in diagnostics and hover
-- Ignore non-builder configuration variables across nested PHP scopes
-- Read large XML catalogs without exhausting the structural event budget
-- Require exact XML services namespace matches
-- Recover XML siblings after unterminated attributes without a closing quote
-- Keep hostile XML parsing linear and bound structural facts and diagnostics
-- Ignore invalid UTF-8 XML names
-- Index XML dependency injection elements only in the services namespace
-- Resolve captured PHP receivers when only a callable body is incomplete
-- Report malformed XML attributes and opaque constructs in configuration files
-- Keep long XML opaque constructs from producing phantom source facts
-- Associate XML service tags only with their direct service declaration
-- Parse XML configuration, service definitions and XLIFF resources with tolerant shared syntax facts
-- Read direct string keys from complete PHP arrays in route and template analysis
-- Resolve typed PHP receivers through nested closures and arrow functions
-- Resolve Messenger inheritance for classes, interfaces and enums without leaking across incomplete declarations
-- Recognize Console parameter attributes stacked or grouped with other attributes
-- Recognize Console definitions inherited from traits imported with an adaptation block
-- Infer Console input names from parameter names the way Symfony does
-- Suppress form option completion for computed form type expressions
-- Recognize case-insensitive PHP `::class` references
-- Ignore Doctrine contexts with computed class arguments
-- Ignore form options of concatenated form type expressions
-- Recognize Twig component tags and Stimulus attributes only in rendered markup
-- Recognize Stimulus Twig helpers only as real `stimulus_*()` calls
-- Recognize Twig importmap entrypoints only as real `importmap()` call arguments
-- Recognize Twig authorization checks only as real `is_granted()` and `logout_*()` calls
-- Ignore PHP configuration chains on variables declared with a non-builder type
-- Resolve incomplete PHP configuration chains from the builder variable in scope
-- Complete PHP configuration builder chains split across lines, comments, nullsafe calls and named entries
-- Scope console `configure()` definitions with PHP method body facts
-- Read console `setDefinition()` lists from resolved Symfony input classes
-- Keep one YAML scalar fact per source region in malformed documents
-- Report tabbed YAML indentation only where it structures the document
-- Link YAML configuration imports from parsed `resource` values only
-- Decode source-derived XLIFF translation keys once
-- Read event listener service tags from parsed YAML, including inline tags
 - Recognize PHP route calls only on Symfony router and controller receivers
-- Ignore XLIFF translation units inside XML comments
-- Follow PHP configuration builder chains through nullsafe calls, comments and renamed imports
-- Decode escaped quoted INI translation messages
-- Read domains and parameters from PHP translation helper calls
-- Read unquoted INI translation messages
-- Decode single-quoted Twig type declarations with Twig's string rules
-- Bind PHP service and parameter completion to the `#[Autowire]` argument holding the cursor
-- Ignore anonymous classes in Messenger inheritance relationships
+- Improve PHP configuration completion across typed scopes, multiline chains, nullsafe calls and named entries
+- Validate only literal PHP configuration values and preserve exact keyed paths
+- Read direct string keys from complete PHP arrays in route and template analysis
+- Improve Console definitions from attributes, traits, scoped methods and Symfony-compatible inferred names
+- Recognize case-insensitive PHP class references and ignore computed Doctrine class arguments
+- Suppress form options for computed or concatenated form type expressions
+- Resolve typed PHP receivers through nested closures and arrow functions
+- Resolve Messenger inheritance without leaking across incomplete or anonymous classes
 - Diagnose missing event listener methods in classes with captured closures
-- Recognize parenthesized Twig callable registration options
-- Validate only literal PHP configuration arguments
-- Resolve adjacent YAML parameter references independently
-- Normalize Symfony UX package names in Stimulus Twig helpers
-- Resolve PHP configuration methods to exact digit-separated keys
-- Preserve named entries in PHP configuration builder chains
-- Document development installation for the unpublished Zed extension
+- Recognize Twig component tags and Stimulus attributes only in rendered markup
+- Recognize Stimulus, importmap and security helpers only as real Twig calls
+- Parse configuration, service and XLIFF XML tolerantly with bounded recovery and exact namespaces
+- Link YAML imports and parameter references from parsed scalar facts
+- Read event listener service tags from parsed YAML
+- Improve translation extraction across XLIFF, INI and PHP helper calls
+- Decode Twig type declarations and callable options with Twig string rules
+- Bind PHP service and parameter completion to the exact `#[Autowire]` argument
 - Reuse indexed source facts when collecting diagnostics
-- Compile effective runtime configuration once per bridge run
-- Keep validated typed environment configuration available across runtime metadata sections
+- Compile effective runtime configuration once and share validated typed environment configuration
+- Document development installation for the unpublished Zed extension
 
 ## 0.19.0 (2026-09-03)
 
