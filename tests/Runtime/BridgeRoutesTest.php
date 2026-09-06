@@ -143,9 +143,9 @@ final class BridgeRoutesTest extends TestCase
     }
 
     #[DataProvider('localizedAliasVersionProvider')]
-    public function testExposesCanonicalAliasesOnlyOnSupportedRoutingVersions(string $version, bool $supported): void
+    public function testExposesCanonicalAliasesOnlyOnSupportedRoutingVersions(string $version, bool $supported, ?string $normalizedVersion = null): void
     {
-        (new RouteFixtureBuilder($this->workspace))->writeRouteApplication(version: $version);
+        (new RouteFixtureBuilder($this->workspace))->writeRouteApplication(version: $version, normalizedVersion: $normalizedVersion);
 
         $process = $this->bridge->run(['--sections=routes']);
 
@@ -168,7 +168,7 @@ final class BridgeRoutesTest extends TestCase
         self::assertSame($supported ? ['localized_legacy', 'localized_legacy'] : [null, null], array_column($aliases, 'canonical'));
     }
 
-    /** @return iterable<string, array{string, bool}> */
+    /** @return iterable<string, array{0: string, 1: bool, 2?: string}> */
     public static function localizedAliasVersionProvider(): iterable
     {
         yield 'older LTS' => ['6.4.45', false];
@@ -180,6 +180,9 @@ final class BridgeRoutesTest extends TestCase
         yield 'first major fix' => ['8.0.6', true];
         yield 'prefixed version' => ['v8.0.6', true];
         yield 'next minor' => ['8.1.0', true];
-        yield 'development minor' => ['8.2.x-dev', true];
+        yield 'development minor' => ['8.2.x-dev', true, '8.2.9999999.9999999-dev'];
+        yield 'development LTS' => ['7.4.x-dev', true, '7.4.9999999.9999999-dev'];
+        yield 'development major' => ['8.0.x-dev', true, '8.0.9999999.9999999-dev'];
+        yield 'development patch' => ['7.4.6-DEV', true, '7.4.6.0-dev'];
     }
 }

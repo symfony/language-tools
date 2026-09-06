@@ -102,18 +102,17 @@ function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
 function symfonyLspBridgeSupportsCanonicalLocalizedRouteAliases(): bool
 {
     try {
-        $version = Composer\InstalledVersions::getPrettyVersion('symfony/routing');
+        $version = Composer\InstalledVersions::getVersion('symfony/routing');
     } catch (Throwable) {
         return false;
     }
 
-    if (!is_string($version) || !preg_match('/^(?:v)?([0-9]+\.[0-9]+)(?:\.|$)/', $version, $matches)) {
+    if (!is_string($version) || !preg_match('/^(?:v)?([0-9]+\.[0-9]+)\.([0-9]+)(?:[.-]|$)/', $version, $matches)) {
         return false;
     }
 
     return match ($matches[1]) {
-        '7.4' => version_compare(ltrim($version, 'v'), '7.4.6', '>='),
-        '8.0' => version_compare(ltrim($version, 'v'), '8.0.6', '>='),
+        '7.4', '8.0' => (int) $matches[2] >= 6,
         default => version_compare($matches[1], '8.1', '>='),
     };
 }

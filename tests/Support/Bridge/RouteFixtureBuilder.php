@@ -10,7 +10,7 @@ final class RouteFixtureBuilder
     ) {
     }
 
-    public function writeRouteApplication(string $kernelNamespace = 'App', string $version = '8.0.6'): void
+    public function writeRouteApplication(string $kernelNamespace = 'App', string $version = '8.0.6', ?string $normalizedVersion = null): void
     {
         $source = $this->prelude->render(<<<'PHP'
             __INSTALLED_VERSIONS__
@@ -153,6 +153,7 @@ final class RouteFixtureBuilder
     }
 PHP,
             version: $version,
+            additionalInstalledVersionMethods: \sprintf('public static function getVersion(string $package): ?string { return %s; }', var_export($normalizedVersion ?? $version, true)),
         );
         $this->workspace->write('vendor/autoload.php', str_replace('namespace App;', 'namespace '.$kernelNamespace.';', $source));
     }

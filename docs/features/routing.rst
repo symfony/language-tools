@@ -36,7 +36,8 @@ Runtime route aliases, including controller aliases such as
 ``App\Controller\ArticleController::show``, are recognized by hover and
 diagnostics. Completion, navigation, references and rename use the declared
 route name. Localized aliases without a locale suffix are recognized starting
-with Symfony Routing 7.4.6, 8.0.6 and 8.1.
+with Symfony Routing 7.4.6, 8.0.6 and 8.1. Development snapshots of these
+maintained branches are supported too.
 
 Route Name Completion
 ---------------------
