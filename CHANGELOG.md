@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Count only document links covering each dogfood probe
 - Avoid mixing typed property receivers across anonymous PHP classes
 - Respect patch-level support for localized route aliases
 - Keep XLIFF messages scoped to their translation unit or segment

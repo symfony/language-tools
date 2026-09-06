@@ -154,9 +154,12 @@ try {
             foreach ($validator->validate($method, $result, $project) as $violation) {
                 $violations[] = ['category' => $probe->category, 'method' => substr($method, strlen('textDocument/')), 'message' => $violation];
             }
+            $resultCount = 'textDocument/documentLink' === $method
+                ? $probe->countCoveringLinks($result)
+                : (is_array($result) && array_is_list($result) ? count($result) : (null === $result ? 0 : 1));
             $entry['requests'][substr($method, strlen('textDocument/'))] = [
                 'milliseconds' => round((microtime(true) - $startedAt) * 1000, 1),
-                'resultCount' => is_array($result) && array_is_list($result) ? count($result) : (null === $result ? 0 : 1),
+                'resultCount' => $resultCount,
                 'error' => $response['error']['message'] ?? null,
             ];
         }

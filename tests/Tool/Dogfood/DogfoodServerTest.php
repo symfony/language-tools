@@ -58,6 +58,94 @@ final class DogfoodServerTest extends TestCase
         }
     }
 
+    public function testCountsOnlyTheDocumentLinksCoveringTheProbe(): void
+    {
+        $filesystem = new Filesystem();
+        $filesystem->dumpFile(Path::join($this->directory, 'config/services.yaml'), <<<'YAML'
+            imports:
+                - { resource: 'services/*.yaml' }
+                - { resource: 'packages/framework.yaml' }
+            YAML);
+        $filesystem->dumpFile(Path::join($this->directory, 'config/routes.yaml'), <<<'YAML'
+            app:
+                resource: 'routes/app.yaml'
+            YAML);
+        $server = Path::join($this->directory, 'server');
+        file_put_contents($server, "#!/usr/bin/env php\n<?php\nrequire ".var_export(\dirname(__DIR__, 3).'/vendor/autoload.php', true).";\n".<<<'PHP'
+            use Symfony\Lsp\Tools\ContentLengthMessageCodec;
+
+            $codec = new ContentLengthMessageCodec();
+            $rootUri = '';
+            while (true) {
+                $message = $codec->read(STDIN);
+                $rootUri = $message['params']['rootUri'] ?? $rootUri;
+                if (isset($message['id'])) {
+                    $uri = $message['params']['textDocument']['uri'] ?? '';
+                    $result = match ($message['method'] ?? null) {
+                        'initialize' => ['serverInfo' => ['version' => 'test']],
+                        'workspace/executeCommand' => [[
+                            'source' => ['state' => 'ready'],
+                            'runtime' => ['state' => 'ready'],
+                        ]],
+                        'textDocument/completion' => [['label' => 'services/'], ['label' => 'packages/']],
+                        'textDocument/documentLink' => str_ends_with($uri, 'services.yaml')
+                            ? [[
+                                'range' => ['start' => ['line' => 2, 'character' => 21], 'end' => ['line' => 2, 'character' => 45]],
+                                'target' => $rootUri.'/config/packages/framework.yaml',
+                            ]]
+                            : [[
+                                'range' => ['start' => ['line' => 1, 'character' => 15], 'end' => ['line' => 1, 'character' => 30]],
+                                'target' => $rootUri.'/config/routes/app.yaml',
+                            ]],
+                        default => null,
+                    };
+                    fwrite(STDOUT, $codec->encode(['jsonrpc' => '2.0', 'id' => $message['id'], 'result' => $result]));
+                    fflush(STDOUT);
+                }
+                if ('exit' === ($message['method'] ?? null)) {
+                    break;
+                }
+            }
+            PHP);
+        chmod($server, 0755);
+
+        $result = (new NativeProcessRunner())->run([
+            \PHP_BINARY,
+            Path::join(\dirname(__DIR__, 3), 'tools/dogfood-server'),
+            '--index-timeout=1',
+            '--request-timeout=1',
+            '--probes-per-category=2',
+            $server,
+            $this->directory,
+        ], timeout: 20.0);
+
+        self::assertSame(0, $result->exitCode, $result->errorOutput);
+        $report = json_decode($result->standardOutput, true, flags: \JSON_THROW_ON_ERROR);
+        self::assertIsArray($report);
+        self::assertSame([], $report['violations'] ?? null);
+        $probes = $report['probes'] ?? null;
+        self::assertIsArray($probes);
+        $linkCounts = [];
+        $completionCounts = [];
+        foreach ($probes as $probe) {
+            self::assertIsArray($probe);
+            if ('import.yaml' !== ($probe['category'] ?? null)) {
+                continue;
+            }
+            $file = $probe['file'] ?? null;
+            $requests = $probe['requests'] ?? null;
+            self::assertIsString($file);
+            self::assertIsArray($requests);
+            self::assertIsArray($requests['documentLink'] ?? null);
+            self::assertIsArray($requests['completion'] ?? null);
+            $linkCounts[$file] = $requests['documentLink']['resultCount'] ?? null;
+            $completionCounts[$file] = $requests['completion']['resultCount'] ?? null;
+        }
+
+        self::assertSame(['config/routes.yaml' => 1, 'config/services.yaml' => 0], $linkCounts);
+        self::assertSame(['config/routes.yaml' => 2, 'config/services.yaml' => 2], $completionCounts);
+    }
+
     public function testCapturesLargeServerErrorOutputWithoutBlockingProtocolResponses(): void
     {
         $server = Path::join($this->directory, 'server');
