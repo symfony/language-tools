@@ -41,7 +41,7 @@ final class DiagnosticBenchmarkTest extends TestCase
             self::assertSame(0, $result->exitCode, $result->stderr."\n".$result->stdout);
             /** @var array<string, mixed> $report */
             $report = json_decode($result->stdout, true, flags: \JSON_THROW_ON_ERROR);
-            self::assertSame(['route', 'template', 'twig_callable'], $report['coveredProviders']);
+            self::assertSame(['route', 'template', 'twig_callable'], $report['fixtureProviders']);
             self::assertSame(4, $report['diagnostics']);
             self::assertSame([
                 'templates/benchmark-callable.html.twig' => ['twig_callable.unknown_argument'],

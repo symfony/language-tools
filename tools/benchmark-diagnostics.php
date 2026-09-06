@@ -164,7 +164,7 @@ ksort($expected);
 ksort($observed);
 
 $result = [
-    'coveredProviders' => ['route', 'template', 'twig_callable'],
+    'fixtureProviders' => ['route', 'template', 'twig_callable'],
     'files' => count($documents),
     'diagnostics' => $diagnosticCount,
     'fixtureDiagnostics' => $observed,
