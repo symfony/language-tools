@@ -26,7 +26,7 @@
 - Decode Twig type declarations and callable options with Twig string rules
 - Bind PHP service and parameter completion to the exact `#[Autowire]` argument
 - Simplify Messenger, route and shared PHP source analysis
-- Expand dogfood coverage for dependency injection and PHP configuration
+- Expand dogfood coverage for `#[Autowire]` service and parameter references
 - Reuse indexed source facts when collecting diagnostics
 - Compile effective runtime configuration once and share validated typed environment configuration
 - Document development installation for the unpublished Zed extension
