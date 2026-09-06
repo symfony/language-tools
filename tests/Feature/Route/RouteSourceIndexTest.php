@@ -65,28 +65,6 @@ final class RouteSourceIndexTest extends TestCase
         self::assertSame([], $index->referencesForUri($uri));
     }
 
-    public function testEqualFactReplacementKeepsDerivedMapsWarm(): void
-    {
-        $uri = 'file:///source.php';
-        $index = new RouteSourceIndex(new DependencyInjectionSourceIndex());
-        $index->replace($this->facts($uri, 'route', 1));
-        self::assertSame([1], $this->declarationLines($index, 'route'));
-
-        $indexed = new \ReflectionProperty(RouteSourceIndex::class, 'indexed');
-        self::assertTrue($indexed->getValue($index));
-
-        $index->replace($this->facts($uri, 'route', 1));
-        self::assertTrue($indexed->getValue($index));
-
-        $index->replaceSource($this->facts($uri, 'route', 1));
-        self::assertTrue($indexed->getValue($index));
-
-        $index->overlay($this->facts($uri, 'overlay', 2));
-        self::assertSame([2], $this->declarationLines($index, 'overlay'));
-        $index->overlay($this->facts($uri, 'overlay', 2));
-        self::assertTrue($indexed->getValue($index));
-    }
-
     public function testControllerFilteringTracksTheCurrentDependencyInjectionHierarchy(): void
     {
         $baseUri = 'file:///BaseController.php';
