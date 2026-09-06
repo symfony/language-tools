@@ -22,51 +22,20 @@ use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\SourceFileEnumerator;
-use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
+use Symfony\Lsp\Tools\CountingDiagnosticPhpParser;
+use Symfony\Lsp\Tools\DiagnosticParseCounter;
 
 require dirname(__DIR__).'/vendor/autoload.php';
 
 if (!function_exists('symfony_lsp_tree_sitter_parse')) {
     fwrite(\STDERR, "The Tree-sitter extension is not loaded. Run through: composer source-index:benchmark\n");
     exit(1);
-}
-
-final class DiagnosticParseCounter
-{
-    public int $calls = 0;
-    public int $bytes = 0;
-
-    public function record(string $source): void
-    {
-        ++$this->calls;
-        $this->bytes += strlen($source);
-    }
-
-    public function reset(): void
-    {
-        $this->calls = 0;
-        $this->bytes = 0;
-    }
-}
-
-final class CountingDiagnosticPhpParser implements PhpParserInterface
-{
-    public function __construct(private readonly PhpParserInterface $parser, private readonly DiagnosticParseCounter $counter)
-    {
-    }
-
-    public function parse(string $source): PhpDocument
-    {
-        $this->counter->record($source);
-
-        return $this->parser->parse($source);
-    }
 }
 
 $projectRoot = realpath(dirname(__DIR__).'/var/build/source-index-benchmark/1500');
