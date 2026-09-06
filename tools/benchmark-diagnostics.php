@@ -6,13 +6,10 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Feature\Route\Route;
-use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteSourceFacts;
 use Symfony\Lsp\Feature\Route\RouteSourceIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
-use Symfony\Lsp\Feature\Twig\TemplateNavigationProvider;
-use Symfony\Lsp\Feature\Twig\TwigCallableDiagnosticProvider;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -75,12 +72,6 @@ $container->register(CountingDiagnosticPhpParser::class, CountingDiagnosticPhpPa
     ->setDecoratedService(TolerantPhpParser::class)
     ->setArgument('$parser', new Reference(CountingDiagnosticPhpParser::class.'.inner'))
     ->setArgument('$counter', new Reference(DiagnosticParseCounter::class));
-$providers = [
-    'route' => new Reference(RouteDiagnosticPublisher::class),
-    'template' => new Reference(TemplateNavigationProvider::class),
-    'twig_callable' => new Reference(TwigCallableDiagnosticProvider::class),
-];
-$container->getDefinition(DiagnosticCollector::class)->setArgument('$providers', array_values($providers));
 foreach ([
     ApplicationSourceScanner::class,
     DiagnosticCollector::class,
@@ -173,7 +164,7 @@ ksort($expected);
 ksort($observed);
 
 $result = [
-    'coveredProviders' => array_keys($providers),
+    'coveredProviders' => ['route', 'template', 'twig_callable'],
     'files' => count($documents),
     'diagnostics' => $diagnosticCount,
     'fixtureDiagnostics' => $observed,
