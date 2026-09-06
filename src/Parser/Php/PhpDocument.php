@@ -203,9 +203,9 @@ final class PhpDocument
         return $variables;
     }
 
-    public function receiverHasType(PhpMethodCall $call, string $type): bool
+    public function receiverHasType(PhpMethodCall $call, string ...$types): bool
     {
-        return array_any($this->receiverVariables($call), static fn (PhpTypedVariable $variable): bool => \in_array($type, $variable->types, true));
+        return array_any($this->receiverVariables($call), static fn (PhpTypedVariable $variable): bool => [] !== array_intersect($types, $variable->types));
     }
 
     public function isVariableVisible(string $name, int $declarationScopeStartOffset, PhpMethodCall $call): bool

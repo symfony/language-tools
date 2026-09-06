@@ -77,7 +77,7 @@ final class MessengerExtractor
             }
             $parents = $this->phpParents($php);
             foreach ($php->methodCalls as $call) {
-                if ('dispatch' !== $call->method || !array_any($php->receiverVariables($call), static fn ($variable): bool => [] !== array_intersect(self::BUS_TYPES, $variable->types))) {
+                if ('dispatch' !== $call->method || !$php->receiverHasType($call, ...self::BUS_TYPES)) {
                     continue;
                 }
                 $messageArgument = $call->positionalArgument(0);

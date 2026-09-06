@@ -78,7 +78,7 @@ final class SecurityExtractor
                 $methodOffset = $match[3][1];
                 $receiverKind = $property ? PhpMethodReceiverKind::ThisProperty : PhpMethodReceiverKind::Variable;
                 $call = \is_string($receiver) ? array_find($php->methodCalls, static fn (PhpMethodCall $call): bool => $match[3][0] === $call->method && $receiver === $call->receiverContext->name && $receiverKind === $call->receiverContext->kind && $methodOffset >= $call->startOffset && $methodOffset < $call->endOffset) : null;
-                if (\is_string($prefix) && null !== $call && $this->hasTypedReceiver($call, $php, self::AUTHORIZATION_TYPES)) {
+                if (\is_string($prefix) && null !== $call && $php->receiverHasType($call, ...self::AUTHORIZATION_TYPES)) {
                     return $this->context(SecuritySymbolKind::Role, $prefix, $text, $match[4][1]);
                 }
             }
@@ -89,7 +89,7 @@ final class SecurityExtractor
                 $methodOffset = $match[3][1];
                 $receiverKind = $property ? PhpMethodReceiverKind::ThisProperty : PhpMethodReceiverKind::Variable;
                 $call = \is_string($receiver) ? array_find($php->methodCalls, static fn (PhpMethodCall $call): bool => $match[3][0] === $call->method && $receiver === $call->receiverContext->name && $receiverKind === $call->receiverContext->kind && $methodOffset >= $call->startOffset && $methodOffset < $call->endOffset) : null;
-                if (\is_string($prefix) && null !== $call && $this->hasTypedReceiver($call, $php, [self::LOGOUT_URL_GENERATOR])) {
+                if (\is_string($prefix) && null !== $call && $php->receiverHasType($call, self::LOGOUT_URL_GENERATOR)) {
                     return $this->context(SecuritySymbolKind::Firewall, $prefix, $text, $match[4][1]);
                 }
             }
@@ -160,7 +160,7 @@ final class SecurityExtractor
             }
             if ('isGranted' === $call->method
                 && preg_match(self::ROLE_PATTERN, $argument->value)
-                && $this->hasTypedReceiver($call, $php, self::AUTHORIZATION_TYPES)
+                && $php->receiverHasType($call, ...self::AUTHORIZATION_TYPES)
             ) {
                 $symbols[] = $this->symbol(SecuritySymbolKind::Role, $argument->value, $uri, $text, $argument->startOffset);
             } elseif ('denyAccessUnlessGranted' === $call->method
@@ -171,7 +171,7 @@ final class SecurityExtractor
                 $symbols[] = $this->symbol(SecuritySymbolKind::Role, $argument->value, $uri, $text, $argument->startOffset);
             } elseif (\in_array($call->method, ['getLogoutPath', 'getLogoutUrl'], true)
                 && preg_match(self::FIREWALL_PATTERN, $argument->value)
-                && $this->hasTypedReceiver($call, $php, [self::LOGOUT_URL_GENERATOR])
+                && $php->receiverHasType($call, self::LOGOUT_URL_GENERATOR)
             ) {
                 $symbols[] = $this->symbol(SecuritySymbolKind::Firewall, $argument->value, $uri, $text, $argument->startOffset);
             }
@@ -261,12 +261,6 @@ final class SecurityExtractor
     private function twigSymbol(SecuritySymbolKind $kind, TwigStringLiteral $literal, string $uri, string $text): SecuritySourceSymbol
     {
         return new SecuritySourceSymbol($kind, $literal->value, $uri, $this->converter->toRange($text, $literal->startOffset, $literal->endOffset - $literal->startOffset), false);
-    }
-
-    /** @param list<string> $acceptedTypes */
-    private function hasTypedReceiver(PhpMethodCall $call, PhpDocument $php, array $acceptedTypes): bool
-    {
-        return array_any($php->receiverVariables($call), static fn ($variable): bool => [] !== array_intersect($acceptedTypes, $variable->types));
     }
 
     private function isAbstractControllerAt(PhpDocument $php, int $offset): bool

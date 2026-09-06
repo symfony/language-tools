@@ -97,10 +97,7 @@ final class PhpTranslationReferenceExtractor
 
     private function hasGlobalParameterReceiver(PhpMethodCall $call, PhpDocument $document): bool
     {
-        return array_any(
-            $document->receiverVariables($call),
-            static fn ($variable): bool => [] !== array_intersect(self::GLOBAL_PARAMETER_TRANSLATORS, $variable->types),
-        );
+        return $document->receiverHasType($call, ...self::GLOBAL_PARAMETER_TRANSLATORS);
     }
 
     private function domain(?PhpArgument $argument): ?string

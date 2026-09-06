@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Feature\Route;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
-use Symfony\Lsp\Parser\Php\PhpTypedVariable;
 
 final class RoutePhpReceiverResolver
 {
@@ -26,13 +25,6 @@ final class RoutePhpReceiverResolver
             return null;
         }
 
-        return array_any($document->receiverVariables($call), self::isRouter(...))
-            ? new RoutePhpReceiver(null)
-            : null;
-    }
-
-    private static function isRouter(PhpTypedVariable $variable): bool
-    {
-        return [] !== array_intersect(self::ROUTER_TYPES, $variable->types);
+        return $document->receiverHasType($call, ...self::ROUTER_TYPES) ? new RoutePhpReceiver(null) : null;
     }
 }

@@ -179,7 +179,7 @@ final class EventExtractor
 
     private function hasEventDispatcherReceiver(PhpDocument $php, PhpMethodCall $call): bool
     {
-        return array_any($php->receiverVariables($call), static fn ($variable): bool => [] !== array_intersect(self::DISPATCHER_TYPES, $variable->types));
+        return $php->receiverHasType($call, ...self::DISPATCHER_TYPES);
     }
 
     /**

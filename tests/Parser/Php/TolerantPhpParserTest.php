@@ -1364,6 +1364,10 @@ final class TolerantPhpParserTest extends TestCase
         self::assertTrue($document->receiverHasType($withName, 'Psr\\Log\\LoggerInterface'));
         self::assertTrue($document->receiverHasType($dispatch, 'Symfony\\Component\\Messenger\\MessageBusInterface'));
         self::assertFalse($document->receiverHasType($debug, 'Psr\\Log\\LoggerInterface'));
+        self::assertTrue($document->receiverHasType($dispatch, 'Symfony\\Component\\Messenger\\MessageBus', 'Symfony\\Component\\Messenger\\MessageBusInterface'));
+        self::assertFalse($document->receiverHasType($withName, 'Symfony\\Component\\Messenger\\MessageBus', 'Symfony\\Component\\Messenger\\MessageBusInterface'));
+        self::assertFalse($document->receiverHasType($withName, 'Log\\LoggerInterface', 'LoggerInterface'));
+        self::assertFalse($document->receiverHasType($debug, 'Psr\\Log\\LoggerInterface', 'Symfony\\Component\\Messenger\\MessageBusInterface'));
 
         self::assertSame(['bus', 'logger'], array_map(static fn ($variable): string => $variable->name, $document->visibleVariables($dispatch->methodStartOffset)));
         self::assertSame(['Psr\\Clock\\ClockInterface'], $document->scopedVariable($dispatch->methodStartOffset, 'clock')?->types);
