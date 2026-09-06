@@ -226,6 +226,27 @@ final class TemplateProviderTest extends TestCase
         );
     }
 
+    public function testRecoversTemplateVariablesWhileANestedRenderArrayIsIncomplete(): void
+    {
+        $references = $this->templateReferenceExtractor(new PositionConverter())->extract(new SourceDocument('file:///workspace/src/Controller.php', 'php', <<<'PHP'
+            <?php
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+
+            final class Controller extends AbstractController
+            {
+                public function show(): void
+                {
+                    $this->render('article/show.html.twig', [
+                        'article' => nested([
+                            'id' => $article->id]
+            PHP));
+
+        self::assertSame(
+            [['article/show.html.twig', ['article']]],
+            array_map(static fn (TemplateReference $reference): array => [$reference->name, $reference->variables], $references),
+        );
+    }
+
     public function testExtractsRenderCallsThroughNestedLexicalCaptures(): void
     {
         $references = $this->templateReferenceExtractor(new PositionConverter())->extract(new SourceDocument('file:///workspace/src/Renderer.php', 'php', <<<'PHP'
