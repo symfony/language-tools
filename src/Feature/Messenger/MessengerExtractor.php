@@ -80,7 +80,7 @@ final class MessengerExtractor
             $scalarTypes = ['array', 'bool', 'callable', 'float', 'int', 'never', 'resource', 'string', 'void'];
             foreach ($php->methodDeclarations as $method) {
                 $parameter = $method->parameters[0] ?? null;
-                if (null === $parameter || [] === $parameter->types || !array_all($parameter->types, static fn (string $type): bool => \in_array(strtolower($type), $scalarTypes, true))) {
+                if (!$method->public || null === $parameter || [] === $parameter->types || !array_all($parameter->types, static fn (string $type): bool => \in_array(strtolower($type), $scalarTypes, true))) {
                     continue;
                 }
                 $handlerSignatures[] = new MessengerHandlerSignature(
@@ -165,7 +165,9 @@ final class MessengerExtractor
             if (null !== $type->parentClassName) {
                 array_unshift($typeParents, $type->parentClassName);
             }
-            $parents[$type->name] = array_values(array_unique($typeParents));
+            if ([] !== $typeParents) {
+                $parents[$type->name] = array_values(array_unique($typeParents));
+            }
         }
 
         return $parents;

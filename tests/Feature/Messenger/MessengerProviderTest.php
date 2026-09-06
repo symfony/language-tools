@@ -242,8 +242,6 @@ YAML;
             PHP));
 
         self::assertSame([
-            'App\\Message\\ParentMessage' => [],
-            'App\\Message\\Inner' => [],
             'App\\Message\\ChildContract' => ['App\\Message\\ParentMessage', 'Vendor\\Contracts\\ExternalMessage'],
             'App\\Message\\BaseMessage' => ['Vendor\\Contracts\\Traceable'],
             'App\\Message\\ChildMessage' => ['App\\Message\\BaseMessage', 'App\\Message\\ChildContract', 'App\\Message\\Inner'],
