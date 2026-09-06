@@ -12,7 +12,6 @@ final class SymfonyLspBridgeContext
     private ?object $kernel = null;
     private ?object $application = null;
     private ?SymfonyLspBridgeEffectiveConfiguration $effectiveConfiguration = null;
-    private bool $effectiveConfigurationsPrepared = false;
     private ?Throwable $kernelError = null;
     private bool $kernelErrorReported = false;
     private array $errors = [];
@@ -24,7 +23,6 @@ final class SymfonyLspBridgeContext
         private bool $targetedRefresh,
         private bool $rebuildContainer,
         private bool $errorDetails,
-        private array $requestedSections,
     ) {
     }
 
@@ -61,25 +59,12 @@ final class SymfonyLspBridgeContext
     public function configuration(string $name, ?string $path = null): mixed
     {
         if (SymfonyLspBridgeEffectiveConfiguration::isSupported()) {
-            $configuration = $this->effectiveConfiguration ??= new SymfonyLspBridgeEffectiveConfiguration($this->kernel());
-            if (!$this->effectiveConfigurationsPrepared) {
-                // Resolve Framework last because it can mutate environment placeholders shared by other extensions
-                $requests = [];
-                foreach (['security' => 'security', 'stimulus' => 'stimulus', 'twig_components' => 'twig_component'] as $section => $configurationName) {
-                    if (in_array($section, $this->requestedSections, true)) {
-                        $requests[] = $configurationName;
-                    }
-                }
-                if ([] !== array_intersect(['messenger', 'assets'], $this->requestedSections)) {
-                    $requests[] = 'framework';
-                }
-                foreach ($requests as $configurationName) {
-                    $configuration->prepare($configurationName);
-                }
-                $this->effectiveConfigurationsPrepared = true;
-            }
+            try {
+                $configuration = $this->effectiveConfiguration ??= new SymfonyLspBridgeEffectiveConfiguration($this->kernel());
 
-            return $configuration->get($name, $path);
+                return $configuration->get($name, $path);
+            } catch (Throwable) {
+            }
         }
 
         $arguments = [

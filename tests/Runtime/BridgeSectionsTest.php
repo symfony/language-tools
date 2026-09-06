@@ -387,6 +387,42 @@ final class BridgeSectionsTest extends TestCase
         self::assertSame([realpath($this->workspace->path).'/templates'], $byNamespace['(None)'] ?? null);
     }
 
+    public function testUsesEffectiveConfigurationForConventionTwigPaths(): void
+    {
+        (new TwigFixtureBuilder($this->workspace))->writeThemedTwigApplication(withEffectiveConfiguration: true);
+
+        $process = $this->bridge->run(['--sections=twig']);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null, $process->stdout);
+        $sections = $result['sections'] ?? null;
+        self::assertIsArray($sections);
+        $twig = $sections['twig'] ?? null;
+        self::assertIsArray($twig);
+        $paths = $twig['paths'] ?? null;
+        self::assertIsArray($paths);
+        $project = realpath($this->workspace->path);
+        self::assertIsString($project);
+        self::assertContains([
+            'namespace' => '@Effective',
+            'path' => $project.'/effective-extra',
+        ], $paths);
+        self::assertContains([
+            'namespace' => '(None)',
+            'path' => $project.'/effective-templates',
+        ], $paths);
+        self::assertNotContains([
+            'namespace' => '@Command',
+            'path' => $project.'/command-extra',
+        ], $paths);
+        self::assertNotContains([
+            'namespace' => '(None)',
+            'path' => $project.'/command-templates',
+        ], $paths);
+    }
+
     public function testReportsUnavailableTwigDebugCommandAsAWarning(): void
     {
         (new TwigFixtureBuilder($this->workspace))->writeTwigApplicationWithoutDebugCommand();

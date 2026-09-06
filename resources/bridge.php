@@ -137,7 +137,7 @@ if (class_exists(Symfony\Component\Runtime\SymfonyRuntime::class)) {
     );
 }
 
-$context = new SymfonyLspBridgeContext($project, $environment, $debug, $targetedRefresh, $rebuildContainer, $errorDetails, $requestedSections);
+$context = new SymfonyLspBridgeContext($project, $environment, $debug, $targetedRefresh, $rebuildContainer, $errorDetails);
 $bootstrapMilliseconds = $elapsedMilliseconds($bridgeStartedAt);
 $kernelStartedAt = hrtime(true);
 $configurationValidation = $context->configurationValidation();

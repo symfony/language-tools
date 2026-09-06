@@ -11,7 +11,7 @@ final class SymfonyLspBridgeEffectiveConfiguration
 {
     private ?ContainerBuilder $container = null;
     private ?Throwable $containerError = null;
-    private array $extensionConfig = [];
+    private array $extensionConfigurations = [];
     private array $configurations = [];
     private array $configurationErrors = [];
 
@@ -24,27 +24,21 @@ final class SymfonyLspBridgeEffectiveConfiguration
         return class_exists(Processor::class)
             && class_exists(ContainerBuilder::class)
             && class_exists(ValidateEnvPlaceholdersPass::class)
+            && method_exists(ValidateEnvPlaceholdersPass::class, 'getExtensionConfig')
             && interface_exists(ConfigurationInterface::class)
             && interface_exists(ConfigurationExtensionInterface::class)
             && interface_exists(ExtensionInterface::class);
     }
 
-    public function prepare(string $name): void
-    {
-        if (array_key_exists($name, $this->configurations) || isset($this->configurationErrors[$name])) {
-            return;
-        }
-
-        try {
-            $this->configurations[$name] = $this->configuration($name);
-        } catch (Throwable $error) {
-            $this->configurationErrors[$name] = $error;
-        }
-    }
-
     public function get(string $name, ?string $path = null): mixed
     {
-        $this->prepare($name);
+        if (!array_key_exists($name, $this->configurations) && !isset($this->configurationErrors[$name])) {
+            try {
+                $this->configurations[$name] = $this->configuration($name);
+            } catch (Throwable $error) {
+                $this->configurationErrors[$name] = $error;
+            }
+        }
         if (isset($this->configurationErrors[$name])) {
             throw $this->configurationErrors[$name];
         }
@@ -70,11 +64,14 @@ final class SymfonyLspBridgeEffectiveConfiguration
     private function configuration(string $name): array
     {
         $container = $this->container();
-        $extension = $container->getExtension($name);
-        if (isset($this->extensionConfig[$name])) {
-            $configuration = $this->extensionConfig[$name];
+        if (array_key_exists($name, $this->extensionConfigurations)) {
+            $configuration = $this->extensionConfigurations[$name];
         } else {
             $configs = $container->getExtensionConfig($name);
+            if (array_filter($configs)) {
+                throw new LogicException(sprintf('Validated configuration for extension alias "%s" is unavailable.', $name));
+            }
+            $extension = $container->getExtension($name);
             $definition = $extension instanceof ConfigurationInterface
                 ? $extension
                 : ($extension instanceof ConfigurationExtensionInterface ? $extension->getConfiguration($configs, $container) : null);
@@ -120,7 +117,7 @@ final class SymfonyLspBridgeEffectiveConfiguration
             $container->getCompiler()->compile($container);
             foreach ($container->getCompilerPassConfig()->getPasses() as $pass) {
                 if ($pass instanceof ValidateEnvPlaceholdersPass) {
-                    $this->extensionConfig = $pass->getExtensionConfig();
+                    $this->extensionConfigurations = $pass->getExtensionConfig();
                     break;
                 }
             }

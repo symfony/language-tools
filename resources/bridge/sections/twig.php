@@ -34,7 +34,7 @@ function symfonyLspBridgeTwigSection(SymfonyLspBridgeContext $context): ?array
             if ([] === $paths) {
                 // theme loaders, such as the Sylius theme bundle, decorate the
                 // filesystem loader and hide every path from debug:twig
-                $paths = symfonyLspBridgeTwigConventionPaths($context, $application);
+                $paths = symfonyLspBridgeTwigConventionPaths($context);
             }
         } catch (Throwable $error) {
             $context->addError('twig', $error);
@@ -60,19 +60,13 @@ function symfonyLspBridgeTwigSection(SymfonyLspBridgeContext $context): ?array
  * the configured paths and default path plus the bundle template directories
  * and their application-level overrides.
  */
-function symfonyLspBridgeTwigConventionPaths(SymfonyLspBridgeContext $context, object $application): array
+function symfonyLspBridgeTwigConventionPaths(SymfonyLspBridgeContext $context): array
 {
     $paths = [];
     $project = rtrim($context->project(), '/\\');
     $defaultPath = $project.'/templates';
     try {
-        $configuration = symfonyLspBridgeRunJsonCommand($application, [
-            'command' => 'debug:config',
-            'name' => 'twig',
-            '--format' => 'json',
-            ...$context->commandOptions(),
-        ]);
-        $configuration = is_array($configuration['twig'] ?? null) ? $configuration['twig'] : $configuration;
+        $configuration = $context->configuration('twig');
         if (is_string($configuration['default_path'] ?? null) && '' !== $configuration['default_path']) {
             $defaultPath = $configuration['default_path'];
         }

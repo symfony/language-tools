@@ -57,6 +57,7 @@
 - Document development installation for the unpublished Zed extension
 - Reuse indexed source facts when collecting diagnostics
 - Compile effective runtime configuration once per bridge run
+- Keep validated typed environment configuration available across runtime metadata sections
 
 ## 0.19.0 (2026-09-03)
 
