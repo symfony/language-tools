@@ -35,7 +35,8 @@ Twig parameter mappings support explicit entries such as
 Runtime route aliases, including controller aliases such as
 ``App\Controller\ArticleController::show``, are recognized by hover and
 diagnostics. Completion, navigation, references and rename use the declared
-route name.
+route name. Localized aliases without a locale suffix are recognized starting
+with Symfony Routing 7.4.6, 8.0.6 and 8.1.
 
 Route Name Completion
 ---------------------

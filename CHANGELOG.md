@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Respect patch-level support for localized route aliases
 - Keep XLIFF messages scoped to their translation unit or segment
 - Ignore quoted Twig markup after unfinished directive lines
 - Preserve YAML tab diagnostics after malformed inline collections

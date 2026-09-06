@@ -107,9 +107,15 @@ function symfonyLspBridgeSupportsCanonicalLocalizedRouteAliases(): bool
         return false;
     }
 
-    return is_string($version)
-        && preg_match('/^(?:v)?([0-9]+\.[0-9]+)(?:\.|$)/', $version, $matches)
-        && version_compare($matches[1], '7.4', '>=');
+    if (!is_string($version) || !preg_match('/^(?:v)?([0-9]+\.[0-9]+)(?:\.|$)/', $version, $matches)) {
+        return false;
+    }
+
+    return match ($matches[1]) {
+        '7.4' => version_compare(ltrim($version, 'v'), '7.4.6', '>='),
+        '8.0' => version_compare(ltrim($version, 'v'), '8.0.6', '>='),
+        default => version_compare($matches[1], '8.1', '>='),
+    };
 }
 
 /** @return list<string> */

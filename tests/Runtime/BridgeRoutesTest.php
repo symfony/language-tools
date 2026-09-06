@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Runtime;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Tests\Support\Bridge\BridgeFixtureWorkspace;
 use Symfony\Lsp\Tests\Support\Bridge\BridgeProcessFixture;
@@ -141,9 +142,10 @@ final class BridgeRoutesTest extends TestCase
         self::assertTrue($result['sections']['routes']['complete']);
     }
 
-    public function testKeepsLocalizedAliasesConcreteBeforeSymfonySupportsCanonicalAliases(): void
+    #[DataProvider('localizedAliasVersionProvider')]
+    public function testExposesCanonicalAliasesOnlyOnSupportedRoutingVersions(string $version, bool $supported): void
     {
-        (new RouteFixtureBuilder($this->workspace))->writeRouteApplication(version: '6.4.45');
+        (new RouteFixtureBuilder($this->workspace))->writeRouteApplication(version: $version);
 
         $process = $this->bridge->run(['--sections=routes']);
 
@@ -163,6 +165,21 @@ final class BridgeRoutesTest extends TestCase
                 && str_starts_with($item['name'], 'localized_legacy.'),
         ));
         self::assertSame(['localized_legacy.en', 'localized_legacy.fr'], array_column($aliases, 'name'));
-        self::assertSame([null, null], array_column($aliases, 'canonical'));
+        self::assertSame($supported ? ['localized_legacy', 'localized_legacy'] : [null, null], array_column($aliases, 'canonical'));
+    }
+
+    /** @return iterable<string, array{string, bool}> */
+    public static function localizedAliasVersionProvider(): iterable
+    {
+        yield 'older LTS' => ['6.4.45', false];
+        yield 'initial LTS minor' => ['7.4.0', false];
+        yield 'before the LTS fix' => ['7.4.5', false];
+        yield 'first LTS fix' => ['7.4.6', true];
+        yield 'initial major' => ['8.0.0', false];
+        yield 'before the major fix' => ['8.0.5', false];
+        yield 'first major fix' => ['8.0.6', true];
+        yield 'prefixed version' => ['v8.0.6', true];
+        yield 'next minor' => ['8.1.0', true];
+        yield 'development minor' => ['8.2.x-dev', true];
     }
 }
