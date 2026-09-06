@@ -155,22 +155,39 @@ final class ProbeFinder
             }
         }
 
+        $patterns = [
+            'service' => [
+                'php' => '{#\[\s*(?:\\\\Symfony\\\\Component\\\\DependencyInjection\\\\Attribute\\\\)?Autowire\s*\([^)]*?\bservice\s*:\s*[\'\"]\??([^\'\"]+)}s',
+                'yaml' => '{@\??([^\'\"\s,\]\}]+)}',
+            ],
+            'parameter' => [
+                'php' => '{#\[\s*(?:\\\\Symfony\\\\Component\\\\DependencyInjection\\\\Attribute\\\\)?Autowire\s*\(\s*(?|[^)]*?\bparam\s*:\s*[\'\"]([A-Za-z_][A-Za-z0-9_.]*)|[\'\"]%(?!env\()([A-Za-z_][A-Za-z0-9_.]*))}s',
+                'yaml' => '{%([^%\s]+)%}',
+            ],
+        ];
         $probes = [];
         foreach ($names as $kind => $declared) {
-            $pattern = 'service' === $kind
-                ? '{@\??([^\'\"\s,\]\}]+)|\bservice\s*:\s*[\'\"]\??([^\'\"]+)}s'
-                : '{%([^%\s]+)%|\bparam\s*:\s*[\'\"]([^\'\"]+)}s';
             $found = 0;
             foreach ($files as $path => $contents) {
                 if ($found >= $this->probesPerCategory) {
                     break;
                 }
-                if (1 === preg_match('{\.xml$}', $path) || false === preg_match_all($pattern, $contents, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE)) {
+                $language = 1 === preg_match('{\.php$}', $path) ? 'php' : (1 === preg_match('{\.ya?ml$}', $path) ? 'yaml' : null);
+                if (null === $language || 'php' === $language && !str_contains($contents, 'Symfony\\Component\\DependencyInjection\\Attribute\\Autowire')) {
+                    continue;
+                }
+                if (false === preg_match_all($patterns[$kind][$language], $contents, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE)) {
                     continue;
                 }
                 foreach ($matches as $match) {
-                    $capture = '' !== ($match[1][0] ?? '') ? $match[1] : ($match[2] ?? null);
+                    $capture = $match[1] ?? null;
                     if (null === $capture || !isset($declared[$capture[0]]) || $this->isCommented($path, $contents, $capture[1])) {
+                        continue;
+                    }
+                    if ('yaml' === $language
+                        && !$this->insideYamlDependencyInjectionSection($contents, $capture[1])
+                        && ('service' === $kind || !str_contains(str_replace('\\', '/', $path), '/config/'))
+                    ) {
                         continue;
                     }
                     $probes[] = $this->probe($kind.'.xml', $path, $contents, $capture[0], $capture[1]);
@@ -181,6 +198,24 @@ final class ProbeFinder
         }
 
         return $probes;
+    }
+
+    private function insideYamlDependencyInjectionSection(string $contents, int $offset): bool
+    {
+        $sectionIndent = null;
+        foreach (preg_split('/\R/', substr($contents, 0, $offset + 1)) ?: [] as $line) {
+            if ('' === trim($line) || str_starts_with(ltrim($line), '#')) {
+                continue;
+            }
+            $indent = strspn($line, ' ');
+            if (1 === preg_match('/^ *(?:parameters|services):\s*(?:#.*)?$/', $line)) {
+                $sectionIndent = $indent;
+            } elseif (null !== $sectionIndent && $indent <= $sectionIndent) {
+                $sectionIndent = null;
+            }
+        }
+
+        return null !== $sectionIndent;
     }
 
     /**

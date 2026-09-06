@@ -167,17 +167,23 @@ final class ProbeFinderTest extends TestCase
         $this->assertPositionInsideValue($parameter);
     }
 
-    public function testDoesNotProbeXmlDependencyInjectionDeclarationsWithoutInteractiveReferences(): void
+    public function testDoesNotProbeXmlDependencyInjectionDeclarationsFromUnsupportedReferences(): void
     {
         $this->write('config/services.xml', <<<'XML'
             <container xmlns="http://symfony.com/schema/dic/services">
                 <services>
                     <service id="app.mailer" class="App\Mailer"/>
+                    <parameter key="app.storage_dir">var/storage</parameter>
                 </services>
             </container>
             XML);
+        $this->write('config/packages/app.yaml', "app:\n    mailer: '@app.mailer'\n");
+        $this->write('src/Controller.php', "<?php\n#[Route('/%app.storage_dir%')]\nfinal class Controller {}\n");
 
-        self::assertSame([], $this->probes(new ProbeFinder(), 'service.xml'));
+        $finder = new ProbeFinder();
+
+        self::assertSame([], $this->probes($finder, 'service.xml'));
+        self::assertSame([], $this->probes($finder, 'parameter.xml'));
     }
 
     public function testFindsCustomTwigCallables(): void
