@@ -4,15 +4,6 @@
 // Measures source index scaling on synthetic projects and enforces per-file
 // memory budgets and a linear-scaling budget across two project sizes.
 
-use Amp\ByteStream\ReadableBuffer;
-use Amp\ByteStream\WritableBuffer;
-use Fabpot\JsonRpc\ContentLengthJsonRpcTransport;
-use Fabpot\JsonRpc\JsonRpcDispatcher;
-use Fabpot\JsonRpc\JsonRpcPeer;
-use Fabpot\JsonRpc\JsonRpcValueDecoding;
-use Symfony\Component\Config\FileLocator;
-use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
@@ -26,10 +17,12 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterTree;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Server\SensitiveDataRedactor;
-use Symfony\Lsp\Server\ServerLogger;
+
+use function Symfony\Lsp\Tools\createBenchmarkContainer;
+use function Symfony\Lsp\Tools\installBenchmarkSyntheticServices;
 
 require dirname(__DIR__).'/vendor/autoload.php';
+require __DIR__.'/benchmark-container.php';
 
 if (!function_exists('symfony_lsp_tree_sitter_parse')) {
     fwrite(\STDERR, "The Tree-sitter extension is not loaded. Run through: composer source-index:benchmark\n");
@@ -273,11 +266,7 @@ function generateProject(string $root, int $target): void
  */
 function bootScanner(bool $countParsers): array
 {
-    $resources = dirname(__DIR__).'/resources';
-    $container = new ContainerBuilder();
-    $container->setParameter('server.version', 'benchmark');
-    $container->setParameter('bridge.source', $resources.'/bridge.php');
-    (new PhpFileLoader($container, new FileLocator($resources)))->load('services.php');
+    $container = createBenchmarkContainer('benchmark');
     $counter = $countParsers ? new ParseCallCounter() : null;
     if (null !== $counter) {
         $container->register(ParseCallCounter::class)->setSynthetic(true)->setPublic(true);
@@ -294,13 +283,7 @@ function bootScanner(bool $countParsers): array
     $container->getDefinition(ProjectIndexStatusRegistry::class)->setPublic(true);
     $container->getDefinition(PersistentSourceIndexStore::class)->setPublic(true);
     $container->compile();
-    $peer = new JsonRpcPeer(
-        new ContentLengthJsonRpcTransport(new ReadableBuffer(''), new WritableBuffer()),
-        valueDecoding: JsonRpcValueDecoding::AssociativeArrays,
-    );
-    $container->set(JsonRpcPeer::class, $peer);
-    $container->set(JsonRpcDispatcher::class, new JsonRpcDispatcher($peer));
-    $container->set(ServerLogger::class, new ServerLogger(null, new SensitiveDataRedactor()));
+    installBenchmarkSyntheticServices($container);
     if (null !== $counter) {
         $container->set(ParseCallCounter::class, $counter);
     }

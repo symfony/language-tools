@@ -1,15 +1,6 @@
 #!/usr/bin/env php
 <?php
 
-use Amp\ByteStream\ReadableBuffer;
-use Amp\ByteStream\WritableBuffer;
-use Fabpot\JsonRpc\ContentLengthJsonRpcTransport;
-use Fabpot\JsonRpc\JsonRpcDispatcher;
-use Fabpot\JsonRpc\JsonRpcPeer;
-use Fabpot\JsonRpc\JsonRpcValueDecoding;
-use Symfony\Component\Config\FileLocator;
-use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
@@ -26,15 +17,17 @@ use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Server\SensitiveDataRedactor;
-use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tools\CountingDiagnosticPhpParser;
 use Symfony\Lsp\Tools\DiagnosticParseCounter;
 
+use function Symfony\Lsp\Tools\createBenchmarkContainer;
+use function Symfony\Lsp\Tools\installBenchmarkSyntheticServices;
+
 require dirname(__DIR__).'/vendor/autoload.php';
+require __DIR__.'/benchmark-container.php';
 
 if (!function_exists('symfony_lsp_tree_sitter_parse')) {
-    fwrite(\STDERR, "The Tree-sitter extension is not loaded. Run through: composer source-index:benchmark\n");
+    fwrite(\STDERR, "The Tree-sitter extension is not loaded. Run through: composer diagnostics:benchmark\n");
     exit(1);
 }
 
@@ -65,11 +58,7 @@ file_put_contents($extensionDirectory.'/BenchmarkExtension.php', <<<'PHP'
     PHP);
 file_put_contents($projectRoot.'/templates/benchmark-callable.html.twig', "{{ benchmark(name: 'value', typo: 1) }}\n");
 
-$resources = dirname(__DIR__).'/resources';
-$container = new ContainerBuilder();
-$container->setParameter('server.version', 'diagnostic-benchmark');
-$container->setParameter('bridge.source', $resources.'/bridge.php');
-(new PhpFileLoader($container, new FileLocator($resources)))->load('services.php');
+$container = createBenchmarkContainer('diagnostic-benchmark');
 $container->register(DiagnosticParseCounter::class)->setSynthetic(true)->setPublic(true);
 $container->register(CountingDiagnosticPhpParser::class, CountingDiagnosticPhpParser::class)
     ->setDecoratedService(TolerantPhpParser::class)
@@ -88,13 +77,7 @@ foreach ([
 }
 $container->getAlias(PhpParserInterface::class)->setPublic(true);
 $container->compile();
-$peer = new JsonRpcPeer(
-    new ContentLengthJsonRpcTransport(new ReadableBuffer(''), new WritableBuffer()),
-    valueDecoding: JsonRpcValueDecoding::AssociativeArrays,
-);
-$container->set(JsonRpcPeer::class, $peer);
-$container->set(JsonRpcDispatcher::class, new JsonRpcDispatcher($peer));
-$container->set(ServerLogger::class, new ServerLogger(null, new SensitiveDataRedactor()));
+installBenchmarkSyntheticServices($container);
 $counter = new DiagnosticParseCounter();
 $container->set(DiagnosticParseCounter::class, $counter);
 
