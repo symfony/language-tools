@@ -25,7 +25,7 @@ use Symfony\Lsp\Project\Project;
 
 final class MessengerSourceIndexerTest extends TestCase
 {
-    public function testStoresNoPayloadForUnrelatedPhpDeclarations(): void
+    public function testStoresNoPayloadForPhpMethodsWithoutMessengerSourceFacts(): void
     {
         $uri = 'file:///workspace/src/Utility.php';
         $indexes = new MessengerSourceIndexRegistry();
@@ -44,7 +44,7 @@ final class MessengerSourceIndexerTest extends TestCase
 
                 private function validate(array $value): void {}
 
-                public function transform(object $value): void {}
+                public function transform(string $value): void {}
             }
             PHP));
         $pipeline->finish($project);
@@ -53,7 +53,7 @@ final class MessengerSourceIndexerTest extends TestCase
         self::assertTrue($indexes->forProject($project)->factsForUri($uri)?->isEmpty());
     }
 
-    public function testKeepsRelationshipsAndCallableHandlerCandidates(): void
+    public function testKeepsRuntimeRelevantRelationshipsAndHandlerAttributes(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Handlers.php', 'php', <<<'PHP'
             <?php
@@ -95,11 +95,6 @@ final class MessengerSourceIndexerTest extends TestCase
             '#[AsMessageHandler(handles: SecondMessage::class)]',
         ], $facts->handlers);
         self::assertSame(['App\\FirstMessage', 'App\\SecondMessage'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
-        self::assertSame([
-            'App\\ConfiguredHandler::handle',
-            'App\\AttributedHandler::__invoke',
-            'App\\MethodHandler::process',
-        ], array_map(static fn ($signature): string => $signature->className.'::'.$signature->method, $facts->handlerSignatures));
     }
 
     public function testPreservesRuntimeRelevantFactsAcrossIncompleteOverlays(): void
@@ -126,7 +121,6 @@ final class MessengerSourceIndexerTest extends TestCase
         self::assertInstanceOf(MessengerSourceFacts::class, $facts);
         self::assertSame(['App\\Handler' => ['App\\BaseHandler']], $facts->parents);
         self::assertSame(['#[AsMessageHandler]'], $facts->handlers);
-        self::assertSame(['App\\Handler::__invoke'], array_map(static fn ($signature): string => $signature->className.'::'.$signature->method, $facts->handlerSignatures));
         self::assertSame([$facts->parents, $facts->handlers], $indexer->runtimeDeclarations($facts));
     }
 

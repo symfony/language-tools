@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
@@ -411,7 +412,8 @@ YAML;
         $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
         $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter));
         $comments = new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]);
-        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser, $comments);
+        $phpParser = new TolerantPhpParser(new Parser());
+        $extractor = new MessengerExtractor($converter, $phpParser, $yamlParser, $comments);
         $indexes = new MessengerIndexRegistry();
         $indexes->forProject($project)->replace(
             [new MessengerBus('command.bus', true)],
@@ -442,7 +444,7 @@ YAML;
         $relationshipResolver = new MessengerRelationshipResolver($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
         $completionProvider = new MessengerCompletionProvider($documentResolver, $converter, $protocol, $indexes, $yamlParser, $comments, new TolerantPhpParser(new Parser()));
         $relationshipProvider = new MessengerRelationshipProvider($protocol, $indexes, $relationshipResolver);
-        $diagnosticProvider = new MessengerDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes);
+        $diagnosticProvider = new MessengerDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $phpParser, $converter);
         $codeLensProvider = new MessengerCodeLensProvider($documentResolver, $protocol, $indexes, $classExtractor, $relationshipResolver);
 
         $completionParams = $this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'command.bus }') + 4));
@@ -466,6 +468,70 @@ YAML;
         self::assertIsArray($codeLens);
         self::assertIsArray($codeLens['command'] ?? null);
         self::assertSame('1 Messenger handler', $codeLens['command']['title'] ?? null);
+    }
+
+    #[DataProvider('handlerSignatureDocumentProvider')]
+    public function testDiagnosesRuntimeHandlerSignaturesFromCurrentDocument(string $indexedType, string $currentType, bool $invalid): void
+    {
+        $uri = 'file:///workspace/src/Handler.php';
+        $indexedText = self::handlerSource($indexedType);
+        $currentText = self::handlerSource($currentType);
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 2, $currentText));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
+        $converter = new PositionConverter();
+        $phpParser = new TolerantPhpParser(new Parser());
+        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
+        $extractor = new MessengerExtractor(
+            $converter,
+            $phpParser,
+            new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
+            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]),
+        );
+        $indexes = new MessengerIndexRegistry();
+        $indexes->forProject($project)->replace([], [], [], [
+            new MessengerHandlerDeclaration('App\\Message', 'messenger.bus.default', 'handler', 'App\\Handler', '__invoke', 0, null),
+        ], true);
+        $sourceIndexes = new MessengerSourceIndexRegistry();
+        $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($uri, 'php', $indexedText)));
+        $protocol = new LspProtocolMapper();
+        $provider = new MessengerDiagnosticProvider(
+            new DocumentContextResolver($documents, $projects),
+            $protocol,
+            $indexes,
+            $sourceIndexes,
+            $phpParser,
+            $converter,
+        );
+
+        $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
+        if (!$invalid) {
+            self::assertSame([], $diagnostics);
+
+            return;
+        }
+        $parameterOffset = strpos($currentText, '$message');
+        self::assertIsInt($parameterOffset);
+        self::assertSame([[
+            'range' => $protocol->range(new Range(
+                $converter->toPosition($currentText, $parameterOffset + 1),
+                $converter->toPosition($currentText, $parameterOffset + \strlen('$message')),
+            )),
+            'severity' => 1,
+            'source' => 'symfony',
+            'code' => 'messenger.invalid_handler_signature',
+            'message' => 'Messenger handler "App\\Handler::__invoke" cannot accept message "App\\Message".',
+        ]], $diagnostics);
+    }
+
+    /** @return iterable<string, array{string, string, bool}> */
+    public static function handlerSignatureDocumentProvider(): iterable
+    {
+        yield 'saved valid signature' => ['\\stdClass', '\\stdClass', false];
+        yield 'saved invalid signature' => ['string', 'string', true];
+        yield 'open valid signature replaces saved invalid signature' => ['string', '\\stdClass', false];
+        yield 'open invalid signature replaces saved valid signature' => ['\\stdClass', 'string', true];
     }
 
     public function testIgnoresCommentedPhpMessengerConstructs(): void
@@ -573,6 +639,21 @@ YAML;
         $position = $converter->toPosition($text, \strlen($text));
 
         self::assertNull($provider->complete($this->params($uri, $position)));
+    }
+
+    private static function handlerSource(string $type): string
+    {
+        return <<<PHP
+            <?php
+            namespace App;
+
+            class BaseHandler {}
+
+            final class Handler extends BaseHandler
+            {
+                public function __invoke({$type} \$message): void {}
+            }
+            PHP;
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
