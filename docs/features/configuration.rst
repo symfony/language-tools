@@ -61,8 +61,9 @@ only when they are literals; expressions, enum cases and class constants stay
 opaque because their runtime values can't be determined statically. Direct
 ``!php/const`` values stay opaque for the same reason.
 Tabs are reported wherever they indent YAML structure, including after leading
-spaces. Tabs inside block scalar content, quoted continuation lines and values
-are valid YAML and stay unreported.
+spaces and on otherwise blank lines. Tabs inside block scalar content, quoted
+continuation lines, flow collection continuations and values are valid YAML and
+stay unreported.
 YAML aliases and merge keys are resolved before validation. Direct alias
 diagnostics point to the alias reference. Inherited mapping keys and values are
 checked at their effective configuration paths, with diagnostics pointing to the

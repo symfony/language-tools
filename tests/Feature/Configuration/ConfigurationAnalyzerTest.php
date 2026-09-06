@@ -24,6 +24,7 @@ use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Xml\XmlDocument;
 use Symfony\Lsp\Parser\Xml\XmlParserInterface;
+use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 
 final class ConfigurationAnalyzerTest extends TestCase
@@ -275,7 +276,8 @@ final class ConfigurationAnalyzerTest extends TestCase
     #[DataProvider('yamlTabIndentationProvider')]
     public function testReportsTabsOnlyInYamlStructuralIndentation(string $text, array $lines): void
     {
-        $analyzer = new YamlIndentationAnalyzer(new PositionConverter(), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())));
+        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
+        $analyzer = new YamlIndentationAnalyzer(new PositionConverter(), new YamlDocumentParser($treeSitter), new YamlCommentParser($treeSitter));
 
         self::assertSame($lines, array_map(static fn (Range $range): int => $range->start->line, $analyzer->tabIndentedLines($text)));
     }
@@ -286,6 +288,11 @@ final class ConfigurationAnalyzerTest extends TestCase
         yield 'tabbed mapping key' => ["parameters:\n\tapp.name: Demo\n", [1]];
         yield 'tab after leading spaces' => ["parameters:\n  \tapp.name: Demo\n", [1]];
         yield 'tabbed sequence item' => ["parameters:\n    app.list:\n\t- one\n", [2]];
+        yield 'flow sequence continuation' => ["parameters:\n    app.list: [first,\n     \tsecond]\n", []];
+        yield 'flow mapping continuation' => ["parameters:\n    app.map: {first: one,\n     \tsecond: two}\n", []];
+        yield 'blank flow sequence continuation' => ["parameters:\n    app.list: [first,\n\t\nsecond]\n", []];
+        yield 'blank flow mapping continuation' => ["parameters:\n    app.map: {first: one,\n \t\nsecond: two}\n", []];
+        yield 'tab-only line' => ["parameters:\n\t\n    app.name: Demo\n", [1]];
         yield 'block literal content' => ["parameters:\n    app.script: |\n        all:\n        \techo hi\n", []];
         yield 'block folded content' => ["parameters:\n    app.note: >\n        first\n        \tsecond\n", []];
         yield 'mapping key after a block scalar' => ["parameters:\n    app.script: |\n        line\n\tapp.name: Demo\n", [3]];

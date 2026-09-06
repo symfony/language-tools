@@ -32,6 +32,7 @@ use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
+use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -1326,7 +1327,24 @@ final class ConfigurationProviderTest extends TestCase
             $diagnostics[0]['range'] ?? null,
         );
 
-        $fixture->documents->update($uri, 2, "parameters:\n    app.script: |\n        all:\n        \techo hi\napp.msg: \"first\n\tsecond\"\n");
+        $flow = "parameters:\n    app.list: [first,\n     \tsecond]\n";
+        $fixture->documents->update($uri, 2, $flow);
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+
+        $blankUri = 'file:///workspace/config/packages/blank.yaml';
+        $blank = "parameters:\n\t\n    app.name: Demo\n";
+        $fixture->documents->open(new Document($blankUri, 'yaml', 1, $blank));
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $blankUri]]);
+        self::assertIsArray($diagnostics);
+        self::assertSame(['config.malformed_structure'], array_column($diagnostics, 'code'));
+        /** @var array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} $diagnostic */
+        $diagnostic = $diagnostics[0];
+        self::assertSame(
+            $this->protocolRange($fixture->converter, $blank, (int) strpos($blank, "\t"), 1),
+            $diagnostic['range'],
+        );
+
+        $fixture->documents->update($uri, 3, "parameters:\n    app.script: |\n        all:\n        \techo hi\napp.msg: \"first\n\tsecond\"\n");
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
@@ -1578,7 +1596,7 @@ final class ConfigurationProviderTest extends TestCase
         return new ConfigurationProviderFixture(
             new ConfigurationCompletionProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
             new ConfigurationHoverProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
-            new ConfigurationDiagnosticProvider($resolver, new ProjectPathResolver($uriConverter), $converter, $protocol, $indexes, $routeIndexes, $runtimeConfiguration, $yaml, $values, $php, $xml, new YamlIndentationAnalyzer($converter, $documentParser), $validationReconciler),
+            new ConfigurationDiagnosticProvider($resolver, new ProjectPathResolver($uriConverter), $converter, $protocol, $indexes, $routeIndexes, $runtimeConfiguration, $yaml, $values, $php, $xml, new YamlIndentationAnalyzer($converter, $documentParser, new YamlCommentParser($treeSitter)), $validationReconciler),
             new ConfigurationDocumentLinkProvider($resolver, $converter, $protocol, $uriConverter, $documentParser),
             $documents,
             $converter,

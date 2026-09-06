@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Configuration;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Parser\Yaml\YamlScalar;
 use Symfony\Lsp\Parser\Yaml\YamlScalarStyle;
@@ -13,6 +14,7 @@ final class YamlIndentationAnalyzer
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly YamlDocumentParser $parser,
+        private readonly YamlCommentParser $comments,
     ) {
     }
 
@@ -23,20 +25,49 @@ final class YamlIndentationAnalyzer
             return [];
         }
         $scalars = $this->parser->parseDocument($text)->scalars;
+        $syntax = $this->comments->mask($text);
+        foreach ($scalars as $scalar) {
+            $this->maskRange($syntax, $text, $scalar->startByte, $scalar->endByte);
+        }
+
+        $flowDepth = 0;
         $ranges = [];
         preg_match_all('/^.*(?:\R|$)/m', $text, $lines, \PREG_OFFSET_CAPTURE);
         foreach ($lines[0] as [$rawLine, $lineOffset]) {
             $line = rtrim($rawLine, "\r\n");
             $indent = strspn($line, " \t");
-            if ($indent === \strlen($line) || !str_contains(substr($line, 0, $indent), "\t")) {
-                continue;
-            }
-            if (!$this->isScalarContent($text, $scalars, $lineOffset, strspn($line, ' '))) {
+            if (str_contains(substr($line, 0, $indent), "\t")
+                && 0 === $flowDepth
+                && ($indent === \strlen($line) || !$this->isScalarContent($text, $scalars, $lineOffset, strspn($line, ' ')))
+            ) {
                 $ranges[] = $this->converter->toRange($text, $lineOffset, \strlen($line));
             }
+            $flowDepth = $this->flowDepth(substr($syntax, $lineOffset, \strlen($rawLine)), $flowDepth);
         }
 
         return $ranges;
+    }
+
+    private function flowDepth(string $line, int $depth): int
+    {
+        for ($offset = 0, $length = \strlen($line); $offset < $length; ++$offset) {
+            if ('[' === $line[$offset] || '{' === $line[$offset]) {
+                ++$depth;
+            } elseif ((']' === $line[$offset] || '}' === $line[$offset]) && 0 < $depth) {
+                --$depth;
+            }
+        }
+
+        return $depth;
+    }
+
+    private function maskRange(string &$masked, string $source, int $start, int $end): void
+    {
+        for ($offset = $start; $offset < $end; ++$offset) {
+            if ("\r" !== $source[$offset] && "\n" !== $source[$offset] && \ord($source[$offset]) < 0x80) {
+                $masked[$offset] = ' ';
+            }
+        }
     }
 
     /** @param list<YamlScalar> $scalars */
