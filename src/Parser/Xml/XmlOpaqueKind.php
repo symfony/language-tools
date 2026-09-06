@@ -2,10 +2,8 @@
 
 namespace Symfony\Lsp\Parser\Xml;
 
-enum XmlOpaqueKind: string
+enum XmlOpaqueKind
 {
-    case Comment = 'comment';
-    case ProcessingInstruction = 'processing-instruction';
-    case Doctype = 'doctype';
-    case Declaration = 'declaration';
+    case Comment;
+    case Other;
 }

@@ -391,7 +391,7 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame(array_fill(0, 3, 'App\Handler'), array_map(static fn ($variable): ?string => $variable->className, $document->typedVariables));
         self::assertSame(['__construct', 'first', 'second'], array_map(static fn ($variable): ?string => $variable->methodName, $document->typedVariables));
         self::assertNotSame($firstParameter->scopeStartOffset, $secondParameter->scopeStartOffset);
-        self::assertSame('bus', substr($source, $promoted->nameStartOffset, $promoted->nameEndOffset - $promoted->nameStartOffset));
+        self::assertSame('bus', substr($source, $promoted->nameStartOffset, \strlen($promoted->name)));
         self::assertSame(PhpMethodReceiverKind::Variable, $firstCall->receiverContext->kind);
         self::assertSame('local', $firstCall->receiverContext->name);
         self::assertSame($firstParameter->scopeStartOffset, $firstCall->scopeStartOffset);
@@ -492,7 +492,6 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame(['private', 'private', 'protected', 'public', 'private'], array_map(static fn ($property): string => $property->visibility, $properties));
         self::assertSame([false, false, false, true, false], array_map(static fn ($property): bool => $property->isPublic(), $properties));
         self::assertSame(['Stores customer identities.', 'Stores customer identities.', null, null, null], array_map(static fn ($property): ?string => $property->description, $properties));
-        self::assertSame(array_fill(0, 5, false), array_map(static fn ($property): bool => $property->promoted, $properties));
         foreach ($properties as $property) {
             self::assertSame($property->name, substr($source, $property->nameStartOffset, $property->nameEndOffset - $property->nameStartOffset));
         }
@@ -561,7 +560,6 @@ final class TolerantPhpParserTest extends TestCase
         ], array_map(static fn ($property): array => $property->types, $properties));
         self::assertSame(['public', 'protected', 'private'], array_map(static fn ($property): string => $property->visibility, $properties));
         self::assertSame([true, false, false], array_map(static fn ($property): bool => $property->isPublic(), $properties));
-        self::assertSame(array_fill(0, 3, true), array_map(static fn ($property): bool => $property->promoted, $properties));
         foreach ($properties as $property) {
             self::assertSame('App\Model\Customer', $property->className);
             self::assertSame($property->name, substr($source, $property->nameStartOffset, $property->nameEndOffset - $property->nameStartOffset));
@@ -600,7 +598,6 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame(['service', 'name'], array_map(static fn ($property): string => $property->name, $document->propertyDeclarations));
         self::assertSame(['private(set) Service $service', 'protected(set) string $name'], array_map(static fn ($property): string => $property->signature, $document->propertyDeclarations));
         self::assertSame(['public', 'public'], array_map(static fn ($property): string => $property->visibility, $document->propertyDeclarations));
-        self::assertSame([false, true], array_map(static fn ($property): bool => $property->promoted, $document->propertyDeclarations));
         self::assertSame([PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], array_map(static fn ($variable): PhpTypedVariableKind => $variable->kind, $document->typedVariables));
         self::assertSame([PhpAttributeTargetKind::Property, PhpAttributeTargetKind::Property], array_map(static fn ($attribute): PhpAttributeTargetKind => $attribute->targets[0]->kind, $document->attributes));
         self::assertSame(['service', 'name'], array_map(static fn ($attribute): ?string => $attribute->targets[0]->memberName, $document->attributes));
@@ -625,7 +622,6 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame('identifier', $property->name);
         self::assertSame('private Identifier $identifier', $property->signature);
         self::assertSame(['Vendor\Identity\Identifier'], $property->types);
-        self::assertTrue($property->promoted);
         self::assertSame('identifier', substr($source, $property->nameStartOffset, $property->nameEndOffset - $property->nameStartOffset));
     }
 
@@ -1259,37 +1255,27 @@ final class TolerantPhpParserTest extends TestCase
         self::assertNull($argument->completeClassReference);
     }
 
-    public function testFindsClassReferencesAndObjectCreationsInsideArguments(): void
+    public function testFindsObjectCreationsInsideArguments(): void
     {
         $source = <<<'PHP'
             <?php
             namespace App;
-            use App\Entity\Article;
-            use App\Entity\Comment;
             use App\Message\Created;
             final class Sample
             {
-                public function run(Registry $registry, Bus $bus): void
+                public function run(Bus $bus): void
                 {
-                    $registry->single(Article::class);
-                    $registry->pair([Article::class, Comment::class]);
                     $bus->dispatch(new Created('body'));
                 }
             }
             PHP;
 
         $document = (new TolerantPhpParser(new Parser()))->parse($source);
-        [$single, $pair, $dispatch] = $document->methodCalls;
+        $creation = $document->firstObjectCreation($document->methodCalls[0]->positionalArgument(0));
 
-        self::assertSame('App\Entity\Article', $document->soleClassReference($single->positionalArgument(0))?->className);
-        self::assertNull($document->soleClassReference($pair->positionalArgument(0)));
-        self::assertSame('App\Entity\Article', $document->firstClassReference($pair->positionalArgument(0))?->className);
-        self::assertNull($document->soleClassReference(null));
-        $creation = $document->firstObjectCreation($dispatch->positionalArgument(0));
         self::assertSame('App\Message\Created', $creation?->className);
         self::assertSame('new Created(\'body\')', substr($source, $creation->startOffset, $creation->endOffset - $creation->startOffset));
         self::assertSame('Created', substr($source, $creation->classNameStartOffset, $creation->classNameEndOffset - $creation->classNameStartOffset));
-        self::assertNull($document->firstObjectCreation($single->positionalArgument(0)));
     }
 
     public function testListsObjectCreationsWithoutTheOnesNestedInTheirArguments(): void

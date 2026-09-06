@@ -33,25 +33,8 @@ final class XmlDocument
         return array_values($this->elements);
     }
 
-    public function element(int $identity): ?XmlElementStart
-    {
-        return $this->elements[$identity] ?? null;
-    }
-
     public function end(int $identity): ?XmlElementEnd
     {
         return $this->ends[$identity] ?? null;
-    }
-
-    public function isDescendantOf(?int $identity, int $ancestorIdentity): bool
-    {
-        while (null !== $identity) {
-            if ($identity === $ancestorIdentity) {
-                return true;
-            }
-            $identity = $this->element($identity)?->parentIdentity;
-        }
-
-        return false;
     }
 }

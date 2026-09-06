@@ -33,7 +33,7 @@ final class TolerantXmlParser implements XmlParserInterface
             $this->appendText($events, $source, $offset, $opening, $this->parentIdentity($stack));
 
             if ($this->startsWith($source, '<!--', $opening)) {
-                [$event, $diagnostic, $offset] = $this->terminatedOpaque($source, $opening, '-->', XmlOpaqueKind::Comment, 4, 'XML comment is not closed.', $this->parentIdentity($stack));
+                [$event, $diagnostic, $offset] = $this->terminatedOpaque($source, $opening, '-->', XmlOpaqueKind::Comment, 4, 'XML comment is not closed.');
                 $events[] = $event;
                 if (null !== $diagnostic) {
                     $this->appendDiagnostic($diagnostics, $diagnostic);
@@ -53,7 +53,7 @@ final class TolerantXmlParser implements XmlParserInterface
                 continue;
             }
             if ($this->startsWith($source, '<?', $opening)) {
-                [$event, $diagnostic, $offset] = $this->terminatedOpaque($source, $opening, '?>', XmlOpaqueKind::ProcessingInstruction, 2, 'XML processing instruction is not closed.', $this->parentIdentity($stack));
+                [$event, $diagnostic, $offset] = $this->terminatedOpaque($source, $opening, '?>', XmlOpaqueKind::Other, 2, 'XML processing instruction is not closed.');
                 $events[] = $event;
                 if (null !== $diagnostic) {
                     $this->appendDiagnostic($diagnostics, $diagnostic);
@@ -62,7 +62,7 @@ final class TolerantXmlParser implements XmlParserInterface
                 continue;
             }
             if ($this->startsWith($source, '<!DOCTYPE', $opening)) {
-                [$event, $diagnostic, $offset] = $this->doctype($source, $opening, $this->parentIdentity($stack));
+                [$event, $diagnostic, $offset] = $this->doctype($source, $opening);
                 $events[] = $event;
                 if (null !== $diagnostic) {
                     $this->appendDiagnostic($diagnostics, $diagnostic);
@@ -71,7 +71,7 @@ final class TolerantXmlParser implements XmlParserInterface
                 continue;
             }
             if ($this->startsWith($source, '<!', $opening)) {
-                [$event, $diagnostic, $offset] = $this->declaration($source, $opening, $this->parentIdentity($stack));
+                [$event, $diagnostic, $offset] = $this->declaration($source, $opening);
                 $events[] = $event;
                 if (null !== $diagnostic) {
                     $this->appendDiagnostic($diagnostics, $diagnostic);
@@ -171,18 +171,18 @@ final class TolerantXmlParser implements XmlParserInterface
     }
 
     /** @return array{XmlOpaque, ?XmlDiagnostic, int} */
-    private function terminatedOpaque(string $source, int $start, string $terminator, XmlOpaqueKind $kind, int $prefixLength, string $message, ?int $parentIdentity): array
+    private function terminatedOpaque(string $source, int $start, string $terminator, XmlOpaqueKind $kind, int $prefixLength, string $message): array
     {
         $limit = \strlen($source);
         $closing = strpos($source, $terminator, $start + $prefixLength);
         if (false !== $closing) {
             $end = $closing + \strlen($terminator);
 
-            return [new XmlOpaque($parentIdentity, $kind, $start, $end, $start + $prefixLength, $closing), null, $end];
+            return [new XmlOpaque($kind, $start, $end, $start + $prefixLength, $closing), null, $end];
         }
 
         return [
-            new XmlOpaque($parentIdentity, $kind, $start, $limit, $start + $prefixLength, $limit),
+            new XmlOpaque($kind, $start, $limit, $start + $prefixLength, $limit),
             new XmlDiagnostic($message, $start, min($limit, $start + $prefixLength)),
             $limit,
         ];
@@ -206,7 +206,7 @@ final class TolerantXmlParser implements XmlParserInterface
     }
 
     /** @return array{XmlOpaque, ?XmlDiagnostic, int} */
-    private function doctype(string $source, int $start, ?int $parentIdentity): array
+    private function doctype(string $source, int $start): array
     {
         $limit = \strlen($source);
         $quote = null;
@@ -244,19 +244,19 @@ final class TolerantXmlParser implements XmlParserInterface
             } elseif ('>' === $byte && 0 === $subsetDepth) {
                 $end = $offset + 1;
 
-                return [new XmlOpaque($parentIdentity, XmlOpaqueKind::Doctype, $start, $end, $start + 9, $offset), null, $end];
+                return [new XmlOpaque(XmlOpaqueKind::Other, $start, $end, $start + 9, $offset), null, $end];
             }
         }
 
         return [
-            new XmlOpaque($parentIdentity, XmlOpaqueKind::Doctype, $start, $limit, $start + 9, $limit),
+            new XmlOpaque(XmlOpaqueKind::Other, $start, $limit, $start + 9, $limit),
             new XmlDiagnostic('XML DOCTYPE is not closed.', $start, min($limit, $start + 9)),
             $limit,
         ];
     }
 
     /** @return array{XmlOpaque, ?XmlDiagnostic, int} */
-    private function declaration(string $source, int $start, ?int $parentIdentity): array
+    private function declaration(string $source, int $start): array
     {
         $limit = \strlen($source);
         $quote = null;
@@ -273,12 +273,12 @@ final class TolerantXmlParser implements XmlParserInterface
             } elseif ('>' === $byte) {
                 $end = $offset + 1;
 
-                return [new XmlOpaque($parentIdentity, XmlOpaqueKind::Declaration, $start, $end, $start + 2, $offset), null, $end];
+                return [new XmlOpaque(XmlOpaqueKind::Other, $start, $end, $start + 2, $offset), null, $end];
             }
         }
 
         return [
-            new XmlOpaque($parentIdentity, XmlOpaqueKind::Declaration, $start, $limit, $start + 2, $limit),
+            new XmlOpaque(XmlOpaqueKind::Other, $start, $limit, $start + 2, $limit),
             new XmlDiagnostic('XML declaration is not closed.', $start, min($limit, $start + 2)),
             $limit,
         ];
@@ -358,7 +358,6 @@ final class TolerantXmlParser implements XmlParserInterface
                 $attributeNameEnd,
                 $valueStart,
                 $valueEnd,
-                $quote,
             );
         }
 
@@ -385,7 +384,7 @@ final class TolerantXmlParser implements XmlParserInterface
             $next = strpos($source, '<', $offset);
             $end = false === $next || $next > $limit ? $limit : $next;
 
-            return [new XmlElementEnd(null, $qualifiedName, $start, $end, $start + 2, $nameEnd), new XmlDiagnostic(\sprintf('Closing element "%s" is not closed.', $qualifiedName), $start + 2, $nameEnd), $end];
+            return [new XmlElementEnd(null, $start), new XmlDiagnostic(\sprintf('Closing element "%s" is not closed.', $qualifiedName), $start + 2, $nameEnd), $end];
         }
         $end = $offset + 1;
         $top = [] === $stack ? null : $stack[array_key_last($stack)];
@@ -393,7 +392,7 @@ final class TolerantXmlParser implements XmlParserInterface
             array_pop($stack);
             $this->removeOpenName($openNameCounts, $qualifiedName);
 
-            return [new XmlElementEnd($top[0], $qualifiedName, $start, $end, $start + 2, $nameEnd), null, $end];
+            return [new XmlElementEnd($top[0], $start), null, $end];
         }
 
         $diagnostic = new XmlDiagnostic(
@@ -402,7 +401,7 @@ final class TolerantXmlParser implements XmlParserInterface
             $nameEnd,
         );
         if (!isset($openNameCounts[$qualifiedName])) {
-            return [new XmlElementEnd(null, $qualifiedName, $start, $end, $start + 2, $nameEnd), $diagnostic, $end];
+            return [new XmlElementEnd(null, $start), $diagnostic, $end];
         }
         do {
             /** @var array{int, string} $entry */
@@ -411,7 +410,7 @@ final class TolerantXmlParser implements XmlParserInterface
             $this->removeOpenName($openNameCounts, $removedName);
         } while ($qualifiedName !== $removedName);
 
-        return [new XmlElementEnd($identity, $qualifiedName, $start, $end, $start + 2, $nameEnd), $diagnostic, $end];
+        return [new XmlElementEnd($identity, $start), $diagnostic, $end];
     }
 
     /** @param array<string, int> $openNameCounts */

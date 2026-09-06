@@ -14,7 +14,6 @@ final class PhpTypedVariable
         public readonly ?int $scopeStartOffset,
         public readonly ?int $scopeEndOffset,
         public readonly int $nameStartOffset,
-        public readonly int $nameEndOffset,
     ) {
     }
 }

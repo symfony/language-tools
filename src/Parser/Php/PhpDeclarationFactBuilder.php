@@ -112,7 +112,6 @@ final class PhpDeclarationFactBuilder
                     $scope?->getStartPosition(),
                     $scope?->getEndPosition(),
                     $declaration->variableName->getStartPosition() + 1,
-                    $declaration->variableName->getEndPosition(),
                 );
 
                 continue;
@@ -134,7 +133,6 @@ final class PhpDeclarationFactBuilder
                     null,
                     null,
                     $variable->getStartPosition() + 1,
-                    $variable->getEndPosition(),
                 );
             }
         }
@@ -180,7 +178,6 @@ final class PhpDeclarationFactBuilder
                     $this->description($declaration),
                     $this->resolvedTypes($declaration->typeDeclarationList, $source, $names),
                     $this->propertyVisibility($declaration),
-                    true,
                 );
 
                 continue;
@@ -218,7 +215,6 @@ final class PhpDeclarationFactBuilder
                     $description,
                     $types,
                     $visibility,
-                    false,
                 );
             }
         }

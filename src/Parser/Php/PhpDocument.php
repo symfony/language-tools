@@ -54,18 +54,6 @@ final class PhpDocument
         return $this->names->resolve($name);
     }
 
-    public function firstClassReference(?PhpArgument $argument): ?PhpClassReference
-    {
-        return $this->classReferencesWithin($argument)[0] ?? null;
-    }
-
-    public function soleClassReference(?PhpArgument $argument): ?PhpClassReference
-    {
-        $references = $this->classReferencesWithin($argument);
-
-        return 1 === \count($references) ? $references[0] : null;
-    }
-
     public function firstObjectCreation(?PhpArgument $argument): ?PhpObjectCreation
     {
         return $this->objectCreationsWithin($argument)[0] ?? null;
@@ -202,23 +190,5 @@ final class PhpDocument
         }
 
         return null;
-    }
-
-    /** @return list<PhpClassReference> */
-    private function classReferencesWithin(?PhpArgument $argument): array
-    {
-        $start = $argument?->expressionStartOffset;
-        $end = $argument?->expressionEndOffset;
-        if (!\is_int($start) || !\is_int($end)) {
-            return [];
-        }
-        $references = [];
-        foreach ($this->classReferences as $reference) {
-            if ($reference->startOffset >= $start && $reference->endOffset <= $end) {
-                $references[] = $reference;
-            }
-        }
-
-        return $references;
     }
 }

@@ -14,7 +14,6 @@ final class PhpPropertyDeclaration
         public readonly ?string $description,
         public readonly array $types,
         public readonly string $visibility,
-        public readonly bool $promoted,
     ) {
     }
 
