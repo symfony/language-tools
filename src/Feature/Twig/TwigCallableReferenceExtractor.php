@@ -7,7 +7,6 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
@@ -16,7 +15,6 @@ final class TwigCallableReferenceExtractor
 {
     public function __construct(
         private readonly TwigDocumentParser $parser,
-        private readonly TwigCommentParser $commentParser,
         private readonly PositionConverter $converter,
         private readonly TwigDirectiveLocator $directives,
         private readonly TwigCallArgumentResolver $arguments,
@@ -26,7 +24,7 @@ final class TwigCallableReferenceExtractor
     public function at(string $text, int $offset): ?TwigCallableReference
     {
         $document = $this->parser->parse($text);
-        $masked = $this->commentParser->mask($text);
+        $masked = $document->maskedSource();
         foreach ([
             ['function_call', 'function_identifier', TwigCallableKind::Function],
             ['filter', 'filter_identifier', TwigCallableKind::Filter],

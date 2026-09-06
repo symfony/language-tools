@@ -11,7 +11,7 @@ final class TwigCallableCall
         public readonly TwigCallableKind $kind,
         public readonly string $callee,
         public readonly array $arguments,
-        public readonly ?string $prefix = null,
+        public readonly string $prefix,
     ) {
     }
 }

@@ -52,10 +52,10 @@ final class TwigCallableCompletionProvider implements CompletionProviderInterfac
                     $used[] = $argument->name;
                 }
             }
-            $start = $this->converter->toPosition($request->document->text, $offset - \strlen($context->prefix ?? ''));
+            $start = $this->converter->toPosition($request->document->text, $offset - \strlen($context->prefix));
             $items = [];
             foreach ($parameters->nameable as $name) {
-                if (!str_starts_with($name, $context->prefix ?? '') || \in_array($name, $used, true)) {
+                if (!str_starts_with($name, $context->prefix) || \in_array($name, $used, true)) {
                     continue;
                 }
                 $items[] = [

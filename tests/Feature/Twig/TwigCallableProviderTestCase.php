@@ -59,7 +59,6 @@ class TwigCallableProviderTestCase extends TestCase
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $referenceExtractor = new TwigCallableReferenceExtractor(
             new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()),
-            $commentParser,
             $converter,
             new TwigDirectiveLocator(),
             new TwigCallArgumentResolver(new TwigArgumentParser()),

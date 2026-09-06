@@ -198,8 +198,7 @@ final class TwigCallableSourceIndexerTest extends TestCase
         $converter = new PositionConverter();
 
         $references = new TwigCallableReferenceExtractor(
-            new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()),
-            $commentParser,
+            new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()),
             $converter,
             new TwigDirectiveLocator(),
             new TwigCallArgumentResolver(new TwigArgumentParser()),
