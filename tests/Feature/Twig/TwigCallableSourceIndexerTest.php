@@ -80,6 +80,22 @@ final class TwigCallableSourceIndexerTest extends TestCase
         }
     }
 
+    public function testPreservesRecoveredUsagesThatAreNotValidCalls(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+        $indexer = $this->indexer(new TwigCallableIndexRegistry());
+        $indexer->begin($project);
+        $facts = $indexer->index($project, new SourceDocument(
+            'file:///workspace/templates/malformed.html.twig',
+            'twig',
+            '{% a ~ name](x: 1) %}',
+        ));
+        self::assertInstanceOf(TwigCallableSourceFacts::class, $facts);
+
+        self::assertSame(['name'], array_map(static fn (TwigCallableUsage $usage): string => $usage->name, $facts->usages));
+        self::assertSame([], $facts->calls);
+    }
+
     public function testPersistsOnlyCallsWithNamedArguments(): void
     {
         $project = new Project('/workspace', 'file:///workspace');

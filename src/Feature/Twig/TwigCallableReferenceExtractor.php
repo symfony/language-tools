@@ -69,7 +69,10 @@ final class TwigCallableReferenceExtractor
             );
 
             $argumentContainer = $document->directChild($container, 'arguments');
-            if (null === $argumentContainer || !str_ends_with($document->maskedText($argumentContainer), ')')) {
+            if (null === $argumentContainer
+                || '' !== trim(substr($document->maskedText($container), $identifier->endByte - $container->startByte, $argumentContainer->startByte - $identifier->endByte))
+                || !str_ends_with($document->maskedText($argumentContainer), ')')
+            ) {
                 continue;
             }
             $arguments = [];
@@ -114,14 +117,10 @@ final class TwigCallableReferenceExtractor
                 if (null === $identifier) {
                     continue;
                 }
-                $arguments = $document->directChild($container, 'arguments');
-                if (null !== $arguments && '' !== trim(substr($document->maskedText($container), $identifier->endByte - $container->startByte, $arguments->startByte - $identifier->endByte))) {
-                    continue;
-                }
                 $nodes[] = [$container, $identifier, $kind];
             }
         }
-        usort($nodes, static fn (array $left, array $right): int => [$left[0]->startByte, $left[0]->endByte] <=> [$right[0]->startByte, $right[0]->endByte]);
+        usort($nodes, static fn (array $left, array $right): int => [$left[1]->startByte, $left[1]->endByte] <=> [$right[1]->startByte, $right[1]->endByte]);
 
         $inside = [];
         $rangeIndex = 0;
