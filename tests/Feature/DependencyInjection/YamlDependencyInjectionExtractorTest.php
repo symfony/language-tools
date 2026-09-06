@@ -185,15 +185,15 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
 
     /** @param FactsData $expected */
     #[DataProvider('yamlSyntaxProvider')]
-    public function testPreservesYamlSyntaxExtraction(string $yaml, ?string $environment, array $expected): void
+    public function testPreservesYamlSyntaxExtraction(string $yaml, array $expected): void
     {
         self::assertSame(
             $expected,
-            self::factsData($this->extractor()->extract('file:///workspace/config/services.yaml', $yaml, $environment)),
+            self::factsData($this->extractor()->extract('file:///workspace/config/services.yaml', $yaml)),
         );
     }
 
-    /** @return iterable<string, array{string, string|null, FactsData}> */
+    /** @return iterable<string, array{string, FactsData}> */
     public static function yamlSyntaxProvider(): iterable
     {
         yield 'quoted keys, tags, block values, sequences, and comments' => [
@@ -220,7 +220,6 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
 
                     app.alias: !service '@app.quoted'
                 YAML,
-            null,
             [
                 'services' => [
                     ['app.quoted', '4:5-4:15', 'App\\Actual', null, null, ['kernel.event_subscriber', 'console.command']],
@@ -240,7 +239,7 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
                 ],
             ],
         ];
-        yield 'matching environment' => [
+        yield 'environment scopes' => [
             <<<'YAML'
                 services:
                     app.base:
@@ -258,11 +257,11 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
                             alias: app.base
                             arguments: ['@app.prod_dependency']
                 YAML,
-            'test',
             [
                 'services' => [
                     ['app.base', '1:4-1:12', null, null, null, []],
                     ['app.test', '7:8-7:16', null, null, 'app.base', []],
+                    ['app.prod', '12:8-12:16', null, 'app.base', null, []],
                 ],
                 'parameters' => [
                     ['app.test_parameter', '5:8-5:26'],
@@ -272,6 +271,8 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
                     ['parameter', 'kernel.environment', '5:30-5:48', false],
                     ['service', 'app.base', '8:23-8:31', false],
                     ['service', 'app.test_dependency', '9:26-9:45', false],
+                    ['service', 'app.base', '13:19-13:27', false],
+                    ['service', 'app.prod_dependency', '14:26-14:45', false],
                 ],
             ],
         ];
@@ -289,7 +290,6 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
                         arguments:
                             - '@after'
                 YAML,
-            null,
             [
                 'services' => [
                     ['app.broken', '3:4-3:14', null, null, null, ['kernel.reset']],

@@ -15,7 +15,7 @@ final class YamlDependencyInjectionDeclarationExtractor
     }
 
     /** @return array{list<ServiceDeclaration>, list<ParameterDeclaration>} */
-    public function extract(string $uri, string $text, YamlDocument $document, ?string $environment): array
+    public function extract(string $uri, string $text, YamlDocument $document): array
     {
         /** @var list<PendingServiceDeclaration> $services */
         $services = [];
@@ -24,7 +24,7 @@ final class YamlDependencyInjectionDeclarationExtractor
         $currentServices = [];
 
         foreach ($document->mappings as $mapping) {
-            if (!$this->includes($mapping->scope, $environment) || $mapping->isSequenceItem()) {
+            if ($mapping->isSequenceItem()) {
                 continue;
             }
             if (2 === \count($mapping->path) && 'parameters' === $mapping->path[0]) {
@@ -72,7 +72,7 @@ final class YamlDependencyInjectionDeclarationExtractor
         }
 
         foreach ($document->scalars as $scalar) {
-            if (!$this->includes($scalar->environment, $environment) || !$this->isTag($scalar)) {
+            if (!$this->isTag($scalar)) {
                 continue;
             }
             $scope = null === $scalar->environment ? 'base' : 'when@'.$scalar->environment;
@@ -86,11 +86,6 @@ final class YamlDependencyInjectionDeclarationExtractor
             array_map(static fn (PendingServiceDeclaration $service): ServiceDeclaration => $service->declaration($uri), $services),
             $parameters,
         ];
-    }
-
-    private function includes(?string $scope, ?string $environment): bool
-    {
-        return null === $environment || null === $scope || 'base' === $scope || $scope === $environment || 'when@'.$environment === $scope;
     }
 
     private function isTag(YamlScalar $scalar): bool

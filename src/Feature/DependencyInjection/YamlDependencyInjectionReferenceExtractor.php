@@ -14,18 +14,15 @@ final class YamlDependencyInjectionReferenceExtractor
     }
 
     /** @return list<DependencyInjectionReference> */
-    public function extract(string $uri, string $text, YamlDocument $document, ?string $environment): array
+    public function extract(string $uri, string $text, YamlDocument $document): array
     {
         /** @var array<int, array<int, list<DependencyInjectionReference>>> $sectionLines */
         $sectionLines = [];
         /** @var array<int, list<DependencyInjectionReference>> $configurationLines */
         $configurationLines = [];
-        $nestedServices = $this->nestedServices($document, $environment);
+        $nestedServices = $this->nestedServices($document);
 
         foreach ($document->scalars as $scalar) {
-            if (!$this->includes($scalar->environment, $environment)) {
-                continue;
-            }
             $inSection = \in_array($scalar->path[0] ?? null, ['parameters', 'services'], true);
             if (!$inSection && !str_contains('/'.$uri, '/config/')) {
                 continue;
@@ -84,12 +81,11 @@ final class YamlDependencyInjectionReferenceExtractor
     }
 
     /** @return array<string, true> */
-    private function nestedServices(YamlDocument $document, ?string $environment): array
+    private function nestedServices(YamlDocument $document): array
     {
         $services = [];
         foreach ($document->mappings as $mapping) {
-            if ($this->includes('base' === $mapping->scope ? null : substr($mapping->scope, \strlen('when@')), $environment)
-                && !$mapping->isSequenceItem()
+            if (!$mapping->isSequenceItem()
                 && 2 === \count($mapping->path)
                 && 'services' === $mapping->path[0]
                 && '' === $mapping->value
@@ -159,11 +155,6 @@ final class YamlDependencyInjectionReferenceExtractor
         $target = $this->scalar($scalar->raw);
 
         return isset($nestedServices[$scope."\0".$scalar->path[1]]) && '' !== ltrim($target, '@?') && !str_starts_with($target, '@');
-    }
-
-    private function includes(?string $scope, ?string $environment): bool
-    {
-        return null === $environment || null === $scope || $scope === $environment;
     }
 
     private function scalar(string $value): string

@@ -13,16 +13,16 @@ final class YamlDependencyInjectionExtractor
     ) {
     }
 
-    public function extract(string $uri, string $text, ?string $environment = null): DependencyInjectionSourceFacts
+    public function extract(string $uri, string $text): DependencyInjectionSourceFacts
     {
         $document = $this->parser->parseDocument($text);
-        [$services, $parameters] = $this->declarationExtractor->extract($uri, $text, $document, $environment);
+        [$services, $parameters] = $this->declarationExtractor->extract($uri, $text, $document);
 
         return new DependencyInjectionSourceFacts(
             $uri,
             $services,
             $parameters,
-            $this->referenceExtractor->extract($uri, $text, $document, $environment),
+            $this->referenceExtractor->extract($uri, $text, $document),
         );
     }
 }

@@ -19,19 +19,19 @@ final class DependencyInjectionDocumentExtractor
         return $this->extract($document, false);
     }
 
-    public function extractForInteractive(SourceDocument $document, ?string $environment = null): ?DependencyInjectionSourceFacts
+    public function extractForInteractive(SourceDocument $document): ?DependencyInjectionSourceFacts
     {
-        return $this->extract($document, true, $environment);
+        return $this->extract($document, true);
     }
 
-    private function extract(SourceDocument $document, bool $interactive, ?string $environment = null): ?DependencyInjectionSourceFacts
+    private function extract(SourceDocument $document, bool $interactive): ?DependencyInjectionSourceFacts
     {
         if (!\in_array($document->languageId, $interactive ? ['php', 'yaml'] : ['php', 'xml', 'yaml'], true)) {
             return null;
         }
 
         if ('yaml' === $document->languageId) {
-            return $this->yamlExtractor->extract($document->uri, $document->text, $environment);
+            return $this->yamlExtractor->extract($document->uri, $document->text);
         }
         if ('xml' === $document->languageId) {
             return $this->xmlExtractor->extract($document->uri, $document->text);
