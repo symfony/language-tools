@@ -292,6 +292,9 @@ final class ConfigurationAnalyzerTest extends TestCase
         yield 'quoted brace in a recovered mapping' => ["services:\n    App\\Foo:\n        tags:\n            - { name: x }\n\t        - { name: '{' }\n    App\\Bar:\n\t    class: X\n", [4, 6]];
         yield 'tab after a recovered flow continuation' => ["parameters:\n    app.map: {first: one,\n \t\nsecond: two}\n\tapp.other: value\n", [4]];
         yield 'flow sequence continuation' => ["parameters:\n    app.list: [first,\n     \tsecond]\n", []];
+        yield 'apostrophe in a plain key' => ["parameters:\n    it's: value\n    app.list: [first,\n     \tsecond]\n", []];
+        yield 'quote in a plain key' => ["parameters:\n    say\"hi: value\n    app.list: [first,\n     \tsecond]\n", []];
+        yield 'apostrophe in a sequence mapping key' => ["parameters:\n    list:\n        - it's: value\n    app.map: {a: 1,\n     \tb: 2}\n", []];
         yield 'flow mapping continuation' => ["parameters:\n    app.map: {first: one,\n     \tsecond: two}\n", []];
         yield 'blank flow sequence continuation' => ["parameters:\n    app.list: [first,\n\t\nsecond]\n", []];
         yield 'blank flow mapping continuation' => ["parameters:\n    app.map: {first: one,\n \t\nsecond: two}\n", []];

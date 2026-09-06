@@ -24,8 +24,14 @@ final class YamlIndentationAnalyzer
         if (!str_contains($text, "\t")) {
             return [];
         }
-        $scalars = $this->parser->parseDocument($text)->scalars;
+        $document = $this->parser->parseDocument($text);
+        $scalars = $document->scalars;
+        $keys = [];
+        foreach ($document->mappings as $mapping) {
+            $keys[$mapping->keyStartByte] = $mapping->keyEndByte;
+        }
         $syntax = $this->comments->mask($text);
+        $keyEnd = 0;
         $scalarIndex = 0;
         $flowDepth = 0;
         $quote = null;
@@ -42,6 +48,11 @@ final class YamlIndentationAnalyzer
                 $ranges[] = $this->converter->toRange($text, $lineOffset, \strlen($line));
             }
             for ($offset = $lineOffset, $end = $lineOffset + \strlen($rawLine); $offset < $end; ++$offset) {
+                $keyEnd = $keys[$offset] ?? $keyEnd;
+                if ($offset < $keyEnd) {
+                    $offset = min($end, $keyEnd) - 1;
+                    continue;
+                }
                 while (isset($scalars[$scalarIndex]) && $scalars[$scalarIndex]->endByte <= $offset) {
                     ++$scalarIndex;
                 }
