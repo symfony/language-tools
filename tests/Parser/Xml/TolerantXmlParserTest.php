@@ -103,7 +103,9 @@ final class TolerantXmlParserTest extends TestCase
 
         self::assertSame(['root'], array_map(static fn (XmlElementStart $event): string => $event->qualifiedName, $starts));
         self::assertSame(['XML comment is not closed.'], array_map(static fn ($diagnostic): string => $diagnostic->message, $document->diagnostics));
-        self::assertSame(\strlen($source), $document->events[1]->endOffset);
+        $opaque = $document->events[1] ?? null;
+        self::assertInstanceOf(XmlOpaque::class, $opaque);
+        self::assertSame(\strlen($source), $opaque->endOffset);
     }
 
     public function testReportsOnlyTheInnermostUnclosedElementAtEndOfFile(): void
