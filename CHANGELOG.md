@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Refuse rename edits when open-document source analysis fails
 - Rebuild source caches after source analysis corrections
 - Exercise explicit provider cases in the diagnostics benchmark
 - Count only document links covering each dogfood probe

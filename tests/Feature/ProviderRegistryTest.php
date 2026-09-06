@@ -202,7 +202,7 @@ final class ProviderRegistryTest extends TestCase
             (new RenameProviderRegistry($health, [$provider]))->rename([]);
             self::fail('The rename should have been refused.');
         } catch (JsonRpcException $error) {
-            self::assertSame('Rename is unavailable while an affected open PHP document contains syntax errors.', $error->getMessage());
+            self::assertSame('Rename is unavailable while an affected open document cannot be analyzed completely.', $error->getMessage());
             self::assertSame(['rename'], $provider->calls);
         }
     }

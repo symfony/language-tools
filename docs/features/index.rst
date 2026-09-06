@@ -15,7 +15,8 @@ additional embedded fixtures or generated sources. Project-root dotenv files
 remain available for environment variable names, but their values aren't read.
 
 PHP call recognition through typed properties requires a named declaring class;
-properties in anonymous classes aren't inferred.
+properties in anonymous classes aren't inferred. Rename is unavailable while
+an affected open document cannot be analyzed completely.
 
 Supported Integrations
 ----------------------

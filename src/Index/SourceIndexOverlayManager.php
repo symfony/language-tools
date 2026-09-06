@@ -38,9 +38,10 @@ final class SourceIndexOverlayManager
             return;
         }
 
+        $this->overlayHealth->record($project, $uri, $trackParseHealth ? SourceParseHealth::Partial : SourceParseHealth::Healthy);
         $health = $trackParseHealth ? $this->parseHealth->resolve($document) : SourceParseHealth::Healthy;
-        $this->overlayHealth->record($project, $uri, $health);
         $this->providers->overlay($project, $document, $health);
+        $this->overlayHealth->record($project, $uri, $health);
     }
 
     public function removeUri(string $uri): void

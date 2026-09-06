@@ -44,7 +44,7 @@ final class RenameProviderRegistry
             }
 
             if ($this->targetsDegradedDocument($result)) {
-                throw new JsonRpcException(JsonRpcError::INVALID_REQUEST, 'Rename is unavailable while an affected open PHP document contains syntax errors.');
+                throw new JsonRpcException(JsonRpcError::INVALID_REQUEST, 'Rename is unavailable while an affected open document cannot be analyzed completely.');
             }
 
             return $result;

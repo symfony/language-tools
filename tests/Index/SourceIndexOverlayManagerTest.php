@@ -2,11 +2,14 @@
 
 namespace Symfony\Lsp\Tests\Index;
 
+use Fabpot\JsonRpc\Exception\JsonRpcException;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Feature\RenameProviderInterface;
+use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Index\PhpParseHealthResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceFactsInterface;
@@ -26,6 +29,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class SourceIndexOverlayManagerTest extends TestCase
 {
@@ -126,10 +130,62 @@ final class SourceIndexOverlayManagerTest extends TestCase
             (new Filesystem())->remove($root);
         }
     }
+
+    public function testFailedOverlayAnalysisBlocksRenameUntilRecovery(): void
+    {
+        $workspace = new TestWorkspace('symfony-lsp-overlay-failure-');
+        try {
+            $uris = new UriToPathConverter();
+            $project = new Project($workspace->rootPath, $uris->toUri($workspace->rootPath));
+            $projects = new ProjectRegistry();
+            $projects->replace([$project]);
+            $documents = new DocumentStore();
+            $uri = $uris->toUri($workspace->path('config/services.xml'));
+            $documents->open(new Document($uri, 'xml', 1, '<container/>'));
+            $provider = new OverlayRecordingProvider();
+            $health = new SourceOverlayHealthRegistry();
+            $manager = new SourceIndexOverlayManager(
+                $projects,
+                $documents,
+                $uris,
+                new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry(new GlobPatternCompiler())),
+                new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), [$provider]),
+                new PhpParseHealthResolver(new TolerantPhpParser(new Parser())),
+                $health,
+            );
+            $edit = ['documentChanges' => [['textDocument' => ['uri' => $uri, 'version' => 1], 'edits' => []]]];
+            $renameProvider = $this->createStub(RenameProviderInterface::class);
+            $renameProvider->method('rename')->willReturn($edit);
+            $renames = new RenameProviderRegistry($health, [$renameProvider]);
+            $manager->updateUri($uri);
+            $provider->fail = true;
+
+            try {
+                $manager->updateUri($uri);
+                self::fail('The extraction failure should propagate.');
+            } catch (\RuntimeException $error) {
+                self::assertSame('Extraction failed.', $error->getMessage());
+            }
+            try {
+                $renames->rename([]);
+                self::fail('Rename should refuse stale source ranges.');
+            } catch (JsonRpcException $error) {
+                self::assertSame('Rename is unavailable while an affected open document cannot be analyzed completely.', $error->getMessage());
+            }
+
+            $provider->fail = false;
+            $manager->updateUri($uri);
+            self::assertSame($edit, $renames->rename([]));
+        } finally {
+            $workspace->cleanup();
+        }
+    }
 }
 
 final class OverlayRecordingProvider implements SourceIndexProviderInterface
 {
+    public bool $fail = false;
+
     /** @var list<string> */
     public array $overlays = [];
 
@@ -182,6 +238,9 @@ final class OverlayRecordingProvider implements SourceIndexProviderInterface
 
     public function overlay(Project $project, Document $document, SourceParseHealth $health): void
     {
+        if ($this->fail) {
+            throw new \RuntimeException('Extraction failed.');
+        }
         $this->overlays[] = $document->uri;
         $this->healths[] = $health;
     }
