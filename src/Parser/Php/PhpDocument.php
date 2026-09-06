@@ -125,6 +125,17 @@ final class PhpDocument
     public function visibleVariables(int $offset, ?string $name = null): array
     {
         $scope = $this->lexicalScopeAt($offset);
+        if (null !== $name) {
+            $variable = $this->scopedVariable($offset, $name);
+            if (null === $variable || null === $variable->scopeStartOffset) {
+                return [];
+            }
+            if (null !== $scope && $variable->scopeStartOffset !== $scope->startOffset && !$this->isVariableVisibleFromScope($name, $variable->scopeStartOffset, $scope->startOffset)) {
+                return [];
+            }
+
+            return [$variable];
+        }
 
         return array_values(array_filter(
             $this->typedVariables,
@@ -133,9 +144,43 @@ final class PhpDocument
                 && null !== $variable->scopeEndOffset
                 && $offset >= $variable->scopeStartOffset
                 && $offset <= $variable->scopeEndOffset
-                && (null === $name || $name === $variable->name)
                 && (null === $scope || $variable->scopeStartOffset === $scope->startOffset || $this->isVariableVisibleFromScope($variable->name, $variable->scopeStartOffset, $scope->startOffset)),
         ));
+    }
+
+    /**
+     * The innermost typed parameter declaration containing the offset,
+     * ignoring closure capture but honoring untyped parameter shadowing.
+     */
+    public function scopedVariable(int $offset, string $name): ?PhpTypedVariable
+    {
+        $parameterScopeStartOffset = -1;
+        foreach ($this->lexicalScopes as $scope) {
+            if ($offset >= $scope->startOffset && $offset <= $scope->endOffset && \in_array($name, $scope->parameterNames, true)) {
+                $parameterScopeStartOffset = max($parameterScopeStartOffset, $scope->startOffset);
+            }
+        }
+
+        $variable = null;
+        foreach ($this->typedVariables as $candidate) {
+            if ($name !== $candidate->name
+                || !\in_array($candidate->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                || null === $candidate->scopeStartOffset
+                || null === $candidate->scopeEndOffset
+                || $offset < $candidate->scopeStartOffset
+                || $offset > $candidate->scopeEndOffset
+                || null !== $variable && $candidate->scopeStartOffset < $variable->scopeStartOffset
+            ) {
+                continue;
+            }
+            $variable = $candidate;
+        }
+
+        if (null === $variable || null === $variable->scopeStartOffset || $parameterScopeStartOffset > $variable->scopeStartOffset) {
+            return null;
+        }
+
+        return $variable;
     }
 
     /**

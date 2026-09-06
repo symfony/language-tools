@@ -1369,8 +1369,11 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame([['object']], array_map(static fn ($variable): array => $variable->types, $document->visibleVariables($dispatch->methodStartOffset, 'logger')));
         self::assertSame([['Symfony\\Component\\Messenger\\MessageBusInterface']], array_map(static fn ($variable): array => $variable->types, $document->visibleVariables($dispatch->methodStartOffset, 'bus')));
         self::assertSame([], $document->visibleVariables($dispatch->methodStartOffset, 'clock'));
+        self::assertSame(['Psr\\Clock\\ClockInterface'], $document->scopedVariable($dispatch->methodStartOffset, 'clock')?->types);
+        self::assertSame(['object'], $document->scopedVariable($dispatch->methodStartOffset, 'logger')?->types);
         self::assertSame([['Psr\\Clock\\ClockInterface']], array_map(static fn ($variable): array => $variable->types, $document->visibleVariables($tick->methodStartOffset, 'clock')));
         self::assertSame([], $document->visibleVariables($send->methodStartOffset, 'bus'));
+        self::assertNull($document->scopedVariable($send->methodStartOffset, 'bus'));
     }
 
     public function testExposesNestedLexicalScopesWithExactRangesAndRecoveryState(): void

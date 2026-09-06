@@ -104,6 +104,9 @@ final class PhpConfigurationAnalyzer
             return null;
         }
         $variables = $document->visibleVariables($receiverEnd, $match[1]);
+        if ([] === $variables && null !== $variable = $document->scopedVariable($receiverEnd, $match[1])) {
+            $variables[] = $variable;
+        }
         $root = $this->variableRoot($variables, $match[1], $index);
 
         return null === $root ? null : [$root];
@@ -152,7 +155,7 @@ final class PhpConfigurationAnalyzer
 
         if (PhpMethodReceiverKind::Variable === $call->receiverContext->kind && null !== $call->receiverContext->name) {
             $variables = $document->receiverVariables($call);
-            if ([] === $variables && [] !== $document->visibleVariables($call->methodStartOffset, $call->receiverContext->name)) {
+            if ([] === $variables && null !== $document->scopedVariable($call->methodStartOffset, $call->receiverContext->name)) {
                 return null;
             }
             $root = $this->variableRoot($variables, $call->receiverContext->name, $index);
