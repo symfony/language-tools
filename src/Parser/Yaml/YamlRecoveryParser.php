@@ -158,7 +158,7 @@ final class YamlRecoveryParser
                 ++$offset;
             }
         }
-        $separator = $this->mappingSeparator($line, $offset);
+        $separator = \in_array($line[$offset] ?? null, ['[', '{'], true) ? null : $this->mappingSeparator($line, $offset);
         if (null === $separator) {
             if (!$sequence) {
                 return null;

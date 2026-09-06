@@ -288,6 +288,9 @@ final class ConfigurationAnalyzerTest extends TestCase
         yield 'tabbed mapping key' => ["parameters:\n\tapp.name: Demo\n", [1]];
         yield 'tab after leading spaces' => ["parameters:\n  \tapp.name: Demo\n", [1]];
         yield 'tabbed sequence item' => ["parameters:\n    app.list:\n\t- one\n", [2]];
+        yield 'tabs after recovered inline mappings' => ["services:\n    App\\Foo:\n        tags:\n            - { name: x }\n\t        - { name: y }\n    App\\Bar:\n\t    class: X\n", [4, 6]];
+        yield 'quoted brace in a recovered mapping' => ["services:\n    App\\Foo:\n        tags:\n            - { name: x }\n\t        - { name: '{' }\n    App\\Bar:\n\t    class: X\n", [4, 6]];
+        yield 'tab after a recovered flow continuation' => ["parameters:\n    app.map: {first: one,\n \t\nsecond: two}\n\tapp.other: value\n", [4]];
         yield 'flow sequence continuation' => ["parameters:\n    app.list: [first,\n     \tsecond]\n", []];
         yield 'flow mapping continuation' => ["parameters:\n    app.map: {first: one,\n     \tsecond: two}\n", []];
         yield 'blank flow sequence continuation' => ["parameters:\n    app.list: [first,\n\t\nsecond]\n", []];

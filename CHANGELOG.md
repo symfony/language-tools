@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Preserve YAML tab diagnostics after malformed inline collections
 - Preserve PHP source analysis while a parent class name is incomplete
 - Report source indexing failures for XML files that exceed analysis limits
 - Keep XML attribute recovery linear on large elements

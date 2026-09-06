@@ -63,7 +63,8 @@ opaque because their runtime values can't be determined statically. Direct
 Tabs are reported wherever they indent YAML structure, including after leading
 spaces and on otherwise blank lines. Tabs inside block scalar content, quoted
 continuation lines, flow collection continuations and values are valid YAML and
-stay unreported.
+stay unreported. Malformed inline collections don't hide indentation errors
+later in the file.
 YAML aliases and merge keys are resolved before validation. Direct alias
 diagnostics point to the alias reference. Inherited mapping keys and values are
 checked at their effective configuration paths, with diagnostics pointing to the

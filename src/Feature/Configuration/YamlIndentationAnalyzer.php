@@ -26,11 +26,10 @@ final class YamlIndentationAnalyzer
         }
         $scalars = $this->parser->parseDocument($text)->scalars;
         $syntax = $this->comments->mask($text);
-        foreach ($scalars as $scalar) {
-            $this->maskRange($syntax, $text, $scalar->startByte, $scalar->endByte);
-        }
-
+        $scalarIndex = 0;
         $flowDepth = 0;
+        $quote = null;
+        $escaped = false;
         $ranges = [];
         preg_match_all('/^.*(?:\R|$)/m', $text, $lines, \PREG_OFFSET_CAPTURE);
         foreach ($lines[0] as [$rawLine, $lineOffset]) {
@@ -42,32 +41,39 @@ final class YamlIndentationAnalyzer
             ) {
                 $ranges[] = $this->converter->toRange($text, $lineOffset, \strlen($line));
             }
-            $flowDepth = $this->flowDepth(substr($syntax, $lineOffset, \strlen($rawLine)), $flowDepth);
+            for ($offset = $lineOffset, $end = $lineOffset + \strlen($rawLine); $offset < $end; ++$offset) {
+                while (isset($scalars[$scalarIndex]) && $scalars[$scalarIndex]->endByte <= $offset) {
+                    ++$scalarIndex;
+                }
+                $scalar = $scalars[$scalarIndex] ?? null;
+                if (null !== $scalar && $scalar->startByte <= $offset
+                    && (0 === $flowDepth || YamlScalarStyle::Plain !== $scalar->style)
+                ) {
+                    $offset = min($end, $scalar->endByte) - 1;
+                    continue;
+                }
+                $character = $syntax[$offset];
+                if (null !== $quote) {
+                    if ($escaped) {
+                        $escaped = false;
+                    } elseif ('"' === $quote && '\\' === $character) {
+                        $escaped = true;
+                    } elseif ($quote === $character) {
+                        $quote = null;
+                    }
+                } elseif (\in_array($character, ['"', "'"], true)
+                    && (null === $scalar || $scalar->startByte > $offset)
+                ) {
+                    $quote = $character;
+                } elseif ('[' === $character || '{' === $character) {
+                    ++$flowDepth;
+                } elseif ((']' === $character || '}' === $character) && 0 < $flowDepth) {
+                    --$flowDepth;
+                }
+            }
         }
 
         return $ranges;
-    }
-
-    private function flowDepth(string $line, int $depth): int
-    {
-        for ($offset = 0, $length = \strlen($line); $offset < $length; ++$offset) {
-            if ('[' === $line[$offset] || '{' === $line[$offset]) {
-                ++$depth;
-            } elseif ((']' === $line[$offset] || '}' === $line[$offset]) && 0 < $depth) {
-                --$depth;
-            }
-        }
-
-        return $depth;
-    }
-
-    private function maskRange(string &$masked, string $source, int $start, int $end): void
-    {
-        for ($offset = $start; $offset < $end; ++$offset) {
-            if ("\r" !== $source[$offset] && "\n" !== $source[$offset] && \ord($source[$offset]) < 0x80) {
-                $masked[$offset] = ' ';
-            }
-        }
     }
 
     /** @param list<YamlScalar> $scalars */
