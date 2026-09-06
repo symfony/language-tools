@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Feature;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
@@ -14,6 +15,7 @@ use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\DiagnosticSuppressor;
 use Symfony\Lsp\Feature\PartialParseDiagnosticFilter;
+use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
@@ -23,6 +25,7 @@ use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
+use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
@@ -155,6 +158,35 @@ final class DiagnosticProviderRegistryTest extends TestCase
         self::assertSame(['stub'], array_column($collector->collect($params, true) ?? [], 'code'));
     }
 
+    public function testSuppressesGitignoredDocumentsEvenWhenExcludedPathsAreIncluded(): void
+    {
+        $root = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
+        mkdir($root.'/templates', 0777, true);
+        file_put_contents($root.'/.gitignore', "templates/\n");
+        file_put_contents($root.'/templates/page.html.twig', '');
+        $uri = (new UriToPathConverter())->toUri($root.'/templates/page.html.twig');
+
+        try {
+            [, , $collector] = $this->registryForProjectDocument(
+                $root,
+                $uri,
+                'twig',
+                '',
+                [],
+                new StubDiagnosticProvider([$this->diagnostic('stub')]),
+            );
+            $params = ['textDocument' => ['uri' => $uri]];
+
+            self::assertSame([], $collector->collect($params));
+            self::assertSame([], $collector->collect($params, true));
+            $detailed = $collector->collectDetailed($params);
+            self::assertInstanceOf(DetailedDiagnosticCollection::class, $detailed);
+            self::assertSame([], $detailed->diagnostics);
+        } finally {
+            (new Filesystem())->remove($root);
+        }
+    }
+
     public function testSuppressesDiagnosticsInDependencyOwnedDocuments(): void
     {
         foreach ([
@@ -200,11 +232,21 @@ final class DiagnosticProviderRegistryTest extends TestCase
      */
     private function registryForDocument(string $uri, string $languageId, string $text, array $excludePaths, DiagnosticProviderInterface ...$providers): array
     {
+        return $this->registryForProjectDocument('/workspace', $uri, $languageId, $text, $excludePaths, ...$providers);
+    }
+
+    /**
+     * @param list<string> $excludePaths
+     *
+     * @return array{DiagnosticProviderRegistry, CollectingClient, DiagnosticCollector}
+     */
+    private function registryForProjectDocument(string $rootPath, string $uri, string $languageId, string $text, array $excludePaths, DiagnosticProviderInterface ...$providers): array
+    {
         $client = new CollectingClient();
         $documents = new DocumentStore();
         $documents->open(new Document($uri, $languageId, 1, $text));
         $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
+        $projects->replace([$project = new Project($rootPath, (new UriToPathConverter())->toUri($rootPath))]);
         $fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
         $fileScope->configure($project, $excludePaths);
 
@@ -216,6 +258,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
             new ProjectPathResolver($converter),
             $fileScope,
             $converter,
+            new SourceFileEnumerator(new GitignoreMatcher(), $fileScope),
             new PartialParseDiagnosticFilter(new SourceOverlayHealthRegistry()),
             new DiagnosticSuppressor(
                 new PositionConverter(),

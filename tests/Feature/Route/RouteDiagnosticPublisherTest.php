@@ -31,6 +31,7 @@ use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
@@ -43,6 +44,7 @@ use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
+use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
@@ -323,12 +325,14 @@ final class RouteDiagnosticPublisherTest extends TestCase
         $positionConverter = new PositionConverter();
         $uriConverter = new UriToPathConverter();
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
         $collector = new DiagnosticCollector(
             $documents,
             $projects,
             new ProjectPathResolver($uriConverter),
-            new ProjectFileScopeRegistry(new GlobPatternCompiler()),
+            $fileScope,
             $uriConverter,
+            new SourceFileEnumerator(new GitignoreMatcher(), $fileScope),
             new PartialParseDiagnosticFilter(new SourceOverlayHealthRegistry()),
             $this->suppressor($positionConverter),
             [new RouteDiagnosticPublisher(
@@ -470,12 +474,14 @@ final class RouteDiagnosticPublisherTest extends TestCase
         $sourceIndexes = $this->sourceIndexes($project, $uri, $languageId, $text, $classIndexes, $phpExtractor, $twigExtractor);
 
         $uriConverter = new UriToPathConverter();
+        $fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
         $collector = new DiagnosticCollector(
             $documents,
             $projects,
             new ProjectPathResolver($uriConverter),
-            new ProjectFileScopeRegistry(new GlobPatternCompiler()),
+            $fileScope,
             $uriConverter,
+            new SourceFileEnumerator(new GitignoreMatcher(), $fileScope),
             new PartialParseDiagnosticFilter(new SourceOverlayHealthRegistry()),
             $this->suppressor($positionConverter),
             [new RouteDiagnosticPublisher(

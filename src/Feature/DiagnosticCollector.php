@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature;
 
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectPathPolicy;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -18,6 +19,7 @@ final class DiagnosticCollector
         private readonly ProjectPathResolver $pathResolver,
         private readonly ProjectFileScopeRegistry $fileScope,
         private readonly UriToPathConverter $uriToPathConverter,
+        private readonly SourceFileEnumerator $files,
         private readonly PartialParseDiagnosticFilter $partialParseFilter,
         private readonly DiagnosticSuppressor $suppressor,
         private readonly iterable $providers,
@@ -146,6 +148,9 @@ final class DiagnosticCollector
             return false;
         }
         $path = $this->uriToPathConverter->convert($uri);
+        if (null !== $path && $this->files->gitignoreExcluded($project->rootPath, $path)) {
+            return true;
+        }
         if (!$includeExcluded && null !== $path && $this->fileScope->isExcluded($project, $path)) {
             return true;
         }

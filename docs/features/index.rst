@@ -8,11 +8,11 @@ the application; others require runtime indexing.
 Use the `headless diagnostics checker`_ to run the same Symfony diagnostics
 against saved files in local automation and CI.
 
-Symfony Language Tools honors your ``.gitignore`` rules and always skips
-``.git/``, ``node_modules/``, ``var/``, ``vendor/`` and frontend lock files.
-Project ``excludePaths`` can omit additional embedded fixtures or generated
-sources. Project-root dotenv files remain available for environment variable
-names, but their values aren't read.
+Symfony Language Tools honors your ``.gitignore`` rules, including for files
+opened in the editor, and always skips ``.git/``, ``node_modules/``, ``var/``,
+``vendor/`` and frontend lock files. Project ``excludePaths`` can omit
+additional embedded fixtures or generated sources. Project-root dotenv files
+remain available for environment variable names, but their values aren't read.
 
 Supported Integrations
 ----------------------

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Skip diagnostics for gitignored open files consistently
 - Ignore markup-like text on incomplete Twig directive lines
 - Diagnose tabs only where Symfony treats them as YAML indentation
 - Keep normalized Symfony UX controller completions visible in editors
