@@ -22,6 +22,13 @@ final class TwigDirectiveLocator
         return $ranges;
     }
 
+    public function unterminatedStart(string $text): ?int
+    {
+        [, $inside, $start] = $this->locate($text, \strlen($text));
+
+        return $inside ? $start : null;
+    }
+
     /** @return array{list<array{start: int, end: int}>, bool, int|null} */
     private function locate(string $text, int $limit): array
     {

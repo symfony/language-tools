@@ -7,7 +7,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterTree;
 
 final class TwigDocument
 {
-    private const CODE_NODE_TYPES = ['output_directive', 'statement_directive', 'comment'];
+    private const CODE_NODE_TYPES = ['output_directive', 'statement_directive'];
 
     private ?string $markup = null;
 
@@ -15,6 +15,7 @@ final class TwigDocument
         private readonly string $source,
         private readonly string $masked,
         private readonly TreeSitterTree $tree,
+        private readonly TwigDirectiveLocator $directiveLocator,
     ) {
     }
 
@@ -36,16 +37,25 @@ final class TwigDocument
         $markup = $this->masked;
         foreach (self::CODE_NODE_TYPES as $type) {
             foreach ($this->tree->nodesOfType($type) as $node) {
-                for ($offset = $node->startByte; $offset < $node->endByte; ++$offset) {
-                    $byte = $markup[$offset];
-                    if ("\r" !== $byte && "\n" !== $byte && \ord($byte) < 0x80) {
-                        $markup[$offset] = ' ';
-                    }
-                }
+                $this->maskRange($markup, $node->startByte, $node->endByte);
             }
+        }
+        if (null !== $start = $this->directiveLocator->unterminatedStart($this->masked)) {
+            $end = $start + strcspn($this->source, "\r\n", $start);
+            $this->maskRange($markup, $start, $end);
         }
 
         return $this->markup = $markup;
+    }
+
+    private function maskRange(string &$masked, int $start, int $end): void
+    {
+        for ($offset = $start; $offset < $end; ++$offset) {
+            $byte = $this->source[$offset];
+            if ("\r" !== $byte && "\n" !== $byte && \ord($byte) < 0x80) {
+                $masked[$offset] = ' ';
+            }
+        }
     }
 
     /** @return list<TreeSitterNode> */

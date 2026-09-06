@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ignore markup-like text on incomplete Twig directive lines
 - Recognize runtime route aliases in diagnostics and hover
 - Ignore non-builder configuration variables across nested PHP scopes
 - Read large XML catalogs without exhausting the structural event budget

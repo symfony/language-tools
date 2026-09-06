@@ -141,6 +141,17 @@ final class StimulusExtractorTest extends TestCase
         );
     }
 
+    public function testIgnoresAttributesOnIncompleteTwigDirectiveLines(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+        $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+            {{ unclosed data-controller="ghost"
+            <div data-controller="real"></div>
+            TWIG));
+
+        self::assertSame(['real'], array_map(static fn ($reference): string => $reference->controller, $facts->references));
+    }
+
     public function testExtractsStaticTwigHelperCallsConservatively(): void
     {
         $project = new Project('/workspace', 'file:///workspace');

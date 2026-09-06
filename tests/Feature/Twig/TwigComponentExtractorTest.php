@@ -82,6 +82,22 @@ final class TwigComponentExtractorTest extends TestCase
         );
     }
 
+    public function testIgnoresMarkupOnIncompleteTwigDirectiveLines(): void
+    {
+        $facts = $this->extractor()->extract(
+            new Project('/workspace', 'file:///workspace'),
+            new SourceDocument('file:///workspace/templates/page.html.twig',
+                'twig',
+                <<<'TWIG'
+                {{ unclosed <twig:Ghost data-live-action-param="haunt"
+                <twig:Real data-live-action-param="save" />
+                TWIG),
+        );
+
+        self::assertSame(['Real'], array_map(static fn ($reference): string => $reference->name, $facts->references));
+        self::assertSame([['Real', 'save']], array_map(static fn ($reference): array => [$reference->component, $reference->action], $facts->actionReferences));
+    }
+
     public function testDecodesEscapedTwigComponentNames(): void
     {
         $facts = $this->extractor()->extract(
