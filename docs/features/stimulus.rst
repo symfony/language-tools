@@ -49,7 +49,8 @@ are ignored.
 recognized only where a template renders them as markup, and only when their
 value is static. Attribute values built from a Twig expression are ignored.
 Markup-like text on an incomplete Twig directive line is ignored, while normal
-markup on following lines remains available.
+markup on following lines remains available. Later quoted expressions remain
+ignored, including expressions spanning several lines.
 
 An unknown static controller name is reported only after all registered
 controllers are known. Unknown actions and targets aren't diagnosed because

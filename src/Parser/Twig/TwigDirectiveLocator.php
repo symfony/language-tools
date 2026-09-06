@@ -22,11 +22,23 @@ final class TwigDirectiveLocator
         return $ranges;
     }
 
-    public function unterminatedStart(string $text): ?int
+    /** @return iterable<array{start: int, end: int}> */
+    public function recoveryRanges(string $text): iterable
     {
-        [, $inside, $start] = $this->locate($text, \strlen($text));
-
-        return $inside ? $start : null;
+        preg_match_all('/(?:^|[\r\n])[^\r\n]*?(\{\{|\{%)/', $text, $matches, \PREG_OFFSET_CAPTURE);
+        $starts = array_column($matches[1], 1);
+        $starts[] = \strlen($text);
+        for ($index = 0, $count = \count($starts) - 1; $index < $count; ++$index) {
+            $offset = $starts[$index];
+            $fragment = substr($text, $offset, $starts[$index + 1] - $offset);
+            [$ranges, $inside, $start] = $this->locate($fragment, \strlen($fragment));
+            foreach ($ranges as $range) {
+                yield ['start' => $offset + $range['start'], 'end' => $offset + $range['end']];
+            }
+            if ($inside && null !== $start) {
+                yield ['start' => $offset + $start, 'end' => $offset + $start + strcspn($fragment, "\r\n", $start)];
+            }
+        }
     }
 
     /** @return array{list<array{start: int, end: int}>, bool, int|null} */

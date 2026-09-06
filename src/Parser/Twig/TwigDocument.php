@@ -40,9 +40,10 @@ final class TwigDocument
                 $this->maskRange($markup, $node->startByte, $node->endByte);
             }
         }
-        if (null !== $start = $this->directiveLocator->unterminatedStart($this->masked)) {
-            $end = $start + strcspn($this->source, "\r\n", $start);
-            $this->maskRange($markup, $start, $end);
+        if ($this->tree->hasError) {
+            foreach ($this->directiveLocator->recoveryRanges($markup) as $range) {
+                $this->maskRange($markup, $range['start'], $range['end']);
+            }
         }
 
         return $this->markup = $markup;

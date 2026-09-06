@@ -86,7 +86,8 @@ including bundle components, are known.
 ``<twig:...>`` tags and ``data-live-action-param`` attributes are recognized
 only where a template renders them as markup. Look-alike text in comments,
 strings, Twig statements and ``verbatim`` blocks is ignored, and so are action
-names built from a Twig expression.
+names built from a Twig expression. Quoted expressions after an unfinished
+directive remain ignored, while markup on following lines stays available.
 
 Stimulus controllers and Live Component actions and events are documented in
 `Stimulus and Live Components`_.

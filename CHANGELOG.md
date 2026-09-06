@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ignore quoted Twig markup after unfinished directive lines
 - Preserve YAML tab diagnostics after malformed inline collections
 - Preserve PHP source analysis while a parent class name is incomplete
 - Report source indexing failures for XML files that exceed analysis limits

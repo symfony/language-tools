@@ -143,12 +143,13 @@ final class TwigDocumentParserTest extends TestCase
 
     public function testKeepsMarkupAfterUnrecoverableDirectiveLinesReadable(): void
     {
-        $source = "<div data-controller=\"before\">\n{{ unclosed data-controller=\"ghost\"\n<div data-controller=\"after\">";
+        $source = "<div data-controller=\"before\">\n{{ unclosed data-controller=\"ghost\"\n{{ '<twig:Quoted data-controller=\"quoted\" />' }}\n<div data-controller=\"after\">";
         $markup = $this->parser()->parse($source)->markup();
 
         self::assertSame(\strlen($source), \strlen($markup));
         self::assertStringContainsString('before', $markup);
         self::assertStringNotContainsString('ghost', $markup);
+        self::assertStringNotContainsString('quoted', $markup);
         self::assertStringContainsString('after', $markup);
     }
 

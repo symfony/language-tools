@@ -152,6 +152,28 @@ final class StimulusExtractorTest extends TestCase
         self::assertSame(['real'], array_map(static fn ($reference): string => $reference->controller, $facts->references));
     }
 
+    #[DataProvider('incompleteDirectiveProvider')]
+    public function testIgnoresQuotedMarkupAfterAnIncompleteDirective(string $prefix, string $newline): void
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+        foreach (['{{ \'<div data-controller="ghost" />\' }}', '{{'.$newline.'\'<div data-controller="ghost" />\''.$newline.'}}'] as $expression) {
+            $text = $prefix.$newline.$expression.$newline.'<div data-controller="real" />';
+            $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', $text));
+
+            self::assertSame(['real'], array_map(static fn ($reference): string => $reference->controller, $facts->references), $text);
+        }
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function incompleteDirectiveProvider(): iterable
+    {
+        yield 'unfinished output' => ['{{ unclosed', "\n"];
+        yield 'unfinished statement' => ['{% if', "\n"];
+        yield 'unfinished string' => ['{{ "unfinished', "\n"];
+        yield 'Windows line endings' => ['{{ unclosed', "\r\n"];
+        yield 'carriage return line endings' => ['{{ unclosed', "\r"];
+    }
+
     public function testExtractsStaticTwigHelperCallsConservatively(): void
     {
         $project = new Project('/workspace', 'file:///workspace');

@@ -90,6 +90,10 @@ final class TwigComponentExtractorTest extends TestCase
                 'twig',
                 <<<'TWIG'
                 {{ unclosed <twig:Ghost data-live-action-param="haunt"
+                {{ '<twig:Quoted data-live-action-param="quoted" />' }}
+                {{
+                    '<twig:Multiline data-live-action-param="multiline" />'
+                }}
                 <twig:Real data-live-action-param="save" />
                 TWIG),
         );
