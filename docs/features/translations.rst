@@ -41,6 +41,10 @@ loaded or expanded. Source-derived keys keep ranges over their exact raw XML
 content. Unsaved resource changes are available immediately, and changes made
 by external tools are picked up while the server is running.
 
+An XLIFF catalog that exceeds the analysis limit fails source indexing rather
+than exposing a partial set of declarations. Split a large catalog into smaller
+resources to keep all declarations available.
+
 ICU brace placeholders such as ``{name}`` are only interpreted in ICU
 catalogs, identified by the ``+intl-icu`` domain suffix. In plain catalogs,
 braces are literal text and only ``%name%`` placeholders are interpreted.

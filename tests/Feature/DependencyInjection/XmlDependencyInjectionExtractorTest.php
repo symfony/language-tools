@@ -114,6 +114,16 @@ final class XmlDependencyInjectionExtractorTest extends TestCase
         self::assertSame('real > service', substr($text, $start, $end - $start));
     }
 
+    public function testRejectsTruncatedServiceDefinitionsInsteadOfReturningPartialDeclarations(): void
+    {
+        $text = '<container xmlns="http://symfony.com/schema/dic/services"><services>'.str_repeat('<service id="logger"/>', 100_000).'</services></container>';
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('XML analysis stopped after reaching its structural limit.');
+
+        $this->extractor()->extract('file:///workspace/config/services.xml', $text);
+    }
+
     public function testDoesNotParseXmlWithoutTheServicesSchemaMarker(): void
     {
         $parser = new CountingXmlParser();

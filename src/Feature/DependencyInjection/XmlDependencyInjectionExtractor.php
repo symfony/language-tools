@@ -24,6 +24,7 @@ final class XmlDependencyInjectionExtractor
             return null;
         }
         $document = $this->parser->parse($text);
+        $document->requireComplete();
         $elements = $document->elements();
         $serviceElements = $this->serviceElements($elements);
         if ([] === $serviceElements) {

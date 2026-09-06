@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Report source indexing failures for XML files that exceed analysis limits
 - Keep XML attribute recovery linear on large elements
 - Skip diagnostics for gitignored open files consistently
 - Ignore markup-like text on incomplete Twig directive lines

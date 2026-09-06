@@ -130,7 +130,10 @@ Limitations
 -----------
 
 XML service definitions are indexed for navigation, but in-file diagnostics
-and cursor features aren't available in XML files.
+and cursor features aren't available in XML files. XML files that exceed the
+analysis limit fail source indexing rather than exposing partial declarations.
+Split a large configuration into smaller imported files to keep navigation
+available.
 
 Environment-specific file detection follows Symfony's conventional ``config/``
 layout. Custom conditional imports aren't inferred from application code.

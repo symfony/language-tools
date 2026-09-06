@@ -137,6 +137,8 @@ final class TolerantXmlParserTest extends TestCase
         $diagnostics = (new TolerantXmlParser())->parse(str_repeat('</missing>', 200).'<real/>');
         $starts = array_values(array_filter($diagnostics->events, static fn ($event): bool => $event instanceof XmlElementStart));
 
+        self::assertTrue($events->truncated);
+        self::assertFalse($diagnostics->truncated);
         self::assertCount(100_000, $events->events);
         self::assertSame(['XML analysis stopped after reaching its structural limit.'], array_map(static fn ($diagnostic): string => $diagnostic->message, $events->diagnostics));
         self::assertCount(100, $diagnostics->diagnostics);

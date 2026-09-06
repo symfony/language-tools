@@ -219,6 +219,7 @@ final class TranslationCatalogExtractor
     private function xliffDeclarations(string $uri, string $text, string $domain, string $locale): array
     {
         $document = $this->xmlParser->parse($text);
+        $document->requireComplete();
         $units = [];
         $sources = [];
         $targets = [];

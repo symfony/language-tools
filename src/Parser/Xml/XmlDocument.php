@@ -17,6 +17,7 @@ final class XmlDocument
     public function __construct(
         public readonly array $events,
         public readonly array $diagnostics = [],
+        public readonly bool $truncated = false,
     ) {
         foreach ($events as $event) {
             if ($event instanceof XmlElementStart) {
@@ -24,6 +25,13 @@ final class XmlDocument
             } elseif ($event instanceof XmlElementEnd && null !== $event->identity) {
                 $this->ends[$event->identity] = $event;
             }
+        }
+    }
+
+    public function requireComplete(): void
+    {
+        if ($this->truncated) {
+            throw new \RuntimeException('XML analysis stopped after reaching its structural limit.');
         }
     }
 

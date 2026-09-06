@@ -218,6 +218,16 @@ final class TranslationExtractorTest extends TestCase
         self::assertSame('key.2999', $facts->declarations[2_999]->key);
     }
 
+    public function testRejectsTruncatedXliffCatalogsInsteadOfReturningPartialDeclarations(): void
+    {
+        $text = '<xliff><file><body>'.str_repeat("\n<trans-unit><source>key</source><target>Value</target></trans-unit>", 15_000).'</body></file></xliff>';
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('XML analysis stopped after reaching its structural limit.');
+
+        $this->extractor()->extract(new SourceDocument('file:///workspace/translations/messages.en.xlf', 'xml', $text));
+    }
+
     public function testIgnoresCommentedXliffUnits(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/translations/messages.en.xlf', 'xml', <<<'XLIFF'
