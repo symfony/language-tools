@@ -1492,6 +1492,38 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame(['inside'], array_map(static fn (PhpStringLiteral $key): string => $key->value, $document->literalArrays[1]->keys));
     }
 
+    public function testKeepsLiteralArrayFactsOnlyForArraysPassedAsArguments(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+
+            final class PageController
+            {
+                #[Route('/page', defaults: ['_locale' => 'en'])]
+                public function page(): Response
+                {
+                    return $this->render('page.html.twig', ['title' => $this->title]);
+                }
+
+                public function messages(): array
+                {
+                    return ['welcome' => 'Bienvenue'];
+                }
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $rendered = $document->literalArray($document->methodCalls[0]->positionalArgument(1));
+        $defaults = $document->literalArray($document->attributes[0]->argument('defaults'));
+
+        self::assertInstanceOf(PhpLiteralArray::class, $rendered);
+        self::assertSame(['title'], array_map(static fn (PhpStringLiteral $key): string => $key->value, $rendered->keys));
+        self::assertInstanceOf(PhpLiteralArray::class, $defaults);
+        self::assertSame(['_locale'], array_map(static fn (PhpStringLiteral $key): string => $key->value, $defaults->keys));
+        self::assertSame([$defaults, $rendered], $document->literalArrays);
+    }
+
     public function testFiltersAttributesByTarget(): void
     {
         $source = <<<'PHP'

@@ -8,6 +8,7 @@ use Microsoft\PhpParser\Node\AttributeGroup;
 use Microsoft\PhpParser\Node\ClassConstDeclaration;
 use Microsoft\PhpParser\Node\EnumCaseDeclaration;
 use Microsoft\PhpParser\Node\Expression\AnonymousFunctionCreationExpression;
+use Microsoft\PhpParser\Node\Expression\ArgumentExpression;
 use Microsoft\PhpParser\Node\Expression\ArrayCreationExpression;
 use Microsoft\PhpParser\Node\Expression\ArrowFunctionCreationExpression;
 use Microsoft\PhpParser\Node\Expression\CallExpression;
@@ -39,7 +40,7 @@ final class TolerantPhpNodeCollection
     /** @var list<ObjectCreationExpression> */
     public readonly array $objectCreations;
 
-    /** @var list<ArrayCreationExpression> */
+    /** @var list<ArrayCreationExpression> Arrays passed directly as a call, constructor or attribute argument */
     public readonly array $literalArrays;
 
     /** @var list<MethodDeclaration> */
@@ -109,7 +110,9 @@ final class TolerantPhpNodeCollection
             } elseif ($node instanceof ObjectCreationExpression) {
                 $objectCreations[] = $node;
             } elseif ($node instanceof ArrayCreationExpression) {
-                $literalArrays[] = $node;
+                if ($node->getParent() instanceof ArgumentExpression) {
+                    $literalArrays[] = $node;
+                }
             } elseif ($node instanceof MethodDeclaration) {
                 $methodDeclarations[] = $node;
             } elseif ($node instanceof AnonymousFunctionCreationExpression || $node instanceof ArrowFunctionCreationExpression) {
