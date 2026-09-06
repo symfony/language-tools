@@ -4,8 +4,10 @@ namespace Symfony\Lsp\Tests\Feature\Twig;
 
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Twig\TwigCallableArgumentAnalyzer;
+use Symfony\Lsp\Feature\Twig\TwigCallableArgumentReference;
 use Symfony\Lsp\Feature\Twig\TwigCallableCallExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableIndexRegistry;
@@ -13,8 +15,10 @@ use Symfony\Lsp\Feature\Twig\TwigCallableKind;
 use Symfony\Lsp\Feature\Twig\TwigCallableReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableSourceFacts;
 use Symfony\Lsp\Feature\Twig\TwigCallableSourceIndexer;
+use Symfony\Lsp\Feature\Twig\TwigCallableUsage;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
+use Symfony\Lsp\Index\SourceParseHealth;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -26,6 +30,44 @@ use Symfony\Lsp\Project\Project;
 
 final class TwigCallableSourceIndexerTest extends TestCase
 {
+    public function testPersistsOnlyCallsWithNamedArguments(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+        $uri = 'file:///workspace/templates/page.html.twig';
+        $text = <<<'TWIG'
+            {{ positional('value') }}
+            {{ named(value: 'value') }}
+            {{ item|filtered }}
+            TWIG;
+        $indexes = new TwigCallableIndexRegistry();
+        $indexer = $this->indexer($indexes);
+        $indexer->begin($project);
+        $facts = $indexer->index($project, new SourceDocument($uri, 'twig', $text));
+        self::assertInstanceOf(TwigCallableSourceFacts::class, $facts);
+        $indexer->finish($project);
+
+        self::assertSame(['positional', 'named', 'filtered'], array_map(static fn (TwigCallableUsage $usage): string => $usage->name, $facts->usages));
+        self::assertCount(1, $facts->calls);
+        self::assertSame('named', $facts->calls[0]->name);
+        self::assertSame(['value'], array_map(static fn (TwigCallableArgumentReference $argument): string => $argument->name, $facts->calls[0]->arguments));
+
+        $codec = new SourceIndexPayloadCodec();
+        $codec->validate([$indexer]);
+        $restored = $codec->decode($indexer->name(), $codec->encode($indexer->name(), $facts));
+        self::assertInstanceOf(TwigCallableSourceFacts::class, $restored);
+        self::assertCount(1, $restored->calls);
+        self::assertSame('named', $restored->calls[0]->name);
+
+        $indexer->overlay($project, new Document($uri, 'twig', 2, "{{ positional('changed') }}\n{{ item|filtered }}"), SourceParseHealth::Healthy);
+        $overlay = $indexes->forProject($project)->factsForUri($uri);
+        self::assertInstanceOf(TwigCallableSourceFacts::class, $overlay);
+        self::assertSame(['positional', 'filtered'], array_map(static fn (TwigCallableUsage $usage): string => $usage->name, $overlay->usages));
+        self::assertSame([], $overlay->calls);
+
+        $indexer->removeOverlay($project, $uri);
+        self::assertSame($facts, $indexes->forProject($project)->factsForUri($uri));
+    }
+
     public function testRestoresPersistedTwigCallableDeclarations(): void
     {
         $project = new Project('/workspace', 'file:///workspace');

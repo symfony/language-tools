@@ -38,7 +38,9 @@ final class TwigCallableCallExtractor
                     $this->converter->toRange($document->text, $argument->nameOffset, \strlen($argument->name)),
                 );
             }
-            $calls[] = new TwigCallableCallReference($call->kind, $call->callee, $arguments);
+            if ([] !== $arguments) {
+                $calls[] = new TwigCallableCallReference($call->kind, $call->callee, $arguments);
+            }
         }
 
         return $calls;
