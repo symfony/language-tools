@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
 use Symfony\Lsp\Index\AbstractSourceFactsIndex;
-use Symfony\Lsp\Index\SourceFactsOverlayOrder;
 
 /** @extends AbstractSourceFactsIndex<RouteSourceFacts> */
 final class RouteSourceIndex extends AbstractSourceFactsIndex
@@ -20,7 +19,7 @@ final class RouteSourceIndex extends AbstractSourceFactsIndex
     public function __construct(
         private readonly DependencyInjectionSourceIndex $classIndex,
     ) {
-        parent::__construct(SourceFactsOverlayOrder::PreserveSavedPosition);
+        parent::__construct();
     }
 
     /** @return list<RouteDeclaration> */

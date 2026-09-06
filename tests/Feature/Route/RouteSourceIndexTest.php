@@ -15,7 +15,7 @@ use Symfony\Lsp\Feature\Route\RouteSourceIndex;
 
 final class RouteSourceIndexTest extends TestCase
 {
-    public function testOverlayAtomicallyShadowsAndRestoresFactsInSavedOrder(): void
+    public function testOverlayAtomicallyShadowsAndRestoresFacts(): void
     {
         $firstUri = 'file:///first.php';
         $secondUri = 'file:///second.php';
@@ -31,8 +31,8 @@ final class RouteSourceIndexTest extends TestCase
         $index->overlay($overlayFirst);
 
         self::assertSame($overlayFirst, $index->factsForUri($firstUri));
-        self::assertSame([3, 2], $this->declarationLines($index, 'shared'));
-        self::assertSame([3, 2], $this->referenceLines($index, 'shared'));
+        self::assertSame([2, 3], $this->declarationLines($index, 'shared'));
+        self::assertSame([2, 3], $this->referenceLines($index, 'shared'));
         self::assertSame([3], array_map(
             static fn (RouteReferenceLocation $reference): int => $reference->range->start->line,
             $index->referencesForUri($firstUri),
