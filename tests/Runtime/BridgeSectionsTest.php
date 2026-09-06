@@ -389,7 +389,7 @@ final class BridgeSectionsTest extends TestCase
 
     public function testUsesEffectiveConfigurationForConventionTwigPaths(): void
     {
-        (new TwigFixtureBuilder($this->workspace))->writeThemedTwigApplication(withEffectiveConfiguration: true);
+        (new TwigFixtureBuilder($this->workspace))->writeThemedTwigApplicationWithEffectiveConfiguration();
 
         $process = $this->bridge->run(['--sections=twig']);
 
