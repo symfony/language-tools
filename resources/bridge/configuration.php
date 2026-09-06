@@ -11,6 +11,7 @@ final class SymfonyLspBridgeEffectiveConfiguration
 {
     private ?ContainerBuilder $container = null;
     private ?Throwable $containerError = null;
+    private array $extensionConfig = [];
     private array $configurations = [];
     private array $configurationErrors = [];
 
@@ -70,15 +71,8 @@ final class SymfonyLspBridgeEffectiveConfiguration
     {
         $container = $this->container();
         $extension = $container->getExtension($name);
-        $extensionConfig = [];
-        foreach ($container->getCompilerPassConfig()->getPasses() as $pass) {
-            if ($pass instanceof ValidateEnvPlaceholdersPass) {
-                $extensionConfig = $pass->getExtensionConfig();
-                break;
-            }
-        }
-        if (isset($extensionConfig[$name])) {
-            $configuration = $extensionConfig[$name];
+        if (isset($this->extensionConfig[$name])) {
+            $configuration = $this->extensionConfig[$name];
         } else {
             $configs = $container->getExtensionConfig($name);
             $definition = $extension instanceof ConfigurationInterface
@@ -124,6 +118,12 @@ final class SymfonyLspBridgeEffectiveConfiguration
                 $container->set('container.env_var_processors_locator', $runtimeContainer->get('container.env_var_processors_locator'));
             }
             $container->getCompiler()->compile($container);
+            foreach ($container->getCompilerPassConfig()->getPasses() as $pass) {
+                if ($pass instanceof ValidateEnvPlaceholdersPass) {
+                    $this->extensionConfig = $pass->getExtensionConfig();
+                    break;
+                }
+            }
 
             return $this->container = $container;
         } catch (Throwable $error) {

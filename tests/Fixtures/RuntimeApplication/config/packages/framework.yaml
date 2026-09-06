@@ -12,7 +12,10 @@ framework:
             command.bus: ~
             event.bus: ~
         transports:
-            async: 'in-memory://'
+            async:
+                dsn: 'in-memory://'
+                retry_strategy:
+                    max_retries: '%env(int:SYMFONY_LSP_TEST_MAX_RETRIES)%'
             failed: 'in-memory://'
         failure_transport: failed
         routing:
