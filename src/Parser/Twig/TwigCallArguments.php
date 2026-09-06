@@ -6,9 +6,14 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
 
 final class TwigCallArguments
 {
-    /** @param list<array{name: string|null, value: TreeSitterNode}> $arguments */
-    public function __construct(private readonly array $arguments)
-    {
+    /**
+     * @param list<array{name: string|null, value: TreeSitterNode}> $arguments
+     * @param list<array{name: string, offset: int}>                $named
+     */
+    public function __construct(
+        private readonly array $arguments,
+        private readonly array $named = [],
+    ) {
     }
 
     public function get(int $position, string ...$names): ?TreeSitterNode
@@ -23,5 +28,11 @@ final class TwigCallArguments
         }
 
         return $positional[$position] ?? null;
+    }
+
+    /** @return list<array{name: string, offset: int}> */
+    public function named(): array
+    {
+        return $this->named;
     }
 }

@@ -14,7 +14,6 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
         private readonly TwigCallableIndexRegistry $indexes,
         private readonly TwigCallableDeclarationExtractor $extractor,
         private readonly TwigCallableReferenceExtractor $references,
-        private readonly TwigCallableCallExtractor $calls,
     ) {
     }
 
@@ -56,7 +55,7 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
             return $this->extractor->extract($document);
         }
         if ('twig' === $document->languageId) {
-            return new TwigCallableSourceFacts($document->uri, [], $this->references->all($document), $this->calls->extract($document));
+            return $this->references->extract($document);
         }
 
         return null;

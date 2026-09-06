@@ -6,19 +6,42 @@ final class TwigDirectiveLocator
 {
     public function insideDirective(string $text, int $offset): bool
     {
+        [, $inside] = $this->locate($text, $offset);
+
+        return $inside;
+    }
+
+    /** @return list<array{start: int, end: int}> */
+    public function ranges(string $text): array
+    {
+        [$ranges, $inside, $start] = $this->locate($text, \strlen($text));
+        if ($inside && null !== $start) {
+            $ranges[] = ['start' => $start, 'end' => \strlen($text)];
+        }
+
+        return $ranges;
+    }
+
+    /** @return array{list<array{start: int, end: int}>, bool, int|null} */
+    private function locate(string $text, int $limit): array
+    {
+        $ranges = [];
+        $start = null;
         $close = null;
         $quote = null;
         $escaped = false;
         $brackets = [];
-        for ($cursor = 0; $cursor < $offset; ++$cursor) {
+        for ($cursor = 0; $cursor < $limit; ++$cursor) {
             $character = $text[$cursor];
             $pair = substr($text, $cursor, 2);
             if (null === $close) {
                 if ('{{' === $pair) {
+                    $start = $cursor;
                     $close = '}}';
                     $brackets = [];
                     ++$cursor;
                 } elseif ('{%' === $pair) {
+                    $start = $cursor;
                     $close = '%}';
                     $brackets = [];
                     ++$cursor;
@@ -42,11 +65,13 @@ final class TwigDirectiveLocator
             } elseif ([] !== $brackets && $character === $brackets[array_key_last($brackets)]) {
                 array_pop($brackets);
             } elseif ([] === $brackets && $close === $pair) {
+                $ranges[] = ['start' => $start ?? $cursor, 'end' => $cursor + 2];
+                $start = null;
                 $close = null;
                 ++$cursor;
             }
         }
 
-        return null !== $close;
+        return [$ranges, null !== $close, $start];
     }
 }

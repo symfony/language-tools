@@ -30,8 +30,7 @@ final class TwigCallableArgumentAnalyzer
 
     public function incompleteCall(string $before): ?TwigCallableCall
     {
-        [$calls, $stack, $quote] = $this->scan($before);
-        unset($calls);
+        [$stack, $quote] = $this->scan($before);
         if (null !== $quote || [] === $stack) {
             return null;
         }
@@ -50,31 +49,19 @@ final class TwigCallableArgumentAnalyzer
         return new TwigCallableCall(
             $open['callable']['kind'],
             $open['callable']['callee'],
-            $open['callable']['calleeOffset'],
-            $open['offset'] + 1,
             $arguments,
             $prefix[1] ?? '',
         );
     }
 
-    /** @return list<TwigCallableCall> */
-    public function completeCalls(string $text): array
-    {
-        [$calls] = $this->scan($text);
-
-        return $calls;
-    }
-
     /**
      * @return array{
-     *     list<TwigCallableCall>,
-     *     list<array{delimiter: string, offset: int, callable: array{kind: TwigCallableKind, callee: string, calleeOffset: int}|null}>,
+     *     list<array{delimiter: string, offset: int, callable: array{kind: TwigCallableKind, callee: string}|null}>,
      *     string|null
      * }
      */
     private function scan(string $text): array
     {
-        $calls = [];
         $stack = [];
         $quote = null;
         $escaped = false;
@@ -102,27 +89,15 @@ final class TwigCallableArgumentAnalyzer
                 ];
                 continue;
             }
-            if ([] === $stack || $character !== ['(' => ')', '[' => ']', '{' => '}'][$stack[array_key_last($stack)]['delimiter']]) {
-                continue;
+            if ([] !== $stack && $character === ['(' => ')', '[' => ']', '{' => '}'][$stack[array_key_last($stack)]['delimiter']]) {
+                array_pop($stack);
             }
-            $open = array_pop($stack);
-            if (')' !== $character || null === $open['callable']) {
-                continue;
-            }
-            $argumentsOffset = $open['offset'] + 1;
-            $calls[] = new TwigCallableCall(
-                $open['callable']['kind'],
-                $open['callable']['callee'],
-                $open['callable']['calleeOffset'],
-                $argumentsOffset,
-                $this->argumentParser->parse(substr($text, $argumentsOffset, $offset - $argumentsOffset), $argumentsOffset),
-            );
         }
 
-        return [$calls, $stack, $quote];
+        return [$stack, $quote];
     }
 
-    /** @return array{kind: TwigCallableKind, callee: string, calleeOffset: int}|null */
+    /** @return array{kind: TwigCallableKind, callee: string}|null */
     private function callableAt(string $text, int $openOffset): ?array
     {
         $head = substr($text, 0, $openOffset);
@@ -130,7 +105,6 @@ final class TwigCallableArgumentAnalyzer
             return [
                 'kind' => TwigCallableKind::Filter,
                 'callee' => $match[1][0],
-                'calleeOffset' => $match[1][1],
             ];
         }
         if (1 !== preg_match('/(?<![\w.|])([A-Za-z_][A-Za-z0-9_]*)\s*$/', $head, $match, \PREG_OFFSET_CAPTURE)
@@ -142,7 +116,6 @@ final class TwigCallableArgumentAnalyzer
         return [
             'kind' => TwigCallableKind::Function,
             'callee' => $match[1][0],
-            'calleeOffset' => $match[1][1],
         ];
     }
 

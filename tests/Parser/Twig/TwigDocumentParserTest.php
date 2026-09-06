@@ -159,6 +159,11 @@ final class TwigDocumentParserTest extends TestCase
         self::assertTrue($locator->insideDirective($source, (int) strpos($source, '2')));
         self::assertFalse($locator->insideDirective($source, \strlen($source)));
         self::assertTrue($locator->insideDirective('{{ unclosed(', 12));
+        self::assertSame(
+            ['{{ call("a }} b") }}', '{% set x = [1, {{k: 2}}] %}'],
+            array_map(static fn (array $range): string => substr($source, $range['start'], $range['end'] - $range['start']), $locator->ranges($source)),
+        );
+        self::assertSame([['start' => 0, 'end' => 12]], $locator->ranges('{{ unclosed('));
     }
 
     private function parser(): TwigDocumentParser

@@ -13,7 +13,6 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableArgumentAnalyzer;
-use Symfony\Lsp\Feature\Twig\TwigCallableCallExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableCompletionProvider;
 use Symfony\Lsp\Feature\Twig\TwigCallableDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableDiagnosticProvider;
@@ -21,12 +20,12 @@ use Symfony\Lsp\Feature\Twig\TwigCallableIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigCallableMethodResolver;
 use Symfony\Lsp\Feature\Twig\TwigCallableReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableRelationshipProvider;
-use Symfony\Lsp\Feature\Twig\TwigCallableSourceFacts;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
+use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
@@ -58,9 +57,14 @@ class TwigCallableProviderTestCase extends TestCase
         $documents = new DocumentStore();
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $referenceExtractor = new TwigCallableReferenceExtractor(new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()), $commentParser, $converter, new TwigDirectiveLocator());
+        $referenceExtractor = new TwigCallableReferenceExtractor(
+            new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()),
+            $commentParser,
+            $converter,
+            new TwigDirectiveLocator(),
+            new TwigCallArgumentResolver(new TwigArgumentParser()),
+        );
         $argumentAnalyzer = new TwigCallableArgumentAnalyzer(new TwigArgumentParser());
-        $callExtractor = new TwigCallableCallExtractor($converter, $referenceExtractor, $argumentAnalyzer, $commentParser);
         $callableFacts = [];
         $classFacts = [];
         $declarationExtractor = new TwigCallableDeclarationExtractor($converter, $phpParser);
@@ -72,8 +76,7 @@ class TwigCallableProviderTestCase extends TestCase
         }
         foreach ($twigDocuments as $uri => $text) {
             $documents->open(new Document($uri, 'twig', 1, $text));
-            $source = new SourceDocument($uri, 'twig', $text);
-            $callableFacts[] = new TwigCallableSourceFacts($uri, [], $referenceExtractor->all($source), $callExtractor->extract($source));
+            $callableFacts[] = $referenceExtractor->extract(new SourceDocument($uri, 'twig', $text));
         }
         $indexes = new TwigCallableIndexRegistry();
         $indexes->forProject($project)->replace(...$callableFacts);

@@ -150,4 +150,9 @@ final class TwigDocument
     {
         return $this->tree->text($node, $this->masked);
     }
+
+    public function maskedSource(): string
+    {
+        return $this->masked;
+    }
 }

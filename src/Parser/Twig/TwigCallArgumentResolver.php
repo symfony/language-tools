@@ -28,23 +28,29 @@ final class TwigCallArgumentResolver
         }
 
         $parsed = $this->parser->parse($text, $offset);
+        $named = [];
+        foreach ($parsed as $argument) {
+            if (null !== $argument->name && null !== $argument->nameOffset) {
+                $named[] = ['name' => $argument->name, 'offset' => $argument->nameOffset];
+            }
+        }
         $arguments = [];
         foreach ($document->children($container) as $child) {
             if ('argument' !== $child->type) {
                 continue;
             }
             $value = $document->directChild($child, 'argument_value') ?? $child;
-            $name = null;
+            $resolved = null;
             foreach ($parsed as $argument) {
                 if ($value->startByte >= $argument->offset && $value->startByte < $argument->offset + \strlen($argument->text)) {
-                    $name = $argument->name;
+                    $resolved = $argument;
 
                     break;
                 }
             }
-            $arguments[] = ['name' => $name, 'value' => $value];
+            $arguments[] = ['name' => $resolved?->name, 'value' => $value];
         }
 
-        return new TwigCallArguments($arguments);
+        return new TwigCallArguments($arguments, $named);
     }
 }

@@ -32,6 +32,10 @@ final class TwigCallArgumentResolverTest extends TestCase
         $parameters = $named->get(1, 'parameters');
         self::assertSame("'named.key'", null === $message ? null : $document->text($message));
         self::assertSame('{}', null === $parameters ? null : $document->text($parameters));
+        self::assertSame([
+            ['name' => 'parameters', 'offset' => strpos($source, 'parameters')],
+            ['name' => 'message', 'offset' => strpos($source, 'message')],
+        ], $named->named());
 
         $positional = $resolver->resolve($document, $calls[1]);
         $message = $positional->get(0);
@@ -40,5 +44,6 @@ final class TwigCallArgumentResolverTest extends TestCase
         self::assertSame("'positional.key'", null === $message ? null : $document->text($message));
         self::assertSame('{}', null === $parameters ? null : $document->text($parameters));
         self::assertSame("'admin'", null === $domain ? null : $document->text($domain));
+        self::assertSame([], $positional->named());
     }
 }
