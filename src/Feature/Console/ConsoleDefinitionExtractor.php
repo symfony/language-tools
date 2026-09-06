@@ -72,10 +72,13 @@ final class ConsoleDefinitionExtractor
             return true;
         }
         $receiver = $php->receiverCall($call);
+        while (null !== $receiver && null !== $parent = $php->receiverCall($receiver)) {
+            $receiver = $parent;
+        }
 
         return null !== $receiver
-            && \in_array($receiver->method, ['addArgument', 'addOption', 'setDefinition'], true)
-            && $this->isDefinitionReceiver($php, $receiver);
+            && PhpMethodReceiverKind::This === $receiver->receiverContext->kind
+            && \in_array($receiver->method, ['addArgument', 'addOption', 'setDefinition'], true);
     }
 
     /** @return array{list<string>, list<string>, bool} */

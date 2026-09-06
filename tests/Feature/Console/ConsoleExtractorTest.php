@@ -115,6 +115,24 @@ final class ConsoleExtractorTest extends TestCase
         self::assertSame([ConsoleInputKind::Argument, ConsoleInputKind::Option], array_map(static fn ($reference): ConsoleInputKind => $reference->kind, $facts->references));
     }
 
+    public function testKeepsDefinitionsFromChainsRootedInDefinitionMethods(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/ImportCommand.php', 'php', <<<'PHP'
+            <?php
+            final class ImportCommand
+            {
+                protected function configure(): void
+                {
+                    $this->addArgument('source')->setDescription('Source')->addOption('format');
+                    $this->setDescription('Import data')->addOption('ignored');
+                }
+            }
+            PHP));
+
+        self::assertSame(['source'], $facts->declarations[0]->arguments);
+        self::assertSame(['format'], $facts->declarations[0]->options);
+    }
+
     public function testIndexesInputReferencesCapturedInsideClosures(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/CapturedCommand.php', 'php', <<<'PHP'

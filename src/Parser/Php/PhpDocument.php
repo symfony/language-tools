@@ -4,6 +4,8 @@ namespace Symfony\Lsp\Parser\Php;
 
 final class PhpDocument
 {
+    /** @var array<string, PhpMethodCall> */
+    private readonly array $methodCallsByRange;
     private readonly PhpNameContext $names;
 
     /**
@@ -35,6 +37,11 @@ final class PhpDocument
         public readonly array $lexicalScopes = [],
         public readonly array $literalArrays = [],
     ) {
+        $methodCallsByRange = [];
+        foreach ($methodCalls as $call) {
+            $methodCallsByRange[$call->startOffset.':'.$call->endOffset] ??= $call;
+        }
+        $this->methodCallsByRange = $methodCallsByRange;
         $this->names = $names ?? new PhpNameContext();
     }
 
@@ -104,13 +111,9 @@ final class PhpDocument
     public function receiverCall(PhpMethodCall $call): ?PhpMethodCall
     {
         $receiver = $call->receiverContext;
-        foreach ($this->methodCalls as $candidate) {
-            if ($call !== $candidate && $receiver->startOffset === $candidate->startOffset && $receiver->endOffset === $candidate->endOffset) {
-                return $candidate;
-            }
-        }
+        $candidate = $this->methodCallsByRange[$receiver->startOffset.':'.$receiver->endOffset] ?? null;
 
-        return null;
+        return $call === $candidate ? null : $candidate;
     }
 
     /**
@@ -121,30 +124,18 @@ final class PhpDocument
      */
     public function visibleVariables(int $offset, ?string $name = null): array
     {
-        $variables = array_values(array_filter(
+        $scope = $this->lexicalScopeAt($offset);
+
+        return array_values(array_filter(
             $this->typedVariables,
-            static fn (PhpTypedVariable $variable): bool => \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+            fn (PhpTypedVariable $variable): bool => \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
                 && null !== $variable->scopeStartOffset
                 && null !== $variable->scopeEndOffset
                 && $offset >= $variable->scopeStartOffset
                 && $offset <= $variable->scopeEndOffset
-                && (null === $name || $name === $variable->name),
+                && (null === $name || $name === $variable->name)
+                && (null === $scope || $variable->scopeStartOffset === $scope->startOffset || $this->isVariableVisibleFromScope($variable->name, $variable->scopeStartOffset, $scope->startOffset)),
         ));
-        if (null === $name) {
-            return $variables;
-        }
-
-        $scopeStartOffset = -1;
-        foreach ($this->lexicalScopes as $scope) {
-            if ($offset >= $scope->startOffset && $offset <= $scope->endOffset && \in_array($name, $scope->parameterNames, true)) {
-                $scopeStartOffset = max($scopeStartOffset, $scope->startOffset);
-            }
-        }
-        foreach ($variables as $variable) {
-            $scopeStartOffset = max($scopeStartOffset, $variable->scopeStartOffset ?? -1);
-        }
-
-        return array_values(array_filter($variables, static fn (PhpTypedVariable $variable): bool => $scopeStartOffset === $variable->scopeStartOffset));
     }
 
     /**
@@ -190,24 +181,7 @@ final class PhpDocument
 
     public function isVariableVisible(string $name, int $declarationScopeStartOffset, PhpMethodCall $call): bool
     {
-        $scopeStartOffset = $call->scopeStartOffset;
-        if (!\is_int($scopeStartOffset)) {
-            return false;
-        }
-        while ($scopeStartOffset !== $declarationScopeStartOffset) {
-            $scope = $this->lexicalScopeStartingAt($scopeStartOffset);
-            if (null === $scope || !$scope->captureComplete || \in_array($name, $scope->parameterNames, true)) {
-                return false;
-            }
-            if (PhpLexicalScopeKind::Closure === $scope->kind && !\in_array($name, $scope->capturedVariableNames, true)) {
-                return false;
-            }
-            if (null === $scopeStartOffset = $scope->parentScopeStartOffset) {
-                return false;
-            }
-        }
-
-        return true;
+        return \is_int($call->scopeStartOffset) && $this->isVariableVisibleFromScope($name, $declarationScopeStartOffset, $call->scopeStartOffset);
     }
 
     /** @return list<PhpAttribute> */
@@ -230,6 +204,36 @@ final class PhpDocument
         }
 
         return $attributes;
+    }
+
+    private function isVariableVisibleFromScope(string $name, int $declarationScopeStartOffset, int $scopeStartOffset): bool
+    {
+        while ($scopeStartOffset !== $declarationScopeStartOffset) {
+            $scope = $this->lexicalScopeStartingAt($scopeStartOffset);
+            if (null === $scope || !$scope->captureComplete || \in_array($name, $scope->parameterNames, true)) {
+                return false;
+            }
+            if (PhpLexicalScopeKind::Closure === $scope->kind && !\in_array($name, $scope->capturedVariableNames, true)) {
+                return false;
+            }
+            if (null === $scopeStartOffset = $scope->parentScopeStartOffset) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function lexicalScopeAt(int $offset): ?PhpLexicalScope
+    {
+        $innermost = null;
+        foreach ($this->lexicalScopes as $scope) {
+            if ($offset >= $scope->startOffset && $offset <= $scope->endOffset && (null === $innermost || $scope->startOffset > $innermost->startOffset)) {
+                $innermost = $scope;
+            }
+        }
+
+        return $innermost;
     }
 
     private function lexicalScopeStartingAt(int $startOffset): ?PhpLexicalScope
