@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Preserve PHP source analysis while a parent class name is incomplete
 - Report source indexing failures for XML files that exceed analysis limits
 - Keep XML attribute recovery linear on large elements
 - Skip diagnostics for gitignored open files consistently

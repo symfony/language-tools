@@ -93,4 +93,5 @@ on an application bus.
 Inherited handler relationships are available only for parent classes and
 interfaces declared in indexed application source. Relationships that can't be
 identified from an incomplete PHP type declaration are omitted until the
-declaration is completed.
+declaration is completed. An unfinished parent class name doesn't prevent
+other declarations in the file from remaining available.

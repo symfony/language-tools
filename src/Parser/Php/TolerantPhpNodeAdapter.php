@@ -63,7 +63,7 @@ final class TolerantPhpNodeAdapter
     {
         $base = $this->member($declaration, 'classBaseClause');
 
-        return $base instanceof ClassBaseClause ? $base : null;
+        return $base instanceof ClassBaseClause && $this->member($base, 'baseClass') instanceof QualifiedName ? $base : null;
     }
 
     /**
