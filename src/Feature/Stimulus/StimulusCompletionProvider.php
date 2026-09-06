@@ -32,6 +32,9 @@ final class StimulusCompletionProvider implements CompletionProviderInterface
         $values = null === $context->kind
             ? $this->stimulus->controllerNames($request->project)
             : $this->stimulus->members($request->project, $context->controller ?? '', $context->kind);
+        $rangeStart = $this->converter->toByteOffset($request->document->text, $context->range->start);
+        $rangeEnd = $this->converter->toByteOffset($request->document->text, $context->range->end);
+        $rawPrefix = substr($request->document->text, $rangeStart, $rangeEnd - $rangeStart);
         $items = [];
         foreach ($values as $value) {
             if (!str_starts_with($value, $context->prefix)) {
@@ -41,6 +44,7 @@ final class StimulusCompletionProvider implements CompletionProviderInterface
                 'label' => $value,
                 'kind' => null === $context->kind ? 7 : 2,
                 'detail' => null === $context->kind ? 'Stimulus controller' : \sprintf('Stimulus %s', $context->kind->value),
+                ...($rawPrefix === $context->prefix ? [] : ['filterText' => $rawPrefix]),
                 'textEdit' => $this->protocol->textEdit($context->range, $value),
             ];
         }

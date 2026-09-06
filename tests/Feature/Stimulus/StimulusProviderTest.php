@@ -154,7 +154,9 @@ final class StimulusProviderTest extends TestCase
         $codeLensProvider = new StimulusCodeLensProvider($documentResolver, $protocol, $sourceIndexes, $extractor);
 
         self::assertSame(['search'], array_column($completionProvider->complete($this->params($converter, $controllerCompletionUri, $controllerCompletionText, \strlen($controllerCompletionText))) ?? [], 'label'));
-        self::assertSame(['symfony--ux-autocomplete--autocomplete'], array_column($completionProvider->complete($this->params($converter, $packageControllerCompletionUri, $packageControllerCompletionText, \strlen($packageControllerCompletionText))) ?? [], 'label'));
+        $packageControllerCompletion = $completionProvider->complete($this->params($converter, $packageControllerCompletionUri, $packageControllerCompletionText, \strlen($packageControllerCompletionText))) ?? [];
+        self::assertSame(['symfony--ux-autocomplete--autocomplete'], array_column($packageControllerCompletion, 'label'));
+        self::assertSame(['@symfony/ux-auto'], array_column($packageControllerCompletion, 'filterText'));
         self::assertSame(['open'], array_column($completionProvider->complete($this->params($converter, $actionCompletionUri, $actionCompletionText, \strlen($actionCompletionText))) ?? [], 'label'));
         self::assertSame(['results'], array_column($completionProvider->complete($this->params($converter, $targetCompletionUri, $targetCompletionText, \strlen($targetCompletionText))) ?? [], 'label'));
         self::assertSame(['onChange'], array_column($completionProvider->complete($this->params($converter, $packageActionCompletionUri, $packageActionCompletionText, \strlen($packageActionCompletionText))) ?? [], 'label'));

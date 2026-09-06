@@ -20,6 +20,7 @@ export const stimulusTests: TestCase[] = [
 
 async function testStimulusLanguageFeatures(): Promise<void> {
     const contents = `<div data-controller="sea"></div>
+{{ stimulus_controller('@symfony/ux-auto') }}
 <button data-controller="search missing"
         data-action="click->search#op click->search#open"
         data-search-target="res results">
@@ -33,6 +34,14 @@ async function testStimulusLanguageFeatures(): Promise<void> {
             'Stimulus controller completion',
         );
         assert.ok(labels(controllerItems).includes('search'));
+
+        const packageControllerCompletionPosition = positionAfter(document, '@symfony/ux-auto');
+        const packageControllerItems = await waitFor(
+            () => completions(document.uri, packageControllerCompletionPosition),
+            (result) => labels(result).includes('symfony--ux-autocomplete--autocomplete'),
+            'Symfony UX package controller completion',
+        );
+        assert.ok(labels(packageControllerItems).includes('symfony--ux-autocomplete--autocomplete'));
 
         const actionCompletionPosition = positionAfter(document, 'click->search#op');
         const actionItems = await waitFor(

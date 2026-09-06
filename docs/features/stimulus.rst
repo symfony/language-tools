@@ -14,7 +14,8 @@ helpers. Action completion is available in ``data-action`` descriptors and the
 ``data-*-target`` attributes and the ``stimulus_target()`` helper. The Twig
 helpers accept Symfony UX package names such as
 ``symfony/ux-autocomplete/autocomplete`` and
-``@symfony/ux-autocomplete/autocomplete``.
+``@symfony/ux-autocomplete/autocomplete``. Controller completion recognizes
+these spellings while typing and inserts the normalized Stimulus identifier.
 
 For example, when ``assets/controllers/search_controller.js`` declares an
 ``open()`` method and a ``results`` target, Symfony Language Tools completes
