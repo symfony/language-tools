@@ -111,21 +111,24 @@ YAML;
         self::assertSame(['Symfony\Component\HttpKernel\Event\RequestEvent'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
     }
 
-    public function testDistinguishesTraitUsesFromClosureCapturesWhenDiagnosingListenerMethods(): void
+    public function testDiagnosesListenerMethodsUsingResolvedTraitFacts(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Listener.php', 'php', <<<'PHP'
             <?php
             namespace App;
 
             use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+            use Vendor\SharedListener as AliasedListener;
 
-            trait SharedListener
+            trait LocalListener
             {
             }
 
             #[AsEventListener(event: 'app.closure', method: 'missingClosure')]
             final class ClosureListener
             {
+                // use AliasedListener;
+
                 public function configure(): void
                 {
                     $value = null;
@@ -134,17 +137,41 @@ YAML;
                 }
             }
 
-            #[AsEventListener(event: 'app.trait', method: 'missingTrait')]
-            final class TraitListener
+            #[AsEventListener(event: 'app.alias', method: 'missingAlias')]
+            final class AliasListener
             {
-                use SharedListener;
+                use AliasedListener;
             }
+
+            #[AsEventListener(event: 'app.multiple', method: 'missingMultiple')]
+            final class MultipleTraitListener
+            {
+                use LocalListener, \Vendor\FullyQualifiedListener;
+            }
+
+            #[AsEventListener(event: 'app.runtime', method: 'onRuntime')]
+            final class RuntimeListener
+            {
+                public function onRuntime(): void
+                {
+                }
+            }
+
+            #[AsEventListener(event: 'app.incomplete', method: 'missingIncomplete')]
+            final class IncompleteListener
+            {
+                use AliasedListener;
             PHP));
 
         self::assertSame(
             [['App\\ClosureListener', 'missingClosure']],
             array_map(static fn ($invalid): array => [$invalid->className, $invalid->method], $facts->invalidListenerMethods),
         );
+        self::assertSame(
+            ['app.closure', 'app.alias', 'app.multiple', 'app.runtime', 'app.incomplete'],
+            array_map(static fn ($symbol): string => $symbol->name, $facts->symbols),
+        );
+        self::assertCount(5, $facts->listeners);
     }
 
     public function testIndexesOnlyCompleteClassReferencesInListenerEvents(): void

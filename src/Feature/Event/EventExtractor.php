@@ -113,7 +113,7 @@ final class EventExtractor
                 $symbols[] = $this->symbol($eventReference->className, $uri, $text, $eventReference->startOffset, true, $eventReference->endOffset - $eventReference->startOffset);
             }
             if (null !== $type) {
-                $invalid = $this->invalidListenerMethod($attribute, $type, $php, $source, $text);
+                $invalid = $this->invalidListenerMethod($attribute, $type, $php, $text);
                 if (null !== $invalid) {
                     $invalidListenerMethods[] = $invalid;
                 }
@@ -152,7 +152,7 @@ final class EventExtractor
         return new EventSourceSymbol(ltrim($name, '\\'), $uri, new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + ($length ?? \strlen($name)))), $declaration);
     }
 
-    private function invalidListenerMethod(PhpAttribute $attribute, PhpTypeDeclaration $type, PhpDocument $php, string $source, string $text): ?InvalidEventListenerMethod
+    private function invalidListenerMethod(PhpAttribute $attribute, PhpTypeDeclaration $type, PhpDocument $php, string $text): ?InvalidEventListenerMethod
     {
         $method = $attribute->argument('method')?->stringLiteral;
         if (null === $method || '' === $method->value) {
@@ -161,7 +161,7 @@ final class EventExtractor
         if (!$type->isClass() || null !== $type->parentClassName || str_contains($type->signature, 'extends')) {
             return null;
         }
-        if ($this->usesTrait($type, $php, $source)) {
+        if ([] !== $type->traitNames) {
             return null;
         }
         foreach ($php->methodDeclarations as $declaration) {
@@ -175,25 +175,6 @@ final class EventExtractor
             $method->value,
             new Range($this->converter->toPosition($text, $method->startOffset), $this->converter->toPosition($text, $method->endOffset)),
         );
-    }
-
-    private function usesTrait(PhpTypeDeclaration $type, PhpDocument $php, string $source): bool
-    {
-        $body = substr($source, $type->startOffset, $type->endOffset - $type->startOffset);
-        preg_match_all('/\buse\s+[^;]+;/', $body, $matches, \PREG_OFFSET_CAPTURE);
-        foreach ($matches[0] as [, $relativeOffset]) {
-            $offset = $type->startOffset + $relativeOffset;
-            if (!array_any($php->methodDeclarations, static fn ($method): bool => $type->name === $method->className
-                && null !== $method->bodyStartOffset
-                && null !== $method->bodyEndOffset
-                && $offset >= $method->bodyStartOffset
-                && $offset < $method->bodyEndOffset
-            )) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private function hasEventDispatcherReceiver(PhpDocument $php, PhpMethodCall $call): bool
