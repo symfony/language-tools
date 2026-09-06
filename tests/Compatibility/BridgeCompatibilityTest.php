@@ -53,6 +53,10 @@ final class BridgeCompatibilityTest extends TestCase
         $routeItems = \is_array($routes['items'] ?? null) ? $routes['items'] : [];
         self::assertContains('fixture_home', array_column($routeItems, 'name'));
         self::assertContains('fixture_health', array_column($routeItems, 'name'));
+        $routeAlias = array_column($routeItems, null, 'name')['App\\Controller\\RouteAliasController::index'] ?? null;
+        self::assertIsArray($routeAlias);
+        self::assertSame('fixture_route_alias', $routeAlias['alias'] ?? null);
+        self::assertSame('/route-alias', $routeAlias['path'] ?? null);
         $routeResources = \is_array($routes['resources'] ?? null) ? $routes['resources'] : [];
         self::assertContains('config/routes.yaml', $routeResources);
         self::assertContains('config/http_endpoints.yaml', $routeResources);
@@ -65,6 +69,17 @@ final class BridgeCompatibilityTest extends TestCase
                 && str_starts_with($route['name'], 'fixture_localized.'),
         ));
         self::assertSame(['fixture_localized', 'fixture_localized'], array_column($localizedRoutes, 'canonical'));
+        $localizedAliasGeneration = $this->generateRoute($project, 'fixture_localized_alias');
+        self::assertContains($localizedAliasGeneration, ['/localized', 'missing']);
+        $localizedAliases = array_values(array_filter(
+            $routeItems,
+            static fn (mixed $route): bool => \is_array($route)
+                && \is_string($route['name'] ?? null)
+                && str_starts_with($route['name'], 'fixture_localized_alias.'),
+        ));
+        self::assertSame(['fixture_localized_alias.en', 'fixture_localized_alias.fr'], array_column($localizedAliases, 'name'));
+        $expectedAliasCanonical = 'missing' === $localizedAliasGeneration ? null : 'fixture_localized_alias';
+        self::assertSame([$expectedAliasCanonical, $expectedAliasCanonical], array_column($localizedAliases, 'canonical'));
         self::assertContains('App\\Environment\\CustomEnvVarProcessor', array_column(\is_array($container['items'] ?? null) ? $container['items'] : [], 'class'));
         self::assertContains('fixture.message', array_column(\is_array($translations['items'] ?? null) ? $translations['items'] : [], 'key'));
         $configurationBundles = \is_array($configuration['bundles'] ?? null) ? $configuration['bundles'] : [];
@@ -238,6 +253,33 @@ final class BridgeCompatibilityTest extends TestCase
         ], $result['configurationValidation'] ?? null);
         self::assertSame([], $result['sections'] ?? null);
         self::assertSame([], $result['errors'] ?? null);
+    }
+
+    private function generateRoute(string $project, string $name): string
+    {
+        $process = (new NativeProcessRunner(30.0))->run([
+            \PHP_BINARY,
+            '-r',
+            <<<'PHP'
+                $project = $argv[1];
+                require $project.'/vendor/autoload.php';
+                $kernel = new App\Kernel('test', false);
+                $kernel->boot();
+                try {
+                    echo $kernel->getContainer()->get('router')->generate($argv[2]);
+                } catch (Symfony\Component\Routing\Exception\RouteNotFoundException) {
+                    echo 'missing';
+                } finally {
+                    $kernel->shutdown();
+                }
+                PHP,
+            $project,
+            $name,
+        ], $project);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+
+        return trim($process->stdout);
     }
 
     /**

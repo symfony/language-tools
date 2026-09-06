@@ -40,14 +40,26 @@ final class BridgeRoutesTest extends TestCase
         self::assertIsArray($result['sections']['routes'] ?? null);
         self::assertSame([
             [
-                'name' => 'article_legacy',
-                'path' => null,
-                'methods' => [],
+                'name' => 'App\\Controller\\ArticleController::show',
+                'path' => '/article/{id}',
+                'methods' => ['GET', 'HEAD'],
                 'schemes' => [],
                 'host' => null,
-                'controller' => null,
-                'defaults' => [],
-                'requirements' => [],
+                'controller' => 'App\\Controller\\ArticleController::show',
+                'defaults' => ['_controller'],
+                'requirements' => ['id' => '\\d+'],
+                'canonical' => null,
+                'alias' => 'article_show',
+            ],
+            [
+                'name' => 'article_legacy',
+                'path' => '/article/{id}',
+                'methods' => ['GET', 'HEAD'],
+                'schemes' => [],
+                'host' => null,
+                'controller' => 'App\\Controller\\ArticleController::show',
+                'defaults' => ['_controller'],
+                'requirements' => ['id' => '\\d+'],
                 'canonical' => null,
                 'alias' => 'article_show',
             ],
@@ -99,9 +111,58 @@ final class BridgeRoutesTest extends TestCase
                 'canonical' => 'localized_home',
                 'alias' => null,
             ],
+            [
+                'name' => 'localized_legacy.en',
+                'path' => '/en',
+                'methods' => ['GET'],
+                'schemes' => [],
+                'host' => null,
+                'controller' => 'App\\Controller\\HomeController',
+                'defaults' => ['_locale', '_canonical_route', '_controller'],
+                'requirements' => [],
+                'canonical' => 'localized_legacy',
+                'alias' => 'localized_home.en',
+            ],
+            [
+                'name' => 'localized_legacy.fr',
+                'path' => '/fr',
+                'methods' => ['GET'],
+                'schemes' => [],
+                'host' => null,
+                'controller' => 'App\\Controller\\HomeController',
+                'defaults' => ['_locale', '_canonical_route', '_controller'],
+                'requirements' => [],
+                'canonical' => 'localized_legacy',
+                'alias' => 'localized_home.fr',
+            ],
         ], $result['sections']['routes']['items']);
         self::assertSame(['_locale', 'tenant'], $result['sections']['routes']['contextParameters']);
         self::assertSame(['config/endpoints/LegacyEndpoints.php', 'config/http_endpoints.yaml'], $result['sections']['routes']['resources']);
         self::assertTrue($result['sections']['routes']['complete']);
+    }
+
+    public function testKeepsLocalizedAliasesConcreteBeforeSymfonySupportsCanonicalAliases(): void
+    {
+        (new RouteFixtureBuilder($this->workspace))->writeRouteApplication(version: '6.4.45');
+
+        $process = $this->bridge->run(['--sections=routes']);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        $sections = $result['sections'] ?? null;
+        self::assertIsArray($sections);
+        $routes = $sections['routes'] ?? null;
+        self::assertIsArray($routes);
+        $items = $routes['items'] ?? null;
+        self::assertIsArray($items);
+        $aliases = array_values(array_filter(
+            $items,
+            static fn (mixed $item): bool => \is_array($item)
+                && \is_string($item['name'] ?? null)
+                && str_starts_with($item['name'], 'localized_legacy.'),
+        ));
+        self::assertSame(['localized_legacy.en', 'localized_legacy.fr'], array_column($aliases, 'name'));
+        self::assertSame([null, null], array_column($aliases, 'canonical'));
     }
 }

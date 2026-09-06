@@ -37,7 +37,9 @@ final class RouteIndex
         foreach ($routes as $route) {
             $this->routes[$route->name] = $route;
             if (null === $canonicalName = $route->canonicalName) {
-                $this->completionRoutes[$route->name] = $route;
+                if (null === $route->alias) {
+                    $this->completionRoutes[$route->name] = $route;
+                }
             } else {
                 $localizedRoutes[$canonicalName][] = $route;
             }
@@ -45,7 +47,9 @@ final class RouteIndex
         foreach ($localizedRoutes as $canonicalName => $variants) {
             $route = $this->aggregate($canonicalName, $variants);
             $this->routes[$canonicalName] = $route;
-            $this->completionRoutes[$canonicalName] = $route;
+            if (null === $variants[0]->alias) {
+                $this->completionRoutes[$canonicalName] = $route;
+            }
         }
         ksort($this->routes);
         ksort($this->completionRoutes);

@@ -10,7 +10,7 @@ final class RouteFixtureBuilder
     ) {
     }
 
-    public function writeRouteApplication(string $kernelNamespace = 'App'): void
+    public function writeRouteApplication(string $kernelNamespace = 'App', string $version = '8.0.6'): void
     {
         $source = $this->prelude->render(<<<'PHP'
             __INSTALLED_VERSIONS__
@@ -105,19 +105,13 @@ final class RouteFixtureBuilder
     {
         $output->write("\n ! [NOTE] Some deprecation notice written to the console output.\n\n");
         $output->write(json_encode([
-            'article_legacy' => [
-                'alias' => 'article_show',
-                'method' => 'ANY',
-                'scheme' => 'ANY',
-                'host' => 'ANY',
-                'defaults' => [],
-            ],
             'homepage' => [
                 'path' => '/',
                 'method' => 'ANY',
                 'scheme' => 'https',
                 'host' => 'example.com',
                 'defaults' => [],
+                'aliases' => 'ignored',
             ],
             'article_show' => [
                 'path' => '/article/{id}',
@@ -126,6 +120,7 @@ final class RouteFixtureBuilder
                 'host' => 'ANY',
                 'defaults' => ['_controller' => 'App\\Controller\\ArticleController::show'],
                 'requirements' => ['id' => '\\d+'],
+                'aliases' => ['article_legacy', 42, null, 'App\\Controller\\ArticleController::show'],
             ],
             'localized_home.en' => [
                 'path' => '/en',
@@ -137,6 +132,7 @@ final class RouteFixtureBuilder
                     '_canonical_route' => 'localized_home',
                     '_controller' => 'App\\Controller\\HomeController',
                 ],
+                'aliases' => ['localized_legacy.en'],
             ],
             'localized_home.fr' => [
                 'path' => '/fr',
@@ -148,6 +144,7 @@ final class RouteFixtureBuilder
                     '_canonical_route' => 'localized_home',
                     '_controller' => 'App\\Controller\\HomeController',
                 ],
+                'aliases' => ['localized_legacy.fr'],
             ],
         ], JSON_THROW_ON_ERROR));
         $output->write("\nTrailing console noise after the payload.\n");
@@ -155,6 +152,7 @@ final class RouteFixtureBuilder
         return 0;
     }
 PHP,
+            version: $version,
         );
         $this->workspace->write('vendor/autoload.php', str_replace('namespace App;', 'namespace '.$kernelNamespace.';', $source));
     }

@@ -77,6 +77,7 @@ jobs:
                   --with "symfony/framework-bundle:${{ matrix.symfony }}.*"
                   --with "symfony/messenger:${{ matrix.symfony }}.*"
                   --with "symfony/property-info:${{ matrix.symfony }}.*"
+                  --with "symfony/routing:${{ matrix.symfony }}.*"
                   --with "symfony/security-bundle:${{ matrix.symfony }}.*"
                   --with "symfony/string:${{ matrix.symfony }}.*"
                   --with "symfony/translation:${{ matrix.symfony }}.*"

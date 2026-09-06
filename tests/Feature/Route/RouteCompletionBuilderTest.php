@@ -19,6 +19,7 @@ final class RouteCompletionBuilderTest extends TestCase
             'items' => [
                 ['name' => 'admin_user', 'path' => '/admin/user'],
                 ['name' => 'article_show', 'path' => '/article/{id}', 'methods' => ['GET']],
+                ['name' => 'article_legacy', 'path' => '/article/{id}', 'alias' => 'article_show'],
                 ['name' => 'article_edit', 'path' => '/article/{id}/edit'],
             ],
         ]);
@@ -39,12 +40,15 @@ final class RouteCompletionBuilderTest extends TestCase
             'items' => [
                 ['name' => 'app_home.en', 'canonical' => 'app_home', 'path' => '/en/{english}'],
                 ['name' => 'app_home.fr', 'canonical' => 'app_home', 'path' => '/fr/{french}'],
+                ['name' => 'legacy_home.en', 'canonical' => 'legacy_home', 'path' => '/en/{english}', 'alias' => 'app_home.en'],
+                ['name' => 'legacy_home.fr', 'canonical' => 'legacy_home', 'path' => '/fr/{french}', 'alias' => 'app_home.fr'],
             ],
         ]);
 
         self::assertSame([
             ['label' => 'app_home', 'kind' => 12, 'detail' => 'Symfony route'],
-        ], (new RouteCompletionBuilder())->complete($index, 'app_'));
+        ], (new RouteCompletionBuilder())->complete($index, ''));
+        self::assertInstanceOf(Route::class, $index->get('legacy_home'));
     }
 
     public function testLoadsRouterRequestContextParameters(): void

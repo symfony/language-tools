@@ -68,6 +68,7 @@ final class RouteHoverHandlerTest extends TestCase
             'App\\Controller\\ArticleController::show',
             ['locale'],
             ['id' => '\\d+'],
+            alias: 'article_detail',
         ));
         $converter = new PositionConverter();
         $offset = strpos($text, 'article_show') + 3;
@@ -91,7 +92,7 @@ final class RouteHoverHandlerTest extends TestCase
         self::assertSame([
             'contents' => [
                 'kind' => 'markdown',
-                'value' => "`article_show`\n\nPath: `/article/{id}`\n\nHost: `{subdomain}.example.com`\n\nMethods: `GET`\n\nSchemes: `https`\n\nDefaults: `locale`\n\nRequirements: `id: \\d+`\n\nController: `App\\Controller\\ArticleController::show`",
+                'value' => "`article_show`\n\nAlias of: `article_detail`\n\nPath: `/article/{id}`\n\nHost: `{subdomain}.example.com`\n\nMethods: `GET`\n\nSchemes: `https`\n\nDefaults: `locale`\n\nRequirements: `id: \\d+`\n\nController: `App\\Controller\\ArticleController::show`",
             ],
         ], $handler->hover([
             'textDocument' => ['uri' => $uri],

@@ -32,6 +32,10 @@ navigation and diagnostics also recognize reordered named arguments. Static
 Twig route names and quoted parameter keys use Twig's string escape semantics.
 Twig parameter mappings support explicit entries such as
 ``{slug: article.slug}`` and shorthand entries such as ``{year, month}``.
+Runtime route aliases, including controller aliases such as
+``App\Controller\ArticleController::show``, are recognized by hover and
+diagnostics. Completion, navigation, references and rename use the declared
+route name.
 
 Route Name Completion
 ---------------------

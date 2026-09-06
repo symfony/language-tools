@@ -117,6 +117,38 @@ final class CheckParityTest extends TestCase
         }
     }
 
+    public function testAcceptsRuntimeRouteAliasesInTwig(): void
+    {
+        $fixture = new RuntimeApplicationFixture();
+        $path = $fixture->rootPath.'/templates/route_alias.html.twig';
+        $text = file_get_contents($path);
+        self::assertIsString($text);
+        $factory = new LanguageServerFactory($fixture->serverVersion);
+        try {
+            $lspDiagnostics = $this->publishedDiagnostics(
+                $factory,
+                $fixture->rootPath,
+                'file://'.$path,
+                'twig',
+                $text,
+                ['workspaceTrust' => true],
+            );
+            $headlessDiagnostics = $this->headlessDiagnostics(
+                $factory,
+                $fixture->rootPath,
+                'templates/route_alias.html.twig',
+                false,
+            );
+
+            $this->assertSameDiagnostics($lspDiagnostics, $headlessDiagnostics);
+            self::assertCount(1, $headlessDiagnostics);
+            self::assertSame('route.not_found', $headlessDiagnostics[0]['code']);
+            self::assertSame('Route "missing_route" does not exist in the selected environment.', $headlessDiagnostics[0]['message']);
+        } finally {
+            $fixture->cleanup();
+        }
+    }
+
     /**
      * @param array<array-key, mixed> $initializationOptions
      *

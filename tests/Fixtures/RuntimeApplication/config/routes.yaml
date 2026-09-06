@@ -1,6 +1,10 @@
 fixture_http_endpoints:
     resource: http_endpoints.yaml
 
+fixture_route_alias:
+    resource: ../src/Controller/RouteAliasController.php
+    type: attribute
+
 fixture_home:
     path: /fixture
     controller: App\Controller\HomeController
@@ -12,3 +16,9 @@ fixture_localized:
         fr: /localisee
     controller: App\Controller\HomeController
     methods: [GET]
+
+fixture_localized_alias.en:
+    alias: fixture_localized.en
+
+fixture_localized_alias.fr:
+    alias: fixture_localized.fr

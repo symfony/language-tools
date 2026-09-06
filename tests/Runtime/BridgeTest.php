@@ -376,9 +376,7 @@ PHP,
         self::assertIsArray($routes);
         $items = $routes['items'] ?? null;
         self::assertIsArray($items);
-        $homepage = $items[2] ?? null;
-        self::assertIsArray($homepage);
-        self::assertSame('homepage', $homepage['name'] ?? null);
+        self::assertContains('homepage', array_column($items, 'name'));
     }
 
     public function testDiscoversTheKernelFromComposerPsr4AutoloadRoots(): void

@@ -17,6 +17,7 @@ function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
             ]);
 
             $items = [];
+            $supportsCanonicalLocalizedAliases = symfonyLspBridgeSupportsCanonicalLocalizedRouteAliases();
             foreach ($routes as $name => $route) {
                 if (!is_string($name) || !is_array($route)) {
                     continue;
@@ -44,10 +45,7 @@ function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
                 if (is_string($canonicalDefault) && is_string($locale) && $name === $canonicalDefault.'.'.$locale) {
                     $canonical = $canonicalDefault;
                 }
-                $alias = is_string($route['alias'] ?? null)
-                    ? $route['alias']
-                    : (is_string($route['aliasFor'] ?? null) ? $route['aliasFor'] : null);
-                $items[] = [
+                $item = [
                     'name' => $name,
                     'path' => is_string($route['path'] ?? null) ? $route['path'] : null,
                     'methods' => $methods,
@@ -62,8 +60,24 @@ function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
                     )),
                     'requirements' => $requirements,
                     'canonical' => $canonical,
-                    'alias' => $alias,
+                    'alias' => null,
                 ];
+                $items[] = $item;
+                foreach (is_array($route['aliases'] ?? null) ? $route['aliases'] : [] as $alias) {
+                    if (!is_string($alias)) {
+                        continue;
+                    }
+                    $aliasCanonical = null;
+                    if ($supportsCanonicalLocalizedAliases && is_string($locale) && str_ends_with($alias, '.'.$locale)) {
+                        $aliasCanonical = substr($alias, 0, -strlen($locale) - 1);
+                    }
+                    $items[] = [
+                        ...$item,
+                        'name' => $alias,
+                        'canonical' => $aliasCanonical,
+                        'alias' => $name,
+                    ];
+                }
             }
 
             usort($items, static fn (array $a, array $b): int => $a['name'] <=> $b['name']);
@@ -83,6 +97,19 @@ function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
     }
 
     return $section ?? null;
+}
+
+function symfonyLspBridgeSupportsCanonicalLocalizedRouteAliases(): bool
+{
+    try {
+        $version = Composer\InstalledVersions::getPrettyVersion('symfony/routing');
+    } catch (Throwable) {
+        return false;
+    }
+
+    return is_string($version)
+        && preg_match('/^(?:v)?([0-9]+\.[0-9]+)(?:\.|$)/', $version, $matches)
+        && version_compare($matches[1], '7.4', '>=');
 }
 
 /** @return list<string> */
