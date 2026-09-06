@@ -9,13 +9,15 @@ use Symfony\Lsp\Project\Project;
 /** @extends AbstractProjectIndexRegistry<RouteSourceIndex> */
 final class RouteSourceIndexRegistry extends AbstractProjectIndexRegistry
 {
-    public function __construct(private readonly DependencyInjectionSourceIndexRegistry $classIndexes)
-    {
+    public function __construct(
+        private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
+        private readonly RouteControllerClassifier $controllers,
+    ) {
         parent::__construct();
     }
 
     protected function createIndex(Project $project): RouteSourceIndex
     {
-        return new RouteSourceIndex($this->classIndexes->forProject($project));
+        return new RouteSourceIndex($this->classIndexes->forProject($project), $this->controllers);
     }
 }

@@ -14,6 +14,7 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
+use Symfony\Lsp\Feature\Route\RouteControllerClassifier;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
 use Symfony\Lsp\Feature\Route\RouteDefinitionHandler;
 use Symfony\Lsp\Feature\Route\RouteSourceFacts;
@@ -67,7 +68,7 @@ final class RouteDefinitionHandlerTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes);
+        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
         $declarationUri = 'file:///workspace/src/ArticleController.php';
         $sourceIndexes->forProject($project)->replace(new RouteSourceFacts($declarationUri, [new RouteDeclaration(
             'article_show',

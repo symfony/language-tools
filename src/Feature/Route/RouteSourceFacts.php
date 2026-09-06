@@ -7,8 +7,8 @@ use Symfony\Lsp\Index\SourceFactsInterface;
 final class RouteSourceFacts implements SourceFactsInterface
 {
     /**
-     * @param list<RouteDeclaration>       $declarations
-     * @param list<RouteReferenceLocation> $references
+     * @param list<RouteDeclaration> $declarations
+     * @param list<RouteReference>   $references
      */
     public function __construct(
         public readonly string $uri,

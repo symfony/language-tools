@@ -35,7 +35,7 @@ final class RouteReferencesHandler implements ReferencesProviderInterface
         }
 
         $locations = array_map(
-            fn (RouteReferenceLocation $reference): array => $this->protocol->location($reference->uri, $reference->range),
+            fn (RouteReference $reference): array => $this->protocol->location($reference->uri, $reference->range),
             $this->sourceIndexes->forProject($request->project)->references($symbol->name),
         );
         $context = $params['context'] ?? null;

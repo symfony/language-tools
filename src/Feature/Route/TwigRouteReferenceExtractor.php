@@ -38,11 +38,12 @@ final class TwigRouteReferenceExtractor
 
             $references[] = new RouteReference(
                 $route->value,
+                $source->uri,
                 new Range(
                     $this->positionConverter->toPosition($source->text, $route->startOffset),
                     $this->positionConverter->toPosition($source->text, $route->endOffset),
                 ),
-                $this->providedParameters($document, $arguments->get(1, 'parameters')),
+                providedParameters: $this->providedParameters($document, $arguments->get(1, 'parameters')),
             );
         }
 

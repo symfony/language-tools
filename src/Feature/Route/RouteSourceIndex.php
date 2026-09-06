@@ -13,11 +13,9 @@ final class RouteSourceIndex extends AbstractSourceFactsIndex
     /** @var array<string, list<RouteDeclaration>> */
     private array $declarationsByName = [];
 
-    /** @var array<string, list<RouteReferenceLocation>> */
-    private array $referencesByUri = [];
-
     public function __construct(
         private readonly DependencyInjectionSourceIndex $classIndex,
+        private readonly RouteControllerClassifier $controllers,
     ) {
         parent::__construct();
     }
@@ -25,18 +23,17 @@ final class RouteSourceIndex extends AbstractSourceFactsIndex
     /** @return list<RouteDeclaration> */
     public function declarations(string $name): array
     {
-        $this->index();
+        $this->indexDeclarations();
 
         return $this->declarationsByName[$name] ?? [];
     }
 
-    /** @return list<RouteReferenceLocation> */
+    /** @return list<RouteReference> */
     public function references(string $name): array
     {
-        $this->index();
         $references = [];
-        foreach ($this->referencesByUri as $sourceReferences) {
-            foreach ($sourceReferences as $reference) {
+        foreach ($this->facts() as $facts) {
+            foreach ($facts->references as $reference) {
                 if ($reference->name === $name && $this->isSupported($reference)) {
                     $references[] = $reference;
                 }
@@ -46,12 +43,12 @@ final class RouteSourceIndex extends AbstractSourceFactsIndex
         return $references;
     }
 
-    /** @return list<RouteReferenceLocation> */
+    /** @return list<RouteReference> */
     public function referencesForUri(string $uri): array
     {
-        $this->index();
+        $facts = $this->factsForUri($uri);
 
-        return array_values(array_filter($this->referencesByUri[$uri] ?? [], $this->isSupported(...)));
+        return null === $facts ? [] : array_values(array_filter($facts->references, $this->isSupported(...)));
     }
 
     protected function factsChanged(): void
@@ -59,31 +56,23 @@ final class RouteSourceIndex extends AbstractSourceFactsIndex
         $this->indexed = false;
     }
 
-    private function index(): void
+    private function indexDeclarations(): void
     {
         if ($this->indexed) {
             return;
         }
 
         $this->declarationsByName = [];
-        $this->referencesByUri = [];
         foreach ($this->facts() as $facts) {
             foreach ($facts->declarations as $declaration) {
                 $this->declarationsByName[$declaration->name][] = $declaration;
-            }
-            foreach ($facts->references as $reference) {
-                $this->referencesByUri[$reference->uri][] = $reference;
             }
         }
         $this->indexed = true;
     }
 
-    private function isSupported(RouteReferenceLocation $reference): bool
+    private function isSupported(RouteReference $reference): bool
     {
-        return null === $reference->controllerClass
-            || $this->classIndex->isSubclassOf(
-                $reference->controllerClass,
-                'Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController',
-            );
+        return $this->controllers->isController($reference->controllerClass, null, $this->classIndex);
     }
 }

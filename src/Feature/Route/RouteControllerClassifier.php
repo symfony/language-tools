@@ -9,13 +9,16 @@ final class RouteControllerClassifier
 {
     private const ABSTRACT_CONTROLLER = 'Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController';
 
-    public function isController(?string $className, PhpDocument $document, ?DependencyInjectionSourceIndex $classIndex): bool
+    public function isController(?string $className, ?PhpDocument $document, ?DependencyInjectionSourceIndex $classIndex): bool
     {
         if (null === $className) {
             return true;
         }
-        if (null !== $classIndex && [] !== $classIndex->classDeclarations($className)) {
+        if (null !== $classIndex && (null === $document || [] !== $classIndex->classDeclarations($className))) {
             return $classIndex->isSubclassOf($className, self::ABSTRACT_CONTROLLER);
+        }
+        if (null === $document) {
+            return false;
         }
 
         $types = [];

@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
@@ -20,7 +21,7 @@ final class PhpRouteReferenceCandidateExtractor
     /**
      * @return list<RouteReference>
      */
-    public function extract(string $text, PhpDocument $document): array
+    public function extract(SourceDocument $source, PhpDocument $document): array
     {
         $references = [];
         foreach ($document->methodCalls as $call) {
@@ -35,12 +36,13 @@ final class PhpRouteReferenceCandidateExtractor
 
             $references[] = new RouteReference(
                 $name->value,
+                $source->uri,
                 new Range(
-                    $this->positionConverter->toPosition($text, $name->startOffset),
-                    $this->positionConverter->toPosition($text, $name->endOffset),
+                    $this->positionConverter->toPosition($source->text, $name->startOffset),
+                    $this->positionConverter->toPosition($source->text, $name->endOffset),
                 ),
-                $this->providedParameters($document, $call, $route),
                 $receiver->controllerClass,
+                $this->providedParameters($document, $call, $route),
             );
         }
 

@@ -20,11 +20,10 @@ use Symfony\Lsp\Feature\DiagnosticSuppressor;
 use Symfony\Lsp\Feature\PartialParseDiagnosticFilter;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteCodeActionProvider;
+use Symfony\Lsp\Feature\Route\RouteControllerClassifier;
 use Symfony\Lsp\Feature\Route\RouteDiagnosticPublisher;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
-use Symfony\Lsp\Feature\Route\RouteReference;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
-use Symfony\Lsp\Feature\Route\RouteReferenceLocation;
 use Symfony\Lsp\Feature\Route\RouteSourceFacts;
 use Symfony\Lsp\Feature\Route\RouteSourceIndexRegistry;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
@@ -339,7 +338,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 new DocumentContextResolver($documents, $projects),
                 new LspProtocolMapper(),
                 new RouteIndexRegistry(),
-                new RouteSourceIndexRegistry($classIndexes),
+                new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier()),
                 new TemplateIndexRegistry($classIndexes),
             )],
         );
@@ -409,17 +408,8 @@ final class RouteDiagnosticPublisherTest extends TestCase
         if ([] !== $classes) {
             $classIndexes->forProject($project)->replace(new DependencyInjectionSourceFacts($uri, classes: array_values($classes)));
         }
-        $indexes = new RouteSourceIndexRegistry($classIndexes);
-        $indexes->forProject($project)->replace(new RouteSourceFacts($uri, [], array_map(
-            static fn (RouteReference $reference): RouteReferenceLocation => new RouteReferenceLocation(
-                $reference->name,
-                $uri,
-                $reference->range,
-                $reference->controllerClass,
-                $reference->providedParameters,
-            ),
-            $references,
-        )));
+        $indexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
+        $indexes->forProject($project)->replace(new RouteSourceFacts($uri, [], $references));
 
         return $indexes;
     }

@@ -11,8 +11,8 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
+use Symfony\Lsp\Feature\Route\RouteControllerClassifier;
 use Symfony\Lsp\Feature\Route\RouteReference;
-use Symfony\Lsp\Feature\Route\RouteReferenceLocation;
 use Symfony\Lsp\Feature\Route\RouteSourceFacts;
 use Symfony\Lsp\Feature\Route\RouteSourceIndexRegistry;
 use Symfony\Lsp\Index\SourceDocument;
@@ -105,18 +105,18 @@ final class RouteReferenceExtractorTest extends TestCase
         self::assertSame(['article_show'], array_map(static fn ($reference): string => $reference->name, $references));
         self::assertSame('App\\Controller\\DemoController', $references[0]->controllerClass);
 
-        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes);
+        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
         $sourceIndexes->forProject($project)->replace(
             new RouteSourceFacts($controllerUri, [], [
-                new RouteReferenceLocation('article_show', $controllerUri, new Range(new Position(7, 35), new Position(7, 47)), 'App\\Controller\\DemoController'),
+                new RouteReference('article_show', $controllerUri, new Range(new Position(7, 35), new Position(7, 47)), 'App\\Controller\\DemoController'),
             ]),
             new RouteSourceFacts('file:///workspace/src/Unrelated.php', [], [
-                new RouteReferenceLocation('article_show', 'file:///workspace/src/Unrelated.php', new Range(new Position(1, 0), new Position(1, 12)), 'App\\Unrelated'),
+                new RouteReference('article_show', 'file:///workspace/src/Unrelated.php', new Range(new Position(1, 0), new Position(1, 12)), 'App\\Unrelated'),
             ]),
         );
 
         self::assertSame([$controllerUri], array_map(
-            static fn (RouteReferenceLocation $reference): string => $reference->uri,
+            static fn (RouteReference $reference): string => $reference->uri,
             $sourceIndexes->forProject($project)->references('article_show'),
         ));
 
@@ -128,10 +128,10 @@ final class RouteReferenceExtractorTest extends TestCase
         self::assertSame([], $sourceIndexes->forProject($project)->references('article_show'));
 
         $classIndex->removeOverlay($baseUri);
-        /** @var list<RouteReferenceLocation> $restoredReferences */
+        /** @var list<RouteReference> $restoredReferences */
         $restoredReferences = $sourceIndexes->forProject($project)->references('article_show');
         self::assertSame([$controllerUri], array_map(
-            static fn (RouteReferenceLocation $reference): string => $reference->uri,
+            static fn (RouteReference $reference): string => $reference->uri,
             $restoredReferences,
         ));
     }

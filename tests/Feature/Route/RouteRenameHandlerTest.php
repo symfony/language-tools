@@ -13,9 +13,10 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\Route;
+use Symfony\Lsp\Feature\Route\RouteControllerClassifier;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
-use Symfony\Lsp\Feature\Route\RouteReferenceLocation;
+use Symfony\Lsp\Feature\Route\RouteReference;
 use Symfony\Lsp\Feature\Route\RouteRenameHandler;
 use Symfony\Lsp\Feature\Route\RouteSourceFacts;
 use Symfony\Lsp\Feature\Route\RouteSourceIndexRegistry;
@@ -104,7 +105,7 @@ final class RouteRenameHandlerTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes);
+        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
         $consumerUri = 'file:///workspace/src/ConsumerController.php';
         $sourceIndexes->forProject($project)->replace(
             new RouteSourceFacts($uri, [new RouteDeclaration(
@@ -112,7 +113,7 @@ final class RouteRenameHandlerTest extends TestCase
                 $uri,
                 new Range(new Position(0, 0), new Position(0, 12)),
             )], []),
-            new RouteSourceFacts($consumerUri, [], [new RouteReferenceLocation(
+            new RouteSourceFacts($consumerUri, [], [new RouteReference(
                 'article_show',
                 $consumerUri,
                 new Range(new Position(5, 28), new Position(5, 40)),
@@ -184,7 +185,7 @@ final class RouteRenameHandlerTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes);
+        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
         $declarationUri = 'file:///workspace/src/ArticleController.php';
         $vendorUri = 'file:///workspace/vendor/acme/Consumer.php';
         $sourceIndexes->forProject($project)->replace(
@@ -193,12 +194,12 @@ final class RouteRenameHandlerTest extends TestCase
                 $declarationUri,
                 new Range(new Position(10, 20), new Position(10, 32)),
             )], []),
-            new RouteSourceFacts($uri, [], [new RouteReferenceLocation(
+            new RouteSourceFacts($uri, [], [new RouteReference(
                 'article_show',
                 $uri,
                 new Range(new Position(5, 28), new Position(5, 40)),
             )]),
-            new RouteSourceFacts($vendorUri, [], [new RouteReferenceLocation(
+            new RouteSourceFacts($vendorUri, [], [new RouteReference(
                 'article_show',
                 $vendorUri,
                 new Range(new Position(5, 28), new Position(5, 40)),

@@ -18,6 +18,8 @@ use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
+use Symfony\Lsp\Feature\Route\RouteControllerClassifier;
+use Symfony\Lsp\Feature\Route\RouteReference;
 use Symfony\Lsp\Feature\Route\RouteSourceIndexRegistry;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
@@ -81,7 +83,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         @rmdir($this->temporaryDirectory);
     }
 
-    public function testResolvesRouteReferencesThroughIndexedControllerHierarchy(): void
+    public function testRestoresRouteReferencesResolvedThroughIndexedControllerHierarchy(): void
     {
         file_put_contents($this->temporaryDirectory.'/src/BaseController.php', <<<'PHP'
             <?php
@@ -111,7 +113,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             'file://'.$this->temporaryDirectory,
         )]);
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $indexes = new RouteSourceIndexRegistry($classIndexes);
+        $indexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
         $positionConverter = new PositionConverter();
         $parser = new TolerantPhpParser(new Parser());
         $scanner = $this->scanner(
@@ -141,10 +143,20 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         );
 
         $scanner->indexAll();
-        self::assertCount(1, $indexes->forProject($project)->references('article_show'));
+        self::assertSame([
+            ['article_show', 'file://'.$this->temporaryDirectory.'/src/ConsumerController.php', 'App\\Controller\\ConsumerController', []],
+        ], array_map(
+            static fn (RouteReference $reference): array => [$reference->name, $reference->uri, $reference->controllerClass, $reference->providedParameters],
+            $indexes->forProject($project)->references('article_show'),
+        ));
 
         $scanner->indexAll();
-        self::assertCount(1, $indexes->forProject($project)->references('article_show'));
+        self::assertSame([
+            ['article_show', 'file://'.$this->temporaryDirectory.'/src/ConsumerController.php', 'App\\Controller\\ConsumerController', []],
+        ], array_map(
+            static fn (RouteReference $reference): array => [$reference->name, $reference->uri, $reference->controllerClass, $reference->providedParameters],
+            $indexes->forProject($project)->references('article_show'),
+        ));
     }
 
     public function testIndexesApplicationPhpAndExcludesVendor(): void
@@ -175,7 +187,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             $this->temporaryDirectory,
             'file://'.$this->temporaryDirectory,
         )]);
-        $indexes = new RouteSourceIndexRegistry(new DependencyInjectionSourceIndexRegistry());
+        $indexes = new RouteSourceIndexRegistry(new DependencyInjectionSourceIndexRegistry(), new RouteControllerClassifier());
         $positionConverter = new PositionConverter();
         $documents = new DocumentStore();
         $indexer = new ProjectRouteSourceIndexer(
@@ -236,7 +248,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         )]);
         $documents = new DocumentStore();
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $indexes = new RouteSourceIndexRegistry($classIndexes);
+        $indexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
         $positionConverter = new PositionConverter();
         $parser = new TolerantPhpParser(new Parser());
         $indexer = new ProjectRouteSourceIndexer(

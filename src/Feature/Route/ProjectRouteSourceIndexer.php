@@ -30,7 +30,7 @@ final class ProjectRouteSourceIndexer extends AbstractSourceIndexer
 
     public function payloadClasses(): array
     {
-        return [RouteDeclaration::class, RouteReferenceLocation::class, RouteSourceFacts::class];
+        return [RouteDeclaration::class, RouteReference::class, RouteSourceFacts::class];
     }
 
     public function runtimeDeclarations(mixed $data): array
@@ -67,16 +67,7 @@ final class ProjectRouteSourceIndexer extends AbstractSourceIndexer
             return new RouteSourceFacts($document->uri, [], []);
         }
 
-        return new RouteSourceFacts($document->uri, $declarations, array_map(
-            static fn (RouteReference $reference): RouteReferenceLocation => new RouteReferenceLocation(
-                $reference->name,
-                $document->uri,
-                $reference->range,
-                $reference->controllerClass,
-                $reference->providedParameters,
-            ),
-            $references,
-        ));
+        return new RouteSourceFacts($document->uri, $declarations, $references);
     }
 
     protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): RouteSourceFacts

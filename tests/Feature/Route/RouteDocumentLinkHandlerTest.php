@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\Route\RouteControllerClassifier;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
 use Symfony\Lsp\Feature\Route\RouteDocumentLinkHandler;
 use Symfony\Lsp\Feature\Route\RouteSourceFacts;
@@ -35,7 +36,7 @@ final class RouteDocumentLinkHandlerTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes);
+        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
         $declarationUri = 'file:///workspace/config/routes.yaml';
         $sourceIndexes->forProject($project)->replace(new RouteSourceFacts($declarationUri, [new RouteDeclaration(
             'article_show',

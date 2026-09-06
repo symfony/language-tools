@@ -14,8 +14,9 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
+use Symfony\Lsp\Feature\Route\RouteControllerClassifier;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
-use Symfony\Lsp\Feature\Route\RouteReferenceLocation;
+use Symfony\Lsp\Feature\Route\RouteReference;
 use Symfony\Lsp\Feature\Route\RouteReferencesHandler;
 use Symfony\Lsp\Feature\Route\RouteSourceFacts;
 use Symfony\Lsp\Feature\Route\RouteSourceIndexRegistry;
@@ -51,7 +52,7 @@ final class RouteReferencesHandlerTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes);
+        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
         $positionConverter = new PositionConverter();
         $classExtractor = new PhpClassDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser()));
         $baseUri = 'file:///workspace/src/BaseController.php';
@@ -68,7 +69,7 @@ final class RouteReferencesHandlerTest extends TestCase
                 $uri,
                 new Range(new Position(2, 32), new Position(2, 44)),
             )], []),
-            new RouteSourceFacts($consumerUri, [], [new RouteReferenceLocation(
+            new RouteSourceFacts($consumerUri, [], [new RouteReference(
                 'article_list',
                 $consumerUri,
                 new Range(new Position(12, 20), new Position(12, 32)),

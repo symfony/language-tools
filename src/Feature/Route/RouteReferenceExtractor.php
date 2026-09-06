@@ -26,7 +26,7 @@ final class RouteReferenceExtractor
         $document = $this->parser->parse($source->text);
 
         return array_values(array_filter(
-            $this->candidates->extract($source->text, $document),
+            $this->candidates->extract($source, $document),
             fn (RouteReference $reference): bool => $this->controllers->isController($reference->controllerClass, $document, $classIndex),
         ));
     }
@@ -38,7 +38,7 @@ final class RouteReferenceExtractor
     {
         $document = $this->parser->parse($source->text);
 
-        return $this->candidates->extract($source->text, $document);
+        return $this->candidates->extract($source, $document);
     }
 
     public function supportsRouteCallAt(string $source, int $byteOffset, ?DependencyInjectionSourceIndex $classIndex = null): bool

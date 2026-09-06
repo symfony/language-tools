@@ -8,8 +8,9 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
+use Symfony\Lsp\Feature\Route\RouteControllerClassifier;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
-use Symfony\Lsp\Feature\Route\RouteReferenceLocation;
+use Symfony\Lsp\Feature\Route\RouteReference;
 use Symfony\Lsp\Feature\Route\RouteSourceFacts;
 use Symfony\Lsp\Feature\Route\RouteSourceIndex;
 
@@ -22,7 +23,7 @@ final class RouteSourceIndexTest extends TestCase
         $savedFirst = $this->facts($firstUri, 'shared', 1);
         $savedSecond = $this->facts($secondUri, 'shared', 2);
         $overlayFirst = $this->facts($firstUri, 'shared', 3);
-        $index = new RouteSourceIndex(new DependencyInjectionSourceIndex());
+        $index = $this->index();
         $index->replace($savedFirst, $savedSecond);
 
         self::assertSame([1, 2], $this->declarationLines($index, 'shared'));
@@ -34,7 +35,7 @@ final class RouteSourceIndexTest extends TestCase
         self::assertSame([2, 3], $this->declarationLines($index, 'shared'));
         self::assertSame([2, 3], $this->referenceLines($index, 'shared'));
         self::assertSame([3], array_map(
-            static fn (RouteReferenceLocation $reference): int => $reference->range->start->line,
+            static fn (RouteReference $reference): int => $reference->range->start->line,
             $index->referencesForUri($firstUri),
         ));
 
@@ -48,7 +49,7 @@ final class RouteSourceIndexTest extends TestCase
     public function testSourceReplacementAndRemovalUpdateDeclarationsAndReferencesTogether(): void
     {
         $uri = 'file:///source.php';
-        $index = new RouteSourceIndex(new DependencyInjectionSourceIndex());
+        $index = $this->index();
         $index->replace($this->facts($uri, 'old', 1));
 
         $index->replaceSource($this->facts($uri, 'new', 2));
@@ -84,9 +85,9 @@ final class RouteSourceIndexTest extends TestCase
                 new PhpClassDeclaration('App\\Controller', $controllerUri, $range, 'App\\BaseController'),
             ]),
         );
-        $index = new RouteSourceIndex($classIndex);
+        $index = new RouteSourceIndex($classIndex, new RouteControllerClassifier());
         $index->replace(new RouteSourceFacts($controllerUri, [], [
-            new RouteReferenceLocation('route', $controllerUri, $range, 'App\\Controller'),
+            new RouteReference('route', $controllerUri, $range, 'App\\Controller'),
         ]));
 
         self::assertCount(1, $index->references('route'));
@@ -112,8 +113,13 @@ final class RouteSourceIndexTest extends TestCase
         return new RouteSourceFacts(
             $uri,
             [new RouteDeclaration($name, $uri, $range)],
-            [new RouteReferenceLocation($name, $uri, $range)],
+            [new RouteReference($name, $uri, $range)],
         );
+    }
+
+    private function index(): RouteSourceIndex
+    {
+        return new RouteSourceIndex(new DependencyInjectionSourceIndex(), new RouteControllerClassifier());
     }
 
     /** @return list<int> */
@@ -129,7 +135,7 @@ final class RouteSourceIndexTest extends TestCase
     private function referenceLines(RouteSourceIndex $index, string $name): array
     {
         return array_map(
-            static fn (RouteReferenceLocation $reference): int => $reference->range->start->line,
+            static fn (RouteReference $reference): int => $reference->range->start->line,
             $index->references($name),
         );
     }
