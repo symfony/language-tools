@@ -7,7 +7,6 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Console\ConsoleDefinitionExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleExtractor;
-use Symfony\Lsp\Feature\Console\ConsoleInputReceiverResolver;
 use Symfony\Lsp\Feature\Console\ConsoleInvokableParameterExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleSourceFacts;
 use Symfony\Lsp\Feature\Console\ConsoleSourceIndexer;
@@ -76,7 +75,6 @@ final class ConsoleSourceIndexerTest extends TestCase
             new PhpCommentParser(),
             new ConsoleDefinitionExtractor(),
             new ConsoleInvokableParameterExtractor(),
-            new ConsoleInputReceiverResolver(),
         ));
     }
 }

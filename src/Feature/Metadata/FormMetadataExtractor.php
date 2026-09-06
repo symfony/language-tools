@@ -236,20 +236,11 @@ final class FormMetadataExtractor
     /** @return list<PhpTypedVariable> */
     private function formBuilderReceiverVariables(PhpDocument $php, PhpMethodCall $call): array
     {
-        if ([] !== $variables = $php->receiverVariables($call)) {
-            return $variables;
-        }
-        foreach ($php->methodCalls as $receiverCall) {
-            if ($call === $receiverCall
-                || $call->startOffset !== $receiverCall->startOffset
-                || $receiverCall->endOffset > $call->receiverContext->endOffset
-                || [] === $variables = $php->receiverVariables($receiverCall)
-            ) {
-                continue;
+        do {
+            if ([] !== $variables = $php->receiverVariables($call)) {
+                return $variables;
             }
-
-            return $variables;
-        }
+        } while (null !== $call = $php->receiverCall($call));
 
         return [];
     }
@@ -299,27 +290,10 @@ final class FormMetadataExtractor
     /** @return array<string, true> */
     private function formBuilderVariables(PhpDocument $php, int $offset): array
     {
-        $className = $this->enclosingClass($php, $offset);
-        if (null === $className) {
-            return [];
-        }
-        $methodName = null;
-        $methodOffset = -1;
-        foreach ($php->methodDeclarations as $method) {
-            if ($className !== $method->className || $method->nameStartOffset > $offset || $method->nameStartOffset <= $methodOffset) {
-                continue;
-            }
-            $methodName = $method->name;
-            $methodOffset = $method->nameStartOffset;
-        }
-        if (null === $methodName) {
-            return [];
-        }
         $variables = [];
-        foreach ($php->typedVariables as $variable) {
+        foreach ($php->visibleVariables($offset) as $variable) {
             if (PhpTypedVariableKind::Parameter === $variable->kind
-                && $className === $variable->className
-                && $methodName === $variable->methodName
+                && null !== $variable->methodName
                 && \in_array('Symfony\\Component\\Form\\FormBuilderInterface', $variable->types, true)
             ) {
                 $variables[$variable->name] = true;

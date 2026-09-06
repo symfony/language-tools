@@ -81,13 +81,8 @@ final class DoctrineRepositoryReceiverResolver
         if (PhpMethodReceiverKind::Other !== $receiver->kind) {
             return null;
         }
-        $repositoryCall = array_find(
-            $php->methodCalls,
-            static fn (PhpMethodCall $candidate): bool => 'getRepository' === $candidate->method
-                && $receiver->startOffset === $candidate->startOffset
-                && $receiver->endOffset === $candidate->endOffset,
-        );
-        $reference = $repositoryCall?->positionalArgument(0)?->completeClassReference;
+        $repositoryCall = $php->receiverCall($call);
+        $reference = 'getRepository' === $repositoryCall?->method ? $repositoryCall->positionalArgument(0)?->completeClassReference : null;
 
         return null !== $reference ? ['entityClass' => $reference->className, 'repositoryClass' => null] : null;
     }

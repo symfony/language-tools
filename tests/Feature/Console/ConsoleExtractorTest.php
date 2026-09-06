@@ -8,7 +8,6 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Console\ConsoleDefinitionExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleInputKind;
-use Symfony\Lsp\Feature\Console\ConsoleInputReceiverResolver;
 use Symfony\Lsp\Feature\Console\ConsoleInvokableParameterExtractor;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
@@ -434,7 +433,6 @@ final class ConsoleExtractorTest extends TestCase
             new PhpCommentParser(),
             new ConsoleDefinitionExtractor(),
             new ConsoleInvokableParameterExtractor(),
-            new ConsoleInputReceiverResolver(),
         );
 
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Command/ReportCommand.php', 'php', $text));
@@ -553,7 +551,6 @@ final class ConsoleExtractorTest extends TestCase
             new PhpCommentParser(),
             new ConsoleDefinitionExtractor(),
             new ConsoleInvokableParameterExtractor(),
-            new ConsoleInputReceiverResolver(),
         );
     }
 }

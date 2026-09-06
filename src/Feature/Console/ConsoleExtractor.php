@@ -19,6 +19,7 @@ final class ConsoleExtractor
 {
     private const AS_COMMAND_ATTRIBUTE = 'Symfony\\Component\\Console\\Attribute\\AsCommand';
     private const COMMAND = 'Symfony\\Component\\Console\\Command\\Command';
+    private const INPUT_INTERFACE = 'Symfony\\Component\\Console\\Input\\InputInterface';
 
     public function __construct(
         private readonly PositionConverter $converter,
@@ -26,7 +27,6 @@ final class ConsoleExtractor
         private readonly PhpCommentParser $phpComments,
         private readonly ConsoleDefinitionExtractor $definitionExtractor,
         private readonly ConsoleInvokableParameterExtractor $invokableParameterExtractor,
-        private readonly ConsoleInputReceiverResolver $inputReceivers,
     ) {
     }
 
@@ -48,7 +48,7 @@ final class ConsoleExtractor
 
         $references = [];
         foreach ($php->methodCalls as $call) {
-            if (!\in_array($call->method, ['getArgument', 'getOption'], true) || !$this->inputReceivers->hasInputReceiver($php, $call)) {
+            if (!\in_array($call->method, ['getArgument', 'getOption'], true) || !$php->receiverHasType($call, self::INPUT_INTERFACE)) {
                 continue;
             }
             $name = $call->positionalArgument(0)?->stringLiteral;
@@ -84,7 +84,7 @@ final class ConsoleExtractor
         $receiver = $property ? $match[2][0] : ($match[1][0] ?? null);
         $receiverKind = $property ? PhpMethodReceiverKind::ThisProperty : PhpMethodReceiverKind::Variable;
         $call = \is_string($receiver) ? array_find($php->methodCalls, static fn (PhpMethodCall $call): bool => $match[3][0] === $call->method && $receiver === $call->receiverContext->name && $receiverKind === $call->receiverContext->kind && $methodOffset >= $call->startOffset && $methodOffset < $call->endOffset) : null;
-        if (null === $call || null === $call->className || !$this->inputReceivers->hasInputReceiver($php, $call)) {
+        if (null === $call || null === $call->className || !$php->receiverHasType($call, self::INPUT_INTERFACE)) {
             return null;
         }
         $rawPrefix = $match['prefix'][0];

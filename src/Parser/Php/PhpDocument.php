@@ -101,6 +101,52 @@ final class PhpDocument
         return $creations;
     }
 
+    public function receiverCall(PhpMethodCall $call): ?PhpMethodCall
+    {
+        $receiver = $call->receiverContext;
+        foreach ($this->methodCalls as $candidate) {
+            if ($call !== $candidate && $receiver->startOffset === $candidate->startOffset && $receiver->endOffset === $candidate->endOffset) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Typed parameter declarations whose scopes contain the offset. When a
+     * name is given, only declarations from its innermost scope are returned.
+     *
+     * @return list<PhpTypedVariable>
+     */
+    public function visibleVariables(int $offset, ?string $name = null): array
+    {
+        $variables = array_values(array_filter(
+            $this->typedVariables,
+            static fn (PhpTypedVariable $variable): bool => \in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
+                && null !== $variable->scopeStartOffset
+                && null !== $variable->scopeEndOffset
+                && $offset >= $variable->scopeStartOffset
+                && $offset <= $variable->scopeEndOffset
+                && (null === $name || $name === $variable->name),
+        ));
+        if (null === $name) {
+            return $variables;
+        }
+
+        $scopeStartOffset = -1;
+        foreach ($this->lexicalScopes as $scope) {
+            if ($offset >= $scope->startOffset && $offset <= $scope->endOffset && \in_array($name, $scope->parameterNames, true)) {
+                $scopeStartOffset = max($scopeStartOffset, $scope->startOffset);
+            }
+        }
+        foreach ($variables as $variable) {
+            $scopeStartOffset = max($scopeStartOffset, $variable->scopeStartOffset ?? -1);
+        }
+
+        return array_values(array_filter($variables, static fn (PhpTypedVariable $variable): bool => $scopeStartOffset === $variable->scopeStartOffset));
+    }
+
     /**
      * Typed variables the call's receiver can resolve to, honoring direct and
      * nested lexical scope boundaries.
@@ -135,6 +181,11 @@ final class PhpDocument
         }
 
         return $variables;
+    }
+
+    public function receiverHasType(PhpMethodCall $call, string $type): bool
+    {
+        return array_any($this->receiverVariables($call), static fn (PhpTypedVariable $variable): bool => \in_array($type, $variable->types, true));
     }
 
     public function isVariableVisible(string $name, int $declarationScopeStartOffset, PhpMethodCall $call): bool

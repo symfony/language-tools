@@ -5,6 +5,8 @@ namespace Symfony\Lsp\Feature\Console;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpLiteralKind;
+use Symfony\Lsp\Parser\Php\PhpMethodCall;
+use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpObjectCreation;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
 
@@ -23,8 +25,7 @@ final class ConsoleDefinitionExtractor
         $configureRanges = $this->methodBodyRanges($php, $type, 'configure');
         foreach ($php->methodCalls as $call) {
             $nested = 'configure' !== $call->enclosingMethod && $this->isWithinMethod($call->startOffset, $call->endOffset, $configureRanges);
-            $receiver = substr($text, $call->receiverContext->startOffset, $call->receiverContext->endOffset - $call->receiverContext->startOffset);
-            if ($type->name !== $call->className || ('configure' !== $call->enclosingMethod && !$nested) || !$this->isDefinitionReceiver($receiver)) {
+            if ($type->name !== $call->className || ('configure' !== $call->enclosingMethod && !$nested) || !$this->isDefinitionReceiver($php, $call)) {
                 continue;
             }
             if ($nested) {
@@ -65,12 +66,16 @@ final class ConsoleDefinitionExtractor
         return [$arguments, $options, $complete];
     }
 
-    private function isDefinitionReceiver(string $receiver): bool
+    private function isDefinitionReceiver(PhpDocument $php, PhpMethodCall $call): bool
     {
-        $receiver = preg_replace('/\s+/', '', $receiver);
+        if (PhpMethodReceiverKind::This === $call->receiverContext->kind) {
+            return true;
+        }
+        $receiver = $php->receiverCall($call);
 
-        return '$this' === $receiver
-            || (\is_string($receiver) && 1 === preg_match('/^\$this->(?:addArgument|addOption|setDefinition)\s*\(/', $receiver));
+        return null !== $receiver
+            && \in_array($receiver->method, ['addArgument', 'addOption', 'setDefinition'], true)
+            && $this->isDefinitionReceiver($php, $receiver);
     }
 
     /** @return array{list<string>, list<string>, bool} */

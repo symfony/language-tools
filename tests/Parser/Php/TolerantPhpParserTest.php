@@ -1335,6 +1335,40 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame([['string']], array_map(static fn ($variable): array => $variable->types, $document->receiverVariables($unrelated)));
     }
 
+    public function testQueriesReceiverCallsVisibleVariablesAndReceiverTypes(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            use Psr\Log\LoggerInterface;
+            use Symfony\Component\Messenger\MessageBusInterface;
+
+            function run(LoggerInterface $logger, MessageBusInterface $bus): void
+            {
+                $logger->withName('app')->info('started');
+                $closure = function (object $logger) use ($bus): void {
+                    $bus->dispatch(new Message());
+                    $logger->debug('done');
+                };
+                $shadow = fn ($bus) => $bus->send();
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        [$info, $withName, $dispatch, $debug, $send] = $document->methodCalls;
+
+        self::assertSame($withName, $document->receiverCall($info));
+        self::assertNull($document->receiverCall($withName));
+        self::assertNull($document->receiverCall($dispatch));
+        self::assertTrue($document->receiverHasType($withName, 'Psr\\Log\\LoggerInterface'));
+        self::assertTrue($document->receiverHasType($dispatch, 'Symfony\\Component\\Messenger\\MessageBusInterface'));
+        self::assertFalse($document->receiverHasType($debug, 'Psr\\Log\\LoggerInterface'));
+
+        self::assertSame(['logger', 'bus', 'logger'], array_map(static fn ($variable): string => $variable->name, $document->visibleVariables($dispatch->methodStartOffset)));
+        self::assertSame([['object']], array_map(static fn ($variable): array => $variable->types, $document->visibleVariables($dispatch->methodStartOffset, 'logger')));
+        self::assertSame([['Symfony\\Component\\Messenger\\MessageBusInterface']], array_map(static fn ($variable): array => $variable->types, $document->visibleVariables($dispatch->methodStartOffset, 'bus')));
+        self::assertSame([], $document->visibleVariables($send->methodStartOffset, 'bus'));
+    }
+
     public function testExposesNestedLexicalScopesWithExactRangesAndRecoveryState(): void
     {
         $source = <<<'PHP'

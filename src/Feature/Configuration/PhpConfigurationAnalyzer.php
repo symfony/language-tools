@@ -8,7 +8,6 @@ use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpTypedVariable;
-use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 use Symfony\Lsp\Parser\SourceComment;
 
 final class PhpConfigurationAnalyzer
@@ -23,12 +22,11 @@ final class PhpConfigurationAnalyzer
     public function occurrences(string $source, ConfigurationIndex $index): array
     {
         $document = $this->parser->parse($source);
-        $callsByRange = $this->callsByRange($document);
 
         /** @var array<int, PhpConfigurationOccurrence|null> $resolved */
         $resolved = [];
         foreach ($document->methodCalls as $call) {
-            $this->resolveCall($call, $document, $index, $callsByRange, $resolved);
+            $this->resolveCall($call, $document, $index, $resolved);
         }
 
         $occurrences = array_values(array_filter($resolved));
@@ -100,16 +98,12 @@ final class PhpConfigurationAnalyzer
             /** @var array<int, PhpConfigurationOccurrence|null> $resolved */
             $resolved = [];
 
-            return $this->resolveCall($call, $document, $index, $this->callsByRange($document), $resolved)?->builderSchemaPath;
+            return $this->resolveCall($call, $document, $index, $resolved)?->builderSchemaPath;
         }
         if (1 !== preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)$/D', substr($masked, 0, $receiverEnd), $match)) {
             return null;
         }
-        $variables = $this->declaredVariables($document, $match[1], $receiverEnd);
-        $parameterScopeStart = $this->parameterScopeStartAt($document, $match[1], $receiverEnd);
-        if (null !== $parameterScopeStart && $parameterScopeStart !== ($variables[0]->scopeStartOffset ?? null)) {
-            $variables = [];
-        }
+        $variables = $document->visibleVariables($receiverEnd, $match[1]);
         $root = $this->variableRoot($variables, $match[1], $index);
 
         return null === $root ? null : [$root];
@@ -144,65 +138,8 @@ final class PhpConfigurationAnalyzer
         return $offset;
     }
 
-    /**
-     * The declarations a plain variable receiver at the offset can resolve to,
-     * taking the innermost scope holding the offset.
-     *
-     * @return list<PhpTypedVariable>
-     */
-    private function declaredVariables(PhpDocument $document, string $name, int $offset): array
-    {
-        $innermost = null;
-        foreach ($document->typedVariables as $variable) {
-            if ($name !== $variable->name
-                || !\in_array($variable->kind, [PhpTypedVariableKind::Parameter, PhpTypedVariableKind::PromotedProperty], true)
-                || null === $variable->scopeStartOffset
-                || null === $variable->scopeEndOffset
-                || $offset < $variable->scopeStartOffset
-                || $offset > $variable->scopeEndOffset
-                || (null !== $innermost && $variable->scopeStartOffset < $innermost->scopeStartOffset)
-            ) {
-                continue;
-            }
-            $innermost = $variable;
-        }
-
-        return null === $innermost ? [] : [$innermost];
-    }
-
-    private function parameterScopeStartAt(PhpDocument $document, string $name, int $offset): ?int
-    {
-        $start = null;
-        foreach ($document->lexicalScopes as $scope) {
-            if ($offset < $scope->startOffset
-                || $offset > $scope->endOffset
-                || !\in_array($name, $scope->parameterNames, true)
-                || (null !== $start && $scope->startOffset < $start)
-            ) {
-                continue;
-            }
-            $start = $scope->startOffset;
-        }
-
-        return $start;
-    }
-
-    /** @return array<string, PhpMethodCall> */
-    private function callsByRange(PhpDocument $document): array
-    {
-        $callsByRange = [];
-        foreach ($document->methodCalls as $call) {
-            $callsByRange[$call->startOffset.':'.$call->endOffset] = $call;
-        }
-
-        return $callsByRange;
-    }
-
-    /**
-     * @param array<string, PhpMethodCall>                $callsByRange
-     * @param array<int, PhpConfigurationOccurrence|null> $resolved
-     */
-    private function resolveCall(PhpMethodCall $call, PhpDocument $document, ConfigurationIndex $index, array $callsByRange, array &$resolved): ?PhpConfigurationOccurrence
+    /** @param array<int, PhpConfigurationOccurrence|null> $resolved */
+    private function resolveCall(PhpMethodCall $call, PhpDocument $document, ConfigurationIndex $index, array &$resolved): ?PhpConfigurationOccurrence
     {
         $id = spl_object_id($call);
         if (\array_key_exists($id, $resolved)) {
@@ -215,10 +152,7 @@ final class PhpConfigurationAnalyzer
 
         if (PhpMethodReceiverKind::Variable === $call->receiverContext->kind && null !== $call->receiverContext->name) {
             $variables = $document->receiverVariables($call);
-            if ([] === $variables
-                && null === $this->parameterScopeStartAt($document, $call->receiverContext->name, $call->methodStartOffset)
-                && [] !== $this->declaredVariables($document, $call->receiverContext->name, $call->methodStartOffset)
-            ) {
+            if ([] === $variables && [] !== $document->visibleVariables($call->methodStartOffset, $call->receiverContext->name)) {
                 return null;
             }
             $root = $this->variableRoot($variables, $call->receiverContext->name, $index);
@@ -227,8 +161,8 @@ final class PhpConfigurationAnalyzer
             }
             $builderPath = $builderSchemaPath = [$root];
         } else {
-            $receiver = $callsByRange[$call->receiverContext->startOffset.':'.$call->receiverContext->endOffset] ?? null;
-            if (null === $receiver || null === $parent = $this->resolveCall($receiver, $document, $index, $callsByRange, $resolved)) {
+            $receiver = $document->receiverCall($call);
+            if (null === $receiver || null === $parent = $this->resolveCall($receiver, $document, $index, $resolved)) {
                 return null;
             }
             $builderPath = $parent->builderPath;
