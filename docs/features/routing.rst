@@ -65,7 +65,7 @@ Route Parameter Completion
 --------------------------
 
 For a statically known route name, completion is available for string keys in
-complete short or long parameter arrays:
+PHP short arrays and Twig parameter maps:
 
 .. code-block:: php
 
@@ -124,8 +124,9 @@ defaults or values already configured in the router request context are
 optional. Parameter maps
 that are variables, contain a dynamic top-level key or use top-level array
 unpacking aren't diagnosed. Nested arrays and unpacking inside a parameter value
-don't make the parameter map dynamic. A quick fix adds the
-missing parameters to the literal parameter map.
+don't make the parameter map dynamic. A quick fix adds missing parameters to
+PHP short arrays and Twig parameter maps; it isn't available for PHP
+``array(...)`` syntax.
 
 Only high-confidence Symfony contexts are diagnosed. Twig route references are
 diagnosed only in files loaded by the selected environment's Twig loader. Editor
