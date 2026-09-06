@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Rebuild source caches after source analysis corrections
 - Exercise explicit provider cases in the diagnostics benchmark
 - Count only document links covering each dogfood probe
 - Avoid mixing typed property receivers across anonymous PHP classes
