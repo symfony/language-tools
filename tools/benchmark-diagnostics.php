@@ -32,7 +32,7 @@ use Symfony\Lsp\Server\ServerLogger;
 
 require dirname(__DIR__).'/vendor/autoload.php';
 
-if (!\function_exists('symfony_lsp_tree_sitter_parse')) {
+if (!function_exists('symfony_lsp_tree_sitter_parse')) {
     fwrite(\STDERR, "The Tree-sitter extension is not loaded. Run through: composer source-index:benchmark\n");
     exit(1);
 }
@@ -45,7 +45,7 @@ final class DiagnosticParseCounter
     public function record(string $source): void
     {
         ++$this->calls;
-        $this->bytes += \strlen($source);
+        $this->bytes += strlen($source);
     }
 
     public function reset(): void
@@ -130,16 +130,23 @@ $counter = new DiagnosticParseCounter();
 $container->set(DiagnosticParseCounter::class, $counter);
 
 $project = new Project($projectRoot, 'file://'.$projectRoot);
-$container->get(ProjectRegistry::class)->replace([$project]);
-$container->get(ApplicationSourceScanner::class)->refreshProject($project);
+/** @var ProjectRegistry $projectRegistry */
+$projectRegistry = $container->get(ProjectRegistry::class);
+$projectRegistry->replace([$project]);
+/** @var ApplicationSourceScanner $sourceScanner */
+$sourceScanner = $container->get(ApplicationSourceScanner::class);
+$sourceScanner->refreshProject($project);
 
 $routes = [];
 for ($index = 0; $index < 374; ++$index) {
     $name = 'app_page_'.str_pad((string) $index, 5, '0', \STR_PAD_LEFT);
     $routes[] = new Route($name, '/'.$index, [], [], null, null);
 }
-$container->get(RouteIndexRegistry::class)->forProject($project)->replace(...$routes);
+/** @var RouteIndexRegistry $routeIndexes */
+$routeIndexes = $container->get(RouteIndexRegistry::class);
+$routeIndexes->forProject($project)->replace(...$routes);
 
+/** @var SourceFileEnumerator $files */
 $files = $container->get(SourceFileEnumerator::class);
 $documents = [];
 $templates = [];
@@ -156,11 +163,17 @@ foreach ($files->files($project) as $path) {
         $templates[] = new TemplateDeclaration($relativePath, $uri, $zeroRange);
     }
 }
-$container->get(TemplateIndexRegistry::class)->forProject($project)->replaceRuntime(true, ...$templates);
+/** @var TemplateIndexRegistry $templateIndexes */
+$templateIndexes = $container->get(TemplateIndexRegistry::class);
+$templateIndexes->forProject($project)->replaceRuntime(true, ...$templates);
 
-$container->get(PhpParserInterface::class)->parse('<?php final class DiagnosticCacheEviction {}');
+/** @var PhpParserInterface $phpParser */
+$phpParser = $container->get(PhpParserInterface::class);
+$phpParser->parse('<?php final class DiagnosticCacheEviction {}');
 $counter->reset();
+/** @var DocumentStore $documentStore */
 $documentStore = $container->get(DocumentStore::class);
+/** @var DiagnosticCollector $collector */
 $collector = $container->get(DiagnosticCollector::class);
 $diagnosticCount = 0;
 $startedAt = hrtime(true);
@@ -171,13 +184,13 @@ foreach ($documents as [$uri, $languageId, $path]) {
     }
     $documentStore->open(new Document($uri, $languageId, 0, $text));
     $collection = $collector->collectDetailed(['textDocument' => ['uri' => $uri]]);
-    $diagnosticCount += \count($collection?->diagnostics ?? []);
+    $diagnosticCount += null === $collection ? 0 : count($collection->diagnostics);
     $documentStore->close($uri);
 }
 $milliseconds = (hrtime(true) - $startedAt) / 1_000_000;
 
 $result = [
-    'files' => \count($documents),
+    'files' => count($documents),
     'diagnostics' => $diagnosticCount,
     'milliseconds' => round($milliseconds, 1),
     'phpParseCallsAfterIndexing' => $counter->calls,
@@ -190,4 +203,4 @@ $result = [
 ];
 
 echo json_encode($result, \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR)."\n";
-exit(\in_array(false, $result['targets'], true) ? 1 : 0);
+exit(in_array(false, $result['targets'], true) ? 1 : 0);
