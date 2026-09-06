@@ -356,8 +356,6 @@ final class TolerantXmlParser implements XmlParserInterface
                 $attributeQualifiedName,
                 substr($source, $valueStart, $valueEnd - $valueStart),
                 $attributeStart,
-                $offset,
-                $attributeStart,
                 $attributeNameEnd,
                 $valueStart,
                 $valueEnd,

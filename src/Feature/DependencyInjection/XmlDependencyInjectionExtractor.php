@@ -31,21 +31,21 @@ final class XmlDependencyInjectionExtractor
             return null;
         }
 
-        $nearestServices = [];
+        $serviceIds = [];
         $tags = [];
         foreach ($elements as $element) {
-            $nearestService = null === $element->parentIdentity ? null : ($nearestServices[$element->parentIdentity] ?? null);
-            if (isset($serviceElements[$element->identity]) && 'service' === $element->localName) {
-                $nearestService = $element->identity;
-            } elseif (isset($serviceElements[$element->identity])
-                && 'tag' === $element->localName
-                && null !== $nearestService
-                && $element->parentIdentity === $nearestService
+            if (!isset($serviceElements[$element->identity])) {
+                continue;
+            }
+            if ('service' === $element->localName) {
+                $serviceIds[$element->identity] = true;
+            } elseif ('tag' === $element->localName
+                && null !== $element->parentIdentity
+                && isset($serviceIds[$element->parentIdentity])
                 && null !== $name = $element->attribute('name')
             ) {
-                $tags[$nearestService][$name->value] = true;
+                $tags[$element->parentIdentity][$name->value] = true;
             }
-            $nearestServices[$element->identity] = $nearestService;
         }
 
         $services = [];
