@@ -1366,13 +1366,10 @@ final class TolerantPhpParserTest extends TestCase
         self::assertFalse($document->receiverHasType($debug, 'Psr\\Log\\LoggerInterface'));
 
         self::assertSame(['bus', 'logger'], array_map(static fn ($variable): string => $variable->name, $document->visibleVariables($dispatch->methodStartOffset)));
-        self::assertSame([['object']], array_map(static fn ($variable): array => $variable->types, $document->visibleVariables($dispatch->methodStartOffset, 'logger')));
-        self::assertSame([['Symfony\\Component\\Messenger\\MessageBusInterface']], array_map(static fn ($variable): array => $variable->types, $document->visibleVariables($dispatch->methodStartOffset, 'bus')));
-        self::assertSame([], $document->visibleVariables($dispatch->methodStartOffset, 'clock'));
         self::assertSame(['Psr\\Clock\\ClockInterface'], $document->scopedVariable($dispatch->methodStartOffset, 'clock')?->types);
         self::assertSame(['object'], $document->scopedVariable($dispatch->methodStartOffset, 'logger')?->types);
-        self::assertSame([['Psr\\Clock\\ClockInterface']], array_map(static fn ($variable): array => $variable->types, $document->visibleVariables($tick->methodStartOffset, 'clock')));
-        self::assertSame([], $document->visibleVariables($send->methodStartOffset, 'bus'));
+        self::assertSame(['logger', 'bus', 'clock'], array_map(static fn ($variable): string => $variable->name, $document->visibleVariables($tick->methodStartOffset)));
+        self::assertSame(['logger', 'clock'], array_map(static fn ($variable): string => $variable->name, $document->visibleVariables($send->methodStartOffset)));
         self::assertNull($document->scopedVariable($send->methodStartOffset, 'bus'));
     }
 

@@ -103,11 +103,8 @@ final class PhpConfigurationAnalyzer
         if (1 !== preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)$/D', substr($masked, 0, $receiverEnd), $match)) {
             return null;
         }
-        $variables = $document->visibleVariables($receiverEnd, $match[1]);
-        if ([] === $variables && null !== $variable = $document->scopedVariable($receiverEnd, $match[1])) {
-            $variables[] = $variable;
-        }
-        $root = $this->variableRoot($variables, $match[1], $index);
+        $variable = $document->scopedVariable($receiverEnd, $match[1]);
+        $root = $this->variableRoot(null === $variable ? [] : [$variable], $match[1], $index);
 
         return null === $root ? null : [$root];
     }

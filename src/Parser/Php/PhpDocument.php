@@ -116,26 +116,10 @@ final class PhpDocument
         return $call === $candidate ? null : $candidate;
     }
 
-    /**
-     * Typed parameter declarations whose scopes contain the offset. When a
-     * name is given, only declarations from its innermost scope are returned.
-     *
-     * @return list<PhpTypedVariable>
-     */
-    public function visibleVariables(int $offset, ?string $name = null): array
+    /** @return list<PhpTypedVariable> */
+    public function visibleVariables(int $offset): array
     {
         $scope = $this->lexicalScopeAt($offset);
-        if (null !== $name) {
-            $variable = $this->scopedVariable($offset, $name);
-            if (null === $variable || null === $variable->scopeStartOffset) {
-                return [];
-            }
-            if (null !== $scope && $variable->scopeStartOffset !== $scope->startOffset && !$this->isVariableVisibleFromScope($name, $variable->scopeStartOffset, $scope->startOffset)) {
-                return [];
-            }
-
-            return [$variable];
-        }
 
         return array_values(array_filter(
             $this->typedVariables,
