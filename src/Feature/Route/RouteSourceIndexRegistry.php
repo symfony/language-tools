@@ -6,16 +6,16 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegist
 use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
 use Symfony\Lsp\Project\Project;
 
-/** @extends AbstractProjectIndexRegistry<RouteReferenceIndex> */
-final class RouteReferenceIndexRegistry extends AbstractProjectIndexRegistry
+/** @extends AbstractProjectIndexRegistry<RouteSourceIndex> */
+final class RouteSourceIndexRegistry extends AbstractProjectIndexRegistry
 {
     public function __construct(private readonly DependencyInjectionSourceIndexRegistry $classIndexes)
     {
         parent::__construct();
     }
 
-    protected function createIndex(Project $project): RouteReferenceIndex
+    protected function createIndex(Project $project): RouteSourceIndex
     {
-        return new RouteReferenceIndex($this->classIndexes->forProject($project));
+        return new RouteSourceIndex($this->classIndexes->forProject($project));
     }
 }

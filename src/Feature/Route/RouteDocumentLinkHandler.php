@@ -13,7 +13,7 @@ final class RouteDocumentLinkHandler implements DocumentLinkProviderInterface
     public function __construct(
         private readonly DocumentContextResolver $documentContextResolver,
         private readonly LspProtocolMapper $protocol,
-        private readonly RouteDeclarationIndexRegistry $declarationIndexes,
+        private readonly RouteSourceIndexRegistry $sourceIndexes,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly RouteReferenceExtractor $phpReferenceExtractor,
         private readonly TwigRouteReferenceExtractor $twigReferenceExtractor,
@@ -38,7 +38,7 @@ final class RouteDocumentLinkHandler implements DocumentLinkProviderInterface
             : $this->phpReferenceExtractor->extract($document, $this->classIndexes->forProject($request->project));
         $links = [];
         foreach ($references as $reference) {
-            $declarations = $this->declarationIndexes->forProject($request->project)->find($reference->name);
+            $declarations = $this->sourceIndexes->forProject($request->project)->declarations($reference->name);
             if (1 !== \count($declarations)) {
                 continue;
             }

@@ -18,8 +18,7 @@ use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
-use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
-use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
+use Symfony\Lsp\Feature\Route\RouteSourceIndexRegistry;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
@@ -112,7 +111,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             'file://'.$this->temporaryDirectory,
         )]);
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $referenceIndexes = new RouteReferenceIndexRegistry($classIndexes);
+        $indexes = new RouteSourceIndexRegistry($classIndexes);
         $positionConverter = new PositionConverter();
         $parser = new TolerantPhpParser(new Parser());
         $scanner = $this->scanner(
@@ -120,8 +119,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new DocumentStore(),
             [
                 new ProjectRouteSourceIndexer(
-                    new RouteDeclarationIndexRegistry(),
-                    $referenceIndexes,
+                    $indexes,
                     new PhpRouteDeclarationExtractor($positionConverter, $parser),
                     new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
                     RouteReferenceExtractorFactory::create($positionConverter, $parser),
@@ -143,10 +141,10 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         );
 
         $scanner->indexAll();
-        self::assertCount(1, $referenceIndexes->forProject($project)->find('article_show'));
+        self::assertCount(1, $indexes->forProject($project)->references('article_show'));
 
         $scanner->indexAll();
-        self::assertCount(1, $referenceIndexes->forProject($project)->find('article_show'));
+        self::assertCount(1, $indexes->forProject($project)->references('article_show'));
     }
 
     public function testIndexesApplicationPhpAndExcludesVendor(): void
@@ -177,13 +175,11 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             $this->temporaryDirectory,
             'file://'.$this->temporaryDirectory,
         )]);
-        $indexes = new RouteDeclarationIndexRegistry();
-        $referenceIndexes = new RouteReferenceIndexRegistry(new DependencyInjectionSourceIndexRegistry());
+        $indexes = new RouteSourceIndexRegistry(new DependencyInjectionSourceIndexRegistry());
         $positionConverter = new PositionConverter();
         $documents = new DocumentStore();
         $indexer = new ProjectRouteSourceIndexer(
             $indexes,
-            $referenceIndexes,
             new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
             new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
             RouteReferenceExtractorFactory::create($positionConverter),
@@ -194,14 +190,14 @@ final class ProjectRouteSourceIndexerTest extends TestCase
 
         $scanner->indexAll();
 
-        self::assertCount(1, $indexes->forProject($project)->find('article_list'));
-        self::assertCount(1, $indexes->forProject($project)->find('admin_dashboard'));
-        self::assertCount(1, $referenceIndexes->forProject($project)->find('article_list'));
-        self::assertSame([], $indexes->forProject($project)->find('ignored_route'));
+        self::assertCount(1, $indexes->forProject($project)->declarations('article_list'));
+        self::assertCount(1, $indexes->forProject($project)->declarations('admin_dashboard'));
+        self::assertCount(1, $indexes->forProject($project)->references('article_list'));
+        self::assertSame([], $indexes->forProject($project)->declarations('ignored_route'));
 
         $scanner->indexAll();
-        self::assertCount(1, $indexes->forProject($project)->find('article_list'));
-        self::assertCount(1, $indexes->forProject($project)->find('admin_dashboard'));
+        self::assertCount(1, $indexes->forProject($project)->declarations('article_list'));
+        self::assertCount(1, $indexes->forProject($project)->declarations('admin_dashboard'));
 
         $uri = 'file://'.$this->temporaryDirectory.'/src/Controller.php';
         $documents->open(new Document($uri, 'php', 2, <<<'PHP'
@@ -212,14 +208,14 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             PHP));
         $scanner->updateOpenDocument(['textDocument' => ['uri' => $uri]]);
 
-        self::assertSame([], $indexes->forProject($project)->find('article_list'));
-        self::assertCount(1, $indexes->forProject($project)->find('article_new'));
+        self::assertSame([], $indexes->forProject($project)->declarations('article_list'));
+        self::assertCount(1, $indexes->forProject($project)->declarations('article_new'));
 
         $documents->close($uri);
         $scanner->restoreClosedDocument(['textDocument' => ['uri' => $uri]]);
 
-        self::assertCount(1, $indexes->forProject($project)->find('article_list'));
-        self::assertSame([], $indexes->forProject($project)->find('article_new'));
+        self::assertCount(1, $indexes->forProject($project)->declarations('article_list'));
+        self::assertSame([], $indexes->forProject($project)->declarations('article_new'));
 
         $packageUri = 'file://'.$this->temporaryDirectory.'/config/packages/framework.yaml';
         $documents->open(new Document($packageUri, 'yaml', 1, <<<'YAML'
@@ -228,10 +224,10 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             YAML));
         $scanner->updateOpenDocument(['textDocument' => ['uri' => $packageUri]]);
 
-        self::assertSame([], $indexes->forProject($project)->find('fake_route'));
+        self::assertSame([], $indexes->forProject($project)->declarations('fake_route'));
     }
 
-    public function testPartialPhpOverlayPreservesRoutesAndUpdatesReferencesBeforeAdaptingIndexes(): void
+    public function testPartialPhpOverlayPreservesRoutesAndUpdatesReferencesAtomically(): void
     {
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project(
@@ -239,14 +235,12 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             'file://'.$this->temporaryDirectory,
         )]);
         $documents = new DocumentStore();
-        $declarations = new RouteDeclarationIndexRegistry();
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $references = new RouteReferenceIndexRegistry($classIndexes);
+        $indexes = new RouteSourceIndexRegistry($classIndexes);
         $positionConverter = new PositionConverter();
         $parser = new TolerantPhpParser(new Parser());
         $indexer = new ProjectRouteSourceIndexer(
-            $declarations,
-            $references,
+            $indexes,
             new PhpRouteDeclarationExtractor($positionConverter, $parser),
             new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
             RouteReferenceExtractorFactory::create($positionConverter, $parser),
@@ -304,10 +298,10 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             PHP);
         $scanner->updateOpenDocument(['textDocument' => ['uri' => $uri]]);
 
-        self::assertCount(1, $declarations->forProject($project)->find('article_show'));
-        self::assertSame([], $declarations->forProject($project)->find('partial_route'));
-        self::assertSame([], $references->forProject($project)->find('old_reference'));
-        self::assertCount(1, $references->forProject($project)->find('current_reference'));
+        self::assertCount(1, $indexes->forProject($project)->declarations('article_show'));
+        self::assertSame([], $indexes->forProject($project)->declarations('partial_route'));
+        self::assertSame([], $indexes->forProject($project)->references('old_reference'));
+        self::assertCount(1, $indexes->forProject($project)->references('current_reference'));
     }
 
     /** @param list<SourceIndexProviderInterface> $providers */

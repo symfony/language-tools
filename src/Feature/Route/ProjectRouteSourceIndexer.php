@@ -14,8 +14,7 @@ use Symfony\Lsp\Project\ProjectPathResolver;
 final class ProjectRouteSourceIndexer extends AbstractSourceIndexer
 {
     public function __construct(
-        private readonly RouteDeclarationIndexRegistry $declarationIndexes,
-        private readonly RouteReferenceIndexRegistry $referenceIndexes,
+        private readonly RouteSourceIndexRegistry $sourceIndexes,
         private readonly PhpRouteDeclarationExtractor $phpDeclarationExtractor,
         private readonly YamlRouteDeclarationExtractor $yamlDeclarationExtractor,
         private readonly RouteReferenceExtractor $phpReferenceExtractor,
@@ -48,12 +47,9 @@ final class ProjectRouteSourceIndexer extends AbstractSourceIndexer
         return RouteSourceFacts::class;
     }
 
-    protected function sourceIndex(Project $project): RouteSourceIndexAdapter
+    protected function sourceIndex(Project $project): RouteSourceIndex
     {
-        return new RouteSourceIndexAdapter(
-            $this->declarationIndexes->forProject($project),
-            $this->referenceIndexes->forProject($project),
-        );
+        return $this->sourceIndexes->forProject($project);
     }
 
     protected function extract(Project $project, SourceDocument $document): RouteSourceFacts

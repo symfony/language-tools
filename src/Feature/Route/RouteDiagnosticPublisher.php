@@ -13,7 +13,7 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
         private readonly DocumentContextResolver $documentContextResolver,
         private readonly LspProtocolMapper $protocol,
         private readonly RouteIndexRegistry $routeIndexes,
-        private readonly RouteReferenceIndexRegistry $referenceIndexes,
+        private readonly RouteSourceIndexRegistry $sourceIndexes,
         private readonly TemplateIndexRegistry $templateIndexes,
     ) {
     }
@@ -46,7 +46,7 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
         }
 
         $diagnostics = [];
-        foreach ($this->referenceIndexes->forProject($request->project)->forUri($request->document->uri) as $reference) {
+        foreach ($this->sourceIndexes->forProject($request->project)->referencesForUri($request->document->uri) as $reference) {
             $route = $routeIndex->get($reference->name);
             if (null === $route) {
                 $diagnostics[] = $this->protocol->diagnostic($reference->range, 1, 'route.not_found', \sprintf('Route "%s" does not exist in the selected environment.', $reference->name));

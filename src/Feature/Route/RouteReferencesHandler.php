@@ -13,8 +13,7 @@ final class RouteReferencesHandler implements ReferencesProviderInterface
         private readonly DocumentContextResolver $documentContextResolver,
         private readonly LspProtocolMapper $protocol,
         private readonly RouteSymbolResolver $symbolResolver,
-        private readonly RouteReferenceIndexRegistry $referenceIndexes,
-        private readonly RouteDeclarationIndexRegistry $declarationIndexes,
+        private readonly RouteSourceIndexRegistry $sourceIndexes,
     ) {
     }
 
@@ -37,11 +36,11 @@ final class RouteReferencesHandler implements ReferencesProviderInterface
 
         $locations = array_map(
             fn (RouteReferenceLocation $reference): array => $this->protocol->location($reference->uri, $reference->range),
-            $this->referenceIndexes->forProject($request->project)->find($symbol->name),
+            $this->sourceIndexes->forProject($request->project)->references($symbol->name),
         );
         $context = $params['context'] ?? null;
         if (\is_array($context) && true === ($context['includeDeclaration'] ?? null)) {
-            foreach ($this->declarationIndexes->forProject($request->project)->find($symbol->name) as $declaration) {
+            foreach ($this->sourceIndexes->forProject($request->project)->declarations($symbol->name) as $declaration) {
                 $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
             }
         }

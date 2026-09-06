@@ -16,8 +16,7 @@ final class RouteRenameHandler implements RenameProviderInterface
         private readonly DocumentContextResolver $documentContextResolver,
         private readonly LspProtocolMapper $protocol,
         private readonly RouteSymbolResolver $symbolResolver,
-        private readonly RouteReferenceIndexRegistry $referenceIndexes,
-        private readonly RouteDeclarationIndexRegistry $declarationIndexes,
+        private readonly RouteSourceIndexRegistry $sourceIndexes,
         private readonly RouteIndexRegistry $routeIndexes,
         private readonly ProjectPathResolver $pathResolver,
     ) {
@@ -65,7 +64,8 @@ final class RouteRenameHandler implements RenameProviderInterface
             return null;
         }
 
-        $declarations = $this->declarationIndexes->forProject($project)->find($symbol->name);
+        $sourceIndex = $this->sourceIndexes->forProject($project);
+        $declarations = $sourceIndex->declarations($symbol->name);
         if ([] === array_filter(
             $declarations,
             fn (RouteDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri),
@@ -75,7 +75,7 @@ final class RouteRenameHandler implements RenameProviderInterface
 
         /** @var array<string, list<array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, newText: string, annotationId: string}>> $editsByUri */
         $editsByUri = [];
-        foreach ($this->referenceIndexes->forProject($project)->find($symbol->name) as $reference) {
+        foreach ($sourceIndex->references($symbol->name) as $reference) {
             if ($this->pathResolver->isApplicationOwned($project, $reference->uri)) {
                 $editsByUri[$reference->uri][] = $this->edit($reference->range, $newName);
             }

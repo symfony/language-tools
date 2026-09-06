@@ -11,8 +11,9 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
-use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteDocumentLinkHandler;
+use Symfony\Lsp\Feature\Route\RouteSourceFacts;
+use Symfony\Lsp\Feature\Route\RouteSourceIndexRegistry;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -33,18 +34,20 @@ final class RouteDocumentLinkHandlerTest extends TestCase
         $documents->open(new Document($uri, 'twig', 1, "{{ path('article_show') }}"));
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $declarations = new RouteDeclarationIndexRegistry();
-        $declarations->forProject($project)->replace(new RouteDeclaration(
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes);
+        $declarationUri = 'file:///workspace/config/routes.yaml';
+        $sourceIndexes->forProject($project)->replace(new RouteSourceFacts($declarationUri, [new RouteDeclaration(
             'article_show',
-            'file:///workspace/config/routes.yaml',
+            $declarationUri,
             new Range(new Position(4, 0), new Position(4, 12)),
-        ));
+        )], []));
         $positionConverter = new PositionConverter();
         $handler = new RouteDocumentLinkHandler(
             new DocumentContextResolver($documents, $projects),
             new LspProtocolMapper(),
-            $declarations,
-            new DependencyInjectionSourceIndexRegistry(),
+            $sourceIndexes,
+            $classIndexes,
             RouteReferenceExtractorFactory::create($positionConverter),
             new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser())),
         );

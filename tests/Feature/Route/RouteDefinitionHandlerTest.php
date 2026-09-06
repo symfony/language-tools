@@ -15,8 +15,9 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegist
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
-use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteDefinitionHandler;
+use Symfony\Lsp\Feature\Route\RouteSourceFacts;
+use Symfony\Lsp\Feature\Route\RouteSourceIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
@@ -65,16 +66,17 @@ final class RouteDefinitionHandlerTest extends TestCase
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $declarations = new RouteDeclarationIndexRegistry();
-        $declarations->forProject($project)->replace(new RouteDeclaration(
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes);
+        $declarationUri = 'file:///workspace/src/ArticleController.php';
+        $sourceIndexes->forProject($project)->replace(new RouteSourceFacts($declarationUri, [new RouteDeclaration(
             'article_show',
-            'file:///workspace/src/ArticleController.php',
+            $declarationUri,
             new Range(new Position(10, 20), new Position(10, 32)),
-        ));
+        )], []));
         $converter = new PositionConverter();
         $cursor = strpos($text, 'article_show') + 3;
         $position = $converter->toPosition($text, $cursor);
-        $classIndexes = new DependencyInjectionSourceIndexRegistry();
         $classExtractor = new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser()));
         $classIndexes->forProject($project)->replace(
             new DependencyInjectionSourceFacts($baseUri, classes: $classExtractor->extract($baseUri, $base)),
@@ -92,7 +94,7 @@ final class RouteDefinitionHandlerTest extends TestCase
                 new UriToPathConverter(),
                 $classIndexes,
             ),
-            $declarations,
+            $sourceIndexes,
         );
 
         self::assertSame([[

@@ -1,0 +1,163 @@
+<?php
+
+namespace Symfony\Lsp\Tests\Feature\Route;
+
+use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Document\Position;
+use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
+use Symfony\Lsp\Feature\Route\RouteDeclaration;
+use Symfony\Lsp\Feature\Route\RouteReferenceLocation;
+use Symfony\Lsp\Feature\Route\RouteSourceFacts;
+use Symfony\Lsp\Feature\Route\RouteSourceIndex;
+
+final class RouteSourceIndexTest extends TestCase
+{
+    public function testOverlayAtomicallyShadowsAndRestoresFactsInSavedOrder(): void
+    {
+        $firstUri = 'file:///first.php';
+        $secondUri = 'file:///second.php';
+        $savedFirst = $this->facts($firstUri, 'shared', 1);
+        $savedSecond = $this->facts($secondUri, 'shared', 2);
+        $overlayFirst = $this->facts($firstUri, 'shared', 3);
+        $index = new RouteSourceIndex(new DependencyInjectionSourceIndex());
+        $index->replace($savedFirst, $savedSecond);
+
+        self::assertSame([1, 2], $this->declarationLines($index, 'shared'));
+        self::assertSame([1, 2], $this->referenceLines($index, 'shared'));
+
+        $index->overlay($overlayFirst);
+
+        self::assertSame($overlayFirst, $index->factsForUri($firstUri));
+        self::assertSame([3, 2], $this->declarationLines($index, 'shared'));
+        self::assertSame([3, 2], $this->referenceLines($index, 'shared'));
+        self::assertSame([3], array_map(
+            static fn (RouteReferenceLocation $reference): int => $reference->range->start->line,
+            $index->referencesForUri($firstUri),
+        ));
+
+        $index->removeOverlay($firstUri);
+
+        self::assertSame($savedFirst, $index->factsForUri($firstUri));
+        self::assertSame([1, 2], $this->declarationLines($index, 'shared'));
+        self::assertSame([1, 2], $this->referenceLines($index, 'shared'));
+    }
+
+    public function testSourceReplacementAndRemovalUpdateDeclarationsAndReferencesTogether(): void
+    {
+        $uri = 'file:///source.php';
+        $index = new RouteSourceIndex(new DependencyInjectionSourceIndex());
+        $index->replace($this->facts($uri, 'old', 1));
+
+        $index->replaceSource($this->facts($uri, 'new', 2));
+
+        self::assertSame([], $index->declarations('old'));
+        self::assertSame([], $index->references('old'));
+        self::assertSame([2], $this->declarationLines($index, 'new'));
+        self::assertSame([2], $this->referenceLines($index, 'new'));
+
+        $index->removeSource($uri);
+
+        self::assertSame([], $index->declarations('new'));
+        self::assertSame([], $index->references('new'));
+        self::assertSame([], $index->referencesForUri($uri));
+    }
+
+    public function testEqualFactReplacementKeepsDerivedMapsWarm(): void
+    {
+        $uri = 'file:///source.php';
+        $index = new RouteSourceIndex(new DependencyInjectionSourceIndex());
+        $index->replace($this->facts($uri, 'route', 1));
+        self::assertSame([1], $this->declarationLines($index, 'route'));
+
+        $indexed = new \ReflectionProperty(RouteSourceIndex::class, 'indexed');
+        self::assertTrue($indexed->getValue($index));
+
+        $index->replace($this->facts($uri, 'route', 1));
+        self::assertTrue($indexed->getValue($index));
+
+        $index->replaceSource($this->facts($uri, 'route', 1));
+        self::assertTrue($indexed->getValue($index));
+
+        $index->overlay($this->facts($uri, 'overlay', 2));
+        self::assertSame([2], $this->declarationLines($index, 'overlay'));
+        $index->overlay($this->facts($uri, 'overlay', 2));
+        self::assertTrue($indexed->getValue($index));
+    }
+
+    public function testControllerFilteringTracksTheCurrentDependencyInjectionHierarchy(): void
+    {
+        $baseUri = 'file:///BaseController.php';
+        $controllerUri = 'file:///Controller.php';
+        $range = $this->range(1);
+        $classIndex = new DependencyInjectionSourceIndex();
+        $classIndex->replace(
+            new DependencyInjectionSourceFacts($baseUri, classes: [
+                new PhpClassDeclaration(
+                    'App\\BaseController',
+                    $baseUri,
+                    $range,
+                    'Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController',
+                ),
+            ]),
+            new DependencyInjectionSourceFacts($controllerUri, classes: [
+                new PhpClassDeclaration('App\\Controller', $controllerUri, $range, 'App\\BaseController'),
+            ]),
+        );
+        $index = new RouteSourceIndex($classIndex);
+        $index->replace(new RouteSourceFacts($controllerUri, [], [
+            new RouteReferenceLocation('route', $controllerUri, $range, 'App\\Controller'),
+        ]));
+
+        self::assertCount(1, $index->references('route'));
+        self::assertCount(1, $index->referencesForUri($controllerUri));
+
+        $classIndex->overlay(new DependencyInjectionSourceFacts($baseUri, classes: [
+            new PhpClassDeclaration('App\\BaseController', $baseUri, $range),
+        ]));
+
+        self::assertSame([], $index->references('route'));
+        self::assertSame([], $index->referencesForUri($controllerUri));
+
+        $classIndex->removeOverlay($baseUri);
+
+        self::assertCount(1, $index->references('route'));
+        self::assertCount(1, $index->referencesForUri($controllerUri));
+    }
+
+    private function facts(string $uri, string $name, int $line): RouteSourceFacts
+    {
+        $range = $this->range($line);
+
+        return new RouteSourceFacts(
+            $uri,
+            [new RouteDeclaration($name, $uri, $range)],
+            [new RouteReferenceLocation($name, $uri, $range)],
+        );
+    }
+
+    /** @return list<int> */
+    private function declarationLines(RouteSourceIndex $index, string $name): array
+    {
+        return array_map(
+            static fn (RouteDeclaration $declaration): int => $declaration->range->start->line,
+            $index->declarations($name),
+        );
+    }
+
+    /** @return list<int> */
+    private function referenceLines(RouteSourceIndex $index, string $name): array
+    {
+        return array_map(
+            static fn (RouteReferenceLocation $reference): int => $reference->range->start->line,
+            $index->references($name),
+        );
+    }
+
+    private function range(int $line): Range
+    {
+        return new Range(new Position($line, 0), new Position($line, 1));
+    }
+}

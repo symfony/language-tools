@@ -15,10 +15,10 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegist
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
-use Symfony\Lsp\Feature\Route\RouteDeclarationIndexRegistry;
-use Symfony\Lsp\Feature\Route\RouteReferenceIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReferenceLocation;
 use Symfony\Lsp\Feature\Route\RouteReferencesHandler;
+use Symfony\Lsp\Feature\Route\RouteSourceFacts;
+use Symfony\Lsp\Feature\Route\RouteSourceIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
@@ -50,13 +50,8 @@ final class RouteReferencesHandlerTest extends TestCase
         $documents->open(new Document($uri, 'php', 1, $text));
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $declarations = new RouteDeclarationIndexRegistry();
-        $declarations->forProject($project)->replace(new RouteDeclaration(
-            'article_list',
-            $uri,
-            new Range(new Position(2, 32), new Position(2, 44)),
-        ));
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes);
         $positionConverter = new PositionConverter();
         $classExtractor = new PhpClassDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser()));
         $baseUri = 'file:///workspace/src/BaseController.php';
@@ -67,13 +62,19 @@ final class RouteReferencesHandlerTest extends TestCase
             new DependencyInjectionSourceFacts($baseUri, classes: $classExtractor->extract($baseUri, $base)),
             new DependencyInjectionSourceFacts($consumerUri, classes: $classExtractor->extract($consumerUri, $consumer)),
         );
-        $references = new RouteReferenceIndexRegistry($classIndexes);
-        $references->forProject($project)->replace(new RouteReferenceLocation(
-            'article_list',
-            $consumerUri,
-            new Range(new Position(12, 20), new Position(12, 32)),
-            'App\\Controller\\DemoController',
-        ));
+        $sourceIndexes->forProject($project)->replace(
+            new RouteSourceFacts($uri, [new RouteDeclaration(
+                'article_list',
+                $uri,
+                new Range(new Position(2, 32), new Position(2, 44)),
+            )], []),
+            new RouteSourceFacts($consumerUri, [], [new RouteReferenceLocation(
+                'article_list',
+                $consumerUri,
+                new Range(new Position(12, 20), new Position(12, 32)),
+                'App\\Controller\\DemoController',
+            )]),
+        );
         $handler = new RouteReferencesHandler(
             new DocumentContextResolver($documents, $projects),
             new LspProtocolMapper(),
@@ -86,8 +87,7 @@ final class RouteReferencesHandlerTest extends TestCase
                 new UriToPathConverter(),
                 $classIndexes,
             ),
-            $references,
-            $declarations,
+            $sourceIndexes,
         );
 
         self::assertSame([
