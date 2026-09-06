@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Tools\Dogfood;
 
+use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 
 final class ProbeFinder
@@ -33,6 +35,8 @@ final class ProbeFinder
         ['category' => 'constraint.option.php', 'files' => '{\.php$}', 'pattern' => '{Assert\\\\[A-Za-z_][A-Za-z0-9_]*\s*\([^\)]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)}s'],
         ['category' => 'console.argument.php', 'files' => '{\.php$}', 'pattern' => '{\$input\s*->\s*getArgument\s*\(\s*[\'\"]([^\'\"]+)}'],
         ['category' => 'console.option.php', 'files' => '{\.php$}', 'pattern' => '{\$input\s*->\s*getOption\s*\(\s*[\'\"]([^\'\"]+)}'],
+        ['category' => 'service.php', 'files' => '{\.php$}', 'requiredText' => 'Symfony\\Component\\DependencyInjection\\Attribute\\Autowire', 'pattern' => '{#\[\s*(?:\\\\Symfony\\\\Component\\\\DependencyInjection\\\\Attribute\\\\)?Autowire\s*\([^)]*?\bservice\s*:\s*[\'\"]\??([^\'\"]+)}s'],
+        ['category' => 'parameter.php', 'files' => '{\.php$}', 'requiredText' => 'Symfony\\Component\\DependencyInjection\\Attribute\\Autowire', 'pattern' => '{#\[\s*(?:\\\\Symfony\\\\Component\\\\DependencyInjection\\\\Attribute\\\\)?Autowire\s*\(\s*(?|[^)]*?\bparam\s*:\s*[\'\"]([A-Za-z_][A-Za-z0-9_.]*)|[\'\"]%(?!env\()([A-Za-z_][A-Za-z0-9_.]*))}s'],
         ['category' => 'translation.php', 'files' => '{\.php$}', 'pattern' => '{(?:->trans|\bt)\(\s*[\'\"]([^\'\"]+)}'],
         ['category' => 'translation.twig', 'files' => '{\.twig$}', 'pattern' => '{[\'\"]([^\'\"]+)[\'\"]\s*\|\s*trans\b}'],
         ['category' => 'configuration.xml', 'files' => '{(?:^|/)config/.*\.xml$}', 'pattern' => '{<[A-Za-z_][A-Za-z0-9_.-]*:(config)\b}'],
@@ -49,6 +53,7 @@ final class ProbeFinder
         private array $roots = self::DEFAULT_ROOTS,
         private int $probesPerCategory = 1,
         private readonly TwigDirectiveLocator $directives = new TwigDirectiveLocator(),
+        private readonly XmlDependencyInjectionExtractor $xmlDependencyInjection = new XmlDependencyInjectionExtractor(new PositionConverter()),
     ) {
     }
 
@@ -78,8 +83,101 @@ final class ProbeFinder
                 }
             }
         }
+        array_push($probes, ...$this->findPhpConfiguration($files));
+        array_push($probes, ...$this->findXmlDependencyInjectionReferences($files));
         foreach (['Function', 'Filter'] as $kind) {
             array_push($probes, ...$this->findTwigCallables($files, $kind));
+        }
+
+        return $probes;
+    }
+
+    /**
+     * @param array<string, string> $files
+     *
+     * @return list<Probe>
+     */
+    private function findPhpConfiguration(array $files): array
+    {
+        $probes = [];
+        foreach ($files as $path => $contents) {
+            if (\count($probes) >= $this->probesPerCategory) {
+                break;
+            }
+            if (1 !== preg_match('{\.php$}', $path) || !str_contains($contents, 'Symfony\\Config\\')) {
+                continue;
+            }
+            preg_match_all('/\buse\s+Symfony\\\\Config\\\\(?:[A-Za-z_][A-Za-z0-9_]*\\\\)*([A-Za-z_][A-Za-z0-9_]*Config)(?:\s+as\s+([A-Za-z_][A-Za-z0-9_]*))?\s*;/', $contents, $imports, \PREG_SET_ORDER);
+            foreach ($imports as $import) {
+                $type = '' === ($import[2] ?? '') ? $import[1] : $import[2];
+                if (false === preg_match_all('/\b'.preg_quote($type, '/').'\s+\$([A-Za-z_][A-Za-z0-9_]*)/', $contents, $variables, \PREG_OFFSET_CAPTURE) || [] === $variables[1]) {
+                    continue;
+                }
+                foreach ($variables[1] as [$variable, $variableOffset]) {
+                    $pattern = '/\$'.preg_quote($variable, '/').'\s*(?:\?->|->)\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(/';
+                    if (1 !== preg_match($pattern, $contents, $call, \PREG_OFFSET_CAPTURE, $variableOffset + \strlen($variable))) {
+                        continue;
+                    }
+                    [$method, $offset] = $call[1];
+                    if ($this->isCommented($path, $contents, $offset)) {
+                        continue;
+                    }
+                    $probes[] = $this->probe('configuration.php', $path, $contents, $method, $offset);
+                    break 2;
+                }
+            }
+        }
+
+        return $probes;
+    }
+
+    /**
+     * @param array<string, string> $files
+     *
+     * @return list<Probe>
+     */
+    private function findXmlDependencyInjectionReferences(array $files): array
+    {
+        $names = ['service' => [], 'parameter' => []];
+        foreach ($files as $path => $contents) {
+            if (1 !== preg_match('{\.xml$}', $path)) {
+                continue;
+            }
+            $facts = $this->xmlDependencyInjection->extract($path, $contents);
+            if (null === $facts) {
+                continue;
+            }
+            foreach ($facts->services as $service) {
+                $names['service'][$service->id] = true;
+            }
+            foreach ($facts->parameters as $parameter) {
+                $names['parameter'][$parameter->name] = true;
+            }
+        }
+
+        $probes = [];
+        foreach ($names as $kind => $declared) {
+            $pattern = 'service' === $kind
+                ? '{@\??([^\'\"\s,\]\}]+)|\bservice\s*:\s*[\'\"]\??([^\'\"]+)}s'
+                : '{%([^%\s]+)%|\bparam\s*:\s*[\'\"]([^\'\"]+)}s';
+            $found = 0;
+            foreach ($files as $path => $contents) {
+                if ($found >= $this->probesPerCategory) {
+                    break;
+                }
+                if (1 === preg_match('{\.xml$}', $path) || false === preg_match_all($pattern, $contents, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE)) {
+                    continue;
+                }
+                foreach ($matches as $match) {
+                    $capture = '' !== ($match[1][0] ?? '') ? $match[1] : ($match[2] ?? null);
+                    if (null === $capture || !isset($declared[$capture[0]]) || $this->isCommented($path, $contents, $capture[1])) {
+                        continue;
+                    }
+                    $probes[] = $this->probe($kind.'.xml', $path, $contents, $capture[0], $capture[1]);
+                    ++$found;
+                    break;
+                }
+            }
         }
 
         return $probes;

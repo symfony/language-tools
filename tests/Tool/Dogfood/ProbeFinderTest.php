@@ -95,6 +95,91 @@ final class ProbeFinderTest extends TestCase
         $this->assertPositionInsideValue($probes[0]);
     }
 
+    public function testFindsPhpConfigurationMethodsOnTypedSymfonyConfigParameters(): void
+    {
+        $this->write('config/packages/framework.php', <<<'PHP'
+            <?php
+
+            use Symfony\Config\FrameworkConfig;
+
+            return static function (FrameworkConfig $framework): void {
+                $framework->router()->utf8(true);
+            };
+            PHP);
+
+        $probes = $this->probes(new ProbeFinder(), 'configuration.php');
+
+        self::assertCount(1, $probes);
+        self::assertSame('router', $probes[0]->value);
+        $this->assertPositionInsideValue($probes[0]);
+    }
+
+    public function testFindsAutowireServiceAndParameterReferences(): void
+    {
+        $this->write('src/Consumer.php', <<<'PHP'
+            <?php
+
+            use Symfony\Component\DependencyInjection\Attribute\Autowire;
+
+            final class Consumer
+            {
+                public function __construct(
+                    #[Autowire(service: 'app.mailer')] object $mailer,
+                    #[Autowire(param: 'app.storage_dir')] string $storage,
+                ) {
+                }
+            }
+            PHP);
+
+        $finder = new ProbeFinder();
+        $service = $this->probes($finder, 'service.php')[0];
+        $parameter = $this->probes($finder, 'parameter.php')[0];
+
+        self::assertSame('app.mailer', $service->value);
+        self::assertSame('app.storage_dir', $parameter->value);
+        $this->assertPositionInsideValue($service);
+        $this->assertPositionInsideValue($parameter);
+    }
+
+    public function testFindsReferencesToXmlDependencyInjectionDeclarations(): void
+    {
+        $this->write('config/services.xml', <<<'XML'
+            <container xmlns="http://symfony.com/schema/dic/services">
+                <services>
+                    <service id="app.mailer" class="App\Mailer"/>
+                    <parameter key="app.storage_dir">var/storage</parameter>
+                </services>
+            </container>
+            XML);
+        $this->write('config/services.yaml', <<<'YAML'
+            services:
+                App\Consumer:
+                    arguments: ['@app.mailer', '%app.storage_dir%']
+            YAML);
+
+        $finder = new ProbeFinder();
+        $service = $this->probes($finder, 'service.xml')[0];
+        $parameter = $this->probes($finder, 'parameter.xml')[0];
+
+        self::assertSame('app.mailer', $service->value);
+        self::assertSame('app.storage_dir', $parameter->value);
+        $this->assertPositionInsideValue($service);
+        $this->assertPositionInsideValue($parameter);
+    }
+
+    public function testDoesNotProbeXmlDependencyInjectionDeclarationsWithoutInteractiveReferences(): void
+    {
+        $this->write('config/services.xml', <<<'XML'
+            <container xmlns="http://symfony.com/schema/dic/services">
+                <services>
+                    <service id="app.mailer" class="App\Mailer"/>
+                </services>
+            </container>
+            XML);
+
+        self::assertSame([], $this->probes(new ProbeFinder(), 'service.xml'));
+    }
+
     public function testFindsCustomTwigCallables(): void
     {
         $this->write('src/AppExtension.php', "<?php\nuse Twig\\TwigFilter;\nuse Twig\\TwigFunction;\nfinal class AppExtension\n{\n    public function getFunctions(): array\n    {\n        return [\n            new TwigFunction('unused_widget', fn () => ''),\n            new TwigFunction('app_widget', fn () => ''),\n        ];\n    }\n    public function getFilters(): array\n    {\n        return [new TwigFilter('app_short', fn () => '')];\n    }\n}\n");

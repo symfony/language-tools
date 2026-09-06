@@ -53,6 +53,23 @@ final class SupportScorerTest extends TestCase
         self::assertSame(12, \strlen($score['fingerprint']));
     }
 
+    public function testPhpConfigurationProbesOnlyExpectCompletionAndHover(): void
+    {
+        $score = (new SupportScorer())->score(['probes' => [[
+            'category' => 'configuration.php',
+            'file' => 'config/packages/framework.php',
+            'value' => 'router',
+            'requests' => [
+                'completion' => ['resultCount' => 1, 'error' => null],
+                'hover' => ['resultCount' => 1, 'error' => null],
+                'definition' => ['resultCount' => 0, 'error' => null],
+                'references' => ['resultCount' => 0, 'error' => null],
+            ],
+        ]]]);
+
+        self::assertSame(1.0, (float) ($score['score'] ?? -1));
+    }
+
     public function testPhpTwigCallableProbesOnlyExpectReferences(): void
     {
         $score = (new SupportScorer())->score(['probes' => [
