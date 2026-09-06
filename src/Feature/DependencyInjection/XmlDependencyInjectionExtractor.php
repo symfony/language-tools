@@ -31,17 +31,13 @@ final class XmlDependencyInjectionExtractor
             return null;
         }
 
-        $serviceIds = [];
         $tags = [];
         foreach ($elements as $element) {
-            if (!isset($serviceElements[$element->identity])) {
-                continue;
-            }
-            if ('service' === $element->localName) {
-                $serviceIds[$element->identity] = true;
-            } elseif ('tag' === $element->localName
+            if (isset($serviceElements[$element->identity])
+                && 'tag' === $element->localName
                 && null !== $element->parentIdentity
-                && isset($serviceIds[$element->parentIdentity])
+                && isset($serviceElements[$element->parentIdentity])
+                && 'service' === $document->element($element->parentIdentity)?->localName
                 && null !== $name = $element->attribute('name')
             ) {
                 $tags[$element->parentIdentity][$name->value] = true;

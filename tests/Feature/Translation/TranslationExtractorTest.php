@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\Translation;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Translation\TranslationExtractor;
@@ -226,6 +227,45 @@ final class TranslationExtractorTest extends TestCase
         $this->expectExceptionMessage('XML analysis stopped after reaching its structural limit.');
 
         $this->extractor()->extract(new SourceDocument('file:///workspace/translations/messages.en.xlf', 'xml', $text));
+    }
+
+    /** @param list<array{string, string}> $expected */
+    #[DataProvider('xliffMessageOwnershipProvider')]
+    public function testKeepsXliffMessagesInTheirOwnUnitsAndSegments(string $text, array $expected): void
+    {
+        $declarations = $this->extractor()->extract(new SourceDocument('file:///workspace/translations/messages.en.xlf', 'xml', $text))->declarations;
+
+        self::assertSame($expected, array_map(static fn ($declaration): array => [$declaration->key, $declaration->message], $declarations));
+    }
+
+    /** @return iterable<string, array{string, list<array{string, string}>}> */
+    public static function xliffMessageOwnershipProvider(): iterable
+    {
+        yield 'alternative translation does not supply the target' => [<<<'XML'
+            <xliff version="1.2"><file><body>
+                <trans-unit id="title" resname="page.title">
+                    <source>Original</source>
+                    <alt-trans><source>Suggested source</source><target>Suggested target</target></alt-trans>
+                </trans-unit>
+            </body></file></xliff>
+            XML, [['page.title', 'Original']]];
+        yield 'ignorable text and independent segments' => [<<<'XML'
+            <xliff version="2.0"><file>
+                <unit id="title">
+                    <ignorable><source> </source><target> </target></ignorable>
+                    <segment><source>First</source></segment>
+                    <segment><source>Second</source><target>Translated</target></segment>
+                </unit>
+            </file></xliff>
+            XML, [['First', 'First'], ['Second', 'Translated']]];
+        yield 'nested suggestions do not supply the source' => [<<<'XML'
+            <xliff version="1.2"><file><body>
+                <trans-unit id="title">
+                    <alt-trans><source>Ignored</source><target>Ignored</target></alt-trans>
+                    <source>Actual</source><target>Translated</target>
+                </trans-unit>
+            </body></file></xliff>
+            XML, [['Actual', 'Translated']]];
     }
 
     public function testIgnoresCommentedXliffUnits(): void

@@ -34,12 +34,14 @@ locale directory, such as ``Translations/en_US/messages.ini``, are recognized
 too; their messages can be quoted or unquoted, and comment lines and trailing
 ``;`` comments are ignored. Escaped quotes and backslashes in quoted messages
 are decoded. XLIFF units inside comments, CDATA sections, processing
-instructions and DOCTYPE declarations are ignored. Mixed-content source and
-target values are supported. XLIFF keys and messages decode only predefined and
-numeric XML references; declared and external entities stay literal and aren't
-loaded or expanded. Source-derived keys keep ranges over their exact raw XML
-content. Unsaved resource changes are available immediately, and changes made
-by external tools are picked up while the server is running.
+instructions and DOCTYPE declarations are ignored. Alternative translations and
+ignorable segments don't replace a unit's messages. Each XLIFF 2 segment keeps
+its own source and target. Mixed-content source and target values are supported.
+XLIFF keys and messages decode only predefined and numeric XML references.
+Declared and external entities stay literal and aren't loaded or expanded.
+Source-derived keys keep ranges over their exact raw XML content. Unsaved
+resource changes are available immediately, and changes made by external tools
+are picked up while the server is running.
 
 An XLIFF catalog that exceeds the analysis limit fails source indexing rather
 than exposing a partial set of declarations. Split a large catalog into smaller

@@ -220,28 +220,24 @@ final class TranslationCatalogExtractor
     {
         $document = $this->xmlParser->parse($text);
         $document->requireComplete();
-        $units = [];
+        $contexts = [];
         $sources = [];
         $targets = [];
-        $nearestUnits = [];
         $textOwners = [];
         $textValues = [];
         foreach ($document->events as $event) {
             if ($event instanceof XmlElementStart) {
-                $nearestUnit = null === $event->parentIdentity ? null : ($nearestUnits[$event->parentIdentity] ?? null);
-                if (\in_array($event->localName, ['trans-unit', 'unit'], true)) {
-                    $nearestUnit = $event->identity;
-                    $units[] = $event;
-                }
-                $nearestUnits[$event->identity] = $nearestUnit;
-
                 $textOwner = null === $event->parentIdentity ? null : ($textOwners[$event->parentIdentity] ?? null);
-                if (null !== $nearestUnit && 'source' === $event->localName) {
-                    $sources[$nearestUnit] ??= $event;
-                    $textOwner = $event->identity;
-                    $textValues[$textOwner] = '';
-                } elseif (null !== $nearestUnit && 'target' === $event->localName) {
-                    $targets[$nearestUnit] ??= $event;
+                if (null !== $event->parentIdentity
+                    && \in_array($event->localName, ['source', 'target'], true)
+                    && null !== $unit = $this->xliffUnit($document, $event->parentIdentity)
+                ) {
+                    $contexts[$event->parentIdentity] = $unit;
+                    if ('source' === $event->localName) {
+                        $sources[$event->parentIdentity] ??= $event;
+                    } else {
+                        $targets[$event->parentIdentity] ??= $event;
+                    }
                     $textOwner = $event->identity;
                     $textValues[$textOwner] = '';
                 }
@@ -256,9 +252,9 @@ final class TranslationCatalogExtractor
         }
 
         $result = [];
-        foreach ($units as $unit) {
-            $source = $sources[$unit->identity] ?? null;
-            $target = $targets[$unit->identity] ?? null;
+        foreach ($contexts as $contextIdentity => $unit) {
+            $source = $sources[$contextIdentity] ?? null;
+            $target = $targets[$contextIdentity] ?? null;
             $name = $unit->attribute('resname') ?? $unit->attribute('name');
             if (null !== $name) {
                 $key = $this->xliffDecoder->decode($name->value);
@@ -266,7 +262,7 @@ final class TranslationCatalogExtractor
                 $keyLength = $name->valueEndOffset - $name->valueStartOffset;
             } elseif (null !== $source) {
                 $key = $textValues[$source->identity] ?? '';
-                [$keyOffset, $keyEnd] = $this->xliffContentRange($document, $source, $target, $unit, \strlen($text));
+                [$keyOffset, $keyEnd] = $this->xliffContentRange($document, $source, $target, $contextIdentity, \strlen($text));
                 $keyLength = $keyEnd - $keyOffset;
             } elseif (null !== $id = $unit->attribute('id')) {
                 $key = $this->xliffDecoder->decode($id->value);
@@ -285,11 +281,23 @@ final class TranslationCatalogExtractor
         return $result;
     }
 
+    private function xliffUnit(XmlDocument $document, int $contextIdentity): ?XmlElementStart
+    {
+        $context = $document->element($contextIdentity);
+        if ('segment' === $context?->localName && null !== $context->parentIdentity) {
+            $unit = $document->element($context->parentIdentity);
+
+            return 'unit' === $unit?->localName ? $unit : null;
+        }
+
+        return \in_array($context?->localName, ['trans-unit', 'unit'], true) ? $context : null;
+    }
+
     /** @return array{int, int} */
-    private function xliffContentRange(XmlDocument $document, XmlElementStart $element, ?XmlElementStart $following, XmlElementStart $unit, int $sourceLength): array
+    private function xliffContentRange(XmlDocument $document, XmlElementStart $element, ?XmlElementStart $following, int $contextIdentity, int $sourceLength): array
     {
         $elementEnd = $document->end($element->identity);
-        $unitEnd = $document->end($unit->identity);
+        $unitEnd = $document->end($contextIdentity);
         $end = null !== $elementEnd ? $elementEnd->startOffset : (null !== $following ? $following->startOffset : (null === $unitEnd ? $sourceLength : $unitEnd->startOffset));
 
         return [$element->endOffset, max($element->endOffset, $end)];
