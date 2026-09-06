@@ -448,6 +448,46 @@ final class TolerantPhpParserTest extends TestCase
         ]);
     }
 
+    public function testDoesNotMixPropertyReceiversAcrossAnonymousClasses(): void
+    {
+        $document = (new TolerantPhpParser(new Parser()))->parse(<<<'PHP'
+            <?php
+            use Psr\Log\LoggerInterface;
+            use Symfony\Component\Messenger\MessageBusInterface;
+
+            new class {
+                public function __construct(private MessageBusInterface $service) {
+                    $service->dispatch(new Message());
+                }
+                public function send(): void {
+                    $this->service->dispatch(new Message());
+                }
+            };
+            new class {
+                public function __construct(private LoggerInterface $service) {}
+                public function log(): void {
+                    $this->service->info('sent');
+                }
+            };
+            final class Publisher {
+                public function __construct(private MessageBusInterface $service) {}
+                public function send(): void {
+                    $this->service->dispatch(new Message());
+                }
+            }
+            PHP);
+
+        self::assertSame([
+            ['Symfony\\Component\\Messenger\\MessageBusInterface'],
+            [],
+            [],
+            ['Symfony\\Component\\Messenger\\MessageBusInterface'],
+        ], array_map(
+            static fn ($call): array => array_merge(...array_map(static fn ($variable): array => $variable->types, $document->receiverVariables($call))),
+            $document->methodCalls,
+        ));
+    }
+
     public function testExposesPropertyDeclarationsWithoutInitializerValues(): void
     {
         $source = <<<'PHP'

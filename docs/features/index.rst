@@ -14,6 +14,9 @@ opened in the editor, and always skips ``.git/``, ``node_modules/``, ``var/``,
 additional embedded fixtures or generated sources. Project-root dotenv files
 remain available for environment variable names, but their values aren't read.
 
+PHP call recognition through typed properties requires a named declaring class;
+properties in anonymous classes aren't inferred.
+
 Supported Integrations
 ----------------------
 

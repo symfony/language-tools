@@ -193,6 +193,7 @@ final class PhpDocument
             ) {
                 $variables[] = $variable;
             } elseif (PhpMethodReceiverKind::ThisProperty === $receiver->kind
+                && null !== $call->className
                 && \in_array($variable->kind, [PhpTypedVariableKind::Property, PhpTypedVariableKind::PromotedProperty], true)
                 && $call->className === $variable->className
             ) {
