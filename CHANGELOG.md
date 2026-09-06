@@ -25,6 +25,8 @@
 - Improve translation extraction across XLIFF, INI and PHP helper calls
 - Decode Twig type declarations and callable options with Twig string rules
 - Bind PHP service and parameter completion to the exact `#[Autowire]` argument
+- Simplify Messenger, route and shared PHP source analysis
+- Expand dogfood coverage for dependency injection and PHP configuration
 - Reuse indexed source facts when collecting diagnostics
 - Compile effective runtime configuration once and share validated typed environment configuration
 - Document development installation for the unpublished Zed extension

@@ -13,9 +13,9 @@ final class SupportScorer
 
     /**
      * Some probe locations intentionally expose only a subset of request kinds.
-     * PHP Twig declarations expose template references, form and constraint
-     * options expose completion and hover metadata, console input names expose
-     * completion, and YAML imports expose links.
+     * PHP Twig declarations expose template references, form, constraint and
+     * configuration probes expose completion and hover metadata, console input
+     * names expose completion, and YAML imports expose links.
      */
     private const EXPECTED_OVERRIDES = [
         'form.option.php' => ['completion', 'hover'],
