@@ -17,7 +17,6 @@ final class FormMetadataProvider implements DiagnosticProviderInterface, HoverPr
         private readonly LspProtocolMapper $protocol,
         private readonly MetadataIndexRegistry $indexes,
         private readonly MetadataSourceIndexRegistry $sourceIndexes,
-        private readonly MetadataExtractor $extractor,
     ) {
     }
 
@@ -28,17 +27,18 @@ final class FormMetadataProvider implements DiagnosticProviderInterface, HoverPr
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        foreach ($this->extractor->formOptions($request->document->text) as $option) {
-            if (!$this->converter->containsByteOffset($request->document->text, $option['range'], $offset, inclusiveEnd: true)) {
+        $facts = $this->sourceIndexes->forProject($request->project)->factsForUri($request->document->uri);
+        foreach ($facts instanceof MetadataSourceFacts ? $facts->formOptions : [] as $option) {
+            if (!$this->converter->containsByteOffset($request->document->text, $option->range, $offset, inclusiveEnd: true)) {
                 continue;
             }
-            $type = $this->indexes->forProject($request->project)->formType($option['class']);
-            if (null === $type || !\in_array($option['option'], $type->options, true)) {
+            $type = $this->indexes->forProject($request->project)->formType($option->className);
+            if (null === $type || !\in_array($option->option, $type->options, true)) {
                 return null;
             }
-            $required = \in_array($option['option'], $type->requiredOptions, true);
+            $required = \in_array($option->option, $type->requiredOptions, true);
 
-            return $this->protocol->markdownHover(\sprintf("Form option: `%s`\n\nType: `%s`\n\nRequired: %s", $option['option'], $type->className, $required ? 'yes' : 'no'));
+            return $this->protocol->markdownHover(\sprintf("Form option: `%s`\n\nType: `%s`\n\nRequired: %s", $option->option, $type->className, $required ? 'yes' : 'no'));
         }
 
         return null;

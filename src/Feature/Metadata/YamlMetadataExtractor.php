@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 
 final class YamlMetadataExtractor
@@ -62,7 +61,7 @@ final class YamlMetadataExtractor
         return $symbols;
     }
 
-    /** @return list<array{constraint: string, option: string, range: Range}> */
+    /** @return list<ConstraintOptionReference> */
     public function constraintOptions(string $text): array
     {
         $options = [];
@@ -72,11 +71,7 @@ final class YamlMetadataExtractor
             if ($count < 5 || 'properties' !== $path[1]) {
                 continue;
             }
-            $options[] = [
-                'constraint' => $path[$count - 2],
-                'option' => $path[$count - 1],
-                'range' => $occurrence->keyRange,
-            ];
+            $options[] = new ConstraintOptionReference($path[$count - 2], $path[$count - 1], $occurrence->keyRange);
         }
 
         return $options;

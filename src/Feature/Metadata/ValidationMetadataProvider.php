@@ -17,7 +17,6 @@ final class ValidationMetadataProvider implements DiagnosticProviderInterface, H
         private readonly LspProtocolMapper $protocol,
         private readonly MetadataIndexRegistry $indexes,
         private readonly MetadataSourceIndexRegistry $sourceIndexes,
-        private readonly MetadataExtractor $extractor,
     ) {
     }
 
@@ -28,16 +27,14 @@ final class ValidationMetadataProvider implements DiagnosticProviderInterface, H
             return null;
         }
         $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        $constraintOptions = 'yaml' === $request->document->languageId
-            ? $this->extractor->yamlConstraintOptions($request->document->text)
-            : $this->extractor->constraintOptions($request->document->text);
-        foreach ($constraintOptions as $option) {
-            if (!$this->converter->containsByteOffset($request->document->text, $option['range'], $offset, inclusiveEnd: true)) {
+        $facts = $this->sourceIndexes->forProject($request->project)->factsForUri($request->document->uri);
+        foreach ($facts instanceof MetadataSourceFacts ? $facts->constraintOptions : [] as $option) {
+            if (!$this->converter->containsByteOffset($request->document->text, $option->range, $offset, inclusiveEnd: true)) {
                 continue;
             }
-            $constraint = $this->indexes->forProject($request->project)->constraint($option['constraint']);
+            $constraint = $this->indexes->forProject($request->project)->constraint($option->constraint);
 
-            return null === $constraint ? null : $this->protocol->markdownHover(\sprintf("Constraint option: `%s`\n\nConstraint: `%s`", $option['option'], $constraint->className));
+            return null === $constraint ? null : $this->protocol->markdownHover(\sprintf("Constraint option: `%s`\n\nConstraint: `%s`", $option->option, $constraint->className));
         }
 
         return null;

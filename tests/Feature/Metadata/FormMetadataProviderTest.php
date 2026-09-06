@@ -40,7 +40,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
         $protocol = new LspProtocolMapper();
         $sourceIndexes = new MetadataSourceIndexRegistry();
         $completionProvider = new MetadataCompletionProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
-        $formProvider = new FormMetadataProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
+        $formProvider = new FormMetadataProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes);
         $formUri = 'file:///workspace/src/Controller/EventController.php';
         $formText = <<<'PHP'
             <?php
@@ -278,7 +278,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
             $dataClasses[$dataClass->formClass] = $dataClass->dataClass;
         }
         self::assertSame(['App\Form\ArticleType' => 'App\Dto\Article'], $dataClasses);
-        self::assertSame(['active_option'], array_column($extractor->formOptions($text), 'option'));
+        self::assertSame(['active_option'], array_map(static fn ($option): string => $option->option, $facts->formOptions));
         self::assertNull($extractor->completionContext('php', $text, strpos($text, "'ignored'") + \strlen("'ign")));
 
         $references = array_values(array_filter(
@@ -346,10 +346,10 @@ final class FormMetadataProviderTest extends MetadataTestCase
             ]);
             PHP;
 
-        $options = $extractor->formOptions($text);
+        $options = $extractor->extract(new SourceDocument('file:///workspace/src/Controller/EventController.php', 'php', $text))->formOptions;
 
-        self::assertSame(['attr', 'required'], array_column($options, 'option'));
-        self::assertSame(strpos($text, "'required'") + 1, $converter->toByteOffset($text, $options[1]['range']->start));
+        self::assertSame(['attr', 'required'], array_map(static fn ($option): string => $option->option, $options));
+        self::assertSame(strpos($text, "'required'") + 1, $converter->toByteOffset($text, $options[1]->range->start));
     }
 
     public function testDecodesLiteralOptionKeysAroundDynamicArrayEntries(): void
@@ -369,13 +369,13 @@ final class FormMetadataProviderTest extends MetadataTestCase
             ]);
             PHP;
 
-        $options = $extractor->formOptions($text);
+        $options = $extractor->extract(new SourceDocument('file:///workspace/src/Controller/EventController.php', 'php', $text))->formOptions;
 
-        self::assertSame(['required', 'attr', 'after'], array_column($options, 'option'));
+        self::assertSame(['required', 'attr', 'after'], array_map(static fn ($option): string => $option->option, $options));
         self::assertSame('requ\\x69red', substr(
             $text,
-            $converter->toByteOffset($text, $options[0]['range']->start),
-            $converter->toByteOffset($text, $options[0]['range']->end) - $converter->toByteOffset($text, $options[0]['range']->start),
+            $converter->toByteOffset($text, $options[0]->range->start),
+            $converter->toByteOffset($text, $options[0]->range->end) - $converter->toByteOffset($text, $options[0]->range->start),
         ));
     }
 
@@ -479,7 +479,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
             ]);
             PHP;
 
-        self::assertSame([], $extractor->formOptions($text));
+        self::assertSame([], $extractor->extract(new SourceDocument('file:///workspace/src/Controller/EventController.php', 'php', $text))->formOptions);
     }
 
     public function testIgnoresOptionsOfDynamicFormTypeExpressions(): void
@@ -499,7 +499,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
         $documents = new DocumentStore();
         $resolver = new DocumentContextResolver($documents, $projects);
         $sourceIndexes = new MetadataSourceIndexRegistry();
-        $formProvider = new FormMetadataProvider($resolver, $converter, new LspProtocolMapper(), $indexes, $sourceIndexes, $extractor);
+        $formProvider = new FormMetadataProvider($resolver, $converter, new LspProtocolMapper(), $indexes, $sourceIndexes);
         $uri = 'file:///workspace/src/Controller/EventController.php';
         $text = <<<'PHP'
             <?php
@@ -520,10 +520,27 @@ final class FormMetadataProviderTest extends MetadataTestCase
         $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($uri, 'php', $text)));
 
         self::assertSame([['App\\Form\\EventType', 'bogus']], array_map(
-            static fn (array $option): array => [$option['class'], $option['option']],
-            $extractor->formOptions($text),
+            static fn ($option): array => [$option->className, $option->option],
+            $extractor->extract(new SourceDocument($uri, 'php', $text))->formOptions,
         ));
         self::assertSame(['form.unknown_option'], array_column($this->diagnostics([$formProvider], $uri), 'code'));
+    }
+
+    public function testIndexesFormOptionsFromIncompleteSource(): void
+    {
+        $extractor = $this->createExtractor(new PositionConverter());
+        $text = <<<'PHP'
+            <?php
+            use App\Form\EventType;
+
+            $this->createForm(EventType::class, null, [
+                'required' => true,
+                'after' =>
+            PHP;
+
+        $options = $extractor->extract(new SourceDocument('file:///workspace/src/Controller/EventController.php', 'php', $text))->formOptions;
+
+        self::assertSame(['required', 'after'], array_map(static fn ($option): string => $option->option, $options));
     }
 
     public function testIgnoresCommentedFormMetadataWhilePreservingActiveRanges(): void
@@ -549,9 +566,9 @@ final class FormMetadataProviderTest extends MetadataTestCase
             }
             PHP;
 
-        $formOptions = $extractor->formOptions($text);
-        self::assertSame(['active_form'], array_column($formOptions, 'option'));
-        self::assertSame(strpos($text, 'active_form'), $converter->toByteOffset($text, $formOptions[0]['range']->start));
+        $formOptions = $extractor->extract(new SourceDocument('file:///workspace/src/Controller/EventController.php', 'php', $text))->formOptions;
+        self::assertSame(['active_form'], array_map(static fn ($option): string => $option->option, $formOptions));
+        self::assertSame(strpos($text, 'active_form'), $converter->toByteOffset($text, $formOptions[0]->range->start));
 
         $uri = 'file:///workspace/src/Controller/EventController.php';
         $project = new Project('/workspace', 'file:///workspace');
@@ -569,6 +586,6 @@ final class FormMetadataProviderTest extends MetadataTestCase
         $sourceIndexes = new MetadataSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($uri, 'php', $text)));
         $resolver = new DocumentContextResolver($documents, $projects);
-        self::assertSame([], (new FormMetadataProvider($resolver, $converter, new LspProtocolMapper(), $indexes, $sourceIndexes, $extractor))->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], (new FormMetadataProvider($resolver, $converter, new LspProtocolMapper(), $indexes, $sourceIndexes))->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 }

@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
@@ -33,24 +32,15 @@ final class MetadataExtractor
                 $document->uri,
                 $this->unique($this->phpSymbols($document->uri, $document->text, $source, $php, $formDataClasses)),
                 $formDataClasses,
-                array_map(
-                    static fn (array $option): FormOptionReference => new FormOptionReference($option['class'], $option['option'], $option['range']),
-                    $this->forms->options($document->text, $source, $php),
-                ),
-                array_map(
-                    static fn (array $option): ConstraintOptionReference => new ConstraintOptionReference($option['constraint'], $option['option'], $option['range']),
-                    $this->validation->options($document->text, $php),
-                ),
+                $this->forms->options($document->text, $source, $php),
+                $this->validation->options($document->text, $php),
             );
         }
         if ('yaml' === $document->languageId) {
             return new MetadataSourceFacts(
                 $document->uri,
                 $this->unique($this->yaml->symbols($document->uri, $document->text)),
-                constraintOptions: array_map(
-                    static fn (array $option): ConstraintOptionReference => new ConstraintOptionReference($option['constraint'], $option['option'], $option['range']),
-                    $this->yaml->constraintOptions($document->text),
-                ),
+                constraintOptions: $this->yaml->constraintOptions($document->text),
             );
         }
 
@@ -69,28 +59,6 @@ final class MetadataExtractor
         }
 
         return 'yaml' === $languageId ? $this->yaml->completionContext($text, $offset) : null;
-    }
-
-    /**
-     * @return list<array{class: string, option: string, range: Range}>
-     */
-    public function formOptions(string $text): array
-    {
-        $php = $this->phpParser->parse($text);
-
-        return $this->forms->options($text, $this->phpComments->mask($text), $php);
-    }
-
-    /** @return list<array{constraint: string, option: string, range: Range}> */
-    public function constraintOptions(string $text): array
-    {
-        return $this->validation->options($text, $this->phpParser->parse($text));
-    }
-
-    /** @return list<array{constraint: string, option: string, range: Range}> */
-    public function yamlConstraintOptions(string $text): array
-    {
-        return $this->yaml->constraintOptions($text);
     }
 
     /**

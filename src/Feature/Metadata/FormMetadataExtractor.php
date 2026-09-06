@@ -122,7 +122,7 @@ final class FormMetadataExtractor
         return $symbols;
     }
 
-    /** @return list<array{class: string, option: string, range: Range}> */
+    /** @return list<FormOptionReference> */
     public function options(string $text, string $source, PhpDocument $php): array
     {
         $options = [];
@@ -135,11 +135,11 @@ final class FormMetadataExtractor
                 continue;
             }
             foreach ($this->arrayKeys->parseArgument($argument, allowNestedUnpacking: true, collectPartialLiteralKeys: true) ?? [] as $key) {
-                $options[] = [
-                    'class' => $type->className,
-                    'option' => $key->value,
-                    'range' => $this->converter->toRange($text, $key->startOffset, $key->endOffset - $key->startOffset),
-                ];
+                $options[] = new FormOptionReference(
+                    $type->className,
+                    $key->value,
+                    $this->converter->toRange($text, $key->startOffset, $key->endOffset - $key->startOffset),
+                );
             }
         }
 

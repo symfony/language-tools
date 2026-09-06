@@ -32,7 +32,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $completionProvider = new MetadataCompletionProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
-        $validationProvider = new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
+        $validationProvider = new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes);
         $constraintUri = 'file:///workspace/src/Dto/Input.php';
         $constraintText = <<<'PHP'
             <?php
@@ -116,7 +116,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $completionProvider = new MetadataCompletionProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
-        $validationProvider = new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
+        $validationProvider = new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes);
         $validationUri = 'file:///workspace/config/validator/User.yaml';
         $validationText = <<<'YAML'
             App\Entity\User:
@@ -133,11 +133,27 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
         );
 
         self::assertSame(['max'], $this->completionLabels($completionProvider, $converter, $validationUri, $validationText, strpos($validationText, 'max:') + 3));
+        self::assertIsArray($this->hover([$validationProvider], $converter, $validationUri, $validationText, strpos($validationText, 'max:') + 1));
         self::assertSame(['validation.unknown_constraint_option'], array_column($this->diagnostics([$validationProvider], $validationUri), 'code'));
         $constraintNameUri = 'file:///workspace/config/validator/Custom.yaml';
         $constraintNameText = "App\\Entity\\User:\n    properties:\n        email:\n            - Sl";
         $documents->open(new Document($constraintNameUri, 'yaml', 1, $constraintNameText));
         self::assertSame(['Slug'], $this->completionLabels($completionProvider, $converter, $constraintNameUri, $constraintNameText, \strlen($constraintNameText)));
+    }
+
+    public function testIndexesConstraintOptionsFromIncompleteSource(): void
+    {
+        $extractor = $this->createExtractor(new PositionConverter());
+        $text = <<<'PHP'
+            <?php
+            use Symfony\Component\Validator\Constraints as Assert;
+
+            #[Assert\Length(max: 120, unknown:
+            PHP;
+
+        $options = $extractor->extract(new SourceDocument('file:///workspace/src/Dto/Input.php', 'php', $text))->constraintOptions;
+
+        self::assertSame(['max', 'unknown'], array_map(static fn ($option): string => $option->option, $options));
     }
 
     public function testIgnoresCommentedValidationMetadataWhilePreservingActiveRanges(): void
@@ -157,11 +173,11 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
             }
             PHP;
 
-        $constraintOptions = $extractor->constraintOptions($text);
-        self::assertSame(['active_constraint'], array_column($constraintOptions, 'option'));
-        self::assertSame(strpos($text, 'active_constraint'), $converter->toByteOffset($text, $constraintOptions[0]['range']->start));
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Dto/Input.php', 'php', $text));
+        self::assertSame(['active_constraint'], array_map(static fn ($option): string => $option->option, $facts->constraintOptions));
+        self::assertSame(strpos($text, 'active_constraint'), $converter->toByteOffset($text, $facts->constraintOptions[0]->range->start));
 
-        $symbols = $extractor->extract(new SourceDocument('file:///workspace/src/Dto/Input.php', 'php', $text))->symbols;
+        $symbols = $facts->symbols;
         $constraints = [];
         foreach ($symbols as $symbol) {
             self::assertStringNotContainsString('commented_', $symbol->name);

@@ -77,7 +77,7 @@ final class ValidationMetadataExtractor
         return $symbols;
     }
 
-    /** @return list<array{constraint: string, option: string, range: Range}> */
+    /** @return list<ConstraintOptionReference> */
     public function options(string $text, PhpDocument $php): array
     {
         $options = [];
@@ -89,7 +89,7 @@ final class ValidationMetadataExtractor
                 if (null === $name || !\is_int($start) || !\is_int($end)) {
                     continue;
                 }
-                $options[] = ['constraint' => $attribute->name, 'option' => $name, 'range' => $this->converter->toRange($text, $start, $end - $start)];
+                $options[] = new ConstraintOptionReference($attribute->name, $name, $this->converter->toRange($text, $start, $end - $start));
             }
         }
 
