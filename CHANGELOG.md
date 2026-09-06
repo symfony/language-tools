@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep XML attribute recovery linear on large elements
 - Skip diagnostics for gitignored open files consistently
 - Ignore markup-like text on incomplete Twig directive lines
 - Match Symfony YAML indentation while preserving scalar boundaries in malformed documents

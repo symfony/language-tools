@@ -74,6 +74,22 @@ final class TolerantXmlParserTest extends TestCase
         self::assertSame('Opening element "broken" is not closed.', $document->diagnostics[0]->message);
     }
 
+    public function testKeepsAttributeRecoveryInsideEachValue(): void
+    {
+        $document = (new TolerantXmlParser())->parse(<<<'XML'
+            <root empty="" first="literal <one/> and <two/>" last="complete">
+                <broken value="unfinished
+                <recovered id="kept"/>
+            </root>
+            XML);
+        $elements = $document->elements();
+
+        self::assertSame(['root', 'recovered'], array_map(static fn (XmlElementStart $element): string => $element->qualifiedName, $elements));
+        self::assertSame(['', 'literal <one/> and <two/>', 'complete'], array_map(static fn ($attribute): string => $attribute->value, $elements[0]->attributes));
+        self::assertSame('kept', $elements[1]->attribute('id')?->value);
+        self::assertSame(['Opening element "broken" is not closed.'], array_map(static fn ($diagnostic): string => $diagnostic->message, $document->diagnostics));
+    }
+
     #[DataProvider('longOpaqueConstructProvider')]
     public function testKeepsLongOpaqueConstructsOpaque(string $source): void
     {

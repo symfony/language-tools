@@ -74,3 +74,16 @@ printf("4000_to_8000,%.4f,%.4f,%.2f\n", $small, $large, $ratio);
 if ($ratio > 3.0) {
     throw new RuntimeException(sprintf('Nested XML scaling ratio %.2f exceeds 3.0.', $ratio));
 }
+
+$attributes = [];
+for ($index = 0; $index < 32_000; ++$index) {
+    $attributes[] = 'attribute'.$index.'="value"';
+}
+$small = $measure('<element '.implode(' ', array_slice($attributes, 0, 8_000)).'/>');
+$large = $measure('<element '.implode(' ', $attributes).'/>');
+$ratio = $large / max($small, 0.001);
+printf("attribute_count,small_ms,large_ms,ratio\n");
+printf("8000_to_32000,%.4f,%.4f,%.2f\n", $small, $large, $ratio);
+if ($ratio > 6.0) {
+    throw new RuntimeException(sprintf('XML attribute scaling ratio %.2f exceeds 6.0.', $ratio));
+}

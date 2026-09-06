@@ -338,12 +338,14 @@ final class TolerantXmlParser implements XmlParserInterface
             }
             $valueStart = ++$offset;
             $valueEnd = strpos($source, $quote, $valueStart);
-            $markup = strpos($source, '<', $valueStart);
-            while (false !== $markup && $markup < (false === $valueEnd ? $limit : $valueEnd)) {
+            $valueLimit = false === $valueEnd ? $limit : $valueEnd;
+            $markup = $valueStart + strcspn($source, '<', $valueStart, $valueLimit - $valueStart);
+            while ($markup < $valueLimit) {
                 if ($this->isRecoveryMarkup($source, $valueStart, $markup)) {
                     return [null, new XmlDiagnostic(\sprintf('Opening element "%s" is not closed.', $qualifiedName), $start + 1, $nameEnd), $markup];
                 }
-                $markup = strpos($source, '<', $markup + 1);
+                ++$markup;
+                $markup += strcspn($source, '<', $markup, $valueLimit - $markup);
             }
             if (false === $valueEnd) {
                 break;
