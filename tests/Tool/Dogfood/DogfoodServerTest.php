@@ -70,6 +70,8 @@ final class DogfoodServerTest extends TestCase
             app:
                 resource: 'routes/app.yaml'
             YAML);
+        $filesystem->dumpFile(Path::join($this->directory, 'config/packages/framework.yaml'), "framework:\n    secret: '%env(APP_SECRET)%'\n");
+        $filesystem->dumpFile(Path::join($this->directory, 'config/routes/app.yaml'), "app_home:\n    path: /\n");
         $server = Path::join($this->directory, 'server');
         file_put_contents($server, "#!/usr/bin/env php\n<?php\nrequire ".var_export(\dirname(__DIR__, 3).'/vendor/autoload.php', true).";\n".<<<'PHP'
             use Symfony\Lsp\Tools\ContentLengthMessageCodec;
