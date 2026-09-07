@@ -1,0 +1,135 @@
+#!/usr/bin/env php
+<?php
+
+require \dirname(__DIR__).'/vendor/autoload.php';
+
+use Symfony\Component\Finder\Finder;
+use Symfony\Lsp\Tools\Dogfood\CoverageAggregator;
+use Symfony\Lsp\Tools\Dogfood\CoverageException;
+
+const USAGE = <<<'USAGE'
+    Usage: tools/dogfood-coverage-report [options] [DIR]
+
+    Unions the coverage artifacts written by tools/dogfood-coverage (cold runs,
+    warm runs and every project) and reports what the runs executed.
+
+    DIR defaults to var/dogfood/coverage.
+
+    Options:
+        --format FORMAT     text (default) or json
+        --limit N           Files listed in the text report, 0 lists all (default: 25)
+        --help              Show this help
+
+    The report counts executed PHP source files, lines and branches below src/.
+    Execution is reach, not correctness: a covered line only means some run walked
+    through it, never that the behavior was asserted.
+
+    USAGE;
+
+$root = \dirname(__DIR__);
+$format = 'text';
+$limit = 25;
+$directory = null;
+$arguments = array_slice($argv, 1);
+while (null !== $argument = array_shift($arguments)) {
+    $value = static function () use ($argument, &$arguments): string {
+        if (str_contains($argument, '=')) {
+            return explode('=', $argument, 2)[1];
+        }
+        $next = array_shift($arguments);
+        if (null === $next) {
+            fwrite(\STDERR, USAGE."\n");
+            exit(2);
+        }
+
+        return $next;
+    };
+    if ('--help' === $argument || '-h' === $argument) {
+        fwrite(\STDOUT, USAGE."\n");
+        exit(0);
+    } elseif ('--format' === $argument || str_starts_with($argument, '--format=')) {
+        $format = $value();
+        if (!\in_array($format, ['text', 'json'], true)) {
+            fwrite(\STDERR, "The --format option accepts \"text\" or \"json\".\n");
+            exit(2);
+        }
+    } elseif ('--limit' === $argument || str_starts_with($argument, '--limit=')) {
+        $limitValue = $value();
+        if (!ctype_digit($limitValue)) {
+            fwrite(\STDERR, "The --limit option must be a positive integer or zero.\n");
+            exit(2);
+        }
+        $limit = (int) $limitValue;
+    } elseif (str_starts_with($argument, '-') || null !== $directory) {
+        fwrite(\STDERR, USAGE."\n");
+        exit(2);
+    } else {
+        $directory = $argument;
+    }
+}
+
+$directory ??= $root.'/var/dogfood/coverage';
+if (!is_dir($directory)) {
+    fwrite(\STDERR, \sprintf('The coverage directory "%s" does not exist; run the matrix with --server ./tools/dogfood-coverage.%s', $directory, "\n"));
+    exit(1);
+}
+$paths = glob($directory.'/coverage-*.json') ?: [];
+sort($paths, \SORT_STRING);
+if ([] === $paths) {
+    fwrite(\STDERR, \sprintf('No coverage artifact in "%s"; run the matrix with --server ./tools/dogfood-coverage.%s', $directory, "\n"));
+    exit(1);
+}
+
+$artifacts = [];
+foreach ($paths as $path) {
+    $contents = file_get_contents($path);
+    if (false === $contents) {
+        fwrite(\STDERR, \sprintf('Unable to read the coverage artifact "%s".%s', $path, "\n"));
+        exit(1);
+    }
+    $artifacts[basename($path)] = $contents;
+}
+
+$sourceFiles = [];
+foreach ((new Finder())->files()->in($root.'/src')->name('*.php')->sortByName() as $file) {
+    $sourceFiles[] = 'src/'.str_replace(\DIRECTORY_SEPARATOR, '/', $file->getRelativePathname());
+}
+
+try {
+    $report = (new CoverageAggregator())->aggregate($artifacts, $sourceFiles);
+} catch (CoverageException $e) {
+    fwrite(\STDERR, $e->getMessage()."\n");
+    exit(1);
+}
+
+if ('json' === $format) {
+    fwrite(\STDOUT, json_encode($report->toArray(), \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR)."\n");
+    exit(0);
+}
+
+$ratio = static fn (int $part, int $total): string => 0 === $total ? 'n/a' : \sprintf('%.1f%%', $part / $total * 100);
+$line = static fn (string $label, int $part, int $total, string $verb): string => \sprintf('%-10s %s/%s %s (%s)', $label, number_format($part), number_format($total), $verb, $ratio($part, $total));
+$uncovered = $report->uncoveredFiles();
+$output = [
+    'Symfony Language Tools execution coverage',
+    \sprintf('%-10s %d', 'Artifacts:', $report->artifactCount),
+    $line('Files:', $report->executedFileCount(), \count($report->files), 'executed'),
+    $line('Lines:', $report->executedLineCount(), $report->executableLineCount(), 'executed'),
+    $line('Branches:', $report->hitBranchCount(), $report->branchCount(), 'taken'),
+    '',
+    'Execution is reach, not correctness: covered code was walked through, not asserted.',
+];
+if ([] !== $uncovered) {
+    $output[] = '';
+    $output[] = \sprintf('Files never executed (%d):', \count($uncovered));
+    $listed = 0 === $limit ? $uncovered : \array_slice($uncovered, 0, $limit);
+    foreach ($listed as $path) {
+        $output[] = '  '.$path;
+    }
+    if (\count($listed) < \count($uncovered)) {
+        $output[] = \sprintf('  ... %d more, use --limit=0 or --format=json for the whole list', \count($uncovered) - \count($listed));
+    }
+}
+fwrite(\STDOUT, implode("\n", $output)."\n");
+
+exit(0);

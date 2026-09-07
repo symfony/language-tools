@@ -1,0 +1,105 @@
+#!/usr/bin/env php
+<?php
+
+const USAGE = <<<'USAGE'
+    Usage: tools/dogfood-coverage [options] [server arguments...]
+
+    Runs the development language server (bin/symfony-lsp) under Xdebug execution
+    coverage. Select it from the dogfooding matrix with:
+
+        tools/dogfood-matrix --server ./tools/dogfood-coverage
+
+    Options:
+        --output-dir DIR    Directory for the coverage artifacts (default: var/dogfood/coverage)
+        --server PATH       Language server executable (default: bin/symfony-lsp)
+        --help              Show this help
+
+    Every server process writes one JSON artifact; union them into a report with:
+
+        tools/dogfood-coverage-report [DIR]
+
+    Notes:
+        Xdebug must already be installed; nothing is ever installed automatically,
+        and a missing coverage driver fails the run instead of reporting an
+        uninstrumented success.
+        The Tree-sitter extension is loaded up front so the server never re-execs
+        itself and drops the instrumentation.
+        Only the PHP files below src/ are measured; vendor, tools and application
+        code are left out, and no source, variable or environment data is recorded.
+        Artifacts are written when the server exits by itself; killed processes
+        leave none.
+
+    USAGE;
+
+$root = \dirname(__DIR__);
+$arguments = array_slice($argv, 1);
+$outputDirectory = null;
+$server = null;
+while ([] !== $arguments) {
+    $argument = $arguments[0];
+    $value = static function () use ($argument, &$arguments): string {
+        array_shift($arguments);
+        if (str_contains($argument, '=')) {
+            return explode('=', $argument, 2)[1];
+        }
+        $next = array_shift($arguments);
+        if (null === $next) {
+            fwrite(\STDERR, USAGE."\n");
+            exit(2);
+        }
+
+        return $next;
+    };
+    if ('--help' === $argument || '-h' === $argument) {
+        fwrite(\STDOUT, USAGE."\n");
+        exit(0);
+    }
+    if ('--output-dir' === $argument || str_starts_with($argument, '--output-dir=')) {
+        $outputDirectory = $value();
+    } elseif ('--server' === $argument || str_starts_with($argument, '--server=')) {
+        $server = $value();
+    } else {
+        // Anything else belongs to the language server itself, such as --socket=<port>
+        break;
+    }
+}
+
+$problems = [];
+$server ??= $root.'/bin/symfony-lsp';
+if (!is_file($server)) {
+    $problems[] = \sprintf('The language server "%s" does not exist.', $server);
+}
+if (!\extension_loaded('xdebug')) {
+    $problems[] = \sprintf('Xdebug is not loaded in "%s"; install it and retry, nothing is installed automatically.', \PHP_BINARY);
+}
+$extension = $root.'/var/build/tree_sitter/modules/symfony_lsp_tree_sitter.so';
+if (!is_file($extension)) {
+    $problems[] = 'The Tree-sitter extension is not built. Run: composer tree-sitter:build';
+}
+if (!\function_exists('pcntl_exec')) {
+    $problems[] = 'The pcntl extension is required to start the instrumented language server.';
+}
+$outputDirectory ??= $root.'/var/dogfood/coverage';
+if (!is_dir($outputDirectory) && !@mkdir($outputDirectory, 0777, true) && !is_dir($outputDirectory)) {
+    $problems[] = \sprintf('Unable to create the coverage directory "%s".', $outputDirectory);
+} elseif (!is_writable($outputDirectory)) {
+    $problems[] = \sprintf('The coverage directory "%s" is not writable.', $outputDirectory);
+}
+if ([] !== $problems) {
+    fwrite(\STDERR, implode("\n", $problems)."\n");
+    exit(1);
+}
+
+putenv('SYMFONY_LSP_COVERAGE_DIR='.(realpath($outputDirectory) ?: $outputDirectory));
+putenv('XDEBUG_MODE=coverage');
+pcntl_exec(\PHP_BINARY, [
+    '-d', 'extension='.$extension,
+    '-d', 'auto_prepend_file='.$root.'/tools/dogfood/coverage-bootstrap.php',
+    '-d', 'xdebug.mode=coverage',
+    '-d', 'opcache.enable_cli=0',
+    $server,
+    ...$arguments,
+]);
+
+fwrite(\STDERR, \sprintf('Unable to start the instrumented language server "%s".%s', $server, "\n"));
+exit(1);
