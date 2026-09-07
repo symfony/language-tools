@@ -8,7 +8,11 @@ namespace Symfony\Lsp\Tools\Dogfood;
  * Every scenario must select a source anchor and assert at least one positive
  * or explicitly empty result, so a manifest can never silently skip coverage.
  *
- * @phpstan-type DiagnosticEntry array{path: string, code: string, severity: int, range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}}
+ * @phpstan-import-type Scenario from ScenarioManifest
+ * @phpstan-import-type ScenarioEdit from ScenarioManifest
+ * @phpstan-import-type ScenarioExpectation from ScenarioManifest
+ * @phpstan-import-type ScenarioExpectations from ScenarioManifest
+ * @phpstan-import-type ScenarioDiagnostic from ScenarioManifest
  */
 final class ScenarioManifestLoader
 {
@@ -19,8 +23,8 @@ final class ScenarioManifestLoader
     private const DIAGNOSTIC_KEYS = ['path', 'code', 'severity', 'range'];
     private const FEATURES = ['completion', 'hover', 'definition', 'references', 'documentLink', 'codeLens', 'prepareRename', 'rename', 'codeAction', 'diagnostics'];
     private const EXPECTATION_KEYS = ['equals', 'includes', 'excludes'];
+    private const SEVERITIES = ['error', 'warning', 'information', 'hint'];
     private const MAX_EDIT_LENGTH = 2000;
-    private const MAX_SEVERITY = 4;
 
     /**
      * @param string|null $revision the revision the project is pinned to, when the manifest must be bound to it
@@ -74,7 +78,7 @@ final class ScenarioManifestLoader
     /**
      * @param array<array-key, mixed> $data
      *
-     * @return list<array<string, mixed>>
+     * @return list<Scenario>
      */
     private function scenarios(array $data, string $path): array
     {
@@ -97,7 +101,7 @@ final class ScenarioManifestLoader
     }
 
     /**
-     * @return array{id: string, file: string, anchor: string, offset: int, expect: array<string, array<string, list<string>>>, newName?: string, edit?: array<string, mixed>}
+     * @return Scenario
      */
     private function scenario(mixed $scenario, int $index, string $path): array
     {
@@ -141,7 +145,7 @@ final class ScenarioManifestLoader
     }
 
     /**
-     * @return array<string, mixed>
+     * @return ScenarioEdit
      */
     private function edit(mixed $edit, string $file, string $context): array
     {
@@ -193,7 +197,7 @@ final class ScenarioManifestLoader
     }
 
     /**
-     * @return array<string, array<string, list<string>>>
+     * @return ScenarioExpectations
      */
     private function expectations(mixed $expect, string $key, string $context): array
     {
@@ -212,7 +216,7 @@ final class ScenarioManifestLoader
     }
 
     /**
-     * @return array<string, list<string>>
+     * @return ScenarioExpectation
      */
     private function expectation(mixed $expectation, string $feature, string $context): array
     {
@@ -225,10 +229,14 @@ final class ScenarioManifestLoader
             }
         }
         $loaded = [];
-        foreach (self::EXPECTATION_KEYS as $key) {
-            if (\array_key_exists($key, $expectation)) {
-                $loaded[$key] = $this->results($expectation[$key], $key, $feature, $context);
-            }
+        if (\array_key_exists('equals', $expectation)) {
+            $loaded['equals'] = $this->results($expectation['equals'], 'equals', $feature, $context);
+        }
+        if (\array_key_exists('includes', $expectation)) {
+            $loaded['includes'] = $this->results($expectation['includes'], 'includes', $feature, $context);
+        }
+        if (\array_key_exists('excludes', $expectation)) {
+            $loaded['excludes'] = $this->results($expectation['excludes'], 'excludes', $feature, $context);
         }
         if (\array_key_exists('equals', $loaded)) {
             if (\array_key_exists('includes', $loaded) || \array_key_exists('excludes', $loaded)) {
@@ -299,7 +307,7 @@ final class ScenarioManifestLoader
     /**
      * @param array<array-key, mixed> $data
      *
-     * @return list<DiagnosticEntry>
+     * @return list<ScenarioDiagnostic>
      */
     private function diagnostics(array $data, string $path): array
     {
@@ -320,7 +328,7 @@ final class ScenarioManifestLoader
     }
 
     /**
-     * @return DiagnosticEntry
+     * @return ScenarioDiagnostic
      */
     private function diagnostic(mixed $entry, int $index, string $path): array
     {
@@ -338,8 +346,8 @@ final class ScenarioManifestLoader
             throw new ConfigurationException(\sprintf('The "code" in %s must be a non-empty diagnostic code.', $context));
         }
         $severity = $entry['severity'] ?? null;
-        if (!\is_int($severity) || 1 > $severity || self::MAX_SEVERITY < $severity) {
-            throw new ConfigurationException(\sprintf('The "severity" in %s must be between 1 and %d.', $context, self::MAX_SEVERITY));
+        if (!\is_string($severity) || !\in_array($severity, self::SEVERITIES, true)) {
+            throw new ConfigurationException(\sprintf('The "severity" in %s must be one of "%s".', $context, implode('", "', self::SEVERITIES)));
         }
 
         return [
@@ -401,7 +409,7 @@ final class ScenarioManifestLoader
     }
 
     /**
-     * @param DiagnosticEntry $entry
+     * @param ScenarioDiagnostic $entry
      *
      * @return list<string|int>
      */

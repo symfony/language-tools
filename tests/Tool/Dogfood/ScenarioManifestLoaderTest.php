@@ -114,6 +114,18 @@ final class ScenarioManifestLoaderTest extends TestCase
         self::assertSame([$first, $first, $second, $third], $manifest->diagnostics);
     }
 
+    public function testAcceptsEveryCheckSeverityName(): void
+    {
+        $diagnostics = array_map(
+            static fn (string $severity): array => self::diagnostic(['severity' => $severity]),
+            ['warning', 'error', 'hint', 'information'],
+        );
+
+        $manifest = (new ScenarioManifestLoader())->load($this->write(self::manifest(['diagnostics' => $diagnostics])));
+
+        self::assertSame(['error', 'hint', 'information', 'warning'], array_column($manifest->diagnostics, 'severity'));
+    }
+
     public function testRejectsAMissingManifest(): void
     {
         $this->expectException(ConfigurationException::class);
@@ -175,8 +187,10 @@ final class ScenarioManifestLoaderTest extends TestCase
         yield 'unknown diagnostic key' => [['diagnostics' => [self::diagnostic(['message' => 'boom'])]], 'Unknown key "message"'];
         yield 'missing diagnostic code' => [['diagnostics' => [self::diagnostic(['code' => null])]], 'non-empty diagnostic code'];
         yield 'numeric diagnostic code' => [['diagnostics' => [self::diagnostic(['code' => 7])]], 'non-empty diagnostic code'];
-        yield 'missing diagnostic severity' => [['diagnostics' => [self::diagnostic(['severity' => null])]], 'between 1 and 4'];
-        yield 'unknown diagnostic severity' => [['diagnostics' => [self::diagnostic(['severity' => 5])]], 'between 1 and 4'];
+        yield 'missing diagnostic severity' => [['diagnostics' => [self::diagnostic(['severity' => null])]], 'must be one of "error", "warning", "information", "hint"'];
+        yield 'unknown diagnostic severity' => [['diagnostics' => [self::diagnostic(['severity' => 'fatal'])]], 'must be one of "error", "warning", "information", "hint"'];
+        yield 'numeric diagnostic severity' => [['diagnostics' => [self::diagnostic(['severity' => 1])]], 'must be one of "error", "warning", "information", "hint"'];
+        yield 'uppercase diagnostic severity' => [['diagnostics' => [self::diagnostic(['severity' => 'Error'])]], 'must be one of "error", "warning", "information", "hint"'];
         yield 'absolute diagnostic path' => [['diagnostics' => [self::diagnostic(['path' => '/etc/passwd'])]], 'relative path inside the project'];
         yield 'traversal diagnostic path' => [['diagnostics' => [self::diagnostic(['path' => '../outside.php'])]], 'relative path inside the project'];
         yield 'missing diagnostic range' => [['diagnostics' => [self::diagnostic(['range' => null])]], 'must declare a "start" and an "end"'];
@@ -316,7 +330,7 @@ final class ScenarioManifestLoaderTest extends TestCase
         return self::merge([
             'path' => 'src/Controller/BlogController.php',
             'code' => 'symfony.route.unknown',
-            'severity' => 1,
+            'severity' => 'error',
             'range' => self::range(3, 8, 3, 20),
         ], $overrides);
     }
