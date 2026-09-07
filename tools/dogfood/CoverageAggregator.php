@@ -6,23 +6,26 @@ namespace Symfony\Lsp\Tools\Dogfood;
  * Unions the per-process coverage artifacts of a dogfooding session, so cold
  * runs, warm runs and every project add up to a single execution picture.
  *
- * Artifacts are rejected instead of skipped when they are malformed or record
- * files outside the measured source tree: a partial union would silently
- * understate what the runs reached.
+ * Artifacts are rejected instead of skipped when they are malformed, record
+ * files outside the measured source tree, or carry a source identity other
+ * than the expected one: a partial union would silently understate what the
+ * runs reached, and a mixed union would place stale line numbers in files that
+ * changed since.
  */
 final class CoverageAggregator
 {
-    public const FORMAT = 'symfony-lsp-coverage/1';
+    public const FORMAT = 'symfony-lsp-coverage/2';
 
     public function __construct(private readonly string $sourcePrefix = 'src/')
     {
     }
 
     /**
-     * @param iterable<string, string> $artifacts   JSON documents keyed by artifact name
-     * @param list<string>             $sourceFiles every measurable file, relative to the repository root
+     * @param iterable<string, string> $artifacts              JSON documents keyed by artifact name
+     * @param list<string>             $sourceFiles            every measurable file, relative to the repository root
+     * @param string|null              $expectedSourceIdentity identity of the source tree the report must describe
      */
-    public function aggregate(iterable $artifacts, array $sourceFiles = []): CoverageReport
+    public function aggregate(iterable $artifacts, array $sourceFiles = [], ?string $expectedSourceIdentity = null): CoverageReport
     {
         /** @var array<string, array<int, bool>> $executed */
         $executed = [];
@@ -31,9 +34,22 @@ final class CoverageAggregator
         /** @var array<string, array<string, array{line: int, hit: bool}>> $branches */
         $branches = [];
         $artifactCount = 0;
+        $identity = $expectedSourceIdentity;
+        $identityOrigin = null;
         foreach ($artifacts as $name => $document) {
             ++$artifactCount;
-            foreach ($this->read((string) $name, $document) as $path => $file) {
+            $artifact = $this->read((string) $name, $document);
+            if (null === $identity) {
+                $identity = $artifact['source'];
+                $identityOrigin = (string) $name;
+            } elseif ($identity !== $artifact['source']) {
+                if (null === $identityOrigin) {
+                    throw new CoverageException(\sprintf('Coverage artifact "%s" measured source %s, but the current source tree is %s; the source changed, so rerun the matrix.', $name, $artifact['source'], $identity));
+                }
+
+                throw new CoverageException(\sprintf('Coverage artifacts "%s" and "%s" measured different source trees (%s and %s); drop the stale artifacts and rerun the matrix.', $identityOrigin, $name, $identity, $artifact['source']));
+            }
+            foreach ($artifact['files'] as $path => $file) {
                 $executed[$path] ??= [];
                 $unexecuted[$path] ??= [];
                 $branches[$path] ??= [];
@@ -77,11 +93,11 @@ final class CoverageAggregator
             $files[$path] = new CoverageFile($path, $executedLines, $unexecutedLines, \count($branches[$path]), $hitBranchCount, $unhitBranchLines);
         }
 
-        return new CoverageReport($files, $artifactCount);
+        return new CoverageReport($files, $artifactCount, $identity);
     }
 
     /**
-     * @return array<string, array{executed: list<int>, unexecuted: list<int>, branches: array<string, array{line: int, hit: bool}>}>
+     * @return array{source: string, files: array<string, array{executed: list<int>, unexecuted: list<int>, branches: array<string, array{line: int, hit: bool}>}>}
      */
     private function read(string $name, string $document): array
     {
@@ -92,6 +108,10 @@ final class CoverageAggregator
         }
         if (!\is_array($decoded) || self::FORMAT !== ($decoded['format'] ?? null)) {
             throw new CoverageException(\sprintf('Coverage artifact "%s" is not in the "%s" format.', $name, self::FORMAT));
+        }
+        $source = $decoded['source'] ?? null;
+        if (!\is_string($source) || 1 !== preg_match('/^sha256:[0-9a-f]{64}$/D', $source)) {
+            throw new CoverageException(\sprintf('Coverage artifact "%s" does not carry a source identity.', $name));
         }
         if (!\is_array($decoded['files'] ?? null)) {
             throw new CoverageException(\sprintf('Coverage artifact "%s" does not contain a "files" map.', $name));
@@ -113,7 +133,7 @@ final class CoverageAggregator
             ];
         }
 
-        return $files;
+        return ['source' => $source, 'files' => $files];
     }
 
     /**

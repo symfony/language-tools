@@ -11,6 +11,10 @@
  * Nothing is ever written to standard output: the server speaks JSON-RPC there.
  */
 
+use Symfony\Lsp\Tools\Dogfood\SourceIdentity;
+
+require_once __DIR__.'/SourceIdentity.php';
+
 (static function (): void {
     ini_set('display_errors', '0');
     ini_set('log_errors', '1');
@@ -39,6 +43,13 @@
 
     $root = dirname(__DIR__, 2);
     $sourceRoot = $root.'/src/';
+    // Stamped before the server loads anything, so edits made during the run
+    // cannot be mistaken for the revision the line numbers belong to.
+    try {
+        $identity = SourceIdentity::of($root.'/src');
+    } catch (RuntimeException $e) {
+        $fail($e->getMessage());
+    }
     if (function_exists('xdebug_set_filter')) {
         xdebug_set_filter(\XDEBUG_FILTER_CODE_COVERAGE, \XDEBUG_PATH_INCLUDE, [$sourceRoot]);
     }
@@ -51,7 +62,7 @@
         $fail('the coverage driver refused to start; run PHP with xdebug.mode=coverage.');
     }
 
-    register_shutdown_function(static function () use ($directory, $root, $sourceRoot): void {
+    register_shutdown_function(static function () use ($directory, $identity, $root, $sourceRoot): void {
         $files = [];
         foreach (xdebug_get_code_coverage() as $path => $data) {
             if (!is_string($path) || !str_starts_with($path, $sourceRoot) || !is_array($data)) {
@@ -102,7 +113,7 @@
         $name = sprintf('coverage-%d-%s.json', getmypid(), bin2hex(random_bytes(6)));
         $temporary = $directory.'/.'.$name.'.part';
         try {
-            $document = json_encode(['format' => 'symfony-lsp-coverage/1', 'files' => $files], \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR)."\n";
+            $document = json_encode(['format' => 'symfony-lsp-coverage/2', 'source' => $identity, 'files' => $files], \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR)."\n";
         } catch (JsonException $e) {
             fwrite(\STDERR, 'dogfood coverage: unable to encode the coverage artifact: '.$e->getMessage()."\n");
 

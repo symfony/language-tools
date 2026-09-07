@@ -11,11 +11,13 @@ namespace Symfony\Lsp\Tools\Dogfood;
 final class CoverageReport
 {
     /**
-     * @param array<string, CoverageFile> $files keyed and ordered by path
+     * @param array<string, CoverageFile> $files          keyed and ordered by path
+     * @param string|null                 $sourceIdentity identity of the source tree the artifacts measured
      */
     public function __construct(
         public readonly array $files,
         public readonly int $artifactCount,
+        public readonly ?string $sourceIdentity = null,
     ) {
     }
 
@@ -62,6 +64,7 @@ final class CoverageReport
     /**
      * @return array{
      *     format: string,
+     *     source: string|null,
      *     artifacts: int,
      *     totals: array{files: int, executedFiles: int, executableLines: int, executedLines: int, branches: int, hitBranches: int},
      *     uncoveredFiles: list<string>,
@@ -71,7 +74,8 @@ final class CoverageReport
     public function toArray(): array
     {
         return [
-            'format' => 'symfony-lsp-coverage-report/1',
+            'format' => 'symfony-lsp-coverage-report/2',
+            'source' => $this->sourceIdentity,
             'artifacts' => $this->artifactCount,
             'totals' => [
                 'files' => \count($this->files),

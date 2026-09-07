@@ -9,6 +9,9 @@ use Symfony\Lsp\Tools\Dogfood\CoverageException;
 
 final class CoverageAggregatorTest extends TestCase
 {
+    private const IDENTITY = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    private const OTHER_IDENTITY = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
     public function testUnionsDuplicateProcessDataIndependentlyOfOrder(): void
     {
         $cold = self::artifact([
@@ -22,6 +25,7 @@ final class CoverageAggregatorTest extends TestCase
         $report = (new CoverageAggregator())->aggregate(['cold.json' => $cold, 'warm.json' => $warm]);
 
         self::assertSame(2, $report->artifactCount);
+        self::assertSame(self::IDENTITY, $report->sourceIdentity);
         self::assertSame([10, 12, 14], $report->files['src/Server/Server.php']->executedLines);
         self::assertSame([16], $report->files['src/Server/Server.php']->unexecutedLines);
         self::assertSame(4, $report->executedLineCount());
@@ -98,6 +102,41 @@ final class CoverageAggregatorTest extends TestCase
         self::assertSame([], $report->files['src/Server/Server.php']->unhitBranchLines);
     }
 
+    public function testRejectsArtifactsMeasuredOnDifferentSourceTrees(): void
+    {
+        $this->expectException(CoverageException::class);
+        $this->expectExceptionMessage('Coverage artifacts "cold.json" and "warm.json" measured different source trees');
+
+        (new CoverageAggregator())->aggregate([
+            'cold.json' => self::artifact(['src/Server/Server.php' => ['executed' => [10], 'unexecuted' => []]]),
+            'warm.json' => self::artifact(['src/Server/Server.php' => ['executed' => [10], 'unexecuted' => []]], self::OTHER_IDENTITY),
+        ]);
+    }
+
+    public function testRejectsArtifactsThatNoLongerMatchTheCurrentSourceTree(): void
+    {
+        $this->expectException(CoverageException::class);
+        $this->expectExceptionMessage(\sprintf('Coverage artifact "cold.json" measured source %s, but the current source tree is %s', self::IDENTITY, self::OTHER_IDENTITY));
+
+        (new CoverageAggregator())->aggregate(
+            ['cold.json' => self::artifact(['src/Server/Server.php' => ['executed' => [10], 'unexecuted' => []]])],
+            ['src/Server/Server.php'],
+            self::OTHER_IDENTITY,
+        );
+    }
+
+    public function testAcceptsArtifactsMatchingTheCurrentSourceTree(): void
+    {
+        $report = (new CoverageAggregator())->aggregate(
+            ['cold.json' => self::artifact(['src/Server/Server.php' => ['executed' => [10], 'unexecuted' => []]])],
+            ['src/Server/Server.php', 'src/Index/Index.php'],
+            self::IDENTITY,
+        );
+
+        self::assertSame(self::IDENTITY, $report->sourceIdentity);
+        self::assertSame(['src/Index/Index.php'], $report->uncoveredFiles());
+    }
+
     #[DataProvider('malformedArtifactProvider')]
     public function testRejectsMalformedArtifacts(string $document, string $expectedMessage): void
     {
@@ -113,49 +152,53 @@ final class CoverageAggregatorTest extends TestCase
     public static function malformedArtifactProvider(): iterable
     {
         yield 'truncated JSON' => ['{"format":', 'Coverage artifact "broken.json" is not valid JSON'];
-        yield 'scalar document' => ['12', 'Coverage artifact "broken.json" is not in the "symfony-lsp-coverage/1" format'];
-        yield 'unknown format' => ['{"format":"other/1","files":{}}', 'is not in the "symfony-lsp-coverage/1" format'];
-        yield 'missing files map' => ['{"format":"symfony-lsp-coverage/1"}', 'does not contain a "files" map'];
-        yield 'invalid file entry' => ['{"format":"symfony-lsp-coverage/1","files":{"src/A.php":3}}', 'contains invalid data for "src/A.php"'];
-        yield 'missing lines' => ['{"format":"symfony-lsp-coverage/1","files":{"src/A.php":{}}}', 'does not list "executed" lines for "src/A.php"'];
+        yield 'scalar document' => ['12', 'Coverage artifact "broken.json" is not in the "symfony-lsp-coverage/2" format'];
+        yield 'unknown format' => ['{"format":"other/1","files":{}}', 'is not in the "symfony-lsp-coverage/2" format'];
+        yield 'superseded format' => ['{"format":"symfony-lsp-coverage/1","files":{}}', 'is not in the "symfony-lsp-coverage/2" format'];
+        yield 'missing source identity' => ['{"format":"symfony-lsp-coverage/2","files":{}}', 'does not carry a source identity'];
+        yield 'truncated source identity' => ['{"format":"symfony-lsp-coverage/2","source":"sha256:abcdef","files":{}}', 'does not carry a source identity'];
+        yield 'unhashed source identity' => ['{"format":"symfony-lsp-coverage/2","source":"main","files":{}}', 'does not carry a source identity'];
+        yield 'missing files map' => [self::document(null), 'does not contain a "files" map'];
+        yield 'invalid file entry' => [self::document('{"src/A.php":3}'), 'contains invalid data for "src/A.php"'];
+        yield 'missing lines' => [self::document('{"src/A.php":{}}'), 'does not list "executed" lines for "src/A.php"'];
         yield 'line map instead of list' => [
-            '{"format":"symfony-lsp-coverage/1","files":{"src/A.php":{"executed":{"4":true},"unexecuted":[]}}}',
+            self::document('{"src/A.php":{"executed":{"4":true},"unexecuted":[]}}'),
             'does not list "executed" lines for "src/A.php"',
         ];
         yield 'line zero' => [
-            '{"format":"symfony-lsp-coverage/1","files":{"src/A.php":{"executed":[0],"unexecuted":[]}}}',
+            self::document('{"src/A.php":{"executed":[0],"unexecuted":[]}}'),
             'contains an invalid "executed" line number for "src/A.php"',
         ];
         yield 'line as string' => [
-            '{"format":"symfony-lsp-coverage/1","files":{"src/A.php":{"executed":["4"],"unexecuted":[]}}}',
+            self::document('{"src/A.php":{"executed":["4"],"unexecuted":[]}}'),
             'contains an invalid "executed" line number for "src/A.php"',
         ];
         yield 'vendor file' => [
-            '{"format":"symfony-lsp-coverage/1","files":{"vendor/a/b.php":{"executed":[4],"unexecuted":[]}}}',
+            self::document('{"vendor/a/b.php":{"executed":[4],"unexecuted":[]}}'),
             'The path "vendor/a/b.php" from coverage artifact "broken.json" is not a PHP file below "src/"',
         ];
         yield 'absolute file' => [
-            '{"format":"symfony-lsp-coverage/1","files":{"/tmp/app/src/A.php":{"executed":[4],"unexecuted":[]}}}',
+            self::document('{"/tmp/app/src/A.php":{"executed":[4],"unexecuted":[]}}'),
             'is not a PHP file below "src/"',
         ];
         yield 'escaping file' => [
-            '{"format":"symfony-lsp-coverage/1","files":{"src/../tools/A.php":{"executed":[4],"unexecuted":[]}}}',
+            self::document('{"src/../tools/A.php":{"executed":[4],"unexecuted":[]}}'),
             'is not a PHP file below "src/"',
         ];
         yield 'twig template' => [
-            '{"format":"symfony-lsp-coverage/1","files":{"src/A.twig":{"executed":[4],"unexecuted":[]}}}',
+            self::document('{"src/A.twig":{"executed":[4],"unexecuted":[]}}'),
             'is not a PHP file below "src/"',
         ];
         yield 'branch map instead of list' => [
-            '{"format":"symfony-lsp-coverage/1","files":{"src/A.php":{"executed":[],"unexecuted":[],"branches":{"a":1}}}}',
+            self::document('{"src/A.php":{"executed":[],"unexecuted":[],"branches":{"a":1}}}'),
             'does not list branches for "src/A.php"',
         ];
         yield 'branch without hit flag' => [
-            '{"format":"symfony-lsp-coverage/1","files":{"src/A.php":{"executed":[],"unexecuted":[],"branches":[{"function":"f","op":0,"line":4}]}}}',
+            self::document('{"src/A.php":{"executed":[],"unexecuted":[],"branches":[{"function":"f","op":0,"line":4}]}}'),
             'contains an invalid branch entry for "src/A.php"',
         ];
         yield 'branch without line' => [
-            '{"format":"symfony-lsp-coverage/1","files":{"src/A.php":{"executed":[],"unexecuted":[],"branches":[{"function":"f","op":0,"hit":true}]}}}',
+            self::document('{"src/A.php":{"executed":[],"unexecuted":[],"branches":[{"function":"f","op":0,"hit":true}]}}'),
             'contains an invalid branch entry for "src/A.php"',
         ];
     }
@@ -168,18 +211,25 @@ final class CoverageAggregatorTest extends TestCase
         (new CoverageAggregator())->aggregate([], ['tools/dogfood-server']);
     }
 
-    public function testAggregatesTheFormatWrittenByTheBootstrap(): void
+    public function testAggregatesTheStampedFormatWrittenByTheBootstrap(): void
     {
         $bootstrap = (string) file_get_contents(\dirname(__DIR__, 3).'/tools/dogfood/coverage-bootstrap.php');
 
         self::assertStringContainsString("'format' => '".CoverageAggregator::FORMAT."'", $bootstrap);
+        self::assertStringContainsString("'source' => \$identity", $bootstrap);
+        self::assertStringContainsString('SourceIdentity::of($root.\'/src\')', $bootstrap);
+    }
+
+    private static function document(?string $files): string
+    {
+        return \sprintf('{"format":"%s","source":"%s"%s}', CoverageAggregator::FORMAT, self::IDENTITY, null === $files ? '' : ',"files":'.$files);
     }
 
     /**
      * @param array<string, array{executed: list<int>, unexecuted: list<int>, branches?: list<array<string, mixed>>}> $files
      */
-    private static function artifact(array $files): string
+    private static function artifact(array $files, string $identity = self::IDENTITY): string
     {
-        return json_encode(['format' => CoverageAggregator::FORMAT, 'files' => $files], \JSON_THROW_ON_ERROR);
+        return json_encode(['format' => CoverageAggregator::FORMAT, 'source' => $identity, 'files' => $files], \JSON_THROW_ON_ERROR);
     }
 }

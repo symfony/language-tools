@@ -5,7 +5,7 @@ require \dirname(__DIR__).'/vendor/autoload.php';
 
 use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Tools\Dogfood\CoverageAggregator;
-use Symfony\Lsp\Tools\Dogfood\CoverageException;
+use Symfony\Lsp\Tools\Dogfood\SourceIdentity;
 
 const USAGE = <<<'USAGE'
     Usage: tools/dogfood-coverage-report [options] [DIR]
@@ -23,6 +23,10 @@ const USAGE = <<<'USAGE'
     The report counts executed PHP source files, lines and branches below src/.
     Execution is reach, not correctness: a covered line only means some run walked
     through it, never that the behavior was asserted.
+
+    Artifacts recorded for another state of src/ are rejected instead of unioned,
+    because their line numbers no longer describe the current files. Rerun the
+    matrix after changing the source; nothing is ever deleted automatically.
 
     USAGE;
 
@@ -96,8 +100,8 @@ foreach ((new Finder())->files()->in($root.'/src')->name('*.php')->sortByName() 
 }
 
 try {
-    $report = (new CoverageAggregator())->aggregate($artifacts, $sourceFiles);
-} catch (CoverageException $e) {
+    $report = (new CoverageAggregator())->aggregate($artifacts, $sourceFiles, SourceIdentity::of($root.'/src'));
+} catch (RuntimeException $e) {
     fwrite(\STDERR, $e->getMessage()."\n");
     exit(1);
 }
@@ -113,6 +117,7 @@ $uncovered = $report->uncoveredFiles();
 $output = [
     'Symfony Language Tools execution coverage',
     \sprintf('%-10s %d', 'Artifacts:', $report->artifactCount),
+    \sprintf('%-10s %s', 'Source:', $report->sourceIdentity ?? 'unknown'),
     $line('Files:', $report->executedFileCount(), \count($report->files), 'executed'),
     $line('Lines:', $report->executedLineCount(), $report->executableLineCount(), 'executed'),
     $line('Branches:', $report->hitBranchCount(), $report->branchCount(), 'taken'),

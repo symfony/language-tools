@@ -26,6 +26,9 @@ const USAGE = <<<'USAGE'
         itself and drops the instrumentation.
         Only the PHP files below src/ are measured; vendor, tools and application
         code are left out, and no source, variable or environment data is recorded.
+        Each artifact is stamped with a hash of the src/ paths and contents taken
+        before the server starts, so runs made on different source states are
+        rejected by the report instead of being unioned into stale line numbers.
         Artifacts are written when the server exits by itself; killed processes
         leave none.
 

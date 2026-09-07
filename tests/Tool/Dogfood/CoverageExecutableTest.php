@@ -7,11 +7,13 @@ use Symfony\Lsp\Tests\Support\ExecutableRunner;
 use Symfony\Lsp\Tests\Support\ProcessResult;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\Dogfood\CoverageAggregator;
+use Symfony\Lsp\Tools\Dogfood\SourceIdentity;
 
 final class CoverageExecutableTest extends TestCase
 {
     private const COVERED_FILE = 'src/Server/ServerVersion.php';
     private const UNCOVERED_FILE = 'src/Server/MemoryLimit.php';
+    private const OTHER_IDENTITY = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
     private TestWorkspace $workspace;
 
@@ -102,6 +104,7 @@ final class CoverageExecutableTest extends TestCase
         $artifact = json_decode((string) file_get_contents($artifacts[0]), true, flags: \JSON_THROW_ON_ERROR);
         self::assertIsArray($artifact);
         self::assertSame(CoverageAggregator::FORMAT, $artifact['format'] ?? null);
+        self::assertSame(SourceIdentity::of($this->root().'/src'), $artifact['source'] ?? null);
         $measured = $artifact['files'] ?? null;
         self::assertIsArray($measured);
         foreach (array_keys($measured) as $path) {
@@ -121,6 +124,7 @@ final class CoverageExecutableTest extends TestCase
         $report = json_decode($result->stdout, true, flags: \JSON_THROW_ON_ERROR);
         self::assertIsArray($report);
         self::assertSame(2, $report['artifacts'] ?? null);
+        self::assertSame(SourceIdentity::of($this->root().'/src'), $report['source'] ?? null);
         $files = $report['files'] ?? null;
         self::assertIsArray($files);
         $covered = $files[self::COVERED_FILE] ?? null;
@@ -147,12 +151,24 @@ final class CoverageExecutableTest extends TestCase
 
         self::assertSame(0, $result->exitCode, $result->stderr);
         self::assertStringContainsString('Artifacts: 2', $result->stdout);
+        self::assertStringContainsString('Source:    '.SourceIdentity::of($this->root().'/src'), $result->stdout);
         self::assertStringContainsString('Files:     1/', $result->stdout);
         self::assertStringContainsString('Lines:     3/4 executed (75.0%)', $result->stdout);
         self::assertStringContainsString('Branches:  1/2 taken (50.0%)', $result->stdout);
         self::assertStringContainsString('Execution is reach, not correctness', $result->stdout);
         self::assertStringContainsString('more, use --limit=0', $result->stdout);
         self::assertSame('', $result->stderr);
+    }
+
+    public function testTheReportRejectsArtifactsRecordedForAnotherSourceState(): void
+    {
+        $this->workspace->write('artifacts/coverage-1-aaaa.json', $this->artifact([4], [], true, self::OTHER_IDENTITY));
+
+        $result = $this->execute(['tools/dogfood-coverage-report', $this->workspace->path('artifacts')]);
+
+        self::assertSame(1, $result->exitCode);
+        self::assertSame('', $result->stdout);
+        self::assertStringContainsString('but the current source tree is '.SourceIdentity::of($this->root().'/src'), $result->stderr);
     }
 
     public function testTheReportRejectsMalformedArtifacts(): void
@@ -186,10 +202,11 @@ final class CoverageExecutableTest extends TestCase
      * @param list<int> $executed
      * @param list<int> $unexecuted
      */
-    private function artifact(array $executed, array $unexecuted, bool $hit): string
+    private function artifact(array $executed, array $unexecuted, bool $hit, ?string $identity = null): string
     {
         return json_encode([
             'format' => CoverageAggregator::FORMAT,
+            'source' => $identity ?? SourceIdentity::of($this->root().'/src'),
             'files' => [self::COVERED_FILE => [
                 'executed' => $executed,
                 'unexecuted' => $unexecuted,
