@@ -1,0 +1,232 @@
+#!/usr/bin/env php
+<?php
+
+// Lists source-fact candidates of a project to help author dogfood scenarios.
+
+use Symfony\Lsp\Index\ApplicationSourceScanner;
+use Symfony\Lsp\Index\InvalidSourceIndexEntry;
+use Symfony\Lsp\Index\PersistentSourceIndexStore;
+use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Index\SourceIndexPayloadCodec;
+use Symfony\Lsp\Index\SourceIndexProviderPipeline;
+use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectDiscovery;
+use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Tools\Dogfood\ConfigurationException;
+use Symfony\Lsp\Tools\Dogfood\ScenarioLocator;
+use Symfony\Lsp\Tools\Dogfood\ScenarioManifestLoader;
+use Symfony\Lsp\Tools\Dogfood\ScenarioPositionIndex;
+use Symfony\Lsp\Tools\Dogfood\SourceFactExplorer;
+
+use function Symfony\Lsp\Tools\createBenchmarkContainer;
+use function Symfony\Lsp\Tools\installBenchmarkSyntheticServices;
+
+require dirname(__DIR__).'/vendor/autoload.php';
+require __DIR__.'/benchmark-container.php';
+
+const VERSION = 'dogfood-discover';
+
+const NOTE = 'Candidates come from a source-only index scan: they show where a feature could be exercised, never that the server answers there. Only reviewed scenarios are evidence.';
+
+const USAGE = <<<'USAGE'
+    Usage: ./tools/php-with-tree-sitter tools/dogfood-discover [options] <project-root>
+
+    Censuses the source facts a project would index and reports a bounded
+    number of representative positions per provider and fact class, as
+    candidates for hand-authored scenarios.
+
+    The project is only read: the application runtime is never booted, no
+    request is sent to a language server, and no payload value, source
+    excerpt or environment value is reported. Candidates are authoring hints,
+    never evidence that a feature works.
+
+    Options:
+      --scenarios=FILE  mark the candidates a reviewed scenario manifest
+                        already targets, and list the scenarios that match no
+                        candidate
+      --limit=N         positions reported per group (default 3, 0 for none)
+      --text            human-readable summary instead of JSON
+    USAGE;
+
+function fail(string $message): never
+{
+    fwrite(\STDERR, rtrim($message, "\n")."\n");
+    exit(1);
+}
+
+$root = null;
+$manifestPath = null;
+$limit = 3;
+$text = false;
+foreach (array_slice($argv, 1) as $argument) {
+    if ('--help' === $argument || '-h' === $argument) {
+        echo USAGE."\n";
+        exit(0);
+    }
+    if ('--text' === $argument) {
+        $text = true;
+    } elseif (str_starts_with($argument, '--scenarios=')) {
+        $manifestPath = substr($argument, \strlen('--scenarios='));
+    } elseif (str_starts_with($argument, '--limit=')) {
+        $value = substr($argument, \strlen('--limit='));
+        if (1 !== preg_match('/^\d+$/', $value)) {
+            fail('The "--limit" option takes a positive number of positions.');
+        }
+        $limit = (int) $value;
+    } elseif (str_starts_with($argument, '-')) {
+        fail(USAGE);
+    } elseif (null === $root) {
+        $root = $argument;
+    } else {
+        fail('Only one project root can be explored at a time.');
+    }
+}
+if (null === $root) {
+    fail(USAGE);
+}
+if (!function_exists('symfony_lsp_tree_sitter_parse')) {
+    fail('The Tree-sitter extension is not loaded. Run through: ./tools/php-with-tree-sitter tools/dogfood-discover');
+}
+
+$rootPath = realpath($root);
+if (false === $rootPath || !is_dir($rootPath)) {
+    fail(sprintf('The project root "%s" does not exist.', $root));
+}
+$rootPath = rtrim(str_replace('\\', '/', $rootPath), '/');
+if (null !== $manifestPath && !is_file($manifestPath)) {
+    fail(sprintf('The scenario manifest "%s" does not exist.', $manifestPath));
+}
+
+$container = createBenchmarkContainer(VERSION);
+foreach ([ApplicationSourceScanner::class, PersistentSourceIndexStore::class, ProjectDiscovery::class, ProjectIndexStatusRegistry::class, ProjectRegistry::class, SourceIndexPayloadCodec::class, SourceIndexProviderPipeline::class] as $service) {
+    $container->getDefinition($service)->setPublic(true);
+}
+$container->compile();
+installBenchmarkSyntheticServices($container);
+
+/** @var ProjectDiscovery $discovery */
+$discovery = $container->get(ProjectDiscovery::class);
+$projects = $discovery->discover([['uri' => (new UriToPathConverter())->toUri($rootPath)]]);
+$project = null;
+foreach ($projects as $candidate) {
+    if ($candidate->rootPath === $rootPath) {
+        $project = $candidate;
+    }
+}
+if (null === $project) {
+    if (1 !== \count($projects)) {
+        fail([] === $projects
+            ? sprintf('No Symfony project was discovered under "%s".', $rootPath)
+            : sprintf("Several Symfony projects were discovered under \"%s\"; explore one of them:\n  %s", $rootPath, implode("\n  ", array_map(static fn (Project $found): string => $found->rootPath, $projects))));
+    }
+    $project = $projects[0];
+}
+
+/** @var ProjectRegistry $registry */
+$registry = $container->get(ProjectRegistry::class);
+// Nested projects own their own files, exactly as in a workspace.
+$registry->replace($projects);
+
+/** @var ApplicationSourceScanner $scanner */
+$scanner = $container->get(ApplicationSourceScanner::class);
+$scanner->refreshProject($project);
+
+/** @var ProjectIndexStatusRegistry $statuses */
+$statuses = $container->get(ProjectIndexStatusRegistry::class);
+$state = $statuses->status($project)['source']['state'] ?? 'unknown';
+if ('ready' !== $state) {
+    fail(sprintf('The source index of "%s" is "%s"; no candidate can be reported.', $project->rootPath, $state));
+}
+
+$scenarios = null;
+if (null !== $manifestPath) {
+    $located = [];
+    try {
+        $manifest = (new ScenarioManifestLoader())->load($manifestPath);
+        $locator = new ScenarioLocator();
+        foreach ($manifest->scenarios as $scenario) {
+            $document = $locator->locate($project->rootPath, $scenario);
+            $located[] = ['id' => $scenario['id'], 'file' => $document->file, 'position' => $document->position];
+        }
+    } catch (ConfigurationException $error) {
+        fail($error->getMessage());
+    }
+    $scenarios = new ScenarioPositionIndex($located);
+}
+
+/** @var SourceIndexPayloadCodec $codec */
+$codec = $container->get(SourceIndexPayloadCodec::class);
+// Instantiating the pipeline validates the payload schema of every provider.
+$container->get(SourceIndexProviderPipeline::class);
+/** @var PersistentSourceIndexStore $store */
+$store = $container->get(PersistentSourceIndexStore::class);
+
+$explorer = new SourceFactExplorer($limit, $scenarios);
+$indexedFiles = 0;
+$reader = $store->beginRead($project);
+try {
+    foreach ($reader->records() as $relativePath => $record) {
+        ++$indexedFiles;
+        foreach ($record['payloads'] as $provider => $payload) {
+            if ('' === $payload) {
+                continue;
+            }
+            try {
+                $explorer->add($provider, $relativePath, $codec->decode($provider, $payload));
+            } catch (\UnexpectedValueException $error) {
+                fail(sprintf('The "%s" source facts of "%s" are unusable: %s', $provider, $relativePath, $error->getMessage()));
+            }
+        }
+    }
+} catch (InvalidSourceIndexEntry $error) {
+    fail(sprintf('The source index of "%s" is corrupted: %s', $project->rootPath, $error->getMessage()));
+} finally {
+    $reader->close();
+}
+if (0 === $indexedFiles) {
+    fail(sprintf('No source index record was written for "%s"; check that "%s" is writable.', $project->rootPath, $store->path($project)));
+}
+
+$census = $explorer->census();
+$report = [
+    'tool' => 'dogfood-discover',
+    'note' => NOTE,
+    'project' => $project->rootPath,
+    'indexedFiles' => $indexedFiles,
+    'filesWithFacts' => $census['files'],
+    'facts' => $census['facts'],
+    'positionsPerGroup' => $limit,
+    'depthLimitReached' => $census['depthLimitReached'],
+    'groups' => $census['groups'],
+];
+if (null !== $census['scenarios']) {
+    $report['scenarios'] = ['manifest' => $manifestPath, ...$census['scenarios']];
+}
+
+if (!$text) {
+    echo json_encode($report, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR)."\n";
+    exit(0);
+}
+
+printf("%s\n\n", NOTE);
+printf("%s: %d files indexed, %d with facts, %d facts\n", $report['project'], $indexedFiles, $census['files'], $census['facts']);
+foreach ($census['groups'] as $group) {
+    printf(
+        "%-24s %-56s %6d facts %4d files%s\n",
+        $group['provider'],
+        (new \ReflectionClass($group['fact']))->getShortName().(null === $group['kind'] ? '' : ':'.$group['kind']),
+        $group['count'],
+        $group['files'],
+        null === $census['scenarios'] ? '' : sprintf(' %4d covered', $group['withScenario']),
+    );
+    foreach ($group['positions'] as $position) {
+        printf("    %s:%d:%d%s\n", $position['file'], $position['line'] + 1, $position['character'] + 1, null === $position['scenario'] ? '' : ' <- '.$position['scenario']);
+    }
+}
+if (null !== $census['scenarios']) {
+    printf("\nscenarios matching a candidate: %d\n", \count($census['scenarios']['covered']));
+    if ([] !== $census['scenarios']['uncovered']) {
+        printf("scenarios matching no candidate: %s\n", implode(', ', $census['scenarios']['uncovered']));
+    }
+}
