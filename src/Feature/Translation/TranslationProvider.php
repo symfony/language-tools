@@ -10,6 +10,7 @@ use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Parser\CommentParserRegistry;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TranslationProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface, ReferencesProviderInterface
@@ -22,6 +23,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         private readonly TranslationConfigurationRegistry $configuration,
         private readonly CommentParserRegistry $comments,
         private readonly TranslationReferenceResolver $referenceResolver,
+        private readonly TwigDirectiveLocator $directives,
     ) {
     }
 
@@ -37,6 +39,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
             $this->comments->mask($request->document->languageId, $request->document->text),
             $request->position,
             $this->converter,
+            $this->directives,
         );
         if (null === $context) {
             return null;

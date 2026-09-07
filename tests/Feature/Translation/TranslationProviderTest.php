@@ -19,6 +19,7 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -123,6 +124,86 @@ final class TranslationProviderTest extends TestCase
         self::assertSame("don\\'t panic", $completion[0]['textEdit']['newText'] ?? null);
     }
 
+    public function testCompletesTwigKeysAfterMarkupQuotedWithAnotherQuote(): void
+    {
+        $uri = 'file:///workspace/templates/admin/blog/_delete_form.html.twig';
+        $text = <<<'TWIG'
+            <twig:ux:icon name="tabler:trash"/>
+            {{ 'article.ti'|trans }}
+            TWIG;
+        [$provider, $converter] = $this->provider($uri, $text, 'twig');
+        $position = $converter->toPosition($text, (int) strpos($text, "'|trans"));
+        $completion = $provider->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ]);
+
+        self::assertIsArray($completion);
+        self::assertSame(['article.title'], array_column($completion, 'label'));
+        self::assertIsArray($completion[0]['textEdit'] ?? null);
+        self::assertSame(
+            ['start' => ['line' => 1, 'character' => 4], 'end' => ['line' => 1, 'character' => 14]],
+            $completion[0]['textEdit']['range'] ?? null,
+        );
+    }
+
+    public function testCompletesTwigKeysAfterCommentsAndMultilineMarkup(): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        $text = <<<'TWIG'
+            {# the "delete" form, see the admin's guide #}
+            <button title="Supprimer l'élément"
+                class="btn">{{ 'article.ti'|trans }}</button>
+            TWIG;
+        [$provider, $converter] = $this->provider($uri, $text, 'twig');
+        $position = $converter->toPosition($text, (int) strpos($text, "'|trans"));
+        $completion = $provider->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ]);
+
+        self::assertIsArray($completion);
+        self::assertSame(['article.title'], array_column($completion, 'label'));
+        self::assertIsArray($completion[0]['textEdit'] ?? null);
+        self::assertSame(
+            ['start' => ['line' => 2, 'character' => 20], 'end' => ['line' => 2, 'character' => 30]],
+            $completion[0]['textEdit']['range'] ?? null,
+        );
+    }
+
+    public function testCompletesTwigKeysWhenTheCursorIsInsideTheKey(): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        $text = "<p class='lead'>{{ 'article.title'|trans }}</p>";
+        [$provider, $converter] = $this->provider($uri, $text, 'twig');
+        $position = $converter->toPosition($text, (int) strpos($text, 'article.ti') + \strlen('article.ti'));
+        $completion = $provider->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ]);
+
+        self::assertIsArray($completion);
+        self::assertSame(['article.title'], array_column($completion, 'label'));
+        self::assertIsArray($completion[0]['textEdit'] ?? null);
+        self::assertSame(
+            ['start' => ['line' => 0, 'character' => 20], 'end' => ['line' => 0, 'character' => 30]],
+            $completion[0]['textEdit']['range'] ?? null,
+        );
+    }
+
+    #[DataProvider('unrelatedTwigStringProvider')]
+    public function testOffersNoTranslationCompletionsInUnrelatedTwigStrings(string $text, string $cursor): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        [$provider, $converter] = $this->provider($uri, $text, 'twig');
+        $position = $converter->toPosition($text, (int) strpos($text, $cursor) + \strlen($cursor));
+
+        self::assertNull($provider->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ]));
+    }
+
     public function testDecodesTwigEscapeSequencesForLookupAndCompletion(): void
     {
         $uri = 'file:///workspace/templates/page.html.twig';
@@ -170,7 +251,7 @@ final class TranslationProviderTest extends TestCase
         $configuration = new TranslationConfigurationRegistry();
         $configuration->configure($project, true);
         $documentResolver = new DocumentContextResolver($documents, $projects);
-        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor));
+        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor), new TwigDirectiveLocator());
 
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -230,7 +311,7 @@ final class TranslationProviderTest extends TestCase
         $configuration = new TranslationConfigurationRegistry();
         $configuration->configure($project, true);
         $documentResolver = new DocumentContextResolver($documents, $projects);
-        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor));
+        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor), new TwigDirectiveLocator());
 
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -480,6 +561,15 @@ final class TranslationProviderTest extends TestCase
         self::assertNull($provider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]));
     }
 
+    /** @return iterable<string, array{string, string}> */
+    public static function unrelatedTwigStringProvider(): iterable
+    {
+        yield 'markup attribute' => ['<a href="/admin" title="article.ti">{{ done }}</a>', 'title="article.ti'];
+        yield 'expression without the filter' => ["{{ 'article.ti' }}", 'article.ti'];
+        yield 'interpolated string' => ['{{ "article.ti#{suffix}"|trans }}', 'article.ti'];
+        yield 'other filter' => ["{{ 'article.ti'|upper }}", 'article.ti'];
+    }
+
     /** @return iterable<string, array{string}> */
     public static function namedPhpTranslationCallProvider(): iterable
     {
@@ -520,6 +610,6 @@ final class TranslationProviderTest extends TestCase
         $configuration = new TranslationConfigurationRegistry();
         $documentResolver = new DocumentContextResolver($documents, $projects);
 
-        return [new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor)), $converter, $configuration, $project];
+        return [new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor), new TwigDirectiveLocator()), $converter, $configuration, $project];
     }
 }
