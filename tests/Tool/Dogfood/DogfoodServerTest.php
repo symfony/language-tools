@@ -6,20 +6,164 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Tools\Dogfood\NativeProcessRunner;
+use Symfony\Lsp\Tools\Dogfood\ProcessResult;
+use Symfony\Lsp\Tools\Dogfood\ScenarioRunner;
 
+/**
+ * @phpstan-import-type ScenarioReport from ScenarioRunner
+ *
+ * @phpstan-type HarnessReport array{project: string, environment: string, manifestRevision: string, serverVersion: string|null, status: array<array-key, mixed>|null, terminal: bool, outcome: string, error: string|null, scenarioCount: int, scenarios: list<ScenarioReport>, requestCount: int, assertionFailures: int, violations: list<array{scenario: string, method: string, message: string}>, transportFailure: string|null, serverError: string|null, exitCode: int|null, runtimeBridgeTimings: array<array-key, mixed>|null, timings: array<string, float|int|null>}
+ */
 final class DogfoodServerTest extends TestCase
 {
+    private const CONTROLLER = <<<'PHP'
+        <?php
+
+        namespace App\Controller;
+
+        final class HelloController
+        {
+            public function index(): string
+            {
+                return $this->render('hello/index.html.twig');
+            }
+        }
+
+        PHP;
+
     private string $directory;
+    private string $project;
 
     protected function setUp(): void
     {
         $this->directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-dogfood-server-'.bin2hex(random_bytes(8)));
-        (new Filesystem())->mkdir($this->directory);
+        $this->project = Path::join($this->directory, 'project');
+        (new Filesystem())->dumpFile(Path::join($this->project, 'src/Controller/HelloController.php'), self::CONTROLLER);
     }
 
     protected function tearDown(): void
     {
         (new Filesystem())->remove($this->directory);
+    }
+
+    public function testRefusesToRunWithoutAScenarioManifest(): void
+    {
+        $server = new ScriptedLanguageServer($this->directory, []);
+        $result = $this->execute([$server->path, $this->project]);
+
+        self::assertSame(2, $result->exitCode);
+        self::assertStringContainsString('--scenarios=FILE', $result->errorOutput);
+        self::assertSame('', $result->standardOutput);
+        self::assertFalse($server->started());
+    }
+
+    public function testRejectsAnUnusableManifestBeforeStartingTheServer(): void
+    {
+        $server = new ScriptedLanguageServer($this->directory, []);
+        $manifest = Path::join($this->directory, 'empty.json');
+        (new Filesystem())->dumpFile($manifest, json_encode([
+            'version' => 1,
+            'revision' => str_repeat('a', 40),
+            'scenarios' => [],
+            'diagnostics' => [],
+        ], \JSON_THROW_ON_ERROR));
+        $result = $this->execute(['--scenarios='.$manifest, $server->path, $this->project]);
+
+        self::assertSame(2, $result->exitCode);
+        self::assertStringContainsString('must be a non-empty list of scenarios', $result->errorOutput);
+        self::assertFalse($server->started());
+    }
+
+    public function testRejectsAManifestReviewedForAnotherRevision(): void
+    {
+        $server = new ScriptedLanguageServer($this->directory, []);
+        $result = $this->execute([
+            '--scenarios='.$this->manifest(),
+            '--revision='.str_repeat('b', 40),
+            $server->path,
+            $this->project,
+        ]);
+
+        self::assertSame(2, $result->exitCode);
+        self::assertStringContainsString('is pinned to "'.str_repeat('b', 40).'"', $result->errorOutput);
+        self::assertFalse($server->started());
+    }
+
+    public function testReportsPassingScenarios(): void
+    {
+        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+            ['method' => 'textDocument/completion', 'result' => [['label' => 'hello/index.html.twig']]],
+        ]]);
+        $result = $this->execute(['--scenarios='.$this->manifest(), $server->path, $this->project]);
+        $report = $this->report($result);
+
+        self::assertSame(0, $result->exitCode, $result->errorOutput);
+        self::assertSame('passed', $report['outcome']);
+        self::assertNull($report['error']);
+        self::assertNull($report['transportFailure']);
+        self::assertSame(str_repeat('a', 40), $report['manifestRevision']);
+        self::assertSame('test', $report['serverVersion']);
+        self::assertTrue($report['terminal']);
+        self::assertSame(1, $report['scenarioCount']);
+        self::assertSame(0, $report['assertionFailures']);
+        self::assertSame([], $report['violations']);
+        self::assertGreaterThan(0, $report['requestCount']);
+        self::assertSame(0, $report['exitCode']);
+        $scenario = $report['scenarios'][0];
+        self::assertSame('hello.completion', $scenario['id']);
+        self::assertSame('pass', $scenario['status']);
+        self::assertSame([['phase' => 'baseline', 'method' => 'completion', 'status' => 'pass']], array_map(
+            static fn (array $check): array => ['phase' => $check['phase'], 'method' => $check['method'], 'status' => $check['status']],
+            $scenario['checks'],
+        ));
+        self::assertMatchesRegularExpression('/^[0-9a-f]{64}$/', (string) $scenario['checks'][0]['fingerprint']);
+        self::assertSame([
+            'startupMilliseconds',
+            'initializeMilliseconds',
+            'sourceIndexMilliseconds',
+            'runtimeIndexMilliseconds',
+            'indexWaitMilliseconds',
+            'scenariosMilliseconds',
+            'shutdownMilliseconds',
+            'totalMilliseconds',
+        ], array_keys($report['timings']));
+        foreach ($report['timings'] as $milliseconds) {
+            self::assertTrue(\is_int($milliseconds) || \is_float($milliseconds));
+            self::assertGreaterThanOrEqual(0.0, (float) $milliseconds);
+        }
+    }
+
+    public function testKeepsTheProcessSuccessfulWhenScenariosFail(): void
+    {
+        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+            ['method' => 'textDocument/completion', 'result' => [['label' => 'other/template.html.twig']]],
+        ]]);
+        $result = $this->execute(['--scenarios='.$this->manifest(), $server->path, $this->project]);
+        $report = $this->report($result);
+
+        self::assertSame(0, $result->exitCode, $result->errorOutput);
+        self::assertSame('failed', $report['outcome']);
+        self::assertGreaterThan(0, $report['assertionFailures']);
+        self::assertSame('fail', $report['scenarios'][0]['checks'][0]['status']);
+        self::assertNotEmpty($report['scenarios'][0]['checks'][0]['failures']);
+    }
+
+    public function testReportsEveryExpectedCheckWhenTheServerNeverAnswers(): void
+    {
+        $server = Path::join($this->directory, 'silent-server');
+        file_put_contents($server, "#!/usr/bin/env php\n<?php\n\nsleep(10);\n");
+        chmod($server, 0755);
+        $result = $this->execute(['--scenarios='.$this->manifest(), $server, $this->project], timeout: 20.0);
+        $report = $this->report($result);
+
+        self::assertSame(1, $result->exitCode);
+        self::assertSame('aborted', $report['outcome']);
+        self::assertIsString($report['error']);
+        self::assertSame(1, $report['scenarioCount']);
+        self::assertSame('error', $report['scenarios'][0]['status']);
+        self::assertSame('error', $report['scenarios'][0]['checks'][0]['status']);
+        self::assertNull($report['scenarios'][0]['checks'][0]['fingerprint']);
+        self::assertNotEmpty($report['scenarios'][0]['checks'][0]['failures']);
     }
 
     public function testTerminatesTheServerWhenProtocolParsingFails(): void
@@ -38,17 +182,11 @@ final class DogfoodServerTest extends TestCase
             PHP);
         chmod($server, 0755);
 
-        $result = (new NativeProcessRunner())->run([
-            \PHP_BINARY,
-            Path::join(\dirname(__DIR__, 3), 'tools/dogfood-server'),
-            '--index-timeout=1',
-            '--request-timeout=1',
-            $server,
-            $this->directory,
-        ], timeout: 5.0);
+        $result = $this->execute(['--scenarios='.$this->manifest(), $server, $this->project]);
 
-        self::assertNotSame(0, $result->exitCode);
+        self::assertSame(1, $result->exitCode);
         self::assertFalse($result->timedOut, $result->errorOutput);
+        self::assertSame('aborted', $this->report($result)['outcome']);
         $lock = fopen($lockPath, 'c+');
         self::assertIsResource($lock);
         try {
@@ -58,190 +196,71 @@ final class DogfoodServerTest extends TestCase
         }
     }
 
-    public function testCountsOnlyTheDocumentLinksCoveringTheProbe(): void
-    {
-        $filesystem = new Filesystem();
-        $filesystem->dumpFile(Path::join($this->directory, 'config/services.yaml'), <<<'YAML'
-            imports:
-                - { resource: 'services/*.yaml' }
-                - { resource: 'packages/framework.yaml' }
-            YAML);
-        $filesystem->dumpFile(Path::join($this->directory, 'config/routes.yaml'), <<<'YAML'
-            app:
-                resource: 'routes/app.yaml'
-            YAML);
-        $filesystem->dumpFile(Path::join($this->directory, 'config/packages/framework.yaml'), "framework:\n    secret: '%env(APP_SECRET)%'\n");
-        $filesystem->dumpFile(Path::join($this->directory, 'config/routes/app.yaml'), "app_home:\n    path: /\n");
-        $server = Path::join($this->directory, 'server');
-        file_put_contents($server, "#!/usr/bin/env php\n<?php\nrequire ".var_export(\dirname(__DIR__, 3).'/vendor/autoload.php', true).";\n".<<<'PHP'
-            use Symfony\Lsp\Tools\ContentLengthMessageCodec;
-
-            $codec = new ContentLengthMessageCodec();
-            $rootUri = '';
-            while (true) {
-                $message = $codec->read(STDIN);
-                $rootUri = $message['params']['rootUri'] ?? $rootUri;
-                if (isset($message['id'])) {
-                    $uri = $message['params']['textDocument']['uri'] ?? '';
-                    $result = match ($message['method'] ?? null) {
-                        'initialize' => ['serverInfo' => ['version' => 'test']],
-                        'workspace/executeCommand' => [[
-                            'source' => ['state' => 'ready'],
-                            'runtime' => ['state' => 'ready'],
-                        ]],
-                        'textDocument/completion' => [['label' => 'services/'], ['label' => 'packages/']],
-                        'textDocument/documentLink' => str_ends_with($uri, 'services.yaml')
-                            ? [[
-                                'range' => ['start' => ['line' => 2, 'character' => 21], 'end' => ['line' => 2, 'character' => 45]],
-                                'target' => $rootUri.'/config/packages/framework.yaml',
-                            ]]
-                            : [[
-                                'range' => ['start' => ['line' => 1, 'character' => 15], 'end' => ['line' => 1, 'character' => 30]],
-                                'target' => $rootUri.'/config/routes/app.yaml',
-                            ]],
-                        default => null,
-                    };
-                    fwrite(STDOUT, $codec->encode(['jsonrpc' => '2.0', 'id' => $message['id'], 'result' => $result]));
-                    fflush(STDOUT);
-                }
-                if ('exit' === ($message['method'] ?? null)) {
-                    break;
-                }
-            }
-            PHP);
-        chmod($server, 0755);
-
-        $result = (new NativeProcessRunner())->run([
-            \PHP_BINARY,
-            Path::join(\dirname(__DIR__, 3), 'tools/dogfood-server'),
-            '--index-timeout=1',
-            '--request-timeout=1',
-            '--probes-per-category=2',
-            $server,
-            $this->directory,
-        ], timeout: 20.0);
-
-        self::assertSame(0, $result->exitCode, $result->errorOutput);
-        $report = json_decode($result->standardOutput, true, flags: \JSON_THROW_ON_ERROR);
-        self::assertIsArray($report);
-        self::assertSame([], $report['violations'] ?? null);
-        $probes = $report['probes'] ?? null;
-        self::assertIsArray($probes);
-        $linkCounts = [];
-        $completionCounts = [];
-        foreach ($probes as $probe) {
-            self::assertIsArray($probe);
-            if ('import.yaml' !== ($probe['category'] ?? null)) {
-                continue;
-            }
-            $file = $probe['file'] ?? null;
-            $requests = $probe['requests'] ?? null;
-            self::assertIsString($file);
-            self::assertIsArray($requests);
-            self::assertIsArray($requests['documentLink'] ?? null);
-            self::assertIsArray($requests['completion'] ?? null);
-            $linkCounts[$file] = $requests['documentLink']['resultCount'] ?? null;
-            $completionCounts[$file] = $requests['completion']['resultCount'] ?? null;
-        }
-
-        self::assertSame(['config/routes.yaml' => 1, 'config/services.yaml' => 0], $linkCounts);
-        self::assertSame(['config/routes.yaml' => 2, 'config/services.yaml' => 2], $completionCounts);
-    }
-
     public function testCapturesLargeServerErrorOutputWithoutBlockingProtocolResponses(): void
     {
-        $server = Path::join($this->directory, 'server');
-        file_put_contents($server, <<<'PHP'
-            #!/usr/bin/env php
-            <?php
+        $server = new ScriptedLanguageServer($this->directory, [
+            'noise' => str_repeat('x', 1000000),
+            'responses' => [['method' => 'textDocument/completion', 'result' => [['label' => 'hello/index.html.twig']]]],
+        ]);
+        $result = $this->execute(['--scenarios='.$this->manifest(), $server->path, $this->project]);
+        $report = $this->report($result);
 
-            function readMessage(): ?array
-            {
-                $length = null;
-                while (false !== $line = fgets(STDIN)) {
-                    if ("\r\n" === $line) {
-                        break;
-                    }
-                    if (preg_match('/^Content-Length: (\d+)\r\n$/i', $line, $matches)) {
-                        $length = (int) $matches[1];
-                    }
-                }
-                if (null === $length) {
-                    return null;
-                }
-                $json = '';
-                while (strlen($json) < $length) {
-                    $chunk = fread(STDIN, $length - strlen($json));
-                    if (false === $chunk || '' === $chunk) {
-                        return null;
-                    }
-                    $json .= $chunk;
-                }
+        self::assertSame(0, $result->exitCode, $result->errorOutput);
+        self::assertSame('passed', $report['outcome']);
+        self::assertSame(0, $report['exitCode']);
+        self::assertNull($report['runtimeBridgeTimings']);
+        self::assertIsString($report['serverError']);
+        self::assertSame(1000000, \strlen($report['serverError']));
+    }
 
-                return json_decode($json, true, flags: JSON_THROW_ON_ERROR);
-            }
+    private function manifest(): string
+    {
+        $path = Path::join($this->directory, 'scenarios.json');
+        (new Filesystem())->dumpFile($path, json_encode([
+            'version' => 1,
+            'revision' => str_repeat('a', 40),
+            'scenarios' => [[
+                'id' => 'hello.completion',
+                'file' => 'src/Controller/HelloController.php',
+                'anchor' => "'hello/index.html.twig'",
+                'offset' => 1,
+                'expect' => ['completion' => ['equals' => ['hello/index.html.twig']]],
+            ]],
+            'diagnostics' => [],
+        ], \JSON_THROW_ON_ERROR));
 
-            function writeMessage(array $message): void
-            {
-                $json = json_encode($message, JSON_THROW_ON_ERROR);
-                fwrite(STDOUT, 'Content-Length: '.strlen($json)."\r\n\r\n".$json);
-                fflush(STDOUT);
-            }
+        return $path;
+    }
 
-            fwrite(STDERR, str_repeat('x', 1000000));
-            fflush(STDERR);
-            while (null !== $message = readMessage()) {
-                if (isset($message['id'])) {
-                    $result = match ($message['method'] ?? null) {
-                        'initialize' => ['serverInfo' => ['version' => 'test']],
-                        'workspace/executeCommand' => [[
-                            'source' => ['state' => 'ready'],
-                            'runtime' => ['state' => 'ready'],
-                        ]],
-                        default => null,
-                    };
-                    writeMessage(['jsonrpc' => '2.0', 'id' => $message['id'], 'result' => $result]);
-                }
-                if ('exit' === ($message['method'] ?? null)) {
-                    break;
-                }
-            }
-            PHP);
-        chmod($server, 0755);
-
-        $result = (new NativeProcessRunner())->run([
+    /**
+     * @param list<string> $arguments
+     */
+    private function execute(array $arguments, float $timeout = 10.0): ProcessResult
+    {
+        return (new NativeProcessRunner())->run([
             \PHP_BINARY,
             Path::join(\dirname(__DIR__, 3), 'tools/dogfood-server'),
             '--index-timeout=1',
-            '--request-timeout=1',
-            $server,
-            $this->directory,
-        ], timeout: 10.0);
+            '--request-timeout=2',
+            ...$arguments,
+        ], timeout: $timeout);
+    }
 
-        self::assertSame(0, $result->exitCode, $result->errorOutput);
-        self::assertSame('', $result->errorOutput);
-        $report = json_decode($result->standardOutput, true, flags: \JSON_THROW_ON_ERROR);
-        self::assertIsArray($report);
-        self::assertSame(0, $report['exitCode'] ?? null);
-        self::assertNull($report['runtimeBridgeTimings'] ?? null);
-        self::assertIsString($report['serverError'] ?? null);
-        self::assertSame(1000000, \strlen($report['serverError']));
-        $timings = $report['timings'] ?? null;
-        self::assertIsArray($timings);
+    /**
+     * @return HarnessReport
+     */
+    private function report(ProcessResult $result): array
+    {
+        $decoded = json_decode($result->standardOutput, true, flags: \JSON_THROW_ON_ERROR);
+        self::assertIsArray($decoded);
         self::assertSame([
-            'startupMilliseconds',
-            'initializeMilliseconds',
-            'sourceIndexMilliseconds',
-            'runtimeIndexMilliseconds',
-            'indexWaitMilliseconds',
-            'probeDiscoveryMilliseconds',
-            'requestsMilliseconds',
-            'shutdownMilliseconds',
-            'totalMilliseconds',
-        ], array_keys($timings));
-        foreach ($timings as $milliseconds) {
-            self::assertTrue(\is_int($milliseconds) || \is_float($milliseconds));
-            self::assertGreaterThanOrEqual(0.0, (float) $milliseconds);
-        }
+            'project', 'environment', 'manifestRevision', 'serverVersion', 'status', 'terminal', 'outcome', 'error',
+            'scenarioCount', 'scenarios', 'requestCount', 'assertionFailures', 'violations', 'transportFailure',
+            'serverError', 'exitCode', 'runtimeBridgeTimings', 'timings',
+        ], array_keys($decoded));
+        /** @var HarnessReport $report */
+        $report = $decoded;
+
+        return $report;
     }
 }

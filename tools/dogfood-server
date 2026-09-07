@@ -5,36 +5,24 @@ require __DIR__.'/../vendor/autoload.php';
 require_once __DIR__.'/ContentLengthProcessClient.php';
 
 use Symfony\Lsp\Tools\ContentLengthProcessClient;
-use Symfony\Lsp\Tools\Dogfood\ProbeFinder;
+use Symfony\Lsp\Tools\Dogfood\ConfigurationException;
 use Symfony\Lsp\Tools\Dogfood\ProtocolValidator;
+use Symfony\Lsp\Tools\Dogfood\ResponseAssertions;
+use Symfony\Lsp\Tools\Dogfood\ResponseFingerprint;
+use Symfony\Lsp\Tools\Dogfood\ScenarioLocator;
+use Symfony\Lsp\Tools\Dogfood\ScenarioManifestLoader;
+use Symfony\Lsp\Tools\Dogfood\ScenarioRunner;
 use Symfony\Lsp\Tools\Dogfood\ServerHarness;
+use Symfony\Lsp\Tools\Dogfood\Utf16Positions;
+use Symfony\Lsp\Tools\Dogfood\WorkspaceEditApplier;
 
-function uri(string $path): string
-{
-    return 'file://'.str_replace('%2F', '/', rawurlencode($path));
-}
-
-function languageId(string $path): string
-{
-    return match (strtolower(pathinfo($path, \PATHINFO_EXTENSION))) {
-        'js', 'mjs' => 'javascript',
-        'php' => 'php',
-        'ts' => 'typescript',
-        'twig' => 'twig',
-        'yaml', 'yml' => 'yaml',
-        'json' => 'json',
-        'xlf', 'xliff' => 'xml',
-        default => 'plaintext',
-    };
-}
-
-const USAGE = "Usage: dogfood-server [--environment=ENV] [--index-timeout=SECONDS] [--request-timeout=SECONDS] [--probe-roots=DIR,DIR] [--probes-per-category=COUNT] <server> <project>\n";
+const USAGE = "Usage: dogfood-server --scenarios=FILE [--revision=COMMIT] [--environment=ENV] [--index-timeout=SECONDS] [--request-timeout=SECONDS] <server> <project>\n";
 
 $environment = 'dev';
 $indexTimeout = 30.0;
 $requestTimeout = 10.0;
-$probeRoots = ProbeFinder::DEFAULT_ROOTS;
-$probesPerCategory = 1;
+$scenarioPath = null;
+$revision = null;
 $positional = [];
 foreach (array_slice($argv, 1) as $argument) {
     if (preg_match('/^--environment=(.+)$/', $argument, $matches)) {
@@ -43,10 +31,10 @@ foreach (array_slice($argv, 1) as $argument) {
         $indexTimeout = (float) $matches[1];
     } elseif (preg_match('/^--request-timeout=(\d+)$/', $argument, $matches)) {
         $requestTimeout = (float) $matches[1];
-    } elseif (preg_match('/^--probe-roots=(.+)$/', $argument, $matches)) {
-        $probeRoots = array_values(array_filter(explode(',', $matches[1]), static fn (string $root): bool => '' !== $root));
-    } elseif (preg_match('/^--probes-per-category=(\d+)$/', $argument, $matches)) {
-        $probesPerCategory = max(1, (int) $matches[1]);
+    } elseif (preg_match('/^--scenarios=(.+)$/', $argument, $matches)) {
+        $scenarioPath = $matches[1];
+    } elseif (preg_match('/^--revision=(.+)$/', $argument, $matches)) {
+        $revision = $matches[1];
     } elseif (str_starts_with($argument, '-')) {
         fwrite(\STDERR, USAGE);
         exit(2);
@@ -54,22 +42,68 @@ foreach (array_slice($argv, 1) as $argument) {
         $positional[] = $argument;
     }
 }
-if (2 !== count($positional)) {
+if (2 !== count($positional) || null === $scenarioPath) {
     fwrite(\STDERR, USAGE);
     exit(2);
 }
 [$server, $project] = $positional;
 $project = realpath($project);
 if (false === $project) {
-    throw new RuntimeException('Project does not exist.');
+    fwrite(\STDERR, "The project does not exist.\n");
+    exit(2);
+}
+
+try {
+    $manifest = (new ScenarioManifestLoader())->load($scenarioPath, $revision);
+} catch (ConfigurationException $exception) {
+    fwrite(\STDERR, $exception->getMessage()."\n");
+    exit(2);
+}
+
+function uri(string $path): string
+{
+    return 'file://'.str_replace('%2F', '/', rawurlencode($path));
 }
 
 $totalStartedAt = hrtime(true);
 $elapsedMilliseconds = static fn (int $startedAt): float => round((hrtime(true) - $startedAt) / 1_000_000, 1);
-$startupStartedAt = hrtime(true);
-$client = new ContentLengthProcessClient([$server], max(10.0, $requestTimeout), getenv());
-$startupMilliseconds = $elapsedMilliseconds($startupStartedAt);
+$timings = [
+    'startupMilliseconds' => null,
+    'initializeMilliseconds' => null,
+    'sourceIndexMilliseconds' => null,
+    'runtimeIndexMilliseconds' => null,
+    'indexWaitMilliseconds' => null,
+    'scenariosMilliseconds' => null,
+    'shutdownMilliseconds' => null,
+    'totalMilliseconds' => null,
+];
+$report = [
+    'project' => $project,
+    'environment' => $environment,
+    'manifestRevision' => $manifest->revision,
+    'serverVersion' => null,
+    'status' => null,
+    'terminal' => false,
+    'outcome' => 'aborted',
+    'error' => null,
+    'scenarioCount' => count($manifest->scenarios),
+    'scenarios' => [],
+    'requestCount' => 0,
+    'assertionFailures' => 0,
+    'violations' => [],
+    'transportFailure' => null,
+    'serverError' => null,
+    'exitCode' => null,
+    'runtimeBridgeTimings' => null,
+    'timings' => $timings,
+];
+
+$client = null;
 try {
+    $startupStartedAt = hrtime(true);
+    $client = new ContentLengthProcessClient([$server], max(10.0, $requestTimeout), getenv());
+    $timings['startupMilliseconds'] = $elapsedMilliseconds($startupStartedAt);
+
     $id = 1;
     $initializeStartedAt = hrtime(true);
     $initialize = $client->request($id, 'initialize', [
@@ -79,139 +113,106 @@ try {
         'capabilities' => new stdClass(),
         'initializationOptions' => ['workspaceTrust' => true, 'runtimeIndexing' => true, 'environment' => $environment],
     ], 10.0);
-    $initializeMilliseconds = $elapsedMilliseconds($initializeStartedAt);
+    $timings['initializeMilliseconds'] = $elapsedMilliseconds($initializeStartedAt);
+    $report['serverVersion'] = $initialize['result']['serverInfo']['version'] ?? null;
     $client->notify('initialized');
 
-    $status = null;
-    $terminal = false;
-    $sourceIndexMilliseconds = null;
-    $runtimeIndexMilliseconds = null;
     $indexStartedAt = hrtime(true);
     $deadline = microtime(true) + $indexTimeout;
     while (microtime(true) < $deadline) {
         $response = $client->request(++$id, 'workspace/executeCommand', ['command' => 'symfony.indexStatus'], $requestTimeout);
         $status = $response['result'][0] ?? null;
         if (is_array($status)) {
-            if (null === $sourceIndexMilliseconds && in_array($status['source']['state'] ?? null, ['ready', 'failed'], true)) {
-                $sourceIndexMilliseconds = $elapsedMilliseconds($indexStartedAt);
+            $report['status'] = $status;
+            if (null === $timings['sourceIndexMilliseconds'] && in_array($status['source']['state'] ?? null, ['ready', 'failed'], true)) {
+                $timings['sourceIndexMilliseconds'] = $elapsedMilliseconds($indexStartedAt);
             }
-            if (null === $runtimeIndexMilliseconds && in_array($status['runtime']['state'] ?? null, ['ready', 'partial', 'failed', 'stale'], true)) {
-                $runtimeIndexMilliseconds = $elapsedMilliseconds($indexStartedAt);
+            if (null === $timings['runtimeIndexMilliseconds'] && in_array($status['runtime']['state'] ?? null, ['ready', 'partial', 'failed', 'stale'], true)) {
+                $timings['runtimeIndexMilliseconds'] = $elapsedMilliseconds($indexStartedAt);
             }
-            if (null !== $sourceIndexMilliseconds && null !== $runtimeIndexMilliseconds) {
-                $terminal = true;
+            if (null !== $timings['sourceIndexMilliseconds'] && null !== $timings['runtimeIndexMilliseconds']) {
+                $report['terminal'] = true;
                 break;
             }
         }
         usleep(250_000);
     }
-    $indexWaitMilliseconds = $elapsedMilliseconds($indexStartedAt);
-    $runtimeBridgeTimings = \is_array($status['runtime']['timings'] ?? null) ? $status['runtime']['timings'] : null;
+    $timings['indexWaitMilliseconds'] = $elapsedMilliseconds($indexStartedAt);
+    $report['runtimeBridgeTimings'] = is_array($report['status']['runtime']['timings'] ?? null) ? $report['status']['runtime']['timings'] : null;
 
-    $probeDiscoveryStartedAt = hrtime(true);
-    $probes = (new ProbeFinder($probeRoots, $probesPerCategory))->find($project);
-    $probeDiscoveryMilliseconds = $elapsedMilliseconds($probeDiscoveryStartedAt);
-    $validator = new ProtocolValidator();
-    $opened = [];
-    $results = [];
-    $violations = [];
-    $requestsStartedAt = hrtime(true);
-    foreach ($probes as $probe) {
-        $documentUri = uri($probe->path);
-        if (!isset($opened[$documentUri])) {
-            $client->notify('textDocument/didOpen', ['textDocument' => [
-                'uri' => $documentUri,
-                'languageId' => languageId($probe->path),
-                'version' => 1,
-                'text' => $probe->contents,
-            ]]);
-            $opened[$documentUri] = true;
-        }
-        $position = ['line' => $probe->line, 'character' => $probe->character];
-        $entry = [
-            'category' => $probe->category,
-            'file' => substr($probe->path, strlen($project) + 1),
-            'value' => $probe->value,
-            'requests' => [],
-        ];
-        foreach (ServerHarness::PROBE_METHODS as $method) {
-            $params = ['textDocument' => ['uri' => $documentUri]];
-            if (!in_array($method, ['textDocument/documentLink', 'textDocument/codeLens', 'textDocument/codeAction'], true)) {
-                $params['position'] = $position;
-            }
-            if ('textDocument/codeAction' === $method) {
-                $params['range'] = ['start' => $position, 'end' => $position];
-                $params['context'] = ['diagnostics' => []];
-            }
-            if ('textDocument/references' === $method) {
-                $params['context'] = ['includeDeclaration' => true];
-            } elseif ('textDocument/rename' === $method) {
-                $params['newName'] = 'dogfood_'.str_replace(['.', '\\', '/'], '_', $probe->value);
-            }
-            $startedAt = microtime(true);
-            $response = $client->request(++$id, $method, $params, $requestTimeout);
-            $result = $response['result'] ?? null;
-            foreach ($validator->validate($method, $result, $project) as $violation) {
-                $violations[] = ['category' => $probe->category, 'method' => substr($method, strlen('textDocument/')), 'message' => $violation];
-            }
-            $resultCount = 'textDocument/documentLink' === $method
-                ? $probe->countCoveringLinks($result)
-                : (is_array($result) && array_is_list($result) ? count($result) : (null === $result ? 0 : 1));
-            $entry['requests'][substr($method, strlen('textDocument/'))] = [
-                'milliseconds' => round((microtime(true) - $startedAt) * 1000, 1),
-                'resultCount' => $resultCount,
-                'error' => $response['error']['message'] ?? null,
-            ];
-        }
-        $results[] = $entry;
-    }
+    $runner = new ScenarioRunner(
+        $client,
+        new ScenarioLocator(),
+        new ResponseAssertions(),
+        new ProtocolValidator(),
+        new WorkspaceEditApplier(new Utf16Positions()),
+        new ResponseFingerprint(),
+        $requestTimeout,
+    );
+    $scenariosStartedAt = hrtime(true);
+    $report = array_replace($report, $runner->run($manifest, $project));
+    $timings['scenariosMilliseconds'] = $elapsedMilliseconds($scenariosStartedAt);
 
-    foreach (array_keys($opened) as $documentUri) {
-        $client->notify('textDocument/didClose', ['textDocument' => ['uri' => $documentUri]]);
-    }
-    $requestsMilliseconds = $elapsedMilliseconds($requestsStartedAt);
     $shutdownStartedAt = hrtime(true);
-    $client->request(++$id, 'shutdown', timeout: $requestTimeout);
-    $client->notify('exit');
-    $exitCode = $client->close(ServerHarness::PROCESS_EXIT_TIMEOUT);
-    $shutdownMilliseconds = $elapsedMilliseconds($shutdownStartedAt);
-    $stderr = $client->errorOutput();
-    $diagnostics = [];
-    foreach ($client->notifications() as $notification) {
-        if ('textDocument/publishDiagnostics' === ($notification['method'] ?? null)) {
-            $diagnostics[] = [
-                'uri' => $notification['params']['uri'] ?? null,
-                'items' => $notification['params']['diagnostics'] ?? [],
-            ];
+    if (null === $report['transportFailure']) {
+        $client->request(++$id, 'shutdown', timeout: $requestTimeout);
+        $client->notify('exit');
+        $report['exitCode'] = $client->close(ServerHarness::PROCESS_EXIT_TIMEOUT);
+    } else {
+        $report['exitCode'] = $client->terminate();
+    }
+    $timings['shutdownMilliseconds'] = $elapsedMilliseconds($shutdownStartedAt);
+    $stderr = trim($client->errorOutput());
+    $report['serverError'] = '' === $stderr ? null : $stderr;
+    $report['outcome'] = outcome($report);
+} catch (Throwable $exception) {
+    $report['error'] = $exception->getMessage();
+    $report['outcome'] = 'aborted';
+    if ([] === $report['scenarios']) {
+        $report = array_replace($report, ScenarioRunner::unavailable($manifest, $exception->getMessage()));
+    }
+    if (null !== $client) {
+        $report['exitCode'] = $client->terminate();
+        $stderr = trim($client->errorOutput());
+        $report['serverError'] = '' === $stderr ? null : $stderr;
+    }
+    $timings['totalMilliseconds'] = $elapsedMilliseconds($totalStartedAt);
+    $report['timings'] = $timings;
+    write($report);
+
+    exit(1);
+} finally {
+    $client?->terminate();
+}
+
+$timings['totalMilliseconds'] = $elapsedMilliseconds($totalStartedAt);
+$report['timings'] = $timings;
+write($report);
+
+/**
+ * @param array<string, mixed> $report
+ */
+function outcome(array $report): string
+{
+    if (null !== $report['transportFailure']) {
+        return 'aborted';
+    }
+    if (0 !== $report['assertionFailures'] || [] !== $report['violations'] || [] === $report['scenarios']) {
+        return 'failed';
+    }
+    foreach ($report['scenarios'] as $scenario) {
+        if ('pass' !== ($scenario['status'] ?? null)) {
+            return 'failed';
         }
     }
 
-    $totalMilliseconds = $elapsedMilliseconds($totalStartedAt);
-    echo json_encode([
-        'project' => $project,
-        'environment' => $environment,
-        'serverVersion' => $initialize['result']['serverInfo']['version'] ?? null,
-        'status' => $status,
-        'terminal' => $terminal,
-        'probeCount' => count($results),
-        'probes' => $results,
-        'violations' => $violations,
-        'diagnostics' => $diagnostics,
-        'serverError' => '' === trim($stderr) ? null : trim($stderr),
-        'exitCode' => $exitCode,
-        'runtimeBridgeTimings' => $runtimeBridgeTimings,
-        'timings' => [
-            'startupMilliseconds' => $startupMilliseconds,
-            'initializeMilliseconds' => $initializeMilliseconds,
-            'sourceIndexMilliseconds' => $sourceIndexMilliseconds,
-            'runtimeIndexMilliseconds' => $runtimeIndexMilliseconds,
-            'indexWaitMilliseconds' => $indexWaitMilliseconds,
-            'probeDiscoveryMilliseconds' => $probeDiscoveryMilliseconds,
-            'requestsMilliseconds' => $requestsMilliseconds,
-            'shutdownMilliseconds' => $shutdownMilliseconds,
-            'totalMilliseconds' => $totalMilliseconds,
-        ],
-    ], \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR)."\n";
-} finally {
-    $client->terminate();
+    return 'passed';
+}
+
+/**
+ * @param array<string, mixed> $report
+ */
+function write(array $report): void
+{
+    echo json_encode($report, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR)."\n";
 }
