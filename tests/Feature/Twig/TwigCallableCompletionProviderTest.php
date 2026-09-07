@@ -189,4 +189,99 @@ final class TwigCallableCompletionProviderTest extends TwigCallableProviderTestC
         self::assertNull($completions('{% macro image(name, '));
         self::assertNull($completions("{{ image(name: 'a"));
     }
+
+    public function testCompletesDirectivesEmbeddedInQuotedMarkupAttributes(): void
+    {
+        $extensionUri = 'file:///workspace/src/Twig/Extensions.php';
+        $extensionText = <<<'PHP'
+            <?php
+            namespace App\Twig;
+
+            use Twig\TwigFilter;
+            use Twig\TwigFunction;
+
+            final class Extensions
+            {
+                public function getFilters(): array
+                {
+                    return [
+                        new TwigFilter('docu_link', [Extensions::class, 'documentationLink']),
+                        new TwigFilter('icon', [Extensions::class, 'icon']),
+                    ];
+                }
+
+                public function getFunctions(): array
+                {
+                    return [new TwigFunction('icon', [Extensions::class, 'icon'])];
+                }
+
+                public function documentationLink(string $url = ''): string
+                {
+                    return $url;
+                }
+
+                public function icon(string $name, bool $onlyIcon = false): string
+                {
+                    return $name;
+                }
+            }
+            PHP;
+        $environment = $this->providers([$extensionUri => $extensionText]);
+        $provider = $environment['completion'];
+        $documents = $environment['documents'];
+        $converter = $environment['converter'];
+        $items = static function (string $text, ?int $offset = null) use ($provider, $documents, $converter): ?array {
+            $uri = 'file:///workspace/templates/about/license.html.twig';
+            $documents->open(new Document($uri, 'twig', 2, $text));
+            $position = $converter->toPosition($text, $offset ?? \strlen($text));
+
+            return $provider->complete([
+                'textDocument' => ['uri' => $uri],
+                'position' => ['line' => $position->line, 'character' => $position->character],
+            ]);
+        };
+        $labels = static function (string $text, ?int $offset = null) use ($items): ?array {
+            $completions = $items($text, $offset);
+
+            return null === $completions ? null : array_column($completions, 'label');
+        };
+        $textEdit = static fn (string $text, ?int $offset = null): mixed => $items($text, $offset)[0]['textEdit'] ?? null;
+
+        $link = '<a href="{{ \'\'|docu_link }}" target="_blank" class="card-btn">';
+        $cursor = (int) strpos($link, ' }}');
+        self::assertSame(['docu_link'], $labels($link, $cursor));
+        self::assertSame(
+            ['range' => ['start' => ['line' => 0, 'character' => 15], 'end' => ['line' => 0, 'character' => 24]], 'newText' => 'docu_link'],
+            $textEdit($link, $cursor),
+        );
+        self::assertSame(['docu_link'], $labels($link, $cursor - 4));
+
+        $accented = '<a title="Créé" href="{{ \'\'|docu_l';
+        self::assertSame(['docu_link'], $labels($accented));
+        self::assertSame(
+            ['range' => ['start' => ['line' => 0, 'character' => 28], 'end' => ['line' => 0, 'character' => 34]], 'newText' => 'docu_link'],
+            $textEdit($accented),
+        );
+
+        $icon = '<i class="fa {{ \'help\'|icon(';
+        self::assertSame(['onlyIcon'], $labels($icon));
+        self::assertSame(
+            ['range' => ['start' => ['line' => 0, 'character' => 28], 'end' => ['line' => 0, 'character' => 28]], 'newText' => 'onlyIcon'],
+            $textEdit($icon),
+        );
+        self::assertSame(['onlyIcon'], $labels($icon.'only'));
+        self::assertSame(
+            ['range' => ['start' => ['line' => 0, 'character' => 28], 'end' => ['line' => 0, 'character' => 32]], 'newText' => 'onlyIcon'],
+            $textEdit($icon.'only'),
+        );
+
+        self::assertSame(['icon'], $labels('<i class="fa {{ ic'));
+        self::assertSame([], $labels('<i class="fa {{ \'help\'|icon(onlyIcon: false, '));
+        self::assertNull($labels('<a href="{{ \'docu_l'));
+        self::assertNull($labels('<i class="fa {{ \'help\'|icon(\'fa-ic'));
+        self::assertNull($labels('<a href="{# {{ \'\'|docu_l'));
+        self::assertNull($labels('<a href="docu_l'));
+        self::assertNull($labels('<a href="{{ \'\'|docu_link }}" title="docu_l'));
+        self::assertNull($labels('<div>{% macro ic'));
+    }
 }

@@ -60,7 +60,7 @@ class TwigCallableProviderTestCase extends TestCase
         $referenceExtractor = new TwigCallableReferenceExtractor(
             new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser()),
             $converter,
-            new TwigDirectiveLocator(),
+            $directives = new TwigDirectiveLocator(),
             new TwigCallArgumentResolver(new TwigArgumentParser()),
         );
         $argumentAnalyzer = new TwigCallableArgumentAnalyzer(new TwigArgumentParser());
@@ -94,7 +94,7 @@ class TwigCallableProviderTestCase extends TestCase
             'documents' => $documents,
             'converter' => $converter,
             'protocol' => $protocol,
-            'completion' => new TwigCallableCompletionProvider($documentResolver, $converter, $protocol, $indexes, $referenceExtractor, $methodResolver, $argumentAnalyzer, $commentParser),
+            'completion' => new TwigCallableCompletionProvider($documentResolver, $converter, $protocol, $indexes, $methodResolver, $argumentAnalyzer, $commentParser, $directives),
             'diagnostic' => new TwigCallableDiagnosticProvider($documentResolver, $protocol, $indexes, $methodResolver),
             'relationship' => new TwigCallableRelationshipProvider($documentResolver, $converter, $protocol, $indexes, $referenceExtractor, $methodResolver, $phpParser),
         ];

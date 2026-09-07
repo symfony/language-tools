@@ -42,7 +42,10 @@ Completion
 
 Function names are completed in Twig expressions, and filter names after a
 ``|`` pipe. Suggestions come from the recognized application declarations
-and replace the identifier being typed.
+and replace the identifier being typed. Completion also works for directives
+written inside quoted HTML attributes, such as
+``<img src="{{ product|image }}">``. Text inside string literals and comments
+is never completed.
 
 Inside a recognized call, argument names are completed from the resolved
 PHP callable. Union, intersection and disjunctive normal form (DNF) parameter

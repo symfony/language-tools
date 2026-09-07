@@ -10,10 +10,14 @@ final class TwigCallableArgumentAnalyzer
     {
     }
 
-    /** @return array{kind: TwigCallableKind, prefix: string}|null */
-    public function callableNameCompletion(string $before): ?array
+    /**
+     * @param string $directive Source of the directive being edited, from its opening marker to the cursor
+     *
+     * @return array{kind: TwigCallableKind, prefix: string}|null
+     */
+    public function callableNameCompletion(string $directive): ?array
     {
-        $syntax = $this->maskStringContents($before);
+        $syntax = $this->maskStringContents($directive);
         if (1 === preg_match('/\|\s*([A-Za-z_][A-Za-z0-9_]*)?$/', $syntax, $matches)) {
             return ['kind' => TwigCallableKind::Filter, 'prefix' => $matches[1] ?? ''];
         }
@@ -28,9 +32,13 @@ final class TwigCallableArgumentAnalyzer
         return null;
     }
 
-    public function incompleteCall(string $before): ?TwigCallableCall
+    /**
+     * @param string $directive Source of the directive being edited, from its opening marker to the cursor
+     * @param int    $start     Byte offset of that opening marker in the document
+     */
+    public function incompleteCall(string $directive, int $start): ?TwigCallableCall
     {
-        [$stack, $quote] = $this->scan($before);
+        [$stack, $quote] = $this->scan($directive);
         if (null !== $quote || [] === $stack) {
             return null;
         }
@@ -38,8 +46,8 @@ final class TwigCallableArgumentAnalyzer
         if ('(' !== $open['delimiter'] || null === $open['callable']) {
             return null;
         }
-        $argumentsText = substr($before, $open['offset'] + 1);
-        $arguments = $this->argumentParser->parse($argumentsText, $open['offset'] + 1);
+        $argumentsText = substr($directive, $open['offset'] + 1);
+        $arguments = $this->argumentParser->parse($argumentsText, $start + $open['offset'] + 1);
         $current = array_pop($arguments);
         if (null === $current || 1 !== preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)?$/', $current->text, $prefix)) {
             return null;

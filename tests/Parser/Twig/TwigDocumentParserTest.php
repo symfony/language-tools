@@ -169,6 +169,12 @@ final class TwigDocumentParserTest extends TestCase
             array_map(static fn (array $range): string => substr($source, $range['start'], $range['end'] - $range['start']), $locator->ranges($source)),
         );
         self::assertSame([['start' => 0, 'end' => 12]], $locator->ranges('{{ unclosed('));
+
+        $markup = '<a href="{{ url|escape }}" class="{% if active %}on{% endif %}">';
+        self::assertSame(9, $locator->directiveStart($markup, (int) strpos($markup, 'escape')));
+        self::assertSame(34, $locator->directiveStart($markup, (int) strpos($markup, 'active')));
+        self::assertNull($locator->directiveStart($markup, (int) strpos($markup, 'class')));
+        self::assertNull($locator->directiveStart($markup, \strlen($markup)));
     }
 
     private function parser(): TwigDocumentParser

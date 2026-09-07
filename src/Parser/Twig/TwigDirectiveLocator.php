@@ -6,9 +6,15 @@ final class TwigDirectiveLocator
 {
     public function insideDirective(string $text, int $offset): bool
     {
-        [, $inside] = $this->locate($text, $offset);
+        return null !== $this->directiveStart($text, $offset);
+    }
 
-        return $inside;
+    /** Byte offset of the opening marker of the directive still open at $offset. */
+    public function directiveStart(string $text, int $offset): ?int
+    {
+        [, $inside, $start] = $this->locate($text, $offset);
+
+        return $inside ? $start : null;
     }
 
     /** @return list<array{start: int, end: int}> */
