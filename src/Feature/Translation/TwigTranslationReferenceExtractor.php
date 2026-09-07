@@ -29,11 +29,45 @@ final class TwigTranslationReferenceExtractor
         $masked = $this->comments->mask($text);
         $defaultDomain = $this->defaultDomain($document);
 
-        return [
-            ...$this->filterReferences($uri, $text, $masked, $document, $defaultDomain),
-            ...$this->functionReferences($uri, $text, $masked, $document, $defaultDomain),
-            ...$this->tagReferences($uri, $text, $masked, $defaultDomain),
-        ];
+        $references = [];
+        foreach ($this->calls($document, $masked) as $call) {
+            $domain = $this->domain($document, $call['domain'], $defaultDomain);
+            if (null !== $domain) {
+                $references[] = $this->reference(
+                    $call['key'],
+                    $domain,
+                    $uri,
+                    $text,
+                    $this->parameters->twig($document, $call['parameters']),
+                );
+            }
+        }
+
+        return [...$references, ...$this->tagReferences($uri, $text, $masked, $defaultDomain)];
+    }
+
+    /**
+     * The domain scoping the key literal at $offset: the call's literal domain,
+     * the template's default domain when the call sets none, or null when the
+     * call sets a domain that isn't statically known.
+     */
+    public function completionDomain(string $text, int $offset): ?string
+    {
+        $document = $this->parser->parse($text);
+        $defaultDomain = $this->defaultDomain($document);
+        foreach ($this->calls($document, $this->comments->mask($text)) as $call) {
+            if ($offset >= $call['key']->startOffset && $offset <= $call['key']->endOffset) {
+                return $this->domain($document, $call['domain'], $defaultDomain);
+            }
+        }
+
+        return $defaultDomain;
+    }
+
+    /** @return list<array{key: TwigStringLiteral, domain: ?TreeSitterNode, parameters: ?TreeSitterNode}> */
+    private function calls(TwigDocument $document, string $masked): array
+    {
+        return [...$this->filterCalls($document, $masked), ...$this->functionCalls($document)];
     }
 
     private function defaultDomain(TwigDocument $document): string
@@ -52,8 +86,8 @@ final class TwigTranslationReferenceExtractor
         return 'messages';
     }
 
-    /** @return list<TranslationReference> */
-    private function filterReferences(string $uri, string $text, string $masked, TwigDocument $document, string $defaultDomain): array
+    /** @return list<array{key: TwigStringLiteral, domain: ?TreeSitterNode, parameters: ?TreeSitterNode}> */
+    private function filterCalls(TwigDocument $document, string $masked): array
     {
         $literals = [];
         foreach (['string', 'interpolated_string'] as $type) {
@@ -64,7 +98,7 @@ final class TwigTranslationReferenceExtractor
             }
         }
 
-        $references = [];
+        $calls = [];
         foreach ($document->nodesOfType('filter') as $filter) {
             $identifier = $document->directChild($filter, 'filter_identifier');
             if (null === $identifier || 'trans' !== $document->text($identifier)) {
@@ -75,20 +109,14 @@ final class TwigTranslationReferenceExtractor
                 continue;
             }
             $arguments = $this->arguments->resolve($document, $filter);
-            $domain = $this->domain($document, $arguments->get(1, 'domain'), $defaultDomain);
-            if (null === $domain) {
-                continue;
-            }
-            $references[] = $this->reference(
-                $key,
-                $domain,
-                $uri,
-                $text,
-                $this->parameters->twig($document, $arguments->get(0, 'arguments', 'parameters')),
-            );
+            $calls[] = [
+                'key' => $key,
+                'domain' => $arguments->get(1, 'domain'),
+                'parameters' => $arguments->get(0, 'arguments', 'parameters'),
+            ];
         }
 
-        return $references;
+        return $calls;
     }
 
     /**
@@ -113,10 +141,10 @@ final class TwigTranslationReferenceExtractor
         return 1 === preg_match('/^\s*\|\s*$/D', $separator) ? $candidate : null;
     }
 
-    /** @return list<TranslationReference> */
-    private function functionReferences(string $uri, string $text, string $masked, TwigDocument $document, string $defaultDomain): array
+    /** @return list<array{key: TwigStringLiteral, domain: ?TreeSitterNode, parameters: ?TreeSitterNode}> */
+    private function functionCalls(TwigDocument $document): array
     {
-        $references = [];
+        $calls = [];
         foreach ($document->nodesOfType('function_call') as $call) {
             $identifier = $document->directChild($call, 'function_identifier');
             if (null === $identifier || !\in_array($document->text($identifier), ['trans', 't'], true)) {
@@ -125,20 +153,17 @@ final class TwigTranslationReferenceExtractor
             $arguments = $this->arguments->resolve($document, $call);
             $keyArgument = $arguments->get(0, 'id', 'message');
             $key = null === $keyArgument ? null : $document->soleStringLiteral($keyArgument);
-            $domain = $this->domain($document, $arguments->get(2, 'domain'), $defaultDomain);
-            if (null === $key || null === $domain) {
+            if (null === $key) {
                 continue;
             }
-            $references[] = $this->reference(
-                $key,
-                $domain,
-                $uri,
-                $text,
-                $this->parameters->twig($document, $arguments->get(1, 'arguments', 'parameters')),
-            );
+            $calls[] = [
+                'key' => $key,
+                'domain' => $arguments->get(2, 'domain'),
+                'parameters' => $arguments->get(1, 'arguments', 'parameters'),
+            ];
         }
 
-        return $references;
+        return $calls;
     }
 
     private function domain(TwigDocument $document, ?TreeSitterNode $argument, string $defaultDomain): ?string

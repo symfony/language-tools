@@ -13,6 +13,19 @@ final class TranslationExtractor
     ) {
     }
 
+    /**
+     * The domain scoping key completion at $offset, or null when the call at
+     * the cursor sets a domain that isn't statically known.
+     */
+    public function completionDomain(SourceDocument $document, int $offset): ?string
+    {
+        return match ($document->languageId) {
+            'php' => $this->phpReferences->completionDomain($document->text, $offset),
+            'twig' => $this->twigReferences->completionDomain($document->text, $offset),
+            default => 'messages',
+        };
+    }
+
     public function extract(SourceDocument $document): TranslationSourceFacts
     {
         $globalParameters = [];

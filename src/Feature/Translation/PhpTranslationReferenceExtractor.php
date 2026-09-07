@@ -36,54 +36,31 @@ final class PhpTranslationReferenceExtractor
         $globalParameters = [];
         $dynamicGlobalParameters = false;
         foreach ($document->methodCalls as $call) {
-            if ('addGlobalParameter' === $call->method && $this->hasGlobalParameterReceiver($call, $document)) {
-                $parameter = $call->namedOrPositionalArgument('id', 0);
-                if (null === $parameter?->stringLiteral) {
-                    $dynamicGlobalParameters = true;
-                } else {
-                    $globalParameters[] = $parameter->stringLiteral->value;
-                }
-
+            if ('addGlobalParameter' !== $call->method || !$this->hasGlobalParameterReceiver($call, $document)) {
                 continue;
             }
-            if ('trans' !== $call->method) {
-                continue;
+            $parameter = $call->namedOrPositionalArgument('id', 0);
+            if (null === $parameter?->stringLiteral) {
+                $dynamicGlobalParameters = true;
+            } else {
+                $globalParameters[] = $parameter->stringLiteral->value;
             }
-            $key = ($call->argument('id') ?? $call->namedOrPositionalArgument('key', 0))?->stringLiteral;
-            if (null === $key || null === $domain = $this->domain($call->namedOrPositionalArgument('domain', 2))) {
+        }
+        foreach ($this->calls($text, $document) as $call) {
+            if (null === $domain = $this->domain($call['domain'])) {
                 continue;
             }
             $references[] = [
-                'offset' => $key->startOffset,
+                'offset' => $call['key']->startOffset,
                 'reference' => $this->reference(
-                    $key,
+                    $call['key'],
                     $domain,
                     $uri,
                     $text,
-                    $this->parameters->php($call->namedOrPositionalArgument('parameters', 1)),
+                    $this->parameters->php($call['parameters']),
                 ),
             ];
         }
-        foreach ($document->objectCreations as $creation) {
-            if (!$this->isTranslatableMessage($creation)) {
-                continue;
-            }
-            $key = $creation->namedOrPositionalArgument('message', 0)?->stringLiteral;
-            if (null === $key || null === $domain = $this->domain($creation->namedOrPositionalArgument('domain', 2))) {
-                continue;
-            }
-            $references[] = [
-                'offset' => $key->startOffset,
-                'reference' => $this->reference(
-                    $key,
-                    $domain,
-                    $uri,
-                    $text,
-                    $this->parameters->php($creation->namedOrPositionalArgument('parameters', 1)),
-                ),
-            ];
-        }
-        array_push($references, ...$this->helperReferences($uri, $text, $document));
         usort($references, static fn (array $left, array $right): int => $left['offset'] <=> $right['offset']);
         $globalParameters = array_values(array_unique($globalParameters));
         sort($globalParameters);
@@ -93,6 +70,57 @@ final class PhpTranslationReferenceExtractor
             $globalParameters,
             $dynamicGlobalParameters,
         );
+    }
+
+    /**
+     * The domain scoping the key literal at $offset: the call's literal domain,
+     * the default domain when the call sets none, or null when the call sets a
+     * domain that isn't statically known.
+     */
+    public function completionDomain(string $text, int $offset): ?string
+    {
+        $document = $this->parser->parse($text);
+        foreach ($this->calls($text, $document) as $call) {
+            if ($offset >= $call['key']->startOffset && $offset <= $call['key']->endOffset) {
+                return $this->domain($call['domain']);
+            }
+        }
+
+        return 'messages';
+    }
+
+    /** @return list<array{key: PhpStringLiteral, domain: ?PhpArgument, parameters: ?PhpArgument}> */
+    private function calls(string $text, PhpDocument $document): array
+    {
+        $calls = [];
+        foreach ($document->methodCalls as $call) {
+            if ('trans' !== $call->method) {
+                continue;
+            }
+            $key = ($call->argument('id') ?? $call->namedOrPositionalArgument('key', 0))?->stringLiteral;
+            if (null !== $key) {
+                $calls[] = [
+                    'key' => $key,
+                    'domain' => $call->namedOrPositionalArgument('domain', 2),
+                    'parameters' => $call->namedOrPositionalArgument('parameters', 1),
+                ];
+            }
+        }
+        foreach ($document->objectCreations as $creation) {
+            if (!$this->isTranslatableMessage($creation)) {
+                continue;
+            }
+            $key = $creation->namedOrPositionalArgument('message', 0)?->stringLiteral;
+            if (null !== $key) {
+                $calls[] = [
+                    'key' => $key,
+                    'domain' => $creation->namedOrPositionalArgument('domain', 2),
+                    'parameters' => $creation->namedOrPositionalArgument('parameters', 1),
+                ];
+            }
+        }
+
+        return [...$calls, ...$this->helperCalls($text, $document)];
     }
 
     private function hasGlobalParameterReceiver(PhpMethodCall $call, PhpDocument $document): bool
@@ -122,8 +150,8 @@ final class PhpTranslationReferenceExtractor
         );
     }
 
-    /** @return list<array{offset: int, reference: TranslationReference}> */
-    private function helperReferences(string $uri, string $text, PhpDocument $document): array
+    /** @return list<array{key: PhpStringLiteral, domain: ?PhpArgument, parameters: ?PhpArgument}> */
+    private function helperCalls(string $text, PhpDocument $document): array
     {
         $tokens = array_values(\PhpToken::tokenize($text));
         $helperNames = $this->importedHelperNames($tokens);
@@ -131,7 +159,7 @@ final class PhpTranslationReferenceExtractor
             $helperNames['t'] = true;
         }
 
-        $references = [];
+        $calls = [];
         foreach ($tokens as $index => $token) {
             $fullyQualified = \T_NAME_FULLY_QUALIFIED === $token->id && 0 === strcasecmp(self::TRANSLATION_HELPER, ltrim($token->text, '\\'));
             if (!$fullyQualified && (\T_STRING !== $token->id || !isset($helperNames[strtolower($token->text)]))) {
@@ -142,26 +170,18 @@ final class PhpTranslationReferenceExtractor
                 continue;
             }
             $arguments = $this->helperArguments($tokens, $index, $text);
-            if (null === $arguments) {
+            $key = $arguments?->namedOrPositionalArgument('message', 0)?->stringLiteral;
+            if (null === $arguments || null === $key) {
                 continue;
             }
-            $key = $arguments->namedOrPositionalArgument('message', 0)?->stringLiteral;
-            if (null === $key || null === $domain = $this->domain($arguments->namedOrPositionalArgument('domain', 2))) {
-                continue;
-            }
-            $references[] = [
-                'offset' => $key->startOffset,
-                'reference' => $this->reference(
-                    $key,
-                    $domain,
-                    $uri,
-                    $text,
-                    $this->parameters->php($arguments->namedOrPositionalArgument('parameters', 1)),
-                ),
+            $calls[] = [
+                'key' => $key,
+                'domain' => $arguments->namedOrPositionalArgument('domain', 2),
+                'parameters' => $arguments->namedOrPositionalArgument('parameters', 1),
             ];
         }
 
-        return $references;
+        return $calls;
     }
 
     /**

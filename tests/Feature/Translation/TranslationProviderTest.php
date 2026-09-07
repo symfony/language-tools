@@ -204,6 +204,44 @@ final class TranslationProviderTest extends TestCase
         ]));
     }
 
+    public function testScopesPhpKeyCompletionToTheLiteralDomain(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = "<?php \$translator->trans('panel.ti', ['%name%' => \$name], 'admin', \$language);";
+        [$provider, $converter] = $this->provider($uri, $text);
+        $position = $converter->toPosition($text, (int) strpos($text, 'panel.ti') + \strlen('panel.ti'));
+
+        self::assertSame(['panel.title'], array_column($provider->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ]) ?? [], 'label'));
+    }
+
+    #[DataProvider('twigLiteralDomainProvider')]
+    public function testScopesTwigKeyCompletionToTheLiteralDomain(string $text): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        [$provider, $converter] = $this->provider($uri, $text, 'twig');
+        $position = $converter->toPosition($text, (int) strpos($text, "'|trans"));
+
+        self::assertSame(['panel.title'], array_column($provider->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ]) ?? [], 'label'));
+    }
+
+    #[DataProvider('dynamicDomainCallProvider')]
+    public function testSuggestsNoKeyWhenTheSelectedDomainIsDynamic(string $uri, string $languageId, string $text): void
+    {
+        [$provider, $converter] = $this->provider($uri, $text, $languageId);
+        $position = $converter->toPosition($text, (int) strpos($text, 'article.ti') + \strlen('article.ti'));
+
+        self::assertSame([], $provider->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ]));
+    }
+
     public function testDecodesTwigEscapeSequencesForLookupAndCompletion(): void
     {
         $uri = 'file:///workspace/templates/page.html.twig';
@@ -251,7 +289,7 @@ final class TranslationProviderTest extends TestCase
         $configuration = new TranslationConfigurationRegistry();
         $configuration->configure($project, true);
         $documentResolver = new DocumentContextResolver($documents, $projects);
-        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor), new TwigDirectiveLocator());
+        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor), new TwigDirectiveLocator(), $extractor);
 
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -311,7 +349,7 @@ final class TranslationProviderTest extends TestCase
         $configuration = new TranslationConfigurationRegistry();
         $configuration->configure($project, true);
         $documentResolver = new DocumentContextResolver($documents, $projects);
-        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor), new TwigDirectiveLocator());
+        $provider = new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor), new TwigDirectiveLocator(), $extractor);
 
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -561,6 +599,38 @@ final class TranslationProviderTest extends TestCase
         self::assertNull($provider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]));
     }
 
+    /** @return iterable<string, array{string}> */
+    public static function twigLiteralDomainProvider(): iterable
+    {
+        yield 'filter argument' => ["{{ 'panel.ti'|trans({}, 'admin') }}"];
+        yield 'default domain tag' => ["{% trans_default_domain 'admin' %}\n{{ 'panel.ti'|trans }}"];
+    }
+
+    /** @return iterable<string, array{string, string, string}> */
+    public static function dynamicDomainCallProvider(): iterable
+    {
+        yield 'php call' => [
+            'file:///workspace/src/Controller.php',
+            'php',
+            "<?php \$translator->trans('article.ti', [], \$domain);",
+        ];
+        yield 'php helper' => [
+            'file:///workspace/src/Controller.php',
+            'php',
+            "<?php\n\nuse function Symfony\\Component\\Translation\\t;\n\nt('article.ti', [], \$domain);\n",
+        ];
+        yield 'twig filter' => [
+            'file:///workspace/templates/page.html.twig',
+            'twig',
+            "{{ 'article.ti'|trans({}, domain) }}",
+        ];
+        yield 'twig function' => [
+            'file:///workspace/templates/page.html.twig',
+            'twig',
+            "{{ t('article.ti', {}, domain) }}",
+        ];
+    }
+
     /** @return iterable<string, array{string, string}> */
     public static function unrelatedTwigStringProvider(): iterable
     {
@@ -610,6 +680,6 @@ final class TranslationProviderTest extends TestCase
         $configuration = new TranslationConfigurationRegistry();
         $documentResolver = new DocumentContextResolver($documents, $projects);
 
-        return [new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor), new TwigDirectiveLocator()), $converter, $configuration, $project];
+        return [new TranslationProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($documentResolver, $converter, $extractor), new TwigDirectiveLocator(), $extractor), $converter, $configuration, $project];
     }
 }

@@ -2,13 +2,16 @@
 
 namespace Symfony\Lsp\Feature\Translation;
 
+use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
+use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -24,6 +27,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         private readonly CommentParserRegistry $comments,
         private readonly TranslationReferenceResolver $referenceResolver,
         private readonly TwigDirectiveLocator $directives,
+        private readonly TranslationExtractor $extractor,
     ) {
     }
 
@@ -46,12 +50,16 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         }
 
         $index = $this->indexes->forProject($request->project);
+        $domain = $this->completionDomain($request->document, $request->position, $context);
+        if (null === $domain) {
+            return [];
+        }
         /** @var list<string> $values */
         $values = match ($context->kind) {
             'domain' => $index->domains(),
             'locale' => $index->locales(),
-            'placeholder' => $this->placeholders($index, $context->domain, $context->key),
-            default => $index->keys($context->domain, $context->prefix),
+            'placeholder' => $this->placeholders($index, $domain, $context->key),
+            default => $index->keys($domain, $context->prefix),
         };
         $values = array_values(array_filter(
             $values,
@@ -64,6 +72,22 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
             'detail' => 'Symfony translation '.$context->kind,
             'textEdit' => $this->protocol->textEdit($context->range, $this->completionValue($context, $value)),
         ], $values);
+    }
+
+    /**
+     * Key completion is scoped to the domain of the statically recognized call
+     * at the cursor; a domain that call computes at runtime scopes nothing.
+     */
+    private function completionDomain(Document $document, Position $position, TranslationCompletionContext $context): ?string
+    {
+        if ('key' !== $context->kind) {
+            return $context->domain;
+        }
+
+        return $this->extractor->completionDomain(
+            SourceDocument::fromDocument($document),
+            $this->converter->toByteOffset($document->text, $position),
+        );
     }
 
     private function completionValue(TranslationCompletionContext $context, string $value): string
