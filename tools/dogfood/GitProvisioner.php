@@ -75,7 +75,7 @@ final class GitProvisioner implements ProvisionerInterface
     {
         $result = $this->processes->run(['git', ...$arguments]);
         if (!$result->successful()) {
-            throw new ProvisioningException(trim($message.' '.trim($result->errorOutput)));
+            throw new ProvisioningException(\sprintf('%s Git %s (exit code %d); subprocess output is omitted because it can contain credentials.', $message, $result->timedOut ? 'timed out' : 'failed', $result->exitCode));
         }
     }
 }

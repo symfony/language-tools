@@ -117,9 +117,24 @@ final class ComposerSetupTest extends TestCase
         $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(2, '', 'Your requirements could not be resolved.', false));
 
         $this->expectException(SetupException::class);
-        $this->expectExceptionMessage('Your requirements could not be resolved.');
+        $this->expectExceptionMessage('Composer install failed for "acme" (exit code 2)');
 
         (new ComposerSetup($processes))->setUp($this->configuration(), $this->directory);
+    }
+
+    public function testDoesNotExposeCredentialBearingDownloadErrors(): void
+    {
+        file_put_contents(Path::join($this->directory, 'composer.lock'), '{}');
+        $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(2, 'private value', 'Download failed: https://example.com/package.zip?token=credential-canary', false));
+
+        try {
+            (new ComposerSetup($processes))->setUp($this->configuration(), $this->directory);
+            self::fail('The failed install must fail setup.');
+        } catch (SetupException $error) {
+            self::assertStringContainsString('exit code 2', $error->getMessage());
+            self::assertStringNotContainsString('credential-canary', $error->getMessage());
+            self::assertStringNotContainsString('private value', $error->getMessage());
+        }
     }
 
     /**

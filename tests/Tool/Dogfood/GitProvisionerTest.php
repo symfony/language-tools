@@ -7,6 +7,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Tools\Dogfood\GitProvisioner;
 use Symfony\Lsp\Tools\Dogfood\NativeProcessRunner;
+use Symfony\Lsp\Tools\Dogfood\ProcessResult;
 use Symfony\Lsp\Tools\Dogfood\ProjectConfiguration;
 use Symfony\Lsp\Tools\Dogfood\ProvisioningException;
 
@@ -100,6 +101,20 @@ final class GitProvisionerTest extends TestCase
         $this->expectExceptionMessage('does not exist in');
 
         $this->provisioner->provision($this->configuration(str_repeat('b', 40)));
+    }
+
+    public function testDoesNotExposeGitAuthenticationErrors(): void
+    {
+        $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(128, '', 'Authentication failed for https://example.com/repository?token=credential-canary', false));
+        $provisioner = new GitProvisioner($processes, new Filesystem(), $this->directory.'/failed-mirrors', $this->directory.'/failed-checkouts');
+
+        try {
+            $provisioner->provision($this->configuration(str_repeat('a', 40)));
+            self::fail('The failed clone must fail provisioning.');
+        } catch (ProvisioningException $error) {
+            self::assertStringContainsString('exit code 128', $error->getMessage());
+            self::assertStringNotContainsString('credential-canary', $error->getMessage());
+        }
     }
 
     public function testReleaseRemovesTheCheckout(): void

@@ -41,7 +41,7 @@ final class ComposerSetup implements SetupInterface
             file_put_contents($applicationRoot.'/composer.json', $manifest);
         }
         if (!$result->successful()) {
-            throw new SetupException(\sprintf('composer install failed in "%s": %s', $applicationRoot, trim($result->errorOutput) ?: 'exit code '.$result->exitCode));
+            throw new SetupException(\sprintf('Composer install %s for "%s" (exit code %d); subprocess output is omitted because it can contain credentials.', $result->timedOut ? 'timed out' : 'failed', $configuration->name, $result->exitCode));
         }
     }
 }
