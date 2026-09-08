@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Tool\Dogfood;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
+use Symfony\Lsp\Tools\Dogfood\ReportHistory;
 use Symfony\Lsp\Tools\Dogfood\ReportImporter;
 
 final class ReportImporterTest extends TestCase
@@ -38,6 +39,30 @@ final class ReportImporterTest extends TestCase
         self::assertSame(ReportFixture::entry()['comparison'], $entry['comparison']);
     }
 
+    public function testDecorativeVersionLabelsCannotDiscardVerifiedMeasurements(): void
+    {
+        $project = ReportFixture::project();
+        $project['frameworkBundle'] = 'dev-feature/example';
+        $project['warm'] = array_replace((array) $project['warm'], ['serverVersion' => 'unrecognized version label']);
+        ReportFixture::write($this->workspace, project: $project);
+        $entry = (new ReportImporter())->collect($this->workspace->path())['entries'][0];
+
+        self::assertSame('passed', $entry['outcome']);
+        self::assertSame(2, $entry['passed']);
+        self::assertSame('dev-feature/example', $entry['framework']);
+        self::assertNull($entry['serverVersion']);
+    }
+
+    public function testArtifactDirectoriesAreLiteralPathsRatherThanGlobPatterns(): void
+    {
+        ReportFixture::write($this->workspace, 'collection[one]/20260907-120000');
+        $result = (new ReportImporter())->collect($this->workspace->path('collection[one]'));
+
+        self::assertCount(1, $result['entries']);
+        self::assertSame('passed', $result['entries'][0]['outcome']);
+        self::assertSame([], $result['warnings']);
+    }
+
     public function testRetainsSetupFailuresWithoutInventingZeroMeasurementsOrLeakingOutput(): void
     {
         $project = array_replace(ReportFixture::project(), [
@@ -56,6 +81,20 @@ final class ReportImporterTest extends TestCase
         self::assertNull($entry['files']);
         self::assertNull($entry['comparison']);
         self::assertStringNotContainsString('credential-canary', json_encode($result, \JSON_THROW_ON_ERROR));
+    }
+
+    public function testTreatsInvalidManifestsAsBlockedRatherThanFailedAssertions(): void
+    {
+        $project = array_replace(ReportFixture::project(), [
+            'ok' => false, 'failure' => ['layer' => 'scenario'],
+            'cold' => null, 'warm' => null, 'diagnostics' => null,
+        ]);
+        $this->workspace->write('20260907-120000/app/project.json', json_encode($project, \JSON_THROW_ON_ERROR));
+        $entry = (new ReportImporter())->collect($this->workspace->path())['entries'][0];
+
+        self::assertSame('blocked', $entry['outcome']);
+        self::assertNull($entry['checks']);
+        self::assertSame(['scenario'], $entry['layers']);
     }
 
     public function testDistinguishesFailedAssertionsFromOperationalErrors(): void
@@ -155,6 +194,30 @@ final class ReportImporterTest extends TestCase
         self::assertSame('blocked', $result['entries'][0]['outcome']);
         self::assertNull($result['entries'][0]['checks']);
         self::assertStringNotContainsString('credential-canary', json_encode($result, \JSON_THROW_ON_ERROR));
+    }
+
+    public function testDamagedPhaseArtifactsStayRepairableRatherThanFinalizingABlockedRun(): void
+    {
+        $project = ReportFixture::project();
+        $project['ok'] = false;
+        $project['cold'] = array_replace((array) $project['cold'], ['layers' => ['scenario'], 'failures' => 1]);
+        $project['warm'] = array_replace((array) $project['warm'], ['layers' => ['scenario'], 'failures' => 1]);
+        ReportFixture::write($this->workspace, project: $project, status: 'fail');
+        foreach (['cold', 'warm'] as $phase) {
+            $this->workspace->write('20260907-120000/app/'.$phase.'.json', 'damaged artifact');
+        }
+        $importer = new ReportImporter();
+        $damaged = $importer->collect($this->workspace->path());
+        self::assertSame('incomplete', $damaged['entries'][0]['outcome']);
+        self::assertFalse($damaged['entries'][0]['finalized']);
+        ReportFixture::write($this->workspace, project: $project, status: 'fail');
+        $repaired = $importer->collect($this->workspace->path());
+        $merged = (new ReportHistory())->merge($damaged['entries'], $repaired['entries']);
+
+        self::assertSame(1, $merged['updated']);
+        self::assertSame('failed', $merged['entries'][0]['outcome']);
+        self::assertSame(2, $merged['entries'][0]['failed']);
+        self::assertTrue($merged['entries'][0]['finalized']);
     }
 
     public function testRefusesAGreenResultWithMissingEvidence(): void

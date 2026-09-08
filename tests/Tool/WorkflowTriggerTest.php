@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Tool;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Yaml\Yaml;
 use Symfony\Lsp\Tools\Dogfood\ConfigurationLoader;
 use Symfony\Lsp\Tools\Dogfood\ProjectConfiguration;
 
@@ -55,6 +56,19 @@ final class WorkflowTriggerTest extends TestCase
             'COMPOSER_PLUGIN_LOADER' => '1',
             'DATABASE_URL' => 'mysql://shopware:shopware@127.0.0.1:9/shopware',
         ], $this->dogfoodConfiguration('shopware')->environmentVariables);
+    }
+
+    public function testReportOnlyChangesDoNotRunTheExternalDogfoodMatrix(): void
+    {
+        /** @var array{on: array<string, array{paths: list<string>}>} $workflow */
+        $workflow = Yaml::parseFile(self::ROOT.'/.github/workflows/dogfood.yaml');
+        foreach (['pull_request', 'push'] as $event) {
+            $paths = $workflow['on'][$event]['paths'];
+            self::assertContains('tools/dogfood/**', $paths);
+            self::assertContains('src/**', $paths);
+            self::assertSame(['!tools/dogfood/Report*.php', '!tools/dogfood/HistoryHtmlReport.php'], array_values(array_filter($paths, static fn (string $path): bool => str_starts_with($path, '!'))));
+            self::assertSame(['!tools/dogfood/Report*.php', '!tools/dogfood/HistoryHtmlReport.php'], \array_slice($paths, -2));
+        }
     }
 
     public function testReleaseBodyComesFromThePromotedCandidate(): void

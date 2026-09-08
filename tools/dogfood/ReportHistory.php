@@ -33,8 +33,8 @@ final class ReportHistory
         }
         $entries = [];
         foreach (explode("\n", rtrim($contents, "\n")) as $line => $json) {
-            if ('' === $json && '' === $contents) {
-                break;
+            if ('' === trim($json)) {
+                continue;
             }
             try {
                 $entries[] = $this->validate(json_decode($json, true, flags: \JSON_THROW_ON_ERROR));
@@ -136,7 +136,8 @@ final class ReportHistory
             }
         }
         foreach (self::LABELS as $key) {
-            if (null !== $entry[$key] && (!\is_string($entry[$key]) || 1 !== preg_match('/^[A-Za-z0-9][A-Za-z0-9._+\-]{0,99}$/D', $entry[$key]))) {
+            $pattern = 'environment' === $key ? '/^[A-Za-z0-9_][A-Za-z0-9._+\-]{0,99}$/D' : '/^[A-Za-z0-9][A-Za-z0-9._+\/\-]{0,99}$/D';
+            if (null !== $entry[$key] && (!\is_string($entry[$key]) || 1 !== preg_match($pattern, $entry[$key]))) {
                 throw new \UnexpectedValueException('Invalid history version or environment.');
             }
         }

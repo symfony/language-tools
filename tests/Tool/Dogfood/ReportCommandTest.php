@@ -29,7 +29,7 @@ final class ReportCommandTest extends TestCase
         $legacy = $this->workspace->write('support/ledger.jsonl', 'legacy history');
         $first = $this->execute(['--record']);
         self::assertSame(0, $first->exitCode, $first->stderr);
-        self::assertStringContainsString('Recorded 1 new observations', $first->stdout);
+        self::assertStringContainsString('Recorded 1 new observation', $first->stdout);
         $ledger = file_get_contents($this->workspace->path('history/ledger.jsonl'));
         $html = file_get_contents($this->workspace->path('history/index.html'));
         self::assertIsString($html);
@@ -59,6 +59,42 @@ final class ReportCommandTest extends TestCase
 
         self::assertSame(0, $result->exitCode, $result->stderr);
         self::assertSame($original, file_get_contents($this->workspace->path('history/index.html')));
+    }
+
+    public function testDamagedArtifactsCannotInvalidateAlreadyFinalizedHistory(): void
+    {
+        $this->fixtures();
+        self::assertSame(0, $this->execute(['--record'])->exitCode);
+        $this->workspace->write('artifacts/20260907-120000/app/cold.json', 'corrupted old artifact');
+        ReportFixture::write($this->workspace, 'artifacts/20260908-120000');
+
+        $result = $this->execute(['--record']);
+
+        self::assertSame(0, $result->exitCode, $result->stderr);
+        self::assertSame('', $result->stderr);
+        $entries = file($this->workspace->path('history/ledger.jsonl'), \FILE_IGNORE_NEW_LINES);
+        self::assertIsArray($entries);
+        self::assertCount(2, $entries);
+        self::assertStringContainsString('"outcome":"passed"', $entries[0]);
+    }
+
+    public function testConflictingFinalizedObservationsAbortTheWholeWrite(): void
+    {
+        $this->fixtures();
+        self::assertSame(0, $this->execute(['--record'])->exitCode);
+        $ledger = file_get_contents($this->workspace->path('history/ledger.jsonl'));
+        $html = file_get_contents($this->workspace->path('history/index.html'));
+        $changed = ReportFixture::project();
+        $changed['timings'] = ['totalMilliseconds' => 9999.0];
+        $this->workspace->write('artifacts/20260907-120000/app/project.json', json_encode($changed, \JSON_THROW_ON_ERROR));
+        ReportFixture::write($this->workspace, 'artifacts/20260908-120000');
+
+        $result = $this->execute(['--record']);
+
+        self::assertSame(1, $result->exitCode);
+        self::assertStringContainsString('refusing to overwrite finalized history', $result->stderr);
+        self::assertSame($ledger, file_get_contents($this->workspace->path('history/ledger.jsonl')));
+        self::assertSame($html, file_get_contents($this->workspace->path('history/index.html')));
     }
 
     public function testPreviewDoesNotCreateOrRewriteTheDurableLedger(): void

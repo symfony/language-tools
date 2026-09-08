@@ -15,6 +15,8 @@ on:
             - tools/dogfood-server
             - tools/dogfood/**
             - tools/php-with-tree-sitter
+            - '!tools/dogfood/Report*.php'
+            - '!tools/dogfood/HistoryHtmlReport.php'
     push:
         branches: [main]
         paths:
@@ -30,6 +32,8 @@ on:
             - tools/dogfood-server
             - tools/dogfood/**
             - tools/php-with-tree-sitter
+            - '!tools/dogfood/Report*.php'
+            - '!tools/dogfood/HistoryHtmlReport.php'
     workflow_dispatch:
         inputs:
             project:

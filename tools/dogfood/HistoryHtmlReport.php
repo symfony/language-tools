@@ -306,12 +306,12 @@ final class HistoryHtmlReport
 
         $charts = $this->chart(
             'Checks',
-            'Passed and failed come from verified assertions. Reported checks are the run\'s own tally of cold and warm checks, not an independent verification.',
+            'Recorded check outcomes across cold and warm phases. Errors are checks that could not be verified; total checks are the sum of these outcomes.',
             $labels,
             [
                 ['label' => 'Checks passed (verified)', 'values' => $this->series($observations, 'passed')],
                 ['label' => 'Checks failed (verified)', 'values' => $this->series($observations, 'failed')],
-                ['label' => 'Checks reported', 'values' => $this->series($observations, 'checks')],
+                ['label' => 'Errors / unverified', 'values' => $this->series($observations, 'errors')],
             ],
             $comparable,
         );
@@ -415,6 +415,9 @@ final class HistoryHtmlReport
     {
         $count = \count($labels);
         $scale = $highest > 0.0 ? $highest : 1.0;
+        if (!$duration && $scale > 1.0) {
+            $scale = ceil($scale / 2.0) * 2.0;
+        }
         $bottom = self::HEIGHT - self::BOTTOM;
         $svg = '';
         foreach (!$duration && $scale <= 1.0 ? [1.0, 0.0] : [1.0, 0.5, 0.0] as $fraction) {
@@ -556,9 +559,9 @@ final class HistoryHtmlReport
         }
 
         return '<h3>History</h3><div class="scroll"><table>'
-            .'<caption>Newest first. Reported checks are the tally of the run itself, passed and failed count verified assertions.</caption>'
+            .'<caption>Newest first. Total checks are passed plus failed plus unverified/error outcomes.</caption>'
             .'<thead><tr><th scope="col">Run</th><th scope="col">Recorded</th><th scope="col">Outcome</th><th scope="col">Scenarios</th>'
-            .'<th scope="col">Checks reported</th><th scope="col">Passed</th><th scope="col">Failed</th><th scope="col">Errors</th>'
+            .'<th scope="col">Total checks</th><th scope="col">Passed</th><th scope="col">Failed</th><th scope="col">Errors</th>'
             .'<th scope="col">Known gaps</th><th scope="col">Diagnostics</th><th scope="col">Files</th><th scope="col">Requests</th>'
             .'<th scope="col">Duration</th><th scope="col">Compared with previous</th></tr></thead>'
             .'<tbody>'.$rows.'</tbody></table></div>';
@@ -579,7 +582,7 @@ final class HistoryHtmlReport
                 ? 'not comparable, run incomplete'
                 : (null === $previous['comparison'] || null === $current['comparison']
                     ? 'not comparable, comparison fingerprint unknown'
-                    : 'not comparable, expectations or environment changed');
+                    : 'not comparable, revision, dependencies, environment or expectations changed');
 
             return ('' === $transition ? '' : $transition.'; ').'<span class="unknown">'.$this->escape($reason).'</span>';
         }
@@ -668,6 +671,10 @@ final class HistoryHtmlReport
     {
         if (!$duration) {
             return number_format($value, 0, '.', ',');
+        }
+
+        if ($value > 0.0 && $value < 10.0) {
+            return $this->coordinate($value).' ms';
         }
 
         return $value >= 1000.0

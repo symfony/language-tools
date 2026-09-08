@@ -32,6 +32,17 @@ final class ReportHistoryTest extends TestCase
         }
     }
 
+    public function testAnEmptyLedgerCanContainBlankLines(): void
+    {
+        $workspace = new TestWorkspace('dogfood-history-');
+        try {
+            $path = $workspace->write('ledger.jsonl', "\n\r\n");
+            self::assertSame([], (new ReportHistory())->load($path));
+        } finally {
+            $workspace->cleanup();
+        }
+    }
+
     public function testCompletesAnInterruptedObservationWithoutDuplicatingIt(): void
     {
         $history = new ReportHistory();

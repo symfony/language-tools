@@ -20,7 +20,7 @@ final class ReportImporter
         if (!is_dir($directory)) {
             throw new \RuntimeException('The matrix artifact directory does not exist.');
         }
-        $runs = 1 === preg_match('/^\d{8}-\d{6}$/D', basename($directory)) ? [$directory] : (glob($directory.'/*', \GLOB_ONLYDIR) ?: []);
+        $runs = 1 === preg_match('/^\d{8}-\d{6}$/D', basename($directory)) ? [$directory] : $this->directories($directory);
         sort($runs, \SORT_STRING);
         $entries = [];
         $legacy = 0;
@@ -32,15 +32,17 @@ final class ReportImporter
             } catch (\UnexpectedValueException) {
                 continue;
             }
-            foreach (glob($runDirectory.'/*', \GLOB_ONLYDIR) ?: [] as $projectDirectory) {
+            foreach ($this->directories($runDirectory) as $projectDirectory) {
                 $project = basename($projectDirectory);
                 if (1 !== preg_match('/^[a-z0-9][a-z0-9._-]{0,99}$/D', $project)) {
                     continue;
                 }
                 $report = null;
+                $damaged = false;
                 try {
                     $report = $this->read($projectDirectory.'/project.json');
                 } catch (\UnexpectedValueException $error) {
+                    $damaged = true;
                     $warnings[] = $run.'/'.$project.': '.$error->getMessage();
                 }
                 if (null !== $report && !$this->behavioral($report)) {
@@ -49,13 +51,18 @@ final class ReportImporter
                 }
                 $phases = [];
                 foreach (['cold', 'warm'] as $phase) {
+                    $summary = $this->map($report[$phase] ?? null);
+                    $layers = \is_array($summary['layers'] ?? null) ? array_filter($summary['layers'], 'is_string') : [];
+                    $operational = [] !== array_intersect($layers, self::OPERATIONAL_LAYERS);
                     try {
                         $phases[$phase] = $this->read($projectDirectory.'/'.$phase.'.json');
+                        if (null === $phases[$phase] && [] !== $summary && !$operational) {
+                            $damaged = true;
+                        }
                     } catch (\UnexpectedValueException $error) {
                         $phases[$phase] = null;
-                        $summary = $this->map($report[$phase] ?? null);
-                        $layers = \is_array($summary['layers'] ?? null) ? array_filter($summary['layers'], 'is_string') : [];
-                        if ([] === array_intersect($layers, self::OPERATIONAL_LAYERS)) {
+                        if (!$operational) {
+                            $damaged = true;
                             $warnings[] = $run.'/'.$project.': '.$error->getMessage();
                         }
                     }
@@ -64,7 +71,13 @@ final class ReportImporter
                     continue;
                 }
                 try {
-                    $entries[] = $this->entry($run, $time, $project, $report, $phases['cold'], $phases['warm']);
+                    $entry = $this->entry($run, $time, $project, $report, $phases['cold'], $phases['warm']);
+                    if ($damaged) {
+                        $entry['outcome'] = 'incomplete';
+                        $entry['finalized'] = false;
+                        $entry['layers'] = array_values(array_unique([...$entry['layers'], 'artifact']));
+                    }
+                    $entries[] = $entry;
                 } catch (\UnexpectedValueException $error) {
                     $warnings[] = $run.'/'.$project.': '.$error->getMessage();
                     $entries[] = $this->entry($run, $time, $project, null, null, null);
@@ -73,6 +86,20 @@ final class ReportImporter
         }
 
         return ['entries' => $entries, 'legacy' => $legacy, 'warnings' => $warnings];
+    }
+
+    /** @return list<string> */
+    private function directories(string $path): array
+    {
+        $directories = [];
+        foreach (new \FilesystemIterator($path, \FilesystemIterator::SKIP_DOTS) as $file) {
+            if ($file instanceof \SplFileInfo && $file->isDir()) {
+                $directories[] = $file->getPathname();
+            }
+        }
+        sort($directories, \SORT_STRING);
+
+        return $directories;
     }
 
     /** @param array<string, mixed> $report */
@@ -193,7 +220,7 @@ final class ReportImporter
                     throw new \UnexpectedValueException('Passing result lacks complete evidence.');
                 }
                 $outcome = 'passed';
-            } elseif ([] !== array_intersect($layers, self::OPERATIONAL_LAYERS) || false === ($diagnosticReport['ok'] ?? null)) {
+            } elseif (0 === $available || [] !== array_intersect($layers, self::OPERATIONAL_LAYERS) || false === ($diagnosticReport['ok'] ?? null)) {
                 $outcome = 'blocked';
             } elseif ([] !== $layers || 0 < $statuses['fail']) {
                 $outcome = 'failed';
@@ -218,8 +245,8 @@ final class ReportImporter
             'revision' => $revision,
             'dependencies' => $dependencies,
             'environment' => $environment,
-            'framework' => $this->label($report['frameworkBundle'] ?? null),
-            'serverVersion' => $this->label($summaryWarm['serverVersion'] ?? $summaryCold['serverVersion'] ?? $warm['serverVersion'] ?? $cold['serverVersion'] ?? null),
+            'framework' => $this->version($report['frameworkBundle'] ?? null),
+            'serverVersion' => $this->version($summaryWarm['serverVersion'] ?? $summaryCold['serverVersion'] ?? $warm['serverVersion'] ?? $cold['serverVersion'] ?? null),
             'expectations' => $expectations,
             'checkSet' => 2 === $available ? hash('sha256', json_encode($details, \JSON_THROW_ON_ERROR)) : null,
             'comparison' => $this->history->comparison($revision, $dependencies, $environment, $expectations),
@@ -331,9 +358,14 @@ final class ReportImporter
         return $value;
     }
 
+    private function version(mixed $value): ?string
+    {
+        return \is_string($value) && 1 === preg_match('/^[A-Za-z0-9][A-Za-z0-9._+\/\-]{0,99}$/D', $value) ? $value : null;
+    }
+
     private function label(mixed $value): ?string
     {
-        if (null !== $value && (!\is_string($value) || 1 !== preg_match('/^[A-Za-z0-9][A-Za-z0-9._+\-]{0,99}$/D', $value))) {
+        if (null !== $value && (!\is_string($value) || 1 !== preg_match('/^[A-Za-z0-9_][A-Za-z0-9._+\-]{0,99}$/D', $value))) {
             throw new \UnexpectedValueException('Invalid artifact version or environment.');
         }
 

@@ -70,13 +70,21 @@ final class ReportCommand
                 }
             }
             try {
+                $existing = $this->history->load($ledger);
+                $finalized = [];
+                foreach ($existing as $entry) {
+                    if ($entry['finalized']) {
+                        $finalized[$entry['run'].'/'.$entry['project']] = true;
+                    }
+                }
                 $imported = is_dir($options['matrix'])
                     ? $this->importer->collect($options['matrix'])
                     : ['entries' => [], 'legacy' => 0, 'warnings' => []];
                 if ($options['customMatrix'] && !is_dir($options['matrix'])) {
                     throw new \RuntimeException('The requested matrix directory does not exist.');
                 }
-                $merged = $this->history->merge($this->history->load($ledger), $imported['entries']);
+                $warnings = array_values(array_filter($imported['warnings'], static fn (string $warning): bool => !isset($finalized[explode(': ', $warning, 2)[0]])));
+                $merged = $this->history->merge($existing, $imported['entries']);
                 if ([] === $merged['entries']) {
                     throw new \RuntimeException('No behavioral dogfood history was found. Run the matrix first.');
                 }
@@ -88,17 +96,17 @@ final class ReportCommand
                     $this->filesystem->dumpFile($output, $html);
                 }
                 if ($options['record']) {
-                    fwrite(\STDOUT, \sprintf("Recorded %d new observations, completed %d observations; %d in history.\nLedger: %s\n", $merged['added'], $merged['updated'], \count($merged['entries']), $ledger));
+                    fwrite(\STDOUT, \sprintf("Recorded %d new observation%s, updated %d observation%s; %d in history.\nLedger: %s\n", $merged['added'], 1 === $merged['added'] ? '' : 's', $merged['updated'], 1 === $merged['updated'] ? '' : 's', \count($merged['entries']), $ledger));
                 }
                 fwrite(\STDOUT, 'HTML: '.$output."\n");
                 if (0 < $imported['legacy']) {
                     fwrite(\STDOUT, \sprintf("Skipped %d legacy probe reports.\n", $imported['legacy']));
                 }
-                foreach ($imported['warnings'] as $warning) {
+                foreach ($warnings as $warning) {
                     fwrite(\STDERR, 'Artifact warning: '.$warning."\n");
                 }
 
-                return [] === $imported['warnings'] ? 0 : 1;
+                return [] === $warnings ? 0 : 1;
             } finally {
                 if (\is_resource($lock)) {
                     flock($lock, \LOCK_UN);

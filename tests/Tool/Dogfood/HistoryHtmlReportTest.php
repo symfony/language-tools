@@ -61,6 +61,22 @@ final class HistoryHtmlReportTest extends TestCase
         self::assertStringNotContainsString('passed -', $change);
     }
 
+    public function testCountAxesDoNotRoundTheirMidpointToTheWrongValue(): void
+    {
+        $document = self::parse((new HistoryHtmlReport())->render([self::entry(['knownGaps' => 1, 'diagnostics' => 3])]));
+        $ticks = self::elements(self::figure($document, 'Known gaps and diagnostics'), 'text[text-anchor="end"]');
+
+        self::assertSame(['4', '2', '0'], array_map(static fn (Element $tick): string => $tick->textContent ?? '', $ticks));
+    }
+
+    public function testTinyDurationsKeepTheirFractionalAxisLabels(): void
+    {
+        $document = self::parse((new HistoryHtmlReport())->render([self::entry(['milliseconds' => 1.0, 'scenarioMilliseconds' => 0.5])]));
+        $ticks = self::elements(self::figure($document, 'Duration'), 'text[text-anchor="end"]');
+
+        self::assertSame(['1 ms', '0.5 ms', '0 ms'], array_map(static fn (Element $tick): string => $tick->textContent ?? '', $ticks));
+    }
+
     public function testKeepsHostileValuesAsTextInsteadOfMarkup(): void
     {
         $hostile = '<script>alert("x")</script>';
@@ -147,17 +163,17 @@ final class HistoryHtmlReportTest extends TestCase
     public function testComparesOnlyObservationsSharingAComparisonFingerprint(): void
     {
         $document = self::parse((new HistoryHtmlReport())->render([
-            self::entry(['run' => '20260101-000000', 'passed' => 100, 'failed' => 4]),
-            self::entry(['run' => '20260102-000000', 'passed' => 104, 'failed' => 0]),
-            self::entry(['run' => '20260103-000000', 'passed' => 40, 'comparison' => str_repeat('9', 64)]),
-            self::entry(['run' => '20260104-000000', 'passed' => 60, 'comparison' => null]),
+            self::entry(['run' => '20260101-000000', 'checks' => 104, 'passed' => 100, 'failed' => 4]),
+            self::entry(['run' => '20260102-000000', 'checks' => 104, 'passed' => 104, 'failed' => 0]),
+            self::entry(['run' => '20260103-000000', 'checks' => 44, 'passed' => 40, 'comparison' => str_repeat('9', 64)]),
+            self::entry(['run' => '20260104-000000', 'checks' => 64, 'passed' => 60, 'comparison' => null]),
         ]));
 
         $changes = array_map(static fn (array $row): string => $row[13], self::rows(self::elements($document, 'table')[1]));
         self::assertSame([
             'Compared with previous',
             'not comparable, comparison fingerprint unknown',
-            'not comparable, expectations or environment changed',
+            'not comparable, revision, dependencies, environment or expectations changed',
             'passed +4, failed -4',
             'first observation',
         ], $changes);
