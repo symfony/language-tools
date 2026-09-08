@@ -1,8 +1,7 @@
 #!/usr/bin/env php
 <?php
 
-// Lists source-fact candidates of a project to help author dogfood scenarios.
-
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\InvalidSourceIndexEntry;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
@@ -125,11 +124,12 @@ if (null === $project) {
 
 /** @var ProjectRegistry $registry */
 $registry = $container->get(ProjectRegistry::class);
-// Nested projects own their own files, exactly as in a workspace.
 $registry->replace($projects);
 
 /** @var ApplicationSourceScanner $scanner */
 $scanner = $container->get(ApplicationSourceScanner::class);
+// Current extractors must run even when the application's files are unchanged
+(new Filesystem())->remove($project->rootPath.'/var/symfony-lsp/'.VERSION);
 $scanner->refreshProject($project);
 
 /** @var ProjectIndexStatusRegistry $statuses */

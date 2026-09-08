@@ -3,6 +3,8 @@
 namespace Symfony\Lsp\Tests\Tool\Dogfood;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Feature\Route\RouteSourceFacts;
+use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Tests\Support\ExecutableRunner;
 use Symfony\Lsp\Tests\Support\ProcessResult;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
@@ -112,6 +114,32 @@ final class DiscoverExecutableTest extends TestCase
         self::assertSame(0, $rebuilt->exitCode, $rebuilt->stderr);
         self::assertSame($cold->stdout, $warm->stdout);
         self::assertSame($cold->stdout, $rebuilt->stdout);
+    }
+
+    public function testDoesNotTrustValidButStaleFactsFromAnEarlierExtractor(): void
+    {
+        $this->skipWithoutTreeSitter();
+        $this->writeProject();
+        $original = $this->execute([$this->workspace->path()]);
+        self::assertSame(0, $original->exitCode, $original->stderr);
+        $index = $this->workspace->path('var/symfony-lsp/dogfood-discover/index/source.jsonl');
+        $lines = explode("\n", rtrim((string) file_get_contents($index), "\n"));
+        $uris = new UriToPathConverter();
+        foreach ($lines as $number => $line) {
+            if (0 === $number) {
+                continue;
+            }
+            /** @var array{path: string, providers: array<string, string>} $record */
+            $record = json_decode($line, true, flags: \JSON_THROW_ON_ERROR);
+            $record['providers']['routes'] = base64_encode(serialize(new RouteSourceFacts($uris->toUri($this->workspace->path($record['path'])), [], [])));
+            $lines[$number] = json_encode($record, \JSON_THROW_ON_ERROR);
+        }
+        file_put_contents($index, implode("\n", $lines)."\n");
+
+        $fresh = $this->execute([$this->workspace->path()]);
+
+        self::assertSame(0, $fresh->exitCode, $fresh->stderr);
+        self::assertSame($original->stdout, $fresh->stdout);
     }
 
     public function testFailsInsteadOfReportingAnEmptyCensusWhenNothingIsPersisted(): void
