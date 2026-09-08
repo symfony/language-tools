@@ -157,6 +157,27 @@ final class ReleaseWorkflowTest extends TestCase
         self::assertSame(array_keys($approved), array_keys(array_intersect_key($approved, $seen)));
     }
 
+    public function testMarketplaceWorkflowVerifiesEveryReleasedVsixWithoutAHardcodedCount(): void
+    {
+        $workflow = $this->workflow('publish-vscode.yaml');
+
+        $targets = [];
+        foreach ($this->releaseAssetSuffixes() as $asset) {
+            if (str_ends_with($asset, '.vsix')) {
+                $targets[] = substr($asset, 0, -\strlen('.vsix'));
+            }
+        }
+
+        self::assertNotSame([], $targets);
+        self::assertStringContainsString("targets=(\n".implode("\n", array_map(
+            static fn (string $target): string => str_repeat(' ', 22).$target,
+            $targets,
+        ))."\n", $workflow);
+        self::assertStringContainsString('for target in "${targets[@]}"', $workflow);
+        self::assertStringContainsString('| wc -l)" -eq "${#targets[@]}"', $workflow);
+        self::assertDoesNotMatchRegularExpression('/wc -l\)" -eq [0-9]+/', $workflow);
+    }
+
     /** @return list<string> */
     private function releaseAssetSuffixes(): array
     {

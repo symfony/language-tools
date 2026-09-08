@@ -87,11 +87,14 @@ jobs:
               run: |
                   version="${RELEASE_TAG#v}"
 
-                  for target in \
-                      linux-x64 \
-                      linux-arm64 \
-                      darwin-arm64 \
+                  targets=(
+                      linux-x64
+                      linux-arm64
+                      darwin-arm64
                       win32-x64
+                  )
+
+                  for target in "${targets[@]}"
                   do
                       vsix="$VSIX_DIRECTORY/symfony-lsp-$RELEASE_TAG-$target.vsix"
                       test -f "$vsix"
@@ -111,7 +114,7 @@ jobs:
                   done
 
                   test "$(find "$VSIX_DIRECTORY" -maxdepth 1 \
-                      -type f -name '*.vsix' | wc -l)" -eq 5
+                      -type f -name '*.vsix' | wc -l)" -eq "${#targets[@]}"
                   cd "$VSIX_DIRECTORY"
                   grep -E '  symfony-lsp-.*\.vsix$' SHA256SUMS \
                       | sha256sum --check --strict -
