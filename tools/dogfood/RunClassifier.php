@@ -4,8 +4,12 @@ namespace Symfony\Lsp\Tools\Dogfood;
 
 final class RunClassifier
 {
-    /** @return list<string> */
-    public function classify(HarnessResult $run): array
+    /**
+     * @param 'runtime'|'source-only' $analysisMode the mode the run was requested in, never the mode it reported
+     *
+     * @return list<string>
+     */
+    public function classify(HarnessResult $run, string $analysisMode = 'runtime'): array
     {
         if ($run->timedOut) {
             return ['timeout'];
@@ -14,6 +18,9 @@ final class RunClassifier
             return ['process'];
         }
         $layers = [];
+        if ($analysisMode !== ($run->result['analysisMode'] ?? 'runtime')) {
+            $layers[] = 'analysis-mode';
+        }
         $source = $this->indexState($run->result, 'source');
         if ('failed' === $source) {
             $layers[] = 'source-index';
@@ -21,7 +28,11 @@ final class RunClassifier
             $layers[] = 'timeout';
         }
         $runtime = $this->indexState($run->result, 'runtime');
-        if (\in_array($runtime, ['failed', 'partial', 'stale'], true)) {
+        if ('source-only' === $analysisMode) {
+            if ('disabled' !== $runtime && !\in_array('analysis-mode', $layers, true)) {
+                $layers[] = 'analysis-mode';
+            }
+        } elseif (\in_array($runtime, ['failed', 'partial', 'stale', 'disabled'], true)) {
             $status = $run->result['status'] ?? null;
             $runtimeStatus = \is_array($status) ? ($status['runtime'] ?? null) : null;
             $stage = \is_array($runtimeStatus) ? ($runtimeStatus['stage'] ?? null) : null;

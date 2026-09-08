@@ -49,6 +49,53 @@ final class DiagnosticCheckHarnessTest extends TestCase
         self::assertTrue($result->ok());
         self::assertSame(41, $result->analyzedFiles);
         self::assertGreaterThanOrEqual(0.0, $result->milliseconds);
+        self::assertSame('runtime', $result->analysisMode);
+        self::assertSame('runtime', $result->toArray()['analysisMode']);
+    }
+
+    public function testChecksSourceOnlyProjectsWithoutRuntimeIndexing(): void
+    {
+        $result = $this->check(self::sourceOnlyReport(), configuration: self::configuration(['analysisMode' => 'source-only']));
+
+        self::assertContains('--source-only', $this->processes->calls[0]['command']);
+        self::assertNotContains('--runtime-indexing', $this->processes->calls[0]['command']);
+        self::assertTrue($result->ok());
+        self::assertSame('source-only', $result->analysisMode);
+        self::assertSame('source-only', $result->toArray()['analysisMode']);
+    }
+
+    #[DataProvider('sourceOnlyRejectionProvider')]
+    public function testRejectsUntrustworthySourceOnlyRuns(string $standardOutput, string $failure): void
+    {
+        $result = $this->check($standardOutput, configuration: self::configuration(['analysisMode' => 'source-only']));
+
+        self::assertFalse($result->ok());
+        self::assertSame($failure, $result->failure);
+        self::assertSame('source-only', $result->toArray()['analysisMode']);
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function sourceOnlyRejectionProvider(): iterable
+    {
+        yield 'runtime analysis' => [self::report(), 'analysis-mode-mismatch'];
+        yield 'runtime ready anyway' => [self::report(['projects' => [self::project([
+            'analysis' => ['mode' => 'source-only', 'reason' => 'runtime-indexing-disabled'],
+            'runtime' => ['state' => 'ready'],
+        ])]]), 'project-not-source-only-ready'];
+        yield 'source not indexed' => [self::report(['projects' => [self::project([
+            'analysis' => ['mode' => 'source-only', 'reason' => 'runtime-indexing-disabled'],
+            'source' => ['state' => 'not-indexed'],
+            'runtime' => ['state' => 'disabled', 'reason' => 'runtime-indexing-disabled'],
+        ])]]), 'project-not-source-only-ready'];
+        yield 'incomplete project' => [self::sourceOnlyReport(['projects' => [self::project([
+            'analysis' => ['mode' => 'source-only', 'reason' => 'runtime-indexing-disabled'],
+            'runtime' => ['state' => 'disabled', 'reason' => 'runtime-indexing-disabled'],
+            'complete' => false,
+        ])]]), 'project-not-source-only-ready'];
+        yield 'incomplete analysis' => [self::sourceOnlyReport(['complete' => false]), 'analysis-incomplete'];
+        yield 'hidden provider failure' => [self::sourceOnlyReport(['errors' => [
+            ['category' => 'operational', 'message' => 'Template diagnostics failed.', 'provider' => 'template'],
+        ]]), 'check-errors'];
     }
 
     public function testDerivesTheBudgetsFromTheProjectIndexTimeout(): void
@@ -156,6 +203,9 @@ final class DiagnosticCheckHarnessTest extends TestCase
         yield 'source-only project' => [self::report(['projects' => [self::project([
             'analysis' => ['mode' => 'source-only', 'reason' => 'debug-disabled'],
             'runtime' => ['state' => 'disabled', 'reason' => 'debug-disabled'],
+        ])]]), 0, 'analysis-mode-mismatch'];
+        yield 'disabled runtime in runtime mode' => [self::report(['projects' => [self::project([
+            'runtime' => ['state' => 'disabled', 'reason' => 'runtime-indexing-disabled'],
         ])]]), 0, 'project-not-runtime-ready'];
         yield 'stale runtime metadata' => [self::report(['projects' => [self::project([
             'runtime' => ['state' => 'stale'],
@@ -267,7 +317,7 @@ final class DiagnosticCheckHarnessTest extends TestCase
         return $harness->run($configuration ?? self::configuration(), $applicationRoot ?? $this->directory);
     }
 
-    /** @param array{indexTimeout?: int} $overrides */
+    /** @param array{indexTimeout?: int, analysisMode?: 'runtime'|'source-only'} $overrides */
     private static function configuration(array $overrides = []): ProjectConfiguration
     {
         return new ProjectConfiguration(
@@ -280,7 +330,17 @@ final class DiagnosticCheckHarnessTest extends TestCase
             false,
             $overrides['indexTimeout'] ?? 120,
             environmentVariables: ['DATABASE_URL' => 'mysql://root@127.0.0.1:9/app'],
+            analysisMode: $overrides['analysisMode'] ?? 'runtime',
         );
+    }
+
+    /** @param array<string, mixed> $overrides */
+    private static function sourceOnlyReport(array $overrides = []): string
+    {
+        return self::report(array_replace(['projects' => [self::project([
+            'analysis' => ['mode' => 'source-only', 'reason' => 'runtime-indexing-disabled'],
+            'runtime' => ['state' => 'disabled', 'reason' => 'runtime-indexing-disabled'],
+        ])]], $overrides));
     }
 
     /** @param array<string, mixed> $overrides */

@@ -284,7 +284,7 @@ final class MatrixCommandTest extends TestCase
         /** @var array<string, mixed> $report */
         $report = json_decode((string) file_get_contents(Path::join($this->output, 'acme/project.json')), true, flags: \JSON_THROW_ON_ERROR);
         self::assertSame(
-            ['name', 'repository', 'revision', 'directory', 'environment', 'setup', 'ci', 'ok', 'failure', 'workingTree', 'dependencies', 'frameworkBundle', 'expectationFingerprint', 'timings', 'cold', 'warm', 'diagnostics', 'knownGaps'],
+            ['name', 'repository', 'revision', 'directory', 'environment', 'analysisMode', 'setup', 'ci', 'ok', 'failure', 'workingTree', 'dependencies', 'frameworkBundle', 'expectationFingerprint', 'timings', 'cold', 'warm', 'diagnostics', 'knownGaps'],
             array_keys($report),
         );
         /** @var array<string, mixed> $cold */

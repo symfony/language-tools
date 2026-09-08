@@ -12,6 +12,7 @@ final class DiagnosticCheckResult
         public readonly array $diagnostics,
         public readonly float $milliseconds,
         public readonly ?int $analyzedFiles,
+        public readonly string $analysisMode = 'runtime',
     ) {
     }
 
@@ -25,6 +26,7 @@ final class DiagnosticCheckResult
     {
         return [
             'ok' => $this->ok(),
+            'analysisMode' => $this->analysisMode,
             'failure' => $this->failure,
             'exitCode' => $this->exitCode,
             'analyzedFiles' => $this->analyzedFiles,

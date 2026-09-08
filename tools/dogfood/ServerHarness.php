@@ -40,6 +40,7 @@ final class ServerHarness implements HarnessInterface
             '--request-timeout='.$configuration->requestTimeout,
             '--scenarios='.$configuration->scenarioFile,
             '--revision='.$configuration->revision,
+            ...('source-only' === $configuration->analysisMode ? ['--source-only'] : []),
             $this->serverPath,
             $applicationRoot,
         ], null, $timeout, $configuration->environmentVariables);

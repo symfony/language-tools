@@ -21,8 +21,9 @@ final class DiagnosticCheckHarness
 
     public function run(ProjectConfiguration $configuration, string $applicationRoot): DiagnosticCheckResult
     {
+        $analysisMode = $configuration->analysisMode;
         if (!Path::isAbsolute($applicationRoot) || !is_dir($applicationRoot)) {
-            return new DiagnosticCheckResult('application-root-invalid', null, [], 0.0, null);
+            return new DiagnosticCheckResult('application-root-invalid', null, [], 0.0, null, $analysisMode);
         }
 
         $startedAt = hrtime(true);
@@ -34,24 +35,24 @@ final class DiagnosticCheckHarness
         );
         $milliseconds = round((hrtime(true) - $startedAt) / 1_000_000, 1);
         if ($process->timedOut) {
-            return new DiagnosticCheckResult('process-timeout', $process->exitCode, [], $milliseconds, null);
+            return new DiagnosticCheckResult('process-timeout', $process->exitCode, [], $milliseconds, null, $analysisMode);
         }
 
         $report = $this->decode($process->standardOutput);
         if (null === $report) {
-            return new DiagnosticCheckResult('report-not-json', $process->exitCode, [], $milliseconds, null);
+            return new DiagnosticCheckResult('report-not-json', $process->exitCode, [], $milliseconds, null, $analysisMode);
         }
         $analyzedFiles = $this->analyzedFiles($report);
-        $failure = $this->verify($report, $process->exitCode);
+        $failure = $this->verify($report, $process->exitCode, $analysisMode);
         if (null !== $failure) {
-            return new DiagnosticCheckResult($failure, $process->exitCode, [], $milliseconds, $analyzedFiles);
+            return new DiagnosticCheckResult($failure, $process->exitCode, [], $milliseconds, $analyzedFiles, $analysisMode);
         }
         $diagnostics = $this->diagnostics($report, $applicationRoot);
         if (\is_string($diagnostics)) {
-            return new DiagnosticCheckResult($diagnostics, $process->exitCode, [], $milliseconds, $analyzedFiles);
+            return new DiagnosticCheckResult($diagnostics, $process->exitCode, [], $milliseconds, $analyzedFiles, $analysisMode);
         }
 
-        return new DiagnosticCheckResult(null, $process->exitCode, $diagnostics, $milliseconds, $analyzedFiles);
+        return new DiagnosticCheckResult(null, $process->exitCode, $diagnostics, $milliseconds, $analyzedFiles, $analysisMode);
     }
 
     /** @return list<string> */
@@ -62,7 +63,7 @@ final class DiagnosticCheckHarness
             'check',
             '--format=json',
             '--profile',
-            '--runtime-indexing',
+            'source-only' === $configuration->analysisMode ? '--source-only' : '--runtime-indexing',
             '--workspace='.$applicationRoot,
             '--environment='.$configuration->environment,
             '--bridge-timeout='.$configuration->indexTimeout,
@@ -88,7 +89,7 @@ final class DiagnosticCheckHarness
     }
 
     /** @param array<mixed> $report */
-    private function verify(array $report, int $exitCode): ?string
+    private function verify(array $report, int $exitCode, string $analysisMode): ?string
     {
         $projects = $report['projects'] ?? null;
         $errors = $report['errors'] ?? null;
@@ -113,14 +114,16 @@ final class DiagnosticCheckHarness
         if ([] === $projects) {
             return 'no-projects';
         }
+        $expectedRuntimeState = 'source-only' === $analysisMode ? 'disabled' : 'ready';
         foreach ($projects as $project) {
-            if (!\is_array($project)
-                || true !== ($project['complete'] ?? null)
-                || 'runtime' !== $this->section($project, 'analysis', 'mode')
+            if (!\is_array($project) || $analysisMode !== $this->section($project, 'analysis', 'mode')) {
+                return 'analysis-mode-mismatch';
+            }
+            if (true !== ($project['complete'] ?? null)
                 || 'ready' !== $this->section($project, 'source', 'state')
-                || 'ready' !== $this->section($project, 'runtime', 'state')
+                || $expectedRuntimeState !== $this->section($project, 'runtime', 'state')
             ) {
-                return 'project-not-runtime-ready';
+                return 'source-only' === $analysisMode ? 'project-not-source-only-ready' : 'project-not-runtime-ready';
             }
         }
         if (null !== ($baseline['path'] ?? null) || 'none' !== ($baseline['mode'] ?? null) || [] !== ($baseline['stale'] ?? null)) {

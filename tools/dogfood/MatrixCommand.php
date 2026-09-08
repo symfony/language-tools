@@ -155,11 +155,11 @@ final class MatrixCommand
                 $this->filesystem->remove(Path::join($applicationRoot, 'var/symfony-lsp/dev'));
                 $cold = $this->harness->run($configuration, $applicationRoot);
                 $this->filesystem->dumpFile(Path::join($artifactDirectory, 'cold.json'), '' !== $cold->rawOutput ? $cold->rawOutput : $cold->errorOutput);
-                $report->cold = $this->summarize($cold);
+                $report->cold = $this->summarize($cold, $configuration);
 
                 $warm = $this->harness->run($configuration, $applicationRoot);
                 $this->filesystem->dumpFile(Path::join($artifactDirectory, 'warm.json'), '' !== $warm->rawOutput ? $warm->rawOutput : $warm->errorOutput);
-                $report->warm = $this->summarize($warm);
+                $report->warm = $this->summarize($warm, $configuration);
                 if ([] === $report->cold->layers && [] === $report->warm->layers) {
                     if (!$this->evidence->covers($manifest, $cold->result ?? []) || !$this->evidence->covers($manifest, $warm->result ?? [])) {
                         $report->failure = new ProjectFailure('scenario', 'The harness did not verify every declared scenario expectation.');
@@ -167,7 +167,7 @@ final class MatrixCommand
                         $report->failure = new ProjectFailure('cache-parity', 'Cold and warm scenario responses differ.');
                     }
                 }
-                if ('ready' === $report->warm->source && 'ready' === $report->warm->runtime) {
+                if ('ready' === $report->warm->source && $this->expectedRuntimeState($configuration) === $report->warm->runtime) {
                     $report->diagnostics = $this->diagnostics->run($configuration, $applicationRoot);
                     $this->writeJson(Path::join($artifactDirectory, 'diagnostics.json'), $report->diagnostics->toArray());
                     if (!$report->diagnostics->ok()) {
@@ -190,7 +190,7 @@ final class MatrixCommand
         return $report;
     }
 
-    private function summarize(HarnessResult $run): RunSummary
+    private function summarize(HarnessResult $run, ProjectConfiguration $configuration): RunSummary
     {
         $result = $run->result ?? [];
         $scenarioCount = $result['scenarioCount'] ?? null;
@@ -223,7 +223,7 @@ final class MatrixCommand
         $runtimeBridgeTimings = $this->runtimeBridgeTimingNormalizer->normalize($result['runtimeBridgeTimings'] ?? null);
 
         return new RunSummary(
-            $this->classifier->classify($run),
+            $this->classifier->classify($run, $configuration->analysisMode),
             $this->classifier->indexState($result, 'source'),
             $this->classifier->indexState($result, 'runtime'),
             \is_int($scenarioCount) ? $scenarioCount : 0,
@@ -333,14 +333,15 @@ final class MatrixCommand
     private function formatLine(ProjectReport $report): string
     {
         if (null !== $report->failure) {
-            return \sprintf('%-28s %s: %s time=%.1fs', $report->configuration->name, $report->failure->layer, $report->failure->message, ($report->timings['totalMilliseconds'] ?? 0.0) / 1000);
+            return \sprintf('%-28s mode=%-11s %s: %s time=%.1fs', $report->configuration->name, $report->configuration->analysisMode, $report->failure->layer, $report->failure->message, ($report->timings['totalMilliseconds'] ?? 0.0) / 1000);
         }
         $cold = $report->cold ?? throw new \LogicException('Missing cold run.');
         $warm = $report->warm ?? throw new \LogicException('Missing warm run.');
 
         return \sprintf(
-            '%-28s cold=%-12s warm=%-12s scenarios=%2d checks=%3d requests=%3d max=%6.1fms failures=%d gaps=%d files=%d time=%.1fs',
+            '%-28s mode=%-11s cold=%-12s warm=%-12s scenarios=%2d checks=%3d requests=%3d max=%6.1fms failures=%d gaps=%d files=%d time=%.1fs',
             $report->configuration->name,
+            $report->configuration->analysisMode,
             [] === $cold->layers ? 'ok' : implode(',', $cold->layers),
             [] === $warm->layers ? 'ok' : implode(',', $warm->layers),
             $warm->scenarios,
@@ -352,6 +353,12 @@ final class MatrixCommand
             $report->diagnostics->analyzedFiles ?? 0,
             ($report->timings['totalMilliseconds'] ?? 0.0) / 1000,
         );
+    }
+
+    /** @return 'ready'|'disabled' */
+    private function expectedRuntimeState(ProjectConfiguration $configuration): string
+    {
+        return 'source-only' === $configuration->analysisMode ? 'disabled' : 'ready';
     }
 
     private function elapsedMilliseconds(int $startedAt): float

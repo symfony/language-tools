@@ -127,7 +127,7 @@ try {
 
 if ($list) {
     foreach ($configurations as $configuration) {
-        printf("%-28s %s ci=%s\n", $configuration->name, substr($configuration->revision, 0, 12), $configuration->ci ? 'yes' : 'no');
+        printf("%-28s %s mode=%-11s ci=%s\n", $configuration->name, substr($configuration->revision, 0, 12), $configuration->analysisMode, $configuration->ci ? 'yes' : 'no');
     }
     exit(0);
 }

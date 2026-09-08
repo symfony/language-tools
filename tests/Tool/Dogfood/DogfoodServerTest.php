@@ -12,7 +12,7 @@ use Symfony\Lsp\Tools\Dogfood\ScenarioRunner;
 /**
  * @phpstan-import-type ScenarioReport from ScenarioRunner
  *
- * @phpstan-type HarnessReport array{project: string, environment: string, manifestRevision: string, serverVersion: string|null, status: array<array-key, mixed>|null, terminal: bool, outcome: string, error: string|null, scenarioCount: int, scenarios: list<ScenarioReport>, requestCount: int, assertionFailures: int, violations: list<array{scenario: string, method: string, message: string}>, transportFailure: string|null, serverError: string|null, exitCode: int|null, runtimeBridgeTimings: array<array-key, mixed>|null, timings: array<string, float|int|null>}
+ * @phpstan-type HarnessReport array{project: string, environment: string, analysisMode: string, manifestRevision: string, serverVersion: string|null, status: array<array-key, mixed>|null, terminal: bool, outcome: string, error: string|null, scenarioCount: int, scenarios: list<ScenarioReport>, requestCount: int, assertionFailures: int, violations: list<array{scenario: string, method: string, message: string}>, transportFailure: string|null, serverError: string|null, exitCode: int|null, runtimeBridgeTimings: array<array-key, mixed>|null, timings: array<string, float|int|null>}
  */
 final class DogfoodServerTest extends TestCase
 {
@@ -269,7 +269,7 @@ final class DogfoodServerTest extends TestCase
         $decoded = json_decode($result->standardOutput, true, flags: \JSON_THROW_ON_ERROR);
         self::assertIsArray($decoded);
         self::assertSame([
-            'project', 'environment', 'manifestRevision', 'serverVersion', 'status', 'terminal', 'outcome', 'error',
+            'project', 'environment', 'analysisMode', 'manifestRevision', 'serverVersion', 'status', 'terminal', 'outcome', 'error',
             'scenarioCount', 'scenarios', 'requestCount', 'assertionFailures', 'violations', 'transportFailure',
             'serverError', 'exitCode', 'runtimeBridgeTimings', 'timings',
         ], array_keys($decoded));

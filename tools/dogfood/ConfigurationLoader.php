@@ -5,7 +5,8 @@ namespace Symfony\Lsp\Tools\Dogfood;
 final class ConfigurationLoader
 {
     private const VERSION = 1;
-    private const KEYS = ['version', 'repository', 'revision', 'directory', 'environment', 'environmentVariables', 'setup', 'ci', 'indexTimeout', 'requestTimeout', 'allowPlugins', 'ignorePlatformRequirements', 'setupChanges'];
+    private const KEYS = ['version', 'repository', 'revision', 'directory', 'environment', 'environmentVariables', 'setup', 'ci', 'indexTimeout', 'requestTimeout', 'allowPlugins', 'ignorePlatformRequirements', 'setupChanges', 'analysisMode'];
+    private const ANALYSIS_MODES = ['runtime', 'source-only'];
     private const DEFAULT_INDEX_TIMEOUT = 120;
     private const MAX_INDEX_TIMEOUT = 900;
     private const DEFAULT_REQUEST_TIMEOUT = 10;
@@ -84,7 +85,23 @@ final class ConfigurationLoader
             $this->setupChanges($data, $file),
             $this->environmentVariables($data, $file),
             \dirname($file).'/scenarios/'.$name.'.json',
+            $this->analysisMode($data, $file),
         );
+    }
+
+    /**
+     * @param array<array-key, mixed> $data
+     *
+     * @return 'runtime'|'source-only'
+     */
+    private function analysisMode(array $data, string $file): string
+    {
+        $mode = $data['analysisMode'] ?? 'runtime';
+        if ('runtime' !== $mode && 'source-only' !== $mode) {
+            throw new ConfigurationException(\sprintf('The "analysisMode" in "%s" must be one of "%s".', $file, implode('", "', self::ANALYSIS_MODES)));
+        }
+
+        return $mode;
     }
 
     /**

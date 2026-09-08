@@ -46,6 +46,7 @@ final class ProjectReport
             'revision' => $this->configuration->revision,
             'directory' => $this->configuration->directory,
             'environment' => $this->configuration->environment,
+            'analysisMode' => $this->configuration->analysisMode,
             'setup' => $this->configuration->setup,
             'ci' => $this->configuration->ci,
             'ok' => $this->ok(),

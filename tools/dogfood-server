@@ -16,9 +16,10 @@ use Symfony\Lsp\Tools\Dogfood\ServerHarness;
 use Symfony\Lsp\Tools\Dogfood\Utf16Positions;
 use Symfony\Lsp\Tools\Dogfood\WorkspaceEditApplier;
 
-const USAGE = "Usage: dogfood-server --scenarios=FILE [--revision=COMMIT] [--environment=ENV] [--index-timeout=SECONDS] [--request-timeout=SECONDS] <server> <project>\n";
+const USAGE = "Usage: dogfood-server --scenarios=FILE [--revision=COMMIT] [--environment=ENV] [--index-timeout=SECONDS] [--request-timeout=SECONDS] [--source-only] <server> <project>\n";
 
 $environment = 'dev';
+$sourceOnly = false;
 $indexTimeout = 30.0;
 $requestTimeout = 10.0;
 $scenarioPath = null;
@@ -35,6 +36,8 @@ foreach (array_slice($argv, 1) as $argument) {
         $scenarioPath = $matches[1];
     } elseif (preg_match('/^--revision=(.+)$/', $argument, $matches)) {
         $revision = $matches[1];
+    } elseif ('--source-only' === $argument) {
+        $sourceOnly = true;
     } elseif (str_starts_with($argument, '-')) {
         fwrite(\STDERR, USAGE);
         exit(2);
@@ -80,6 +83,7 @@ $timings = [
 $report = [
     'project' => $project,
     'environment' => $environment,
+    'analysisMode' => $sourceOnly ? 'source-only' : 'runtime',
     'manifestRevision' => $manifest->revision,
     'serverVersion' => null,
     'status' => null,
@@ -111,7 +115,7 @@ try {
         'rootUri' => uri($project),
         'workspaceFolders' => [['uri' => uri($project), 'name' => basename($project)]],
         'capabilities' => new stdClass(),
-        'initializationOptions' => ['workspaceTrust' => true, 'runtimeIndexing' => true, 'environment' => $environment],
+        'initializationOptions' => ['workspaceTrust' => true, 'runtimeIndexing' => !$sourceOnly, 'environment' => $environment],
     ], 10.0);
     $timings['initializeMilliseconds'] = $elapsedMilliseconds($initializeStartedAt);
     $report['serverVersion'] = $initialize['result']['serverInfo']['version'] ?? null;
@@ -127,10 +131,10 @@ try {
             if (null === $timings['sourceIndexMilliseconds'] && in_array($status['source']['state'] ?? null, ['ready', 'failed'], true)) {
                 $timings['sourceIndexMilliseconds'] = $elapsedMilliseconds($indexStartedAt);
             }
-            if (null === $timings['runtimeIndexMilliseconds'] && in_array($status['runtime']['state'] ?? null, ['ready', 'partial', 'failed', 'stale'], true)) {
+            if (!$sourceOnly && null === $timings['runtimeIndexMilliseconds'] && in_array($status['runtime']['state'] ?? null, ['ready', 'partial', 'failed', 'stale'], true)) {
                 $timings['runtimeIndexMilliseconds'] = $elapsedMilliseconds($indexStartedAt);
             }
-            if (null !== $timings['sourceIndexMilliseconds'] && null !== $timings['runtimeIndexMilliseconds']) {
+            if (null !== $timings['sourceIndexMilliseconds'] && ($sourceOnly || null !== $timings['runtimeIndexMilliseconds'])) {
                 $report['terminal'] = true;
                 break;
             }
@@ -138,6 +142,9 @@ try {
         usleep(250_000);
     }
     $timings['indexWaitMilliseconds'] = $elapsedMilliseconds($indexStartedAt);
+    if ($sourceOnly) {
+        $report['status'] = disabledRuntime($report['status']);
+    }
     $report['runtimeBridgeTimings'] = is_array($report['status']['runtime']['timings'] ?? null) ? $report['status']['runtime']['timings'] : null;
 
     $runner = new ScenarioRunner(
@@ -150,10 +157,13 @@ try {
         $requestTimeout,
     );
     $scenariosStartedAt = hrtime(true);
-    $ready = 'ready' === ($report['status']['source']['state'] ?? null) && 'ready' === ($report['status']['runtime']['state'] ?? null);
+    $expectedRuntimeState = $sourceOnly ? 'disabled' : 'ready';
+    $ready = 'ready' === ($report['status']['source']['state'] ?? null) && $expectedRuntimeState === ($report['status']['runtime']['state'] ?? null);
     $report = array_replace($report, $ready
         ? $runner->run($manifest, $project)
-        : ScenarioRunner::unavailable($manifest, 'Source and runtime indexing must be ready before scenarios run.'));
+        : ScenarioRunner::unavailable($manifest, $sourceOnly
+            ? 'Source indexing must be ready and runtime indexing disabled before scenarios run.'
+            : 'Source and runtime indexing must be ready before scenarios run.'));
     $timings['scenariosMilliseconds'] = $elapsedMilliseconds($scenariosStartedAt);
 
     $shutdownStartedAt = hrtime(true);
@@ -191,6 +201,23 @@ try {
 $timings['totalMilliseconds'] = $elapsedMilliseconds($totalStartedAt);
 $report['timings'] = $timings;
 write($report);
+
+/**
+ * Reports an untouched runtime section as disabled, never rewriting observed runtime evidence.
+ */
+function disabledRuntime(mixed $status): mixed
+{
+    if (!is_array($status) || false !== ($status['runtimeEnabled'] ?? null)) {
+        return $status;
+    }
+    $runtime = $status['runtime'] ?? null;
+    if (!is_array($runtime) || 'not-indexed' !== ($runtime['state'] ?? null)) {
+        return $status;
+    }
+    $status['runtime'] = ['state' => 'disabled'];
+
+    return $status;
+}
 
 /**
  * @param array<string, mixed> $report
