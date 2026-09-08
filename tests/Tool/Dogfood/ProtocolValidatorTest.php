@@ -326,6 +326,16 @@ final class ProtocolValidatorTest extends TestCase
         self::assertSame([], $this->validate('textDocument/rename', $result));
     }
 
+    public function testRejectsNonFileEditTargetsWithoutEchoingTheirContents(): void
+    {
+        foreach (['untitled:Untitled-1', 'custom://secret-value'] as $uri) {
+            $edit = ['changes' => [$uri => [['range' => self::range(0, 0, 0, 0), 'newText' => 'changed']]]];
+            self::assertSame(['An edit must target an application-owned file URI.'], $this->validate('textDocument/rename', $edit));
+            self::assertSame(['An edit must target an application-owned file URI.'], $this->validate('textDocument/codeAction', [['title' => 'Change', 'edit' => $edit]]));
+            self::assertSame(['An edit must target an application-owned file URI.'], $this->validate('textDocument/rename', ['documentChanges' => [['kind' => 'create', 'uri' => $uri]]]));
+        }
+    }
+
     public function testRejectsRenameEditsOutsideTheEditedDocument(): void
     {
         $result = ['changes' => [

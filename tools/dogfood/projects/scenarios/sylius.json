@@ -1,0 +1,1336 @@
+{
+    "version": 1,
+    "revision": "c4c61a0d66666e7dec5487cdd1b059bec418892c",
+    "scenarios": [
+        {
+            "id": "route.css.negative",
+            "file": "src/Sylius/Bundle/AdminBundle/templates/admin_user/form/sections/personal_information/avatar.html.twig",
+            "anchor": "style=\"background-image: url(",
+            "offset": 26,
+            "expect": {
+                "completion": {
+                    "equals": []
+                },
+                "definition": {
+                    "equals": []
+                }
+            }
+        },
+        {
+            "id": "template.php",
+            "file": "src/Sylius/Bundle/AdminBundle/Action/Account/RenderRequestPasswordResetPageAction.php",
+            "anchor": "            $this->twig->render('@SyliusAdmin/security/request_password_reset.html.twig', [",
+            "offset": 87,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "@SyliusAdmin/security/request_password_reset.html.twig"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "template.twig",
+            "file": "src/Sylius/Bundle/AdminBundle/templates/catalog_promotion/form/sections/translations.html.twig",
+            "anchor": "{% import '@SyliusAdmin/shared/helper/translations.html.twig' as translations %}",
+            "offset": 60,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "@SyliusAdmin/shared/helper/translations.html.twig"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "component.twig",
+            "file": "src/Sylius/Bundle/AdminBundle/templates/product/form/sections/attributes/autocomplete/input.html.twig",
+            "anchor": "<twig:sylius_admin:product:product_attribute_autocomplete",
+            "offset": 57,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "sylius_admin:product:product_attribute_autocomplete"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "stimulus.action.twig",
+            "file": "src/Sylius/Bundle/AdminBundle/templates/dashboard/index/component/channel_selector.html.twig",
+            "anchor": "                            data-action=\"live#action\"",
+            "offset": 52,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "action"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "asset.twig",
+            "file": "src/Sylius/Bundle/AdminBundle/templates/product/show/content/page_body/media.html.twig",
+            "anchor": "                                {% set path = image.path is not null ? image.path|imagine_filter('sylius_admin_product_thumbnail') : asset('bundles/syliusui/images/200x200.png') %}",
+            "offset": 175,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "bundles/syliusui/images/200x200.png"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "form.property.php",
+            "file": "src/Sylius/Bundle/AdminBundle/Form/RequestPasswordResetType.php",
+            "anchor": "            ->add('email', EmailType::class, [",
+            "offset": 24,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "email"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "console.argument.php",
+            "file": "src/Sylius/Bundle/AdminBundle/Console/Command/DeleteAdminUserCommand.php",
+            "anchor": "        $email = $input->getArgument('email');",
+            "offset": 43,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "email"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "console.option.php",
+            "file": "src/Sylius/Bundle/AdminBundle/Console/Command/ListAdminUsersCommand.php",
+            "anchor": "        $searchTerm = $input->getOption('search');",
+            "offset": 47,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "search"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "translation.php",
+            "file": "src/Sylius/Behat/Context/Api/Admin/ManagingAdministratorsContext.php",
+            "anchor": "            $this->translator->trans('sylius.user.email.invalid', [], 'validators', $locale->getCode()),",
+            "offset": 63,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "sylius.user.email.invalid"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "translation.twig",
+            "file": "src/Sylius/Bundle/AdminBundle/templates/admin_user/form/sections/account.html.twig",
+            "anchor": "            {{ 'sylius.ui.account'|trans }}",
+            "offset": 33,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "sylius.ui.account"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "service.alice.negative",
+            "file": "src/Sylius/Bundle/AddressingBundle/tests/Matcher/ZoneMatcherTest/fixtures.yaml",
+            "anchor": "        country: \"@country_PL\"",
+            "offset": 29,
+            "expect": {
+                "references": {
+                    "equals": []
+                }
+            }
+        },
+        {
+            "id": "parameter.yaml",
+            "file": "src/Sylius/Bundle/AddressingBundle/test/app/config/config.yml",
+            "anchor": "    translator: { fallbacks: [\"%locale%\"] }",
+            "offset": 38,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "locale"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "environment.references",
+            "file": "src/Sylius/Bundle/AdminBundle/Resources/config/app/config.yml",
+            "anchor": "    sylius_admin.path_name: '%env(resolve:SYLIUS_ADMIN_ROUTING_PATH_NAME)%'",
+            "offset": 72,
+            "expect": {
+                "references": {
+                    "includes": [
+                        "src/Sylius/Bundle/AdminBundle/Resources/config/app/config.yml:8:42-8:72"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "twig.function",
+            "file": "src/Sylius/Bundle/AdminBundle/templates/admin_user/form/sections/personal_information/avatar.html.twig",
+            "anchor": "                formaction=\"{{ path('sylius_admin_admin_user_remove_avatar', {'id': admin_user.id, '_csrf_token': sylius_csrf_protection_enabled() ? csrf_token(admin_user.id) : null}) }}\"",
+            "offset": 144,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "sylius_csrf_protection_enabled"
+                    ]
+                }
+            }
+        }
+    ],
+    "diagnostics": [
+        {
+            "path": "src/Sylius/Bundle/AddressingBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 6,
+                    "character": 14
+                },
+                "end": {
+                    "line": 6,
+                    "character": 20
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "bc1d43163aa6df4042db7bceb631c1dd330e634f74e10eab1fea6adb8a03ef30"
+        },
+        {
+            "path": "src/Sylius/Bundle/AddressingBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 24,
+                    "character": 18
+                },
+                "end": {
+                    "line": 24,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/AddressingBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 25,
+                    "character": 16
+                },
+                "end": {
+                    "line": 25,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "src/Sylius/Bundle/AdminBundle/Controller/CustomerStatisticsController.php",
+            "code": "template.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 52,
+                    "character": 13
+                },
+                "end": {
+                    "line": 52,
+                    "character": 66
+                }
+            },
+            "kind": "application",
+            "reason": "This pinned source reference is unresolved in the configured runtime template paths; retain the exact finding for review when pins change.",
+            "messageHash": "f101173591b77b5ad0a0cc392ad1527bc8838ea0c9218f9fe83f3a97abaed238"
+        },
+        {
+            "path": "src/Sylius/Bundle/AdminBundle/templates/catalog_promotion/grid/action/delete.html.twig",
+            "code": "twig_component.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 2,
+                    "character": 14
+                },
+                "end": {
+                    "line": 2,
+                    "character": 39
+                }
+            },
+            "kind": "application",
+            "reason": "This bundle template references a component not registered in the configured runtime component metadata.",
+            "messageHash": "e01876d3811ec01eebd8ed16ccc5537299ce175aa794dfa770ae95ae103c90ef"
+        },
+        {
+            "path": "src/Sylius/Bundle/AdminBundle/templates/shared/form_theme.html.twig",
+            "code": "template.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 0,
+                    "character": 12
+                },
+                "end": {
+                    "line": 0,
+                    "character": 40
+                }
+            },
+            "kind": "application",
+            "reason": "This pinned source reference is unresolved in the configured runtime template paths; retain the exact finding for review when pins change.",
+            "messageHash": "bb2bdaf4ac95512cc3f9a125539b62d11df41eac902b96f102ba56f77eba58b6"
+        },
+        {
+            "path": "src/Sylius/Bundle/AdminBundle/templates/shared/grid/action/delete.html.twig",
+            "code": "twig_component.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 11,
+                    "character": 14
+                },
+                "end": {
+                    "line": 11,
+                    "character": 39
+                }
+            },
+            "kind": "application",
+            "reason": "This bundle template references a component not registered in the configured runtime component metadata.",
+            "messageHash": "e01876d3811ec01eebd8ed16ccc5537299ce175aa794dfa770ae95ae103c90ef"
+        },
+        {
+            "path": "src/Sylius/Bundle/AttributeBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 6,
+                    "character": 14
+                },
+                "end": {
+                    "line": 6,
+                    "character": 20
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "bc1d43163aa6df4042db7bceb631c1dd330e634f74e10eab1fea6adb8a03ef30"
+        },
+        {
+            "path": "src/Sylius/Bundle/AttributeBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 20,
+                    "character": 18
+                },
+                "end": {
+                    "line": 20,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/AttributeBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 21,
+                    "character": 16
+                },
+                "end": {
+                    "line": 21,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "src/Sylius/Bundle/ChannelBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 6,
+                    "character": 14
+                },
+                "end": {
+                    "line": 6,
+                    "character": 20
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "bc1d43163aa6df4042db7bceb631c1dd330e634f74e10eab1fea6adb8a03ef30"
+        },
+        {
+            "path": "src/Sylius/Bundle/ChannelBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 24,
+                    "character": 18
+                },
+                "end": {
+                    "line": 24,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/ChannelBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 25,
+                    "character": 16
+                },
+                "end": {
+                    "line": 25,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "src/Sylius/Bundle/CurrencyBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 6,
+                    "character": 14
+                },
+                "end": {
+                    "line": 6,
+                    "character": 20
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "bc1d43163aa6df4042db7bceb631c1dd330e634f74e10eab1fea6adb8a03ef30"
+        },
+        {
+            "path": "src/Sylius/Bundle/CurrencyBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 24,
+                    "character": 18
+                },
+                "end": {
+                    "line": 24,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/CurrencyBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 25,
+                    "character": 16
+                },
+                "end": {
+                    "line": 25,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "src/Sylius/Bundle/CustomerBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 6,
+                    "character": 14
+                },
+                "end": {
+                    "line": 6,
+                    "character": 20
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "bc1d43163aa6df4042db7bceb631c1dd330e634f74e10eab1fea6adb8a03ef30"
+        },
+        {
+            "path": "src/Sylius/Bundle/CustomerBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 24,
+                    "character": 18
+                },
+                "end": {
+                    "line": 24,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/CustomerBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 25,
+                    "character": 16
+                },
+                "end": {
+                    "line": 25,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "src/Sylius/Bundle/InventoryBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 6,
+                    "character": 14
+                },
+                "end": {
+                    "line": 6,
+                    "character": 20
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "bc1d43163aa6df4042db7bceb631c1dd330e634f74e10eab1fea6adb8a03ef30"
+        },
+        {
+            "path": "src/Sylius/Bundle/InventoryBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 24,
+                    "character": 18
+                },
+                "end": {
+                    "line": 24,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/InventoryBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 25,
+                    "character": 16
+                },
+                "end": {
+                    "line": 25,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "src/Sylius/Bundle/LocaleBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 6,
+                    "character": 14
+                },
+                "end": {
+                    "line": 6,
+                    "character": 20
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "bc1d43163aa6df4042db7bceb631c1dd330e634f74e10eab1fea6adb8a03ef30"
+        },
+        {
+            "path": "src/Sylius/Bundle/LocaleBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 24,
+                    "character": 18
+                },
+                "end": {
+                    "line": 24,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/LocaleBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 25,
+                    "character": 16
+                },
+                "end": {
+                    "line": 25,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "src/Sylius/Bundle/MoneyBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 6,
+                    "character": 14
+                },
+                "end": {
+                    "line": 6,
+                    "character": 20
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "bc1d43163aa6df4042db7bceb631c1dd330e634f74e10eab1fea6adb8a03ef30"
+        },
+        {
+            "path": "src/Sylius/Bundle/MoneyBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 24,
+                    "character": 18
+                },
+                "end": {
+                    "line": 24,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/MoneyBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 25,
+                    "character": 16
+                },
+                "end": {
+                    "line": 25,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "src/Sylius/Bundle/OrderBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 6,
+                    "character": 14
+                },
+                "end": {
+                    "line": 6,
+                    "character": 20
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "bc1d43163aa6df4042db7bceb631c1dd330e634f74e10eab1fea6adb8a03ef30"
+        },
+        {
+            "path": "src/Sylius/Bundle/OrderBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 24,
+                    "character": 18
+                },
+                "end": {
+                    "line": 24,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/OrderBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 25,
+                    "character": 16
+                },
+                "end": {
+                    "line": 25,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "src/Sylius/Bundle/PaymentBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 7,
+                    "character": 14
+                },
+                "end": {
+                    "line": 7,
+                    "character": 20
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "bc1d43163aa6df4042db7bceb631c1dd330e634f74e10eab1fea6adb8a03ef30"
+        },
+        {
+            "path": "src/Sylius/Bundle/PaymentBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 26,
+                    "character": 18
+                },
+                "end": {
+                    "line": 26,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/PaymentBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 27,
+                    "character": 16
+                },
+                "end": {
+                    "line": 27,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "src/Sylius/Bundle/ProductBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 6,
+                    "character": 14
+                },
+                "end": {
+                    "line": 6,
+                    "character": 20
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "bc1d43163aa6df4042db7bceb631c1dd330e634f74e10eab1fea6adb8a03ef30"
+        },
+        {
+            "path": "src/Sylius/Bundle/ProductBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 20,
+                    "character": 18
+                },
+                "end": {
+                    "line": 20,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/ProductBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 21,
+                    "character": 16
+                },
+                "end": {
+                    "line": 21,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "src/Sylius/Bundle/PromotionBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 6,
+                    "character": 14
+                },
+                "end": {
+                    "line": 6,
+                    "character": 20
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "bc1d43163aa6df4042db7bceb631c1dd330e634f74e10eab1fea6adb8a03ef30"
+        },
+        {
+            "path": "src/Sylius/Bundle/PromotionBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 24,
+                    "character": 18
+                },
+                "end": {
+                    "line": 24,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/PromotionBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 25,
+                    "character": 16
+                },
+                "end": {
+                    "line": 25,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "src/Sylius/Bundle/ReviewBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 6,
+                    "character": 14
+                },
+                "end": {
+                    "line": 6,
+                    "character": 20
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "bc1d43163aa6df4042db7bceb631c1dd330e634f74e10eab1fea6adb8a03ef30"
+        },
+        {
+            "path": "src/Sylius/Bundle/ReviewBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 24,
+                    "character": 18
+                },
+                "end": {
+                    "line": 24,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/ReviewBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 25,
+                    "character": 16
+                },
+                "end": {
+                    "line": 25,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "src/Sylius/Bundle/ShippingBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 6,
+                    "character": 14
+                },
+                "end": {
+                    "line": 6,
+                    "character": 20
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "bc1d43163aa6df4042db7bceb631c1dd330e634f74e10eab1fea6adb8a03ef30"
+        },
+        {
+            "path": "src/Sylius/Bundle/ShippingBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 24,
+                    "character": 18
+                },
+                "end": {
+                    "line": 24,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/ShippingBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 25,
+                    "character": 16
+                },
+                "end": {
+                    "line": 25,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "src/Sylius/Bundle/ShopBundle/templates/cart/index/content/form/sections/general/items/body/item.html.twig",
+            "code": "twig_component.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 3,
+                    "character": 18
+                },
+                "end": {
+                    "line": 3,
+                    "character": 53
+                }
+            },
+            "kind": "application",
+            "reason": "This bundle template references a component not registered in the configured runtime component metadata.",
+            "messageHash": "850e6c490856a8b7bdc733fd59bdb4720b49d346db337f4f5d234659a45d33b2"
+        },
+        {
+            "path": "src/Sylius/Bundle/ShopBundle/templates/form/theme.html.twig",
+            "code": "template.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 0,
+                    "character": 12
+                },
+                "end": {
+                    "line": 0,
+                    "character": 40
+                }
+            },
+            "kind": "application",
+            "reason": "This pinned source reference is unresolved in the configured runtime template paths; retain the exact finding for review when pins change.",
+            "messageHash": "bb2bdaf4ac95512cc3f9a125539b62d11df41eac902b96f102ba56f77eba58b6"
+        },
+        {
+            "path": "src/Sylius/Bundle/ShopBundle/templates/grid/action/delete.html.twig",
+            "code": "twig_component.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 4,
+                    "character": 14
+                },
+                "end": {
+                    "line": 4,
+                    "character": 38
+                }
+            },
+            "kind": "application",
+            "reason": "This bundle template references a component not registered in the configured runtime component metadata.",
+            "messageHash": "cee439e8ca02791999f15aece78427391d56746efbfaf22904f01c74e105897a"
+        },
+        {
+            "path": "src/Sylius/Bundle/ShopBundle/templates/shared/components/order_item/product_info.html.twig",
+            "code": "twig_component.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 6,
+                    "character": 26
+                },
+                "end": {
+                    "line": 6,
+                    "character": 48
+                }
+            },
+            "kind": "application",
+            "reason": "This bundle template references a component not registered in the configured runtime component metadata.",
+            "messageHash": "963b2d1d892dad12363da5f897d28b64ef6b70deaeb0ed1b82ebfbec8a6bd721"
+        },
+        {
+            "path": "src/Sylius/Bundle/ShopBundle/templates/shared/layout/base/offcanvas/cart/body/items/item.html.twig",
+            "code": "twig_component.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 5,
+                    "character": 22
+                },
+                "end": {
+                    "line": 5,
+                    "character": 57
+                }
+            },
+            "kind": "application",
+            "reason": "This bundle template references a component not registered in the configured runtime component metadata.",
+            "messageHash": "850e6c490856a8b7bdc733fd59bdb4720b49d346db337f4f5d234659a45d33b2"
+        },
+        {
+            "path": "src/Sylius/Bundle/ShopBundle/templates/shared/order/show/summary/table/body/item.html.twig",
+            "code": "twig_component.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 1,
+                    "character": 18
+                },
+                "end": {
+                    "line": 1,
+                    "character": 53
+                }
+            },
+            "kind": "application",
+            "reason": "This bundle template references a component not registered in the configured runtime component metadata.",
+            "messageHash": "850e6c490856a8b7bdc733fd59bdb4720b49d346db337f4f5d234659a45d33b2"
+        },
+        {
+            "path": "src/Sylius/Bundle/ShopBundle/templates/shared/order/table/item.html.twig",
+            "code": "twig_component.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 7,
+                    "character": 22
+                },
+                "end": {
+                    "line": 7,
+                    "character": 57
+                }
+            },
+            "kind": "application",
+            "reason": "This bundle template references a component not registered in the configured runtime component metadata.",
+            "messageHash": "850e6c490856a8b7bdc733fd59bdb4720b49d346db337f4f5d234659a45d33b2"
+        },
+        {
+            "path": "src/Sylius/Bundle/ShopBundle/templates/shared/product/card/details/image.html.twig",
+            "code": "twig_component.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 4,
+                    "character": 22
+                },
+                "end": {
+                    "line": 4,
+                    "character": 44
+                }
+            },
+            "kind": "application",
+            "reason": "This bundle template references a component not registered in the configured runtime component metadata.",
+            "messageHash": "963b2d1d892dad12363da5f897d28b64ef6b70deaeb0ed1b82ebfbec8a6bd721"
+        },
+        {
+            "path": "src/Sylius/Bundle/TaxationBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 6,
+                    "character": 14
+                },
+                "end": {
+                    "line": 6,
+                    "character": 20
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "bc1d43163aa6df4042db7bceb631c1dd330e634f74e10eab1fea6adb8a03ef30"
+        },
+        {
+            "path": "src/Sylius/Bundle/TaxationBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 24,
+                    "character": 18
+                },
+                "end": {
+                    "line": 24,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/TaxationBundle/test/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 25,
+                    "character": 16
+                },
+                "end": {
+                    "line": 25,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "src/Sylius/Bundle/TaxonomyBundle/tests/Functional/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 28,
+                    "character": 18
+                },
+                "end": {
+                    "line": 28,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/TaxonomyBundle/tests/Functional/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 29,
+                    "character": 16
+                },
+                "end": {
+                    "line": 29,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "src/Sylius/Bundle/UiBundle/templates/form/theme.html.twig",
+            "code": "template.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 0,
+                    "character": 12
+                },
+                "end": {
+                    "line": 0,
+                    "character": 37
+                }
+            },
+            "kind": "application",
+            "reason": "This pinned source reference is unresolved in the configured runtime template paths; retain the exact finding for review when pins change.",
+            "messageHash": "4f9c9d2926f4bbdb4942301264f4550e9cec07062302578f68df8fab359f262a"
+        },
+        {
+            "path": "src/Sylius/Bundle/UserBundle/tests/Functional/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 28,
+                    "character": 18
+                },
+                "end": {
+                    "line": 28,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "3dbf8dfeb18c55f4fa62c35510a2118d03530afb76ef3df038fb53bcacf2a7e9"
+        },
+        {
+            "path": "src/Sylius/Bundle/UserBundle/tests/Functional/app/config/config.yml",
+            "code": "parameter.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 29,
+                    "character": 16
+                },
+                "end": {
+                    "line": 29,
+                    "character": 29
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
+        },
+        {
+            "path": "templates/bundles/ApiPlatformBundle/SwaggerUi/index.html.twig",
+            "code": "template.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 0,
+                    "character": 12
+                },
+                "end": {
+                    "line": 0,
+                    "character": 51
+                }
+            },
+            "kind": "application",
+            "reason": "This pinned source reference is unresolved in the configured runtime template paths; retain the exact finding for review when pins change.",
+            "messageHash": "078231c9ef9d28c6dd2dfd92ce8074478eefa9daf02b874550a8807665f446d9"
+        }
+    ]
+}

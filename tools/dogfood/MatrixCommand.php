@@ -20,8 +20,8 @@ final class MatrixCommand
         'sourceIndexMilliseconds',
         'runtimeIndexMilliseconds',
         'indexWaitMilliseconds',
-        'probeDiscoveryMilliseconds',
-        'requestsMilliseconds',
+        'manifestMilliseconds',
+        'scenariosMilliseconds',
         'shutdownMilliseconds',
         'totalMilliseconds',
     ];
@@ -38,7 +38,9 @@ final class MatrixCommand
         private Filesystem $filesystem,
         private RuntimeBridgeTimingNormalizer $runtimeBridgeTimingNormalizer,
         private \Closure $output,
-        private SupportScorer $scorer = new SupportScorer(),
+        private readonly DiagnosticCheckHarness $diagnostics,
+        private readonly ScenarioManifestLoader $manifests = new ScenarioManifestLoader(),
+        private readonly ScenarioEvidence $evidence = new ScenarioEvidence(),
     ) {
     }
 
@@ -98,6 +100,19 @@ final class MatrixCommand
         $startedAt = hrtime(true);
         $this->filesystem->mkdir($artifactDirectory);
         $report = new ProjectReport($configuration);
+        try {
+            $manifest = $this->manifests->load($configuration->scenarioFile, $configuration->revision);
+            if (!$this->evidence->hasPositiveCheck($manifest)) {
+                throw new ConfigurationException('A matrix manifest must include a positive behavioral expectation.');
+            }
+            $report->knownGaps = array_values(array_filter($manifest->diagnostics, static fn (array $diagnostic): bool => 'known-gap' === $diagnostic['kind']));
+        } catch (\InvalidArgumentException|\RuntimeException $error) {
+            $report->failure = new ProjectFailure('scenario', $error->getMessage());
+            $report->timings['totalMilliseconds'] = $this->elapsedMilliseconds($startedAt);
+            $this->writeJson(Path::join($artifactDirectory, 'project.json'), $report->toArray());
+
+            return $report;
+        }
 
         $provisionStartedAt = hrtime(true);
         try {
@@ -139,16 +154,28 @@ final class MatrixCommand
                 $this->filesystem->remove(Path::join($applicationRoot, 'var/symfony-lsp/dev'));
                 $cold = $this->harness->run($configuration, $applicationRoot);
                 $this->filesystem->dumpFile(Path::join($artifactDirectory, 'cold.json'), '' !== $cold->rawOutput ? $cold->rawOutput : $cold->errorOutput);
-                $report->cold = $this->summarize($cold, $configuration->name);
+                $report->cold = $this->summarize($cold);
 
                 $warm = $this->harness->run($configuration, $applicationRoot);
                 $this->filesystem->dumpFile(Path::join($artifactDirectory, 'warm.json'), '' !== $warm->rawOutput ? $warm->rawOutput : $warm->errorOutput);
-                $report->warm = $this->summarize($warm, $configuration->name);
-                if ([] === $report->cold->layers
-                    && [] === $report->warm->layers
-                    && $this->diagnostics($cold) !== $this->diagnostics($warm)
-                ) {
-                    $report->failure = new ProjectFailure('cache-parity', 'Cold and warm diagnostic publications differ.');
+                $report->warm = $this->summarize($warm);
+                if ([] === $report->cold->layers && [] === $report->warm->layers) {
+                    if (!$this->evidence->covers($manifest, $cold->result ?? []) || !$this->evidence->covers($manifest, $warm->result ?? [])) {
+                        $report->failure = new ProjectFailure('scenario', 'The harness did not verify every declared scenario expectation.');
+                    } elseif ($this->evidence->semantics($cold->result ?? []) !== $this->evidence->semantics($warm->result ?? [])) {
+                        $report->failure = new ProjectFailure('cache-parity', 'Cold and warm scenario responses differ.');
+                    }
+                }
+                if ('ready' === $report->warm->source && 'ready' === $report->warm->runtime) {
+                    $report->diagnostics = $this->diagnostics->run($configuration, $applicationRoot);
+                    $this->writeJson(Path::join($artifactDirectory, 'diagnostics.json'), $report->diagnostics->toArray());
+                    if (!$report->diagnostics->ok()) {
+                        $report->failure ??= new ProjectFailure('diagnostics', 'Whole-project analysis failed: '.$report->diagnostics->failure.'.');
+                    } elseif (null === $report->diagnostics->analyzedFiles || 0 === $report->diagnostics->analyzedFiles) {
+                        $report->failure ??= new ProjectFailure('diagnostics', 'Whole-project analysis did not report any analyzed files.');
+                    } elseif ($this->evidence->diagnostics($manifest->diagnostics) !== $this->evidence->diagnostics($report->diagnostics->diagnostics)) {
+                        $report->failure ??= new ProjectFailure('diagnostics', $this->evidence->diagnosticDifference($manifest->diagnostics, $report->diagnostics->diagnostics));
+                    }
                 }
             }
         } finally {
@@ -162,82 +189,28 @@ final class MatrixCommand
         return $report;
     }
 
-    /** @return list<array<array-key, mixed>> */
-    private function diagnostics(HarnessResult $run): array
-    {
-        $diagnostics = $run->result['diagnostics'] ?? null;
-        if (!\is_array($diagnostics)) {
-            return [];
-        }
-
-        $normalized = [];
-        foreach ($diagnostics as $publication) {
-            if (!\is_array($publication)) {
-                $normalized[] = $this->diagnosticEntry('malformed-publication', $publication);
-
-                continue;
-            }
-            $items = $publication['items'] ?? null;
-            if (\is_array($items)) {
-                $items = array_map(
-                    fn (mixed $item): array => \is_array($item)
-                        ? $this->diagnosticEntry('item', $this->normalizeDiagnosticValue($item))
-                        : $this->diagnosticEntry('malformed-item', $item),
-                    $items,
-                );
-                usort($items, static fn (array $left, array $right): int => serialize($left) <=> serialize($right));
-                $publication['items'] = $items;
-            }
-            $normalized[] = $this->diagnosticEntry('publication', $this->normalizeDiagnosticValue($publication));
-        }
-        usort($normalized, static fn (array $left, array $right): int => serialize($left) <=> serialize($right));
-
-        return $normalized;
-    }
-
-    /** @return array{type: string, value: mixed} */
-    private function diagnosticEntry(string $type, mixed $value): array
-    {
-        return ['type' => $type, 'value' => $value];
-    }
-
-    /**
-     * @param array<array-key, mixed> $value
-     *
-     * @return array<array-key, mixed>
-     */
-    private function normalizeDiagnosticValue(array $value): array
-    {
-        foreach ($value as $key => $child) {
-            if (\is_array($child)) {
-                $value[$key] = $this->normalizeDiagnosticValue($child);
-            }
-        }
-        if (!array_is_list($value)) {
-            ksort($value);
-        }
-
-        return $value;
-    }
-
-    private function summarize(HarnessResult $run, string $project): RunSummary
+    private function summarize(HarnessResult $run): RunSummary
     {
         $result = $run->result ?? [];
-        $probeCount = $result['probeCount'] ?? null;
-        $requestErrors = 0;
+        $scenarioCount = $result['scenarioCount'] ?? null;
+        $requestCount = $result['requestCount'] ?? null;
+        $checks = 0;
+        $failures = 0;
         $maxMilliseconds = 0.0;
-        foreach (\is_array($result['probes'] ?? null) ? $result['probes'] : [] as $probe) {
-            if (!\is_array($probe) || !\is_array($probe['requests'] ?? null)) {
+        foreach (\is_array($result['scenarios'] ?? null) ? $result['scenarios'] : [] as $scenario) {
+            if (!\is_array($scenario) || !\is_array($scenario['checks'] ?? null)) {
+                ++$failures;
                 continue;
             }
-            foreach ($probe['requests'] as $request) {
-                if (!\is_array($request)) {
+            if ('pass' !== ($scenario['status'] ?? null)) {
+                ++$failures;
+            }
+            foreach ($scenario['checks'] as $check) {
+                if (!\is_array($check)) {
                     continue;
                 }
-                if (null !== ($request['error'] ?? null)) {
-                    ++$requestErrors;
-                }
-                $milliseconds = $request['milliseconds'] ?? null;
+                ++$checks;
+                $milliseconds = $check['milliseconds'] ?? null;
                 if (\is_int($milliseconds) || \is_float($milliseconds)) {
                     $maxMilliseconds = max($maxMilliseconds, (float) $milliseconds);
                 }
@@ -252,12 +225,13 @@ final class MatrixCommand
             $this->classifier->classify($run),
             $this->classifier->indexState($result, 'source'),
             $this->classifier->indexState($result, 'runtime'),
-            \is_int($probeCount) ? $probeCount : 0,
-            $requestErrors,
+            \is_int($scenarioCount) ? $scenarioCount : 0,
+            $checks,
+            \is_int($requestCount) ? $requestCount : 0,
+            $failures,
             \is_array($violations) ? \count($violations) : 0,
             $maxMilliseconds,
             \is_string($serverVersion) ? $serverVersion : null,
-            $this->scorer->score($result, $project)['score'] ?? null,
             $this->runTimings($run, $result),
             $runtimeBridgeTimings,
         );
@@ -271,7 +245,7 @@ final class MatrixCommand
     private function runTimings(HarnessResult $run, array $result): array
     {
         $timings = [
-            'budgetProbeDiscoveryMilliseconds' => $run->probeDiscoveryMilliseconds,
+            'manifestMilliseconds' => $run->manifestMilliseconds,
             'processMilliseconds' => $run->processMilliseconds,
         ];
         $reported = $result['timings'] ?? null;
@@ -364,14 +338,17 @@ final class MatrixCommand
         $warm = $report->warm ?? throw new \LogicException('Missing warm run.');
 
         return \sprintf(
-            '%-28s cold=%-12s warm=%-12s probes=%2d max=%6.1fms errors=%d%s time=%.1fs',
+            '%-28s cold=%-12s warm=%-12s scenarios=%2d checks=%3d requests=%3d max=%6.1fms failures=%d gaps=%d files=%d time=%.1fs',
             $report->configuration->name,
             [] === $cold->layers ? 'ok' : implode(',', $cold->layers),
             [] === $warm->layers ? 'ok' : implode(',', $warm->layers),
-            $warm->probes,
+            $warm->scenarios,
+            $cold->checks + $warm->checks,
+            $cold->requests + $warm->requests,
             max($cold->maxMilliseconds, $warm->maxMilliseconds),
-            $cold->requestErrors + $warm->requestErrors,
-            null === $warm->supportScore ? '' : \sprintf(' support=%5.1f%%', 100 * $warm->supportScore),
+            $cold->failures + $warm->failures,
+            \count($report->knownGaps),
+            $report->diagnostics->analyzedFiles ?? 0,
             ($report->timings['totalMilliseconds'] ?? 0.0) / 1000,
         );
     }

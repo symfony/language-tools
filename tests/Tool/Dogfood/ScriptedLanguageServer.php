@@ -189,7 +189,7 @@ final class ScriptedLanguageServer
                 }
                 $items = [];
                 foreach ($rule['items'] as $item) {
-                    $itemRange = $range($text, $item['find']);
+                    $itemRange = $item['range'] ?? $range($text, $item['find']);
                     if (null !== $itemRange) {
                         $items[] = [
                             'code' => $item['code'],

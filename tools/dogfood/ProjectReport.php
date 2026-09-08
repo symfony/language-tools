@@ -13,6 +13,10 @@ final class ProjectReport
     public ?string $frameworkBundle = null;
     public ?RunSummary $cold = null;
     public ?RunSummary $warm = null;
+    public ?DiagnosticCheckResult $diagnostics = null;
+
+    /** @var list<array<string, mixed>> */
+    public array $knownGaps = [];
 
     /** @var array<string, float> */
     public array $timings = [];
@@ -26,7 +30,8 @@ final class ProjectReport
     {
         return null === $this->failure
             && null !== $this->cold && [] === $this->cold->layers
-            && null !== $this->warm && [] === $this->warm->layers;
+            && null !== $this->warm && [] === $this->warm->layers
+            && null !== $this->diagnostics && $this->diagnostics->ok();
     }
 
     /**
@@ -50,6 +55,8 @@ final class ProjectReport
             'timings' => $this->timings,
             'cold' => $this->cold?->toArray(),
             'warm' => $this->warm?->toArray(),
+            'diagnostics' => $this->diagnostics?->toArray(),
+            'knownGaps' => $this->knownGaps,
         ];
     }
 }

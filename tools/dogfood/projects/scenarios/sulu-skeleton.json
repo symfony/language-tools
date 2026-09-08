@@ -1,0 +1,59 @@
+{
+    "version": 1,
+    "revision": "39c5c04392562f2e18462b4c762a56de50838c83",
+    "scenarios": [
+        {
+            "id": "template.twig",
+            "file": "templates/articles/article.html.twig",
+            "anchor": "{% extends 'base.html.twig' %}",
+            "offset": 26,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "base.html.twig"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "service.yaml",
+            "file": "config/packages/http_discovery.yaml",
+            "anchor": "    Psr\\Http\\Message\\RequestFactoryInterface: '@http_discovery.psr17_factory'",
+            "offset": 76,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "http_discovery.psr17_factory"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "parameter.yaml",
+            "file": "config/packages/cmsig_seal.yaml",
+            "anchor": "            dir: '%kernel.project_dir%/config/schemas'\r",
+            "offset": 37,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "kernel.project_dir"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "environment",
+            "file": "config/packages/cmsig_seal.yaml",
+            "anchor": "            adapter: '%env(resolve:SEAL_DSN)%'\r",
+            "offset": 43,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "SEAL_DSN"
+                    ]
+                }
+            }
+        }
+    ],
+    "diagnostics": []
+}

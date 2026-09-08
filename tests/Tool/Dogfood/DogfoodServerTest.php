@@ -89,6 +89,21 @@ final class DogfoodServerTest extends TestCase
         self::assertFalse($server->started());
     }
 
+    public function testDoesNotSpendRequestsOnScenariosWhenRuntimeIndexingFails(): void
+    {
+        $server = new ScriptedLanguageServer($this->directory, ['responses' => [[
+            'method' => 'workspace/executeCommand',
+            'result' => [['source' => ['state' => 'ready'], 'runtime' => ['state' => 'failed']]],
+        ]]]);
+        $result = $this->execute(['--scenarios='.$this->manifest(), $server->path, $this->project]);
+        $report = $this->report($result);
+
+        self::assertSame(0, $report['requestCount']);
+        self::assertSame('error', $report['scenarios'][0]['status']);
+        self::assertNotContains('textDocument/didOpen', $server->methods());
+        self::assertNotContains('textDocument/completion', $server->methods());
+    }
+
     public function testReportsPassingScenarios(): void
     {
         $server = new ScriptedLanguageServer($this->directory, ['responses' => [

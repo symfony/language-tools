@@ -15,6 +15,7 @@ final class DiagnosticCheckHarness
     public function __construct(
         private ProcessRunnerInterface $processes,
         private string $serverPath,
+        private readonly ResponseFingerprint $fingerprint = new ResponseFingerprint(),
     ) {
     }
 
@@ -45,7 +46,7 @@ final class DiagnosticCheckHarness
         if (null !== $failure) {
             return new DiagnosticCheckResult($failure, $process->exitCode, [], $milliseconds, $analyzedFiles);
         }
-        $diagnostics = $this->diagnostics($report);
+        $diagnostics = $this->diagnostics($report, $applicationRoot);
         if (\is_string($diagnostics)) {
             return new DiagnosticCheckResult($diagnostics, $process->exitCode, [], $milliseconds, $analyzedFiles);
         }
@@ -134,7 +135,7 @@ final class DiagnosticCheckHarness
      *
      * @return list<DogfoodDiagnostic>|string failure reason when a diagnostic cannot be projected
      */
-    private function diagnostics(array $report): array|string
+    private function diagnostics(array $report, string $applicationRoot): array|string
     {
         $reported = $report['diagnostics'] ?? null;
         if (!\is_array($reported)) {
@@ -152,13 +153,14 @@ final class DiagnosticCheckHarness
             $file = $reportedDiagnostic['workspacePath'] ?? null;
             $code = $reportedDiagnostic['code'] ?? null;
             $severity = $reportedDiagnostic['severity'] ?? null;
+            $message = $reportedDiagnostic['message'] ?? null;
             $range = $this->range($reportedDiagnostic['range'] ?? null);
             if (!\is_string($file)
                 || !\is_string($code)
                 || '' === $code
                 || !\is_string($severity)
                 || !\in_array($severity, self::SEVERITIES, true)
-                || null === $range
+                || null === $range || !\is_string($message) || '' === $message
             ) {
                 return 'diagnostic-invalid';
             }
@@ -170,6 +172,7 @@ final class DiagnosticCheckHarness
                 'code' => $code,
                 'severity' => $severity,
                 'range' => $range,
+                'messageHash' => $this->fingerprint->hash($message, $applicationRoot),
             ];
         }
         usort($diagnostics, static fn (array $left, array $right): int => self::sortKey($left) <=> self::sortKey($right));
@@ -205,7 +208,7 @@ final class DiagnosticCheckHarness
         $endLine = \is_array($end) ? ($end['line'] ?? null) : null;
         $endCharacter = \is_array($end) ? ($end['character'] ?? null) : null;
         if (!\is_int($startLine) || !\is_int($startCharacter) || !\is_int($endLine) || !\is_int($endCharacter)
-            || $startLine < 0 || $startCharacter < 0
+            || $startLine < 0 || $startCharacter < 0 || $endCharacter < 0
             || $endLine < $startLine
             || ($endLine === $startLine && $endCharacter < $startCharacter)
         ) {

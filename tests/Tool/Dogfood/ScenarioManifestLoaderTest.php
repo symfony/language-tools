@@ -184,6 +184,11 @@ final class ScenarioManifestLoaderTest extends TestCase
         yield 'missing diagnostics' => [['diagnostics' => null], 'must declare a "diagnostics" baseline'];
         yield 'diagnostics map' => [['diagnostics' => ['src' => []]], 'list of baseline entries'];
         yield 'diagnostic list entry' => [['diagnostics' => [['a']]], 'must be an object'];
+        yield 'unrecorded diagnostic wording' => [['diagnostics' => [self::diagnostic(['messageHash' => null])]], 'SHA-256 "messageHash"'];
+        yield 'invalid diagnostic wording hash' => [['diagnostics' => [self::diagnostic(['messageHash' => 'value'])]], 'SHA-256 "messageHash"'];
+        yield 'unreviewed diagnostic' => [['diagnostics' => [self::diagnostic(['reason' => null])]], 'review "reason"'];
+        yield 'unclassified diagnostic' => [['diagnostics' => [self::diagnostic(['kind' => null])]], 'application or known-gap'];
+        yield 'unknown diagnostic classification' => [['diagnostics' => [self::diagnostic(['kind' => 'ignored'])]], 'application or known-gap'];
         yield 'unknown diagnostic key' => [['diagnostics' => [self::diagnostic(['message' => 'boom'])]], 'Unknown key "message"'];
         yield 'missing diagnostic code' => [['diagnostics' => [self::diagnostic(['code' => null])]], 'non-empty diagnostic code'];
         yield 'numeric diagnostic code' => [['diagnostics' => [self::diagnostic(['code' => 7])]], 'non-empty diagnostic code'];
@@ -332,6 +337,9 @@ final class ScenarioManifestLoaderTest extends TestCase
             'code' => 'symfony.route.unknown',
             'severity' => 'error',
             'range' => self::range(3, 8, 3, 20),
+            'kind' => 'application',
+            'reason' => 'The pinned controller references a route that is not declared.',
+            'messageHash' => str_repeat('a', 64),
         ], $overrides);
     }
 

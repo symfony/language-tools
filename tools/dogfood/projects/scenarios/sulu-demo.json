@@ -1,0 +1,111 @@
+{
+    "version": 1,
+    "revision": "fcbc11bd1bc657929be4bd52abfb1f308918fe36",
+    "scenarios": [
+        {
+            "id": "template.twig",
+            "file": "templates/articles/blog.html.twig",
+            "anchor": "{% extends 'base.html.twig' %}",
+            "offset": 26,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "base.html.twig"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "asset.twig.references",
+            "file": "templates/base.html.twig",
+            "anchor": "        {% set assetCss = asset('build/website/app.css') %}",
+            "offset": 54,
+            "expect": {
+                "references": {
+                    "includes": [
+                        "templates/base.html.twig:16:33-16:54"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "doctrine.field.repository.php",
+            "file": "src/Build/UserBuilder.php",
+            "anchor": "        $user = $userRepository->findOneBy(['username' => 'admin']);",
+            "offset": 53,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "username"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "translation.twig",
+            "file": "templates/articles/blog.html.twig",
+            "anchor": "            <div class=\"posted-by\">{{ 'posted_by'|trans }} <span>{{ author.fullName }}</span></div>",
+            "offset": 48,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "posted_by"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "service.yaml",
+            "file": "config/packages/nyholm_psr7.yaml",
+            "anchor": "    Psr\\Http\\Message\\RequestFactoryInterface: '@nyholm.psr7.psr17_factory'",
+            "offset": 73,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "nyholm.psr7.psr17_factory"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "parameter.yaml",
+            "file": "config/packages/doctrine.yaml",
+            "anchor": "        profiling_collect_backtrace: '%kernel.debug%'",
+            "offset": 51,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "kernel.debug"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "environment",
+            "file": "config/packages/cache.yaml",
+            "anchor": "    env(REDIS_DSN): 'redis://%env(resolve:REDIS_PASSWORD)%@%env(resolve:REDIS_HOST)%/1'",
+            "offset": 56,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "REDIS_PASSWORD"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "twig.function",
+            "file": "templates/includes/footer.html.twig",
+            "anchor": "                                            {{ country(address.countryCode) }}</p>",
+            "offset": 54,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "country"
+                    ]
+                }
+            }
+        }
+    ],
+    "diagnostics": []
+}

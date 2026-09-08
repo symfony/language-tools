@@ -20,7 +20,7 @@ final class ScenarioManifestLoader
     private const KEYS = ['version', 'revision', 'scenarios', 'diagnostics'];
     private const SCENARIO_KEYS = ['id', 'file', 'anchor', 'offset', 'expect', 'newName', 'edit'];
     private const EDIT_KEYS = ['before', 'after', 'file', 'anchor', 'offset', 'expect', 'applyCodeAction', 'afterFix'];
-    private const DIAGNOSTIC_KEYS = ['path', 'code', 'severity', 'range'];
+    private const DIAGNOSTIC_KEYS = ['path', 'code', 'severity', 'range', 'kind', 'reason', 'messageHash'];
     private const FEATURES = ['completion', 'hover', 'definition', 'references', 'documentLink', 'codeLens', 'prepareRename', 'rename', 'codeAction', 'diagnostics'];
     private const EXPECTATION_KEYS = ['equals', 'includes', 'excludes'];
     private const SEVERITIES = ['error', 'warning', 'information', 'hint'];
@@ -350,11 +350,24 @@ final class ScenarioManifestLoader
             throw new ConfigurationException(\sprintf('The "severity" in %s must be one of "%s".', $context, implode('", "', self::SEVERITIES)));
         }
 
+        $messageHash = $entry['messageHash'] ?? null;
+        if (!\is_string($messageHash) || 1 !== preg_match('/^[a-f0-9]{64}$/D', $messageHash)) {
+            throw new ConfigurationException(\sprintf('The %s must declare a SHA-256 "messageHash".', $context));
+        }
+        $kind = $entry['kind'] ?? null;
+        $reason = $entry['reason'] ?? null;
+        if (!\in_array($kind, ['application', 'known-gap'], true) || !\is_string($reason) || '' === trim($reason) || !$this->isSafeText($reason)) {
+            throw new ConfigurationException(\sprintf('The %s must declare an application or known-gap "kind" and a non-empty review "reason".', $context));
+        }
+
         return [
             'path' => $this->relativePath($entry['path'] ?? null, 'path', $context),
             'code' => $code,
             'severity' => $severity,
             'range' => $this->range($entry['range'] ?? null, $context),
+            'kind' => $kind,
+            'reason' => $reason,
+            'messageHash' => $messageHash,
         ];
     }
 

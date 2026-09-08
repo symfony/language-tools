@@ -1,0 +1,46 @@
+{
+    "version": 1,
+    "revision": "3826b828b412739a38af9f12bb97f55b380b7dce",
+    "scenarios": [
+        {
+            "id": "template.twig",
+            "file": "templates/web2print/container.html.twig",
+            "anchor": "{% extends 'web2print/layout.html.twig' %}",
+            "offset": 38,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "web2print/layout.html.twig"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "parameter.yaml",
+            "file": "config/packages/security.yaml",
+            "anchor": "        pimcore_studio: \"%pimcore_studio_backend.firewall_settings%\"",
+            "offset": 66,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "pimcore_studio_backend.firewall_settings"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "environment",
+            "file": "config/config.yaml",
+            "anchor": "        jwt_key: '%env(MERCURE_JWT_KEY)%'",
+            "offset": 38,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "MERCURE_JWT_KEY"
+                    ]
+                }
+            }
+        }
+    ],
+    "diagnostics": []
+}

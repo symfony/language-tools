@@ -4,9 +4,7 @@ namespace Symfony\Lsp\Tools\Dogfood;
 
 final class RunClassifier
 {
-    /**
-     * @return list<string> failed layers, empty on success
-     */
+    /** @return list<string> */
     public function classify(HarnessResult $run): array
     {
         if ($run->timedOut) {
@@ -16,35 +14,35 @@ final class RunClassifier
             return ['process'];
         }
         $layers = [];
-        $timedOut = false;
         $source = $this->indexState($run->result, 'source');
         if ('failed' === $source) {
             $layers[] = 'source-index';
         } elseif ('ready' !== $source) {
-            $timedOut = true;
+            $layers[] = 'timeout';
         }
         $runtime = $this->indexState($run->result, 'runtime');
         if (\in_array($runtime, ['failed', 'partial', 'stale'], true)) {
-            $layers[] = 'bootstrap' === $this->runtimeStage($run->result) ? 'bootstrap' : 'runtime-index';
-        } elseif ('ready' !== $runtime) {
-            $timedOut = true;
-        }
-        if ($timedOut) {
+            $status = $run->result['status'] ?? null;
+            $runtimeStatus = \is_array($status) ? ($status['runtime'] ?? null) : null;
+            $stage = \is_array($runtimeStatus) ? ($runtimeStatus['stage'] ?? null) : null;
+            $layers[] = 'bootstrap' === $stage ? 'bootstrap' : 'runtime-index';
+        } elseif ('ready' !== $runtime && !\in_array('timeout', $layers, true)) {
             $layers[] = 'timeout';
         }
-        if ($this->hasRequestError($run->result) || [] !== ($run->result['violations'] ?? [])) {
+        if (!$this->hasVerifiedScenarios($run->result)) {
+            $layers[] = 'scenario';
+        }
+        if ([] !== ($run->result['violations'] ?? [])) {
             $layers[] = 'request';
         }
-        if (0 !== ($run->result['exitCode'] ?? 0) || null !== ($run->result['serverError'] ?? null)) {
+        if (0 !== ($run->result['exitCode'] ?? null) || null !== ($run->result['serverError'] ?? null)) {
             $layers[] = 'process';
         }
 
         return $layers;
     }
 
-    /**
-     * @param array<mixed> $result
-     */
+    /** @param array<mixed> $result */
     public function indexState(array $result, string $section): string
     {
         $status = $result['status'] ?? null;
@@ -56,36 +54,37 @@ final class RunClassifier
         return \is_array($part) && \is_string($part['state'] ?? null) ? $part['state'] : 'unknown';
     }
 
-    /**
-     * @param array<mixed> $result
-     */
-    private function runtimeStage(array $result): ?string
+    /** @param array<mixed> $result */
+    private function hasVerifiedScenarios(array $result): bool
     {
-        $status = $result['status'] ?? null;
-        if (!\is_array($status) || !\is_array($status['runtime'] ?? null)) {
-            return null;
+        $scenarios = $result['scenarios'] ?? null;
+        if (!\is_array($scenarios) || !array_is_list($scenarios) || [] === $scenarios
+            || \count($scenarios) !== ($result['scenarioCount'] ?? null)
+            || 0 !== ($result['assertionFailures'] ?? null)
+        ) {
+            return false;
         }
-        $stage = $status['runtime']['stage'] ?? null;
-
-        return \is_string($stage) ? $stage : null;
-    }
-
-    /**
-     * @param array<mixed> $result
-     */
-    private function hasRequestError(array $result): bool
-    {
-        foreach (\is_array($result['probes'] ?? null) ? $result['probes'] : [] as $probe) {
-            if (!\is_array($probe) || !\is_array($probe['requests'] ?? null)) {
-                continue;
+        $ids = [];
+        foreach ($scenarios as $scenario) {
+            if (!\is_array($scenario) || 'pass' !== ($scenario['status'] ?? null)
+                || !\is_string($scenario['id'] ?? null) || '' === $scenario['id'] || isset($ids[$scenario['id']])
+                || !\is_array($scenario['checks'] ?? null) || [] === $scenario['checks']
+                || [] !== ($scenario['failures'] ?? [])
+            ) {
+                return false;
             }
-            foreach ($probe['requests'] as $request) {
-                if (\is_array($request) && null !== ($request['error'] ?? null)) {
-                    return true;
+            $ids[$scenario['id']] = true;
+            foreach ($scenario['checks'] as $check) {
+                if (!\is_array($check) || 'pass' !== ($check['status'] ?? null)
+                    || !\is_string($check['method'] ?? null) || !\is_string($check['phase'] ?? null)
+                    || !\is_string($check['fingerprint'] ?? null) || 1 !== preg_match('/^[a-f0-9]{64}$/D', $check['fingerprint'])
+                    || [] !== ($check['failures'] ?? [])
+                ) {
+                    return false;
                 }
             }
         }
 
-        return false;
+        return true;
     }
 }

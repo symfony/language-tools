@@ -150,7 +150,10 @@ try {
         $requestTimeout,
     );
     $scenariosStartedAt = hrtime(true);
-    $report = array_replace($report, $runner->run($manifest, $project));
+    $ready = 'ready' === ($report['status']['source']['state'] ?? null) && 'ready' === ($report['status']['runtime']['state'] ?? null);
+    $report = array_replace($report, $ready
+        ? $runner->run($manifest, $project)
+        : ScenarioRunner::unavailable($manifest, 'Source and runtime indexing must be ready before scenarios run.'));
     $timings['scenariosMilliseconds'] = $elapsedMilliseconds($scenariosStartedAt);
 
     $shutdownStartedAt = hrtime(true);

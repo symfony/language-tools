@@ -48,6 +48,35 @@ final class ResponseFingerprintTest extends TestCase
         self::assertNotSame($this->fingerprint->hash($first, self::ROOT), $this->fingerprint->hash($second, self::ROOT));
     }
 
+    public function testRetainsPositionalCommandArgumentsAndNestedExtensionData(): void
+    {
+        foreach (['arguments', 'data'] as $key) {
+            self::assertNotSame(
+                $this->fingerprint->hash([$key => ['uri', ['values' => [1, 2]]]], self::ROOT),
+                $this->fingerprint->hash([$key => [['values' => [1, 2]], 'uri']], self::ROOT),
+            );
+            self::assertNotSame(
+                $this->fingerprint->hash([$key => [['values' => [1, 2]]]], self::ROOT),
+                $this->fingerprint->hash([$key => [['values' => [2, 1]]]], self::ROOT),
+            );
+        }
+    }
+
+    public function testDoesNotNormalizeApplicationVersionFieldsInsideOpaqueData(): void
+    {
+        self::assertNotSame(
+            $this->fingerprint->hash(['data' => ['uri' => 'item', 'version' => 1]], self::ROOT),
+            $this->fingerprint->hash(['data' => ['uri' => 'item', 'version' => 2]], self::ROOT),
+        );
+    }
+
+    public function testRejectsUnencodableResponsesInsteadOfHashingPartialOutput(): void
+    {
+        $this->expectException(\JsonException::class);
+
+        $this->fingerprint->hash(['value' => \INF], self::ROOT);
+    }
+
     public function testKeepsReplacementTextApart(): void
     {
         self::assertNotSame(

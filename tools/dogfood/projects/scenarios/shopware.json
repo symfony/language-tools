@@ -1,0 +1,422 @@
+{
+    "version": 1,
+    "revision": "d4e452365f8125b7cacf046b7eef56dbef5f92d5",
+    "scenarios": [
+        {
+            "id": "route.php",
+            "file": "src/Administration/Framework/SystemCheck/AdministrationReadinessCheck.php",
+            "anchor": "        $indexRoute = $this->router->generate('administration.index');",
+            "offset": 67,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "administration.index"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "route.twig",
+            "file": "src/Administration/Resources/views/administration/error-404.html.twig",
+            "anchor": "          href=\"{{ path('administration.index') }}\"",
+            "offset": 45,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "administration.index"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "template.twig",
+            "file": "src/Administration/Resources/views/administration/error-404.html.twig",
+            "anchor": "{% extends '@Administration/administration/layout/base.html.twig' %}",
+            "offset": 64,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "@Administration/administration/layout/base.html.twig"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "asset.twig.references",
+            "file": "src/Storefront/Resources/views/storefront/element/cms-element-video.html.twig",
+            "anchor": "                                        src=\"{{ asset('bundles/storefront/assets/default/cms/video-icon.webp') }}\"",
+            "offset": 108,
+            "expect": {
+                "references": {
+                    "includes": [
+                        "src/Storefront/Resources/views/storefront/element/cms-element-video.html.twig:53:55-53:108"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "console.argument.php",
+            "file": "src/Core/Checkout/Cart/Command/CartMigrateCommand.php",
+            "anchor": "        $url = $input->getArgument('url');",
+            "offset": 39,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "url"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "console.option.php",
+            "file": "src/Core/Content/Cms/Command/CreatePageCommand.php",
+            "anchor": "        if ($input->getOption('reset')) {",
+            "offset": 36,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "reset"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "translation.dynamic.negative",
+            "file": "src/Core/Checkout/Cart/CartRuleLoader.php",
+            "anchor": "                'checkout.' . $error->getMessageKey(),",
+            "offset": 26,
+            "expect": {
+                "definition": {
+                    "equals": []
+                },
+                "references": {
+                    "equals": []
+                }
+            }
+        },
+        {
+            "id": "translation.snippet.references",
+            "file": "src/Administration/Resources/app/administration/src/module/sw-sales-channel/product-export-templates/billiger-de/body.csv.twig",
+            "anchor": "    {{ \"detail.deliveryTimeAvailable\"|trans({'%name%': product.deliveryTime.translation('name')}) }}{#- -#}",
+            "offset": 36,
+            "expect": {
+                "references": {
+                    "includes": [
+                        "src/Administration/Resources/app/administration/src/module/sw-sales-channel/product-export-templates/billiger-de/body.csv.twig:21:8-21:36"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "parameter.yaml",
+            "file": "src/Core/Framework/Resources/config/packages/dev/easy_log_handler.yaml",
+            "anchor": "        arguments: ['%kernel.logs_dir%/%kernel.environment%.log']",
+            "offset": 37,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "kernel.logs_dir"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "environment.references",
+            "file": "src/Core/Framework/Resources/config/packages/framework.yaml",
+            "anchor": "    secret: \"%env(APP_SECRET)%\"",
+            "offset": 28,
+            "expect": {
+                "references": {
+                    "includes": [
+                        "src/Core/Framework/Resources/config/packages/framework.yaml:24:18-24:28"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "twig.filter",
+            "file": "src/Administration/Resources/app/administration/src/module/sw-sales-channel/product-export-templates/billiger-de/body.csv.twig",
+            "anchor": "    {{ price.referencePrice.price|currency }} / {{ price.referencePrice.referenceUnit }} {{ price.referencePrice.unitName }}{#- -#}",
+            "offset": 42,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "currency"
+                    ]
+                }
+            }
+        }
+    ],
+    "diagnostics": [
+        {
+            "path": "src/Core/DevOps/Docs/App/DocsAppEventCommand.php",
+            "code": "template.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 59,
+                    "character": 17
+                },
+                "end": {
+                    "line": 59,
+                    "character": 45
+                }
+            },
+            "kind": "application",
+            "reason": "The documentation generator renders templates through its separate Twig environment.",
+            "messageHash": "8cb837a6a3e383b309d1e7334c724d605caa4629d5547aabcc6e98bec465c61b"
+        },
+        {
+            "path": "src/Core/DevOps/Docs/Script/HooksReferenceGenerator.php",
+            "code": "template.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 86,
+                    "character": 65
+                },
+                "end": {
+                    "line": 86,
+                    "character": 87
+                }
+            },
+            "kind": "application",
+            "reason": "The documentation generator renders templates through its separate Twig environment.",
+            "messageHash": "668d78027ad4b73786edce48fef3272ac8353b7155d5d9f1294ae4a2644bee25"
+        },
+        {
+            "path": "src/Core/DevOps/Docs/Script/ServiceReferenceGenerator.php",
+            "code": "template.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 83,
+                    "character": 94
+                },
+                "end": {
+                    "line": 83,
+                    "character": 119
+                }
+            },
+            "kind": "application",
+            "reason": "The documentation generator renders templates through its separate Twig environment.",
+            "messageHash": "e507f48e369140dd190da39df0ceb2497d97e1e0bdb2c326f31905c826937e5d"
+        },
+        {
+            "path": "src/Core/Installer/Controller/DatabaseConfigurationController.php",
+            "code": "route.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 87,
+                    "character": 39
+                },
+                "end": {
+                    "line": 87,
+                    "character": 64
+                }
+            },
+            "kind": "application",
+            "reason": "Installer routes belong to the separate installer kernel and are absent from the storefront kernel used in this matrix.",
+            "messageHash": "8b95667c444c4f6674b8d1b1364b33abf35df854bf861d4df3268e6912302259"
+        },
+        {
+            "path": "src/Core/Installer/Controller/DatabaseImportController.php",
+            "code": "route.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 34,
+                    "character": 43
+                },
+                "end": {
+                    "line": 34,
+                    "character": 75
+                }
+            },
+            "kind": "application",
+            "reason": "Installer routes belong to the separate installer kernel and are absent from the storefront kernel used in this matrix.",
+            "messageHash": "ac6ca7621e3713ae08acc94c8ccb562532a1dc17bf456c680e111db13f64b336"
+        },
+        {
+            "path": "src/Core/Installer/Controller/LicenseController.php",
+            "code": "route.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 24,
+                    "character": 43
+                },
+                "end": {
+                    "line": 24,
+                    "character": 75
+                }
+            },
+            "kind": "application",
+            "reason": "Installer routes belong to the separate installer kernel and are absent from the storefront kernel used in this matrix.",
+            "messageHash": "ac6ca7621e3713ae08acc94c8ccb562532a1dc17bf456c680e111db13f64b336"
+        },
+        {
+            "path": "src/Core/Installer/Controller/RequirementsController.php",
+            "code": "route.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 34,
+                    "character": 43
+                },
+                "end": {
+                    "line": 34,
+                    "character": 60
+                }
+            },
+            "kind": "application",
+            "reason": "Installer routes belong to the separate installer kernel and are absent from the storefront kernel used in this matrix.",
+            "messageHash": "7b5b6e25ce7825f9eed9daab4c7005c21bc939bd0bcfe72976f07e9315ae4ef3"
+        },
+        {
+            "path": "src/Core/Installer/Controller/ShopConfigurationController.php",
+            "code": "route.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 53,
+                    "character": 43
+                },
+                "end": {
+                    "line": 53,
+                    "character": 75
+                }
+            },
+            "kind": "application",
+            "reason": "Installer routes belong to the separate installer kernel and are absent from the storefront kernel used in this matrix.",
+            "messageHash": "ac6ca7621e3713ae08acc94c8ccb562532a1dc17bf456c680e111db13f64b336"
+        },
+        {
+            "path": "src/Core/Installer/Controller/ShopConfigurationController.php",
+            "code": "route.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 131,
+                    "character": 51
+                },
+                "end": {
+                    "line": 131,
+                    "character": 67
+                }
+            },
+            "kind": "application",
+            "reason": "Installer routes belong to the separate installer kernel and are absent from the storefront kernel used in this matrix.",
+            "messageHash": "c88857d8e9132bb553a177c83c2326285bb82c5ba45779fe285d1781c6c5218c"
+        },
+        {
+            "path": "src/Core/Installer/Controller/ShopConfigurationController.php",
+            "code": "route.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 135,
+                    "character": 47
+                },
+                "end": {
+                    "line": 135,
+                    "character": 68
+                }
+            },
+            "kind": "application",
+            "reason": "Installer routes belong to the separate installer kernel and are absent from the storefront kernel used in this matrix.",
+            "messageHash": "2d945a09ae442768e448e36eafe91d6868f1bc43239524479f026fd66e34be8f"
+        },
+        {
+            "path": "src/Core/Installer/Controller/StartController.php",
+            "code": "route.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 26,
+                    "character": 43
+                },
+                "end": {
+                    "line": 26,
+                    "character": 65
+                }
+            },
+            "kind": "application",
+            "reason": "Installer routes belong to the separate installer kernel and are absent from the storefront kernel used in this matrix.",
+            "messageHash": "c291a208291eb11c22bca498a02545aed51e6da36fbfd9ca42b78fe558b4239c"
+        },
+        {
+            "path": "tests/unit/Core/Framework/MessageQueue/MessageHandlerCompilerPassTest.php",
+            "code": "messenger.unknown_bus",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 81,
+                    "character": 10
+                },
+                "end": {
+                    "line": 81,
+                    "character": 17
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "f2e35c575e51306b8a10954c38c45dd0b91f6e6a6b7ab844b6933acb8fe79658"
+        },
+        {
+            "path": "tests/unit/Core/Framework/MessageQueue/MessageHandlerCompilerPassTest.php",
+            "code": "messenger.unknown_transport",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 82,
+                    "character": 20
+                },
+                "end": {
+                    "line": 82,
+                    "character": 33
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "a1bf584edd989eb33a50ed25e92c92d2cdf5d587b0e51f8545708b4a7062e696"
+        },
+        {
+            "path": "tests/unit/Core/Framework/MessageQueue/Middleware/RoutingOverwriteMiddlewareTest.php",
+            "code": "messenger.unknown_bus",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 133,
+                    "character": 84
+                },
+                "end": {
+                    "line": 133,
+                    "character": 88
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "dc845c3768114e47d9d3f6424dbdca4af04165a87107bc4a16519a8670e2afca"
+        },
+        {
+            "path": "tests/unit/Core/Framework/MessageQueue/Middleware/RoutingOverwriteMiddlewareTest.php",
+            "code": "messenger.unknown_bus",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 141,
+                    "character": 34
+                },
+                "end": {
+                    "line": 141,
+                    "character": 38
+                }
+            },
+            "kind": "application",
+            "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
+            "messageHash": "dc845c3768114e47d9d3f6424dbdca4af04165a87107bc4a16519a8670e2afca"
+        }
+    ]
+}

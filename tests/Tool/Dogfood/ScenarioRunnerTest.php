@@ -134,6 +134,8 @@ final class ScenarioRunnerTest extends TestCase
             'textDocument/completion',
             'textDocument/hover',
             'textDocument/didClose',
+            'shutdown',
+            'exit',
         ], $server->methods());
         self::assertSame(2, $report['requestCount']);
     }
@@ -153,6 +155,24 @@ final class ScenarioRunnerTest extends TestCase
         self::assertStringContainsString('no diagnostics for version 1', $check['failures'][0]);
         self::assertSame('error', $report['scenarios'][0]['status']);
         self::assertGreaterThan(0, $report['requestCount']);
+    }
+
+    public function testChecksPublishedDiagnosticBoundsEvenWhenTheProjectionMatches(): void
+    {
+        $server = new ScriptedLanguageServer($this->directory, ['diagnostics' => [[
+            'contains' => 'hello/index.html.twig',
+            'items' => [[
+                'code' => 'template.not_found',
+                'find' => 'hello/index.html.twig',
+                'range' => ['start' => ['line' => 999, 'character' => 0], 'end' => ['line' => 999, 'character' => 1]],
+            ]],
+        ]]]);
+        $report = $this->execute($server, [$this->scenario([
+            'expect' => ['diagnostics' => ['equals' => ['template.not_found:error:999:0-999:1']]],
+        ])]);
+
+        self::assertCount(2, $report['violations']);
+        self::assertStringContainsString('outside', $report['violations'][0]['message']);
     }
 
     public function testAssertsTheDiagnosticsOfTheEditedVersion(): void
@@ -350,7 +370,15 @@ final class ScenarioRunnerTest extends TestCase
             5.0,
         );
 
-        return $runner->run($this->manifest($scenarios), $this->project);
+        $report = $runner->run($this->manifest($scenarios), $this->project);
+        if (null === $report['transportFailure']) {
+            $this->client->request('test-shutdown', 'shutdown');
+            $this->client->notify('exit');
+            $this->client->close(5.0);
+            $this->client = null;
+        }
+
+        return $report;
     }
 
     /**

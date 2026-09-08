@@ -15,22 +15,6 @@ final class Utf16PositionsTest extends TestCase
         $this->positions = new Utf16Positions();
     }
 
-    public function testConvertsByteOffsetsToUtf16Positions(): void
-    {
-        $text = "héllo\r\n🐘 world\nlast";
-
-        self::assertSame(['line' => 0, 'character' => 0], $this->positions->position($text, 0));
-        self::assertSame(['line' => 0, 'character' => 5], $this->positions->position($text, 6));
-        self::assertSame(['line' => 1, 'character' => 2], $this->positions->position($text, 12));
-        self::assertSame(['line' => 2, 'character' => 4], $this->positions->position($text, \strlen($text)));
-    }
-
-    public function testClampsOffsetsOutsideTheText(): void
-    {
-        self::assertSame(['line' => 0, 'character' => 0], $this->positions->position("hello\n", -5));
-        self::assertSame(['line' => 1, 'character' => 0], $this->positions->position("hello\n", 500));
-    }
-
     public function testConvertsPositionsToByteOffsets(): void
     {
         $text = "héllo\r\n🐘 world\n";

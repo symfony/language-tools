@@ -2,10 +2,13 @@
 
 ## Unreleased
 
+- Replace dogfood support scores with reviewed behavioral scenarios and whole-project diagnostic regression checks
+- Keep credential-bearing setup output out of dogfood failure reports
+- Complete Twig callables inside quoted HTML attributes
+- Complete translation keys in surrounding markup and honor the selected translation domain
 - Refuse rename edits when open-document source analysis fails
 - Rebuild source caches after source analysis corrections
 - Exercise explicit provider cases in the diagnostics benchmark
-- Count only document links covering each dogfood probe
 - Avoid mixing typed property receivers across anonymous PHP classes
 - Respect patch-level support for localized route aliases
 - Keep XLIFF messages scoped to their translation unit or segment

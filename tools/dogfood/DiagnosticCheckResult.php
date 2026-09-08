@@ -2,7 +2,7 @@
 
 namespace Symfony\Lsp\Tools\Dogfood;
 
-/** @phpstan-type DogfoodDiagnostic array{path: string, code: string, severity: string, range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} */
+/** @phpstan-type DogfoodDiagnostic array{path: string, code: string, severity: string, messageHash: string, range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} */
 final class DiagnosticCheckResult
 {
     /** @param list<DogfoodDiagnostic> $diagnostics */

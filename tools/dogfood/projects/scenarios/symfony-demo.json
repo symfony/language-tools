@@ -1,0 +1,406 @@
+{
+    "version": 1,
+    "revision": "920d86dc809f837543cb519d3df5b364a2c36577",
+    "scenarios": [
+        {
+            "id": "route.php",
+            "file": "src/Controller/Admin/BlogController.php",
+            "anchor": "                return $this->redirectToRoute('admin_post_new', [], Response::HTTP_SEE_OTHER);",
+            "offset": 61,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "admin_post_new"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "route.twig",
+            "file": "templates/admin/blog/_delete_form.html.twig",
+            "anchor": "<form action=\"{{ url('admin_post_delete', {id: post.id}) }}\" method=\"post\" data-confirmation=\"true\" id=\"delete-form\">",
+            "offset": 39,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "admin_post_delete"
+                    ]
+                },
+                "definition": {
+                    "equals": [
+                        "src/Controller/Admin/BlogController.php:159:40-159:57"
+                    ]
+                },
+                "references": {
+                    "equals": [
+                        "templates/admin/blog/_delete_form.html.twig:1:22-1:39",
+                        "src/Controller/Admin/BlogController.php:159:40-159:57"
+                    ]
+                },
+                "prepareRename": {
+                    "equals": [
+                        "1:22-1:39"
+                    ]
+                },
+                "rename": {
+                    "equals": [
+                        "src/Controller/Admin/BlogController.php:159:40-159:57=>admin_post_remove",
+                        "templates/admin/blog/_delete_form.html.twig:1:22-1:39=>admin_post_remove"
+                    ]
+                }
+            },
+            "newName": "admin_post_remove"
+        },
+        {
+            "id": "template.php",
+            "file": "src/Controller/Admin/BlogController.php",
+            "anchor": "        return $this->render('admin/blog/index.html.twig', ['posts' => $authorPosts]);",
+            "offset": 42,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "admin/blog/index.html.twig"
+                    ]
+                },
+                "documentLink": {
+                    "equals": [
+                        "63:30-63:56=>templates/admin/blog/index.html.twig"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "template.twig",
+            "file": "templates/admin/blog/edit.html.twig",
+            "anchor": "{% extends 'admin/layout.html.twig' %}",
+            "offset": 34,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "admin/layout.html.twig"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "component.twig",
+            "file": "templates/admin/blog/_delete_form.html.twig",
+            "anchor": "        <twig:ux:icon name=\"tabler:trash\"/>",
+            "offset": 21,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "ux:icon"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "stimulus.controller.twig",
+            "file": "templates/security/login.html.twig",
+            "anchor": "                        <input type=\"hidden\" name=\"_csrf_token\" data-controller=\"csrf-protection\" value=\"{{ csrf_token('authenticate') }}\">",
+            "offset": 96,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "csrf-protection"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "stimulus.helper.twig",
+            "file": "templates/security/login.html.twig",
+            "anchor": "    <div class=\"row\" {{ stimulus_controller('login') }}>",
+            "offset": 50,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "login"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "asset.twig",
+            "file": "templates/base.html.twig",
+            "anchor": "        <link rel=\"shortcut icon\" type=\"image/svg+xml\" href=\"{{ asset('favicon.svg') }}\">",
+            "offset": 82,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "favicon.svg"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "importmap.twig",
+            "file": "templates/admin/layout.html.twig",
+            "anchor": "    {{ importmap(['app', 'admin']) }}",
+            "offset": 22,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "app"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "doctrine.field.repository.php",
+            "file": "src/Command/AddUserCommand.php",
+            "anchor": "        $existingUser = $this->users->findOneBy(['username' => $username]);",
+            "offset": 58,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "username"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "form.property.php",
+            "file": "src/Form/CommentType.php",
+            "anchor": "            ->add('content', TextareaType::class, [",
+            "offset": 26,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "content"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "constraint.option.php",
+            "file": "src/Entity/Comment.php",
+            "anchor": "    #[Assert\\NotBlank(message: 'comment.blank')]",
+            "offset": 29,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "message"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "console.argument.php",
+            "file": "src/Command/AddUserCommand.php",
+            "anchor": "        $username = $input->getArgument('username');",
+            "offset": 49,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "username"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "parameter.php",
+            "file": "src/Command/ListUsersCommand.php",
+            "anchor": "        #[Autowire('%app.notifications.email_sender%')]",
+            "offset": 51,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "app.notifications.email_sender"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "translation.php",
+            "file": "src/EventSubscriber/CommentNotificationSubscriber.php",
+            "anchor": "        $subject = $this->translator->trans('notification.comment_created');",
+            "offset": 73,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "notification.comment_created"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "translation.twig",
+            "file": "templates/admin/blog/_delete_form.html.twig",
+            "anchor": "        {{ 'action.delete_post'|trans }}",
+            "offset": 30,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "action.delete_post"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "parameter.yaml",
+            "file": "config/packages/doctrine.yaml",
+            "anchor": "        profiling_collect_backtrace: '%kernel.debug%'",
+            "offset": 51,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "kernel.debug"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "environment",
+            "file": "config/packages/doctrine.yaml",
+            "anchor": "url: '%env(resolve:DATABASE_URL)%'",
+            "offset": 31,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "DATABASE_URL"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "twig.function",
+            "file": "templates/admin/blog/edit.html.twig",
+            "anchor": "    {{ show_source_code(_self) }}",
+            "offset": 23,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "show_source_code"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "route.parameters.edit",
+            "file": "templates/admin/blog/_delete_form.html.twig",
+            "anchor": "url('admin_post_delete', {id: post.id})",
+            "offset": 10,
+            "expect": {
+                "definition": {
+                    "equals": [
+                        "src/Controller/Admin/BlogController.php:159:40-159:57"
+                    ]
+                }
+            },
+            "edit": {
+                "before": "url('admin_post_delete', {id: post.id})",
+                "after": "url('admin_post_delete', {'i': post.id})",
+                "anchor": "url('admin_post_delete', {'i': post.id})",
+                "offset": 28,
+                "expect": {
+                    "completion": {
+                        "includes": [
+                            "id"
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "id": "route.quickfix.edit",
+            "file": "templates/admin/blog/_delete_form.html.twig",
+            "anchor": "url('admin_post_delete', {id: post.id})",
+            "offset": 10,
+            "expect": {
+                "diagnostics": {
+                    "equals": []
+                }
+            },
+            "edit": {
+                "before": "url('admin_post_delete', {id: post.id})",
+                "after": "url('admin_post_delete')",
+                "anchor": "url('admin_post_delete'",
+                "offset": 10,
+                "expect": {
+                    "diagnostics": {
+                        "includes": [
+                            "route.missing_parameters:error:1:22-1:39"
+                        ]
+                    }
+                },
+                "applyCodeAction": "Add missing route parameter",
+                "afterFix": {
+                    "diagnostics": {
+                        "equals": []
+                    }
+                }
+            }
+        },
+        {
+            "id": "configuration.yaml",
+            "file": "config/packages/framework.yaml",
+            "anchor": "    secret:",
+            "offset": 10,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "secret"
+                    ]
+                },
+                "hover": {
+                    "includes": [
+                        "secret"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "event.dispatch.php",
+            "file": "src/Controller/BlogController.php",
+            "anchor": "new CommentCreatedEvent($comment)",
+            "offset": 10,
+            "expect": {
+                "definition": {
+                    "includes": [
+                        "src/EventSubscriber/CommentNotificationSubscriber.php:28:21-28:50"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "security.role.twig",
+            "file": "templates/base.html.twig",
+            "anchor": "is_granted('ROLE_ADMIN')",
+            "offset": 22,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "ROLE_ADMIN"
+                    ]
+                },
+                "hover": {
+                    "includes": [
+                        "ROLE_ADMIN"
+                    ]
+                }
+            }
+        }
+    ],
+    "diagnostics": [
+        {
+            "path": "config/packages/web_profiler.yaml",
+            "code": "config.deprecated_key",
+            "severity": "warning",
+            "range": {
+                "start": {
+                    "line": 6,
+                    "character": 12
+                },
+                "end": {
+                    "line": 6,
+                    "character": 35
+                }
+            },
+            "kind": "application",
+            "reason": "The pinned application uses a configuration option deprecated by its locked dependencies.",
+            "messageHash": "091412dd2ceae6933bd5b57f3d7e31623e7901c159962740c305de8f56c378f7"
+        }
+    ]
+}

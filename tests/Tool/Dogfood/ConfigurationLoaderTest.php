@@ -50,8 +50,7 @@ final class ConfigurationLoaderTest extends TestCase
         self::assertTrue($configuration->ci);
         self::assertSame(120, $configuration->indexTimeout);
         self::assertSame(10, $configuration->requestTimeout);
-        self::assertSame(['src', 'templates', 'config'], $configuration->probeRoots);
-        self::assertSame(1, $configuration->probesPerCategory);
+        self::assertSame($this->directory.'/scenarios/kimai.json', $configuration->scenarioFile);
     }
 
     public function testLoadsFullConfiguration(): void
@@ -70,8 +69,6 @@ final class ConfigurationLoaderTest extends TestCase
             'ci' => false,
             'indexTimeout' => 300,
             'requestTimeout' => 20,
-            'probeRoots' => ['project-base/src', 'project-base/templates'],
-            'probesPerCategory' => 3,
             'allowPlugins' => ['contao/manager-plugin'],
         ]);
 
@@ -87,8 +84,7 @@ final class ConfigurationLoaderTest extends TestCase
         self::assertFalse($configuration->ci);
         self::assertSame(300, $configuration->indexTimeout);
         self::assertSame(20, $configuration->requestTimeout);
-        self::assertSame(['project-base/src', 'project-base/templates'], $configuration->probeRoots);
-        self::assertSame(3, $configuration->probesPerCategory);
+        self::assertSame($this->directory.'/scenarios/twig.symfony.com.json', $configuration->scenarioFile);
         self::assertSame(['contao/manager-plugin'], $configuration->allowPlugins);
     }
 
@@ -196,12 +192,8 @@ final class ConfigurationLoaderTest extends TestCase
         yield 'huge index timeout' => [['indexTimeout' => 1000], 'between 1 and 900'];
         yield 'zero request timeout' => [['requestTimeout' => 0], 'between 1 and 120'];
         yield 'huge request timeout' => [['requestTimeout' => 600], 'between 1 and 120'];
-        yield 'empty probe roots' => [['probeRoots' => []], 'non-empty list of relative paths'];
-        yield 'absolute probe root' => [['probeRoots' => ['/srv']], 'non-empty list of relative paths'];
-        yield 'parent probe root' => [['probeRoots' => ['../other']], 'non-empty list of relative paths'];
-        yield 'comma probe root' => [['probeRoots' => ['src,templates']], 'non-empty list of relative paths'];
-        yield 'zero probes per category' => [['probesPerCategory' => 0], 'between 1 and 10'];
-        yield 'huge probes per category' => [['probesPerCategory' => 100], 'between 1 and 10'];
+        yield 'obsolete probe roots' => [['probeRoots' => ['src']], 'Unknown key "probeRoots"'];
+        yield 'obsolete probe count' => [['probesPerCategory' => 3], 'Unknown key "probesPerCategory"'];
         yield 'plugin map' => [['allowPlugins' => ['contao/manager-plugin' => true]], 'list of Composer plugin names'];
         yield 'invalid plugin name' => [['allowPlugins' => ['not a plugin']], 'list of Composer plugin names'];
         yield 'invalid platform requirement' => [['ignorePlatformRequirements' => ['symfony/imap']], 'platform package names'];

@@ -1,0 +1,535 @@
+{
+    "version": 1,
+    "revision": "fd8989e9011aeff0a9ed573c294707140b4401b0",
+    "scenarios": [
+        {
+            "id": "route.twig",
+            "file": "templates/activity/delete.html.twig",
+            "anchor": "        'back': path('admin_activity')",
+            "offset": 36,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "admin_activity"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "template.php",
+            "file": "src/Controller/AboutController.php",
+            "anchor": "        return $this->render('about/license.html.twig', [",
+            "offset": 53,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "about/license.html.twig"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "template.twig",
+            "file": "templates/about/license.html.twig",
+            "anchor": "{% extends 'base.html.twig' %}",
+            "offset": 26,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "base.html.twig"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "twig.constant",
+            "file": "templates/about/license.html.twig",
+            "anchor": "                    <img src=\"{{ asset('apple-touch-icon.png') }}\" class=\"avatar avatar-2xl mb-3 avatar-rounded\" alt=\"{{ constant('App\\\\Constants::SOFTWARE') }}\">",
+            "offset": 155,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "SOFTWARE"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "asset.twig",
+            "file": "templates/about/license.html.twig",
+            "anchor": "                    <img src=\"{{ asset('apple-touch-icon.png') }}\" class=\"avatar avatar-2xl mb-3 avatar-rounded\" alt=\"{{ constant('App\\\\Constants::SOFTWARE') }}\">",
+            "offset": 60,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "apple-touch-icon.png"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "doctrine.field.repository.php",
+            "file": "src/Activity/ActivityService.php",
+            "anchor": "        return $this->repository->findOneBy(['project' => $project?->getId(), 'name' => $name]);",
+            "offset": 53,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "project"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "form.property.php",
+            "file": "src/Form/AccessTokenForm.php",
+            "anchor": "            ->add('name', TextType::class, [",
+            "offset": 23,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "name"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "constraint.option.php",
+            "file": "src/Entity/AccessToken.php",
+            "anchor": "    #[Assert\\Length(min: 2, max: 100)]",
+            "offset": 23,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "min"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "console.argument.php",
+            "file": "src/Command/AbstractRoleCommand.php",
+            "anchor": "        $username = $input->getArgument('username');",
+            "offset": 49,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "username"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "console.option.php",
+            "file": "src/Command/ExportCreateCommand.php",
+            "anchor": "$input->getOption('exported')",
+            "offset": 27,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "exported"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "translation.php",
+            "file": "src/Controller/Security/PasswordResetController.php",
+            "anchor": "                $translator->trans('reset.subject', ['%username%' => $username], 'email', $language)",
+            "offset": 49,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "reset.subject"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "translation.twig",
+            "file": "templates/about/license.html.twig",
+            "anchor": "                        {{ 'help'|trans }}",
+            "offset": 32,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "help"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "service.yaml",
+            "file": "config/services.yaml",
+            "anchor": "$httpClient: '@App\\Pdf\\SafeRemoteContentClient'",
+            "offset": 46,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "App\\Pdf\\SafeRemoteContentClient"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "parameter.yaml",
+            "file": "config/packages/assets.yaml",
+            "anchor": "        json_manifest_path: '%kernel.project_dir%/public/build/manifest.json'",
+            "offset": 48,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "kernel.project_dir"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "environment",
+            "file": "config/packages/doctrine.yaml",
+            "anchor": "                url: '%env(DATABASE_URL)%'",
+            "offset": 39,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "DATABASE_URL"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "twig.function",
+            "file": "templates/about/license.html.twig",
+            "anchor": "                        <i class=\"me-2 text-body-secondary {{ 'help'|icon(false) }}\"></i>",
+            "offset": 73,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "icon"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "twig.filter",
+            "file": "templates/about/license.html.twig",
+            "anchor": "                    <a href=\"{{ ''|docu_link }}\" target=\"_blank\" class=\"card-btn\">",
+            "offset": 44,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "docu_link"
+                    ]
+                }
+            }
+        }
+    ],
+    "diagnostics": [
+        {
+            "path": "config/packages/twig.yaml",
+            "code": "config.unknown_key",
+            "severity": "warning",
+            "range": {
+                "start": {
+                    "line": 5,
+                    "character": 4
+                },
+                "end": {
+                    "line": 5,
+                    "character": 24
+                }
+            },
+            "kind": "application",
+            "reason": "The pinned application retains the removed Twig exception_controller configuration key.",
+            "messageHash": "6663e1057763ed1629b21c4943f035ab32322843074c0cbac6fbe60b4de15f0a"
+        },
+        {
+            "path": "src/Form/Type/TeamMemberType.php",
+            "code": "form.unknown_option",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 24,
+                    "character": 13
+                },
+                "end": {
+                    "line": 24,
+                    "character": 25
+                }
+            },
+            "kind": "known-gap",
+            "reason": "EnhancedChoiceTypeExtension declares this option, but the current form metadata lookup does not recognize it.",
+            "messageHash": "ee12d1da11cd82a13751bba3d70157a6197415bea0a81963bc67d0425d8959a9"
+        },
+        {
+            "path": "src/Form/WeekByUserForm.php",
+            "code": "form.unknown_option",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 30,
+                    "character": 17
+                },
+                "end": {
+                    "line": 30,
+                    "character": 22
+                }
+            },
+            "kind": "known-gap",
+            "reason": "EnhancedChoiceTypeExtension declares this option, but the current form metadata lookup does not recognize it.",
+            "messageHash": "56959a1557c69c163c7df332a08572c89d5b1303a7f4ba34cdc7e1ea9f83ae0b"
+        },
+        {
+            "path": "src/Form/YearByUserForm.php",
+            "code": "form.unknown_option",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 30,
+                    "character": 17
+                },
+                "end": {
+                    "line": 30,
+                    "character": 22
+                }
+            },
+            "kind": "known-gap",
+            "reason": "EnhancedChoiceTypeExtension declares this option, but the current form metadata lookup does not recognize it.",
+            "messageHash": "56959a1557c69c163c7df332a08572c89d5b1303a7f4ba34cdc7e1ea9f83ae0b"
+        },
+        {
+            "path": "src/Reporting/CustomerMonthlyProjects/CustomerMonthlyProjectsForm.php",
+            "code": "form.unknown_option",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 27,
+                    "character": 13
+                },
+                "end": {
+                    "line": 27,
+                    "character": 18
+                }
+            },
+            "kind": "known-gap",
+            "reason": "EnhancedChoiceTypeExtension declares this option, but the current form metadata lookup does not recognize it.",
+            "messageHash": "4ed9f21867a6d160e5fab8e42f886b1fcee99347834a64748a1b6e692b2db6ca"
+        },
+        {
+            "path": "src/Reporting/MonthByUser/MonthByUserForm.php",
+            "code": "form.unknown_option",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 33,
+                    "character": 17
+                },
+                "end": {
+                    "line": 33,
+                    "character": 22
+                }
+            },
+            "kind": "known-gap",
+            "reason": "EnhancedChoiceTypeExtension declares this option, but the current form metadata lookup does not recognize it.",
+            "messageHash": "56959a1557c69c163c7df332a08572c89d5b1303a7f4ba34cdc7e1ea9f83ae0b"
+        },
+        {
+            "path": "src/Reporting/MonthlyUserList/MonthlyUserListForm.php",
+            "code": "form.unknown_option",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 34,
+                    "character": 13
+                },
+                "end": {
+                    "line": 34,
+                    "character": 18
+                }
+            },
+            "kind": "known-gap",
+            "reason": "EnhancedChoiceTypeExtension declares this option, but the current form metadata lookup does not recognize it.",
+            "messageHash": "059ea56e35d01b4ed18a77a867b8d38e94ba31b1d7da965069b9736a4fee8a15"
+        },
+        {
+            "path": "src/Reporting/MonthlyUserList/MonthlyUserListForm.php",
+            "code": "form.unknown_option",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 39,
+                    "character": 13
+                },
+                "end": {
+                    "line": 39,
+                    "character": 18
+                }
+            },
+            "kind": "known-gap",
+            "reason": "EnhancedChoiceTypeExtension declares this option, but the current form metadata lookup does not recognize it.",
+            "messageHash": "c76b6062fb2ccbfc308c2dd9328c50ad2854aa7db0f197d22a57b597480873f2"
+        },
+        {
+            "path": "src/Reporting/ProjectDateRange/ProjectDateRangeForm.php",
+            "code": "form.unknown_option",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 29,
+                    "character": 13
+                },
+                "end": {
+                    "line": 29,
+                    "character": 18
+                }
+            },
+            "kind": "known-gap",
+            "reason": "EnhancedChoiceTypeExtension declares this option, but the current form metadata lookup does not recognize it.",
+            "messageHash": "4ed9f21867a6d160e5fab8e42f886b1fcee99347834a64748a1b6e692b2db6ca"
+        },
+        {
+            "path": "src/Reporting/ProjectView/ProjectViewForm.php",
+            "code": "form.unknown_option",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 27,
+                    "character": 13
+                },
+                "end": {
+                    "line": 27,
+                    "character": 18
+                }
+            },
+            "kind": "known-gap",
+            "reason": "EnhancedChoiceTypeExtension declares this option, but the current form metadata lookup does not recognize it.",
+            "messageHash": "4ed9f21867a6d160e5fab8e42f886b1fcee99347834a64748a1b6e692b2db6ca"
+        },
+        {
+            "path": "src/Reporting/WeekByUser/WeekByUserForm.php",
+            "code": "form.unknown_option",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 33,
+                    "character": 17
+                },
+                "end": {
+                    "line": 33,
+                    "character": 22
+                }
+            },
+            "kind": "known-gap",
+            "reason": "EnhancedChoiceTypeExtension declares this option, but the current form metadata lookup does not recognize it.",
+            "messageHash": "56959a1557c69c163c7df332a08572c89d5b1303a7f4ba34cdc7e1ea9f83ae0b"
+        },
+        {
+            "path": "src/Reporting/WeeklyUserList/WeeklyUserListForm.php",
+            "code": "form.unknown_option",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 34,
+                    "character": 13
+                },
+                "end": {
+                    "line": 34,
+                    "character": 18
+                }
+            },
+            "kind": "known-gap",
+            "reason": "EnhancedChoiceTypeExtension declares this option, but the current form metadata lookup does not recognize it.",
+            "messageHash": "059ea56e35d01b4ed18a77a867b8d38e94ba31b1d7da965069b9736a4fee8a15"
+        },
+        {
+            "path": "src/Reporting/WeeklyUserList/WeeklyUserListForm.php",
+            "code": "form.unknown_option",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 39,
+                    "character": 13
+                },
+                "end": {
+                    "line": 39,
+                    "character": 18
+                }
+            },
+            "kind": "known-gap",
+            "reason": "EnhancedChoiceTypeExtension declares this option, but the current form metadata lookup does not recognize it.",
+            "messageHash": "c76b6062fb2ccbfc308c2dd9328c50ad2854aa7db0f197d22a57b597480873f2"
+        },
+        {
+            "path": "src/Reporting/YearByUser/YearByUserForm.php",
+            "code": "form.unknown_option",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 33,
+                    "character": 17
+                },
+                "end": {
+                    "line": 33,
+                    "character": 22
+                }
+            },
+            "kind": "known-gap",
+            "reason": "EnhancedChoiceTypeExtension declares this option, but the current form metadata lookup does not recognize it.",
+            "messageHash": "56959a1557c69c163c7df332a08572c89d5b1303a7f4ba34cdc7e1ea9f83ae0b"
+        },
+        {
+            "path": "src/Reporting/YearlyUserList/YearlyUserListForm.php",
+            "code": "form.unknown_option",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 34,
+                    "character": 13
+                },
+                "end": {
+                    "line": 34,
+                    "character": 18
+                }
+            },
+            "kind": "known-gap",
+            "reason": "EnhancedChoiceTypeExtension declares this option, but the current form metadata lookup does not recognize it.",
+            "messageHash": "059ea56e35d01b4ed18a77a867b8d38e94ba31b1d7da965069b9736a4fee8a15"
+        },
+        {
+            "path": "src/Reporting/YearlyUserList/YearlyUserListForm.php",
+            "code": "form.unknown_option",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 39,
+                    "character": 13
+                },
+                "end": {
+                    "line": 39,
+                    "character": 18
+                }
+            },
+            "kind": "known-gap",
+            "reason": "EnhancedChoiceTypeExtension declares this option, but the current form metadata lookup does not recognize it.",
+            "messageHash": "c76b6062fb2ccbfc308c2dd9328c50ad2854aa7db0f197d22a57b597480873f2"
+        },
+        {
+            "path": "templates/dashboard/grid.html.twig",
+            "code": "route.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 51,
+                    "character": 140
+                },
+                "end": {
+                    "line": 51,
+                    "character": 152
+                }
+            },
+            "kind": "application",
+            "reason": "This retained template references an optional or historical route absent from the configured runtime route collection.",
+            "messageHash": "8916124d37cbe18341baa069353fd3dff7ae49ad061a5f9e5908ea906eb9f058"
+        }
+    ]
+}

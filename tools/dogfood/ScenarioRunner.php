@@ -95,7 +95,7 @@ final class ScenarioRunner
             $scenarios[] = ['id' => $definition['id'], 'status' => 'error', 'checks' => $checks, 'failures' => [$reason]];
         }
 
-        return self::reportOf($scenarios, 0, [], $reason);
+        return self::reportOf($scenarios, 0, [], null);
     }
 
     private function reset(): void
@@ -234,7 +234,7 @@ final class ScenarioRunner
 
     private function applyCodeAction(string $title, string $uri, Position $position, string $projectRoot): void
     {
-        $diagnostics = $this->diagnostics($uri) ?? throw new ScenarioStepException($this->missingDiagnostics($uri));
+        $diagnostics = $this->validatedDiagnostics($uri, $projectRoot);
         if ([] === $diagnostics) {
             throw new ScenarioStepException(\sprintf('The server reported no diagnostic to fix with "%s".', $title));
         }
@@ -264,7 +264,7 @@ final class ScenarioRunner
     private function check(string $phase, array $definition, array $expect, string $uri, Position $position, string $projectRoot): void
     {
         foreach ($expect as $method => $expectation) {
-            $startedAt = microtime(true);
+            $startedAt = hrtime(true);
             try {
                 $result = $this->resolve($method, $definition, $uri, $position, $projectRoot);
                 $projected = $this->assertions->project($method, $result, $projectRoot, $uri, $this->position($position));
@@ -286,11 +286,11 @@ final class ScenarioRunner
     private function resolve(string $method, array $definition, string $uri, Position $position, string $projectRoot): mixed
     {
         if (self::DIAGNOSTICS === $method) {
-            return $this->diagnostics($uri) ?? throw new ScenarioStepException($this->missingDiagnostics($uri));
+            return $this->validatedDiagnostics($uri, $projectRoot);
         }
         $lspMethod = self::METHODS[$method] ?? throw new ScenarioStepException(\sprintf('Method "%s" is not part of the scenario protocol.', $method));
 
-        return $this->result($method, $this->request($lspMethod, $this->parameters($method, $definition, $uri, $position)), $projectRoot, $uri);
+        return $this->result($method, $this->request($lspMethod, $this->parameters($method, $definition, $uri, $position, $projectRoot)), $projectRoot, $uri);
     }
 
     /**
@@ -317,10 +317,10 @@ final class ScenarioRunner
      *
      * @return array<string, mixed>
      */
-    private function parameters(string $method, array $definition, string $uri, Position $position): array
+    private function parameters(string $method, array $definition, string $uri, Position $position, string $projectRoot): array
     {
         if ('codeAction' === $method) {
-            return $this->codeActionParameters($uri, $position, $this->diagnostics($uri) ?? throw new ScenarioStepException($this->missingDiagnostics($uri)));
+            return $this->codeActionParameters($uri, $position, $this->validatedDiagnostics($uri, $projectRoot));
         }
         $parameters = ['textDocument' => ['uri' => $uri]];
         if (!\in_array($method, self::DOCUMENT_METHODS, true)) {
@@ -430,6 +430,15 @@ final class ScenarioRunner
         }
 
         return null;
+    }
+
+    /** @return list<mixed> */
+    private function validatedDiagnostics(string $uri, string $projectRoot): array
+    {
+        $diagnostics = $this->diagnostics($uri) ?? throw new ScenarioStepException($this->missingDiagnostics($uri));
+        $this->result(self::DIAGNOSTICS, ['result' => $diagnostics], $projectRoot, $uri);
+
+        return $diagnostics;
     }
 
     private function missingDiagnostics(string $uri): string
@@ -563,13 +572,13 @@ final class ScenarioRunner
     /**
      * @param list<string> $failures
      */
-    private function record(string $phase, string $method, string $status, float $startedAt, ?string $fingerprint, array $failures): void
+    private function record(string $phase, string $method, string $status, int $startedAt, ?string $fingerprint, array $failures): void
     {
         $this->checks[$phase.'|'.$method] = [
             'phase' => $phase,
             'method' => $method,
             'status' => $status,
-            'milliseconds' => round((microtime(true) - $startedAt) * 1000, 1),
+            'milliseconds' => round((hrtime(true) - $startedAt) / 1_000_000, 1),
             'fingerprint' => $fingerprint,
             'failures' => $failures,
         ];

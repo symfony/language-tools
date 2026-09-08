@@ -8,6 +8,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Runtime\RuntimeBridgeTimingNormalizer;
 use Symfony\Lsp\Tools\Dogfood\ComposerSetup;
+use Symfony\Lsp\Tools\Dogfood\DiagnosticCheckHarness;
 use Symfony\Lsp\Tools\Dogfood\HarnessInterface;
 use Symfony\Lsp\Tools\Dogfood\HarnessResult;
 use Symfony\Lsp\Tools\Dogfood\MatrixCommand;
@@ -28,11 +29,23 @@ final class MatrixCommandTest extends TestCase
     /** @var list<string> */
     private array $lines = [];
 
+    /** @var array<string, mixed> */
+    private array $diagnosticReport = [];
+
     protected function setUp(): void
     {
         $this->directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-dogfood-'.bin2hex(random_bytes(8)));
         $this->checkout = Path::join($this->directory, 'checkout');
         $this->output = Path::join($this->directory, 'output');
+        $this->diagnosticReport = [
+            'schemaVersion' => 1,
+            'complete' => true,
+            'projects' => [['complete' => true, 'analysis' => ['mode' => 'runtime'], 'source' => ['state' => 'ready'], 'runtime' => ['state' => 'ready']]],
+            'diagnostics' => [],
+            'errors' => [],
+            'baseline' => ['path' => null, 'mode' => 'none', 'stale' => []],
+            'profile' => ['projects' => [['files' => 20]]],
+        ];
         (new Filesystem())->mkdir($this->checkout);
         file_put_contents(Path::join($this->checkout, 'composer.json'), '{}');
         file_put_contents(Path::join($this->checkout, 'composer.lock'), json_encode([
@@ -66,9 +79,10 @@ final class MatrixCommandTest extends TestCase
         self::assertSame([], $report['cold']['layers'] ?? null);
         self::assertSame([], $report['warm']['layers'] ?? null);
         self::assertSame(['provisionMilliseconds', 'setupMilliseconds', 'releaseMilliseconds', 'totalMilliseconds'], array_keys($report['timings']));
-        self::assertSame(8.0, (float) ($report['cold']['timings']['budgetProbeDiscoveryMilliseconds'] ?? -1));
+        self::assertSame(5.0, (float) ($report['cold']['timings']['manifestMilliseconds'] ?? -1));
         self::assertSame(30.0, (float) ($report['cold']['timings']['processMilliseconds'] ?? -1));
         self::assertSame(4.0, (float) ($report['cold']['timings']['runtimeIndexMilliseconds'] ?? -1));
+        self::assertSame(6.0, (float) ($report['cold']['timings']['scenariosMilliseconds'] ?? -1));
         self::assertIsArray($report['cold']['runtimeBridgeTimings']);
         self::assertSame('full', $report['cold']['runtimeBridgeTimings']['scope']);
         $runtimeBridgeTotal = $report['cold']['runtimeBridgeTimings']['totalMilliseconds'] ?? null;
@@ -116,79 +130,89 @@ final class MatrixCommandTest extends TestCase
         yield 'four workers' => [4, 4];
     }
 
-    public function testIgnoresDiagnosticAndFieldOrderingForCacheParity(): void
+    public function testIgnoresScenarioOrderAndLatencyForCacheParity(): void
     {
-        $first = [
-            'severity' => 1,
-            'code' => 'route.not_found',
-            'range' => ['start' => ['line' => 1, 'character' => 2], 'end' => ['line' => 1, 'character' => 4]],
-            'message' => 'Missing route.',
-        ];
-        $second = [
-            'code' => 'template.not_found',
-            'message' => 'Missing template.',
-            'severity' => 1,
-        ];
-        $cold = $this->harnessRun(['diagnostics' => [[
-            'uri' => 'file:///workspace/config/services.yaml',
-            'items' => [$first, $second],
-        ]]]);
-        $warm = $this->harnessRun(['diagnostics' => [[
-            'items' => [array_reverse($second, true), array_reverse($first, true)],
-            'uri' => 'file:///workspace/config/services.yaml',
-        ]]]);
+        $cold = $this->successfulRun();
+        $scenarios = array_reverse($this->scenarioResults());
+        $scenarios[0]['checks'][0]['milliseconds'] = 999.0;
+        $warm = $this->harnessRun(['scenarios' => $scenarios]);
 
-        $exitCode = $this->command(new FakeProvisioner($this->checkout), new FakeHarness($cold, $warm))->run([$this->configuration()], $this->output);
-
-        self::assertSame(0, $exitCode);
+        self::assertSame(0, $this->command(new FakeProvisioner($this->checkout), new FakeHarness($cold, $warm))->run([$this->configuration()], $this->output));
     }
 
-    public function testFailsWhenColdAndWarmDiagnosticsDiffer(): void
+    public function testFailsWhenNonemptyResponsesChangeBetweenColdAndWarm(): void
     {
-        $cold = $this->harnessRun(['diagnostics' => [[
-            'uri' => 'file:///workspace/config/services.yaml',
-            'items' => [['code' => 'service.not_found']],
-        ]]]);
-        $warm = $this->harnessRun(['diagnostics' => [[
-            'uri' => 'file:///workspace/config/services.yaml',
-            'items' => [],
-        ]]]);
+        $scenarios = $this->scenarioResults();
+        $scenarios[0]['checks'][0]['fingerprint'] = str_repeat('b', 64);
+        $warm = $this->harnessRun(['scenarios' => $scenarios]);
 
-        $exitCode = $this->command(new FakeProvisioner($this->checkout), new FakeHarness($cold, $warm))->run([$this->configuration()], $this->output);
-
-        self::assertSame(1, $exitCode);
-        $report = $this->readReport();
-        self::assertSame('cache-parity', $report['failure']['layer'] ?? null);
-        self::assertStringContainsString('Cold and warm diagnostic publications differ.', $report['failure']['message']);
-    }
-
-    /**
-     * @param list<mixed> $coldDiagnostics
-     * @param list<mixed> $warmDiagnostics
-     */
-    #[DataProvider('malformedDiagnosticsProvider')]
-    public function testMalformedDiagnosticsRemainSignificantForCacheParity(array $coldDiagnostics, array $warmDiagnostics): void
-    {
-        $cold = $this->harnessRun(['diagnostics' => $coldDiagnostics]);
-        $warm = $this->harnessRun(['diagnostics' => $warmDiagnostics]);
-
-        $exitCode = $this->command(new FakeProvisioner($this->checkout), new FakeHarness($cold, $warm))->run([$this->configuration()], $this->output);
+        $exitCode = $this->command(new FakeProvisioner($this->checkout), new FakeHarness($this->successfulRun(), $warm))->run([$this->configuration()], $this->output);
 
         self::assertSame(1, $exitCode);
         self::assertSame('cache-parity', $this->readReport()['failure']['layer'] ?? null);
     }
 
-    /** @return iterable<string, array{list<mixed>, list<mixed>}> */
-    public static function malformedDiagnosticsProvider(): iterable
+    public function testFailsWhenTheHarnessOmitsAnExpectedScenario(): void
     {
-        yield 'publication' => [[42], []];
-        yield 'item' => [[[
-            'uri' => 'file:///workspace/config/services.yaml',
-            'items' => [42],
-        ]], [[
-            'uri' => 'file:///workspace/config/services.yaml',
-            'items' => [],
-        ]]];
+        $incomplete = $this->harnessRun(['scenarioCount' => 1, 'scenarios' => [$this->scenarioResults()[0]]]);
+
+        self::assertSame(1, $this->command(new FakeProvisioner($this->checkout), new FakeHarness($incomplete, $incomplete))->run([$this->configuration()], $this->output));
+        self::assertSame('scenario', $this->readReport()['failure']['layer'] ?? null);
+    }
+
+    public function testMissingManifestFailsBeforeProvisioning(): void
+    {
+        $configuration = $this->configuration();
+        unlink($configuration->scenarioFile);
+        $provisioner = new FakeProvisioner($this->checkout);
+        $harness = new FakeHarness();
+
+        self::assertSame(1, $this->command($provisioner, $harness)->run([$configuration], $this->output));
+        self::assertSame([], $harness->applicationRoots);
+        self::assertSame([], $provisioner->released);
+        self::assertSame('scenario', $this->readReport()['failure']['layer'] ?? null);
+    }
+
+    public function testAnAllEmptyServerCannotSatisfyTheEntireMatrixManifest(): void
+    {
+        $configuration = $this->configuration();
+        file_put_contents($configuration->scenarioFile, json_encode([
+            'version' => 1, 'revision' => str_repeat('a', 40), 'diagnostics' => [],
+            'scenarios' => [['id' => 'negative.only', 'file' => 'templates/page.html.twig', 'anchor' => 'unrelated', 'expect' => ['definition' => ['equals' => []]]]],
+        ], \JSON_THROW_ON_ERROR));
+        $harness = new FakeHarness();
+
+        self::assertSame(1, $this->command(new FakeProvisioner($this->checkout), $harness)->run([$configuration], $this->output));
+        self::assertSame([], $harness->applicationRoots);
+        self::assertSame('scenario', $this->readReport()['failure']['layer'] ?? null);
+    }
+
+    public function testWholeProjectAnalysisCannotPassWithoutAnalyzingFiles(): void
+    {
+        $this->diagnosticReport['profile'] = ['projects' => [['files' => 0]]];
+
+        self::assertSame(1, $this->command(new FakeProvisioner($this->checkout), new FakeHarness($this->successfulRun(), $this->successfulRun()))->run([$this->configuration()], $this->output));
+        self::assertSame('diagnostics', $this->readReport()['failure']['layer'] ?? null);
+    }
+
+    public function testWholeProjectProviderFailureCannotPass(): void
+    {
+        $this->diagnosticReport['errors'] = [['category' => 'operational']];
+
+        self::assertSame(1, $this->command(new FakeProvisioner($this->checkout), new FakeHarness($this->successfulRun(), $this->successfulRun()))->run([$this->configuration()], $this->output));
+        self::assertSame('diagnostics', $this->readReport()['failure']['layer'] ?? null);
+    }
+
+    public function testWholeProjectDiagnosticDriftCannotPass(): void
+    {
+        $this->diagnosticReport['diagnostics'] = [[
+            'workspacePath' => 'templates/index.html.twig', 'code' => 'route.not_found', 'severity' => 'error', 'baseline' => 'active', 'message' => 'Unknown route.',
+            'range' => ['start' => ['line' => 1, 'character' => 2], 'end' => ['line' => 1, 'character' => 6]],
+        ]];
+
+        self::assertSame(1, $this->command(new FakeProvisioner($this->checkout), new FakeHarness($this->successfulRun(), $this->successfulRun()))->run([$this->configuration()], $this->output));
+        self::assertSame('diagnostics', $this->readReport()['failure']['layer'] ?? null);
+        self::assertFileExists($this->output.'/acme/diagnostics.json');
     }
 
     public function testUsesTheConfiguredApplicationDirectory(): void
@@ -242,13 +266,13 @@ final class MatrixCommandTest extends TestCase
         /** @var array<string, mixed> $report */
         $report = json_decode((string) file_get_contents(Path::join($this->output, 'acme/project.json')), true, flags: \JSON_THROW_ON_ERROR);
         self::assertSame(
-            ['name', 'repository', 'revision', 'directory', 'environment', 'setup', 'ci', 'ok', 'failure', 'workingTree', 'dependencies', 'frameworkBundle', 'timings', 'cold', 'warm'],
+            ['name', 'repository', 'revision', 'directory', 'environment', 'setup', 'ci', 'ok', 'failure', 'workingTree', 'dependencies', 'frameworkBundle', 'timings', 'cold', 'warm', 'diagnostics', 'knownGaps'],
             array_keys($report),
         );
         /** @var array<string, mixed> $cold */
         $cold = $report['cold'];
         self::assertSame(
-            ['layers', 'source', 'runtime', 'probes', 'requestErrors', 'violations', 'maxMilliseconds', 'serverVersion', 'supportScore', 'timings', 'runtimeBridgeTimings'],
+            ['layers', 'source', 'runtime', 'scenarios', 'checks', 'requests', 'failures', 'violations', 'maxMilliseconds', 'serverVersion', 'timings', 'runtimeBridgeTimings'],
             array_keys($cold),
         );
         /** @var array<string, mixed> $summary */
@@ -305,7 +329,7 @@ final class MatrixCommandTest extends TestCase
     {
         $provisioner = new FakeProvisioner($this->checkout);
         $harness = new FakeHarness($this->successfulRun(), $this->successfulRun());
-        $configuration = new ProjectConfiguration('acme', 'https://github.com/acme/app.git', str_repeat('a', 40), null, 'dev', 'composer', false, 120, setupChanges: ['.env.local.demo']);
+        $configuration = new ProjectConfiguration('acme', 'https://github.com/acme/app.git', str_repeat('a', 40), null, 'dev', 'composer', false, 120, setupChanges: ['.env.local.demo'], scenarioFile: $this->configuration()->scenarioFile);
 
         $exitCode = $this->command($provisioner, $harness, ' D .env.local.demo')->run([$configuration], $this->output);
 
@@ -316,9 +340,11 @@ final class MatrixCommandTest extends TestCase
 
     private function command(FakeProvisioner $provisioner, HarnessInterface $harness, string $workingTree = '?? vendor/'): MatrixCommand
     {
-        $processes = new FakeProcessRunner(static function (array $command) use ($workingTree): ProcessResult {
+        $diagnosticReport = json_encode($this->diagnosticReport, \JSON_THROW_ON_ERROR);
+        $processes = new FakeProcessRunner(static function (array $command) use ($workingTree, $diagnosticReport): ProcessResult {
             return match (true) {
                 'status' === ($command[3] ?? null) => new ProcessResult(0, $workingTree."\n", '', false),
+                'check' === ($command[1] ?? null) => new ProcessResult(0, $diagnosticReport, '', false),
                 'composer' === $command[0] && 'install' === $command[1] => new ProcessResult(0, '', '', false),
                 '--version' === ($command[1] ?? null) => new ProcessResult(0, $command[0].' version 1.0', '', false),
                 default => new ProcessResult(1, '', 'Unexpected command '.implode(' ', $command), false),
@@ -336,12 +362,35 @@ final class MatrixCommandTest extends TestCase
             function (string $line): void {
                 $this->lines[] = $line;
             },
+            new DiagnosticCheckHarness($processes, '/server'),
         );
     }
 
     private function configuration(?string $directory = null, string $name = 'acme'): ProjectConfiguration
     {
-        return new ProjectConfiguration($name, 'https://github.com/acme/app.git', str_repeat('a', 40), $directory, 'dev', 'composer', false, 120);
+        $manifest = $this->directory.'/'.$name.'.scenarios.json';
+        file_put_contents($manifest, json_encode([
+            'version' => 1, 'revision' => str_repeat('a', 40), 'diagnostics' => [],
+            'scenarios' => [
+                ['id' => 'route.twig', 'file' => 'templates/index.html.twig', 'anchor' => 'home', 'expect' => ['hover' => ['includes' => ['home']]]],
+                ['id' => 'template.php', 'file' => 'src/Controller.php', 'anchor' => 'index.html.twig', 'expect' => ['definition' => ['includes' => ['templates/index.html.twig:0:0-0:0']]]],
+            ],
+        ], \JSON_THROW_ON_ERROR));
+
+        return new ProjectConfiguration($name, 'https://github.com/acme/app.git', str_repeat('a', 40), $directory, 'dev', 'composer', false, 120, scenarioFile: $manifest);
+    }
+
+    /** @return list<array{id: string, status: string, checks: list<array{phase: string, method: string, status: string, milliseconds: float, fingerprint: string, failures: list<string>}>, failures: list<string>}> */
+    private function scenarioResults(): array
+    {
+        $scenarios = [];
+        foreach (['route.twig' => 'hover', 'template.php' => 'definition'] as $id => $method) {
+            $scenarios[] = ['id' => $id, 'status' => 'pass', 'checks' => [[
+                'phase' => 'baseline', 'method' => $method, 'status' => 'pass', 'milliseconds' => 12.5, 'fingerprint' => str_repeat('a', 64), 'failures' => [],
+            ]], 'failures' => []];
+        }
+
+        return $scenarios;
     }
 
     private function successfulRun(): HarnessResult
@@ -358,11 +407,10 @@ final class MatrixCommandTest extends TestCase
             'status' => ['source' => ['state' => 'ready'], 'runtime' => ['state' => 'ready']],
             'terminal' => true,
             'serverVersion' => '0.15.0',
-            'probeCount' => 2,
-            'probes' => [
-                ['requests' => ['hover' => ['milliseconds' => 12.5, 'resultCount' => 1, 'error' => null]]],
-                ['requests' => ['definition' => ['milliseconds' => 3.1, 'resultCount' => 1, 'error' => null]]],
-            ],
+            'scenarioCount' => 2,
+            'requestCount' => 2,
+            'assertionFailures' => 0,
+            'scenarios' => $this->scenarioResults(),
             'violations' => [],
             'diagnostics' => [],
             'serverError' => null,
@@ -381,8 +429,8 @@ final class MatrixCommandTest extends TestCase
                 'sourceIndexMilliseconds' => 3.0,
                 'runtimeIndexMilliseconds' => 4.0,
                 'indexWaitMilliseconds' => 4.0,
-                'probeDiscoveryMilliseconds' => 5.0,
-                'requestsMilliseconds' => 6.0,
+                'manifestMilliseconds' => 5.0,
+                'scenariosMilliseconds' => 6.0,
                 'shutdownMilliseconds' => 7.0,
                 'totalMilliseconds' => 27.0,
             ],

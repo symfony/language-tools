@@ -75,11 +75,21 @@ final class DiagnosticCheckHarnessTest extends TestCase
                 'start' => ['line' => 3, 'character' => 4],
                 'end' => ['line' => 3, 'character' => 9],
             ],
+            'messageHash' => hash('sha256', json_encode('The route "s3cr3t_admin" does not exist.', \JSON_THROW_ON_ERROR)),
         ]], $result->diagnostics);
         $serialized = json_encode($result->toArray(), \JSON_THROW_ON_ERROR);
         self::assertStringNotContainsString('s3cr3t_admin', $serialized);
-        self::assertStringNotContainsString('message', $serialized);
+        self::assertArrayNotHasKey('message', $result->diagnostics[0]);
         self::assertStringNotContainsString($this->directory, $serialized);
+    }
+
+    public function testDetectsChangedDiagnosticWordingWithoutPublishingIt(): void
+    {
+        $first = $this->check(self::report(['diagnostics' => [self::diagnostic('config/services.yaml', 'service.not_found', ['message' => 'First explanation.'])]]), exitCode: 10);
+        $second = $this->check(self::report(['diagnostics' => [self::diagnostic('config/services.yaml', 'service.not_found', ['message' => 'Changed explanation.'])]]), exitCode: 10);
+
+        self::assertNotSame($first->diagnostics[0]['messageHash'], $second->diagnostics[0]['messageHash']);
+        self::assertStringNotContainsString('Changed explanation', json_encode($second->toArray(), \JSON_THROW_ON_ERROR));
     }
 
     public function testPreservesDuplicateDiagnosticsInADeterministicOrder(): void
@@ -186,6 +196,15 @@ final class DiagnosticCheckHarnessTest extends TestCase
         ]]), 10, 'diagnostic-invalid'];
         yield 'diagnostic with a negative position' => [self::report(['diagnostics' => [
             self::diagnostic('config/services.yaml', 'service.not_found', ['range' => self::range(-1, 0, 0, 0)]),
+        ]]), 10, 'diagnostic-invalid'];
+        yield 'negative character on a later line' => [self::report(['diagnostics' => [
+            self::diagnostic('config/services.yaml', 'service.not_found', ['range' => self::range(0, 0, 1, -1)]),
+        ]]), 10, 'diagnostic-invalid'];
+        yield 'diagnostic without a message' => [self::report(['diagnostics' => [
+            self::diagnostic('config/services.yaml', 'service.not_found', ['message' => null]),
+        ]]), 10, 'diagnostic-invalid'];
+        yield 'empty diagnostic message' => [self::report(['diagnostics' => [
+            self::diagnostic('config/services.yaml', 'service.not_found', ['message' => '']),
         ]]), 10, 'diagnostic-invalid'];
         yield 'diagnostic without a code' => [self::report(['diagnostics' => [
             self::diagnostic('config/services.yaml', ''),

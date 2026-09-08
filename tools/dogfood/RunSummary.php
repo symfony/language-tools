@@ -16,32 +16,32 @@ final class RunSummary
         public readonly array $layers,
         public readonly string $source,
         public readonly string $runtime,
-        public readonly int $probes,
-        public readonly int $requestErrors,
+        public readonly int $scenarios,
+        public readonly int $checks,
+        public readonly int $requests,
+        public readonly int $failures,
         public readonly int $violations,
         public readonly float $maxMilliseconds,
         public readonly ?string $serverVersion,
-        public readonly ?float $supportScore = null,
         public readonly array $timings = [],
         public readonly ?array $runtimeBridgeTimings = null,
     ) {
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return [
             'layers' => $this->layers,
             'source' => $this->source,
             'runtime' => $this->runtime,
-            'probes' => $this->probes,
-            'requestErrors' => $this->requestErrors,
+            'scenarios' => $this->scenarios,
+            'checks' => $this->checks,
+            'requests' => $this->requests,
+            'failures' => $this->failures,
             'violations' => $this->violations,
             'maxMilliseconds' => $this->maxMilliseconds,
             'serverVersion' => $this->serverVersion,
-            'supportScore' => $this->supportScore,
             'timings' => $this->timings,
             'runtimeBridgeTimings' => $this->runtimeBridgeTimings,
         ];

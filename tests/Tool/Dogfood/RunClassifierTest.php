@@ -43,17 +43,19 @@ final class RunClassifierTest extends TestCase
             self::harnessResult(['violations' => [['category' => 'route.twig', 'method' => 'rename', 'message' => 'Rename edits "vendor/a.twig".']]]),
             ['request'],
         ];
-        yield 'request error' => [
-            self::harnessResult(['probes' => [['requests' => ['hover' => ['error' => 'Internal error.']]]]]),
-            ['request'],
-        ];
+        yield 'no scenarios' => [self::harnessResult(['scenarios' => [], 'scenarioCount' => 0]), ['scenario']];
+        yield 'missing scenario count' => [self::harnessResult(['scenarioCount' => null]), ['scenario']];
+        yield 'wrong scenario count' => [self::harnessResult(['scenarioCount' => 2]), ['scenario']];
+        yield 'assertion failure' => [self::harnessResult(['assertionFailures' => 1]), ['scenario']];
+        yield 'missing assertions' => [self::harnessResult(['scenarios' => [['id' => 'route.twig', 'status' => 'pass', 'checks' => []]]]), ['scenario']];
+        yield 'request error' => [self::harnessResult(['scenarios' => [['id' => 'route.twig', 'status' => 'error', 'checks' => []]]]), ['scenario']];
         yield 'combined failure' => [
             self::harnessResult([
                 'status' => self::indexStatus('failed', 'failed'),
-                'probes' => [['requests' => ['hover' => ['error' => 'Internal error.']]]],
+                'scenarios' => [['id' => 'route.twig', 'status' => 'error', 'checks' => []]],
                 'serverError' => 'boom',
             ]),
-            ['source-index', 'runtime-index', 'request', 'process'],
+            ['source-index', 'runtime-index', 'scenario', 'process'],
         ];
     }
 
@@ -75,7 +77,11 @@ final class RunClassifierTest extends TestCase
         return array_merge([
             'status' => self::indexStatus('ready', 'ready'),
             'terminal' => true,
-            'probes' => [['requests' => ['hover' => ['error' => null]]]],
+            'scenarioCount' => 1,
+            'assertionFailures' => 0,
+            'scenarios' => [['id' => 'route.twig', 'status' => 'pass', 'checks' => [[
+                'phase' => 'baseline', 'method' => 'hover', 'status' => 'pass', 'fingerprint' => str_repeat('a', 64), 'failures' => [],
+            ]], 'failures' => []]],
             'violations' => [],
             'serverError' => null,
             'exitCode' => 0,

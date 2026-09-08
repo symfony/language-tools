@@ -1,0 +1,301 @@
+{
+    "version": 1,
+    "revision": "bd92ad789274317c82f6e1e1179d56f7406bc702",
+    "scenarios": [
+        {
+            "id": "route.php",
+            "file": "app/bundles/ApiBundle/Controller/ClientController.php",
+            "anchor": "            $returnUrl = $this->generateUrl('mautic_client_index', ['page' => $lastPage]);",
+            "offset": 64,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "mautic_client_index"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "route.twig",
+            "file": "app/bundles/ApiBundle/Resources/views/Authorize/oAuth2/authorize.html.twig",
+            "anchor": "<form class=\"form-login text-center\" role=\"form\" name=\"fos_oauth_server_authorize_form\" action=\"{{ path('fos_oauth_server_authorize') }}\" method=\"post\">",
+            "offset": 131,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "fos_oauth_server_authorize"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "template.php",
+            "file": "app/bundles/ApiBundle/Controller/ClientController.php",
+            "anchor": "        return $this->render('@MauticApi/Client/authorized.html.twig', ['clients' => $clients]);",
+            "offset": 68,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "@MauticApi/Client/authorized.html.twig"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "template.twig",
+            "file": "app/bundles/ApiBundle/Resources/views/Authorize/oAuth2/authorize.html.twig",
+            "anchor": "{% extends '@MauticUser/Security/base.html.twig' %}",
+            "offset": 47,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "@MauticUser/Security/base.html.twig"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "asset.twig.references",
+            "file": "app/bundles/DynamicContentBundle/Resources/views/DynamicContent/StandaloneSlotGenerator/dwc-generator.html.twig",
+            "anchor": "<link rel=\"stylesheet\" type=\"text/css\" href=\"{{ asset('app/bundles/DynamicContentBundle/Assets/css/dwc-generator.css') }}\">",
+            "offset": 116,
+            "expect": {
+                "references": {
+                    "includes": [
+                        "app/bundles/DynamicContentBundle/Resources/views/DynamicContent/StandaloneSlotGenerator/dwc-generator.html.twig:0:55-0:116"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "doctrine.field.repository.php",
+            "file": "app/bundles/AssetBundle/Tests/Controller/AssetControllerFunctionalTest.php",
+            "anchor": "        return $repository->findOneBy(['username' => $username]);",
+            "offset": 48,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "username"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "doctrine.field.form.php",
+            "file": "app/bundles/EmailBundle/Form/Type/BatchCategoryType.php",
+            "anchor": "                'choice_label'  => 'title',",
+            "offset": 41,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "title"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "form.option.php",
+            "file": "app/bundles/CategoryBundle/Controller/BatchContactController.php",
+            "anchor": "                            'items'  => $items,",
+            "offset": 34,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "items"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "form.property.php",
+            "file": "app/bundles/AssetBundle/Form/Type/AssetType.php",
+            "anchor": "        $builder->add('storageLocation', ButtonGroupType::class, [",
+            "offset": 38,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "storageLocation"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "console.argument.php",
+            "file": "app/bundles/CampaignBundle/Command/CampaignDeleteEventLogsCommand.php",
+            "anchor": "        $eventIds   = $input->getArgument('campaign_event_ids');",
+            "offset": 61,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "campaign_event_ids"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "console.option.php",
+            "file": "app/bundles/CampaignBundle/Command/CampaignDeleteEventLogsCommand.php",
+            "anchor": "        $campaignId = (int) $input->getOption('campaign-id');",
+            "offset": 58,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "campaign-id"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "parameter.php",
+            "file": "app/bundles/CoreBundle/Controller/JsController.php",
+            "anchor": "        #[Autowire(param: 'kernel.debug')]",
+            "offset": 39,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "kernel.debug"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "translation.php",
+            "file": "app/AppKernel.php",
+            "anchor": "                throw new Mautic\\CoreBundle\\Exception\\DatabaseConnectionException($this->getContainer()->get('translator')->trans('mautic.core.db.connection.error', ['%code%' => $e->getCode()]), 0, $e);",
+            "offset": 162,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "mautic.core.db.connection.error"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "translation.twig",
+            "file": "app/bundles/ApiBundle/Resources/views/Authorize/oAuth2/authorize.html.twig",
+            "anchor": "{% set msg = name is empty ? 'mautic.api.oauth.clientnoname'|trans : 'mautic.api.oauth.clientwithname'|trans({'name' : name}) %}",
+            "offset": 59,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "mautic.api.oauth.clientnoname"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "environment.references",
+            "file": "app/bundles/CoreBundle/Config/config.php",
+            "anchor": "                    '%env(resolve:MAUTIC_EL_FINDER_PATH)%',",
+            "offset": 55,
+            "expect": {
+                "references": {
+                    "includes": [
+                        "app/bundles/CoreBundle/Config/config.php:174:34-174:55"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "twig.function",
+            "file": "app/bundles/AssetBundle/Resources/views/Action/asset.html.twig",
+            "anchor": "            {% set category = getEntity('Mautic\\\\CategoryBundle\\\\Entity\\\\Category', action.properties.category) %}",
+            "offset": 39,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "getEntity"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "twig.filter",
+            "file": "app/bundles/CoreBundle/Resources/views/Helper/pagination.html.twig",
+            "anchor": "    {% set limit = limit is not defined ? 30 : limit|int %}",
+            "offset": 56,
+            "expect": {
+                "completion": {
+                    "includes": [
+                        "int"
+                    ]
+                }
+            }
+        }
+    ],
+    "diagnostics": [
+        {
+            "path": "app/bundles/CoreBundle/Resources/views/Offline/offline.html.twig",
+            "code": "template.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 37,
+                    "character": 32
+                },
+                "end": {
+                    "line": 37,
+                    "character": 48
+                }
+            },
+            "kind": "application",
+            "reason": "This pinned source reference is unresolved in the configured runtime template paths; retain the exact finding for review when pins change.",
+            "messageHash": "6f07cb40fb75fb5f6ff749fc5684d7635e030168edb7f3475cca08024e4aa72f"
+        },
+        {
+            "path": "app/bundles/LeadBundle/Controller/AjaxController.php",
+            "code": "template.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 355,
+                    "character": 21
+                },
+                "end": {
+                    "line": 355,
+                    "character": 59
+                }
+            },
+            "kind": "application",
+            "reason": "This pinned source reference is unresolved in the configured runtime template paths; retain the exact finding for review when pins change.",
+            "messageHash": "d7292a8e42ed8424b2148d0d8b845068dfa3d257f6eb43fd9a3e4c23fade4302"
+        },
+        {
+            "path": "app/bundles/SmsBundle/Resources/views/Sms/template_graph.html.twig",
+            "code": "template.not_found",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 13,
+                    "character": 37
+                },
+                "end": {
+                    "line": 13,
+                    "character": 81
+                }
+            },
+            "kind": "application",
+            "reason": "This pinned source reference is unresolved in the configured runtime template paths; retain the exact finding for review when pins change.",
+            "messageHash": "5dd3770c4bdb625b961302a16a4bea2e97c63407acdfc52cdb48c5c58a8802ce"
+        },
+        {
+            "path": "app/config/parameters.php",
+            "code": "env.malformed_chain",
+            "severity": "error",
+            "range": {
+                "start": {
+                    "line": 47,
+                    "character": 54
+                },
+                "end": {
+                    "line": 47,
+                    "character": 77
+                }
+            },
+            "kind": "known-gap",
+            "reason": "This sprintf format becomes an environment expression at runtime and is not a complete static environment expression.",
+            "messageHash": "63b02cece37aeb22cc441dc7b10071997cd38c94fce6dc33d3b6147a9b15435a"
+        }
+    ]
+}

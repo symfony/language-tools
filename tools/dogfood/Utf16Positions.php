@@ -2,23 +2,8 @@
 
 namespace Symfony\Lsp\Tools\Dogfood;
 
-/**
- * Converts between byte offsets and UTF-16 protocol positions without reusing the server implementation.
- */
 final class Utf16Positions
 {
-    /**
-     * @return array{line: int, character: int}
-     */
-    public function position(string $text, int $byteOffset): array
-    {
-        $byteOffset = max(0, min($byteOffset, \strlen($text)));
-        $line = substr_count($text, "\n", 0, $byteOffset);
-        $lineStart = 0 === $line ? 0 : (int) strrpos(substr($text, 0, $byteOffset), "\n") + 1;
-
-        return ['line' => $line, 'character' => $this->units(substr($text, $lineStart, $byteOffset - $lineStart))];
-    }
-
     /**
      * @param array<array-key, mixed> $position
      *

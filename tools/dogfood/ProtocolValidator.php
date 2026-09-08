@@ -145,6 +145,8 @@ final class ProtocolValidator
     private function ownedPath(string $uri): ?string
     {
         if (!str_starts_with($uri, 'file://')) {
+            $this->violations[] = 'An edit must target an application-owned file URI.';
+
             return null;
         }
         $path = $this->path($uri);

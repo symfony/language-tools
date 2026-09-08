@@ -5,12 +5,6 @@
     "setup": "composer",
     "ci": true,
     "indexTimeout": 300,
-    "probeRoots": [
-        "app",
-        "plugins",
-        "themes",
-        "config"
-    ],
     "ignorePlatformRequirements": [
         "ext-imap"
     ]

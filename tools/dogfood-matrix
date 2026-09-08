@@ -17,7 +17,7 @@ use Symfony\Lsp\Tools\Dogfood\RunClassifier;
 use Symfony\Lsp\Tools\Dogfood\ServerHarness;
 use Symfony\Lsp\Tools\Dogfood\SetupInterface;
 use Symfony\Lsp\Tools\Dogfood\SetupRegistry;
-use Symfony\Lsp\Tools\Dogfood\SupportScorer;
+use Symfony\Lsp\Tools\Dogfood\DiagnosticCheckHarness;
 
 const USAGE = <<<'USAGE'
     Usage: tools/dogfood-matrix [options] [project...]
@@ -167,7 +167,7 @@ $command = new MatrixCommand(
     static function (string $line): void {
         fwrite(\STDOUT, $line."\n");
     },
-    SupportScorer::withExclusionsFile($root.'/.gerard/dogfood/support/exclusions.json'),
+    new DiagnosticCheckHarness($processes, $serverPath),
 );
 
 try {
