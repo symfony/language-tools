@@ -126,8 +126,10 @@ final class HistoryHtmlReport
     {
         $flags = [];
         foreach ($observations as $index => $observation) {
-            $previous = 0 === $index ? null : $observations[$index - 1]['comparison'];
-            $flags[] = null !== $previous && null !== $observation['comparison'] && $previous === $observation['comparison'];
+            $previous = 0 === $index ? null : $observations[$index - 1];
+            $flags[] = null !== $previous && $previous['finalized'] && $observation['finalized']
+                && 'incomplete' !== $previous['outcome'] && 'incomplete' !== $observation['outcome']
+                && null !== $previous['comparison'] && $previous['comparison'] === $observation['comparison'];
         }
 
         return $flags;
@@ -158,9 +160,9 @@ final class HistoryHtmlReport
         return \sprintf(
             '<p class="summary">%s, %s, %s, %s.</p>'
             .'<p class="note">Every number belongs to a single project: the matrix membership changes between runs, so nothing is averaged into a global score. '
-            .'Missing measurements read as unknown, never as zero. Known gaps are recorded acceptances, not failures. '
+            .'Missing measurements read as unknown, never as zero. Known gaps are confirmed analyzer limitations, separate from new failures. '
             .'Two observations are only compared when they share the same non-null comparison fingerprint.</p>'
-            .'<p class="note">%sPassed and failed describe verified assertions, blocked means setup or process trouble, incomplete means the run produced no usable result.</p>',
+            .'<p class="note">%sPassed and failed describe verified assertions, blocked means setup or process trouble, incomplete means the run did not finish or its artifacts are incomplete.</p>',
             $this->plural($observations, 'observation'),
             $this->plural(\count($projects), 'project'),
             $this->plural(\count($identifiers), 'run'),
@@ -214,8 +216,9 @@ final class HistoryHtmlReport
             $label = $this->outcomeLabel($observation['outcome']);
             $labels[] = strtolower($label);
             $chips .= \sprintf(
-                '<span class="chip %s" title="%s"></span>',
+                '<span class="chip %s" style="background:var(--%s)" title="%s"></span>',
                 $this->outcomeClass($observation['outcome']),
+                isset(self::OUTCOMES[$observation['outcome']]) ? $observation['outcome'] : 'none',
                 $this->escape($observation['run'].': '.$label),
             );
         }
@@ -314,7 +317,7 @@ final class HistoryHtmlReport
         );
         $charts .= $this->chart(
             'Known gaps and diagnostics',
-            'Known gaps are behaviors recorded as unsupported on purpose. They are not failures, and a rising line is not a regression by itself.',
+            'Known gaps are confirmed analyzer limitations retained explicitly until fixed. Changed expectations can also change this count; it is not a support score.',
             $labels,
             [
                 ['label' => 'Known gaps', 'values' => $this->series($observations, 'knownGaps')],
@@ -414,7 +417,7 @@ final class HistoryHtmlReport
         $scale = $highest > 0.0 ? $highest : 1.0;
         $bottom = self::HEIGHT - self::BOTTOM;
         $svg = '';
-        foreach ([1.0, 0.5, 0.0] as $fraction) {
+        foreach (!$duration && $scale <= 1.0 ? [1.0, 0.0] : [1.0, 0.5, 0.0] as $fraction) {
             $y = self::TOP + (self::HEIGHT - self::TOP - self::BOTTOM) * (1.0 - $fraction);
             $svg .= \sprintf(
                 '<line class="grid" x1="%s" y1="%s" x2="%s" y2="%s"></line><text class="tick" x="%s" y="%s" text-anchor="end">%s</text>',
@@ -570,15 +573,18 @@ final class HistoryHtmlReport
         if (null === $previous) {
             return '<span class="unknown">first observation</span>';
         }
+        $transition = $previous['outcome'] === $current['outcome'] ? '' : $this->escape($this->outcomeLabel($previous['outcome']).' → '.$this->outcomeLabel($current['outcome']));
         if (!$comparable) {
-            $reason = null === $previous['comparison'] || null === $current['comparison']
-                ? 'not comparable, comparison fingerprint unknown'
-                : 'not comparable, expectations or environment changed';
+            $reason = !$previous['finalized'] || !$current['finalized'] || 'incomplete' === $previous['outcome'] || 'incomplete' === $current['outcome']
+                ? 'not comparable, run incomplete'
+                : (null === $previous['comparison'] || null === $current['comparison']
+                    ? 'not comparable, comparison fingerprint unknown'
+                    : 'not comparable, expectations or environment changed');
 
-            return '<span class="unknown">'.$this->escape($reason).'</span>';
+            return ('' === $transition ? '' : $transition.'; ').'<span class="unknown">'.$this->escape($reason).'</span>';
         }
 
-        $parts = [];
+        $parts = '' === $transition ? [] : [$transition];
         foreach (['passed', 'failed', 'errors'] as $field) {
             $now = $current[$field];
             $before = $previous[$field];
@@ -810,6 +816,12 @@ final class HistoryHtmlReport
                     }
                 }
                 select.addEventListener('change', apply);
+                document.querySelectorAll('a[href^="#project-"]').forEach(function (link) {
+                    link.addEventListener('click', function () {
+                        select.value = link.getAttribute('href').slice(1);
+                        apply();
+                    });
+                });
                 apply();
             })();
             JS;

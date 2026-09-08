@@ -18,6 +18,49 @@ final class HistoryHtmlReportTest extends TestCase
         self::assertCount(0, $document->querySelectorAll('#project-filter'));
     }
 
+    public function testHistoryStripsKeepDistinctOutcomeColors(): void
+    {
+        $entries = [];
+        foreach (['passed', 'failed', 'blocked', 'incomplete'] as $index => $outcome) {
+            $entries[] = self::entry(['run' => \sprintf('2026010%d-000000', $index + 1), 'outcome' => $outcome]);
+        }
+        $document = self::parse((new HistoryHtmlReport())->render($entries));
+
+        self::assertSame([
+            'background:var(--passed)', 'background:var(--failed)', 'background:var(--blocked)', 'background:var(--incomplete)',
+        ], array_map(static fn (Element $chip): string => $chip->getAttribute('style') ?? '', self::elements($document, '.strip .chip')));
+    }
+
+    public function testZeroCountChartsHaveUnambiguousAxisLabels(): void
+    {
+        $document = self::parse((new HistoryHtmlReport())->render([self::entry(['knownGaps' => 0, 'diagnostics' => 0])]));
+        $ticks = self::elements(self::figure($document, 'Known gaps and diagnostics'), 'text[text-anchor="end"]');
+
+        self::assertSame(['1', '0'], array_map(static fn (Element $tick): string => $tick->textContent ?? '', $ticks));
+    }
+
+    public function testShowsOutcomeChangesEvenWhenCheckCountsAreIdentical(): void
+    {
+        $document = self::parse((new HistoryHtmlReport())->render([
+            self::entry(['outcome' => 'failed', 'layers' => ['cache-parity'], 'passed' => 240, 'failed' => 0]),
+            self::entry(['run' => '20260102-000000', 'passed' => 240, 'failed' => 0]),
+        ]));
+
+        self::assertStringContainsString('Failed → Passed', self::text($document, '[data-project-panel] .wrap'));
+    }
+
+    public function testDoesNotComparePartialCheckCountsWithACompletedRun(): void
+    {
+        $document = self::parse((new HistoryHtmlReport())->render([
+            self::entry(),
+            self::entry(['run' => '20260102-000000', 'outcome' => 'incomplete', 'finalized' => false, 'passed' => 1]),
+        ]));
+        $change = self::text($document, '[data-project-panel] .wrap');
+
+        self::assertStringContainsString('run incomplete', $change);
+        self::assertStringNotContainsString('passed -', $change);
+    }
+
     public function testKeepsHostileValuesAsTextInsteadOfMarkup(): void
     {
         $hostile = '<script>alert("x")</script>';
@@ -72,7 +115,7 @@ final class HistoryHtmlReportTest extends TestCase
         );
         self::assertSame('badge outcome-blocked', self::element($document, 'tbody .badge')->getAttribute('class'));
         self::assertSame(
-            ['20260102-000000', 'unknown', 'Blocked process not finalized', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'not comparable, comparison fingerprint unknown'],
+            ['20260102-000000', 'unknown', 'Blocked process not finalized', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'Passed → Blocked; not comparable, run incomplete'],
             self::rows(self::elements($document, 'table')[1])[1],
         );
     }
@@ -135,7 +178,7 @@ final class HistoryHtmlReportTest extends TestCase
         $history = self::rows(self::elements($document, 'table')[1]);
         self::assertSame(['Failed', 'Known gaps'], [$history[0][6], $history[0][8]]);
         self::assertSame(['0', '7'], [$history[1][6], $history[1][8]]);
-        self::assertStringContainsString('Known gaps are behaviors recorded as unsupported on purpose. They are not failures', self::text(self::figure($document, 'Known gaps and diagnostics'), '.note'));
+        self::assertStringContainsString('Known gaps are confirmed analyzer limitations retained explicitly until fixed', self::text(self::figure($document, 'Known gaps and diagnostics'), '.note'));
     }
 
     public function testKeepsEveryMeasurementInsideItsOwnProject(): void
