@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Record behavioral dogfood history and generate an offline HTML progress report
 - Replace dogfood support scores with reviewed behavioral scenarios and whole-project diagnostic regression checks
 - Keep credential-bearing setup output out of dogfood failure reports
 - Complete Twig callables inside quoted HTML attributes

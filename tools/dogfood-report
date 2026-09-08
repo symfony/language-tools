@@ -1,0 +1,16 @@
+#!/usr/bin/env php
+<?php
+
+require \dirname(__DIR__).'/vendor/autoload.php';
+
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Lsp\Tools\Dogfood\HistoryHtmlReport;
+use Symfony\Lsp\Tools\Dogfood\ReportCommand;
+use Symfony\Lsp\Tools\Dogfood\ReportHistory;
+use Symfony\Lsp\Tools\Dogfood\ReportImporter;
+
+/** @var list<string> $argv */
+$filesystem = new Filesystem();
+$history = new ReportHistory($filesystem);
+$command = new ReportCommand(\dirname(__DIR__), new ReportImporter($history), $history, new HistoryHtmlReport(), $filesystem);
+exit($command->run(array_slice($argv, 1)));

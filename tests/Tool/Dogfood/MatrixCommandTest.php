@@ -73,6 +73,9 @@ final class MatrixCommandTest extends TestCase
         self::assertFileExists(Path::join($this->output, 'acme/warm.json'));
         $report = $this->readReport();
         self::assertTrue($report['ok']);
+        $recorded = $this->readJson($this->output.'/acme/project.json');
+        self::assertIsString($recorded['expectationFingerprint'] ?? null);
+        self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/D', $recorded['expectationFingerprint']);
         self::assertSame('8.1.0', $report['frameworkBundle']);
         self::assertNotEmpty($report['dependencies']['composerLockSha256']);
         self::assertSame(['modified' => [], 'untracked' => 1], $report['workingTree']);
@@ -95,6 +98,21 @@ final class MatrixCommandTest extends TestCase
         self::assertCount(1, $summary['projects']);
         self::assertStringContainsString('cold=ok', $this->lines[0]);
         self::assertStringContainsString('warm=ok', $this->lines[0]);
+    }
+
+    public function testFingerprintChangesWhenExpectationsChangeWithoutChangingScenarioIds(): void
+    {
+        $configuration = $this->configuration();
+        $command = $this->command(new FakeProvisioner($this->checkout), new FakeHarness($this->successfulRun(), $this->successfulRun(), $this->successfulRun(), $this->successfulRun()));
+        self::assertSame(0, $command->run([$configuration], $this->output));
+        $first = $this->readJson($this->output.'/acme/project.json')['expectationFingerprint'];
+        $contents = (string) file_get_contents($configuration->scenarioFile);
+        $contents = str_replace('"includes":["home"]', '"includes":["changed"]', $contents, $replaced);
+        self::assertSame(1, $replaced);
+        file_put_contents($configuration->scenarioFile, $contents);
+
+        self::assertSame(0, $command->run([$configuration], $this->output.'/next'));
+        self::assertNotSame($first, $this->readJson($this->output.'/next/acme/project.json')['expectationFingerprint']);
     }
 
     public function testRejectsInvalidJobCount(): void
@@ -266,7 +284,7 @@ final class MatrixCommandTest extends TestCase
         /** @var array<string, mixed> $report */
         $report = json_decode((string) file_get_contents(Path::join($this->output, 'acme/project.json')), true, flags: \JSON_THROW_ON_ERROR);
         self::assertSame(
-            ['name', 'repository', 'revision', 'directory', 'environment', 'setup', 'ci', 'ok', 'failure', 'workingTree', 'dependencies', 'frameworkBundle', 'timings', 'cold', 'warm', 'diagnostics', 'knownGaps'],
+            ['name', 'repository', 'revision', 'directory', 'environment', 'setup', 'ci', 'ok', 'failure', 'workingTree', 'dependencies', 'frameworkBundle', 'expectationFingerprint', 'timings', 'cold', 'warm', 'diagnostics', 'knownGaps'],
             array_keys($report),
         );
         /** @var array<string, mixed> $cold */

@@ -102,6 +102,7 @@ final class MatrixCommand
         $report = new ProjectReport($configuration);
         try {
             $manifest = $this->manifests->load($configuration->scenarioFile, $configuration->revision);
+            $report->expectationFingerprint = hash('sha256', json_encode([$manifest->scenarios, $manifest->diagnostics], \JSON_THROW_ON_ERROR));
             if (!$this->evidence->hasPositiveCheck($manifest)) {
                 throw new ConfigurationException('A matrix manifest must include a positive behavioral expectation.');
             }

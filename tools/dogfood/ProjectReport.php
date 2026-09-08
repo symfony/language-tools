@@ -11,6 +11,7 @@ final class ProjectReport
 
     public ?string $composerLockSha256 = null;
     public ?string $frameworkBundle = null;
+    public ?string $expectationFingerprint = null;
     public ?RunSummary $cold = null;
     public ?RunSummary $warm = null;
     public ?DiagnosticCheckResult $diagnostics = null;
@@ -52,6 +53,7 @@ final class ProjectReport
             'workingTree' => $this->workingTree,
             'dependencies' => ['composerLockSha256' => $this->composerLockSha256],
             'frameworkBundle' => $this->frameworkBundle,
+            'expectationFingerprint' => $this->expectationFingerprint,
             'timings' => $this->timings,
             'cold' => $this->cold?->toArray(),
             'warm' => $this->warm?->toArray(),
