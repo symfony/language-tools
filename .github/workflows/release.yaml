@@ -57,12 +57,10 @@ jobs:
                   assets=(
                       "symfony-lsp-$GITHUB_REF_NAME-linux-x64.tar.gz"
                       "symfony-lsp-$GITHUB_REF_NAME-linux-arm64.tar.gz"
-                      "symfony-lsp-$GITHUB_REF_NAME-macos-x64.tar.gz"
                       "symfony-lsp-$GITHUB_REF_NAME-macos-arm64.tar.gz"
                       "symfony-lsp-$GITHUB_REF_NAME-windows-x64.zip"
                       "symfony-lsp-$GITHUB_REF_NAME-linux-x64.vsix"
                       "symfony-lsp-$GITHUB_REF_NAME-linux-arm64.vsix"
-                      "symfony-lsp-$GITHUB_REF_NAME-darwin-x64.vsix"
                       "symfony-lsp-$GITHUB_REF_NAME-darwin-arm64.vsix"
                       "symfony-lsp-$GITHUB_REF_NAME-win32-x64.vsix"
                   )

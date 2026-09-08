@@ -28,7 +28,7 @@ final class ReleaseWorkflowTest extends TestCase
         self::assertStringContainsString('^v[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$', $workflow);
         self::assertSame(2, substr_count($workflow, 'tools/build-release-phar'));
         self::assertSame(2, substr_count($workflow, 'tools/package-release'));
-        self::assertSame(4, substr_count($workflow, 'spc_checksum:'));
+        self::assertSame(3, substr_count($workflow, 'spc_checksum:'));
         self::assertSame(2, substr_count($workflow, '- name: Verify static-php-cli'));
         self::assertStringContainsString('name: windows-x64', $workflow);
         self::assertStringContainsString('timeout-minutes: 45', $workflow);
@@ -163,12 +163,10 @@ final class ReleaseWorkflowTest extends TestCase
         return [
             'linux-x64.tar.gz',
             'linux-arm64.tar.gz',
-            'macos-x64.tar.gz',
             'macos-arm64.tar.gz',
             'windows-x64.zip',
             'linux-x64.vsix',
             'linux-arm64.vsix',
-            'darwin-x64.vsix',
             'darwin-arm64.vsix',
             'win32-x64.vsix',
         ];

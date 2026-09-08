@@ -57,7 +57,8 @@ trust, configuration and troubleshooting.
 The extension isn't published in Zed's registry yet. Install it from source as
 a development extension by following the [Zed guide](docs/editors/zed.rst).
 It downloads the latest stable server automatically and runs alongside a
-general PHP language server on Linux and macOS. Windows is not supported.
+general PHP language server on Linux and Apple Silicon macOS. Windows and
+Intel macOS are not supported.
 
 ### OpenCode
 

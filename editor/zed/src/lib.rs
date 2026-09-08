@@ -152,8 +152,10 @@ fn platform_name(os: Os, architecture: Architecture) -> Result<&'static str> {
     match (os, architecture) {
         (Os::Linux, Architecture::X8664) => Ok("linux-x64"),
         (Os::Linux, Architecture::Aarch64) => Ok("linux-arm64"),
-        (Os::Mac, Architecture::X8664) => Ok("macos-x64"),
         (Os::Mac, Architecture::Aarch64) => Ok("macos-arm64"),
+        (Os::Mac, Architecture::X8664) => {
+            Err("Symfony Language Tools does not support Intel macOS".into())
+        }
         (Os::Windows, _) => Err("Symfony Language Tools for Zed does not support Windows".into()),
         (_, Architecture::X86) => {
             Err("Symfony Language Tools does not support 32-bit systems".into())
@@ -222,6 +224,14 @@ mod tests {
             release_package("0.9.2", Os::Mac, Architecture::Aarch64)
                 .unwrap()
                 .asset_name,
+        );
+    }
+
+    #[test]
+    fn rejects_intel_macos() {
+        assert_eq!(
+            "Symfony Language Tools does not support Intel macOS",
+            release_package("v0.9.2", Os::Mac, Architecture::X8664).unwrap_err(),
         );
     }
 

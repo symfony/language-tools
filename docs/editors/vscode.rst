@@ -27,7 +27,7 @@ channel:
     $ code --install-extension symfony.language-tools --pre-release
 
 The Marketplace selects the package matching the extension host. Packages are
-available for Linux x64 and ARM64, macOS x64 and ARM64 and Windows x64. Each
+available for Linux x64 and ARM64, macOS ARM64 and Windows x64. Each
 package contains the matching self-contained language server, so
 ``symfonyLsp.serverPath`` doesn't need to be configured.
 

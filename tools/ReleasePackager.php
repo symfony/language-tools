@@ -21,7 +21,7 @@ final class ReleasePackager
     public function package(string $platform, ReleaseReference $reference): string
     {
         [$sourceExecutable, $packagedExecutable, $archiveExtension, $socketMode] = match ($platform) {
-            'linux-x64', 'linux-arm64', 'macos-x64', 'macos-arm64' => ['build/symfony-lsp', 'symfony-lsp', 'tar.gz', false],
+            'linux-x64', 'linux-arm64', 'macos-arm64' => ['build/symfony-lsp', 'symfony-lsp', 'tar.gz', false],
             'windows-x64' => ['build/symfony-lsp.exe', 'symfony-lsp.exe', 'zip', true],
             default => throw new \InvalidArgumentException('Unsupported release platform "'.$platform.'".'),
         };

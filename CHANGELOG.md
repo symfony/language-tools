@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Drop Intel macOS from releases, editor packages and the Zed platform matrix
 - Add CoreShop source-only dogfooding with explicit analysis modes in reports and history
 - Record behavioral dogfood history and generate an offline HTML progress report
 - Replace dogfood support scores with reviewed behavioral scenarios and whole-project diagnostic regression checks

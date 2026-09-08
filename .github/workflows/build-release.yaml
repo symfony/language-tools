@@ -49,10 +49,6 @@ jobs:
                       runner: ubuntu-24.04-arm
                       spc: linux-aarch64
                       spc_checksum: 675a3840dcdc4ed041fe20eaa54310ce019a9984c1c03951df9ec66df5795213
-                    - platform: macos-x64
-                      runner: macos-15-intel
-                      spc: macos-x86_64
-                      spc_checksum: e8b798048f62ca4960764196543b60ae703f7174aa418824cf542aeec1d2cd6a
                     - platform: macos-arm64
                       runner: macos-14
                       spc: macos-aarch64
@@ -229,9 +225,6 @@ jobs:
                     - platform: linux-arm64
                       target: linux-arm64
                       executable: symfony-lsp
-                    - platform: macos-x64
-                      target: darwin-x64
-                      executable: symfony-lsp
                     - platform: macos-arm64
                       target: darwin-arm64
                       executable: symfony-lsp
@@ -328,12 +321,10 @@ jobs:
                   assets=(
                       "symfony-lsp-$VERSION-linux-x64.tar.gz"
                       "symfony-lsp-$VERSION-linux-arm64.tar.gz"
-                      "symfony-lsp-$VERSION-macos-x64.tar.gz"
                       "symfony-lsp-$VERSION-macos-arm64.tar.gz"
                       "symfony-lsp-$VERSION-windows-x64.zip"
                       "symfony-lsp-$VERSION-linux-x64.vsix"
                       "symfony-lsp-$VERSION-linux-arm64.vsix"
-                      "symfony-lsp-$VERSION-darwin-x64.vsix"
                       "symfony-lsp-$VERSION-darwin-arm64.vsix"
                       "symfony-lsp-$VERSION-win32-x64.vsix"
                   )

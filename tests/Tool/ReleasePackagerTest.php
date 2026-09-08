@@ -91,7 +91,6 @@ final class ReleasePackagerTest extends TestCase
     {
         yield 'Zed Linux x64 stable asset' => ['linux-x64', 'tag', 'v1.2.3', '1.2.3', 'symfony-lsp', 'tar.gz', false];
         yield 'Linux arm64 development asset' => ['linux-arm64', 'branch', 'main', 'dev', 'symfony-lsp', 'tar.gz', false];
-        yield 'macOS x64 stable asset' => ['macos-x64', 'tag', 'v1.2.3', '1.2.3', 'symfony-lsp', 'tar.gz', false];
         yield 'Zed macOS arm64 prerelease asset' => ['macos-arm64', 'tag', 'v1.2.3-rc.1', '1.2.3-rc.1', 'symfony-lsp', 'tar.gz', false];
         yield 'Windows socket asset' => ['windows-x64', 'tag', 'v1.2.3', '1.2.3', 'symfony-lsp.exe', 'zip', true];
     }
@@ -108,6 +107,16 @@ final class ReleasePackagerTest extends TestCase
             self::assertSame('The packaged server smoke test failed.', $exception->getMessage());
         }
         self::assertFileDoesNotExist($this->workspace->path('dist/symfony-lsp-v1.2.3-windows-x64.zip'));
+    }
+
+    public function testRejectsIntelMacOsAsAnUnsupportedPlatform(): void
+    {
+        $packager = new ReleasePackager($this->workspace->rootPath, new InteractiveProcessRunner());
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unsupported release platform "macos-x64".');
+
+        $packager->package('macos-x64', new ReleaseReference('tag', 'v1.2.3'));
     }
 
     public function testRejectsPackagesWithoutRequiredRuntimeLicenses(): void

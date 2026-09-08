@@ -8,13 +8,20 @@ stable standalone server for the current supported platform.
 Platform Support
 ----------------
 
-The Zed integration supports Linux and macOS on x86-64 and ARM64 systems.
+The Zed integration supports Linux on x86-64 and ARM64 systems, and macOS on
+ARM64 systems.
 
 .. warning::
 
     Windows is not supported. Zed starts language servers over standard input
     and output, while the self-contained Windows server requires the socket
     transport.
+
+.. warning::
+
+    Intel macOS is not supported. The release doesn't contain an Intel macOS
+    server, so the extension reports an unsupported platform instead of
+    downloading one.
 
 Installing the Extension
 ------------------------

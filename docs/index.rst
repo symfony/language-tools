@@ -20,7 +20,7 @@ corresponding page for installation, configuration and troubleshooting:
   enable it through ``nvim-lspconfig``;
 * `Zed`_: install the development extension from source while registry
   publication is pending. It downloads and runs the server automatically on
-  Linux and macOS;
+  Linux and Apple Silicon macOS;
 * `OpenCode`_: install the standalone server, then configure it as a custom
   language server for Symfony-aware diagnostics and navigation.
 
@@ -84,8 +84,11 @@ downloads it automatically. For a manual installation or a custom binary,
 download the archive for your platform from the GitHub release:
 
 * ``linux-x64`` or ``linux-arm64``;
-* ``macos-x64`` or ``macos-arm64``;
+* ``macos-arm64``;
 * ``windows-x64``.
+
+Intel macOS isn't supported. Build the server from source to run it on an
+Intel Mac.
 
 Extract the archive to get the self-contained ``symfony-lsp`` executable. On
 Windows, it has an ``.exe`` suffix.

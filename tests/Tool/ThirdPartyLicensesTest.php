@@ -101,7 +101,7 @@ final class ThirdPartyLicensesTest extends TestCase
         self::assertStringContainsString('EXTENSIONS: ctype,filter,iconv,mbstring,pcntl,phar,posix,tokenizer,zlib', $workflow);
         self::assertStringContainsString('EXTENSIONS: ctype,filter,iconv,mbstring,phar,tokenizer,zlib', $workflow);
         self::assertStringContainsString('| PHP 8.4 series | PHP License 3.01 |', $notices);
-        self::assertSame(4, substr_count($workflow, 'spc_checksum:'));
+        self::assertSame(3, substr_count($workflow, 'spc_checksum:'));
         self::assertStringContainsString("throw 'Invalid static-php-cli checksum.'", $workflow);
         self::assertSame(2, substr_count($workflow, 'tools/package-release'));
         self::assertStringContainsString("'runtime/src_php-src_0.txt'", $packager);
