@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.20.0 (2026-09-08)
 
 - Drop Intel macOS from releases, editor packages and the Zed platform matrix
 - Add CoreShop source-only dogfooding with explicit analysis modes in reports and history
