@@ -66,6 +66,35 @@ final class ServerHarnessTest extends TestCase
         yield 'editing and restoration' => [$scenario, 98.0];
     }
 
+    /** @param 'runtime'|'source-only' $analysisMode */
+    #[DataProvider('analysisModeProvider')]
+    public function testForwardsTheRequestedAnalysisMode(string $analysisMode, bool $expectedSourceOnly): void
+    {
+        $manifest = $this->directory.'/scenarios.json';
+        file_put_contents($manifest, json_encode([
+            'version' => 1, 'revision' => str_repeat('a', 40), 'diagnostics' => [],
+            'scenarios' => [['id' => 'route.twig', 'file' => 'templates/index.html.twig', 'anchor' => 'home', 'expect' => ['completion' => ['includes' => ['home']]]]],
+        ], \JSON_THROW_ON_ERROR));
+        $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '{}', '', false));
+        $configuration = new ProjectConfiguration(
+            'application', 'https://example.com/application.git', str_repeat('a', 40), null, 'dev', 'composer', false, 20,
+            scenarioFile: $manifest,
+            analysisMode: $analysisMode,
+        );
+
+        (new ServerHarness($processes, '/tools/dogfood-server', '/bin/symfony-lsp'))->run($configuration, $this->directory);
+
+        self::assertSame($expectedSourceOnly, \in_array('--source-only', $processes->calls[0]['command'], true));
+        self::assertSame(['/bin/symfony-lsp', $this->directory], \array_slice($processes->calls[0]['command'], -2));
+    }
+
+    /** @return iterable<string, array{'runtime'|'source-only', bool}> */
+    public static function analysisModeProvider(): iterable
+    {
+        yield 'runtime' => ['runtime', false];
+        yield 'source-only' => ['source-only', true];
+    }
+
     public function testMissingManifestNeverStartsTheProcess(): void
     {
         $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '{}', '', false));

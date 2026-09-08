@@ -148,6 +148,75 @@ final class DogfoodServerTest extends TestCase
         }
     }
 
+    public function testRunsScenariosWithoutRuntimeIndexingInSourceOnlyMode(): void
+    {
+        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+            ['method' => 'workspace/executeCommand', 'result' => [[
+                'source' => ['state' => 'ready'],
+                'runtime' => ['state' => 'not-indexed'],
+                'runtimeEnabled' => false,
+            ]]],
+            ['method' => 'textDocument/completion', 'result' => [['label' => 'hello/index.html.twig']]],
+        ]]);
+        $result = $this->execute(['--scenarios='.$this->manifest(), '--source-only', $server->path, $this->project]);
+        $report = $this->report($result);
+
+        self::assertSame(0, $result->exitCode, $result->errorOutput);
+        self::assertSame('source-only', $report['analysisMode']);
+        self::assertSame('passed', $report['outcome']);
+        self::assertTrue($report['terminal']);
+        self::assertSame(['state' => 'disabled'], $report['status']['runtime'] ?? null);
+        self::assertNull($report['timings']['runtimeIndexMilliseconds']);
+        self::assertSame('pass', $report['scenarios'][0]['status']);
+        self::assertFalse($this->initializationOptions($server)['runtimeIndexing'] ?? null);
+    }
+
+    public function testRefusesToRunScenariosWhenSourceOnlyRuntimeIsStillEnabled(): void
+    {
+        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+            ['method' => 'workspace/executeCommand', 'result' => [[
+                'source' => ['state' => 'ready'],
+                'runtime' => ['state' => 'ready'],
+                'runtimeEnabled' => true,
+            ]]],
+            ['method' => 'textDocument/completion', 'result' => [['label' => 'hello/index.html.twig']]],
+        ]]);
+        $result = $this->execute(['--scenarios='.$this->manifest(), '--source-only', $server->path, $this->project]);
+        $report = $this->report($result);
+
+        self::assertSame('source-only', $report['analysisMode']);
+        self::assertSame(['state' => 'ready'], $report['status']['runtime'] ?? null);
+        self::assertSame('failed', $report['outcome']);
+        self::assertSame(0, $report['requestCount']);
+        self::assertNotContains('textDocument/completion', $server->methods());
+    }
+
+    public function testKeepsTheReportedRuntimeStateWhenRuntimeIndexingWasNotDisabled(): void
+    {
+        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+            ['method' => 'workspace/executeCommand', 'result' => [[
+                'source' => ['state' => 'ready'],
+                'runtime' => ['state' => 'not-indexed'],
+            ]]],
+        ]]);
+        $report = $this->report($this->execute(['--scenarios='.$this->manifest(), '--source-only', $server->path, $this->project]));
+
+        self::assertSame(['state' => 'not-indexed'], $report['status']['runtime'] ?? null);
+        self::assertSame('failed', $report['outcome']);
+    }
+
+    public function testReportsRuntimeAnalysisByDefault(): void
+    {
+        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+            ['method' => 'textDocument/completion', 'result' => [['label' => 'hello/index.html.twig']]],
+        ]]);
+        $report = $this->report($this->execute(['--scenarios='.$this->manifest(), $server->path, $this->project]));
+
+        self::assertSame('runtime', $report['analysisMode']);
+        self::assertSame('passed', $report['outcome']);
+        self::assertTrue($this->initializationOptions($server)['runtimeIndexing'] ?? null);
+    }
+
     public function testKeepsTheProcessSuccessfulWhenScenariosFail(): void
     {
         $server = new ScriptedLanguageServer($this->directory, ['responses' => [
@@ -226,6 +295,17 @@ final class DogfoodServerTest extends TestCase
         self::assertNull($report['runtimeBridgeTimings']);
         self::assertIsString($report['serverError']);
         self::assertSame(1000000, \strlen($report['serverError']));
+    }
+
+    /** @return array<array-key, mixed> */
+    private function initializationOptions(ScriptedLanguageServer $server): array
+    {
+        $parameters = $server->messages('initialize')[0]['params'] ?? null;
+        self::assertIsArray($parameters);
+        $options = $parameters['initializationOptions'] ?? null;
+        self::assertIsArray($options);
+
+        return $options;
     }
 
     private function manifest(): string

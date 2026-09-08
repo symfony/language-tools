@@ -115,6 +115,54 @@ final class MatrixCommandTest extends TestCase
         self::assertNotSame($first, $this->readJson($this->output.'/next/acme/project.json')['expectationFingerprint']);
     }
 
+    public function testRunsSourceOnlyProjectsWithoutRuntimeMetadata(): void
+    {
+        $this->diagnosticReport['projects'] = [['complete' => true, 'analysis' => ['mode' => 'source-only'], 'source' => ['state' => 'ready'], 'runtime' => ['state' => 'disabled']]];
+        $harness = new FakeHarness($this->successfulSourceOnlyRun(), $this->successfulSourceOnlyRun());
+
+        $exitCode = $this->command(new FakeProvisioner($this->checkout), $harness)->run([$this->configuration(analysisMode: 'source-only')], $this->output);
+
+        self::assertSame(0, $exitCode);
+        $report = $this->readReport();
+        self::assertTrue($report['ok']);
+        $recorded = $this->readJson($this->output.'/acme/project.json');
+        self::assertSame('source-only', $recorded['analysisMode'] ?? null);
+        self::assertSame([], $report['cold']['layers'] ?? null);
+        self::assertSame([], $report['warm']['layers'] ?? null);
+        self::assertSame('disabled', $report['warm']['runtime']);
+        $diagnostics = $this->readJson($this->output.'/acme/diagnostics.json');
+        self::assertTrue($diagnostics['ok'] ?? null);
+        self::assertSame('source-only', $diagnostics['analysisMode'] ?? null);
+        self::assertStringContainsString('mode=source-only', $this->lines[0]);
+    }
+
+    public function testFailsWhenASourceOnlyProjectStillBootsTheRuntime(): void
+    {
+        $harness = new FakeHarness($this->successfulSourceOnlyRun(), $this->harnessRun(['analysisMode' => 'source-only']));
+
+        $exitCode = $this->command(new FakeProvisioner($this->checkout), $harness)->run([$this->configuration(analysisMode: 'source-only')], $this->output);
+
+        self::assertSame(1, $exitCode);
+        $report = $this->readReport();
+        self::assertSame([], $report['cold']['layers'] ?? null);
+        self::assertSame(['analysis-mode'], $report['warm']['layers'] ?? null);
+        self::assertFileDoesNotExist(Path::join($this->output, 'acme/diagnostics.json'));
+    }
+
+    public function testFailsWhenARuntimeProjectReportsSourceOnlyRuns(): void
+    {
+        $harness = new FakeHarness($this->successfulSourceOnlyRun(), $this->successfulSourceOnlyRun());
+
+        $exitCode = $this->command(new FakeProvisioner($this->checkout), $harness)->run([$this->configuration()], $this->output);
+
+        self::assertSame(1, $exitCode);
+        $report = $this->readReport();
+        self::assertSame(['analysis-mode', 'runtime-index'], $report['cold']['layers'] ?? null);
+        self::assertSame(['analysis-mode', 'runtime-index'], $report['warm']['layers'] ?? null);
+        self::assertFileDoesNotExist(Path::join($this->output, 'acme/diagnostics.json'));
+        self::assertStringContainsString('mode=runtime', $this->lines[0]);
+    }
+
     public function testRejectsInvalidJobCount(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -384,7 +432,8 @@ final class MatrixCommandTest extends TestCase
         );
     }
 
-    private function configuration(?string $directory = null, string $name = 'acme'): ProjectConfiguration
+    /** @param 'runtime'|'source-only' $analysisMode */
+    private function configuration(?string $directory = null, string $name = 'acme', string $analysisMode = 'runtime'): ProjectConfiguration
     {
         $manifest = $this->directory.'/'.$name.'.scenarios.json';
         file_put_contents($manifest, json_encode([
@@ -395,7 +444,16 @@ final class MatrixCommandTest extends TestCase
             ],
         ], \JSON_THROW_ON_ERROR));
 
-        return new ProjectConfiguration($name, 'https://github.com/acme/app.git', str_repeat('a', 40), $directory, 'dev', 'composer', false, 120, scenarioFile: $manifest);
+        return new ProjectConfiguration($name, 'https://github.com/acme/app.git', str_repeat('a', 40), $directory, 'dev', 'composer', false, 120, scenarioFile: $manifest, analysisMode: $analysisMode);
+    }
+
+    private function successfulSourceOnlyRun(): HarnessResult
+    {
+        return $this->harnessRun([
+            'analysisMode' => 'source-only',
+            'status' => ['source' => ['state' => 'ready'], 'runtime' => ['state' => 'disabled']],
+            'runtimeBridgeTimings' => null,
+        ]);
     }
 
     /** @return list<array{id: string, status: string, checks: list<array{phase: string, method: string, status: string, milliseconds: float, fingerprint: string, failures: list<string>}>, failures: list<string>}> */
@@ -458,11 +516,11 @@ final class MatrixCommandTest extends TestCase
     }
 
     /**
-     * @return array{ok: bool, frameworkBundle: ?string, dependencies: array{composerLockSha256: ?string}, workingTree: array{modified: list<string>, untracked: int}|null, timings: array<string, int|float>, cold: array{layers: list<string>, timings: array<string, int|float|null>, runtimeBridgeTimings: array<string, mixed>|null}|null, warm: array{layers: list<string>, timings: array<string, int|float|null>, runtimeBridgeTimings: array<string, mixed>|null}|null, failure: array{layer: string, message: string}|null}
+     * @return array{ok: bool, frameworkBundle: ?string, dependencies: array{composerLockSha256: ?string}, workingTree: array{modified: list<string>, untracked: int}|null, timings: array<string, int|float>, cold: array{layers: list<string>, runtime: string, timings: array<string, int|float|null>, runtimeBridgeTimings: array<string, mixed>|null}|null, warm: array{layers: list<string>, runtime: string, timings: array<string, int|float|null>, runtimeBridgeTimings: array<string, mixed>|null}|null, failure: array{layer: string, message: string}|null}
      */
     private function readReport(): array
     {
-        /** @var array{ok: bool, frameworkBundle: ?string, dependencies: array{composerLockSha256: ?string}, workingTree: array{modified: list<string>, untracked: int}|null, timings: array<string, int|float>, cold: array{layers: list<string>, timings: array<string, int|float|null>, runtimeBridgeTimings: array<string, mixed>|null}|null, warm: array{layers: list<string>, timings: array<string, int|float|null>, runtimeBridgeTimings: array<string, mixed>|null}|null, failure: array{layer: string, message: string}|null} $report */
+        /** @var array{ok: bool, frameworkBundle: ?string, dependencies: array{composerLockSha256: ?string}, workingTree: array{modified: list<string>, untracked: int}|null, timings: array<string, int|float>, cold: array{layers: list<string>, runtime: string, timings: array<string, int|float|null>, runtimeBridgeTimings: array<string, mixed>|null}|null, warm: array{layers: list<string>, runtime: string, timings: array<string, int|float|null>, runtimeBridgeTimings: array<string, mixed>|null}|null, failure: array{layer: string, message: string}|null} $report */
         $report = $this->readJson(Path::join($this->output, 'acme/project.json'));
 
         return $report;

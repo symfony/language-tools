@@ -50,7 +50,15 @@ final class ConfigurationLoaderTest extends TestCase
         self::assertTrue($configuration->ci);
         self::assertSame(120, $configuration->indexTimeout);
         self::assertSame(10, $configuration->requestTimeout);
+        self::assertSame('runtime', $configuration->analysisMode);
         self::assertSame($this->directory.'/scenarios/kimai.json', $configuration->scenarioFile);
+    }
+
+    public function testLoadsAnExplicitSourceOnlyAnalysisMode(): void
+    {
+        $this->write('coreshop.json', array_merge($this->valid(), ['analysisMode' => 'source-only']));
+
+        self::assertSame('source-only', (new ConfigurationLoader())->load([$this->directory], ['composer'])[0]->analysisMode);
     }
 
     public function testLoadsFullConfiguration(): void
@@ -167,6 +175,8 @@ final class ConfigurationLoaderTest extends TestCase
     {
         yield 'invalid name' => [[], 'Invalid project name', 'Kimai!.json'];
         yield 'unknown key' => [['command' => 'rm -rf /'], 'Unknown key "command"'];
+        yield 'unknown analysis mode' => [['analysisMode' => 'runtime-only'], '"analysisMode" in'];
+        yield 'boolean analysis mode' => [['analysisMode' => false], '"analysisMode" in'];
         yield 'missing version' => [['version' => null], '"version": 1'];
         yield 'unsupported version' => [['version' => 2], '"version": 1'];
         yield 'missing repository' => [['repository' => null], 'non-empty "repository"'];
