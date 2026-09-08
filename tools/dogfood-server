@@ -158,7 +158,9 @@ try {
     );
     $scenariosStartedAt = hrtime(true);
     $expectedRuntimeState = $sourceOnly ? 'disabled' : 'ready';
-    $ready = 'ready' === ($report['status']['source']['state'] ?? null) && $expectedRuntimeState === ($report['status']['runtime']['state'] ?? null);
+    $ready = 'ready' === ($report['status']['source']['state'] ?? null)
+        && $expectedRuntimeState === ($report['status']['runtime']['state'] ?? null)
+        && (!$sourceOnly || false === ($report['status']['runtimeEnabled'] ?? null));
     $report = array_replace($report, $ready
         ? $runner->run($manifest, $project)
         : ScenarioRunner::unavailable($manifest, $sourceOnly
@@ -202,9 +204,6 @@ $timings['totalMilliseconds'] = $elapsedMilliseconds($totalStartedAt);
 $report['timings'] = $timings;
 write($report);
 
-/**
- * Reports an untouched runtime section as disabled, never rewriting observed runtime evidence.
- */
 function disabledRuntime(mixed $status): mixed
 {
     if (!is_array($status) || false !== ($status['runtimeEnabled'] ?? null)) {

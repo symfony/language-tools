@@ -96,7 +96,7 @@ final class ConfigurationLoader
      */
     private function analysisMode(array $data, string $file): string
     {
-        $mode = $data['analysisMode'] ?? 'runtime';
+        $mode = \array_key_exists('analysisMode', $data) ? $data['analysisMode'] : 'runtime';
         if ('runtime' !== $mode && 'source-only' !== $mode) {
             throw new ConfigurationException(\sprintf('The "analysisMode" in "%s" must be one of "%s".', $file, implode('", "', self::ANALYSIS_MODES)));
         }

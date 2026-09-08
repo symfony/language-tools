@@ -33,6 +33,8 @@ final class RunClassifierTest extends TestCase
     public static function sourceOnlyClassificationProvider(): iterable
     {
         yield 'success' => [self::sourceOnlyResult(), []];
+        yield 'enabled runtime reported disabled' => [self::sourceOnlyResult(['status' => array_replace(self::indexStatus('ready', 'disabled'), ['runtimeEnabled' => true])]), ['analysis-mode']];
+        yield 'missing enabled state' => [self::sourceOnlyResult(['status' => ['source' => ['state' => 'ready'], 'runtime' => ['state' => 'disabled']]]), ['analysis-mode']];
         yield 'implicit runtime report' => [self::harnessResult(['status' => self::indexStatus('ready', 'disabled')]), ['analysis-mode']];
         yield 'runtime report' => [self::harnessResult(), ['analysis-mode']];
         yield 'runtime booted anyway' => [self::sourceOnlyResult(['status' => self::indexStatus('ready', 'ready')]), ['analysis-mode']];
@@ -56,6 +58,7 @@ final class RunClassifierTest extends TestCase
     public static function classificationProvider(): iterable
     {
         yield 'success' => [self::harnessResult(), []];
+        yield 'explicit null mode' => [self::harnessResult(['analysisMode' => null]), ['analysis-mode']];
         yield 'timeout' => [new HarnessResult(-1, true, null, '', ''), ['timeout']];
         yield 'invalid output' => [new HarnessResult(0, false, null, 'not json', ''), ['process']];
         yield 'harness crash' => [new HarnessResult(1, false, self::decodedResult(), '{}', 'boom'), ['process']];
@@ -134,10 +137,10 @@ final class RunClassifierTest extends TestCase
     }
 
     /**
-     * @return array{source: array{state: string}, runtime: array{state: string}}
+     * @return array{source: array{state: string}, runtime: array{state: string}, runtimeEnabled: bool}
      */
     private static function indexStatus(string $source, string $runtime): array
     {
-        return ['source' => ['state' => $source], 'runtime' => ['state' => $runtime]];
+        return ['source' => ['state' => $source], 'runtime' => ['state' => $runtime], 'runtimeEnabled' => 'disabled' !== $runtime];
     }
 }

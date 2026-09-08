@@ -191,6 +191,22 @@ final class DogfoodServerTest extends TestCase
         self::assertNotContains('textDocument/completion', $server->methods());
     }
 
+    public function testDisabledStatusCannotHideEnabledRuntimeIndexing(): void
+    {
+        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+            ['method' => 'workspace/executeCommand', 'result' => [[
+                'source' => ['state' => 'ready'],
+                'runtime' => ['state' => 'disabled'],
+                'runtimeEnabled' => true,
+            ]]],
+        ]]);
+        $report = $this->report($this->execute(['--scenarios='.$this->manifest(), '--source-only', $server->path, $this->project]));
+
+        self::assertSame('failed', $report['outcome']);
+        self::assertSame(0, $report['requestCount']);
+        self::assertNotContains('textDocument/completion', $server->methods());
+    }
+
     public function testKeepsTheReportedRuntimeStateWhenRuntimeIndexingWasNotDisabled(): void
     {
         $server = new ScriptedLanguageServer($this->directory, ['responses' => [

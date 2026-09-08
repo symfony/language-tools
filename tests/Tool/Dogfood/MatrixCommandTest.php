@@ -451,7 +451,7 @@ final class MatrixCommandTest extends TestCase
     {
         return $this->harnessRun([
             'analysisMode' => 'source-only',
-            'status' => ['source' => ['state' => 'ready'], 'runtime' => ['state' => 'disabled']],
+            'status' => ['source' => ['state' => 'ready'], 'runtime' => ['state' => 'disabled'], 'runtimeEnabled' => false],
             'runtimeBridgeTimings' => null,
         ]);
     }

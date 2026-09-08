@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Tool\Dogfood;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\Dogfood\ReportHistory;
@@ -37,6 +38,87 @@ final class ReportImporterTest extends TestCase
         self::assertSame(123, $entry['files']);
         self::assertSame(24.0, $entry['scenarioMilliseconds']);
         self::assertSame(ReportFixture::entry()['comparison'], $entry['comparison']);
+    }
+
+    public function testRecordsSourceOnlyResultsWithTheirOwnComparisonScope(): void
+    {
+        ReportFixture::write($this->workspace, project: ReportFixture::project('source-only'));
+        $result = (new ReportImporter())->collect($this->workspace->path());
+        $entry = $result['entries'][0];
+
+        self::assertSame([], $result['warnings']);
+        self::assertSame('passed', $entry['outcome']);
+        self::assertSame('source-only', $entry['analysisMode']);
+        self::assertSame(2, $entry['passed']);
+        self::assertSame(123, $entry['files']);
+        self::assertNotSame(ReportFixture::entry()['comparison'], $entry['comparison']);
+    }
+
+    #[DataProvider('inconsistentModeProvider')]
+    public function testCannotRecordPassingSourceOnlyResultsWithInconsistentEvidence(string $part): void
+    {
+        $project = ReportFixture::project('source-only');
+        if ('diagnostics' === $part) {
+            $project['diagnostics'] = array_replace((array) $project['diagnostics'], ['analysisMode' => 'runtime']);
+        }
+        if ('summary' === $part) {
+            $project['warm'] = array_replace((array) $project['warm'], ['runtime' => 'ready']);
+        }
+        ReportFixture::write($this->workspace, project: $project);
+        if (!\in_array($part, ['summary', 'diagnostics'], true)) {
+            $phase = ReportFixture::phase(analysisMode: 'source-only');
+            if ('mode' === $part) {
+                $phase['analysisMode'] = 'runtime';
+            } elseif ('missing-mode' === $part) {
+                unset($phase['analysisMode']);
+            } else {
+                $status = (array) $phase['status'];
+                if ('runtime-state' === $part) {
+                    $status['runtime'] = ['state' => 'ready'];
+                } else {
+                    $status['runtimeEnabled'] = true;
+                }
+                $phase['status'] = $status;
+            }
+            $this->workspace->write('20260907-120000/app/warm.json', json_encode($phase, \JSON_THROW_ON_ERROR));
+        }
+        $result = (new ReportImporter())->collect($this->workspace->path());
+
+        self::assertCount(1, $result['warnings']);
+        self::assertSame('incomplete', $result['entries'][0]['outcome']);
+        self::assertSame('source-only', $result['entries'][0]['analysisMode']);
+        self::assertFalse($result['entries'][0]['finalized']);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function inconsistentModeProvider(): iterable
+    {
+        foreach (['mode', 'missing-mode', 'diagnostics', 'summary', 'runtime-state', 'runtime-enabled'] as $part) {
+            yield $part => [$part];
+        }
+    }
+
+    public function testImportsLegacyModeAsRuntimeWithoutWeakeningReadiness(): void
+    {
+        $project = ReportFixture::project();
+        unset($project['analysisMode']);
+        $diagnostics = (array) $project['diagnostics'];
+        unset($diagnostics['analysisMode']);
+        $project['diagnostics'] = $diagnostics;
+        ReportFixture::write($this->workspace, project: $project);
+        foreach (['cold', 'warm'] as $name) {
+            $phase = ReportFixture::phase();
+            unset($phase['analysisMode']);
+            $this->workspace->write('20260907-120000/app/'.$name.'.json', json_encode($phase, \JSON_THROW_ON_ERROR));
+        }
+        $importer = new ReportImporter();
+        $entry = $importer->collect($this->workspace->path())['entries'][0];
+        self::assertSame('runtime', $entry['analysisMode']);
+        self::assertSame('passed', $entry['outcome']);
+
+        $project['warm'] = array_replace((array) $project['warm'], ['runtime' => 'disabled']);
+        $this->workspace->write('20260907-120000/app/project.json', json_encode($project, \JSON_THROW_ON_ERROR));
+        self::assertSame('incomplete', $importer->collect($this->workspace->path())['entries'][0]['outcome']);
     }
 
     public function testDecorativeVersionLabelsCannotDiscardVerifiedMeasurements(): void
@@ -95,6 +177,19 @@ final class ReportImporterTest extends TestCase
         self::assertSame('blocked', $entry['outcome']);
         self::assertNull($entry['checks']);
         self::assertSame(['scenario'], $entry['layers']);
+    }
+
+    public function testMissingEvidenceCannotSilentlyDegradeAFailedObservation(): void
+    {
+        $project = array_replace(ReportFixture::project('source-only'), ['ok' => false, 'failure' => ['layer' => 'scenario']]);
+        ReportFixture::write($this->workspace, project: $project, status: 'fail');
+        unlink($this->workspace->path('20260907-120000/app/warm.json'));
+        $result = (new ReportImporter())->collect($this->workspace->path());
+
+        self::assertSame(['20260907-120000/app: The warm artifact is missing.'], $result['warnings']);
+        self::assertSame('incomplete', $result['entries'][0]['outcome']);
+        self::assertSame('source-only', $result['entries'][0]['analysisMode']);
+        self::assertFalse($result['entries'][0]['finalized']);
     }
 
     public function testDistinguishesFailedAssertionsFromOperationalErrors(): void
@@ -228,6 +323,9 @@ final class ReportImporterTest extends TestCase
 
         self::assertSame('incomplete', $result['entries'][0]['outcome']);
         self::assertFalse($result['entries'][0]['finalized']);
-        self::assertSame(['20260907-120000/app: Passing result lacks complete evidence.'], $result['warnings']);
+        self::assertSame([
+            '20260907-120000/app: The warm artifact is missing.',
+            '20260907-120000/app: Passing result lacks complete evidence.',
+        ], $result['warnings']);
     }
 }

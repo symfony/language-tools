@@ -5,17 +5,17 @@ namespace Symfony\Lsp\Tools\Dogfood;
 use Symfony\Component\Filesystem\Filesystem;
 
 /**
- * @phpstan-type HistoryEntry array{version: 1, run: string, project: string, time: string, outcome: string, finalized: bool, layers: list<string>, revision: ?string, dependencies: ?string, environment: ?string, framework: ?string, serverVersion: ?string, expectations: ?string, checkSet: ?string, comparison: ?string, scenarios: ?int, checks: ?int, passed: ?int, failed: ?int, errors: ?int, requests: ?int, knownGaps: ?int, diagnostics: ?int, files: ?int, milliseconds: ?float, scenarioMilliseconds: ?float}
+ * @phpstan-type HistoryEntry array{version: 2, run: string, project: string, time: string, outcome: string, finalized: bool, layers: list<string>, analysisMode: ?string, revision: ?string, dependencies: ?string, environment: ?string, framework: ?string, serverVersion: ?string, expectations: ?string, checkSet: ?string, comparison: ?string, scenarios: ?int, checks: ?int, passed: ?int, failed: ?int, errors: ?int, requests: ?int, knownGaps: ?int, diagnostics: ?int, files: ?int, milliseconds: ?float, scenarioMilliseconds: ?float}
  */
 final class ReportHistory
 {
-    public const LAYERS = ['provisioning', 'setup', 'bootstrap', 'source-index', 'runtime-index', 'request', 'process', 'timeout', 'scenario', 'cache-parity', 'diagnostics', 'artifact'];
+    public const LAYERS = ['analysis-mode', 'provisioning', 'setup', 'bootstrap', 'source-index', 'runtime-index', 'request', 'process', 'timeout', 'scenario', 'cache-parity', 'diagnostics', 'artifact'];
 
     private const COUNTS = ['scenarios', 'checks', 'passed', 'failed', 'errors', 'requests', 'knownGaps', 'diagnostics', 'files'];
     private const DURATIONS = ['milliseconds', 'scenarioMilliseconds'];
     private const HASHES = ['dependencies', 'expectations', 'checkSet', 'comparison'];
     private const LABELS = ['environment', 'framework', 'serverVersion'];
-    private const KEYS = ['version', 'run', 'project', 'time', 'outcome', 'finalized', 'layers', 'revision', ...self::HASHES, ...self::LABELS, ...self::COUNTS, ...self::DURATIONS];
+    private const KEYS = ['version', 'run', 'project', 'time', 'outcome', 'finalized', 'layers', 'analysisMode', 'revision', ...self::HASHES, ...self::LABELS, ...self::COUNTS, ...self::DURATIONS];
 
     public function __construct(private readonly Filesystem $filesystem = new Filesystem())
     {
@@ -94,7 +94,7 @@ final class ReportHistory
             if ($previous['finalized']) {
                 throw new \UnexpectedValueException(\sprintf('Recorded results for %s changed; refusing to overwrite finalized history.', $key));
             }
-            foreach (['revision', 'dependencies', 'environment', 'expectations'] as $field) {
+            foreach (['analysisMode', 'revision', 'dependencies', 'environment', 'expectations'] as $field) {
                 if (null !== $previous[$field] && null !== $entry[$field] && $previous[$field] !== $entry[$field]) {
                     throw new \UnexpectedValueException(\sprintf('The input identity for incomplete run %s changed.', $key));
                 }
@@ -112,7 +112,12 @@ final class ReportHistory
     /** @return HistoryEntry */
     public function validate(mixed $entry): array
     {
-        if (!\is_array($entry) || 1 !== ($entry['version'] ?? null)
+        $legacy = \is_array($entry) && 1 === ($entry['version'] ?? null) && !\array_key_exists('analysisMode', $entry);
+        if ($legacy) {
+            $entry['version'] = 2;
+            $entry['analysisMode'] = 'runtime';
+        }
+        if (!\is_array($entry) || 2 !== ($entry['version'] ?? null)
             || [] !== array_diff(self::KEYS, array_keys($entry))
             || [] !== array_diff(array_keys($entry), self::KEYS)
         ) {
@@ -121,6 +126,7 @@ final class ReportHistory
         if (!\is_string($entry['run']) || !\is_string($entry['time']) || $this->time($entry['run']) !== $entry['time']
             || !\is_string($entry['project']) || 1 !== preg_match('/^[a-z0-9][a-z0-9._-]{0,99}$/D', $entry['project'])
             || !\in_array($entry['outcome'], ['passed', 'failed', 'blocked', 'incomplete'], true)
+            || !\in_array($entry['analysisMode'], [null, 'runtime', 'source-only'], true)
             || !\is_bool($entry['finalized']) || !\is_array($entry['layers']) || !array_is_list($entry['layers'])
         ) {
             throw new \UnexpectedValueException('Invalid history identity or outcome.');
@@ -160,15 +166,25 @@ final class ReportHistory
         if (null !== $entry['checks'] && (null === $entry['passed'] || null === $entry['failed'] || null === $entry['errors'] || $entry['passed'] + $entry['failed'] + $entry['errors'] !== $entry['checks'])) {
             throw new \UnexpectedValueException('History check totals disagree.');
         }
-        if ('passed' === $entry['outcome'] && (!$entry['finalized'] || [] !== $entry['layers'] || null === $entry['checks'] || $entry['checks'] < 1 || 0 !== $entry['failed'] || 0 !== $entry['errors'] || null === $entry['files'] || $entry['files'] < 1 || null === $entry['diagnostics'])) {
+        if ('passed' === $entry['outcome'] && (null === $entry['analysisMode'] || !$entry['finalized'] || [] !== $entry['layers'] || null === $entry['checks'] || $entry['checks'] < 1 || 0 !== $entry['failed'] || 0 !== $entry['errors'] || null === $entry['files'] || $entry['files'] < 1 || null === $entry['diagnostics'])) {
             throw new \UnexpectedValueException('A passing history entry has incomplete evidence.');
         }
         if (null !== $entry['knownGaps'] && null !== $entry['diagnostics'] && $entry['knownGaps'] > $entry['diagnostics']) {
             throw new \UnexpectedValueException('History gap totals disagree.');
         }
-        if ($entry['comparison'] !== $this->comparison($entry['revision'], $entry['dependencies'], $entry['environment'], $entry['expectations'])) {
+        $comparison = $this->comparison($entry['revision'], $entry['dependencies'], $entry['environment'], $entry['expectations'], $entry['analysisMode']);
+        if ($legacy && null !== $comparison) {
+            $legacyComparison = hash('sha256', json_encode([$entry['revision'], $entry['dependencies'], $entry['environment'], $entry['expectations']], \JSON_THROW_ON_ERROR));
+            if ($entry['comparison'] !== $legacyComparison) {
+                throw new \UnexpectedValueException('History comparison fingerprint disagrees with its inputs.');
+            }
+            $entry['comparison'] = $comparison;
+        }
+        if ($entry['comparison'] !== $comparison) {
             throw new \UnexpectedValueException('History comparison fingerprint disagrees with its inputs.');
         }
+
+        $entry = array_replace(array_fill_keys(self::KEYS, null), $entry);
 
         /* @var HistoryEntry $entry */
         return $entry;
@@ -184,12 +200,12 @@ final class ReportHistory
         return $date->format('Y-m-d\TH:i:s\Z');
     }
 
-    public function comparison(?string $revision, ?string $dependencies, ?string $environment, ?string $expectations): ?string
+    public function comparison(?string $revision, ?string $dependencies, ?string $environment, ?string $expectations, ?string $analysisMode = 'runtime'): ?string
     {
-        if (null === $revision || null === $dependencies || null === $environment || null === $expectations) {
+        if (null === $revision || null === $dependencies || null === $environment || null === $expectations || null === $analysisMode) {
             return null;
         }
 
-        return hash('sha256', json_encode([$revision, $dependencies, $environment, $expectations], \JSON_THROW_ON_ERROR));
+        return hash('sha256', json_encode([$revision, $dependencies, $environment, $expectations, $analysisMode], \JSON_THROW_ON_ERROR));
     }
 }

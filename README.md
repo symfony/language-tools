@@ -18,7 +18,9 @@ Symfony Language Tools is continuously tested with real applications including
 [Shopware](https://github.com/shopware/shopware),
 [Pimcore Skeleton](https://github.com/pimcore/skeleton) and
 [Symfony Demo](https://github.com/symfony/demo) across supported Symfony
-versions.
+versions. [CoreShop](https://github.com/coreshop/CoreShop) is additionally tested
+in source-only mode, without booting its application or validating runtime
+metadata.
 
 ## Installation
 

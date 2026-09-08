@@ -18,7 +18,7 @@ final class RunClassifier
             return ['process'];
         }
         $layers = [];
-        if ($analysisMode !== ($run->result['analysisMode'] ?? 'runtime')) {
+        if ($analysisMode !== (\array_key_exists('analysisMode', $run->result) ? $run->result['analysisMode'] : 'runtime')) {
             $layers[] = 'analysis-mode';
         }
         $source = $this->indexState($run->result, 'source');
@@ -29,7 +29,8 @@ final class RunClassifier
         }
         $runtime = $this->indexState($run->result, 'runtime');
         if ('source-only' === $analysisMode) {
-            if ('disabled' !== $runtime && !\in_array('analysis-mode', $layers, true)) {
+            $status = $run->result['status'] ?? null;
+            if (('disabled' !== $runtime || !\is_array($status) || false !== ($status['runtimeEnabled'] ?? null)) && !\in_array('analysis-mode', $layers, true)) {
                 $layers[] = 'analysis-mode';
             }
         } elseif (\in_array($runtime, ['failed', 'partial', 'stale', 'disabled'], true)) {

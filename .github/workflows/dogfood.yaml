@@ -43,6 +43,7 @@ on:
                 default: all
                 options:
                     - all
+                    - coreshop
                     - kimai
                     - mautic
                     - pimcore
@@ -69,6 +70,7 @@ jobs:
             fail-fast: false
             matrix:
                 include:
+                    - project: coreshop
                     - project: kimai
                     - project: mautic
                     - project: sulu-demo

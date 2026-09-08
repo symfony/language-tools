@@ -58,6 +58,23 @@ final class WorkflowTriggerTest extends TestCase
         ], $this->dogfoodConfiguration('shopware')->environmentVariables);
     }
 
+    public function testEveryPublicDogfoodProjectIsSelectableAndRunsInCi(): void
+    {
+        /** @var array{on: array{workflow_dispatch: array{inputs: array{project: array{options: list<string>}}}}, jobs: array{dogfood: array{strategy: array{matrix: array{include: list<array{project: string}>}}}}} $workflow */
+        $workflow = Yaml::parseFile(self::ROOT.'/.github/workflows/dogfood.yaml');
+        $configurations = (new ConfigurationLoader())->load([self::ROOT.'/tools/dogfood/projects'], ['composer', 'composer-no-scripts']);
+        $expected = array_values(array_map(static fn (ProjectConfiguration $project): string => $project->name, array_filter($configurations, static fn (ProjectConfiguration $project): bool => $project->ci)));
+        $matrix = array_column($workflow['jobs']['dogfood']['strategy']['matrix']['include'], 'project');
+        $choices = array_values(array_diff($workflow['on']['workflow_dispatch']['inputs']['project']['options'], ['all']));
+        sort($matrix);
+        sort($choices);
+
+        self::assertSame($expected, $matrix);
+        self::assertSame($expected, $choices);
+        self::assertSame('source-only', $this->dogfoodConfiguration('coreshop')->analysisMode);
+        self::assertSame('runtime', $this->dogfoodConfiguration('pimcore')->analysisMode);
+    }
+
     public function testReportOnlyChangesDoNotRunTheExternalDogfoodMatrix(): void
     {
         /** @var array{on: array<string, array{paths: list<string>}>} $workflow */

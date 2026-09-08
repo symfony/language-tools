@@ -144,6 +144,14 @@ final class ConfigurationLoaderTest extends TestCase
         (new ConfigurationLoader())->load([Path::join($this->directory, 'missing')], ['composer']);
     }
 
+    public function testRejectsAnExplicitNullAnalysisMode(): void
+    {
+        file_put_contents($this->directory.'/app.json', json_encode($this->valid() + ['analysisMode' => null], \JSON_THROW_ON_ERROR));
+        $this->expectException(ConfigurationException::class);
+        $this->expectExceptionMessage('analysisMode');
+        (new ConfigurationLoader())->load([$this->directory], ['composer']);
+    }
+
     public function testRejectsInvalidJson(): void
     {
         file_put_contents(Path::join($this->directory, 'kimai.json'), '{');

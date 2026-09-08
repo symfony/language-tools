@@ -61,6 +61,17 @@ final class ComposerSetupTest extends TestCase
         self::assertSame(['composer', 'install', '--no-interaction', '--no-progress', '--no-scripts'], $processes->calls[0]['command']);
     }
 
+    public function testSourceOnlyModeCannotRunApplicationComposerScripts(): void
+    {
+        file_put_contents(Path::join($this->directory, 'composer.lock'), '{}');
+        $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '', '', false));
+        $configuration = new ProjectConfiguration('acme', 'https://example.com/app.git', str_repeat('a', 40), null, 'dev', 'composer', false, 120, analysisMode: 'source-only');
+
+        (new ComposerSetup($processes))->setUp($configuration, $this->directory);
+
+        self::assertSame(['composer', 'install', '--no-interaction', '--no-progress', '--no-scripts'], $processes->calls[0]['command']);
+    }
+
     public function testCopiesThePinnedLockFileWhenTheProjectCommitsNone(): void
     {
         file_put_contents(Path::join($this->directory, 'pinned.lock'), '{"pinned": true}');

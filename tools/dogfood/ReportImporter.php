@@ -6,7 +6,7 @@ namespace Symfony\Lsp\Tools\Dogfood;
 final class ReportImporter
 {
     private const MAX_ARTIFACT_BYTES = 25_000_000;
-    private const OPERATIONAL_LAYERS = ['provisioning', 'setup', 'bootstrap', 'source-index', 'runtime-index', 'request', 'process', 'timeout'];
+    private const OPERATIONAL_LAYERS = ['analysis-mode', 'provisioning', 'setup', 'bootstrap', 'source-index', 'runtime-index', 'request', 'process', 'timeout'];
 
     public function __construct(
         private readonly ReportHistory $history = new ReportHistory(),
@@ -58,6 +58,7 @@ final class ReportImporter
                         $phases[$phase] = $this->read($projectDirectory.'/'.$phase.'.json');
                         if (null === $phases[$phase] && [] !== $summary && !$operational) {
                             $damaged = true;
+                            $warnings[] = $run.'/'.$project.': The '.$phase.' artifact is missing.';
                         }
                     } catch (\UnexpectedValueException $error) {
                         $phases[$phase] = null;
@@ -70,8 +71,13 @@ final class ReportImporter
                 if (null === $report && !isset($phases['cold']['scenarioCount']) && !isset($phases['warm']['scenarioCount'])) {
                     continue;
                 }
+                $modeSource = $report ?? $phases['warm'] ?? $phases['cold'];
+                $analysisMode = null === $modeSource ? null : (\array_key_exists('analysisMode', $modeSource) ? $modeSource['analysisMode'] : 'runtime');
                 try {
-                    $entry = $this->entry($run, $time, $project, $report, $phases['cold'], $phases['warm']);
+                    if (!\in_array($analysisMode, [null, 'runtime', 'source-only'], true)) {
+                        throw new \UnexpectedValueException('Invalid analysis mode.');
+                    }
+                    $entry = $this->entry($run, $time, $project, $report, $phases['cold'], $phases['warm'], $analysisMode);
                     if ($damaged) {
                         $entry['outcome'] = 'incomplete';
                         $entry['finalized'] = false;
@@ -80,7 +86,7 @@ final class ReportImporter
                     $entries[] = $entry;
                 } catch (\UnexpectedValueException $error) {
                     $warnings[] = $run.'/'.$project.': '.$error->getMessage();
-                    $entries[] = $this->entry($run, $time, $project, null, null, null);
+                    $entries[] = $this->entry($run, $time, $project, null, null, null, \in_array($analysisMode, ['runtime', 'source-only'], true) ? $analysisMode : null);
                 }
             }
         }
@@ -118,7 +124,7 @@ final class ReportImporter
      *
      * @return HistoryEntry
      */
-    private function entry(string $run, string $time, string $project, ?array $report, ?array $cold, ?array $warm): array
+    private function entry(string $run, string $time, string $project, ?array $report, ?array $cold, ?array $warm, ?string $analysisMode): array
     {
         if (null !== $report && ($report['name'] ?? null) !== $project) {
             throw new \UnexpectedValueException('Project identity differs from its directory.');
@@ -131,6 +137,9 @@ final class ReportImporter
         foreach (['cold' => $cold, 'warm' => $warm] as $phase => $response) {
             if (null === $response) {
                 continue;
+            }
+            if ((\array_key_exists('analysisMode', $response) ? $response['analysisMode'] : 'runtime') !== $analysisMode) {
+                throw new \UnexpectedValueException('The harness analysis mode differs from the project report.');
             }
             $scenarios = $response['scenarios'] ?? null;
             if (!\is_array($scenarios) || !array_is_list($scenarios) || ($response['scenarioCount'] ?? null) !== \count($scenarios)) {
@@ -182,6 +191,9 @@ final class ReportImporter
         $knownGaps = null;
         $files = null;
         if (true === ($diagnosticReport['ok'] ?? null)) {
+            if ((\array_key_exists('analysisMode', $diagnosticReport) ? $diagnosticReport['analysisMode'] : 'runtime') !== $analysisMode) {
+                throw new \UnexpectedValueException('The diagnostic analysis mode differs from the project report.');
+            }
             $items = $diagnosticReport['diagnostics'] ?? null;
             if (!\is_array($items) || !array_is_list($items)) {
                 throw new \UnexpectedValueException('Malformed diagnostic observation.');
@@ -213,11 +225,21 @@ final class ReportImporter
         $outcome = 'incomplete';
         if (null !== $report) {
             if (true === ($report['ok'] ?? null)) {
-                if (2 !== $available || [] !== $layers || 0 !== $statuses['fail'] || 0 !== $statuses['error'] || null === $files || 0 === $files
+                $runtimeState = 'source-only' === $analysisMode ? 'disabled' : 'ready';
+                if (null === $analysisMode || 2 !== $available || [] !== $layers || 0 !== $statuses['fail'] || 0 !== $statuses['error'] || null === $files || 0 === $files
                     || 'ready' !== ($summaryCold['source'] ?? null) || 'ready' !== ($summaryWarm['source'] ?? null)
-                    || 'ready' !== ($summaryCold['runtime'] ?? null) || 'ready' !== ($summaryWarm['runtime'] ?? null)
+                    || $runtimeState !== ($summaryCold['runtime'] ?? null) || $runtimeState !== ($summaryWarm['runtime'] ?? null)
                 ) {
                     throw new \UnexpectedValueException('Passing result lacks complete evidence.');
+                }
+                foreach ([$cold, $warm] as $response) {
+                    $status = $this->map($response['status'] ?? null);
+                    if ('ready' !== ($this->map($status['source'] ?? null)['state'] ?? null)
+                        || $runtimeState !== ($this->map($status['runtime'] ?? null)['state'] ?? null)
+                        || ('source-only' === $analysisMode && false !== ($status['runtimeEnabled'] ?? null))
+                    ) {
+                        throw new \UnexpectedValueException('Passing result has inconsistent indexing evidence.');
+                    }
                 }
                 $outcome = 'passed';
             } elseif (0 === $available || [] !== array_intersect($layers, self::OPERATIONAL_LAYERS) || false === ($diagnosticReport['ok'] ?? null)) {
@@ -235,7 +257,8 @@ final class ReportImporter
         $expectations = $this->digest($report['expectationFingerprint'] ?? null);
         sort($details);
         $entry = [
-            'version' => 1,
+            'version' => 2,
+            'analysisMode' => $analysisMode,
             'run' => $run,
             'project' => $project,
             'time' => $time,
@@ -249,7 +272,7 @@ final class ReportImporter
             'serverVersion' => $this->version($summaryWarm['serverVersion'] ?? $summaryCold['serverVersion'] ?? $warm['serverVersion'] ?? $cold['serverVersion'] ?? null),
             'expectations' => $expectations,
             'checkSet' => 2 === $available ? hash('sha256', json_encode($details, \JSON_THROW_ON_ERROR)) : null,
-            'comparison' => $this->history->comparison($revision, $dependencies, $environment, $expectations),
+            'comparison' => $this->history->comparison($revision, $dependencies, $environment, $expectations, $analysisMode),
             'scenarios' => $this->integer($summaryWarm['scenarios'] ?? $summaryCold['scenarios'] ?? $warm['scenarioCount'] ?? $cold['scenarioCount'] ?? null),
             'checks' => 0 === $available ? null : array_sum($statuses),
             'passed' => 0 === $available ? null : $statuses['pass'],

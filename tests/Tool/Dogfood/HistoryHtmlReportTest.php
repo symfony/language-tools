@@ -126,12 +126,12 @@ final class HistoryHtmlReportTest extends TestCase
         ]));
 
         self::assertSame(
-            ['kimai', '2', '20260102-000000', 'Blocked process not finalized', '', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown'],
+            ['kimai', '2', '20260102-000000', 'Blocked Runtime process not finalized', '', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown'],
             self::rows(self::element($document, 'table'))[1],
         );
         self::assertSame('badge outcome-blocked', self::element($document, 'tbody .badge')->getAttribute('class'));
         self::assertSame(
-            ['20260102-000000', 'unknown', 'Blocked process not finalized', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'Passed → Blocked; not comparable, run incomplete'],
+            ['20260102-000000', 'unknown', 'Blocked Runtime process not finalized', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'Passed → Blocked; not comparable, run incomplete'],
             self::rows(self::elements($document, 'table')[1])[1],
         );
     }
@@ -187,6 +187,20 @@ final class HistoryHtmlReportTest extends TestCase
         self::assertSame([2, 2, 2], array_map(self::pointCount(...), self::elements($checks, 'polyline')));
     }
 
+    public function testLabelsSourceOnlyResultsWithoutComparingThemWithRuntimeResults(): void
+    {
+        $document = self::parse((new HistoryHtmlReport())->render([
+            self::entry(),
+            self::entry(['run' => '20260102-000000', 'analysisMode' => 'source-only', 'passed' => 100]),
+        ]));
+
+        self::assertSame('Source-only', self::text($document, 'table .analysis-mode'));
+        self::assertStringContainsString('Source-only observations do not boot the application', (string) self::element($document, 'body')->textContent);
+        self::assertSame('not comparable, analysis mode changed or unknown', self::text($document, '[data-project-panel] .wrap'));
+        self::assertCount(0, self::figure($document, 'Checks')->querySelectorAll('polyline'));
+        self::assertCount(1, self::figure($document, 'Checks')->querySelectorAll('.break'));
+    }
+
     public function testSeparatesKnownGapsFromFailures(): void
     {
         $document = self::parse((new HistoryHtmlReport())->render([self::entry(['knownGaps' => 7, 'failed' => 0])]));
@@ -239,7 +253,8 @@ final class HistoryHtmlReportTest extends TestCase
     private static function entry(array $overrides = []): array
     {
         return array_merge([
-            'version' => 1,
+            'version' => 2,
+            'analysisMode' => 'runtime',
             'run' => '20260101-000000',
             'project' => 'kimai',
             'time' => '2026-01-01T00:00:00+00:00',

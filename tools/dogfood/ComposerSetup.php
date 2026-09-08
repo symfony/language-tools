@@ -33,7 +33,7 @@ final class ComposerSetup implements SetupInterface
         foreach ($configuration->ignorePlatformRequirements as $requirement) {
             $command[] = '--ignore-platform-req='.$requirement;
         }
-        if (!$this->scripts) {
+        if (!$this->scripts || 'source-only' === $configuration->analysisMode) {
             $command[] = '--no-scripts';
         }
         $result = $this->processes->run($command, $applicationRoot, $this->timeout, $environment);

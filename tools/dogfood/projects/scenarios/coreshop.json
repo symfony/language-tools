@@ -1,0 +1,68 @@
+{
+    "version": 1,
+    "revision": "13d4e67800bdcb061fc237878f991e0d52bf9a79",
+    "scenarios": [
+        {
+            "id": "twig.filter",
+            "file": "src/CoreShop/Bundle/FrontendBundle/Resources/views/Category/_grid.html.twig",
+            "anchor": "render(url('coreshop_partial_cart_add', {'product': product.id|coreshop_string}))",
+            "offset": 69,
+            "expect": {
+                "completion": {"includes": ["coreshop_string"]},
+                "definition": {"equals": ["src/CoreShop/Bundle/FrontendBundle/Twig/TypeCastExtension.php:33:28-33:43"]}
+            }
+        },
+        {
+            "id": "twig.function",
+            "file": "src/CoreShop/Bundle/FrontendBundle/Resources/views/Category/index.html.twig",
+            "anchor": "coreshop_test_html_attribute('view-list')",
+            "offset": 6,
+            "expect": {
+                "completion": {"includes": ["coreshop_test_html_attribute"]},
+                "definition": {"equals": ["src/CoreShop/Bundle/TestBundle/Twig/Extension/TestHtmlAttributeExtension.php:33:17-33:45"]}
+            }
+        },
+        {
+            "id": "translation.twig",
+            "file": "src/CoreShop/Bundle/FrontendBundle/Resources/views/Category/index.html.twig",
+            "anchor": "{{ 'coreshop.ui.home'|trans }}",
+            "offset": 10,
+            "expect": {"completion": {"includes": ["coreshop.ui.home"]}},
+            "edit": {
+                "before": "{{ 'coreshop.ui.home'|trans }}",
+                "after": "{{ 'coreshop.ui.hom'|trans }}",
+                "anchor": "{{ 'coreshop.ui.hom'|trans }}",
+                "offset": 19,
+                "expect": {"completion": {"includes": ["coreshop.ui.home"]}}
+            }
+        },
+        {
+            "id": "parameter.yaml",
+            "file": "config/packages/security.yaml",
+            "anchor": "pattern: '%coreshop.security.frontend_regex%'",
+            "offset": 17,
+            "expect": {
+                "completion": {"includes": ["coreshop.security.frontend_regex"]},
+                "definition": {"equals": [
+                    "config/packages/security.yaml:1:4-1:36",
+                    "src/CoreShop/Bundle/CoreBundle/Resources/config/pimcore/security.yml:1:4-1:36"
+                ]}
+            }
+        },
+        {
+            "id": "service.yaml",
+            "file": "src/CoreShop/Bundle/FrontendBundle/Resources/config/services.yml",
+            "anchor": "$frontendInstaller: '@CoreShop\\Bundle\\FrontendBundle\\Installer\\FrontendInstallerInterface'",
+            "offset": 28,
+            "expect": {"completion": {"includes": ["CoreShop\\Bundle\\FrontendBundle\\Installer\\FrontendInstallerInterface"]}}
+        },
+        {
+            "id": "security.role",
+            "file": "config/packages/security.yaml",
+            "anchor": "- { path: ^/asset/webdav, roles: ROLE_PIMCORE_USER }",
+            "offset": 39,
+            "expect": {"completion": {"includes": ["ROLE_PIMCORE_USER"]}}
+        }
+    ],
+    "diagnostics": []
+}

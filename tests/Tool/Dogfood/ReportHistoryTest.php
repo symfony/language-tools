@@ -76,6 +76,60 @@ final class ReportHistoryTest extends TestCase
         );
     }
 
+    public function testDifferentAnalysisModesAreNeverComparable(): void
+    {
+        $history = new ReportHistory();
+        $runtime = ReportFixture::entry();
+        $sourceOnly = array_replace($runtime, ['analysisMode' => 'source-only', 'comparison' => $history->comparison($runtime['revision'], $runtime['dependencies'], $runtime['environment'], $runtime['expectations'], 'source-only')]);
+        self::assertNotSame($runtime['comparison'], $sourceOnly['comparison']);
+        self::assertNull($history->comparison($runtime['revision'], $runtime['dependencies'], $runtime['environment'], $runtime['expectations'], null));
+
+        $partial = array_replace($runtime, ['outcome' => 'incomplete', 'finalized' => false]);
+        $this->expectException(\UnexpectedValueException::class);
+        $this->expectExceptionMessage('input identity');
+        $history->merge([$partial], [$sourceOnly]);
+    }
+
+    public function testUpgradesLegacyRuntimeHistoryWithoutChangingItsObservations(): void
+    {
+        $workspace = new TestWorkspace('dogfood-history-');
+        try {
+            $history = new ReportHistory();
+            $expected = ReportFixture::entry();
+            $legacy = $expected;
+            unset($legacy['analysisMode']);
+            $legacy['version'] = 1;
+            $legacy['comparison'] = hash('sha256', json_encode([$legacy['revision'], $legacy['dependencies'], $legacy['environment'], $legacy['expectations']], \JSON_THROW_ON_ERROR));
+            $path = $workspace->write('ledger.jsonl', json_encode($legacy, \JSON_THROW_ON_ERROR)."\n");
+            $loaded = $history->load($path);
+            self::assertSame([$expected], $loaded);
+            self::assertSame(['entries' => [$expected], 'added' => 0, 'updated' => 0], $history->merge($loaded, [$expected]));
+            $history->save($path, $loaded);
+            $saved = file_get_contents($path);
+            $history->save($path, $history->load($path));
+            self::assertSame($saved, file_get_contents($path));
+        } finally {
+            $workspace->cleanup();
+        }
+    }
+
+    public function testLegacyUpgradeDoesNotRepairAForgedComparison(): void
+    {
+        $legacy = ReportFixture::entry();
+        unset($legacy['analysisMode']);
+        $legacy['version'] = 1;
+        $legacy['comparison'] = str_repeat('f', 64);
+        $this->expectException(\UnexpectedValueException::class);
+        $this->expectExceptionMessage('comparison fingerprint');
+        (new ReportHistory())->validate($legacy);
+    }
+
+    public function testObjectKeyOrderingDoesNotRewriteFinalizedHistory(): void
+    {
+        $entry = ReportFixture::entry();
+        self::assertSame(['entries' => [$entry], 'added' => 0, 'updated' => 0], (new ReportHistory())->merge([$entry], [array_reverse($entry, true)]));
+    }
+
     public function testRejectsCorruptLedgersWithoutLosingRecordedData(): void
     {
         $workspace = new TestWorkspace('dogfood-history-');

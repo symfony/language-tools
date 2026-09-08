@@ -49,13 +49,16 @@ for the complete feature matrix.
 Tested with Real Applications
 -----------------------------
 
-Symfony Language Tools is continuously tested with real open-source projects
+Symfony Language Tools is continuously tested with real applications
 across supported Symfony versions:
 
 * `Kimai`_ and `Mautic`_ on Symfony 6.4;
 * `Sulu Demo`_, `Sulu Skeleton`_, `Sylius`_, `Shopware`_ and
   `Pimcore Skeleton`_ on Symfony 7.4;
 * `Symfony Demo`_ on Symfony 8.1.
+
+`CoreShop`_ is additionally tested in source-only mode, without booting its
+application or validating runtime metadata.
 
 These applications cover conventional, legacy and distribution-specific
 bootstraps, large codebases, bundle ecosystems and different Symfony features.
@@ -181,5 +184,6 @@ extension configuration is required. Verify that it starts:
 .. _`Sulu Skeleton`: https://github.com/sulu/skeleton
 .. _`Sylius`: https://github.com/Sylius/Sylius
 .. _`Shopware`: https://github.com/shopware/shopware
+.. _`CoreShop`: https://github.com/coreshop/CoreShop
 .. _`Pimcore Skeleton`: https://github.com/pimcore/skeleton
 .. _`Symfony Demo`: https://github.com/symfony/demo

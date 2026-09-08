@@ -17,7 +17,7 @@ namespace Symfony\Lsp\Tools\Dogfood;
  * scripts, loads no font, stylesheet, or chart library, and contains no
  * rendering timestamp so identical observations always produce identical bytes.
  *
- * @phpstan-type Observation array{run: string, project: string, time: string|null, outcome: string, finalized: bool, layers: list<string>, revision: string|null, dependencies: string|null, environment: string|null, framework: string|null, serverVersion: string|null, expectations: string|null, checkSet: string|null, comparison: string|null, scenarios: int|null, checks: int|null, passed: int|null, failed: int|null, errors: int|null, requests: int|null, knownGaps: int|null, diagnostics: int|null, files: int|null, milliseconds: float|null, scenarioMilliseconds: float|null}
+ * @phpstan-type Observation array{run: string, project: string, time: string|null, outcome: string, finalized: bool, layers: list<string>, analysisMode: string|null, revision: string|null, dependencies: string|null, environment: string|null, framework: string|null, serverVersion: string|null, expectations: string|null, checkSet: string|null, comparison: string|null, scenarios: int|null, checks: int|null, passed: int|null, failed: int|null, errors: int|null, requests: int|null, knownGaps: int|null, diagnostics: int|null, files: int|null, milliseconds: float|null, scenarioMilliseconds: float|null}
  * @phpstan-type ProjectView array{name: string, slug: string, observations: list<Observation>, comparable: list<bool>}
  * @phpstan-type Series array{label: string, values: list<float|null>}
  */
@@ -95,6 +95,7 @@ final class HistoryHtmlReport
             'outcome' => $this->text($entry['outcome'] ?? null) ?? '',
             'finalized' => true === ($entry['finalized'] ?? null),
             'layers' => $this->textList($entry['layers'] ?? null),
+            'analysisMode' => \in_array($entry['analysisMode'] ?? null, ['runtime', 'source-only'], true) ? $entry['analysisMode'] : null,
             'revision' => $this->text($entry['revision'] ?? null),
             'dependencies' => $this->text($entry['dependencies'] ?? null),
             'environment' => $this->text($entry['environment'] ?? null),
@@ -129,6 +130,7 @@ final class HistoryHtmlReport
             $previous = 0 === $index ? null : $observations[$index - 1];
             $flags[] = null !== $previous && $previous['finalized'] && $observation['finalized']
                 && 'incomplete' !== $previous['outcome'] && 'incomplete' !== $observation['outcome']
+                && null !== $observation['analysisMode'] && $previous['analysisMode'] === $observation['analysisMode']
                 && null !== $previous['comparison'] && $previous['comparison'] === $observation['comparison'];
         }
 
@@ -161,7 +163,8 @@ final class HistoryHtmlReport
             '<p class="summary">%s, %s, %s, %s.</p>'
             .'<p class="note">Every number belongs to a single project: the matrix membership changes between runs, so nothing is averaged into a global score. '
             .'Missing measurements read as unknown, never as zero. Known gaps are confirmed analyzer limitations, separate from new failures. '
-            .'Two observations are only compared when they share the same non-null comparison fingerprint.</p>'
+            .'Source-only observations do not boot the application or validate runtime metadata. '
+            .'Two observations are only compared when they share the same analysis mode and non-null comparison fingerprint.</p>'
             .'<p class="note">%sPassed and failed describe verified assertions, blocked means setup or process trouble, incomplete means the run did not finish or its artifacts are incomplete.</p>',
             $this->plural($observations, 'observation'),
             $this->plural(\count($projects), 'project'),
@@ -219,7 +222,7 @@ final class HistoryHtmlReport
                 '<span class="chip %s" style="background:var(--%s)" title="%s"></span>',
                 $this->outcomeClass($observation['outcome']),
                 isset(self::OUTCOMES[$observation['outcome']]) ? $observation['outcome'] : 'none',
-                $this->escape($observation['run'].': '.$label),
+                $this->escape($observation['run'].': '.$label.' ('.$this->modeLabel($observation['analysisMode']).')'),
             );
         }
 
@@ -278,6 +281,7 @@ final class HistoryHtmlReport
             'Run' => $this->escape($latest['run']),
             'Recorded' => $this->textCell($latest['time']),
             'Outcome' => $this->outcome($latest),
+            'Analysis' => $this->modeLabel($latest['analysisMode']),
             'Failing layers' => [] === $latest['layers'] ? '<span class="unknown">none recorded</span>' : $this->escape(implode(', ', $latest['layers'])),
             'Revision' => $this->fingerprintCell($latest['revision']),
             'Dependencies' => $this->fingerprintCell($latest['dependencies']),
@@ -578,11 +582,12 @@ final class HistoryHtmlReport
         }
         $transition = $previous['outcome'] === $current['outcome'] ? '' : $this->escape($this->outcomeLabel($previous['outcome']).' → '.$this->outcomeLabel($current['outcome']));
         if (!$comparable) {
-            $reason = !$previous['finalized'] || !$current['finalized'] || 'incomplete' === $previous['outcome'] || 'incomplete' === $current['outcome']
-                ? 'not comparable, run incomplete'
-                : (null === $previous['comparison'] || null === $current['comparison']
-                    ? 'not comparable, comparison fingerprint unknown'
-                    : 'not comparable, revision, dependencies, environment or expectations changed');
+            $reason = match (true) {
+                !$previous['finalized'], !$current['finalized'], 'incomplete' === $previous['outcome'], 'incomplete' === $current['outcome'] => 'not comparable, run incomplete',
+                null === $current['analysisMode'], $previous['analysisMode'] !== $current['analysisMode'] => 'not comparable, analysis mode changed or unknown',
+                null === $previous['comparison'], null === $current['comparison'] => 'not comparable, comparison fingerprint unknown',
+                default => 'not comparable, revision, dependencies, environment or expectations changed',
+            };
 
             return ('' === $transition ? '' : $transition.'; ').'<span class="unknown">'.$this->escape($reason).'</span>';
         }
@@ -623,6 +628,7 @@ final class HistoryHtmlReport
             $this->outcomeClass($observation['outcome']),
             $this->escape($this->outcomeLabel($observation['outcome'])),
         );
+        $badge .= ' <span class="analysis-mode">'.$this->modeLabel($observation['analysisMode']).'</span>';
         if ([] !== $observation['layers']) {
             $badge .= \sprintf(' <span class="layers">%s</span>', $this->escape(implode(', ', $observation['layers'])));
         }
@@ -631,6 +637,15 @@ final class HistoryHtmlReport
         }
 
         return $badge;
+    }
+
+    private function modeLabel(?string $analysisMode): string
+    {
+        return match ($analysisMode) {
+            'source-only' => 'Source-only',
+            'runtime' => 'Runtime',
+            default => 'Unknown analysis',
+        };
     }
 
     private function outcomeLabel(string $outcome): string
@@ -777,6 +792,7 @@ final class HistoryHtmlReport
             td.wrap{white-space:normal;text-align:left;min-width:12rem}
             td.strip-cell{text-align:left}
             .badge{display:inline-block;padding:0 .4rem;border-radius:.6rem;color:#fff;font-size:.75rem}
+            .analysis-mode{display:inline-block;border:1px solid var(--line);border-radius:.3rem;padding:0 .3rem;font-size:.75rem;color:var(--fg)}
             .outcome-passed{background:var(--passed)}.outcome-failed{background:var(--failed)}
             .outcome-blocked{background:var(--blocked)}.outcome-incomplete{background:var(--incomplete)}
             .outcome-unknown{background:var(--none)}
