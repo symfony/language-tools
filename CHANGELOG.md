@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Bound source indexing memory by collecting cyclic garbage on heap growth instead of every 256 files
+- Compute PHP syntax diagnostics only when a feature reads them
+- Walk PHP syntax trees without nested generators during indexing
+- Resolve route collection variables once per file instead of rescanning the file before every method call
 - Publish musl VS Code packages so the extension installs in Alpine containers
 - Analyze files that a negated gitignore pattern restores below an excluded directory
 - Keep PHP configuration builder chains at their level after a scalar shortcut argument
