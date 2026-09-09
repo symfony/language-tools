@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep PHP configuration builder chains at their level after a scalar shortcut argument
 - Verify released VS Code packages against the published target list instead of a fixed count
 - Start the next development cycle even when the published tag workflow fails
 

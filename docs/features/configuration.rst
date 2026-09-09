@@ -23,13 +23,14 @@ Configuration completion is available in YAML, XML and PHP configuration
 files. YAML suggestions follow the current indentation and mapping path. PHP
 suggestions recognize the bundle configuration DSL, including chains split
 across lines, chains separated by comments or nullsafe calls, named entries
-such as ``firewall('main')`` and leaf setters that stay at their current
-level. Their root key comes from the declared builder type of the variable in
-scope, including renamed ``use`` imports. XML suggestions follow the current
-element path. Commented configuration constructs are ignored. XML structure,
-hover and diagnostics tolerate ``>`` inside quoted attributes and recover valid
-siblings after malformed markup. Comments, CDATA sections, processing
-instructions and DOCTYPE declarations are treated as opaque content.
+such as ``firewall('main')``, and leaf setters and scalar shortcuts that stay
+at their current level. Their root key comes from the declared builder type of
+the variable in scope, including renamed ``use`` imports. XML suggestions
+follow the current element path. Commented configuration constructs are
+ignored. XML structure, hover and diagnostics tolerate ``>`` inside quoted
+attributes and recover valid siblings after malformed markup. Comments, CDATA
+sections, processing instructions and DOCTYPE declarations are treated as
+opaque content.
 
 YAML value completion suggests allowed enum values. Suggested keys include
 type and description details when the bundle provides them.
@@ -48,8 +49,12 @@ Diagnostics report statically provable configuration errors, including unknown
 or duplicate keys, invalid scalar types, invalid enum values, deprecated nodes
 and malformed structures. Fluent PHP builder calls that set leaf values stay at
 their current configuration level, while child builder calls continue into
-nested options. Calls that select or set named entries, such as
-``firewall('main')``, keep literal entry names in diagnostic and hover paths.
+nested options. An option that also accepts a scalar, such as
+``processPsr3Messages(true)`` or ``tokenHandler('App\TokenHandler')``, stays at
+its current level when the call passes a scalar and continues into nested
+options when it passes an array, matching the generated builder. Calls that
+select or set named entries, such as ``firewall('main')``, keep literal entry
+names in diagnostic and hover paths.
 Builder chains are followed through nullsafe calls and comments between calls,
 and their root key comes from the declared builder type of the variable,
 including renamed ``use`` imports. Chains on variables declared with a type

@@ -4,6 +4,8 @@ namespace Symfony\Lsp\Feature\Configuration;
 
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpLiteral;
+use Symfony\Lsp\Parser\Php\PhpLiteralKind;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -190,7 +192,7 @@ final class PhpConfigurationAnalyzer
             $literal = 1 === \count($call->arguments) ? $call->arguments[0]->completeLiteral : null;
         }
         $node = $index->find($schemaPath);
-        if (null !== $node && $this->returnsCurrentBuilder($node)) {
+        if (null !== $node && $this->returnsCurrentBuilder($node, $literal)) {
             $returnedBuilderPath = $builderPath;
             $returnedBuilderSchemaPath = $builderSchemaPath;
         } else {
@@ -252,9 +254,13 @@ final class PhpConfigurationAnalyzer
         return $this->inferredConfigurationName($name);
     }
 
-    private function returnsCurrentBuilder(ConfigurationNode $node): bool
+    private function returnsCurrentBuilder(ConfigurationNode $node, ?PhpLiteral $value): bool
     {
         if ('array' !== $node->type) {
+            return true;
+        }
+        // a generated builder method that also accepts a scalar assigns the value and returns the current builder
+        if (null !== $value && PhpLiteralKind::Array !== $value->kind) {
             return true;
         }
         if (null === $node->prototype) {

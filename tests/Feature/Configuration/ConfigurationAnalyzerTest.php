@@ -153,6 +153,33 @@ final class ConfigurationAnalyzerTest extends TestCase
         );
     }
 
+    public function testKeepsTheCurrentBuilderAfterAScalarShortcutArgument(): void
+    {
+        $analyzer = new PhpConfigurationAnalyzer(new TolerantPhpParser(new Parser()), new PhpCommentParser());
+        $index = $this->index();
+
+        $shortcut = '<?php function configure(FrameworkConfig $options) { $options->psr3(true)->router()->utf8(true); }';
+        self::assertSame(
+            [['framework', 'psr_3'], ['framework', 'router'], ['framework', 'router', 'utf8']],
+            array_map(static fn (PhpConfigurationOccurrence $occurrence): array => $occurrence->path, $analyzer->occurrences($shortcut, $index)),
+        );
+
+        foreach (['$options->psr3()', '$options->psr3([])', "\$options->psr3(['enabled' => true])", '$options->psr3($values)'] as $call) {
+            $descends = '<?php function configure(FrameworkConfig $options) { '.$call.'->enabled(true); }';
+            self::assertSame(
+                [['framework', 'psr_3'], ['framework', 'psr_3', 'enabled']],
+                array_map(static fn (PhpConfigurationOccurrence $occurrence): array => $occurrence->path, $analyzer->occurrences($descends, $index)),
+                $descends,
+            );
+        }
+
+        $completion = '<?php function configure(FrameworkConfig $options) { $options->psr3(true)->ro';
+        self::assertSame(
+            ['path' => ['framework'], 'prefix' => 'ro', 'start' => \strlen($completion) - 2],
+            $analyzer->completionContext($completion, $index, \strlen($completion)),
+        );
+    }
+
     public function testAnalyzesChainsWithNullsafeCallsCommentsAndDynamicMethods(): void
     {
         $analyzer = new PhpConfigurationAnalyzer(new TolerantPhpParser(new Parser()), new PhpCommentParser());

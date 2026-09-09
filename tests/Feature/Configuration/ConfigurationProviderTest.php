@@ -873,6 +873,42 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame(['Expected boolean for "framework.psr_3_handler.main.enabled".'], array_column($diagnostics, 'message'));
     }
 
+    public function testKeepsPhpConfigurationChainsAtTheirLevelAfterAScalarShortcut(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/security.php';
+        $text = <<<'PHP'
+            <?php
+
+            function configure(SecurityConfig $securityConfig): void
+            {
+                $securityConfig
+                    ->firewall('main')
+                    ->accessToken()
+                    ->tokenHandler('App\Demo\DemoTokenHandler')
+                    ->failureHandler('App\Demo\DemoFailureHandler');
+            }
+            PHP;
+        $fixture->documents->open(new Document($uri, 'php', 1, $text));
+
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+
+        $hover = $fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, (int) strpos($text, 'failureHandler') + 1));
+        self::assertIsArray($hover);
+        self::assertIsArray($hover['contents'] ?? null);
+        self::assertIsString($hover['contents']['value'] ?? null);
+        self::assertStringContainsString('`security.firewall.main.access_token.failure_handler`', $hover['contents']['value']);
+
+        $nested = str_replace("tokenHandler('App\\Demo\\DemoTokenHandler')", "tokenHandler(['id' => 'App\\Demo\\DemoTokenHandler'])", $text);
+        $fixture->documents->update($uri, 2, $nested);
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+        self::assertSame(['config.unknown_key'], array_column($diagnostics, 'code'));
+        self::assertSame(
+            ['Unknown configuration key "security.firewall.main.access_token.token_handler.failure_handler".'],
+            array_column($diagnostics, 'message'),
+        );
+    }
+
     public function testRecognizesPhpConfigurationCallsSeparatedByNullsafeArrowsAndComments(): void
     {
         $fixture = $this->providers();
@@ -1563,6 +1599,12 @@ final class ConfigurationProviderTest extends TestCase
                             $this->node('secret', 'scalar'),
                             $this->node('name', 'scalar'),
                             $this->node('always_remember_me', 'boolean'),
+                        ]),
+                        $this->node('access_token', 'array', children: [
+                            $this->node('token_handler', 'array', accepts: ['scalar' => true], children: [
+                                $this->node('id', 'scalar'),
+                            ]),
+                            $this->node('failure_handler', 'scalar'),
                         ]),
                         $this->node('custom_authenticators', 'array', prototype: $this->node('custom_authenticator', 'scalar')),
                     ], aliases: ['custom_authenticator' => 'custom_authenticators']), keyAttribute: 'name'),
