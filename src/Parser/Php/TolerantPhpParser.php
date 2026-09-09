@@ -26,7 +26,7 @@ final class TolerantPhpParser implements PhpParserInterface
     public function parse(string $source): PhpDocument
     {
         $root = $this->parser->parseSourceFile($source);
-        $nodes = new TolerantPhpNodeCollection($root->getDescendantNodes(), $source);
+        $nodes = new TolerantPhpNodeCollection($root, $source);
         $names = $this->names->build($nodes, $source);
         $classReferences = $this->expressions->classReferences($nodes, $source, $names);
         $declarations = $this->declarations->build($nodes, $source, $names, $classReferences);

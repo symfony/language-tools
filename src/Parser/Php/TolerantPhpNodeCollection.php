@@ -70,9 +70,10 @@ final class TolerantPhpNodeCollection
     /** @var array<int, list<TraitUseClause>> */
     public readonly array $typeTraitUses;
 
-    /** @param iterable<Node> $descendants */
-    public function __construct(iterable $descendants, string $source)
+    public function __construct(Node $root, string $source)
     {
+        $descendants = $this->descendants($root);
+
         $attributes = [];
         $methodCalls = [];
         $typedVariableDeclarations = [];
@@ -143,5 +144,46 @@ final class TolerantPhpNodeCollection
         $this->methodAttributes = $methodAttributes;
         $this->parameterAttributes = $parameterAttributes;
         $this->typeTraitUses = $typeTraitUses;
+    }
+
+    /**
+     * Walks in document order, avoiding the nested generators of getDescendantNodes().
+     *
+     * @return list<Node>
+     */
+    private function descendants(Node $root): array
+    {
+        $descendants = [];
+        $stack = $this->childNodes($root);
+        while (null !== $node = array_pop($stack)) {
+            $descendants[] = $node;
+            foreach ($this->childNodes($node) as $child) {
+                $stack[] = $child;
+            }
+        }
+
+        return $descendants;
+    }
+
+    /** @return list<Node> Child nodes in reverse document order, ready to be popped */
+    private function childNodes(Node $node): array
+    {
+        $children = [];
+        /** @var list<string> $names */
+        $names = $node::CHILD_NAMES;
+        foreach ($names as $name) {
+            $value = $node->$name;
+            if ($value instanceof Node) {
+                $children[] = $value;
+            } elseif (\is_array($value)) {
+                foreach ($value as $child) {
+                    if ($child instanceof Node) {
+                        $children[] = $child;
+                    }
+                }
+            }
+        }
+
+        return array_reverse($children);
     }
 }
