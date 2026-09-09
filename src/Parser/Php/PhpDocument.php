@@ -8,25 +8,37 @@ final class PhpDocument
     private readonly array $methodCallsByRange;
     private readonly PhpNameContext $names;
 
+    /** @var ?list<PhpDiagnostic> */
+    private ?array $resolvedDiagnostics = null;
+
     /**
-     * @param list<PhpAttribute>           $attributes
-     * @param list<PhpMethodCall>          $methodCalls
-     * @param list<PhpTypeDeclaration>     $typeDeclarations
-     * @param list<PhpDiagnostic>          $diagnostics
-     * @param list<PhpTypedVariable>       $typedVariables
-     * @param list<PhpObjectCreation>      $objectCreations
-     * @param list<PhpMethodDeclaration>   $methodDeclarations
-     * @param list<PhpConstantDeclaration> $constantDeclarations
-     * @param list<PhpPropertyDeclaration> $propertyDeclarations
-     * @param list<PhpClassReference>      $classReferences
-     * @param list<PhpLexicalScope>        $lexicalScopes
-     * @param list<PhpLiteralArray>        $literalArrays
+     * Syntax diagnostics require a second tree walk that indexing never reads.
+     *
+     * @var list<PhpDiagnostic>
+     */
+    public array $diagnostics {
+        get => $this->resolvedDiagnostics ??= \is_array($this->diagnosticsSource) ? $this->diagnosticsSource : ($this->diagnosticsSource)();
+    }
+
+    /**
+     * @param list<PhpAttribute>                                  $attributes
+     * @param list<PhpMethodCall>                                 $methodCalls
+     * @param list<PhpTypeDeclaration>                            $typeDeclarations
+     * @param list<PhpDiagnostic>|\Closure(): list<PhpDiagnostic> $diagnosticsSource
+     * @param list<PhpTypedVariable>                              $typedVariables
+     * @param list<PhpObjectCreation>                             $objectCreations
+     * @param list<PhpMethodDeclaration>                          $methodDeclarations
+     * @param list<PhpConstantDeclaration>                        $constantDeclarations
+     * @param list<PhpPropertyDeclaration>                        $propertyDeclarations
+     * @param list<PhpClassReference>                             $classReferences
+     * @param list<PhpLexicalScope>                               $lexicalScopes
+     * @param list<PhpLiteralArray>                               $literalArrays
      */
     public function __construct(
         public readonly array $attributes,
         public readonly array $methodCalls,
         public readonly array $typeDeclarations,
-        public readonly array $diagnostics,
+        private readonly \Closure|array $diagnosticsSource,
         public readonly array $typedVariables = [],
         ?PhpNameContext $names = null,
         public readonly array $objectCreations = [],

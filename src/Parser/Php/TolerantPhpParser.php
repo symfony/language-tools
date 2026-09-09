@@ -32,20 +32,22 @@ final class TolerantPhpParser implements PhpParserInterface
         $declarations = $this->declarations->build($nodes, $source, $names, $classReferences);
         $expressions = $this->expressions->build($nodes, $source, $names, $classReferences);
 
-        $diagnostics = [];
-        foreach (DiagnosticsProvider::getDiagnostics($root) as $diagnostic) {
-            $diagnostics[] = new PhpDiagnostic(
-                $diagnostic->message,
-                $diagnostic->start,
-                $diagnostic->start + $diagnostic->length,
-            );
-        }
-
         return new PhpDocument(
             $declarations->attributes,
             $expressions->methodCalls,
             $declarations->typeDeclarations,
-            $diagnostics,
+            static function () use ($root): array {
+                $diagnostics = [];
+                foreach (DiagnosticsProvider::getDiagnostics($root) as $diagnostic) {
+                    $diagnostics[] = new PhpDiagnostic(
+                        $diagnostic->message,
+                        $diagnostic->start,
+                        $diagnostic->start + $diagnostic->length,
+                    );
+                }
+
+                return $diagnostics;
+            },
             $declarations->typedVariables,
             $names,
             $expressions->objectCreations,
