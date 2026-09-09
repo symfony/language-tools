@@ -168,4 +168,40 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
             $declarations,
         ));
     }
+
+    public function testIgnoresCollectionCallsThatPrecedeTheCollection(): void
+    {
+        $text = <<<'PHP'
+            <?php
+            use Symfony\Component\Routing\Route;
+            use Symfony\Component\Routing\RouteCollection;
+
+            $collection->add('too_early', new Route('/early'));
+            $collection = new RouteCollection();
+            $collection->add('legacy_article', new Route('/legacy'));
+            PHP;
+
+        $declarations = (new PhpRouteDeclarationExtractor(new PositionConverter(), new TolerantPhpParser(new Parser())))->extract(
+            new SourceDocument('file:///workspace/config/routes.php', 'php', $text),
+        );
+
+        self::assertSame(['legacy_article'], array_map(
+            static fn (RouteDeclaration $declaration): string => $declaration->name,
+            $declarations,
+        ));
+    }
+
+    public function testIgnoresUnrelatedAddCallsInLargeFiles(): void
+    {
+        $text = "<?php\n\n";
+        for ($i = 0; $i < 4000; ++$i) {
+            $text .= "\$collection->add(new Item('item_{$i}'));\n";
+        }
+
+        $declarations = (new PhpRouteDeclarationExtractor(new PositionConverter(), new TolerantPhpParser(new Parser())))->extract(
+            new SourceDocument('file:///workspace/src/Fixture.php', 'php', $text),
+        );
+
+        self::assertSame([], $declarations);
+    }
 }

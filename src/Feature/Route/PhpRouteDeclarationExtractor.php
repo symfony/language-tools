@@ -44,15 +44,14 @@ final class PhpRouteDeclarationExtractor
             );
         }
 
+        $collectionVariables = null;
         foreach ($document->methodCalls as $call) {
             if ('add' !== $call->method || !preg_match('/^\$(\w+)$/', $call->receiver, $variable)) {
                 continue;
             }
-            $beforeCall = substr($source->text, 0, $call->startOffset);
-            if (!preg_match(
-                '/(?:RoutingConfigurator\s+\$'.preg_quote($variable[1], '/').'\b|\$'.preg_quote($variable[1], '/').'\s*=\s*new\s+(?:\\\\?RouteCollection|[^\s;(]*\\\\RouteCollection)\b)/s',
-                $beforeCall,
-            )) {
+            $collectionVariables ??= $this->collectionVariableOffsets($source->text);
+            $declaredAt = $collectionVariables[$variable[1]] ?? null;
+            if (null === $declaredAt || $declaredAt > $call->startOffset) {
                 continue;
             }
             $name = $call->positionalArgument(0)?->stringLiteral;
@@ -76,6 +75,31 @@ final class PhpRouteDeclarationExtractor
         );
 
         return $declarations;
+    }
+
+    /**
+     * @return array<string, int> First offset at which each variable is bound to a route collection
+     */
+    private function collectionVariableOffsets(string $text): array
+    {
+        if (!preg_match_all(
+            '/RoutingConfigurator\s+\$(\w+)\b|\$(\w+)\s*=\s*new\s+(?:\\\\?RouteCollection|[^\s;(]*\\\\RouteCollection)\b/s',
+            $text,
+            $matches,
+            \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE,
+        )) {
+            return [];
+        }
+
+        $offsets = [];
+        foreach ($matches as $match) {
+            $variable = '' === ($match[1][0] ?? '') ? ($match[2][0] ?? '') : $match[1][0];
+            if ('' !== $variable) {
+                $offsets[$variable] ??= $match[0][1];
+            }
+        }
+
+        return $offsets;
     }
 
     private function declaration(string $name, string $uri, string $text, int $offset, int $endOffset): RouteDeclaration
