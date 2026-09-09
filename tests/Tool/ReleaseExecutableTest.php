@@ -340,6 +340,88 @@ final class ReleaseExecutableTest extends TestCase
         }
     }
 
+    public function testStartsTheNextDevelopmentCycleWhenThePublishedTagWorkflowFails(): void
+    {
+        $root = \dirname(__DIR__, 2);
+        $workspace = new TestWorkspace();
+        $workspace->mkdir('bin', 'project', 'project/resources');
+        $bin = $workspace->path('bin');
+        $project = $workspace->path('project');
+        $calls = $workspace->path('calls');
+        $workspace->write('project/resources/version', "dev\n");
+        $workspace->write('project/CHANGELOG.md', "# Changelog\n\n## 9.9.9 (2026-01-01)\n\n- Publish the release\n");
+        $workspace->executable('bin/git', <<<'BASH'
+            #!/usr/bin/env bash
+            set -euo pipefail
+            echo "git $*" >> "$TOOL_CALLS"
+            case "$*" in
+                "rev-parse HEAD"|"rev-parse HEAD^"|"rev-parse refs/remotes/origin/main") echo releasecommit ;;
+            esac
+            BASH);
+        $workspace->executable('bin/gh', <<<'BASH'
+            #!/usr/bin/env bash
+            set -euo pipefail
+            echo "gh $*" >> "$TOOL_CALLS"
+            case "$*" in
+                "run list --workflow=release.yaml "*)
+                    echo '[{"databaseId":111,"headSha":"releasecommit","displayTitle":"Release"}]' ;;
+                "run list "*)
+                    echo '[{"databaseId":222,"headSha":"releasecommit","displayTitle":"Checks"}]' ;;
+                "run view 111 --json=jobs")
+                    echo '{"jobs":[{"steps":[{"name":"Verify release packages","conclusion":"failure"}]}]}' ;;
+                "run watch 111 --exit-status") exit 1 ;;
+            esac
+            BASH);
+        $php = <<<'PHP'
+            [, $root, $project] = $argv;
+            require $root.'/vendor/autoload.php';
+            $processes = new Symfony\Lsp\Tools\ReleaseProcessRunner(new Symfony\Lsp\Tools\InteractiveProcessRunner());
+            $command = new Symfony\Lsp\Tools\ReleaseCommand(
+                $project,
+                new Symfony\Lsp\Tools\ReleaseMetadataUpdater(),
+                $processes,
+                new Symfony\Lsp\Tools\ReleaseGit($project, $processes),
+                new Symfony\Lsp\Tools\ReleaseGitHub($project, $processes),
+                new Symfony\Lsp\Tools\NativeReleaseSleeper(),
+            );
+            try {
+                (new ReflectionClass($command))
+                    ->getMethod('completePublishedRelease')
+                    ->invoke($command, 'v9.9.9', 'releasecommit');
+            } catch (RuntimeException $exception) {
+                fwrite(STDERR, $exception->getMessage()."\n");
+                exit(3);
+            }
+            PHP;
+
+        try {
+            $environment = getenv();
+            $environment['PATH'] = $bin.\PATH_SEPARATOR.($environment['PATH'] ?? '');
+            $environment['TOOL_CALLS'] = $calls;
+            $result = $this->runProcess([\PHP_BINARY, '-r', $php, $root, $project], $environment);
+
+            self::assertSame(3, $result->exitCode, $result->stderr);
+            self::assertStringContainsString('Workflow release.yaml failed without an automatic rerun.', $result->stderr);
+            self::assertStringContainsString(
+                'Tag v9.9.9 is published and main starts the next development cycle, but its release workflow failed.'
+                    .' Recover the extension publication with "gh workflow run publish-vscode.yaml --ref main -f tag=v9.9.9".',
+                $result->stderr,
+            );
+
+            $changelog = file_get_contents($workspace->path('project/CHANGELOG.md'));
+            self::assertIsString($changelog);
+            self::assertStringStartsWith("# Changelog\n\n## Unreleased\n\n## 9.9.9 (2026-01-01)\n", $changelog);
+
+            $toolCalls = file($calls, \FILE_IGNORE_NEW_LINES | \FILE_SKIP_EMPTY_LINES);
+            self::assertIsArray($toolCalls);
+            self::assertContains('git commit -m Start development on the next release', $toolCalls);
+            self::assertContains('git push origin HEAD:refs/heads/main', $toolCalls);
+            self::assertSame(6, \count(array_filter($toolCalls, static fn (string $call): bool => str_starts_with($call, 'gh run watch 222'))));
+        } finally {
+            $workspace->cleanup();
+        }
+    }
+
     public function testRefusesReleasePreparationWhenCurrentMainHasFailedWorkflows(): void
     {
         $root = \dirname(__DIR__, 2);

@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Verify released VS Code packages against the published target list instead of a fixed count
+- Start the next development cycle even when the published tag workflow fails
 
 ## 0.20.0 (2026-09-08)
 

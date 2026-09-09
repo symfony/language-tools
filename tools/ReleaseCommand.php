@@ -61,8 +61,7 @@ final class ReleaseCommand
         }
 
         $releaseCommit = $this->git->remoteTagCommit($tag);
-        $this->waitForWorkflow('release.yaml', $releaseCommit);
-        $this->finishRelease($releaseCommit);
+        $this->completePublishedRelease($tag, $releaseCommit);
 
         $url = $this->github->releaseUrl($tag);
         fwrite(\STDOUT, \sprintf("Release %s completed: %s\n", $version, $url));
@@ -169,6 +168,23 @@ final class ReleaseCommand
         sort($expected);
         if ($expected !== $changed) {
             throw new \RuntimeException(\sprintf("Unexpected release files changed.\nExpected: %s\nActual: %s", implode(', ', $expected), implode(', ', $changed)));
+        }
+    }
+
+    private function completePublishedRelease(string $tag, string $releaseCommit): void
+    {
+        $tagWorkflowFailure = null;
+        try {
+            $this->waitForWorkflow('release.yaml', $releaseCommit);
+        } catch (\RuntimeException $exception) {
+            $tagWorkflowFailure = $exception;
+            fwrite(\STDERR, \sprintf("\n%s\n", $exception->getMessage()));
+        }
+
+        $this->finishRelease($releaseCommit);
+
+        if (null !== $tagWorkflowFailure) {
+            throw new \RuntimeException(\sprintf('Tag %s is published and main starts the next development cycle, but its release workflow failed. Recover the extension publication with "gh workflow run publish-vscode.yaml --ref main -f tag=%s".', $tag, $tag), 0, $tagWorkflowFailure);
         }
     }
 
