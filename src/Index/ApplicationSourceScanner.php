@@ -22,6 +22,7 @@ use function Amp\delay;
 final class ApplicationSourceScanner implements ProjectStateInterface
 {
     private const LOCK_PREFIX = "source\0";
+    private const CYCLE_COLLECTION_BYTES = 67108864;
 
     /** @var array<string, array<string, SourceIndexMetadata>> */
     private array $entries = [];
@@ -236,7 +237,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
             }
 
             try {
-                $entries = $this->scanSourceFiles($project, $reader, $writer, $cancellation, $gcWasEnabled);
+                $entries = $this->scanSourceFiles($project, $reader, $writer, $cancellation, $gcWasEnabled ? memory_get_usage() + self::CYCLE_COLLECTION_BYTES : null);
             } finally {
                 if ($gcWasEnabled) {
                     gc_collect_cycles();
@@ -259,11 +260,14 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         }
     }
 
-    /** @return array<string, SourceIndexMetadata> */
-    private function scanSourceFiles(Project $project, ?SourceIndexReaderInterface $reader, SourceIndexWriterInterface $writer, Cancellation $cancellation, bool $collectCycles): array
+    /**
+     * @param ?int $collectionThreshold Heap size above which cyclic garbage is collected, or null when collection is disabled
+     *
+     * @return array<string, SourceIndexMetadata>
+     */
+    private function scanSourceFiles(Project $project, ?SourceIndexReaderInterface $reader, SourceIndexWriterInterface $writer, Cancellation $cancellation, ?int $collectionThreshold): array
     {
         $entries = [];
-        $parsedCount = 0;
         if (null === $reader || !$reader->hasRecords()) {
             foreach ($this->sourceFiles($project, $cancellation) as $relativePath => $source) {
                 $processed = $this->scanSourceFile($source['location'], $source['languageId'], null);
@@ -272,9 +276,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
                 }
                 $entries[$relativePath] = $processed->metadata;
                 $writer->add($relativePath, $processed->metadata, $processed->payloads);
-                if ($processed->parsed && $collectCycles && 0 === ++$parsedCount % 256) {
-                    gc_collect_cycles();
-                }
+                $collectionThreshold = $this->collectCycles($processed->parsed, $collectionThreshold);
             }
 
             return $entries;
@@ -298,9 +300,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
             }
             $entries[$relativePath] = $processed->metadata;
             $writer->add($relativePath, $processed->metadata, $processed->payloads);
-            if ($processed->parsed && $collectCycles && 0 === ++$parsedCount % 256) {
-                gc_collect_cycles();
-            }
+            $collectionThreshold = $this->collectCycles($processed->parsed, $collectionThreshold);
         }
         foreach ($sources as $relativePath => $source) {
             if (0 === ++$processedCount % 64) {
@@ -313,12 +313,25 @@ final class ApplicationSourceScanner implements ProjectStateInterface
             }
             $entries[$relativePath] = $processed->metadata;
             $writer->add($relativePath, $processed->metadata, $processed->payloads);
-            if ($processed->parsed && $collectCycles && 0 === ++$parsedCount % 256) {
-                gc_collect_cycles();
-            }
+            $collectionThreshold = $this->collectCycles($processed->parsed, $collectionThreshold);
         }
 
         return $entries;
+    }
+
+    /**
+     * Collection walks the whole live facts graph, so it is driven by heap growth instead of a file count.
+     *
+     * @return ?int The next threshold, or null when collection is disabled
+     */
+    private function collectCycles(bool $parsed, ?int $threshold): ?int
+    {
+        if (!$parsed || null === $threshold || memory_get_usage() < $threshold) {
+            return $threshold;
+        }
+        gc_collect_cycles();
+
+        return memory_get_usage() + self::CYCLE_COLLECTION_BYTES;
     }
 
     /** @param ?SourceIndexRecord $cached */
