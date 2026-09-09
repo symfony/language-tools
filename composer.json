@@ -14,7 +14,7 @@
         "symfony/config": "^8.1",
         "symfony/dependency-injection": "^8.1",
         "symfony/filesystem": "^8.1",
-        "symfony/finder": "^8.1",
+        "symfony/finder": "^8.1.5",
         "symfony/yaml": "^8.1"
     },
     "require-dev": {
