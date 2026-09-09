@@ -61,6 +61,8 @@ jobs:
                       "symfony-lsp-$GITHUB_REF_NAME-windows-x64.zip"
                       "symfony-lsp-$GITHUB_REF_NAME-linux-x64.vsix"
                       "symfony-lsp-$GITHUB_REF_NAME-linux-arm64.vsix"
+                      "symfony-lsp-$GITHUB_REF_NAME-alpine-x64.vsix"
+                      "symfony-lsp-$GITHUB_REF_NAME-alpine-arm64.vsix"
                       "symfony-lsp-$GITHUB_REF_NAME-darwin-arm64.vsix"
                       "symfony-lsp-$GITHUB_REF_NAME-win32-x64.vsix"
                   )

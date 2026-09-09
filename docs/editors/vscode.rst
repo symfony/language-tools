@@ -27,9 +27,14 @@ channel:
     $ code --install-extension symfony.language-tools --pre-release
 
 The Marketplace selects the package matching the extension host. Packages are
-available for Linux x64 and ARM64, macOS ARM64 and Windows x64. Each
-package contains the matching self-contained language server, so
-``symfonyLsp.serverPath`` doesn't need to be configured.
+available for Linux x64 and ARM64, musl-based Linux x64 and ARM64 such as
+Alpine, macOS ARM64 and Windows x64. Each package contains the matching
+self-contained language server, so ``symfonyLsp.serverPath`` doesn't need to be
+configured.
+
+The extension always runs where the workspace is. When you attach VS Code to a
+container or a remote host, the Marketplace installs the package for that
+platform, not for your local machine.
 
 You can also download the matching ``.vsix`` file from the GitHub release and
 install it directly:

@@ -54,6 +54,7 @@ jobs:
                       spc: macos-aarch64
                       spc_checksum: acf2f25d56d0cbf8e65aa82e5054fef555f7be7c5c38046c6e0819f266d83225
         env:
+            ALPINE_IMAGE: alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
             REFERENCE_TYPE: ${{ needs.reference.outputs.type }}
             VERSION: ${{ inputs.version }}
         steps:
@@ -83,7 +84,6 @@ jobs:
             - name: Build the standalone Linux server
               if: runner.os == 'Linux'
               env:
-                  ALPINE_IMAGE: alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
                   EXTENSIONS: ctype,filter,iconv,mbstring,pcntl,phar,posix,tokenizer,zlib
                   GITHUB_TOKEN: ${{ github.token }}
                   SPC_DOWNLOAD_RETRIES: 5
@@ -104,6 +104,15 @@ jobs:
                           ./spc micro:combine ../../../build/symfony-lsp.phar -O ../../../build/symfony-lsp
                           chmod +x ../../../build/symfony-lsp
                       '
+            - name: Verify the Linux server on musl
+              if: runner.os == 'Linux'
+              timeout-minutes: 2
+              run: |
+                  docker run --rm \
+                      --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
+                      --workdir "$GITHUB_WORKSPACE" \
+                      "$ALPINE_IMAGE" \
+                      ./build/symfony-lsp --version
             - name: Download PHP sources
               if: runner.os == 'macOS'
               working-directory: var/build/release
@@ -225,6 +234,12 @@ jobs:
                     - platform: linux-arm64
                       target: linux-arm64
                       executable: symfony-lsp
+                    - platform: linux-x64
+                      target: alpine-x64
+                      executable: symfony-lsp
+                    - platform: linux-arm64
+                      target: alpine-arm64
+                      executable: symfony-lsp
                     - platform: macos-arm64
                       target: darwin-arm64
                       executable: symfony-lsp
@@ -325,6 +340,8 @@ jobs:
                       "symfony-lsp-$VERSION-windows-x64.zip"
                       "symfony-lsp-$VERSION-linux-x64.vsix"
                       "symfony-lsp-$VERSION-linux-arm64.vsix"
+                      "symfony-lsp-$VERSION-alpine-x64.vsix"
+                      "symfony-lsp-$VERSION-alpine-arm64.vsix"
                       "symfony-lsp-$VERSION-darwin-arm64.vsix"
                       "symfony-lsp-$VERSION-win32-x64.vsix"
                   )

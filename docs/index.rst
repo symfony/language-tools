@@ -87,6 +87,9 @@ download the archive for your platform from the GitHub release:
 * ``macos-arm64``;
 * ``windows-x64``.
 
+The Linux executables are statically linked, so the same archive runs on glibc
+and musl distributions, including Alpine.
+
 Intel macOS isn't supported. Build the server from source to run it on an
 Intel Mac.
 

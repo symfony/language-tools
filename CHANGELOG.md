@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Publish musl VS Code packages so the extension installs in Alpine containers
 - Analyze files that a negated gitignore pattern restores below an excluded directory
 - Keep PHP configuration builder chains at their level after a scalar shortcut argument
 - Verify released VS Code packages against the published target list instead of a fixed count

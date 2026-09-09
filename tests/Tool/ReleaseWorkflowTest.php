@@ -161,12 +161,7 @@ final class ReleaseWorkflowTest extends TestCase
     {
         $workflow = $this->workflow('publish-vscode.yaml');
 
-        $targets = [];
-        foreach ($this->releaseAssetSuffixes() as $asset) {
-            if (str_ends_with($asset, '.vsix')) {
-                $targets[] = substr($asset, 0, -\strlen('.vsix'));
-            }
-        }
+        $targets = $this->releaseVsixTargets();
 
         self::assertNotSame([], $targets);
         self::assertStringContainsString("targets=(\n".implode("\n", array_map(
@@ -176,6 +171,48 @@ final class ReleaseWorkflowTest extends TestCase
         self::assertStringContainsString('for target in "${targets[@]}"', $workflow);
         self::assertStringContainsString('| wc -l)" -eq "${#targets[@]}"', $workflow);
         self::assertDoesNotMatchRegularExpression('/wc -l\)" -eq [0-9]+/', $workflow);
+    }
+
+    public function testEveryReleasedVsixPackagesAnArchivedServerPlatform(): void
+    {
+        $built = array_column($this->matrixInclude('unix-binaries'), 'platform');
+        $built[] = 'windows-x64';
+
+        $packaged = [];
+        foreach ($this->matrixInclude('vscode-extension') as $entry) {
+            self::assertIsArray($entry);
+            self::assertContains($entry['platform'], $built);
+            $packaged[] = $entry['target'];
+        }
+
+        self::assertSame($this->releaseVsixTargets(), $packaged);
+    }
+
+    /** @return array<mixed> */
+    private function matrixInclude(string $job): array
+    {
+        $value = Yaml::parseFile(self::ROOT.'/.github/workflows/build-release.yaml');
+        foreach (['jobs', $job, 'strategy', 'matrix', 'include'] as $key) {
+            self::assertIsArray($value);
+            self::assertArrayHasKey($key, $value);
+            $value = $value[$key];
+        }
+        self::assertIsArray($value);
+
+        return $value;
+    }
+
+    /** @return list<string> */
+    private function releaseVsixTargets(): array
+    {
+        $targets = [];
+        foreach ($this->releaseAssetSuffixes() as $asset) {
+            if (str_ends_with($asset, '.vsix')) {
+                $targets[] = substr($asset, 0, -\strlen('.vsix'));
+            }
+        }
+
+        return $targets;
     }
 
     /** @return list<string> */
@@ -188,6 +225,8 @@ final class ReleaseWorkflowTest extends TestCase
             'windows-x64.zip',
             'linux-x64.vsix',
             'linux-arm64.vsix',
+            'alpine-x64.vsix',
+            'alpine-arm64.vsix',
             'darwin-arm64.vsix',
             'win32-x64.vsix',
         ];
