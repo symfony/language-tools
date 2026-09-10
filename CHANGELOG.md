@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.20.1 (2026-09-10)
 
 - Enforce per-project CPU budgets for cold indexing and whole-project checks in local dogfood runs
