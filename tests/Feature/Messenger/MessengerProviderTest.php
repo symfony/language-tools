@@ -30,6 +30,8 @@ use Symfony\Lsp\Feature\Messenger\MessengerTransport;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -444,7 +446,7 @@ YAML;
         $relationshipResolver = new MessengerRelationshipResolver($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
         $completionProvider = new MessengerCompletionProvider($documentResolver, $converter, $protocol, $indexes, $yamlParser, $comments, new TolerantPhpParser(new Parser()));
         $relationshipProvider = new MessengerRelationshipProvider($protocol, $indexes, $relationshipResolver);
-        $diagnosticProvider = new MessengerDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $phpParser, $converter);
+        $diagnosticProvider = new MessengerDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $classIndexes, $phpParser, $converter);
         $codeLensProvider = new MessengerCodeLensProvider($documentResolver, $protocol, $indexes, $classExtractor, $relationshipResolver);
 
         $completionParams = $this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'command.bus }') + 4));
@@ -495,12 +497,15 @@ YAML;
         ], true);
         $sourceIndexes = new MessengerSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($uri, 'php', $indexedText)));
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $classIndexes->forProject($project)->replace(new DependencyInjectionSourceFacts($uri, classes: (new PhpClassDeclarationExtractor($converter, $phpParser))->extract($uri, $currentText)));
         $protocol = new LspProtocolMapper();
         $provider = new MessengerDiagnosticProvider(
             new DocumentContextResolver($documents, $projects),
             $protocol,
             $indexes,
             $sourceIndexes,
+            $classIndexes,
             $phpParser,
             $converter,
         );
@@ -532,6 +537,59 @@ YAML;
         yield 'saved invalid signature' => ['string', 'string', true];
         yield 'open valid signature replaces saved invalid signature' => ['string', '\\stdClass', false];
         yield 'open invalid signature replaces saved valid signature' => ['\\stdClass', 'string', true];
+    }
+
+    public function testParsesOnlyDocumentsDeclaringRuntimeHandlers(): void
+    {
+        $handlerUri = 'file:///workspace/src/Handler.php';
+        $handlerText = self::handlerSource('string');
+        $serviceUri = 'file:///workspace/src/Service.php';
+        $serviceText = "<?php\nnamespace App;\nfinal class Service { public function __invoke(string \$message): void {} }\n";
+        $documents = new DocumentStore();
+        $documents->open(new Document($handlerUri, 'php', 1, $handlerText));
+        $documents->open(new Document($serviceUri, 'php', 1, $serviceText));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
+        $converter = new PositionConverter();
+        $classExtractor = new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser()));
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $classIndexes->forProject($project)->replace(
+            new DependencyInjectionSourceFacts($handlerUri, classes: $classExtractor->extract($handlerUri, $handlerText)),
+            new DependencyInjectionSourceFacts($serviceUri, classes: $classExtractor->extract($serviceUri, $serviceText)),
+        );
+        $indexes = new MessengerIndexRegistry();
+        $indexes->forProject($project)->replace([], [], [], [
+            new MessengerHandlerDeclaration('App\\Message', 'messenger.bus.default', 'handler', 'App\\Handler', '__invoke', 0, null),
+        ], true);
+        $parser = new class(new TolerantPhpParser(new Parser())) implements PhpParserInterface {
+            /** @var list<string> */
+            public array $sources = [];
+
+            public function __construct(private readonly PhpParserInterface $parser)
+            {
+            }
+
+            public function parse(string $source): PhpDocument
+            {
+                $this->sources[] = $source;
+
+                return $this->parser->parse($source);
+            }
+        };
+        $provider = new MessengerDiagnosticProvider(
+            new DocumentContextResolver($documents, $projects),
+            new LspProtocolMapper(),
+            $indexes,
+            new MessengerSourceIndexRegistry(),
+            $classIndexes,
+            $parser,
+            $converter,
+        );
+
+        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $serviceUri]]));
+        self::assertSame([], $parser->sources);
+        self::assertSame(['messenger.invalid_handler_signature'], array_column($provider->diagnostics(['textDocument' => ['uri' => $handlerUri]]) ?? [], 'code'));
+        self::assertSame([$handlerText], $parser->sources);
     }
 
     public function testIgnoresCommentedPhpMessengerConstructs(): void

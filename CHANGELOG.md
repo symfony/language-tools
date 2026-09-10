@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Stop parsing every PHP file for Messenger handler signature diagnostics
 - Bound source indexing memory by collecting cyclic garbage on heap growth instead of every 256 files
 - Compute PHP syntax diagnostics only when a feature reads them
 - Walk PHP syntax trees without nested generators during indexing

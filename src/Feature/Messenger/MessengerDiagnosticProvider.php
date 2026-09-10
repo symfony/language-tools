@@ -5,17 +5,23 @@ namespace Symfony\Lsp\Feature\Messenger;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
 {
+    private const SCALAR_TYPES = ['array', 'bool', 'callable', 'float', 'int', 'never', 'resource', 'string', 'void'];
+
     public function __construct(
         private readonly DocumentContextResolver $documents,
         private readonly LspProtocolMapper $protocol,
         private readonly MessengerIndexRegistry $indexes,
         private readonly MessengerSourceIndexRegistry $sourceIndexes,
+        private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly PhpParserInterface $parser,
         private readonly PositionConverter $converter,
     ) {
@@ -50,15 +56,18 @@ final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
         if ('php' !== $request->document->languageId) {
             return $diagnostics;
         }
+        $handlersByClass = $this->declaredHandlers($request->project, $request->document->uri, $index);
+        if ([] === $handlersByClass) {
+            return $diagnostics;
+        }
 
-        $scalarTypes = ['array', 'bool', 'callable', 'float', 'int', 'never', 'resource', 'string', 'void'];
         foreach ($this->parser->parse($request->document->text)->methodDeclarations as $method) {
-            $handlers = $index->handlersByClass($method->className);
+            $handlers = $handlersByClass[ltrim($method->className, '\\')] ?? [];
             if ([] === $handlers) {
                 continue;
             }
             $parameter = $method->parameters[0] ?? null;
-            if (!$method->public || null === $parameter || [] === $parameter->types || !array_all($parameter->types, static fn (string $type): bool => \in_array(strtolower($type), $scalarTypes, true))) {
+            if (!$method->public || null === $parameter || [] === $parameter->types || !array_all($parameter->types, static fn (string $type): bool => \in_array(strtolower($type), self::SCALAR_TYPES, true))) {
                 continue;
             }
             $range = new Range(
@@ -74,5 +83,25 @@ final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
         }
 
         return $diagnostics;
+    }
+
+    /**
+     * Persisted class declarations decide whether the document needs a parse at all.
+     *
+     * @return array<string, list<MessengerHandlerDeclaration>>
+     */
+    private function declaredHandlers(Project $project, string $uri, MessengerIndex $index): array
+    {
+        $facts = $this->classIndexes->forProject($project)->factsForUri($uri);
+        $handlersByClass = [];
+        foreach ($facts instanceof DependencyInjectionSourceFacts ? $facts->classes : [] as $class) {
+            $className = ltrim($class->className, '\\');
+            $handlers = $index->handlersByClass($className);
+            if ([] !== $handlers) {
+                $handlersByClass[$className] = $handlers;
+            }
+        }
+
+        return $handlersByClass;
     }
 }

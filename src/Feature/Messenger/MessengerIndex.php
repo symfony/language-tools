@@ -10,8 +10,10 @@ final class MessengerIndex
     private array $transports = [];
     /** @var array<string, MessengerMessage> */
     private array $messages = [];
-    /** @var list<MessengerHandlerDeclaration> */
-    private array $handlers = [];
+    /** @var array<string, list<MessengerHandlerDeclaration>> */
+    private array $handlersByMessage = [];
+    /** @var array<string, list<MessengerHandlerDeclaration>> */
+    private array $handlersByClass = [];
     private bool $complete = false;
 
     /**
@@ -37,7 +39,12 @@ final class MessengerIndex
             $this->messages[$message->className] = $message;
         }
         ksort($this->messages);
-        $this->handlers = $handlers;
+        $this->handlersByMessage = [];
+        $this->handlersByClass = [];
+        foreach ($handlers as $handler) {
+            $this->handlersByMessage[$handler->message][] = $handler;
+            $this->handlersByClass[$handler->className][] = $handler;
+        }
         $this->complete = $complete;
     }
 
@@ -77,13 +84,13 @@ final class MessengerIndex
     /** @return list<MessengerHandlerDeclaration> */
     public function handlersForMessage(string $className): array
     {
-        return array_values(array_filter($this->handlers, static fn (MessengerHandlerDeclaration $handler): bool => $handler->message === ltrim($className, '\\')));
+        return $this->handlersByMessage[ltrim($className, '\\')] ?? [];
     }
 
     /** @return list<MessengerHandlerDeclaration> */
     public function handlersByClass(string $className): array
     {
-        return array_values(array_filter($this->handlers, static fn (MessengerHandlerDeclaration $handler): bool => $handler->className === ltrim($className, '\\')));
+        return $this->handlersByClass[ltrim($className, '\\')] ?? [];
     }
 
     public function isComplete(): bool

@@ -41,14 +41,15 @@ final class DiagnosticBenchmarkTest extends TestCase
             self::assertSame(0, $result->exitCode, $result->stderr."\n".$result->stdout);
             /** @var array<string, mixed> $report */
             $report = json_decode($result->stdout, true, flags: \JSON_THROW_ON_ERROR);
-            self::assertSame(['route', 'template', 'twig_callable'], $report['fixtureProviders']);
-            self::assertSame(4, $report['diagnostics']);
+            self::assertSame(['messenger', 'route', 'template', 'twig_callable'], $report['fixtureProviders']);
+            self::assertSame(5, $report['diagnostics']);
             self::assertSame([
+                'src/MessageHandler/BenchmarkHandler.php' => ['messenger.invalid_handler_signature'],
                 'templates/benchmark-callable.html.twig' => ['twig_callable.unknown_argument'],
                 'templates/benchmark-route.html.twig' => ['route.not_found'],
                 'templates/benchmark-template.html.twig' => ['template.not_found'],
             ], $report['fixtureDiagnostics']);
-            self::assertSame(0, $report['phpParseCallsAfterIndexing']);
+            self::assertSame(1, $report['phpParseCallsAfterIndexing']);
         } finally {
             $workspace->cleanup();
         }

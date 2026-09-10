@@ -5,6 +5,8 @@ use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Feature\DiagnosticCollector;
+use Symfony\Lsp\Feature\Messenger\MessengerHandlerDeclaration;
+use Symfony\Lsp\Feature\Messenger\MessengerIndexRegistry;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteSourceFacts;
@@ -36,7 +38,7 @@ if (false === $projectRoot || !is_dir($projectRoot)) {
     fwrite(\STDERR, "The benchmark project is unavailable. Run composer source-index:benchmark or pass a generated project directory.\n");
     exit(1);
 }
-foreach (['src/Twig', 'templates'] as $directory) {
+foreach (['src/MessageHandler', 'src/Twig', 'templates'] as $directory) {
     if (!is_dir($projectRoot.'/'.$directory)) {
         mkdir($projectRoot.'/'.$directory, 0777, true);
     }
@@ -58,6 +60,19 @@ file_put_contents($projectRoot.'/src/Twig/BenchmarkExtension.php', <<<'PHP'
     }
     PHP);
 $cases = [
+    'src/MessageHandler/BenchmarkHandler.php' => [<<<'PHP'
+        <?php
+
+        namespace App\MessageHandler;
+
+        final class BenchmarkHandler
+        {
+            public function __invoke(string $message): void
+            {
+            }
+        }
+
+        PHP, ['messenger.invalid_handler_signature']],
     'templates/benchmark-callable.html.twig' => ["{{ benchmark(name: 'value', typo: 1) }}\n", ['twig_callable.unknown_argument']],
     'templates/benchmark-route.html.twig' => ["{{ path('benchmark_missing_route') }}\n", ['route.not_found']],
     'templates/benchmark-template.html.twig' => ["{% include 'benchmark_missing_template.html.twig' %}\n", ['template.not_found']],
@@ -76,6 +91,7 @@ foreach ([
     ApplicationSourceScanner::class,
     DiagnosticCollector::class,
     DocumentStore::class,
+    MessengerIndexRegistry::class,
     ProjectRegistry::class,
     RouteIndexRegistry::class,
     RouteSourceIndexRegistry::class,
@@ -125,6 +141,12 @@ $routeIndexes->forProject($project)->replace(...array_values($routes));
 $templateIndexes = $container->get(TemplateIndexRegistry::class);
 $templateIndex = $templateIndexes->forProject($project);
 $templateIndex->replaceRuntime(true, ...$templateIndex->matching(''));
+/** @var MessengerIndexRegistry $messengerIndexes */
+$messengerIndexes = $container->get(MessengerIndexRegistry::class);
+$messengerIndexes->forProject($project)->replace([], [], [], [
+    new MessengerHandlerDeclaration('App\\Message\\BenchmarkMessage', 'messenger.bus.default', 'App\\MessageHandler\\BenchmarkHandler', 'App\\MessageHandler\\BenchmarkHandler', '__invoke', 0, null),
+], true);
+$handlerFiles = 1;
 
 /** @var PhpParserInterface $phpParser */
 $phpParser = $container->get(PhpParserInterface::class);
@@ -164,7 +186,7 @@ ksort($expected);
 ksort($observed);
 
 $result = [
-    'fixtureProviders' => ['route', 'template', 'twig_callable'],
+    'fixtureProviders' => ['messenger', 'route', 'template', 'twig_callable'],
     'files' => count($documents),
     'diagnostics' => $diagnosticCount,
     'fixtureDiagnostics' => $observed,
@@ -175,7 +197,7 @@ $result = [
         'expectedFixtureDiagnostics' => $observed === $expected,
         'noProviderFailures' => 0 === $failureCount,
         'diagnosticsUnderOneSecond' => $milliseconds < 1000,
-        'noRepeatedPhpParsing' => 0 === $counter->calls,
+        'phpParsingLimitedToMessengerHandlerFiles' => $handlerFiles === $counter->calls,
     ],
 ];
 
