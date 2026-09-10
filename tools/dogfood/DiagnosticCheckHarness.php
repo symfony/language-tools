@@ -26,14 +26,13 @@ final class DiagnosticCheckHarness
             return new DiagnosticCheckResult('application-root-invalid', null, [], 0.0, null, $analysisMode);
         }
 
-        $startedAt = hrtime(true);
         $process = $this->processes->run(
             $this->command($configuration, $applicationRoot),
             $applicationRoot,
             $this->checkTimeout($configuration) + self::PROCESS_TERMINATION_ALLOWANCE,
             $configuration->environmentVariables,
         );
-        $milliseconds = round((hrtime(true) - $startedAt) / 1_000_000, 1);
+        $milliseconds = $process->milliseconds;
         if ($process->timedOut) {
             return new DiagnosticCheckResult('process-timeout', $process->exitCode, [], $milliseconds, null, $analysisMode);
         }
@@ -43,16 +42,17 @@ final class DiagnosticCheckHarness
             return new DiagnosticCheckResult('report-not-json', $process->exitCode, [], $milliseconds, null, $analysisMode);
         }
         $analyzedFiles = $this->analyzedFiles($report);
+        $timings = [$process->cpuMilliseconds, $this->profileMilliseconds($report), $this->phases($report), $this->projectPhases($report)];
         $failure = $this->verify($report, $process->exitCode, $analysisMode);
         if (null !== $failure) {
-            return new DiagnosticCheckResult($failure, $process->exitCode, [], $milliseconds, $analyzedFiles, $analysisMode);
+            return new DiagnosticCheckResult($failure, $process->exitCode, [], $milliseconds, $analyzedFiles, $analysisMode, ...$timings);
         }
         $diagnostics = $this->diagnostics($report, $applicationRoot);
         if (\is_string($diagnostics)) {
-            return new DiagnosticCheckResult($diagnostics, $process->exitCode, [], $milliseconds, $analyzedFiles, $analysisMode);
+            return new DiagnosticCheckResult($diagnostics, $process->exitCode, [], $milliseconds, $analyzedFiles, $analysisMode, ...$timings);
         }
 
-        return new DiagnosticCheckResult(null, $process->exitCode, $diagnostics, $milliseconds, $analyzedFiles, $analysisMode);
+        return new DiagnosticCheckResult(null, $process->exitCode, $diagnostics, $milliseconds, $analyzedFiles, $analysisMode, ...$timings);
     }
 
     /** @return list<string> */
@@ -256,6 +256,59 @@ final class DiagnosticCheckHarness
         }
 
         return $files;
+    }
+
+    /** @param array<mixed> $report */
+    private function profileMilliseconds(array $report): ?float
+    {
+        $profile = $report['profile'] ?? null;
+        $total = \is_array($profile) ? ($profile['totalMilliseconds'] ?? null) : null;
+
+        return \is_int($total) || \is_float($total) ? (float) $total : null;
+    }
+
+    /**
+     * @param array<mixed> $report
+     *
+     * @return array<string, float>
+     */
+    private function phases(array $report): array
+    {
+        $profile = $report['profile'] ?? null;
+
+        return $this->milliseconds(\is_array($profile) ? ($profile['phasesMilliseconds'] ?? null) : null);
+    }
+
+    /**
+     * @param array<mixed> $report
+     *
+     * @return array<string, float>
+     */
+    private function projectPhases(array $report): array
+    {
+        $profile = $report['profile'] ?? null;
+        $projects = \is_array($profile) ? ($profile['projects'] ?? null) : null;
+        $phases = [];
+        foreach (\is_array($projects) ? $projects : [] as $project) {
+            foreach ($this->milliseconds(\is_array($project) ? ($project['phasesMilliseconds'] ?? null) : null) as $phase => $milliseconds) {
+                $phases[$phase] = ($phases[$phase] ?? 0.0) + $milliseconds;
+            }
+        }
+
+        return $phases;
+    }
+
+    /** @return array<string, float> */
+    private function milliseconds(mixed $reported): array
+    {
+        $milliseconds = [];
+        foreach (\is_array($reported) ? $reported : [] as $phase => $value) {
+            if (\is_string($phase) && (\is_int($value) || \is_float($value))) {
+                $milliseconds[$phase] = (float) $value;
+            }
+        }
+
+        return $milliseconds;
     }
 
     /** @param array<mixed> $values */

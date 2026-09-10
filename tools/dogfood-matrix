@@ -29,6 +29,7 @@ const USAGE = <<<'USAGE'
         --server PATH           Language server executable (default: bin/symfony-lsp)
         --setup FILE            PHP file returning extra setup implementations
         --jobs N                Maximum concurrent projects (default: 4)
+        --no-budgets            Report the configured time budgets without enforcing them
         --ci                    Only run CI-eligible projects
         --list                  List configured projects and exit
 
@@ -41,6 +42,7 @@ $configurationDirectories = [];
 $server = null;
 $setupFile = null;
 $jobs = 4;
+$enforceBudgets = true;
 $ciOnly = false;
 $list = false;
 $selection = [];
@@ -71,6 +73,8 @@ while (null !== $argument = array_shift($arguments)) {
             exit(2);
         }
         $jobs = (int) $jobsValue;
+    } elseif ('--no-budgets' === $argument) {
+        $enforceBudgets = false;
     } elseif ('--ci' === $argument) {
         $ciOnly = true;
     } elseif ('--list' === $argument) {
@@ -171,7 +175,7 @@ $command = new MatrixCommand(
 );
 
 try {
-    $exitCode = $command->run($configurations, Path::join($root, 'var/dogfood/matrix', gmdate('Ymd-His')), $jobs);
+    $exitCode = $command->run($configurations, Path::join($root, 'var/dogfood/matrix', gmdate('Ymd-His')), $jobs, $enforceBudgets);
 } catch (ProcessInterruptedException $e) {
     fwrite(\STDERR, "Interrupted.\n");
     exit(128 + $e->signal);

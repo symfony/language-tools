@@ -34,6 +34,8 @@ final class ConfigurationLoaderTest extends TestCase
             'revision' => self::REVISION,
             'setup' => 'composer',
             'ci' => true,
+            'checkCpuBudget' => 20,
+            'coldRunCpuBudget' => 35,
         ]);
 
         $configurations = (new ConfigurationLoader())->load([$this->directory], ['composer']);
@@ -50,6 +52,8 @@ final class ConfigurationLoaderTest extends TestCase
         self::assertTrue($configuration->ci);
         self::assertSame(120, $configuration->indexTimeout);
         self::assertSame(10, $configuration->requestTimeout);
+        self::assertSame(20, $configuration->checkCpuBudget);
+        self::assertSame(35, $configuration->coldRunCpuBudget);
         self::assertSame('runtime', $configuration->analysisMode);
         self::assertSame($this->directory.'/scenarios/kimai.json', $configuration->scenarioFile);
     }
@@ -77,6 +81,8 @@ final class ConfigurationLoaderTest extends TestCase
             'ci' => false,
             'indexTimeout' => 300,
             'requestTimeout' => 20,
+            'checkCpuBudget' => 10,
+            'coldRunCpuBudget' => 15,
             'allowPlugins' => ['contao/manager-plugin'],
         ]);
 
@@ -92,6 +98,8 @@ final class ConfigurationLoaderTest extends TestCase
         self::assertFalse($configuration->ci);
         self::assertSame(300, $configuration->indexTimeout);
         self::assertSame(20, $configuration->requestTimeout);
+        self::assertSame(10, $configuration->checkCpuBudget);
+        self::assertSame(15, $configuration->coldRunCpuBudget);
         self::assertSame($this->directory.'/scenarios/twig.symfony.com.json', $configuration->scenarioFile);
         self::assertSame(['contao/manager-plugin'], $configuration->allowPlugins);
     }
@@ -210,6 +218,12 @@ final class ConfigurationLoaderTest extends TestCase
         yield 'huge index timeout' => [['indexTimeout' => 1000], 'between 1 and 900'];
         yield 'zero request timeout' => [['requestTimeout' => 0], 'between 1 and 120'];
         yield 'huge request timeout' => [['requestTimeout' => 600], 'between 1 and 120'];
+        yield 'missing check budget' => [['checkCpuBudget' => null], '"checkCpuBudget" between 1 and 900 CPU seconds'];
+        yield 'zero check budget' => [['checkCpuBudget' => 0], '"checkCpuBudget" between 1 and 900 CPU seconds'];
+        yield 'huge check budget' => [['checkCpuBudget' => 1000], '"checkCpuBudget" between 1 and 900 CPU seconds'];
+        yield 'fractional check budget' => [['checkCpuBudget' => 12.5], '"checkCpuBudget" between 1 and 900 CPU seconds'];
+        yield 'missing cold index budget' => [['coldRunCpuBudget' => null], '"coldRunCpuBudget" between 1 and 900 CPU seconds'];
+        yield 'string cold index budget' => [['coldRunCpuBudget' => '30'], '"coldRunCpuBudget" between 1 and 900 CPU seconds'];
         yield 'obsolete probe roots' => [['probeRoots' => ['src']], 'Unknown key "probeRoots"'];
         yield 'obsolete probe count' => [['probesPerCategory' => 3], 'Unknown key "probesPerCategory"'];
         yield 'plugin map' => [['allowPlugins' => ['contao/manager-plugin' => true]], 'list of Composer plugin names'];
@@ -230,6 +244,8 @@ final class ConfigurationLoaderTest extends TestCase
             'revision' => self::REVISION,
             'setup' => 'composer',
             'ci' => true,
+            'checkCpuBudget' => 20,
+            'coldRunCpuBudget' => 35,
         ];
     }
 

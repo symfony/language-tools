@@ -7,5 +7,7 @@
     "environmentVariables": {
         "DATABASE_URL": "mysql://root:root@127.0.0.1:9/dogfood?serverVersion=8.0.32&charset=utf8mb4"
     },
-    "indexTimeout": 300
+    "indexTimeout": 300,
+    "checkCpuBudget": 45,
+    "coldRunCpuBudget": 110
 }

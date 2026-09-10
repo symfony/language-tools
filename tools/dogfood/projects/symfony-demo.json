@@ -6,5 +6,7 @@
     "ci": true,
     "setupChanges": [
         ".env.local.demo"
-    ]
+    ],
+    "checkCpuBudget": 10,
+    "coldRunCpuBudget": 10
 }

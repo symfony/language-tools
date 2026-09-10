@@ -60,6 +60,7 @@ final class ServerHarness implements HarnessInterface
             $result->errorOutput,
             round($manifestMilliseconds, 1),
             round((hrtime(true) - $startedAt) / 1_000_000, 1),
+            $result->cpuMilliseconds,
         );
     }
 

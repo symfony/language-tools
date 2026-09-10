@@ -7,5 +7,7 @@
     "environmentVariables": {
         "APP_ENV": "dev",
         "DATABASE_URL": "mysql://root:root@127.0.0.1:9/dogfood?serverVersion=8.4.7&charset=utf8mb4"
-    }
+    },
+    "checkCpuBudget": 10,
+    "coldRunCpuBudget": 10
 }

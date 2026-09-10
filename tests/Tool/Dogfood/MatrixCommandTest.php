@@ -32,6 +32,12 @@ final class MatrixCommandTest extends TestCase
     /** @var array<string, mixed> */
     private array $diagnosticReport = [];
 
+    /** @var array<string, mixed> */
+    private array $profile = [];
+
+    private float $checkMilliseconds = 1234.5;
+    private ?float $checkCpuMilliseconds = 987.6;
+
     protected function setUp(): void
     {
         $this->directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-dogfood-'.bin2hex(random_bytes(8)));
@@ -44,7 +50,10 @@ final class MatrixCommandTest extends TestCase
             'diagnostics' => [],
             'errors' => [],
             'baseline' => ['path' => null, 'mode' => 'none', 'stale' => []],
-            'profile' => ['projects' => [['files' => 20]]],
+        ];
+        $this->profile = [
+            'phasesMilliseconds' => ['startup' => 50.0, 'projectDiscovery' => 10.0, 'fileSelection' => 4.5, 'projectAnalysis' => 1010.0, 'diagnostics' => 160.0],
+            'projects' => [['files' => 20, 'phasesMilliseconds' => ['sourceIndex' => 300.0, 'filePreparation' => 20.0, 'runtimeIndex' => 700.0, 'diagnostics' => 160.0]]],
         ];
         (new Filesystem())->mkdir($this->checkout);
         file_put_contents(Path::join($this->checkout, 'composer.json'), '{}');
@@ -98,6 +107,93 @@ final class MatrixCommandTest extends TestCase
         self::assertCount(1, $summary['projects']);
         self::assertStringContainsString('cold=ok', $this->lines[0]);
         self::assertStringContainsString('warm=ok', $this->lines[0]);
+        self::assertStringContainsString('cold-cpu=2.5/120s check-cpu=1.0/60s', $this->lines[0]);
+        self::assertSame(2500.0, (float) ($report['cold']['timings']['cpuMilliseconds'] ?? -1));
+        $diagnostics = $this->readJson($this->output.'/acme/diagnostics.json');
+        self::assertSame(1500, $diagnostics['milliseconds'] ?? null);
+        self::assertSame(987.6, $diagnostics['cpuMilliseconds'] ?? null);
+        self::assertSame(1234.5, $diagnostics['profileMilliseconds'] ?? null);
+        self::assertSame(['startup' => 50, 'projectDiscovery' => 10, 'fileSelection' => 4.5, 'projectAnalysis' => 1010, 'diagnostics' => 160], $diagnostics['phasesMilliseconds'] ?? null);
+        self::assertSame(['sourceIndex' => 300, 'filePreparation' => 20, 'runtimeIndex' => 700, 'diagnostics' => 160], $diagnostics['projectPhasesMilliseconds'] ?? null);
+    }
+
+    public function testFailsWhenTheWholeProjectAnalysisExceedsItsCpuBudget(): void
+    {
+        $this->checkMilliseconds = 70_000.0;
+        $this->checkCpuMilliseconds = 61_234.5;
+
+        $exitCode = $this->command(new FakeProvisioner($this->checkout), new FakeHarness($this->successfulRun(), $this->successfulRun()))->run([$this->configuration()], $this->output);
+
+        self::assertSame(1, $exitCode);
+        self::assertSame([
+            'layer' => 'budget',
+            'message' => 'Whole-project analysis used 61.2s of CPU time, over the 60s budget (wall time 70.3s, startup 0.1s, discovery 0.0s, selection 0.0s, source index 0.3s, runtime index 0.7s, diagnostics 0.2s).',
+        ], $this->readReport()['failure']);
+        self::assertStringContainsString('budget: Whole-project analysis used 61.2s of CPU time', $this->lines[0]);
+        self::assertTrue($this->readJson($this->output.'/acme/diagnostics.json')['ok'] ?? null);
+    }
+
+    public function testFailsWhenTheColdRunExceedsItsCpuBudget(): void
+    {
+        $cold = $this->harnessRun(['timings' => [
+            'sourceIndexMilliseconds' => 100_500.0,
+            'runtimeIndexMilliseconds' => null,
+            'indexWaitMilliseconds' => 100_600.0,
+            'totalMilliseconds' => 101_000.0,
+        ]], cpuMilliseconds: 120_100.0);
+
+        $exitCode = $this->command(new FakeProvisioner($this->checkout), new FakeHarness($cold, $this->successfulRun()))->run([$this->configuration()], $this->output);
+
+        self::assertSame(1, $exitCode);
+        self::assertSame([
+            'layer' => 'budget',
+            'message' => 'The cold run used 120.1s of CPU time, over the 120s budget (wall time 0.0s, index wait 100.6s, source index 100.5s, runtime index n/a).',
+        ], $this->readReport()['failure']);
+    }
+
+    public function testBudgetsCpuTimeRatherThanWallTime(): void
+    {
+        $this->checkMilliseconds = 61_234.5;
+        $this->checkCpuMilliseconds = 30_000.0;
+        $cold = $this->harnessRun(['timings' => ['indexWaitMilliseconds' => 150_000.0, 'totalMilliseconds' => 151_000.0]], cpuMilliseconds: 40_000.0);
+
+        $exitCode = $this->command(new FakeProvisioner($this->checkout), new FakeHarness($cold, $this->successfulRun()))->run([$this->configuration()], $this->output);
+
+        self::assertSame(0, $exitCode);
+        self::assertTrue($this->readReport()['ok']);
+        self::assertStringContainsString('cold-cpu=40.0/120s check-cpu=30.0/60s', $this->lines[0]);
+    }
+
+    public function testSkipsBudgetsWhenCpuTimeIsUnmeasured(): void
+    {
+        $this->checkMilliseconds = 61_234.5;
+        $this->checkCpuMilliseconds = null;
+        $cold = $this->harnessRun([], cpuMilliseconds: null);
+
+        $exitCode = $this->command(new FakeProvisioner($this->checkout), new FakeHarness($cold, $this->successfulRun()))->run([$this->configuration()], $this->output);
+
+        self::assertSame(0, $exitCode);
+        self::assertStringContainsString('cold-cpu=n/a/120s check-cpu=n/a/60s', $this->lines[0]);
+    }
+
+    public function testKeepsOtherFailuresAheadOfBudgetFailures(): void
+    {
+        $this->checkCpuMilliseconds = 61_234.5;
+        $this->diagnosticReport['errors'] = [['category' => 'operational']];
+
+        self::assertSame(1, $this->command(new FakeProvisioner($this->checkout), new FakeHarness($this->successfulRun(), $this->successfulRun()))->run([$this->configuration()], $this->output));
+        self::assertSame('diagnostics', $this->readReport()['failure']['layer'] ?? null);
+    }
+
+    public function testReportsBudgetsWithoutEnforcingThemWhenAsked(): void
+    {
+        $this->checkCpuMilliseconds = 61_234.5;
+
+        $exitCode = $this->command(new FakeProvisioner($this->checkout), new FakeHarness($this->successfulRun(), $this->successfulRun()))->run([$this->configuration()], $this->output, enforceBudgets: false);
+
+        self::assertSame(0, $exitCode);
+        self::assertTrue($this->readReport()['ok']);
+        self::assertStringContainsString('check-cpu=61.2/60s', $this->lines[0]);
     }
 
     public function testFingerprintChangesWhenExpectationsChangeWithoutChangingScenarioIds(): void
@@ -255,7 +351,7 @@ final class MatrixCommandTest extends TestCase
 
     public function testWholeProjectAnalysisCannotPassWithoutAnalyzingFiles(): void
     {
-        $this->diagnosticReport['profile'] = ['projects' => [['files' => 0]]];
+        $this->profile = ['projects' => [['files' => 0]]];
 
         self::assertSame(1, $this->command(new FakeProvisioner($this->checkout), new FakeHarness($this->successfulRun(), $this->successfulRun()))->run([$this->configuration()], $this->output));
         self::assertSame('diagnostics', $this->readReport()['failure']['layer'] ?? null);
@@ -406,11 +502,13 @@ final class MatrixCommandTest extends TestCase
 
     private function command(FakeProvisioner $provisioner, HarnessInterface $harness, string $workingTree = '?? vendor/'): MatrixCommand
     {
-        $diagnosticReport = json_encode($this->diagnosticReport, \JSON_THROW_ON_ERROR);
-        $processes = new FakeProcessRunner(static function (array $command) use ($workingTree, $diagnosticReport): ProcessResult {
+        $diagnosticReport = json_encode($this->diagnosticReport + ['profile' => $this->profile + ['totalMilliseconds' => $this->checkMilliseconds]], \JSON_THROW_ON_ERROR);
+        $checkMilliseconds = $this->checkMilliseconds;
+        $checkCpuMilliseconds = $this->checkCpuMilliseconds;
+        $processes = new FakeProcessRunner(static function (array $command) use ($workingTree, $diagnosticReport, $checkMilliseconds, $checkCpuMilliseconds): ProcessResult {
             return match (true) {
                 'status' === ($command[3] ?? null) => new ProcessResult(0, $workingTree."\n", '', false),
-                'check' === ($command[1] ?? null) => new ProcessResult(0, $diagnosticReport, '', false),
+                'check' === ($command[1] ?? null) => new ProcessResult(0, $diagnosticReport, '', false, $checkMilliseconds + 265.5, $checkCpuMilliseconds),
                 'composer' === $command[0] && 'install' === $command[1] => new ProcessResult(0, '', '', false),
                 '--version' === ($command[1] ?? null) => new ProcessResult(0, $command[0].' version 1.0', '', false),
                 default => new ProcessResult(1, '', 'Unexpected command '.implode(' ', $command), false),
@@ -477,7 +575,7 @@ final class MatrixCommandTest extends TestCase
     /**
      * @param array<string, mixed> $overrides
      */
-    private function harnessRun(array $overrides): HarnessResult
+    private function harnessRun(array $overrides, ?float $cpuMilliseconds = 2500.0): HarnessResult
     {
         $result = array_merge([
             'status' => ['source' => ['state' => 'ready'], 'runtime' => ['state' => 'ready']],
@@ -512,7 +610,7 @@ final class MatrixCommandTest extends TestCase
             ],
         ], $overrides);
 
-        return new HarnessResult(0, false, $result, json_encode($result, \JSON_THROW_ON_ERROR), '', 8.0, 30.0);
+        return new HarnessResult(0, false, $result, json_encode($result, \JSON_THROW_ON_ERROR), '', 8.0, 30.0, $cpuMilliseconds);
     }
 
     /**

@@ -10,6 +10,8 @@ final class ProjectConfiguration
      * @param list<string>            $setupChanges               tracked files the project's own setup scripts are expected to change
      * @param array<string, string>   $environmentVariables
      * @param 'runtime'|'source-only' $analysisMode
+     * @param int                     $checkCpuBudget             CPU seconds the whole-project check process tree may use
+     * @param int                     $coldRunCpuBudget           CPU seconds the cold server run process tree may use
      */
     public function __construct(
         public readonly string $name,
@@ -28,6 +30,8 @@ final class ProjectConfiguration
         public readonly array $environmentVariables = [],
         public readonly string $scenarioFile = '',
         public readonly string $analysisMode = 'runtime',
+        public readonly int $checkCpuBudget = 60,
+        public readonly int $coldRunCpuBudget = 120,
     ) {
     }
 }

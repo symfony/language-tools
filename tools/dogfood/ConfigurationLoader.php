@@ -5,12 +5,13 @@ namespace Symfony\Lsp\Tools\Dogfood;
 final class ConfigurationLoader
 {
     private const VERSION = 1;
-    private const KEYS = ['version', 'repository', 'revision', 'directory', 'environment', 'environmentVariables', 'setup', 'ci', 'indexTimeout', 'requestTimeout', 'allowPlugins', 'ignorePlatformRequirements', 'setupChanges', 'analysisMode'];
+    private const KEYS = ['version', 'repository', 'revision', 'directory', 'environment', 'environmentVariables', 'setup', 'ci', 'indexTimeout', 'requestTimeout', 'checkCpuBudget', 'coldRunCpuBudget', 'allowPlugins', 'ignorePlatformRequirements', 'setupChanges', 'analysisMode'];
     private const ANALYSIS_MODES = ['runtime', 'source-only'];
     private const DEFAULT_INDEX_TIMEOUT = 120;
     private const MAX_INDEX_TIMEOUT = 900;
     private const DEFAULT_REQUEST_TIMEOUT = 10;
     private const MAX_REQUEST_TIMEOUT = 120;
+    private const MAX_BUDGET = 900;
 
     /**
      * @param list<string> $directories
@@ -86,7 +87,22 @@ final class ConfigurationLoader
             $this->environmentVariables($data, $file),
             \dirname($file).'/scenarios/'.$name.'.json',
             $this->analysisMode($data, $file),
+            $this->budget($data, 'checkCpuBudget', $file),
+            $this->budget($data, 'coldRunCpuBudget', $file),
         );
+    }
+
+    /**
+     * @param array<array-key, mixed> $data
+     */
+    private function budget(array $data, string $key, string $file): int
+    {
+        $budget = $data[$key] ?? null;
+        if (!\is_int($budget) || $budget < 1 || $budget > self::MAX_BUDGET) {
+            throw new ConfigurationException(\sprintf('The configuration in "%s" must declare a "%s" between 1 and %d CPU seconds.', $file, $key, self::MAX_BUDGET));
+        }
+
+        return $budget;
     }
 
     /**

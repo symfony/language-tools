@@ -9,7 +9,7 @@ use Symfony\Component\Filesystem\Filesystem;
  */
 final class ReportHistory
 {
-    public const LAYERS = ['analysis-mode', 'provisioning', 'setup', 'bootstrap', 'source-index', 'runtime-index', 'request', 'process', 'timeout', 'scenario', 'cache-parity', 'diagnostics', 'artifact'];
+    public const LAYERS = ['analysis-mode', 'provisioning', 'setup', 'bootstrap', 'source-index', 'runtime-index', 'request', 'process', 'timeout', 'scenario', 'cache-parity', 'diagnostics', 'budget', 'artifact'];
 
     private const COUNTS = ['scenarios', 'checks', 'passed', 'failed', 'errors', 'requests', 'knownGaps', 'diagnostics', 'files'];
     private const DURATIONS = ['milliseconds', 'scenarioMilliseconds'];

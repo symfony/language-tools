@@ -47,7 +47,7 @@ final class MatrixCommand
     /**
      * @param list<ProjectConfiguration> $configurations
      */
-    public function run(array $configurations, string $outputDirectory, int $jobs = 4): int
+    public function run(array $configurations, string $outputDirectory, int $jobs = 4, bool $enforceBudgets = true): int
     {
         if ($jobs < 1) {
             throw new \InvalidArgumentException('The dogfood job count must be positive.');
@@ -59,10 +59,10 @@ final class MatrixCommand
         /** @var array<int, \Amp\Future<ProjectReport>> $futures */
         $futures = [];
         foreach ($configurations as $index => $configuration) {
-            $futures[$index] = async(function () use ($configuration, $outputDirectory, $semaphore): ProjectReport {
+            $futures[$index] = async(function () use ($configuration, $outputDirectory, $semaphore, $enforceBudgets): ProjectReport {
                 $lock = $semaphore->acquire();
                 try {
-                    $report = $this->runProject($configuration, Path::join($outputDirectory, $configuration->name));
+                    $report = $this->runProject($configuration, Path::join($outputDirectory, $configuration->name), $enforceBudgets);
                     ($this->output)($this->formatLine($report));
 
                     return $report;
@@ -95,7 +95,7 @@ final class MatrixCommand
         return $failed ? 1 : 0;
     }
 
-    private function runProject(ProjectConfiguration $configuration, string $artifactDirectory): ProjectReport
+    private function runProject(ProjectConfiguration $configuration, string $artifactDirectory, bool $enforceBudgets): ProjectReport
     {
         $startedAt = hrtime(true);
         $this->filesystem->mkdir($artifactDirectory);
@@ -178,6 +178,9 @@ final class MatrixCommand
                         $report->failure ??= new ProjectFailure('diagnostics', $this->evidence->diagnosticDifference($manifest->diagnostics, $report->diagnostics->diagnostics));
                     }
                 }
+                if ($enforceBudgets) {
+                    $report->failure ??= $this->budgetFailure($report);
+                }
             }
         } finally {
             $releaseStartedAt = hrtime(true);
@@ -188,6 +191,61 @@ final class MatrixCommand
         $this->writeJson(Path::join($artifactDirectory, 'project.json'), $report->toArray());
 
         return $report;
+    }
+
+    private function budgetFailure(ProjectReport $report): ?ProjectFailure
+    {
+        $configuration = $report->configuration;
+        $cold = $report->cold;
+        $coldCpu = null === $cold || [] !== $cold->layers ? null : $cold->timings['cpuMilliseconds'] ?? null;
+        if (null !== $coldCpu && $coldCpu > $configuration->coldRunCpuBudget * 1000) {
+            return new ProjectFailure('budget', \sprintf(
+                'The cold run used %.1fs of CPU time, over the %ds budget (%s).',
+                $coldCpu / 1000,
+                $configuration->coldRunCpuBudget,
+                $this->describeTimings([
+                    'wall time' => $cold->timings['processMilliseconds'] ?? null,
+                    'index wait' => $cold->timings['indexWaitMilliseconds'] ?? null,
+                    'source index' => $cold->timings['sourceIndexMilliseconds'] ?? null,
+                    'runtime index' => $cold->timings['runtimeIndexMilliseconds'] ?? null,
+                ]),
+            ));
+        }
+        $diagnostics = $report->diagnostics;
+        if (null !== $diagnostics && $diagnostics->ok() && null !== $diagnostics->cpuMilliseconds && $diagnostics->cpuMilliseconds > $configuration->checkCpuBudget * 1000) {
+            return new ProjectFailure('budget', \sprintf(
+                'Whole-project analysis used %.1fs of CPU time, over the %ds budget (%s).',
+                $diagnostics->cpuMilliseconds / 1000,
+                $configuration->checkCpuBudget,
+                $this->describeTimings([
+                    'wall time' => $diagnostics->milliseconds,
+                    'startup' => $diagnostics->phasesMilliseconds['startup'] ?? null,
+                    'discovery' => $diagnostics->phasesMilliseconds['projectDiscovery'] ?? null,
+                    'selection' => $diagnostics->phasesMilliseconds['fileSelection'] ?? null,
+                    'source index' => $diagnostics->projectPhasesMilliseconds['sourceIndex'] ?? null,
+                    'runtime index' => $diagnostics->projectPhasesMilliseconds['runtimeIndex'] ?? null,
+                    'diagnostics' => $diagnostics->phasesMilliseconds['diagnostics'] ?? null,
+                ]),
+            ));
+        }
+
+        return null;
+    }
+
+    /** @param array<string, float|null> $timings */
+    private function describeTimings(array $timings): string
+    {
+        $parts = [];
+        foreach ($timings as $label => $milliseconds) {
+            $parts[] = \sprintf('%s %s', $label, null === $milliseconds ? 'n/a' : \sprintf('%.1fs', $milliseconds / 1000));
+        }
+
+        return implode(', ', $parts);
+    }
+
+    private function cpuSeconds(?float $milliseconds): string
+    {
+        return null === $milliseconds ? 'n/a' : \sprintf('%.1f', $milliseconds / 1000);
     }
 
     private function summarize(HarnessResult $run, ProjectConfiguration $configuration): RunSummary
@@ -248,6 +306,7 @@ final class MatrixCommand
         $timings = [
             'manifestMilliseconds' => $run->manifestMilliseconds,
             'processMilliseconds' => $run->processMilliseconds,
+            'cpuMilliseconds' => $run->cpuMilliseconds,
         ];
         $reported = $result['timings'] ?? null;
         if (!\is_array($reported)) {
@@ -339,7 +398,7 @@ final class MatrixCommand
         $warm = $report->warm ?? throw new \LogicException('Missing warm run.');
 
         return \sprintf(
-            '%-28s mode=%-11s cold=%-12s warm=%-12s scenarios=%2d checks=%3d requests=%3d max=%6.1fms failures=%d gaps=%d files=%d time=%.1fs',
+            '%-28s mode=%-11s cold=%-12s warm=%-12s scenarios=%2d checks=%3d requests=%3d max=%6.1fms failures=%d gaps=%d files=%d cold-cpu=%s/%ds check-cpu=%s/%ds time=%.1fs',
             $report->configuration->name,
             $report->configuration->analysisMode,
             [] === $cold->layers ? 'ok' : implode(',', $cold->layers),
@@ -351,6 +410,10 @@ final class MatrixCommand
             $cold->failures + $warm->failures,
             \count($report->knownGaps),
             $report->diagnostics->analyzedFiles ?? 0,
+            $this->cpuSeconds($cold->timings['cpuMilliseconds'] ?? null),
+            $report->configuration->coldRunCpuBudget,
+            $this->cpuSeconds($report->diagnostics?->cpuMilliseconds),
+            $report->configuration->checkCpuBudget,
             ($report->timings['totalMilliseconds'] ?? 0.0) / 1000,
         );
     }

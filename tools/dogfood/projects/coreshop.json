@@ -4,5 +4,7 @@
     "revision": "13d4e67800bdcb061fc237878f991e0d52bf9a79",
     "analysisMode": "source-only",
     "setup": "composer-no-scripts",
-    "ci": true
+    "ci": true,
+    "checkCpuBudget": 15,
+    "coldRunCpuBudget": 30
 }

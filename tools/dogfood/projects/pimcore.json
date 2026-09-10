@@ -8,5 +8,7 @@
         "DATABASE_URL": "mysql://root:root@127.0.0.1:9/dogfood?serverVersion=8.4.7&charset=utf8mb4"
     },
     "ignorePlatformRequirements": ["ext-amqp"],
-    "indexTimeout": 300
+    "indexTimeout": 300,
+    "checkCpuBudget": 15,
+    "coldRunCpuBudget": 25
 }

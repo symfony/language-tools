@@ -5,6 +5,8 @@
     "setup": "composer",
     "ci": true,
     "indexTimeout": 300,
+    "checkCpuBudget": 30,
+    "coldRunCpuBudget": 65,
     "ignorePlatformRequirements": [
         "ext-imap"
     ]

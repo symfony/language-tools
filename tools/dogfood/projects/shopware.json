@@ -9,5 +9,7 @@
         "COMPOSER_PLUGIN_LOADER": "1",
         "DATABASE_URL": "mysql://shopware:shopware@127.0.0.1:9/shopware"
     },
-    "indexTimeout": 900
+    "indexTimeout": 900,
+    "checkCpuBudget": 60,
+    "coldRunCpuBudget": 145
 }

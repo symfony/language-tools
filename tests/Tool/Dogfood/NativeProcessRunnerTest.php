@@ -32,6 +32,27 @@ final class NativeProcessRunnerTest extends TestCase
 
         self::assertTrue($result->successful());
         self::assertSame('configured', $result->standardOutput);
+        self::assertGreaterThan(0.0, $result->milliseconds);
+    }
+
+    public function testMeasuresTheCpuTimeOfTheProcessTree(): void
+    {
+        if ('Windows' === \PHP_OS_FAMILY) {
+            self::markTestSkipped('Windows processes are not launched through the measuring wrapper.');
+        }
+
+        $result = (new NativeProcessRunner())->run([\PHP_BINARY, '-r', <<<'PHP'
+            $child = proc_open([PHP_BINARY, '-r', '$x = 0; for ($i = 0; $i < 2000000; ++$i) { $x += $i % 7; }'], [], $pipes);
+            proc_close($child);
+            usleep(150000);
+            echo getenv('SYMFONY_LSP_DOGFOOD_USAGE_FILE') === false ? 'isolated' : 'leaked';
+            PHP]);
+
+        self::assertTrue($result->successful());
+        self::assertSame('isolated', $result->standardOutput);
+        self::assertNotNull($result->cpuMilliseconds);
+        self::assertGreaterThan(50.0, $result->cpuMilliseconds);
+        self::assertLessThan($result->milliseconds, $result->cpuMilliseconds);
     }
 
     public function testCommandsCannotOpenTheControllingTerminal(): void

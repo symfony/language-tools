@@ -48,9 +48,16 @@ final class DiagnosticCheckHarnessTest extends TestCase
         self::assertSame(['DATABASE_URL' => 'mysql://root@127.0.0.1:9/app'], $this->processes->calls[0]['environment']);
         self::assertTrue($result->ok());
         self::assertSame(41, $result->analyzedFiles);
-        self::assertGreaterThanOrEqual(0.0, $result->milliseconds);
+        self::assertSame(1300.0, $result->milliseconds);
+        self::assertSame(987.6, $result->cpuMilliseconds);
+        self::assertSame(1234.5, $result->profileMilliseconds);
+        self::assertSame(['startup' => 50.0, 'projectDiscovery' => 10.0, 'fileSelection' => 4.5, 'projectAnalysis' => 1020.0, 'diagnostics' => 150.0], $result->phasesMilliseconds);
+        self::assertSame(['sourceIndex' => 300.0, 'filePreparation' => 20.0, 'runtimeIndex' => 700.0, 'diagnostics' => 150.0], $result->projectPhasesMilliseconds);
         self::assertSame('runtime', $result->analysisMode);
         self::assertSame('runtime', $result->toArray()['analysisMode']);
+        self::assertSame(1300.0, $result->toArray()['milliseconds']);
+        self::assertSame(987.6, $result->toArray()['cpuMilliseconds']);
+        self::assertSame(1234.5, $result->toArray()['profileMilliseconds']);
     }
 
     public function testChecksSourceOnlyProjectsWithoutRuntimeIndexing(): void
@@ -297,21 +304,30 @@ final class DiagnosticCheckHarnessTest extends TestCase
 
         self::assertTrue($result->ok());
         self::assertNull($result->analyzedFiles);
+        self::assertNull($result->profileMilliseconds);
+        self::assertSame([], $result->phasesMilliseconds);
+        self::assertSame([], $result->projectPhasesMilliseconds);
     }
 
     public function testSumsTheAnalyzedFileCountOfEveryProject(): void
     {
         $result = $this->check(self::report([
             'projects' => [self::project(), self::project(['id' => 'apps/api'])],
-            'profile' => ['projects' => [['id' => '.', 'files' => 41], ['id' => 'apps/api', 'files' => 8]]],
+            'profile' => ['projects' => [
+                ['id' => '.', 'files' => 41, 'phasesMilliseconds' => ['sourceIndex' => 300.0, 'runtimeIndex' => 700.0, 'diagnostics' => 150.0]],
+                ['id' => 'apps/api', 'files' => 8, 'phasesMilliseconds' => ['sourceIndex' => 50.0, 'runtimeIndex' => null, 'diagnostics' => 10]],
+            ]],
         ]));
 
         self::assertSame(49, $result->analyzedFiles);
+        self::assertSame(['sourceIndex' => 350.0, 'runtimeIndex' => 700.0, 'diagnostics' => 160.0], $result->projectPhasesMilliseconds);
+        self::assertNull($result->profileMilliseconds);
+        self::assertSame([], $result->phasesMilliseconds);
     }
 
     private function check(string $standardOutput, int $exitCode = 0, bool $timedOut = false, ?string $applicationRoot = null, ?ProjectConfiguration $configuration = null): DiagnosticCheckResult
     {
-        $this->processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult($exitCode, $standardOutput, 'Runtime bridge took 1.2s.', $timedOut));
+        $this->processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult($exitCode, $standardOutput, 'Runtime bridge took 1.2s.', $timedOut, 1300.0, 987.6));
         $harness = new DiagnosticCheckHarness($this->processes, '/bin/symfony-lsp');
 
         return $harness->run($configuration ?? self::configuration(), $applicationRoot ?? $this->directory);
@@ -351,7 +367,11 @@ final class DiagnosticCheckHarnessTest extends TestCase
             'tool' => ['name' => 'Symfony Language Tools', 'version' => '1.2.3'],
             'complete' => true,
             'projects' => [self::project()],
-            'profile' => ['totalMilliseconds' => 1234.5, 'projects' => [['id' => '.', 'files' => 41]]],
+            'profile' => [
+                'totalMilliseconds' => 1234.5,
+                'phasesMilliseconds' => ['startup' => 50.0, 'projectDiscovery' => 10.0, 'fileSelection' => 4.5, 'projectAnalysis' => 1020.0, 'diagnostics' => 150.0],
+                'projects' => [['id' => '.', 'files' => 41, 'phasesMilliseconds' => ['sourceIndex' => 300.0, 'filePreparation' => 20.0, 'runtimeIndex' => 700.0, 'diagnostics' => 150.0]]],
+            ],
             'diagnostics' => [],
             'baseline' => ['path' => null, 'mode' => 'none', 'strict' => false, 'stale' => []],
             'summary' => ['diagnostics' => 0, 'active' => 0, 'matched' => 0, 'stale' => 0, 'blocking' => 0],

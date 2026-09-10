@@ -21,9 +21,15 @@ final class NativeProcessRunner implements ProcessRunnerInterface
             $inheritedEnvironment[(string) $key] = $value;
         }
         $isolated = 'Windows' !== \PHP_OS_FAMILY;
+        $usageFile = null;
         if ($isolated) {
             array_unshift($command, \PHP_BINARY, __DIR__.'/launch-process.php');
+            $usageFile = tempnam(sys_get_temp_dir(), 'symfony-lsp-dogfood-usage-');
+            if (false !== $usageFile) {
+                $environment['SYMFONY_LSP_DOGFOOD_USAGE_FILE'] = $usageFile;
+            }
         }
+        $startedAt = hrtime(true);
         $process = Process::start($command, $directory, array_replace($inheritedEnvironment, $environment));
         $process->getStdin()->close();
         /** @var \Amp\Future<string> $stdout */
@@ -50,7 +56,7 @@ final class NativeProcessRunner implements ProcessRunnerInterface
             ));
         } catch (CancelledException) {
             $this->kill($process, $isolated);
-            $result = new ProcessResult(-1, $stdout->await(), $stderr->await(), null === $signal);
+            $result = new ProcessResult(-1, $stdout->await(), $stderr->await(), null === $signal, $this->elapsedMilliseconds($startedAt));
             if (null !== $signal) {
                 throw new ProcessInterruptedException($signal);
             }
@@ -60,9 +66,30 @@ final class NativeProcessRunner implements ProcessRunnerInterface
             foreach ($signalWatchers as $signalWatcher) {
                 EventLoop::cancel($signalWatcher);
             }
+            if (false !== $usageFile && null !== $usageFile) {
+                $cpuMilliseconds = $this->cpuMilliseconds($usageFile);
+                @unlink($usageFile);
+            }
         }
 
-        return new ProcessResult($exitCode, $stdout->await(), $stderr->await(), false);
+        return new ProcessResult($exitCode, $stdout->await(), $stderr->await(), false, $this->elapsedMilliseconds($startedAt), $cpuMilliseconds ?? null);
+    }
+
+    private function elapsedMilliseconds(int $startedAt): float
+    {
+        return round((hrtime(true) - $startedAt) / 1_000_000, 1);
+    }
+
+    private function cpuMilliseconds(string $usageFile): ?float
+    {
+        $contents = @file_get_contents($usageFile);
+        if (!\is_string($contents) || '' === $contents) {
+            return null;
+        }
+        $usage = json_decode($contents, true);
+        $cpuMilliseconds = \is_array($usage) ? ($usage['cpuMilliseconds'] ?? null) : null;
+
+        return \is_int($cpuMilliseconds) || \is_float($cpuMilliseconds) ? (float) $cpuMilliseconds : null;
     }
 
     private function kill(Process $process, bool $isolated): void

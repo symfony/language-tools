@@ -105,7 +105,7 @@ jobs:
               run: composer tree-sitter:build
             - name: Run the project through the matrix
               if: env.DOGFOOD_SELECTED == 'true'
-              run: ./tools/dogfood-matrix ${{ matrix.project }}
+              run: ./tools/dogfood-matrix --no-budgets ${{ matrix.project }}
             - uses: actions/upload-artifact@v7
               if: always() && env.DOGFOOD_SELECTED == 'true'
               with:

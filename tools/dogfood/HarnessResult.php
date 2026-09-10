@@ -5,7 +5,8 @@ namespace Symfony\Lsp\Tools\Dogfood;
 final class HarnessResult
 {
     /**
-     * @param array<mixed>|null $result decoded harness output, null when unavailable
+     * @param array<mixed>|null $result          decoded harness output, null when unavailable
+     * @param float|null        $cpuMilliseconds CPU time of the harness process tree, null when unmeasured
      */
     public function __construct(
         public readonly int $exitCode,
@@ -15,6 +16,7 @@ final class HarnessResult
         public readonly string $errorOutput,
         public readonly float $manifestMilliseconds = 0.0,
         public readonly float $processMilliseconds = 0.0,
+        public readonly ?float $cpuMilliseconds = null,
     ) {
     }
 }
