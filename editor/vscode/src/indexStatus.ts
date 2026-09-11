@@ -32,8 +32,11 @@ export function validateKernel(value: string): string | undefined {
     if ('' === value) {
         return undefined;
     }
+    if (value.includes('\0')) {
+        return 'Use a kernel class name, such as Api\\Kernel, or an entry point path, such as bin/console-api.';
+    }
     if (value.includes('/') || value.endsWith('.php')) {
-        return value.startsWith('/') || value.split('/').includes('..')
+        return /^[/\\]|^[A-Za-z]:|^[A-Za-z][A-Za-z0-9+.-]*:\/\/|(^|[/\\])\.\.([/\\]|$)/.test(value)
             ? 'Use a path inside the application, such as bin/console-api.'
             : undefined;
     }

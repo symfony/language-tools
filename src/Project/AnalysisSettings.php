@@ -96,7 +96,7 @@ final class AnalysisSettings
 
     private function kernel(mixed $value, string $context): string
     {
-        if (!\is_string($value) || '' === $value) {
+        if (!\is_string($value) || '' === $value || str_contains($value, "\0")) {
             throw new InvalidConfigurationException(\sprintf('The %s option "kernel" must be a kernel class name or a project-relative entry point path.', $context));
         }
 
@@ -104,7 +104,12 @@ final class AnalysisSettings
             while (str_starts_with($value, './')) {
                 $value = substr($value, 2);
             }
-            if ('' === $value || Path::isAbsolute($value) || \in_array('..', explode('/', $value), true)) {
+            // Windows resolves backslash separators and drive letters, so both are checked on every platform
+            if ('' === $value
+                || Path::isAbsolute($value)
+                || 1 === preg_match('{^[\\\\]|^[A-Za-z]:}', $value)
+                || \in_array('..', preg_split('{[/\\\\]}', $value) ?: [], true)
+            ) {
                 throw new InvalidConfigurationException(\sprintf('The %s option "kernel" must point to an entry point inside each Symfony project.', $context));
             }
 

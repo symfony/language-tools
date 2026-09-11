@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Project;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Project\AnalysisSettings;
@@ -144,5 +145,30 @@ final class ProjectConfigurationTest extends TestCase
         $this->expectExceptionMessage('bridgeTimeout');
 
         $this->configuration->load([['uri' => (new UriToPathConverter())->toUri($this->directory)]]);
+    }
+
+    #[DataProvider('escapingKernels')]
+    public function testRejectsKernelEntryPointsThatLeaveTheProject(string $kernel, string $message): void
+    {
+        file_put_contents($this->directory.'/.symfony-lsp.json', json_encode([
+            'version' => 1,
+            'kernel' => $kernel,
+        ], \JSON_THROW_ON_ERROR));
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage($message);
+
+        $this->configuration->load([['uri' => (new UriToPathConverter())->toUri($this->directory)]]);
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function escapingKernels(): iterable
+    {
+        yield 'parent traversal' => ['../outside/bin/console', 'inside each Symfony project'];
+        yield 'Windows parent traversal' => ['bin\\..\\..\\outside\\console.php', 'inside each Symfony project'];
+        yield 'Windows drive root' => ['C:\\outside\\bin\\console.php', 'inside each Symfony project'];
+        yield 'Windows share root' => ['\\\\server\\share\\console.php', 'inside each Symfony project'];
+        yield 'stream wrapper' => ['phar://outside/bin/console', 'inside each Symfony project'];
+        yield 'null byte' => ["bin/console\0.php", 'kernel class name or a project-relative entry point path'];
     }
 }

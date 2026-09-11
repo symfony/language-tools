@@ -102,6 +102,10 @@ async function testKernelValidation(): Promise<void> {
     assert.equal(validateKernel('bin/websiteconsole'), undefined);
     assert.ok(validateKernel('../other/bin/console'));
     assert.ok(validateKernel('/opt/app/bin/console'));
+    assert.ok(validateKernel('bin\\..\\..\\other\\console.php'));
+    assert.ok(validateKernel('C:\\other\\bin\\console.php'));
+    assert.ok(validateKernel('phar://other/bin/console'));
+    assert.ok(validateKernel('bin/console\0.php'));
     assert.ok(validateKernel('App Kernel'));
 }
 
