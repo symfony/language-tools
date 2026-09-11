@@ -222,13 +222,14 @@ across editor restarts. If the application cannot boot during the next refresh,
 Symfony Language Tools restores that information, reports when it was last
 updated and keeps the project stale until a refresh succeeds.
 
-Use the editor's commands to refresh project data, inspect the current status
-or switch the selected Symfony environment. Custom Language Server Protocol
-clients can invoke these command identifiers directly:
+Use the editor's commands to refresh project data, inspect the current status,
+switch the selected Symfony environment or switch the analyzed kernel. Custom
+Language Server Protocol clients can invoke these command identifiers directly:
 
 * ``symfony.refreshIndex``;
 * ``symfony.indexStatus``;
-* ``symfony.switchEnvironment``.
+* ``symfony.switchEnvironment``;
+* ``symfony.switchKernel``, with an empty value to detect the kernel again.
 
 Runtime timing data returned by ``symfony.indexStatus`` includes a ``scope``
 field. ``full`` means section timings cover a complete runtime index;
@@ -258,8 +259,11 @@ Symfony Language Tools has these general limitations:
   own, for example because the distribution's front controller defines
   constants before creating it, the front controller is used instead. Symfony
   Runtime options under ``extra.runtime`` and ``APP_RUNTIME_OPTIONS`` are
-  supported;
-* one Symfony environment is active at a time for each application root;
+  supported. Applications that ship several kernels select one with the
+  ``kernel`` setting; see the `project configuration`_;
+* one Symfony environment and one kernel are active at a time for each
+  application root, so files belonging to another kernel of the same
+  application are analyzed against the selected one;
 * references and rename cover only statically recognized values.
 
 See each integration page for its supported contexts and specific limitations.
@@ -280,7 +284,8 @@ If a runtime-backed feature returns no results, verify that:
   ``composer.lock`` contains it as a transitive dependency;
 * ``vendor/autoload.php`` exists;
 * the application kernel boots through one of the supported conventions in the
-  configured environment;
+  configured environment, or the ``kernel`` setting selects the right one when
+  the application ships several;
 * the bundle that provides the integration is registered in that kernel: a
   package installed by Composer contributes no runtime information to a kernel
   that doesn't register its bundle;
@@ -293,6 +298,7 @@ Run ``symfony-lsp check --verbose`` to see the sanitized cause of a kernel boot
 failure.
 
 .. _`headless diagnostics checker`: headless-diagnostics.rst
+.. _`project configuration`: ../project-configuration.rst
 .. _`release metadata`: https://symfony.com/releases.json
 .. _`Docker support`: ../docker.rst
 .. _`Routing`: routing.rst

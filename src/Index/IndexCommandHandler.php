@@ -4,6 +4,8 @@ namespace Symfony\Lsp\Index;
 
 use Amp\Cancellation;
 use Symfony\Lsp\Feature\Configuration\StaleConfigurationValidationSnapshotException;
+use Symfony\Lsp\Project\AnalysisSettings;
+use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\TrustStatus;
@@ -16,13 +18,14 @@ use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 /**
  * @phpstan-import-type ProjectRuntimeIndexStatus from ProjectIndexStatusRegistry
  *
- * @phpstan-type ProjectIndexCommandStatus array{root: string, environment: string, runtimeEnabled: bool, trusted: bool, source: array{state: string, error?: string}, runtime: ProjectRuntimeIndexStatus}
+ * @phpstan-type ProjectIndexCommandStatus array{root: string, environment: string, kernel: string|null, runtimeEnabled: bool, trusted: bool, source: array{state: string, error?: string}, runtime: ProjectRuntimeIndexStatus}
  */
 final class IndexCommandHandler
 {
     public const REFRESH_COMMAND = 'symfony.refreshIndex';
     public const STATUS_COMMAND = 'symfony.indexStatus';
     public const SWITCH_ENVIRONMENT_COMMAND = 'symfony.switchEnvironment';
+    public const SWITCH_KERNEL_COMMAND = 'symfony.switchKernel';
 
     public function __construct(
         private readonly ProjectRegistry $projects,
@@ -31,6 +34,7 @@ final class IndexCommandHandler
         private readonly RuntimeInitializerInterface $runtimeInitializer,
         private readonly ProjectIndexStatusRegistry $statuses,
         private readonly RuntimeConfiguration $configuration,
+        private readonly AnalysisSettings $analysisSettings,
     ) {
     }
 
@@ -42,19 +46,24 @@ final class IndexCommandHandler
     public function execute(array $params, ?Cancellation $cancellation = null): ?array
     {
         $command = $params['command'] ?? null;
-        if (!\is_string($command) || !\in_array($command, [self::REFRESH_COMMAND, self::STATUS_COMMAND, self::SWITCH_ENVIRONMENT_COMMAND], true)) {
+        if (!\is_string($command) || !\in_array($command, [self::REFRESH_COMMAND, self::STATUS_COMMAND, self::SWITCH_ENVIRONMENT_COMMAND, self::SWITCH_KERNEL_COMMAND], true)) {
             return null;
         }
 
         $projects = $this->selectedProjects($params);
-        if (self::SWITCH_ENVIRONMENT_COMMAND === $command) {
-            $environment = $this->environment($params);
-            if (null === $environment) {
+        if (self::SWITCH_ENVIRONMENT_COMMAND === $command || self::SWITCH_KERNEL_COMMAND === $command) {
+            $switchesEnvironment = self::SWITCH_ENVIRONMENT_COMMAND === $command;
+            $value = $switchesEnvironment ? $this->environment($params) : $this->kernel($params);
+            if (null === $value) {
                 return null;
             }
             foreach ($projects as $project) {
                 $cancellation?->throwIfRequested();
-                $this->configuration->setEnvironment($project, $environment);
+                if ($switchesEnvironment) {
+                    $this->configuration->setEnvironment($project, $value);
+                } else {
+                    $this->configuration->setKernel($project, '' === $value ? null : $value);
+                }
                 if ($this->configuration->runtimeIndexing($project) && TrustStatus::Trusted === $this->workspaceTrust->status($project)) {
                     $this->initializeRuntime($project, new RuntimeRefreshPlan(RuntimeRefreshMode::Clear), $cancellation);
                 }
@@ -72,6 +81,7 @@ final class IndexCommandHandler
         return array_map(fn (Project $project): array => [
             ...$this->statuses->status($project),
             'environment' => $this->configuration->environment($project),
+            'kernel' => $this->configuration->kernel($project),
             'runtimeEnabled' => $this->configuration->runtimeIndexing($project),
             'trusted' => TrustStatus::Trusted === $this->workspaceTrust->status($project),
         ], $projects);
@@ -100,6 +110,31 @@ final class IndexCommandHandler
         $environment = \is_array($arguments) ? ($arguments[1] ?? null) : null;
 
         return \is_string($environment) && preg_match('/^[A-Za-z0-9_.-]+$/', $environment) ? $environment : null;
+    }
+
+    /**
+     * @param array<array-key, mixed> $params
+     *
+     * @return string|null the selected kernel, an empty string to detect it again, or null when the request is invalid
+     */
+    private function kernel(array $params): ?string
+    {
+        $arguments = $params['arguments'] ?? null;
+        $kernel = \is_array($arguments) ? ($arguments[1] ?? null) : null;
+        if (!\is_string($kernel)) {
+            return null;
+        }
+        if ('' === $kernel) {
+            return '';
+        }
+
+        try {
+            $normalized = $this->analysisSettings->normalizeProject(['kernel' => $kernel]);
+        } catch (InvalidConfigurationException) {
+            return null;
+        }
+
+        return \is_string($normalized['kernel'] ?? null) ? $normalized['kernel'] : null;
     }
 
     /**

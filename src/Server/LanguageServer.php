@@ -137,6 +137,7 @@ final class LanguageServer
                         IndexCommandHandler::REFRESH_COMMAND,
                         IndexCommandHandler::STATUS_COMMAND,
                         IndexCommandHandler::SWITCH_ENVIRONMENT_COMMAND,
+                        IndexCommandHandler::SWITCH_KERNEL_COMMAND,
                     ],
                 ],
                 'workspace' => [

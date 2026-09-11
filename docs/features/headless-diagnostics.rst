@@ -96,8 +96,22 @@ those configured exclusions, but it can't bypass the excluded directories or
 other ``.gitignore`` rules.
 
 Runtime analysis is enabled by default and boots the application with the
-configured PHP command. Use source-only mode for code that you don't trust or
-when CI must not execute the application:
+configured PHP command. Applications that ship several kernels check each one
+with its own run, without editing ``composer.json``:
+
+.. code-block:: terminal
+
+    $ symfony-lsp check --kernel='Admin\Kernel' src/Admin config/admin
+    $ symfony-lsp check --kernel=bin/apiconsole src/Api config/api
+
+The value is a kernel class name, or a project-relative application entry point
+when it contains ``/`` or ends in ``.php``. Each kernel keeps its own retained
+runtime information. Two runs of the same working directory still share the
+source index and the application cache, so run them one after the other or from
+separate checkouts.
+
+Use source-only mode for code that you don't trust or when CI must not execute
+the application:
 
 .. code-block:: terminal
 

@@ -32,6 +32,7 @@ final class CheckOptionsParserTest extends TestCase
             '--source-only',
             '--no-container-project-root',
             '--environment=test',
+            '--kernel=Api\\Kernel',
             '--php-command=["symfony","php"]',
             '--fail-on=route.not_found,config.deprecated_key',
             '--baseline=diagnostics.json',
@@ -48,6 +49,7 @@ final class CheckOptionsParserTest extends TestCase
             'runtimeIndexing' => false,
             'containerProjectRoot' => null,
             'environment' => 'test',
+            'kernel' => 'Api\\Kernel',
             'phpCommand' => ['symfony', 'php'],
         ], $options->overrides);
         self::assertSame(['config.deprecated_key', 'route.not_found'], $options->blockingCodes);
@@ -148,6 +150,16 @@ final class CheckOptionsParserTest extends TestCase
             ['--unknown'],
             'human',
             'Unknown check option "--unknown".',
+        ];
+        yield 'kernel outside the project' => [
+            ['--kernel=../other/bin/console'],
+            'human',
+            'The command-line option "kernel" must point to an entry point inside each Symfony project.',
+        ];
+        yield 'kernel that is neither a class nor a path' => [
+            ['--kernel=Api Kernel'],
+            'human',
+            'The command-line option "kernel" must be a kernel class name or a project-relative entry point path.',
         ];
         yield 'unknown short flag' => [
             ['-x'],

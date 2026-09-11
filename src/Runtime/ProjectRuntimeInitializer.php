@@ -42,6 +42,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         $requestedSections = $plan->sections();
         $sections = $requestedSections ?? $this->snapshotLoaders->sections();
         $bridge = $this->bridgeInstaller->install($project);
+        $kernel = $this->configuration->kernel($project);
         $loadedSections = [];
 
         try {
@@ -50,6 +51,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                 $this->pathMapper->toContainer($project, $bridge),
                 '--project='.$this->pathMapper->toContainer($project, $project->rootPath),
                 '--environment='.$this->configuration->environment($project),
+                ...(null === $kernel ? [] : ['--kernel='.$kernel]),
                 '--debug=1',
                 '--sections='.implode(',', $sections),
                 '--configuration-generation='.$this->configurationValidation->generation($project),

@@ -16,6 +16,7 @@ final class CheckOptionsParser
         '--project-root',
         '--container-project-root',
         '--environment',
+        '--kernel',
         '--bridge-timeout',
         '--timeout',
         '--php-command',
@@ -154,6 +155,9 @@ final class CheckOptionsParser
                 break;
             case 'environment':
                 $draft->overrides['environment'] = $value;
+                break;
+            case 'kernel':
+                $draft->overrides['kernel'] = $value;
                 break;
             case 'bridge-timeout':
                 $draft->overrides['bridgeTimeout'] = $this->positiveNumber($name, $value);

@@ -8,7 +8,7 @@ import {
     serverStartupMessage,
     useSocketTransport,
 } from '../../src/extension';
-import { indexStatusBarText, indexStatusPollingEnabled } from '../../src/indexStatus';
+import { indexStatusBarText, indexStatusPollingEnabled, validateKernel } from '../../src/indexStatus';
 import {
     completions,
     labels,
@@ -22,6 +22,7 @@ import {
 interface IndexStatus {
     root: string;
     environment: string;
+    kernel: string | null;
     runtimeEnabled: boolean;
     trusted: boolean;
     source: { state: string };
@@ -33,6 +34,7 @@ export const lifecycleTests: TestCase[] = [
     ['Only contributed analysis settings are forwarded at startup', testConfiguredAnalysisOptions],
     ['Partial runtime indexes use a warning status', testPartialIndexStatus],
     ['Index status polling follows the language client state', testIndexStatusPolling],
+    ['Kernel input accepts class names and project-relative entry points', testKernelValidation],
     ['Server reports and refreshes indexes', testIndexCommands],
     ['Server remains responsive after workspace configuration changes', testConfigurationChange],
 ];
@@ -86,11 +88,21 @@ async function testPartialIndexStatus(): Promise<void> {
     assert.equal(indexStatusBarText({
         root: workspace().uri.fsPath,
         environment: 'dev',
+        kernel: null,
         runtimeEnabled: true,
         trusted: true,
         source: { state: 'ready' },
         runtime: { state: 'partial' },
     }), '$(warning) Symfony');
+}
+
+async function testKernelValidation(): Promise<void> {
+    assert.equal(validateKernel(''), undefined);
+    assert.equal(validateKernel('App\\Kernel'), undefined);
+    assert.equal(validateKernel('bin/websiteconsole'), undefined);
+    assert.ok(validateKernel('../other/bin/console'));
+    assert.ok(validateKernel('/opt/app/bin/console'));
+    assert.ok(validateKernel('App Kernel'));
 }
 
 async function testIndexStatusPolling(): Promise<void> {
@@ -105,6 +117,7 @@ async function testIndexCommands(): Promise<void> {
     assert.ok(commands.includes('symfonyLsp.refreshIndex'));
     assert.ok(commands.includes('symfonyLsp.indexStatus'));
     assert.ok(commands.includes('symfonyLsp.switchEnvironment'));
+    assert.ok(commands.includes('symfonyLsp.switchKernel'));
 
     const statuses = await waitFor(
         () => vscode.commands.executeCommand<IndexStatus[]>('symfonyLsp.indexStatus'),
@@ -122,6 +135,14 @@ async function testIndexCommands(): Promise<void> {
 
     const switched = await vscode.commands.executeCommand<IndexStatus[]>('symfonyLsp.switchEnvironment', 'test', statuses[0].root);
     assert.equal(switched[0].environment, 'test');
+
+    const selectedKernel = await vscode.commands.executeCommand<IndexStatus[]>('symfonyLsp.switchKernel', 'App\\Kernel', statuses[0].root);
+    assert.equal(selectedKernel[0].kernel, 'App\\Kernel');
+    assert.equal(selectedKernel[0].runtime.state, 'ready');
+
+    const detectedKernel = await vscode.commands.executeCommand<IndexStatus[]>('symfonyLsp.switchKernel', '', statuses[0].root);
+    assert.equal(detectedKernel[0].kernel, null);
+    assert.equal(detectedKernel[0].runtime.state, 'ready');
 }
 
 async function testConfigurationChange(): Promise<void> {

@@ -47,7 +47,7 @@ require __DIR__.'/bridge/sections/doctrine.php';
 require __DIR__.'/bridge/sections/environment.php';
 require __DIR__.'/bridge/sections/console.php';
 
-$options = getopt('', ['project:', 'environment::', 'debug::', 'sections::', 'targeted-refresh::', 'rebuild-container::', 'error-details::', 'configuration-generation::', 'release-metadata-url:', 'release-metadata-cache:']);
+$options = getopt('', ['project:', 'environment::', 'kernel::', 'debug::', 'sections::', 'targeted-refresh::', 'rebuild-container::', 'error-details::', 'configuration-generation::', 'release-metadata-url:', 'release-metadata-cache:']);
 $project = $options['project'] ?? null;
 if (!is_string($project) || '' === $project) {
     fwrite(STDERR, "The --project option is required.\n");
@@ -80,6 +80,8 @@ if (!preg_match('/^(?:v)?([0-9]+\.[0-9]+)(?:\.|$)/', $version, $matches)) {
 
 $environmentOption = $options['environment'] ?? 'dev';
 $environment = is_string($environmentOption) ? $environmentOption : 'dev';
+$kernelOption = $options['kernel'] ?? null;
+$kernel = is_string($kernelOption) && '' !== $kernelOption ? $kernelOption : null;
 $debugOption = $options['debug'] ?? '1';
 $debug = !in_array($debugOption, ['0', 'false'], true);
 $requestedSections = $options['sections'] ?? '';
@@ -137,7 +139,7 @@ if (class_exists(Symfony\Component\Runtime\SymfonyRuntime::class)) {
     );
 }
 
-$context = new SymfonyLspBridgeContext($project, $environment, $debug, $targetedRefresh, $rebuildContainer, $errorDetails);
+$context = new SymfonyLspBridgeContext($project, $environment, $debug, $targetedRefresh, $rebuildContainer, $errorDetails, $kernel);
 $bootstrapMilliseconds = $elapsedMilliseconds($bridgeStartedAt);
 $kernelStartedAt = hrtime(true);
 $configurationValidation = $context->configurationValidation();

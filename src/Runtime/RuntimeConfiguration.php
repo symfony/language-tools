@@ -72,6 +72,17 @@ final class RuntimeConfiguration implements ProjectStateInterface
         $this->configureProject($project, $settings);
     }
 
+    public function setKernel(Project $project, ?string $kernel): void
+    {
+        $settings = $this->projectSettings[$project->rootPath] ?? [];
+        if (null === $kernel) {
+            unset($settings['kernel']);
+        } else {
+            $settings['kernel'] = $kernel;
+        }
+        $this->configureProject($project, $settings);
+    }
+
     public function removeProject(Project $project): void
     {
         unset($this->projectSettings[$project->rootPath]);
@@ -111,6 +122,13 @@ final class RuntimeConfiguration implements ProjectStateInterface
         $environment = $this->setting($project, 'environment', 'dev');
 
         return \is_string($environment) ? $environment : 'dev';
+    }
+
+    public function kernel(?Project $project = null): ?string
+    {
+        $kernel = $this->setting($project, 'kernel', null);
+
+        return \is_string($kernel) && '' !== $kernel ? $kernel : null;
     }
 
     public function debug(?Project $project = null): bool

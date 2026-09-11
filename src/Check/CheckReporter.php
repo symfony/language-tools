@@ -57,6 +57,7 @@ Options:
   --container-project-root=PATH    Override the container-side project root
   --no-container-project-root      Run the project PHP command on the host
   --environment=NAME               Override the Symfony environment
+  --kernel=CLASS|PATH              Select the kernel class or application entry point
   --debug, --no-debug              Enable or disable Symfony debug mode
   --runtime-indexing               Enable runtime indexing
   --no-runtime-indexing            Disable runtime indexing

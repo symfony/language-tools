@@ -20,6 +20,7 @@ use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Project\AnalysisSettings;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
@@ -73,6 +74,7 @@ final class IndexCommandHandlerTest extends TestCase
             new StatusRuntimeInitializer($runtime, $statuses, $projects),
             $statuses,
             $runtimeConfiguration,
+            new AnalysisSettings(),
         );
 
         $result = $handler->execute([
@@ -86,6 +88,7 @@ final class IndexCommandHandlerTest extends TestCase
             'source' => ['state' => 'ready'],
             'runtime' => ['state' => 'ready'],
             'environment' => 'dev',
+            'kernel' => null,
             'runtimeEnabled' => true,
             'trusted' => true,
         ]], $result);
@@ -109,6 +112,57 @@ final class IndexCommandHandlerTest extends TestCase
         self::assertFalse($untrusted[0]['trusted'] ?? null);
     }
 
+    public function testSwitchesTheAnalyzedKernelAndReturnsToAutomaticDetection(): void
+    {
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project(
+            $this->temporaryDirectory,
+            'file://'.$this->temporaryDirectory,
+        )]);
+        $statuses = new ProjectIndexStatusRegistry();
+        $runtime = new RecordingRuntimeInitializer();
+        $workspaceTrust = new WorkspaceTrust();
+        $workspaceTrust->set($project, TrustStatus::Trusted);
+        $runtimeConfiguration = new RuntimeConfiguration();
+        $handler = new IndexCommandHandler(
+            $projects,
+            $workspaceTrust,
+            $this->scanner($projects, $statuses),
+            new StatusRuntimeInitializer($runtime, $statuses, $projects),
+            $statuses,
+            $runtimeConfiguration,
+            new AnalysisSettings(),
+        );
+
+        $switched = $handler->execute([
+            'command' => IndexCommandHandler::SWITCH_KERNEL_COMMAND,
+            'arguments' => [$project->rootUri, 'Api\\Kernel'],
+        ]);
+
+        self::assertSame('Api\\Kernel', $runtimeConfiguration->kernel($project));
+        self::assertSame('Api\\Kernel', $switched[0]['kernel'] ?? null);
+        self::assertSame(RuntimeRefreshMode::Clear, $runtime->plans[0]->mode());
+
+        $entryPoint = $handler->execute([
+            'command' => IndexCommandHandler::SWITCH_KERNEL_COMMAND,
+            'arguments' => [$project->rootUri, './bin/websiteconsole'],
+        ]);
+        self::assertSame('bin/websiteconsole', $entryPoint[0]['kernel'] ?? null);
+
+        self::assertNull($handler->execute([
+            'command' => IndexCommandHandler::SWITCH_KERNEL_COMMAND,
+            'arguments' => [$project->rootUri, '../outside/bin/console'],
+        ]));
+        self::assertSame('bin/websiteconsole', $runtimeConfiguration->kernel($project));
+
+        $automatic = $handler->execute([
+            'command' => IndexCommandHandler::SWITCH_KERNEL_COMMAND,
+            'arguments' => [$project->rootUri, ''],
+        ]);
+        self::assertNull($runtimeConfiguration->kernel($project));
+        self::assertNull($automatic[0]['kernel'] ?? null);
+    }
+
     public function testRetriesManualRuntimeRefreshAfterAConfigurationChangeInvalidatesTheSnapshot(): void
     {
         $projects = new ProjectRegistry();
@@ -128,6 +182,7 @@ final class IndexCommandHandlerTest extends TestCase
             new StatusRuntimeInitializer($runtime, $statuses, $projects),
             $statuses,
             new RuntimeConfiguration(),
+            new AnalysisSettings(),
         );
 
         $result = $handler->execute([

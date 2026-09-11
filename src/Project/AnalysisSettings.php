@@ -10,6 +10,7 @@ final class AnalysisSettings
         'phpCommand',
         'containerProjectRoot',
         'environment',
+        'kernel',
         'debug',
         'runtimeIndexing',
         'releaseMetadata',
@@ -40,6 +41,7 @@ final class AnalysisSettings
                     'phpCommand' => $this->phpCommand($value, $context),
                     'containerProjectRoot' => $this->containerProjectRoot($value, $context),
                     'environment' => $this->environment($value, $context),
+                    'kernel' => $this->kernel($value, $context),
                     'debug', 'runtimeIndexing', 'releaseMetadata', 'translationDiagnostics' => $this->boolean($name, $value, $context),
                     'bridgeTimeout' => $this->positiveNumber($name, $value, $context),
                     'excludePaths' => $this->excludePaths($value, $context),
@@ -90,6 +92,30 @@ final class AnalysisSettings
         }
 
         return $value;
+    }
+
+    private function kernel(mixed $value, string $context): string
+    {
+        if (!\is_string($value) || '' === $value) {
+            throw new InvalidConfigurationException(\sprintf('The %s option "kernel" must be a kernel class name or a project-relative entry point path.', $context));
+        }
+
+        if (str_contains($value, '/') || str_ends_with($value, '.php')) {
+            while (str_starts_with($value, './')) {
+                $value = substr($value, 2);
+            }
+            if ('' === $value || Path::isAbsolute($value) || \in_array('..', explode('/', $value), true)) {
+                throw new InvalidConfigurationException(\sprintf('The %s option "kernel" must point to an entry point inside each Symfony project.', $context));
+            }
+
+            return $value;
+        }
+
+        if (!preg_match('/^\\\\?[A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*(?:\\\\[A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*)*$/D', $value)) {
+            throw new InvalidConfigurationException(\sprintf('The %s option "kernel" must be a kernel class name or a project-relative entry point path.', $context));
+        }
+
+        return ltrim($value, '\\');
     }
 
     private function boolean(string $name, mixed $value, string $context): bool

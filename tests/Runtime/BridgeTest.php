@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Tests\Support\Bridge\AutoloaderFixtureBuilder;
 use Symfony\Lsp\Tests\Support\Bridge\BridgeFixtureWorkspace;
 use Symfony\Lsp\Tests\Support\Bridge\BridgeProcessFixture;
+use Symfony\Lsp\Tests\Support\Bridge\BridgeProcessResult;
 use Symfony\Lsp\Tests\Support\Bridge\RouteFixtureBuilder;
 
 final class BridgeTest extends TestCase
@@ -421,6 +422,81 @@ PHP,
         self::assertIsArray($result['sections'] ?? null);
         self::assertIsArray($result['sections']['routes'] ?? null);
         self::assertTrue($result['sections']['routes']['complete']);
+    }
+
+    public function testBootsTheConfiguredKernelClassInsteadOfTheConventionalOne(): void
+    {
+        (new RouteFixtureBuilder($this->workspace))->writeMultiKernelApplication();
+
+        self::assertSame(['admin_dashboard'], $this->routeNames($this->bridge->run(['--sections=routes'])));
+        self::assertSame(['api_dashboard'], $this->routeNames($this->bridge->run(['--sections=routes', '--kernel=Api\Kernel'])));
+        self::assertSame(['api_dashboard'], $this->routeNames($this->bridge->run(['--sections=routes', '--kernel=\Api\Kernel'])));
+    }
+
+    public function testBootsTheConfiguredApplicationEntryPointWithoutTheRuntimeMarker(): void
+    {
+        (new RouteFixtureBuilder($this->workspace))->writeMultiKernelApplication();
+
+        self::assertStringNotContainsString('autoload_runtime.php', (string) file_get_contents($this->workspace->path.'/bin/apiconsole'));
+        self::assertSame(['api_dashboard'], $this->routeNames($this->bridge->run(['--sections=routes', '--kernel=bin/apiconsole'])));
+    }
+
+    #[DataProvider('unusableKernelProvider')]
+    public function testReportsUnusableConfiguredKernelsWithoutBootingAnotherOne(string $kernel, string $expectedCause): void
+    {
+        (new RouteFixtureBuilder($this->workspace))->writeMultiKernelApplication();
+
+        $process = $this->bridge->run(['--sections=routes', '--error-details=1', '--kernel='.$kernel]);
+
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        self::assertSame([], $result['sections']);
+        $errors = $result['errors'] ?? null;
+        self::assertIsArray($errors);
+        $error = $errors[0] ?? null;
+        self::assertIsArray($error);
+        self::assertSame('The application kernel could not be booted.', $error['message'] ?? null);
+        $cause = $error['cause'] ?? null;
+        self::assertIsArray($cause);
+        $chain = $cause['chain'] ?? null;
+        self::assertIsArray($chain);
+        $firstCause = $chain[0] ?? null;
+        self::assertIsArray($firstCause);
+        self::assertSame($expectedCause, $firstCause['message'] ?? null);
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function unusableKernelProvider(): iterable
+    {
+        yield 'unknown class' => ['Api\Missing', 'The configured kernel class "Api\Missing" does not exist.'];
+        yield 'class that is not a kernel' => ['Support\NotAKernel', 'The configured kernel class "Support\NotAKernel" is not a Symfony kernel.'];
+        yield 'missing entry point' => ['bin/webconsole', 'The configured application entry point "bin/webconsole" does not exist.'];
+        yield 'entry point without an application closure' => ['bin/no-closure.php', 'The configured application entry point "bin/no-closure.php" did not return a Symfony kernel. Expected a front controller returning the application closure of the Symfony Runtime.'];
+    }
+
+    /** @return list<string> */
+    private function routeNames(BridgeProcessResult $process): array
+    {
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors']);
+        $sections = $result['sections'] ?? null;
+        self::assertIsArray($sections);
+        $routes = $sections['routes'] ?? null;
+        self::assertIsArray($routes);
+        $items = $routes['items'] ?? null;
+        self::assertIsArray($items);
+
+        $names = [];
+        foreach ($items as $item) {
+            self::assertIsArray($item);
+            $name = $item['name'] ?? null;
+            self::assertIsString($name);
+            $names[] = $name;
+        }
+
+        return $names;
     }
 
     public function testRejectsVersionsWithoutAReleaseBranch(): void

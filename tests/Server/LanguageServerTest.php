@@ -57,6 +57,7 @@ final class LanguageServerTest extends TestCase
                                 'symfony.refreshIndex',
                                 'symfony.indexStatus',
                                 'symfony.switchEnvironment',
+                                'symfony.switchKernel',
                             ],
                         ],
                         'workspace' => [

@@ -259,6 +259,38 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertFileExists($this->temporaryDirectory.substr($processRunner->command[6], \strlen('/app')));
     }
 
+    public function testPassesTheConfiguredKernelToTheBridge(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $snapshot = new ProcessResult(0, json_encode([
+            'schemaVersion' => 1,
+            'sections' => [],
+        ], \JSON_THROW_ON_ERROR), '');
+        $processRunner = new CapturingProcessRunner($snapshot, $snapshot, $snapshot);
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $configuration = new RuntimeConfiguration();
+        $configuration->configure(['kernel' => 'Api\Kernel']);
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
+            $processRunner,
+            new RuntimeSnapshotLoaderRegistry([]),
+            self::projects($project),
+            configuration: $configuration,
+        );
+
+        $initializer->initialize($project);
+
+        self::assertSame('--kernel=Api\Kernel', $processRunner->command[4]);
+
+        $configuration->setKernel($project, 'bin/apiconsole');
+        $initializer->initialize($project);
+        self::assertSame('--kernel=bin/apiconsole', $processRunner->command[4]);
+
+        $configuration->setKernel($project, null);
+        $initializer->initialize($project);
+        self::assertNotContains('--kernel=bin/apiconsole', $processRunner->command);
+    }
+
     public function testRejectsRuntimeIndexingWithoutDebugMode(): void
     {
         $source = $this->temporaryDirectory.'/source.php';

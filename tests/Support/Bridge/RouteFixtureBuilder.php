@@ -202,6 +202,117 @@ PHP,
         ));
     }
 
+    /**
+     * Mirrors applications with several kernels sharing one Composer install,
+     * each reachable through its own front controller.
+     */
+    public function writeMultiKernelApplication(): void
+    {
+        $this->workspace->write('vendor/autoload.php', $this->prelude->render(<<<'PHP'
+            __INSTALLED_VERSIONS__
+            namespace Symfony\Component\HttpKernel;
+            interface KernelInterface
+            {
+            }
+            __CONSOLE_IO__
+            namespace Distribution;
+            final class Runtime
+            {
+                public function __construct(private array $options = []) {}
+                public function getResolver(\Closure $app): object
+                {
+                    return new class($app, $this->options) {
+                        public function __construct(private \Closure $app, private array $options) {}
+                        public function resolve(): array
+                        {
+                            return [$this->app, [['APP_ENV' => $this->options['env'] ?? 'prod', 'APP_DEBUG' => $this->options['debug'] ?? false]]];
+                        }
+                    };
+                }
+            }
+            final class ConsoleApplication
+            {
+                public function __construct(private object $kernel) {}
+                public function getKernel(): object { return $this->kernel; }
+            }
+            namespace Admin;
+            final class Kernel implements \Symfony\Component\HttpKernel\KernelInterface
+            {
+                public function __construct(public string $environment, public bool $debug) {}
+                public function shutdown(): void {}
+            }
+            namespace Api;
+            final class Kernel implements \Symfony\Component\HttpKernel\KernelInterface
+            {
+                public function __construct(public string $environment, public bool $debug) {}
+                public function shutdown(): void {}
+            }
+            namespace Support;
+            final class NotAKernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+            }
+            __FRAMEWORK_APPLICATION__
+            PHP,
+            applicationMembers: <<<'PHP'
+    public function run(object $input, object $output): int
+    {
+        $application = strtolower(substr($this->kernel::class, 0, strrpos($this->kernel::class, '\\')));
+        $output->write(json_encode([
+            $application.'_dashboard' => [
+                'path' => '/'.$application,
+                'method' => 'ANY',
+                'scheme' => 'ANY',
+                'host' => 'ANY',
+                'defaults' => [],
+            ],
+        ], JSON_THROW_ON_ERROR));
+
+        return 0;
+    }
+PHP,
+            applicationConstructor: <<<'PHP'
+public function __construct(private object $kernel) {}
+PHP,
+        ));
+        $this->workspace->write('composer.json', json_encode([
+            'autoload' => ['psr-4' => ['Admin\\' => 'src/Admin/', 'Api\\' => 'src/Api/']],
+            'extra' => ['runtime' => ['class' => 'Distribution\\Runtime']],
+        ], \JSON_THROW_ON_ERROR));
+        $this->workspace->makeDirectory('src/Admin');
+        $this->workspace->makeDirectory('src/Api');
+        $this->workspace->write('src/Admin/Kernel.php', '<?php');
+        $this->workspace->write('src/Api/Kernel.php', '<?php');
+        $this->workspace->write('vendor/autoload_runtime.php', <<<'PHP'
+            <?php
+            if (true === (require_once __DIR__.'/autoload.php')) {
+                return;
+            }
+            throw new RuntimeException('The runtime must not run when the autoloader is already loaded.');
+            PHP);
+        $this->workspace->makeDirectory('bin');
+        $this->workspace->write('bin/console.php', <<<'PHP'
+            <?php
+            require_once dirname(__DIR__).'/vendor/autoload_runtime.php';
+
+            $kernelClass ??= \Admin\Kernel::class;
+
+            return static function (array $context) use ($kernelClass): object {
+                return new \Distribution\ConsoleApplication(new $kernelClass($context['APP_ENV'], (bool) $context['APP_DEBUG']));
+            };
+            PHP);
+        $this->workspace->write('bin/apiconsole', <<<'PHP'
+            <?php
+            $kernelClass = \Api\Kernel::class;
+
+            return include __DIR__.'/console.php';
+            PHP);
+        $this->workspace->write('bin/no-closure.php', <<<'PHP'
+            <?php
+            return new \stdClass();
+            PHP);
+    }
+
     public function writeSharedKernelApplication(): void
     {
         $this->workspace->write('vendor/autoload.php', $this->prelude->render(<<<'PHP'

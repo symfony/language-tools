@@ -79,7 +79,10 @@ The command palette provides these commands:
 * ``Symfony Language Tools: Show Index Status`` reports each discovered
   application;
 * ``Symfony Language Tools: Switch Environment`` selects an environment and
-  rebuilds its runtime index.
+  rebuilds its runtime index;
+* ``Symfony Language Tools: Switch Kernel`` selects the kernel class or
+  application entry point to analyze and rebuilds its runtime index. Leave the
+  input empty to detect the kernel again.
 
 Configuration
 -------------
@@ -125,7 +128,9 @@ Keep that server enabled for PHP diagnostics, types and general completion.
 Run ``Developer: Reload Window`` after changing ``symfonyLsp.serverPath`` or
 ``symfonyLsp.memoryLimit``. Use
 ``Symfony Language Tools: Switch Environment`` to change the active environment
-without restarting the extension.
+without restarting the extension, and
+``Symfony Language Tools: Switch Kernel`` for applications with several
+kernels. The status bar details report the selected kernel when one is set.
 
 Troubleshooting
 ---------------

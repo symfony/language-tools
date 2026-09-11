@@ -218,6 +218,7 @@ final class RuntimeSnapshotStore
             'phpCommand' => $this->configuration->phpCommand($project),
             'containerProjectRoot' => $this->configuration->containerProjectRoot($project),
             'environment' => $this->configuration->environment($project),
+            'kernel' => $this->configuration->kernel($project),
             'debug' => $this->configuration->debug($project),
         ]);
 

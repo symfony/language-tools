@@ -5,6 +5,7 @@ import { LanguageClient, State } from 'vscode-languageclient/node';
 const refreshCommand = 'symfony.refreshIndex';
 const statusCommand = 'symfony.indexStatus';
 const switchEnvironmentCommand = 'symfony.switchEnvironment';
+const switchKernelCommand = 'symfony.switchKernel';
 
 interface IndexSection {
     state: string;
@@ -20,10 +21,26 @@ export function indexStatusPollingEnabled(state: State): boolean {
 export interface IndexStatus {
     root: string;
     environment: string;
+    kernel: string | null;
     runtimeEnabled: boolean;
     trusted: boolean;
     source: IndexSection;
     runtime: IndexSection;
+}
+
+export function validateKernel(value: string): string | undefined {
+    if ('' === value) {
+        return undefined;
+    }
+    if (value.includes('/') || value.endsWith('.php')) {
+        return value.startsWith('/') || value.split('/').includes('..')
+            ? 'Use a path inside the application, such as bin/console-api.'
+            : undefined;
+    }
+
+    return /^\\?[A-Za-z_][A-Za-z0-9_]*(\\[A-Za-z_][A-Za-z0-9_]*)*$/.test(value)
+        ? undefined
+        : 'Use a kernel class name, such as Api\\Kernel, or an entry point path, such as bin/console-api.';
 }
 
 export function indexStatusBarText(status: IndexStatus): string {
@@ -70,6 +87,7 @@ export class IndexStatusController implements vscode.Disposable {
             vscode.commands.registerCommand('symfonyLsp.refreshIndex', () => this.execute(refreshCommand)),
             vscode.commands.registerCommand('symfonyLsp.indexStatus', () => this.showStatus()),
             vscode.commands.registerCommand('symfonyLsp.switchEnvironment', (environment?: string, root?: string) => this.switchEnvironment(environment, root)),
+            vscode.commands.registerCommand('symfonyLsp.switchKernel', (kernel?: string, root?: string) => this.switchKernel(kernel, root)),
             vscode.window.onDidChangeActiveTextEditor(() => this.render()),
             vscode.workspace.onDidSaveTextDocument(() => this.scheduleRefresh()),
             this.client.onDidChangeState(({ newState }) => this.handleClientState(newState)),
@@ -154,6 +172,20 @@ export class IndexStatusController implements vscode.Disposable {
         return this.execute(switchEnvironmentCommand, [root ?? current?.root ?? null, selectedEnvironment]);
     }
 
+    private async switchKernel(kernel?: string, root?: string): Promise<IndexStatus[] | undefined> {
+        const current = this.currentStatus();
+        const selectedKernel = kernel ?? await vscode.window.showInputBox({
+            prompt: 'Kernel class or application entry point used for runtime indexing; leave empty to detect it automatically',
+            value: current?.kernel ?? '',
+            validateInput: validateKernel,
+        });
+        if (undefined === selectedKernel) {
+            return undefined;
+        }
+
+        return this.execute(switchKernelCommand, [root ?? current?.root ?? null, selectedKernel]);
+    }
+
     private scheduleRefresh(): void {
         if (!indexStatusPollingEnabled(this.client.state)) {
             return;
@@ -236,7 +268,8 @@ export class IndexStatusController implements vscode.Disposable {
         if ('stale' === status.runtime.state && status.runtime.lastSuccessfulAt) {
             details.unshift(`Last successful runtime index: ${status.runtime.lastSuccessfulAt}.`);
         }
-        const summary = `${status.root}: source ${status.source.state}, runtime ${runtime}, environment ${status.environment}`;
+        const kernel = status.kernel ? `, kernel ${status.kernel}` : '';
+        const summary = `${status.root}: source ${status.source.state}, runtime ${runtime}, environment ${status.environment}${kernel}`;
 
         return 0 === details.length ? summary : `${summary}. ${details.join(' ')}`;
     }

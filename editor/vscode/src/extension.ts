@@ -162,6 +162,7 @@ export function configuredAnalysisOptions(configuration: vscode.WorkspaceConfigu
         'phpCommand',
         'containerProjectRoot',
         'environment',
+        'kernel',
         'debug',
         'runtimeIndexing',
         'releaseMetadata',

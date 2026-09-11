@@ -177,6 +177,8 @@ final class RuntimeSnapshotStoreTest extends TestCase
         $containerRoot->configure(['containerProjectRoot' => '/app']);
         $environment = new RuntimeConfiguration();
         $environment->configure(['environment' => 'test']);
+        $kernel = new RuntimeConfiguration();
+        $kernel->configure(['kernel' => 'Api\Kernel']);
         $debug = new RuntimeConfiguration();
         $debug->configure(['debug' => false]);
 
@@ -185,6 +187,7 @@ final class RuntimeSnapshotStoreTest extends TestCase
             'PHP command' => [$this->project, $phpCommand],
             'container project root' => [$this->project, $containerRoot],
             'environment' => [$this->project, $environment],
+            'kernel' => [$this->project, $kernel],
             'debug' => [$this->project, $debug],
         ] as $dimension => [$project, $changedConfiguration]) {
             self::assertNull(

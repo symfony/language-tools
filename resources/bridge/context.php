@@ -24,6 +24,7 @@ final class SymfonyLspBridgeContext
         private bool $targetedRefresh,
         private bool $rebuildContainer,
         private bool $errorDetails,
+        private ?string $configuredKernel = null,
     ) {
     }
 
@@ -174,6 +175,10 @@ final class SymfonyLspBridgeContext
 
     private function bootKernel(): object
     {
+        if (null !== $this->configuredKernel) {
+            return $this->boot($this->selectedKernel($this->configuredKernel));
+        }
+
         $kernelClass = $this->conventionalKernelClass();
         if (null === $kernelClass) {
             $kernel = $this->frontControllerKernel();
@@ -194,6 +199,42 @@ final class SymfonyLspBridgeContext
             }
 
             return $this->boot($kernel);
+        }
+    }
+
+    /*
+     * An explicit selection never falls back to another kernel: booting a
+     * different application than the configured one would hide the mistake.
+     */
+    private function selectedKernel(string $kernel): object
+    {
+        if (str_contains($kernel, '/') || str_ends_with($kernel, '.php')) {
+            $path = rtrim($this->project, '/\\').'/'.ltrim($kernel, '/');
+            if (!is_file($path)) {
+                throw new RuntimeException(sprintf('The configured application entry point "%s" does not exist.', $kernel));
+            }
+            $instance = $this->entryPointKernel($path);
+            if (null === $instance) {
+                throw new RuntimeException(sprintf('The configured application entry point "%s" did not return a Symfony kernel. Expected a front controller returning the application closure of the Symfony Runtime.', $kernel));
+            }
+
+            return $instance;
+        }
+
+        $class = ltrim($kernel, '\\');
+        if (!class_exists($class)) {
+            throw new RuntimeException(sprintf('The configured kernel class "%s" does not exist.', $class));
+        }
+        if (interface_exists(Symfony\Component\HttpKernel\KernelInterface::class)
+            && !is_subclass_of($class, Symfony\Component\HttpKernel\KernelInterface::class)
+        ) {
+            throw new RuntimeException(sprintf('The configured kernel class "%s" is not a Symfony kernel.', $class));
+        }
+
+        try {
+            return new $class($this->environment, $this->debug);
+        } catch (Throwable $error) {
+            throw new RuntimeException(sprintf('The configured kernel class "%s" could not be created with an environment and a debug flag. Configure the application entry point instead, such as "bin/console".', $class), 0, $error);
         }
     }
 
@@ -270,31 +311,35 @@ final class SymfonyLspBridgeContext
                 continue;
             }
             $contents = @file_get_contents($path);
+            // an unattended scan only includes scripts that declare the convention themselves
             if (false === $contents || !str_contains($contents, 'autoload_runtime.php')) {
                 continue;
             }
-            $argv = $_SERVER['argv'] ?? null;
-            // front controllers parse argv, which must not expose the bridge options
-            $_SERVER['argv'] = [$path];
-            try {
-                $app = require $path;
-                if (!$app instanceof Closure) {
-                    continue;
-                }
-                $kernel = $this->resolveRuntimeApplication($app);
-            } finally {
-                if (null === $argv) {
-                    unset($_SERVER['argv']);
-                } else {
-                    $_SERVER['argv'] = $argv;
-                }
-            }
+            $kernel = $this->entryPointKernel($path);
             if (null !== $kernel) {
                 return $kernel;
             }
         }
 
         return null;
+    }
+
+    private function entryPointKernel(string $path): ?object
+    {
+        $argv = $_SERVER['argv'] ?? null;
+        // front controllers parse argv, which must not expose the bridge options
+        $_SERVER['argv'] = [$path];
+        try {
+            $app = require $path;
+
+            return $app instanceof Closure ? $this->resolveRuntimeApplication($app) : null;
+        } finally {
+            if (null === $argv) {
+                unset($_SERVER['argv']);
+            } else {
+                $_SERVER['argv'] = $argv;
+            }
+        }
     }
 
     private function resolveRuntimeApplication(Closure $app): ?object

@@ -88,6 +88,12 @@
         "title": "Switch Environment",
         "category": "Symfony Language Tools",
         "icon": "$(server-environment)"
+      },
+      {
+        "command": "symfonyLsp.switchKernel",
+        "title": "Switch Kernel",
+        "category": "Symfony Language Tools",
+        "icon": "$(symbol-class)"
       }
     ],
     "configuration": {
@@ -122,6 +128,11 @@
           "type": "string",
           "scope": "resource",
           "description": "Symfony environment used for runtime indexing. The built-in default is dev."
+        },
+        "symfonyLsp.kernel": {
+          "type": "string",
+          "scope": "resource",
+          "description": "Kernel class name, such as Api\\Kernel, or project-relative application entry point, such as bin/console-api, used for runtime indexing. The built-in default detects the kernel automatically."
         },
         "symfonyLsp.debug": {
           "type": "boolean",
