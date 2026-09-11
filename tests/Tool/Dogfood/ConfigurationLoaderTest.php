@@ -47,6 +47,7 @@ final class ConfigurationLoaderTest extends TestCase
         self::assertSame(self::REVISION, $configuration->revision);
         self::assertNull($configuration->directory);
         self::assertSame('dev', $configuration->environment);
+        self::assertNull($configuration->kernel);
         self::assertSame([], $configuration->environmentVariables);
         self::assertSame('composer', $configuration->setup);
         self::assertTrue($configuration->ci);
@@ -63,6 +64,35 @@ final class ConfigurationLoaderTest extends TestCase
         $this->write('coreshop.json', array_merge($this->valid(), ['analysisMode' => 'source-only']));
 
         self::assertSame('source-only', (new ConfigurationLoader())->load([$this->directory], ['composer'])[0]->analysisMode);
+    }
+
+    #[DataProvider('kernelProvider')]
+    public function testLoadsAnExplicitKernel(string $kernel): void
+    {
+        $this->write('application.json', $this->valid() + ['kernel' => $kernel]);
+
+        self::assertSame($kernel, (new ConfigurationLoader())->load([$this->directory], ['composer'])[0]->kernel);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function kernelProvider(): iterable
+    {
+        yield 'class' => ['App\\Kernel'];
+        yield 'fully qualified class' => ['\\App\\Kernel'];
+        yield 'global class' => ['AppKernel'];
+        yield 'unicode class' => ['Application\\NoyauÉté'];
+        yield 'extensionless entry point' => ['bin/websiteconsole'];
+        yield 'php entry point' => ['website.php'];
+        yield 'explicit relative entry point' => ['./public/index.php'];
+    }
+
+    public function testRejectsAnExplicitNullKernel(): void
+    {
+        file_put_contents($this->directory.'/app.json', json_encode($this->valid() + ['kernel' => null], \JSON_THROW_ON_ERROR));
+        $this->expectException(ConfigurationException::class);
+        $this->expectExceptionMessage('"kernel"');
+
+        (new ConfigurationLoader())->load([$this->directory], ['composer']);
     }
 
     public function testLoadsFullConfiguration(): void
@@ -207,6 +237,19 @@ final class ConfigurationLoaderTest extends TestCase
         yield 'absolute directory' => [['directory' => '/srv'], 'relative path inside the repository'];
         yield 'parent directory' => [['directory' => '../other'], 'relative path inside the repository'];
         yield 'invalid environment' => [['environment' => 'dev; rm'], 'simple environment name'];
+        yield 'empty kernel' => [['kernel' => ''], 'kernel class name or a project-relative entry point path'];
+        yield 'boolean kernel' => [['kernel' => false], 'kernel class name or a project-relative entry point path'];
+        yield 'array kernel' => [['kernel' => ['App\\Kernel']], 'kernel class name or a project-relative entry point path'];
+        yield 'invalid kernel class' => [['kernel' => 'App\\123Kernel'], 'kernel class name or a project-relative entry point path'];
+        yield 'kernel class trailing newline' => [['kernel' => "App\\Kernel\n"], 'kernel class name or a project-relative entry point path'];
+        yield 'null byte kernel path' => [['kernel' => "bin/website\0console"], 'kernel class name or a project-relative entry point path'];
+        yield 'absolute kernel path' => [['kernel' => '/app/console.php'], 'relative path inside the project'];
+        yield 'windows absolute kernel path' => [['kernel' => 'C:\\app\\console.php'], 'relative path inside the project'];
+        yield 'unc kernel path' => [['kernel' => '\\\\server\\app\\console.php'], 'relative path inside the project'];
+        yield 'parent kernel path' => [['kernel' => '../bin/console'], 'relative path inside the project'];
+        yield 'nested parent kernel path' => [['kernel' => 'bin/../console.php'], 'relative path inside the project'];
+        yield 'windows parent kernel path' => [['kernel' => 'bin\\..\\console.php'], 'relative path inside the project'];
+        yield 'url kernel path' => [['kernel' => 'file:///app/console.php'], 'relative path inside the project'];
         yield 'environment variable list' => [['environmentVariables' => ['DATABASE_URL']], 'map of environment variable names to string values'];
         yield 'invalid environment variable name' => [['environmentVariables' => ['database-url' => 'value']], 'map of environment variable names to string values'];
         yield 'non-string environment variable' => [['environmentVariables' => ['DATABASE_URL' => 42]], 'map of environment variable names to string values'];

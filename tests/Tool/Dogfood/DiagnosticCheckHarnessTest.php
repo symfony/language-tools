@@ -60,6 +60,26 @@ final class DiagnosticCheckHarnessTest extends TestCase
         self::assertSame(1234.5, $result->toArray()['profileMilliseconds']);
     }
 
+    #[DataProvider('kernelProvider')]
+    public function testForwardsOnlyExplicitKernels(?string $kernel): void
+    {
+        $result = $this->check(self::report(), configuration: self::configuration(['kernel' => $kernel]));
+
+        self::assertTrue($result->ok());
+        self::assertSame(null === $kernel ? [] : ['--kernel='.$kernel], array_values(array_filter(
+            $this->processes->calls[0]['command'], static fn (string $argument): bool => str_starts_with($argument, '--kernel='),
+        )));
+        self::assertContains('--environment=prod', $this->processes->calls[0]['command']);
+    }
+
+    /** @return iterable<string, array{string|null}> */
+    public static function kernelProvider(): iterable
+    {
+        yield 'not configured' => [null];
+        yield 'class' => ['Api\\Kernel'];
+        yield 'entry point' => ['bin/websiteconsole'];
+    }
+
     public function testChecksSourceOnlyProjectsWithoutRuntimeIndexing(): void
     {
         $result = $this->check(self::sourceOnlyReport(), configuration: self::configuration(['analysisMode' => 'source-only']));
@@ -333,7 +353,7 @@ final class DiagnosticCheckHarnessTest extends TestCase
         return $harness->run($configuration ?? self::configuration(), $applicationRoot ?? $this->directory);
     }
 
-    /** @param array{indexTimeout?: int, analysisMode?: 'runtime'|'source-only'} $overrides */
+    /** @param array{indexTimeout?: int, analysisMode?: 'runtime'|'source-only', kernel?: string|null} $overrides */
     private static function configuration(array $overrides = []): ProjectConfiguration
     {
         return new ProjectConfiguration(
@@ -347,6 +367,7 @@ final class DiagnosticCheckHarnessTest extends TestCase
             $overrides['indexTimeout'] ?? 120,
             environmentVariables: ['DATABASE_URL' => 'mysql://root@127.0.0.1:9/app'],
             analysisMode: $overrides['analysisMode'] ?? 'runtime',
+            kernel: $overrides['kernel'] ?? null,
         );
     }
 

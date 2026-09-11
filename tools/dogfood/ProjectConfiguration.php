@@ -32,6 +32,7 @@ final class ProjectConfiguration
         public readonly string $analysisMode = 'runtime',
         public readonly int $checkCpuBudget = 60,
         public readonly int $coldRunCpuBudget = 120,
+        public readonly ?string $kernel = null,
     ) {
     }
 }

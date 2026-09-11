@@ -66,6 +66,7 @@ final class DiagnosticCheckHarness
             'source-only' === $configuration->analysisMode ? '--source-only' : '--runtime-indexing',
             '--workspace='.$applicationRoot,
             '--environment='.$configuration->environment,
+            ...(null === $configuration->kernel ? [] : ['--kernel='.$configuration->kernel]),
             '--bridge-timeout='.$configuration->indexTimeout,
             '--timeout='.$this->checkTimeout($configuration),
         ];

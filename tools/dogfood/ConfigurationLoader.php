@@ -5,7 +5,7 @@ namespace Symfony\Lsp\Tools\Dogfood;
 final class ConfigurationLoader
 {
     private const VERSION = 1;
-    private const KEYS = ['version', 'repository', 'revision', 'directory', 'environment', 'environmentVariables', 'setup', 'ci', 'indexTimeout', 'requestTimeout', 'checkCpuBudget', 'coldRunCpuBudget', 'allowPlugins', 'ignorePlatformRequirements', 'setupChanges', 'analysisMode'];
+    private const KEYS = ['version', 'repository', 'revision', 'directory', 'environment', 'kernel', 'environmentVariables', 'setup', 'ci', 'indexTimeout', 'requestTimeout', 'checkCpuBudget', 'coldRunCpuBudget', 'allowPlugins', 'ignorePlatformRequirements', 'setupChanges', 'analysisMode'];
     private const ANALYSIS_MODES = ['runtime', 'source-only'];
     private const DEFAULT_INDEX_TIMEOUT = 120;
     private const MAX_INDEX_TIMEOUT = 900;
@@ -89,6 +89,7 @@ final class ConfigurationLoader
             $this->analysisMode($data, $file),
             $this->budget($data, 'checkCpuBudget', $file),
             $this->budget($data, 'coldRunCpuBudget', $file),
+            $this->kernel($data, $file),
         );
     }
 
@@ -179,6 +180,29 @@ final class ConfigurationLoader
         }
 
         return $environment;
+    }
+
+    /**
+     * @param array<array-key, mixed> $data
+     */
+    private function kernel(array $data, string $file): ?string
+    {
+        if (!\array_key_exists('kernel', $data)) {
+            return null;
+        }
+        $kernel = $data['kernel'];
+        if (!\is_string($kernel) || '' === $kernel || str_contains($kernel, "\0")) {
+            throw new ConfigurationException(\sprintf('The "kernel" in "%s" must be a kernel class name or a project-relative entry point path.', $file));
+        }
+        if (str_contains($kernel, '/') || str_ends_with($kernel, '.php')) {
+            if (1 === preg_match('{^[/\\\\]|^[A-Za-z][A-Za-z0-9+.-]*:|(?:^|[/\\\\])\.\.(?:[/\\\\]|$)}', $kernel)) {
+                throw new ConfigurationException(\sprintf('The "kernel" in "%s" must be a relative path inside the project.', $file));
+            }
+        } elseif (1 !== preg_match('/^\\\\?[A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*(?:\\\\[A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*)*$/D', $kernel)) {
+            throw new ConfigurationException(\sprintf('The "kernel" in "%s" must be a kernel class name or a project-relative entry point path.', $file));
+        }
+
+        return $kernel;
     }
 
     /**

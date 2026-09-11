@@ -16,9 +16,10 @@ use Symfony\Lsp\Tools\Dogfood\ServerHarness;
 use Symfony\Lsp\Tools\Dogfood\Utf16Positions;
 use Symfony\Lsp\Tools\Dogfood\WorkspaceEditApplier;
 
-const USAGE = "Usage: dogfood-server --scenarios=FILE [--revision=COMMIT] [--environment=ENV] [--index-timeout=SECONDS] [--request-timeout=SECONDS] [--source-only] <server> <project>\n";
+const USAGE = "Usage: dogfood-server --scenarios=FILE [--revision=COMMIT] [--environment=ENV] [--kernel=VALUE] [--index-timeout=SECONDS] [--request-timeout=SECONDS] [--source-only] <server> <project>\n";
 
 $environment = 'dev';
+$kernel = null;
 $sourceOnly = false;
 $indexTimeout = 30.0;
 $requestTimeout = 10.0;
@@ -28,6 +29,8 @@ $positional = [];
 foreach (array_slice($argv, 1) as $argument) {
     if (preg_match('/^--environment=(.+)$/', $argument, $matches)) {
         $environment = $matches[1];
+    } elseif (preg_match('/^--kernel=(.+)$/', $argument, $matches)) {
+        $kernel = $matches[1];
     } elseif (preg_match('/^--index-timeout=(\d+)$/', $argument, $matches)) {
         $indexTimeout = (float) $matches[1];
     } elseif (preg_match('/^--request-timeout=(\d+)$/', $argument, $matches)) {
@@ -115,7 +118,12 @@ try {
         'rootUri' => uri($project),
         'workspaceFolders' => [['uri' => uri($project), 'name' => basename($project)]],
         'capabilities' => new stdClass(),
-        'initializationOptions' => ['workspaceTrust' => true, 'runtimeIndexing' => !$sourceOnly, 'environment' => $environment],
+        'initializationOptions' => [
+            'workspaceTrust' => true,
+            'runtimeIndexing' => !$sourceOnly,
+            'environment' => $environment,
+            ...(null === $kernel ? [] : ['kernel' => $kernel]),
+        ],
     ], 10.0);
     $timings['initializeMilliseconds'] = $elapsedMilliseconds($initializeStartedAt);
     $report['serverVersion'] = $initialize['result']['serverInfo']['version'] ?? null;

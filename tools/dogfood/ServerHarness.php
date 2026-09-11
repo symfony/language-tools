@@ -36,6 +36,7 @@ final class ServerHarness implements HarnessInterface
             \PHP_BINARY,
             $this->harnessPath,
             '--environment='.$configuration->environment,
+            ...(null === $configuration->kernel ? [] : ['--kernel='.$configuration->kernel]),
             '--index-timeout='.$configuration->indexTimeout,
             '--request-timeout='.$configuration->requestTimeout,
             '--scenarios='.$configuration->scenarioFile,

@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Tool\Dogfood;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
@@ -231,6 +232,38 @@ final class DogfoodServerTest extends TestCase
         self::assertSame('runtime', $report['analysisMode']);
         self::assertSame('passed', $report['outcome']);
         self::assertTrue($this->initializationOptions($server)['runtimeIndexing'] ?? null);
+    }
+
+    #[DataProvider('kernelProvider')]
+    public function testInitializesOnlyExplicitKernels(?string $kernel): void
+    {
+        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+            ['method' => 'textDocument/completion', 'result' => [['label' => 'hello/index.html.twig']]],
+        ]]);
+        $result = $this->execute([
+            '--scenarios='.$this->manifest(),
+            '--environment=test',
+            ...(null === $kernel ? [] : ['--kernel='.$kernel]),
+            $server->path,
+            $this->project,
+        ]);
+
+        self::assertSame(0, $result->exitCode, $result->errorOutput);
+        self::assertSame('passed', $this->report($result)['outcome']);
+        self::assertSame([
+            'workspaceTrust' => true,
+            'runtimeIndexing' => true,
+            'environment' => 'test',
+            ...(null === $kernel ? [] : ['kernel' => $kernel]),
+        ], $this->initializationOptions($server));
+    }
+
+    /** @return iterable<string, array{string|null}> */
+    public static function kernelProvider(): iterable
+    {
+        yield 'not configured' => [null];
+        yield 'class' => ['Api\\Kernel'];
+        yield 'entry point' => ['bin/websiteconsole'];
     }
 
     public function testKeepsTheProcessSuccessfulWhenScenariosFail(): void

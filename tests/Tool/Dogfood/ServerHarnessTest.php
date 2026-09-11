@@ -95,6 +95,37 @@ final class ServerHarnessTest extends TestCase
         yield 'source-only' => ['source-only', true];
     }
 
+    #[DataProvider('kernelProvider')]
+    public function testForwardsOnlyExplicitKernels(?string $kernel): void
+    {
+        $manifest = $this->directory.'/scenarios.json';
+        file_put_contents($manifest, json_encode([
+            'version' => 1, 'revision' => str_repeat('a', 40), 'diagnostics' => [],
+            'scenarios' => [['id' => 'route.twig', 'file' => 'templates/index.html.twig', 'anchor' => 'home', 'expect' => ['completion' => ['includes' => ['home']]]]],
+        ], \JSON_THROW_ON_ERROR));
+        $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '{}', '', false));
+        $configuration = new ProjectConfiguration(
+            'application', 'https://example.com/application.git', str_repeat('a', 40), null, 'dev', 'composer', false, 20,
+            scenarioFile: $manifest,
+            kernel: $kernel,
+        );
+
+        (new ServerHarness($processes, '/tools/dogfood-server', '/bin/symfony-lsp'))->run($configuration, $this->directory);
+
+        self::assertSame(null === $kernel ? [] : ['--kernel='.$kernel], array_values(array_filter(
+            $processes->calls[0]['command'], static fn (string $argument): bool => str_starts_with($argument, '--kernel='),
+        )));
+        self::assertContains('--environment=dev', $processes->calls[0]['command']);
+    }
+
+    /** @return iterable<string, array{string|null}> */
+    public static function kernelProvider(): iterable
+    {
+        yield 'not configured' => [null];
+        yield 'class' => ['Api\\Kernel'];
+        yield 'entry point' => ['bin/websiteconsole'];
+    }
+
     public function testMissingManifestNeverStartsTheProcess(): void
     {
         $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '{}', '', false));
