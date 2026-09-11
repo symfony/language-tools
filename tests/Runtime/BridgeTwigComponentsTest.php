@@ -60,6 +60,29 @@ final class BridgeTwigComponentsTest extends TestCase
         self::assertSame(['Alert', 'Form:Input', 'acme:Badge', 'ux:icon'], $section['names']);
     }
 
+    public function testClearsTheTwigComponentsSectionWhenTheBundleIsNotRegistered(): void
+    {
+        (new TwigComponentFixtureBuilder($this->workspace))->writeTwigComponentApplication(bundleRegistered: false);
+
+        $process = $this->bridge->run(['--sections=twig_components']);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors']);
+        $sections = $result['sections'] ?? [];
+        self::assertIsArray($sections);
+        $section = $sections['twig_components'] ?? null;
+        self::assertIsArray($section);
+        self::assertSame([
+            'complete' => true,
+            'names' => [],
+            'caseInsensitiveNames' => [],
+            'anonymousTemplateDirectory' => 'components',
+            'warnings' => [],
+        ], array_diff_key($section, ['generation' => true]));
+    }
+
     public function testClearsTheTwigComponentsSectionWithoutTheComponentPackage(): void
     {
         (new RouteFixtureBuilder($this->workspace))->writeRouteApplication();

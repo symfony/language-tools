@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Skip Twig component runtime metadata when the application kernel doesn't register the bundle
 - Keep release and packaging output in order when it is redirected to a file
 
 ## 0.20.1 (2026-09-10)

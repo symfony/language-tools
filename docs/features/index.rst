@@ -281,6 +281,9 @@ If a runtime-backed feature returns no results, verify that:
 * ``vendor/autoload.php`` exists;
 * the application kernel boots through one of the supported conventions in the
   configured environment;
+* the bundle that provides the integration is registered in that kernel: a
+  package installed by Composer contributes no runtime information to a kernel
+  that doesn't register its bundle;
 * the configured PHP command is compatible with the application;
 * ``containerProjectRoot`` matches the container-side project path when the
   PHP command runs in Docker (see `Docker support`_);

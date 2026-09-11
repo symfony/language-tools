@@ -2,17 +2,24 @@
 
 function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
 {
-    if (!class_exists(Symfony\UX\TwigComponent\ComponentFactory::class)) {
-        $section = [
+    $enabled = false;
+    if (class_exists(Symfony\UX\TwigComponent\ComponentFactory::class)) {
+        try {
+            $enabled = $context->hasExtension('twig_component');
+        } catch (Throwable $error) {
+            $context->addError('twig_components', $error);
+
+            return null;
+        }
+    }
+    if (!$enabled) {
+        return symfonyLspBridgeFinalizeSection([
             'complete' => true,
             'names' => [],
             'caseInsensitiveNames' => [],
             'anonymousTemplateDirectory' => 'components',
             'warnings' => [],
-        ];
-        $section['generation'] = hash('sha256', json_encode($section, JSON_THROW_ON_ERROR));
-
-        return $section;
+        ]);
     }
     if (!class_exists(Symfony\Component\Console\Input\ArrayInput::class)
         || !class_exists(Symfony\Component\Console\Output\BufferedOutput::class)

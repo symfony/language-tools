@@ -11,6 +11,7 @@ final class SymfonyLspBridgeContext
 
     private ?object $kernel = null;
     private ?object $application = null;
+    private ?array $extensionAliases = null;
     private ?SymfonyLspBridgeEffectiveConfiguration $effectiveConfiguration = null;
     private ?Throwable $kernelError = null;
     private bool $kernelErrorReported = false;
@@ -54,6 +55,31 @@ final class SymfonyLspBridgeContext
             '--no-debug' => !$this->debug,
             '--no-interaction' => true,
         ];
+    }
+
+    // a Composer-installed package is configurable only when a bundle the analyzed kernel registers declares its extension
+    public function hasExtension(string $alias): bool
+    {
+        if (null === $this->extensionAliases) {
+            $aliases = [];
+            $kernel = $this->kernel();
+            foreach (method_exists($kernel, 'getBundles') ? $kernel->getBundles() : [] as $bundle) {
+                try {
+                    $extension = is_object($bundle) && method_exists($bundle, 'getContainerExtension')
+                        ? $bundle->getContainerExtension()
+                        : null;
+                    $name = is_object($extension) && method_exists($extension, 'getAlias') ? $extension->getAlias() : null;
+                } catch (Throwable) {
+                    continue;
+                }
+                if (is_string($name) && '' !== $name) {
+                    $aliases[$name] = true;
+                }
+            }
+            $this->extensionAliases = $aliases;
+        }
+
+        return isset($this->extensionAliases[$alias]);
     }
 
     public function configuration(string $name, ?string $path = null): mixed
