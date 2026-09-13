@@ -3,85 +3,213 @@
 namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Parser\JavaScript\JavaScriptToken;
+use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenKind;
+use Symfony\Lsp\Parser\JavaScript\JavaScriptTokens;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathPolicy;
 use Symfony\Lsp\Project\ProjectPathResolver;
 
 final class StimulusControllerExtractor
 {
-    private const LAZY_COMMENT_PATTERN = '/\/\*!?\s*stimulusFetch:\s*[\'"]lazy[\'"]\s*\*\/|\/\/\s*stimulusFetch:\s*[\'"]lazy[\'"]/i';
+    private const LAZY_COMMENT_PATTERN = '/^\/[\/*]!?\s*stimulusFetch:\s*[\'"]lazy[\'"]/i';
     private const LIFECYCLE_METHODS = ['connect', 'constructor', 'disconnect', 'initialize'];
-    private const APPLICATION_FACTORY_PATTERN = '/(?:^|[^.\w$])([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?:await\s+)?(?:startStimulusApp|Application\s*\.\s*start)\s*\(/';
-    private const REGISTRATION_PATTERN = '/(?:^|[^.\w$])((?:this\s*\.\s*)?[A-Za-z_$][A-Za-z0-9_$]*)\s*\.\s*register\s*\(\s*([\'"])([^\'"]+)\2\s*,/';
     private const APPLICATION_IDENTIFIERS = ['application', 'this.application'];
+    private const MEMBER_ARRAYS = ['targets' => StimulusMemberKind::Target, 'outlets' => StimulusMemberKind::Outlet, 'classes' => StimulusMemberKind::ClassName];
 
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly ProjectPathResolver $pathResolver,
-        private readonly JavaScriptSourceAnalyzer $codeMasker,
         private readonly StimulusControllerNameNormalizer $controllerNameNormalizer,
     ) {
     }
 
     /** @return list<StimulusControllerDeclaration> */
-    public function extract(Project $project, string $uri, string $text): array
+    public function extract(Project $project, string $uri, string $text, JavaScriptTokens $tokens): array
     {
-        $code = $this->codeMasker->mask($text);
         $name = $this->controllerName($project, $uri);
         if (null === $name) {
-            return $this->registrations($project, $uri, $text, $code);
+            return $this->registrations($project, $uri, $text, $tokens);
         }
 
-        $members = [];
-        $declarationOffset = 0;
-        $declarationLength = 0;
-        if (null !== $class = $this->exportedClass($code)) {
-            [$declarationOffset, $declarationLength, $bodyOffset, $bodyLength] = $class;
-            $body = substr($text, $bodyOffset, $bodyLength);
-            $bodyCode = substr($code, $bodyOffset, $bodyLength);
-            $members = $this->methodMembers($text, $body, $bodyCode, $bodyOffset);
-            foreach ([
-                'targets' => StimulusMemberKind::Target,
-                'outlets' => StimulusMemberKind::Outlet,
-                'classes' => StimulusMemberKind::ClassName,
-            ] as $property => $kind) {
-                array_push($members, ...$this->stringArrayMembers($text, $body, $bodyCode, $bodyOffset, $property, $kind));
-            }
-            array_push($members, ...$this->valueMembers($text, $bodyCode, $bodyOffset));
-            usort($members, fn (StimulusMember $a, StimulusMember $b): int => $this->converter->toByteOffset($text, $a->range->start) <=> $this->converter->toByteOffset($text, $b->range->start));
-        }
+        [$declarationOffset, $declarationLength, $bodyIndex] = $this->exportedClass($tokens);
 
         return [
             new StimulusControllerDeclaration(
                 $name,
                 $uri,
                 $this->converter->toRange($text, $declarationOffset, $declarationLength),
-                $members,
-                1 === preg_match(self::LAZY_COMMENT_PATTERN, $text),
+                null === $bodyIndex ? [] : $this->members($tokens, $text, $bodyIndex),
+                $this->isLazy($tokens),
             ),
-            ...$this->registrations($project, $uri, $text, $code),
+            ...$this->registrations($project, $uri, $text, $tokens),
         ];
     }
 
-    /** @return list<StimulusControllerDeclaration> */
-    private function registrations(Project $project, string $uri, string $text, string $code): array
+    /** @return array{int, int, int|null} */
+    private function exportedClass(JavaScriptTokens $tokens): array
     {
-        if (!$this->isAssetFile($project, $uri) || !preg_match_all(self::REGISTRATION_PATTERN, $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE)) {
+        for ($index = 0, $count = $tokens->count(); $index < $count; ++$index) {
+            if (!$tokens->isIdentifier($index, 'export') || !$tokens->isIdentifier($index + 1, 'default')) {
+                continue;
+            }
+            $classIndex = $tokens->isIdentifier($index + 2, 'abstract') ? $index + 3 : $index + 2;
+            $class = $tokens->isIdentifier($classIndex, 'class') ? $tokens->at($classIndex) : null;
+            if (null === $class) {
+                continue;
+            }
+            $export = $tokens->at($index);
+            $declarationOffset = null === $export ? 0 : $export->offset;
+            $declarationLength = $class->offset + $class->length() - $declarationOffset;
+            for ($body = $classIndex + 1; $body < $count; ++$body) {
+                if ($tokens->isPunctuator($body, '{')) {
+                    return [$declarationOffset, $declarationLength, $body];
+                }
+            }
+
+            return [$declarationOffset, $declarationLength, null];
+        }
+
+        return [0, 0, null];
+    }
+
+    /** @return list<StimulusMember> */
+    private function members(JavaScriptTokens $tokens, string $text, int $bodyIndex): array
+    {
+        $end = $tokens->closingDelimiter($bodyIndex) ?? $tokens->count();
+        $members = [];
+        $depth = 0;
+        for ($index = $bodyIndex + 1; $index < $end; ++$index) {
+            $token = $tokens->at($index);
+            if (null === $token) {
+                break;
+            }
+            if (JavaScriptTokenKind::Punctuator === $token->kind && \in_array($token->value, ['{', '[', '('], true)) {
+                ++$depth;
+                continue;
+            }
+            if (JavaScriptTokenKind::Punctuator === $token->kind && \in_array($token->value, ['}', ']', ')'], true)) {
+                --$depth;
+                continue;
+            }
+            if (0 !== $depth || JavaScriptTokenKind::Identifier !== $token->kind) {
+                continue;
+            }
+            if ('static' === $token->value) {
+                array_push($members, ...$this->staticMembers($tokens, $text, $index));
+                continue;
+            }
+            $method = $this->method($tokens, $index);
+            if (null !== $method && !\in_array($method->value, self::LIFECYCLE_METHODS, true)) {
+                $members[] = new StimulusMember($method->value, StimulusMemberKind::Action, $this->converter->toRange($text, $method->offset, $method->length()));
+            }
+        }
+
+        return $members;
+    }
+
+    private function method(JavaScriptTokens $tokens, int $index): ?JavaScriptToken
+    {
+        $token = $tokens->at($index);
+        if (null === $token || !$token->startsLine) {
+            return null;
+        }
+        if ('async' === $token->value) {
+            $token = $tokens->identifier(++$index);
+        }
+        if (null === $token || !$tokens->isPunctuator($index + 1, '(')) {
+            return null;
+        }
+        $arguments = $tokens->closingDelimiter($index + 1);
+        if (null === $arguments) {
+            return null;
+        }
+        $body = $arguments + 1;
+        if ($tokens->isPunctuator($body, ':')) {
+            while ($body < $tokens->count() && !$tokens->isPunctuator($body, '{')) {
+                ++$body;
+            }
+        }
+
+        return $tokens->isPunctuator($body, '{') ? $token : null;
+    }
+
+    /** @return list<StimulusMember> */
+    private function staticMembers(JavaScriptTokens $tokens, string $text, int $index): array
+    {
+        $property = $tokens->identifier($index + 1);
+        if (null === $property || !$tokens->isPunctuator($index + 2, '=')) {
+            return [];
+        }
+        if (isset(self::MEMBER_ARRAYS[$property->value]) && $tokens->isPunctuator($index + 3, '[')) {
+            $close = $tokens->closingDelimiter($index + 3);
+
+            return null === $close ? [] : array_map(
+                fn (JavaScriptToken $string): StimulusMember => new StimulusMember($string->value, self::MEMBER_ARRAYS[$property->value], $this->converter->toRange($text, $string->offset, $string->length())),
+                $tokens->stringsBetween($index + 3, $close),
+            );
+        }
+        if ('values' !== $property->value || !$tokens->isPunctuator($index + 3, '{')) {
             return [];
         }
 
-        $applications = $this->applicationIdentifiers($text, $code);
+        return $this->valueMembers($tokens, $text, $index + 3);
+    }
+
+    /** @return list<StimulusMember> */
+    private function valueMembers(JavaScriptTokens $tokens, string $text, int $open): array
+    {
+        $close = $tokens->closingDelimiter($open);
+        if (null === $close) {
+            return [];
+        }
+        $members = [];
+        $depth = 0;
+        for ($index = $open + 1; $index < $close; ++$index) {
+            $token = $tokens->at($index);
+            if (null === $token) {
+                break;
+            }
+            if (JavaScriptTokenKind::Punctuator === $token->kind && \in_array($token->value, ['{', '[', '('], true)) {
+                ++$depth;
+            } elseif (JavaScriptTokenKind::Punctuator === $token->kind && \in_array($token->value, ['}', ']', ')'], true)) {
+                --$depth;
+            } elseif (0 === $depth
+                && JavaScriptTokenKind::Identifier === $token->kind
+                && $tokens->isPunctuator($index + 1, ':')
+                && ($index === $open + 1 || $tokens->isPunctuator($index - 1, ','))
+            ) {
+                $members[] = new StimulusMember($token->value, StimulusMemberKind::Value, $this->converter->toRange($text, $token->offset, $token->length()));
+            }
+        }
+
+        return $members;
+    }
+
+    /** @return list<StimulusControllerDeclaration> */
+    private function registrations(Project $project, string $uri, string $text, JavaScriptTokens $tokens): array
+    {
+        if (!$this->isAssetFile($project, $uri)) {
+            return [];
+        }
+        $applications = $this->applicationIdentifiers($tokens);
         $declarations = [];
-        foreach ($matches as $match) {
-            [$receiver, $receiverOffset] = $match[1];
-            [$name, $nameOffset] = $match[3];
-            if (' ' === $code[$receiverOffset] || !\in_array(str_replace([' ', "\t", "\r", "\n"], '', $receiver), $applications, true)) {
+        for ($index = 0, $count = $tokens->count(); $index < $count; ++$index) {
+            if (!$tokens->isIdentifier($index, 'register')
+                || !$tokens->isPunctuator($index + 1, '(')
+                || !$tokens->isString($index + 2)
+                || !$tokens->isPunctuator($index + 3, ',')
+            ) {
+                continue;
+            }
+            $name = $tokens->at($index + 2);
+            if (null === $name || '' === $name->value || !\in_array($tokens->receiver($index), $applications, true)) {
                 continue;
             }
             $declarations[] = new StimulusControllerDeclaration(
-                $name,
+                $name->value,
                 $uri,
-                $this->converter->toRange($text, $nameOffset, \strlen($name)),
+                $this->converter->toRange($text, $name->offset, $name->length()),
                 [],
                 false,
             );
@@ -91,110 +219,34 @@ final class StimulusControllerExtractor
     }
 
     /** @return list<string> */
-    private function applicationIdentifiers(string $text, string $code): array
+    private function applicationIdentifiers(JavaScriptTokens $tokens): array
     {
         $identifiers = self::APPLICATION_IDENTIFIERS;
-        preg_match_all(self::APPLICATION_FACTORY_PATTERN, $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-        foreach ($matches as $match) {
-            [$identifier, $offset] = $match[1];
-            if (' ' !== $code[$offset]) {
-                $identifiers[] = $identifier;
+        for ($index = 0, $count = $tokens->count(); $index < $count; ++$index) {
+            $target = $tokens->identifier($index);
+            if (null === $target || $tokens->isPunctuator($index - 1, '.') || !$tokens->isPunctuator($index + 1, '=')) {
+                continue;
+            }
+            $factory = $tokens->isIdentifier($index + 2, 'await') ? $index + 3 : $index + 2;
+            if (($tokens->isIdentifier($factory, 'startStimulusApp') && $tokens->isPunctuator($factory + 1, '('))
+                || ($tokens->isIdentifier($factory, 'Application') && $tokens->isPunctuator($factory + 1, '.') && $tokens->isIdentifier($factory + 2, 'start') && $tokens->isPunctuator($factory + 3, '('))
+            ) {
+                $identifiers[] = $target->value;
             }
         }
 
         return $identifiers;
     }
 
-    /** @return array{int, int, int, int}|null */
-    private function exportedClass(string $code): ?array
+    private function isLazy(JavaScriptTokens $tokens): bool
     {
-        if (!preg_match('/\bexport\s+default\s+(?:abstract\s+)?class\b/', $code, $match, \PREG_OFFSET_CAPTURE)) {
-            return null;
-        }
-
-        $declaration = $match[0][0];
-        $declarationOffset = $match[0][1];
-        $open = strpos($code, '{', $declarationOffset + \strlen($declaration));
-        if (false === $open) {
-            return [$declarationOffset, \strlen($declaration), \strlen($code), 0];
-        }
-
-        $depth = 0;
-        $length = \strlen($code);
-        for ($offset = $open; $offset < $length; ++$offset) {
-            if ('{' === $code[$offset]) {
-                ++$depth;
-            } elseif ('}' === $code[$offset] && 0 === --$depth) {
-                return [$declarationOffset, \strlen($declaration), $open + 1, $offset - $open - 1];
+        foreach ($tokens->comments() as $comment) {
+            if (1 === preg_match(self::LAZY_COMMENT_PATTERN, $comment->value)) {
+                return true;
             }
         }
 
-        return [$declarationOffset, \strlen($declaration), $open + 1, $length - $open - 1];
-    }
-
-    /** @return list<StimulusMember> */
-    private function methodMembers(string $text, string $body, string $bodyCode, int $bodyOffset): array
-    {
-        preg_match_all('/^[ \t]*(?:async\s+)?([A-Za-z_$][A-Za-z0-9_$]*)\s*\([^)]*\)\s*(?::\s*[^\{\r\n]+)?\s*\{/m', $body, $matches, \PREG_OFFSET_CAPTURE);
-        $members = [];
-        foreach ($matches[1] as [$name, $offset]) {
-            if (' ' !== $bodyCode[$offset] && !\in_array($name, self::LIFECYCLE_METHODS, true)) {
-                $members[] = new StimulusMember($name, StimulusMemberKind::Action, $this->converter->toRange($text, $bodyOffset + $offset, \strlen($name)));
-            }
-        }
-
-        return $members;
-    }
-
-    /** @return list<StimulusMember> */
-    private function stringArrayMembers(string $text, string $body, string $bodyCode, int $bodyOffset, string $property, StimulusMemberKind $kind): array
-    {
-        if (!preg_match('/\bstatic\s+'.preg_quote($property, '/').'\s*=\s*(\[)/', $bodyCode, $match, \PREG_OFFSET_CAPTURE)) {
-            return [];
-        }
-        $open = $match[1][1];
-        $close = $this->closingDelimiter($bodyCode, $open, '[', ']');
-        $valuesOffset = $open + 1;
-        $valuesBody = substr($body, $valuesOffset, $close - $valuesOffset);
-        $members = [];
-        foreach ($this->codeMasker->quotedStrings($valuesBody) as [$name, $offset]) {
-            $members[] = new StimulusMember($name, $kind, $this->converter->toRange($text, $bodyOffset + $valuesOffset + $offset, \strlen($name)));
-        }
-
-        return $members;
-    }
-
-    /** @return list<StimulusMember> */
-    private function valueMembers(string $text, string $bodyCode, int $bodyOffset): array
-    {
-        if (!preg_match('/\bstatic\s+values\s*=\s*(\{)/', $bodyCode, $match, \PREG_OFFSET_CAPTURE)) {
-            return [];
-        }
-        $open = $match[1][1];
-        $close = $this->closingDelimiter($bodyCode, $open, '{', '}');
-        $valuesOffset = $open + 1;
-        $valuesBody = substr($bodyCode, $valuesOffset, $close - $valuesOffset);
-        preg_match_all('/(?:^|,)\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*:/m', $valuesBody, $values, \PREG_OFFSET_CAPTURE);
-        $members = [];
-        foreach ($values[1] as [$name, $offset]) {
-            $members[] = new StimulusMember($name, StimulusMemberKind::Value, $this->converter->toRange($text, $bodyOffset + $valuesOffset + $offset, \strlen($name)));
-        }
-
-        return $members;
-    }
-
-    private function closingDelimiter(string $code, int $open, string $openingDelimiter, string $closingDelimiter): int
-    {
-        $depth = 0;
-        for ($offset = $open, $length = \strlen($code); $offset < $length; ++$offset) {
-            if ($openingDelimiter === $code[$offset]) {
-                ++$depth;
-            } elseif ($closingDelimiter === $code[$offset] && 0 === --$depth) {
-                return $offset;
-            }
-        }
-
-        return \strlen($code);
+        return false;
     }
 
     private function controllerName(Project $project, string $uri): ?string

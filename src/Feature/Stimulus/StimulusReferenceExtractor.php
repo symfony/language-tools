@@ -4,6 +4,8 @@ namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\JavaScript\JavaScriptToken;
+use Symfony\Lsp\Parser\JavaScript\JavaScriptTokens;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
@@ -12,6 +14,7 @@ use Symfony\Lsp\Parser\Twig\TwigStringLiteral;
 
 final class StimulusReferenceExtractor
 {
+    private const APPLICATION_RECEIVERS = ['application', 'this.application'];
     private const HELPER_MEMBER_KINDS = [
         'stimulus_controller' => null,
         'stimulus_action' => StimulusMemberKind::Action,
@@ -20,7 +23,6 @@ final class StimulusReferenceExtractor
 
     public function __construct(
         private readonly PositionConverter $converter,
-        private readonly JavaScriptSourceAnalyzer $codeMasker,
         private readonly StimulusControllerNameNormalizer $controllerNameNormalizer,
         private readonly TwigDocumentParser $parser,
         private readonly TwigCallArgumentResolver $arguments,
@@ -28,20 +30,42 @@ final class StimulusReferenceExtractor
     }
 
     /** @return list<StimulusReference> */
-    public function extractJavaScript(string $uri, string $text): array
+    public function extractJavaScript(string $uri, string $text, JavaScriptTokens $tokens): array
     {
-        $code = $this->codeMasker->mask($text);
         $references = [];
-        preg_match_all('/\b(?:application|this\.application)\s*\.\s*getControllerForElementAndIdentifier\s*\([^,]+,\s*([\'"])([^\'"]+)\1/', $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-        foreach ($matches as $match) {
-            if (' ' === $code[$match[0][1]]) {
+        for ($index = 0, $count = $tokens->count(); $index < $count; ++$index) {
+            $identifier = $this->resolvedControllerIdentifier($tokens, $index);
+            if (null === $identifier || '' === $identifier->value) {
                 continue;
             }
-            [$name, $offset] = $match[2];
-            $references[] = new StimulusReference($name, null, null, $uri, $this->converter->toRange($text, $offset, \strlen($name)));
+            $references[] = new StimulusReference($identifier->value, null, null, $uri, $this->converter->toRange($text, $identifier->offset, $identifier->length()));
         }
 
         return $references;
+    }
+
+    private function resolvedControllerIdentifier(JavaScriptTokens $tokens, int $index): ?JavaScriptToken
+    {
+        if (!$tokens->isIdentifier($index, 'getControllerForElementAndIdentifier')
+            || !$tokens->isPunctuator($index + 1, '(')
+            || !\in_array($tokens->receiver($index), self::APPLICATION_RECEIVERS, true)
+        ) {
+            return null;
+        }
+        $close = $tokens->closingDelimiter($index + 1);
+        if (null === $close) {
+            return null;
+        }
+        for ($argument = $index + 2; $argument < $close; ++$argument) {
+            if ($tokens->isPunctuator($argument, ',')) {
+                return $tokens->isString($argument + 1) ? $tokens->at($argument + 1) : null;
+            }
+            if ($tokens->isPunctuator($argument, '(') || $tokens->isPunctuator($argument, '[') || $tokens->isPunctuator($argument, '{')) {
+                $argument = $tokens->closingDelimiter($argument) ?? $close;
+            }
+        }
+
+        return null;
     }
 
     /** @return list<StimulusReference> */

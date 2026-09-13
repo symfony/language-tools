@@ -5,10 +5,10 @@ namespace Symfony\Lsp\Tests\Feature\Stimulus;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Feature\Stimulus\JavaScriptSourceAnalyzer;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerDeclaration;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerNameNormalizer;
+use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenizer;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -102,6 +102,74 @@ final class StimulusControllerExtractorTest extends TestCase
         );
     }
 
+    public function testIgnoresControlStructuresInsideMethodBodies(): void
+    {
+        $declaration = $this->extract(<<<'JS'
+            export default class extends Controller {
+                open() {
+                    if (ready) {
+                    }
+                    for (const item of items) {
+                    }
+                    while (pending) {
+                    }
+                    switch (mode) {
+                    }
+                }
+            }
+            JS);
+
+        self::assertSame(['open'], array_map(static fn ($member): string => $member->name, $declaration->members));
+    }
+
+    public function testIgnoresMembersOfClassesNestedInsideTheControllerBody(): void
+    {
+        $declaration = $this->extract(<<<'JS'
+            export default class extends Controller {
+                open() {
+                    const helper = class { static targets = ['nested']; inner() {} };
+                }
+            }
+            JS);
+
+        self::assertSame(['open'], array_map(static fn ($member): string => $member->name, $declaration->members));
+    }
+
+    public function testIgnoresPropertiesAndAccessorsThatAreNotMethodDeclarations(): void
+    {
+        $declaration = $this->extract(<<<'JS'
+            export default class extends Controller {
+                handler = function () {
+                }
+
+                get computed() {
+                }
+
+                static helper() {
+                }
+
+                open() {
+                }
+            }
+            JS);
+
+        self::assertSame(['open'], array_map(static fn ($member): string => $member->name, $declaration->members));
+    }
+
+    #[DataProvider('lazyMarkerProvider')]
+    public function testDetectsTheLazyMarkerOnlyInComments(string $text, bool $expected): void
+    {
+        self::assertSame($expected, $this->extract($text)->lazy);
+    }
+
+    /** @return iterable<string, array{string, bool}> */
+    public static function lazyMarkerProvider(): iterable
+    {
+        yield 'block comment' => ["/* stimulusFetch: 'lazy' */\nexport default class extends Controller {}", true];
+        yield 'line comment' => ["// stimulusFetch: 'lazy'\nexport default class extends Controller {}", true];
+        yield 'inside a string' => ["const doc = \"/* stimulusFetch: 'lazy' */\";\nexport default class extends Controller {}", false];
+    }
+
     public function testReturnsADeclarationForAnIncompleteClassHeader(): void
     {
         $declaration = $this->extract('export default class extends Controller');
@@ -174,8 +242,7 @@ final class StimulusControllerExtractorTest extends TestCase
 
     public function testMarksManuallyRegisteredControllersAsEager(): void
     {
-        $project = new Project('/workspace', 'file:///workspace');
-        $declarations = $this->createExtractor()->extract($project, 'file:///workspace/assets/controllers/example_controller.js', <<<'JS'
+        $declarations = $this->extractDeclarations('file:///workspace/assets/controllers/example_controller.js', <<<'JS'
             /* stimulusFetch: 'lazy' */
             export default class extends Controller {
                 connect() {
@@ -209,21 +276,20 @@ final class StimulusControllerExtractorTest extends TestCase
 
     private function extract(string $text): StimulusControllerDeclaration
     {
-        $project = new Project('/workspace', 'file:///workspace');
-
-        return $this->createExtractor()->extract($project, 'file:///workspace/assets/controllers/example_controller.js', $text)[0];
+        return $this->extractDeclarations('file:///workspace/assets/controllers/example_controller.js', $text)[0];
     }
 
     /** @return list<string> */
     private function extractNames(string $uri, string $text): array
     {
-        $project = new Project('/workspace', 'file:///workspace');
-
-        return array_map(static fn ($declaration): string => $declaration->name, $this->createExtractor()->extract($project, $uri, $text));
+        return array_map(static fn ($declaration): string => $declaration->name, $this->extractDeclarations($uri, $text));
     }
 
-    private function createExtractor(): StimulusControllerExtractor
+    /** @return list<StimulusControllerDeclaration> */
+    private function extractDeclarations(string $uri, string $text): array
     {
-        return new StimulusControllerExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new JavaScriptSourceAnalyzer(), new StimulusControllerNameNormalizer());
+        $extractor = new StimulusControllerExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new StimulusControllerNameNormalizer());
+
+        return $extractor->extract(new Project('/workspace', 'file:///workspace'), $uri, $text, (new JavaScriptTokenizer())->tokenize($text));
     }
 }

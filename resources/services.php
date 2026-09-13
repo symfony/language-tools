@@ -61,6 +61,7 @@ use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Index\SourceIndexStoreInterface;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\CommentParserRegistry;
+use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenizer;
 use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -196,6 +197,7 @@ return static function (ContainerConfigurator $container): void {
     $services->set(PersistentSourceIndexStore::class);
     $services->load('Symfony\\Lsp\\Parser\\', '../src/Parser/**/*{Parser,Locator}.php');
     $services->set(TreeSitterResultDecoder::class);
+    $services->set(JavaScriptTokenizer::class);
     $services->set(YamlScalarDecoder::class);
     $services->set(XliffXmlReferenceDecoder::class);
     $services->set(BalancedDelimiterMatcher::class);

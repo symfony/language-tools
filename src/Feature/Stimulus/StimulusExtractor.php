@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenizer;
 use Symfony\Lsp\Project\Project;
 
 final class StimulusExtractor
@@ -11,13 +12,16 @@ final class StimulusExtractor
         private readonly StimulusControllerExtractor $controllers,
         private readonly StimulusReferenceExtractor $references,
         private readonly StimulusCompletionContextResolver $completionContexts,
+        private readonly JavaScriptTokenizer $tokenizer,
     ) {
     }
 
     public function extract(Project $project, SourceDocument $document): StimulusSourceFacts
     {
         if (\in_array($document->languageId, ['javascript', 'typescript'], true)) {
-            return new StimulusSourceFacts($document->uri, $this->controllers->extract($project, $document->uri, $document->text), $this->references->extractJavaScript($document->uri, $document->text));
+            $tokens = $this->tokenizer->tokenize($document->text);
+
+            return new StimulusSourceFacts($document->uri, $this->controllers->extract($project, $document->uri, $document->text, $tokens), $this->references->extractJavaScript($document->uri, $document->text, $tokens));
         }
         if ('twig' === $document->languageId) {
             return new StimulusSourceFacts($document->uri, [], $this->references->extractTwig($document->uri, $document->text));

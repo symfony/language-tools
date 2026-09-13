@@ -5,13 +5,13 @@ namespace Symfony\Lsp\Tests\Feature\Stimulus;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Feature\Stimulus\JavaScriptSourceAnalyzer;
 use Symfony\Lsp\Feature\Stimulus\StimulusCompletionContextResolver;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerNameNormalizer;
 use Symfony\Lsp\Feature\Stimulus\StimulusExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusReferenceExtractor;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenizer;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
@@ -96,6 +96,17 @@ final class StimulusExtractorTest extends TestCase
             JS));
 
         self::assertSame(['example', 'registered'], array_map(static fn ($declaration): string => $declaration->name, $facts->declarations));
+        self::assertSame(['resolved'], array_map(static fn ($reference): string => $reference->controller, $facts->references));
+    }
+
+    public function testResolvesControllerLookupsWhoseFirstArgumentContainsCommas(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+        $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/assets/controllers/example_controller.js', 'javascript', <<<'JS'
+            this.application.getControllerForElementAndIdentifier(this.element.querySelector('a, b'), 'resolved');
+            other.application.getControllerForElementAndIdentifier(element, 'unrelated');
+            JS));
+
         self::assertSame(['resolved'], array_map(static fn ($reference): string => $reference->controller, $facts->references));
     }
 
@@ -219,13 +230,14 @@ final class StimulusExtractorTest extends TestCase
     {
         $converter = new PositionConverter();
         $comments = new TwigCommentParser();
-        $codeMasker = new JavaScriptSourceAnalyzer();
+        $tokenizer = new JavaScriptTokenizer();
         $controllerNameNormalizer = new StimulusControllerNameNormalizer();
 
         return new StimulusExtractor(
-            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $codeMasker, $controllerNameNormalizer),
-            new StimulusReferenceExtractor($converter, $codeMasker, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser())),
+            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $controllerNameNormalizer),
+            new StimulusReferenceExtractor($converter, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser())),
             new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer),
+            $tokenizer,
         );
     }
 

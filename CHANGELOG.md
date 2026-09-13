@@ -3,6 +3,11 @@
 ## Unreleased
 
 - Recognize Stimulus controllers registered manually on a Stimulus application in asset scripts
+- Analyze Stimulus asset scripts through a JavaScript tokenizer instead of pattern matching on masked text
+- Stop reporting JavaScript control structures such as `if` and `for` as Stimulus controller actions
+- Ignore Stimulus members declared by classes nested inside a controller method
+- Recognize the Stimulus lazy loading marker only in comments, not in string contents
+- Resolve Stimulus controller lookups whose element argument contains a comma
 - Select the analyzed kernel with the `kernel` setting, the `--kernel` check option or the `symfony.switchKernel` command
 - Skip Twig component runtime metadata when the application kernel doesn't register the bundle
 - Keep release and packaging output in order when it is redirected to a file

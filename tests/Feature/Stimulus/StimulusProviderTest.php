@@ -7,7 +7,6 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Feature\Stimulus\JavaScriptSourceAnalyzer;
 use Symfony\Lsp\Feature\Stimulus\StimulusCodeLensProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusCompletionContextResolver;
 use Symfony\Lsp\Feature\Stimulus\StimulusCompletionProvider;
@@ -23,6 +22,7 @@ use Symfony\Lsp\Feature\Stimulus\StimulusRelationshipProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusResolver;
 use Symfony\Lsp\Feature\Stimulus\StimulusSourceIndexRegistry;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenizer;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
@@ -237,13 +237,14 @@ final class StimulusProviderTest extends TestCase
     private function createExtractor(PositionConverter $converter): StimulusExtractor
     {
         $comments = new TwigCommentParser();
-        $codeMasker = new JavaScriptSourceAnalyzer();
+        $tokenizer = new JavaScriptTokenizer();
         $controllerNameNormalizer = new StimulusControllerNameNormalizer();
 
         return new StimulusExtractor(
-            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $codeMasker, $controllerNameNormalizer),
-            new StimulusReferenceExtractor($converter, $codeMasker, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser())),
+            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $controllerNameNormalizer),
+            new StimulusReferenceExtractor($converter, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser())),
             new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer),
+            $tokenizer,
         );
     }
 
