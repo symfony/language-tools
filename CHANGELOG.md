@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.20.2 (2026-09-13)
 
 - Recognize Stimulus controllers registered manually on a Stimulus application in asset scripts
 - Analyze Stimulus asset scripts through a JavaScript tokenizer instead of pattern matching on masked text
