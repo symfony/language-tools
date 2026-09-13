@@ -36,6 +36,10 @@ processor result types that are incompatible with a statically known bundle
 configuration type. A missing declaration isn't an error because the variable
 can be supplied by the shell, a deployment platform or a secrets provider.
 
+A doubled ``%%`` is an escaped percent sign, as in Symfony parameter values and
+in ``sprintf()`` formats, so ``%%env(APP_URL)%%`` is neither a reference nor a
+malformed expression.
+
 Privacy
 -------
 

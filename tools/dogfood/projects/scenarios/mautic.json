@@ -278,24 +278,6 @@
             "kind": "application",
             "reason": "This pinned source reference is unresolved in the configured runtime template paths; retain the exact finding for review when pins change.",
             "messageHash": "5dd3770c4bdb625b961302a16a4bea2e97c63407acdfc52cdb48c5c58a8802ce"
-        },
-        {
-            "path": "app/config/parameters.php",
-            "code": "env.malformed_chain",
-            "severity": "error",
-            "range": {
-                "start": {
-                    "line": 47,
-                    "character": 54
-                },
-                "end": {
-                    "line": 47,
-                    "character": 77
-                }
-            },
-            "kind": "known-gap",
-            "reason": "This sprintf format becomes an environment expression at runtime and is not a complete static environment expression.",
-            "messageHash": "63b02cece37aeb22cc441dc7b10071997cd38c94fce6dc33d3b6147a9b15435a"
         }
     ]
 }

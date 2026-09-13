@@ -265,6 +265,36 @@ final class EnvironmentProviderTest extends TestCase
         self::assertSame(['LIVE_ENV'], array_map(static fn ($reference): string => $reference->name, $facts->references));
     }
 
+    public function testTreatsDoubledPercentSignsAsEscapes(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]), $this->yamlParser());
+        $php = <<<'PHP'
+            <?php
+            $container->setParameter('mautic.url', sprintf('%%env(%sresolve:MAUTIC_%s)%%', $type, strtoupper($key)));
+            $escaped = '%%env(ESCAPED_ENV)%%';
+            $chained = '%kernel.project_dir%%env(LIVE_ENV)%';
+            $broken = '100%% %env(BROKEN_ENV%';
+            PHP;
+
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Kernel.php', 'php', $php));
+
+        self::assertSame(['LIVE_ENV'], array_map(static fn ($reference): string => $reference->name, $facts->references));
+        self::assertCount(1, $facts->malformedExpressions);
+        self::assertEquals(
+            $converter->toRange($php, (int) strpos($php, '%env(BROKEN_ENV%'), \strlen('%env(BROKEN_ENV%')),
+            $facts->malformedExpressions[0]->range,
+        );
+
+        $yamlFacts = $extractor->extract(new SourceDocument('file:///workspace/config/services.yaml', 'yaml', <<<'YAML'
+            escaped: '%%env(ESCAPED_ENV)%%'
+            chained: '%kernel.project_dir%%env(LIVE_ENV)%'
+            YAML));
+
+        self::assertSame(['LIVE_ENV'], array_map(static fn ($reference): string => $reference->name, $yamlFacts->references));
+        self::assertSame([], $yamlFacts->malformedExpressions);
+    }
+
     /** @return array{EnvironmentCompletionProvider, EnvironmentRelationshipProvider, EnvironmentDiagnosticProvider} */
     private function providers(DocumentStore $documents, ProjectRegistry $projects, PositionConverter $converter, EnvironmentIndexRegistry $indexes, EnvironmentExtractor $extractor, CommentParserRegistry $comments, YamlDocumentParser $yamlParser): array
     {

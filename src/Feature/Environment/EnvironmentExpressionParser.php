@@ -28,10 +28,10 @@ final class EnvironmentExpressionParser
     /** @return list<EnvironmentExpression> */
     public function parseAll(string $source, int $sourceOffset = 0): array
     {
-        preg_match_all('/%env\([^\)\r\n]*\)%/', $source, $matches, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/%%|%[^%\s]*+%/', $source, $matches, \PREG_OFFSET_CAPTURE);
         $expressions = [];
         foreach ($matches[0] as [$expression, $offset]) {
-            $parsed = $this->parse($expression, $sourceOffset + $offset);
+            $parsed = '%%' === $expression ? null : $this->parse($expression, $sourceOffset + $offset);
             if (null !== $parsed) {
                 $expressions[] = $parsed;
             }

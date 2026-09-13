@@ -62,9 +62,12 @@ final class EnvironmentExtractor
     /** @return list<MalformedEnvironmentExpression> */
     private function malformedExpressions(string $text, string $source, int $baseOffset = 0): array
     {
-        preg_match_all('/%env\([^\)\r\n]*%/', $source, $matches, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/%%|(%env\([^\)\r\n]*%)|%[^%\s]*+%/', $source, $matches, \PREG_OFFSET_CAPTURE);
         $expressions = [];
-        foreach ($matches[0] as [$expression, $offset]) {
+        foreach ($matches[1] as [$expression, $offset]) {
+            if (0 > $offset) {
+                continue;
+            }
             $expressions[] = new MalformedEnvironmentExpression(
                 $this->converter->toRange($text, $baseOffset + $offset, \strlen($expression)),
             );
