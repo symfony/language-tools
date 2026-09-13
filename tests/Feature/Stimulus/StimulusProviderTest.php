@@ -41,14 +41,7 @@ final class StimulusProviderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace');
         $converter = new PositionConverter();
-        $comments = new TwigCommentParser();
-        $codeMasker = new JavaScriptSourceAnalyzer();
-        $controllerNameNormalizer = new StimulusControllerNameNormalizer();
-        $extractor = new StimulusExtractor(
-            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $codeMasker, $controllerNameNormalizer),
-            new StimulusReferenceExtractor($converter, $codeMasker, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser())),
-            new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer),
-        );
+        $extractor = $this->createExtractor($converter);
         $controllerUri = 'file:///workspace/assets/controllers/search_controller.js';
         $controllerText = <<<'JS'
             import { Controller } from '@hotwired/stimulus';
@@ -195,6 +188,63 @@ final class StimulusProviderTest extends TestCase
         self::assertIsArray($lenses);
         self::assertIsArray($lenses[0]['command'] ?? null);
         self::assertSame('3 Stimulus controller usages', $lenses[0]['command']['title'] ?? null);
+    }
+
+    public function testRecognizesManuallyRegisteredControllers(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+        $converter = new PositionConverter();
+        $extractor = $this->createExtractor($converter);
+        $bootstrapUri = 'file:///workspace/assets/app/stimulus_bootstrap.js';
+        $bootstrapText = <<<'JS'
+            import { startStimulusApp } from '@symfony/stimulus-bundle';
+
+            const app = startStimulusApp();
+
+            import Clipboard from 'stimulus-clipboard';
+
+            app.register('clipboard', Clipboard);
+            JS;
+        $usageUri = 'file:///workspace/templates/episode/tracked.html.twig';
+        $usageText = '<div data-controller="clipboard"></div>';
+        $completionUri = 'file:///workspace/templates/completion.html.twig';
+        $completionText = '<div data-controller="clip';
+        $documents = new DocumentStore();
+        $documents->open(new Document($bootstrapUri, 'javascript', 1, $bootstrapText));
+        $documents->open(new Document($usageUri, 'twig', 1, $usageText));
+        $documents->open(new Document($completionUri, 'twig', 1, $completionText));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project]);
+        $indexes = new StimulusIndexRegistry();
+        $indexes->forProject($project)->replace(true);
+        $sourceIndexes = new StimulusSourceIndexRegistry();
+        $sourceIndexes->forProject($project)->replace(
+            $extractor->extract($project, new SourceDocument($bootstrapUri, 'javascript', $bootstrapText)),
+            $extractor->extract($project, new SourceDocument($usageUri, 'twig', $usageText)),
+        );
+        $documentResolver = new DocumentContextResolver($documents, $projects);
+        $protocol = new LspProtocolMapper();
+        $stimulus = new StimulusResolver($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
+        $diagnosticProvider = new StimulusDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $stimulus);
+        $completionProvider = new StimulusCompletionProvider($documentResolver, $converter, $protocol, $extractor, $stimulus);
+        $relationshipProvider = new StimulusRelationshipProvider(new UriToPathConverter(), $protocol, $indexes, $sourceIndexes, $stimulus);
+
+        self::assertSame([], $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $usageUri]]));
+        self::assertSame(['clipboard'], array_column($completionProvider->complete($this->params($converter, $completionUri, $completionText, \strlen($completionText))) ?? [], 'label'));
+        self::assertSame([$bootstrapUri], array_column($relationshipProvider->definition($this->params($converter, $usageUri, $usageText, strpos($usageText, 'clipboard') + 2)) ?? [], 'uri'));
+    }
+
+    private function createExtractor(PositionConverter $converter): StimulusExtractor
+    {
+        $comments = new TwigCommentParser();
+        $codeMasker = new JavaScriptSourceAnalyzer();
+        $controllerNameNormalizer = new StimulusControllerNameNormalizer();
+
+        return new StimulusExtractor(
+            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $codeMasker, $controllerNameNormalizer),
+            new StimulusReferenceExtractor($converter, $codeMasker, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser())),
+            new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer),
+        );
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */

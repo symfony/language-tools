@@ -32,18 +32,13 @@ final class StimulusReferenceExtractor
     {
         $code = $this->codeMasker->mask($text);
         $references = [];
-        foreach ([
-            '/\b(?:application|this\.application)\s*\.\s*register\s*\(\s*([\'"])([^\'"]+)\1/',
-            '/\b(?:application|this\.application)\s*\.\s*getControllerForElementAndIdentifier\s*\([^,]+,\s*([\'"])([^\'"]+)\1/',
-        ] as $pattern) {
-            preg_match_all($pattern, $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-            foreach ($matches as $match) {
-                if (' ' === $code[$match[0][1]]) {
-                    continue;
-                }
-                [$name, $offset] = $match[2];
-                $references[] = new StimulusReference($name, null, null, $uri, $this->converter->toRange($text, $offset, \strlen($name)));
+        preg_match_all('/\b(?:application|this\.application)\s*\.\s*getControllerForElementAndIdentifier\s*\([^,]+,\s*([\'"])([^\'"]+)\1/', $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        foreach ($matches as $match) {
+            if (' ' === $code[$match[0][1]]) {
+                continue;
             }
+            [$name, $offset] = $match[2];
+            $references[] = new StimulusReference($name, null, null, $uri, $this->converter->toRange($text, $offset, \strlen($name)));
         }
 
         return $references;

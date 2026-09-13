@@ -109,17 +109,88 @@ final class StimulusControllerExtractorTest extends TestCase
         self::assertSame([], $declaration->members);
     }
 
+    #[DataProvider('manualRegistrationProvider')]
+    public function testDeclaresManuallyRegisteredControllers(string $text): void
+    {
+        self::assertSame(['clipboard'], $this->extractNames('file:///workspace/assets/app/stimulus_bootstrap.js', $text));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function manualRegistrationProvider(): iterable
+    {
+        yield 'stimulus bundle application' => [<<<'JS'
+            import { startStimulusApp } from '@symfony/stimulus-bundle';
+            import Clipboard from 'stimulus-clipboard';
+
+            const app = startStimulusApp();
+            app.register('clipboard', Clipboard);
+            JS];
+        yield 'exported stimulus bridge application' => [<<<'JS'
+            import { startStimulusApp } from '@symfony/stimulus-bridge';
+
+            export const app = startStimulusApp(require.context('./controllers', true, /\.[jt]sx?$/));
+            app.register('clipboard', Clipboard);
+            JS];
+        yield 'started hotwired application' => [<<<'JS'
+            import { Application } from '@hotwired/stimulus';
+
+            const application = Application.start();
+            application.register('clipboard', Clipboard);
+            JS];
+        yield 'registration split over several lines' => [<<<'JS'
+            const app = startStimulusApp();
+            app.register(
+                'clipboard',
+                Clipboard,
+            );
+            JS];
+    }
+
+    public function testKeepsManuallyRegisteredIdentifiersVerbatim(): void
+    {
+        self::assertSame(['clip_board'], $this->extractNames('file:///workspace/assets/app/stimulus_bootstrap.js', <<<'JS'
+            const app = startStimulusApp();
+            app.register('clip_board', Clipboard);
+            JS));
+    }
+
+    public function testIgnoresRegistrationsOnUnrelatedReceivers(): void
+    {
+        self::assertSame([], $this->extractNames('file:///workspace/assets/app/stimulus_bootstrap.js', <<<'JS'
+            const app = startStimulusApp();
+            const registry = new Container();
+            registry.register('unrelated', Thing);
+            this.container.register('service', Service);
+            JS));
+    }
+
+    public function testIgnoresRegistrationsOutsideAssetDirectories(): void
+    {
+        self::assertSame([], $this->extractNames('file:///workspace/public/build/bootstrap.js', <<<'JS'
+            const app = startStimulusApp();
+            app.register('clipboard', Clipboard);
+            JS));
+    }
+
+    public function testMarksManuallyRegisteredControllersAsEager(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+        $declarations = $this->createExtractor()->extract($project, 'file:///workspace/assets/controllers/example_controller.js', <<<'JS'
+            /* stimulusFetch: 'lazy' */
+            export default class extends Controller {
+                connect() {
+                    this.application.register('clipboard', Clipboard);
+                }
+            }
+            JS);
+
+        self::assertSame([['example', true], ['clipboard', false]], array_map(static fn ($declaration): array => [$declaration->name, $declaration->lazy], $declarations));
+    }
+
     #[DataProvider('ignoredControllerPathProvider')]
     public function testIgnoresControllerNamedAssetsOutsideIndexableControllerDirectories(string $uri): void
     {
-        $project = new Project('/workspace', 'file:///workspace');
-        $extractor = new StimulusControllerExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new JavaScriptSourceAnalyzer(), new StimulusControllerNameNormalizer());
-
-        self::assertSame([], $extractor->extract(
-            $project,
-            $uri,
-            'export default class extends Controller {}',
-        ));
+        self::assertSame([], $this->extractNames($uri, 'export default class extends Controller {}'));
     }
 
     /** @return iterable<string, array{string}> */
@@ -139,8 +210,20 @@ final class StimulusControllerExtractorTest extends TestCase
     private function extract(string $text): StimulusControllerDeclaration
     {
         $project = new Project('/workspace', 'file:///workspace');
-        $extractor = new StimulusControllerExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new JavaScriptSourceAnalyzer(), new StimulusControllerNameNormalizer());
 
-        return $extractor->extract($project, 'file:///workspace/assets/controllers/example_controller.js', $text)[0];
+        return $this->createExtractor()->extract($project, 'file:///workspace/assets/controllers/example_controller.js', $text)[0];
+    }
+
+    /** @return list<string> */
+    private function extractNames(string $uri, string $text): array
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+
+        return array_map(static fn ($declaration): string => $declaration->name, $this->createExtractor()->extract($project, $uri, $text));
+    }
+
+    private function createExtractor(): StimulusControllerExtractor
+    {
+        return new StimulusControllerExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new JavaScriptSourceAnalyzer(), new StimulusControllerNameNormalizer());
     }
 }

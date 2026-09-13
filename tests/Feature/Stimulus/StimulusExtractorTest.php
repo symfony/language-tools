@@ -56,7 +56,7 @@ final class StimulusExtractorTest extends TestCase
         self::assertSame(['open'], array_map(static fn ($member): string => $member->name, $facts->declarations[0]->members));
     }
 
-    public function testIgnoresJavaScriptReferencesInsideCommentsAndStrings(): void
+    public function testIgnoresJavaScriptRegistrationsAndReferencesInsideCommentsAndStrings(): void
     {
         $project = new Project('/workspace', 'file:///workspace');
         $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/assets/controllers/example_controller.js', 'javascript', <<<'JS'
@@ -68,10 +68,8 @@ final class StimulusExtractorTest extends TestCase
             this.application.getControllerForElementAndIdentifier(element, 'resolved');
             JS));
 
-        self::assertSame(
-            ['registered', 'resolved'],
-            array_map(static fn ($reference): string => $reference->controller, $facts->references),
-        );
+        self::assertSame(['example', 'registered'], array_map(static fn ($declaration): string => $declaration->name, $facts->declarations));
+        self::assertSame(['resolved'], array_map(static fn ($reference): string => $reference->controller, $facts->references));
     }
 
     public function testDoesNotMaskTypeScriptDivisionAsRegularExpressions(): void
@@ -82,13 +80,11 @@ final class StimulusExtractorTest extends TestCase
             const genericRatio = factory<Type> / this.application.getControllerForElementAndIdentifier(element, 'resolved') / divisor;
             TS));
 
-        self::assertSame(
-            ['registered', 'resolved'],
-            array_map(static fn ($reference): string => $reference->controller, $facts->references),
-        );
+        self::assertSame(['example', 'registered'], array_map(static fn ($declaration): string => $declaration->name, $facts->declarations));
+        self::assertSame(['resolved'], array_map(static fn ($reference): string => $reference->controller, $facts->references));
     }
 
-    public function testExtractsJavaScriptReferencesInsideTemplateInterpolations(): void
+    public function testExtractsJavaScriptRegistrationsAndReferencesInsideTemplateInterpolations(): void
     {
         $project = new Project('/workspace', 'file:///workspace');
         $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/assets/controllers/example_controller.js', 'javascript', <<<'JS'
@@ -99,10 +95,8 @@ final class StimulusExtractorTest extends TestCase
             `;
             JS));
 
-        self::assertSame(
-            ['registered', 'resolved'],
-            array_map(static fn ($reference): string => $reference->controller, $facts->references),
-        );
+        self::assertSame(['example', 'registered'], array_map(static fn ($declaration): string => $declaration->name, $facts->declarations));
+        self::assertSame(['resolved'], array_map(static fn ($reference): string => $reference->controller, $facts->references));
     }
 
     public function testIgnoresTwigReferencesInsideDocumentationComments(): void

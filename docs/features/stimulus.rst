@@ -31,6 +31,22 @@ these values:
         Search
     </button>
 
+Controllers registered manually on a Stimulus application in a JavaScript or
+TypeScript file under ``assets/`` are recognized too, which is how third-party
+controllers are added to the bootstrap file:
+
+.. code-block:: javascript
+
+    import { startStimulusApp } from '@symfony/stimulus-bundle';
+    import Clipboard from 'stimulus-clipboard';
+
+    const app = startStimulusApp();
+
+    app.register('clipboard', Clipboard);
+
+The registered identifier is used exactly as written, and the registered class
+isn't inspected, so its actions, targets and values remain unknown.
+
 Hover describes the controller source, loading mode, actions, targets, values,
 outlets and CSS classes. A ``stimulusFetch: 'lazy'`` line or block comment marks
 the entire controller file as lazy, regardless of where the comment appears. Go
@@ -86,6 +102,8 @@ are recognized when they use the conventional ``*_controller.js`` and
 ``*_controller.ts`` names. Runtime indexing adds custom paths, installed
 Symfony UX controllers and bundle ``controllers.json`` registries.
 Only members inside the exported default controller class are recognized;
-helper classes in the same file are ignored. Dynamic controller registration,
-computed action names, inherited actions and dynamic Live Component event names
-are ignored.
+helper classes in the same file are ignored. Manual registrations are
+recognized on ``application``, ``this.application`` and variables assigned from
+``startStimulusApp()`` or ``Application.start()``, and only when the registered
+name is a static string. Computed controller names, computed action names,
+inherited actions and dynamic Live Component event names are ignored.

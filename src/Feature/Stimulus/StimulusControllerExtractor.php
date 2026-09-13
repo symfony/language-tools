@@ -11,6 +11,9 @@ final class StimulusControllerExtractor
 {
     private const LAZY_COMMENT_PATTERN = '/\/\*!?\s*stimulusFetch:\s*[\'"]lazy[\'"]\s*\*\/|\/\/\s*stimulusFetch:\s*[\'"]lazy[\'"]/i';
     private const LIFECYCLE_METHODS = ['connect', 'constructor', 'disconnect', 'initialize'];
+    private const APPLICATION_FACTORY_PATTERN = '/(?:^|[^.\w$])([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?:await\s+)?(?:startStimulusApp|Application\s*\.\s*start)\s*\(/';
+    private const REGISTRATION_PATTERN = '/(?:^|[^.\w$])((?:this\s*\.\s*)?[A-Za-z_$][A-Za-z0-9_$]*)\s*\.\s*register\s*\(\s*([\'"])([^\'"]+)\2\s*,/';
+    private const APPLICATION_IDENTIFIERS = ['application', 'this.application'];
 
     public function __construct(
         private readonly PositionConverter $converter,
@@ -23,16 +26,17 @@ final class StimulusControllerExtractor
     /** @return list<StimulusControllerDeclaration> */
     public function extract(Project $project, string $uri, string $text): array
     {
+        $code = $this->codeMasker->mask($text);
         $name = $this->controllerName($project, $uri);
         if (null === $name) {
-            return [];
+            return $this->registrations($project, $uri, $text, $code);
         }
 
         $members = [];
         $declarationOffset = 0;
         $declarationLength = 0;
-        if (null !== $class = $this->exportedClass($text)) {
-            [$declarationOffset, $declarationLength, $bodyOffset, $bodyLength, $code] = $class;
+        if (null !== $class = $this->exportedClass($code)) {
+            [$declarationOffset, $declarationLength, $bodyOffset, $bodyLength] = $class;
             $body = substr($text, $bodyOffset, $bodyLength);
             $bodyCode = substr($code, $bodyOffset, $bodyLength);
             $members = $this->methodMembers($text, $body, $bodyCode, $bodyOffset);
@@ -47,19 +51,63 @@ final class StimulusControllerExtractor
             usort($members, fn (StimulusMember $a, StimulusMember $b): int => $this->converter->toByteOffset($text, $a->range->start) <=> $this->converter->toByteOffset($text, $b->range->start));
         }
 
-        return [new StimulusControllerDeclaration(
-            $name,
-            $uri,
-            $this->converter->toRange($text, $declarationOffset, $declarationLength),
-            $members,
-            1 === preg_match(self::LAZY_COMMENT_PATTERN, $text),
-        )];
+        return [
+            new StimulusControllerDeclaration(
+                $name,
+                $uri,
+                $this->converter->toRange($text, $declarationOffset, $declarationLength),
+                $members,
+                1 === preg_match(self::LAZY_COMMENT_PATTERN, $text),
+            ),
+            ...$this->registrations($project, $uri, $text, $code),
+        ];
     }
 
-    /** @return array{int, int, int, int, string}|null */
-    private function exportedClass(string $text): ?array
+    /** @return list<StimulusControllerDeclaration> */
+    private function registrations(Project $project, string $uri, string $text, string $code): array
     {
-        $code = $this->codeMasker->mask($text);
+        if (!$this->isAssetFile($project, $uri) || !preg_match_all(self::REGISTRATION_PATTERN, $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE)) {
+            return [];
+        }
+
+        $applications = $this->applicationIdentifiers($text, $code);
+        $declarations = [];
+        foreach ($matches as $match) {
+            [$receiver, $receiverOffset] = $match[1];
+            [$name, $nameOffset] = $match[3];
+            if (' ' === $code[$receiverOffset] || !\in_array(str_replace([' ', "\t", "\r", "\n"], '', $receiver), $applications, true)) {
+                continue;
+            }
+            $declarations[] = new StimulusControllerDeclaration(
+                $name,
+                $uri,
+                $this->converter->toRange($text, $nameOffset, \strlen($name)),
+                [],
+                false,
+            );
+        }
+
+        return $declarations;
+    }
+
+    /** @return list<string> */
+    private function applicationIdentifiers(string $text, string $code): array
+    {
+        $identifiers = self::APPLICATION_IDENTIFIERS;
+        preg_match_all(self::APPLICATION_FACTORY_PATTERN, $text, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        foreach ($matches as $match) {
+            [$identifier, $offset] = $match[1];
+            if (' ' !== $code[$offset]) {
+                $identifiers[] = $identifier;
+            }
+        }
+
+        return $identifiers;
+    }
+
+    /** @return array{int, int, int, int}|null */
+    private function exportedClass(string $code): ?array
+    {
         if (!preg_match('/\bexport\s+default\s+(?:abstract\s+)?class\b/', $code, $match, \PREG_OFFSET_CAPTURE)) {
             return null;
         }
@@ -68,7 +116,7 @@ final class StimulusControllerExtractor
         $declarationOffset = $match[0][1];
         $open = strpos($code, '{', $declarationOffset + \strlen($declaration));
         if (false === $open) {
-            return [$declarationOffset, \strlen($declaration), \strlen($text), 0, $code];
+            return [$declarationOffset, \strlen($declaration), \strlen($code), 0];
         }
 
         $depth = 0;
@@ -77,11 +125,11 @@ final class StimulusControllerExtractor
             if ('{' === $code[$offset]) {
                 ++$depth;
             } elseif ('}' === $code[$offset] && 0 === --$depth) {
-                return [$declarationOffset, \strlen($declaration), $open + 1, $offset - $open - 1, $code];
+                return [$declarationOffset, \strlen($declaration), $open + 1, $offset - $open - 1];
             }
         }
 
-        return [$declarationOffset, \strlen($declaration), $open + 1, $length - $open - 1, $code];
+        return [$declarationOffset, \strlen($declaration), $open + 1, $length - $open - 1];
     }
 
     /** @return list<StimulusMember> */
@@ -160,5 +208,17 @@ final class StimulusControllerExtractor
         }
 
         return $this->controllerNameNormalizer->normalize($match[1]);
+    }
+
+    private function isAssetFile(Project $project, string $uri): bool
+    {
+        $path = $this->pathResolver->relative($project, $uri);
+        if (null === $path) {
+            return false;
+        }
+        $segments = explode('/', $path);
+        array_pop($segments);
+
+        return \in_array('assets', $segments, true) && [] === array_intersect($segments, ProjectPathPolicy::EXCLUDED_DIRECTORIES);
     }
 }

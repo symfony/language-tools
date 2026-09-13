@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recognize Stimulus controllers registered manually on a Stimulus application in asset scripts
 - Select the analyzed kernel with the `kernel` setting, the `--kernel` check option or the `symfony.switchKernel` command
 - Skip Twig component runtime metadata when the application kernel doesn't register the bundle
 - Keep release and packaging output in order when it is redirected to a file
