@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.20.2 (2026-09-13)
 
 - Recognize Stimulus controllers registered manually on a Stimulus application in asset scripts
