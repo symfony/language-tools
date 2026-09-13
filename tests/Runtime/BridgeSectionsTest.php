@@ -341,6 +341,44 @@ final class BridgeSectionsTest extends TestCase
         self::assertSame([], $result['sections']['metadata']['constraints'] ?? null);
     }
 
+    public function testCompletesFormOptionsInheritedFromExtendedAncestorTypes(): void
+    {
+        (new MetadataFixtureBuilder($this->workspace))->writeFormApplication();
+
+        $process = $this->bridge->run(['--sections=metadata']);
+
+        $snapshot = $process->stdout;
+        self::assertSame(0, $process->exitCode, $snapshot);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null, $snapshot);
+        self::assertIsArray($result['sections'] ?? null);
+        $metadata = $result['sections']['metadata'] ?? null;
+        self::assertIsArray($metadata);
+        self::assertFalse($metadata['formsComplete'] ?? null);
+        self::assertSame(['The App\\Form\\UnknownType form metadata is unavailable.'], $metadata['warnings'] ?? null);
+        self::assertSame([
+            [
+                'class' => 'App\\Form\\UserType',
+                'blockPrefix' => 'user',
+                'options' => ['attr', 'label', 'multiple', 'selectpicker', 'width'],
+                'requiredOptions' => ['label'],
+            ],
+            [
+                'class' => 'Symfony\\Component\\Form\\Extension\\Core\\Type\\ChoiceType',
+                'blockPrefix' => 'choice',
+                'options' => ['attr', 'multiple', 'selectpicker', 'width'],
+                'requiredOptions' => [],
+            ],
+            [
+                'class' => 'Symfony\\Component\\Form\\Extension\\Core\\Type\\FormType',
+                'blockPrefix' => 'form',
+                'options' => ['attr'],
+                'requiredOptions' => [],
+            ],
+        ], $metadata['forms'] ?? null);
+    }
+
     public function testKeepsConstraintMetadataWithoutOptionalDependencies(): void
     {
         (new MetadataFixtureBuilder($this->workspace))->writeConstraintApplication();

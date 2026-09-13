@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Treat a doubled `%%` as an escaped percent sign in environment expressions
+- Recognize form options declared by a type extension registered on several types of the same hierarchy
 
 ## 0.20.2 (2026-09-13)
 

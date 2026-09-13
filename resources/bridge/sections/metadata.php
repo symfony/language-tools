@@ -24,26 +24,23 @@ function symfonyLspBridgeMetadataSection(SymfonyLspBridgeContext $context): ?arr
                         }
                     }
                 }
+                $descriptions = [];
                 foreach (array_keys($types) as $type) {
-                    try {
-                        $metadata = symfonyLspBridgeRunJsonCommand($application, ['command' => 'debug:form', 'class' => $type, ...$commandOptions]);
-                        $options = [];
-                        foreach (symfonyLspBridgeMetadataStringLeaves(is_array($metadata['options'] ?? null) ? $metadata['options'] : []) as $name) {
-                            $options[$name] = true;
-                        }
-                        $required = array_values(array_filter(is_array($metadata['options']['required'] ?? null) ? $metadata['options']['required'] : [], 'is_string'));
-                        $optionNames = array_keys($options);
-                        sort($optionNames);
-                        sort($required);
-                        $forms[$type] = [
-                            'class' => $type,
-                            'blockPrefix' => is_string($metadata['block_prefix'] ?? null) ? $metadata['block_prefix'] : null,
-                            'options' => $optionNames,
-                            'requiredOptions' => $required,
-                        ];
-                    } catch (Throwable) {
+                    $metadata = symfonyLspBridgeMetadataFormDescription($application, $commandOptions, $type, $descriptions);
+                    if (null === $metadata) {
                         $warnings[] = sprintf('The %s form metadata is unavailable.', $type);
+                        continue;
                     }
+                    $options = symfonyLspBridgeMetadataFormOptions($application, $commandOptions, $metadata, $descriptions);
+                    $required = array_values(array_filter(is_array($metadata['options']['required'] ?? null) ? $metadata['options']['required'] : [], 'is_string'));
+                    sort($options);
+                    sort($required);
+                    $forms[$type] = [
+                        'class' => $type,
+                        'blockPrefix' => is_string($metadata['block_prefix'] ?? null) ? $metadata['block_prefix'] : null,
+                        'options' => $options,
+                        'requiredOptions' => $required,
+                    ];
                 }
                 $formsComplete = count($forms) === count($types);
             }
@@ -94,6 +91,44 @@ function symfonyLspBridgeMetadataSection(SymfonyLspBridgeContext $context): ?arr
         'warnings' => $warnings,
     ];
     return symfonyLspBridgeFinalizeSection($section);
+}
+
+function symfonyLspBridgeMetadataFormDescription(object $application, array $commandOptions, string $type, array &$descriptions): ?array
+{
+    if (!array_key_exists($type, $descriptions)) {
+        try {
+            $descriptions[$type] = symfonyLspBridgeRunJsonCommand($application, ['command' => 'debug:form', 'class' => $type, ...$commandOptions]);
+        } catch (Throwable) {
+            $descriptions[$type] = null;
+        }
+    }
+
+    return $descriptions[$type];
+}
+
+/*
+ * debug:form attributes the options of a type extension to the highest type it
+ * extends, so a type extension registered on both a type and one of its
+ * ancestors describes no option at all below that ancestor. Options are
+ * inherited along the parent chain, so their union restores them.
+ */
+function symfonyLspBridgeMetadataFormOptions(object $application, array $commandOptions, array $metadata, array &$descriptions): array
+{
+    $descriptionChain = [$metadata];
+    foreach (is_array($metadata['parent_types'] ?? null) ? $metadata['parent_types'] : [] as $parent) {
+        $parentMetadata = is_string($parent) ? symfonyLspBridgeMetadataFormDescription($application, $commandOptions, $parent, $descriptions) : null;
+        if (is_array($parentMetadata)) {
+            $descriptionChain[] = $parentMetadata;
+        }
+    }
+    $options = [];
+    foreach ($descriptionChain as $description) {
+        foreach (symfonyLspBridgeMetadataStringLeaves(is_array($description['options'] ?? null) ? $description['options'] : []) as $name) {
+            $options[$name] = true;
+        }
+    }
+
+    return array_keys($options);
 }
 
 function symfonyLspBridgeMetadataStringLeaves(array $values): array

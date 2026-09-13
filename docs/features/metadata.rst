@@ -15,7 +15,9 @@ type and options must be passed positionally. Required options are identified in
 completion and hover details.
 
 After runtime indexing, definitely unknown literal options are diagnosed for
-known form types. Dynamic option arrays and unresolved form types are ignored.
+known form types. Options declared by form type extensions are known, including
+on the types that inherit them from an extended parent type. Dynamic option
+arrays and unresolved form types are ignored.
 A type argument that concatenates, wraps or computes a class name is dynamic,
 even when it contains a ``::class`` reference. It doesn't trigger option
 completion or diagnostics. Quoted strings in nested option values can contain
