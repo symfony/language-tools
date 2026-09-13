@@ -124,8 +124,8 @@ $cases = [
     ],
     [
         'name' => 'stimulus',
-        'file' => 'assets/controllers/search_controller.js',
-        'replace' => ['    open() {', "    benchmarkAction() {\n    }\n\n    open() {"],
+        'file' => 'assets/controllers/benchmark_controller.js',
+        'create' => "import { Controller } from '@hotwired/stimulus';\n\nexport default class extends Controller {\n    connect() {\n    }\n}\n",
         'section' => 'stimulus',
         'preserveContainer' => true,
         'generationChanges' => true,
