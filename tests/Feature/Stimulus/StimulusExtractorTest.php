@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Stimulus\StimulusCompletionContextResolver;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerNameNormalizer;
+use Symfony\Lsp\Feature\Stimulus\StimulusControllerSourceAnalyzer;
 use Symfony\Lsp\Feature\Stimulus\StimulusExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusReferenceExtractor;
 use Symfony\Lsp\Index\SourceDocument;
@@ -234,7 +235,7 @@ final class StimulusExtractorTest extends TestCase
         $controllerNameNormalizer = new StimulusControllerNameNormalizer();
 
         return new StimulusExtractor(
-            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $controllerNameNormalizer),
+            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $controllerNameNormalizer, new StimulusControllerSourceAnalyzer($converter)),
             new StimulusReferenceExtractor($converter, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser())),
             new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer),
             $tokenizer,

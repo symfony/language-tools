@@ -5,13 +5,13 @@ namespace Symfony\Lsp\Feature\Stimulus;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
-use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
 
 final class ProjectStimulusSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
     public function __construct(
         private readonly StimulusIndexRegistry $indexes,
         private readonly ContainerPathMapper $pathMapper,
+        private readonly StimulusControllerSourceLoader $sources,
     ) {
     }
 
@@ -27,27 +27,21 @@ final class ProjectStimulusSnapshotLoader implements RuntimeSnapshotLoaderInterf
             if (!\is_array($item) || !\is_string($item['name'] ?? null) || !\is_string($item['sourcePath'] ?? null)) {
                 continue;
             }
+            $sourcePath = $this->pathMapper->toHost($project, $item['sourcePath']);
+            $source = $this->sources->load($sourcePath);
+            $lazy = $item['lazy'] ?? null;
             $controllers[] = new StimulusController(
                 $item['name'],
-                $this->pathMapper->toHost($project, $item['sourcePath']),
-                true === ($item['lazy'] ?? false),
+                $sourcePath,
+                \is_bool($lazy) ? $lazy : (bool) $source?->lazy,
                 true === ($item['vendor'] ?? false),
-                $this->strings($item['actions'] ?? []),
-                $this->strings($item['targets'] ?? []),
-                $this->strings($item['values'] ?? []),
-                $this->strings($item['outlets'] ?? []),
-                $this->strings($item['classes'] ?? []),
+                $source?->memberNames(StimulusMemberKind::Action) ?? [],
+                $source?->memberNames(StimulusMemberKind::Target) ?? [],
+                $source?->memberNames(StimulusMemberKind::Value) ?? [],
+                $source?->memberNames(StimulusMemberKind::Outlet) ?? [],
+                $source?->memberNames(StimulusMemberKind::ClassName) ?? [],
             );
         }
         $this->indexes->forProject($project)->replace(true === ($section['complete'] ?? false), ...$controllers);
-    }
-
-    /** @return list<string> */
-    private function strings(mixed $values): array
-    {
-        $values = RuntimeSnapshotValues::stringList($values);
-        sort($values);
-
-        return $values;
     }
 }

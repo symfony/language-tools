@@ -13,6 +13,7 @@ use Symfony\Lsp\Feature\Stimulus\StimulusCompletionProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusController;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerNameNormalizer;
+use Symfony\Lsp\Feature\Stimulus\StimulusControllerSourceAnalyzer;
 use Symfony\Lsp\Feature\Stimulus\StimulusDiagnosticProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusDocumentLinkProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusExtractor;
@@ -241,7 +242,7 @@ final class StimulusProviderTest extends TestCase
         $controllerNameNormalizer = new StimulusControllerNameNormalizer();
 
         return new StimulusExtractor(
-            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $controllerNameNormalizer),
+            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $controllerNameNormalizer, new StimulusControllerSourceAnalyzer($converter)),
             new StimulusReferenceExtractor($converter, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser())),
             new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer),
             $tokenizer,

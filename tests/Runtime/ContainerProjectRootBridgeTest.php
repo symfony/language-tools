@@ -4,16 +4,20 @@ namespace Symfony\Lsp\Tests\Runtime;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Asset\AssetIndexRegistry;
 use Symfony\Lsp\Feature\Asset\ProjectAssetSnapshotLoader;
 use Symfony\Lsp\Feature\Configuration\ConfigurationValidationRegistry;
 use Symfony\Lsp\Feature\Configuration\ProjectConfigurationValidationSnapshotLoader;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\Stimulus\ProjectStimulusSnapshotLoader;
+use Symfony\Lsp\Feature\Stimulus\StimulusControllerSourceAnalyzer;
+use Symfony\Lsp\Feature\Stimulus\StimulusControllerSourceLoader;
 use Symfony\Lsp\Feature\Stimulus\StimulusIndexRegistry;
 use Symfony\Lsp\Feature\Twig\ProjectTemplateSnapshotLoader;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenizer;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -73,7 +77,7 @@ final class ContainerProjectRootBridgeTest extends TestCase
             new RuntimeSnapshotLoaderRegistry([
                 new ProjectTemplateSnapshotLoader($templateIndexes, new UriToPathConverter(), $pathMapper),
                 new ProjectAssetSnapshotLoader($assetIndexes, $pathMapper),
-                new ProjectStimulusSnapshotLoader($stimulusIndexes, $pathMapper),
+                new ProjectStimulusSnapshotLoader($stimulusIndexes, $pathMapper, new StimulusControllerSourceLoader(new JavaScriptTokenizer(), new StimulusControllerSourceAnalyzer(new PositionConverter()))),
             ]),
             $configuration,
             $pathMapper,

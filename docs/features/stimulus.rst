@@ -101,9 +101,10 @@ Project controllers in ``controllers/`` directories anywhere under ``assets/``
 are recognized when they use the conventional ``*_controller.js`` and
 ``*_controller.ts`` names. Runtime indexing adds custom paths, installed
 Symfony UX controllers and bundle ``controllers.json`` registries.
-Only members inside the exported default controller class are recognized;
-helper classes in the same file are ignored. Manual registrations are
+Only members of the default-exported controller class and of superclasses
+declared in the same file are recognized; other classes in the file are ignored,
+and actions inherited from another file aren't. Manual registrations are
 recognized on ``application``, ``this.application`` and variables assigned from
 ``startStimulusApp()`` or ``Application.start()``, and only when the registered
-name is a static string. Computed controller names, computed action names,
-inherited actions and dynamic Live Component event names are ignored.
+name is a static string. Computed controller names, computed action names and
+dynamic Live Component event names are ignored.

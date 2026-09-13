@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerDeclaration;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerNameNormalizer;
+use Symfony\Lsp\Feature\Stimulus\StimulusControllerSourceAnalyzer;
 use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenizer;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
@@ -15,168 +16,6 @@ use Symfony\Lsp\Project\UriToPathConverter;
 
 final class StimulusControllerExtractorTest extends TestCase
 {
-    public function testExtractsMembersFromAnUnclosedControllerClass(): void
-    {
-        $declaration = $this->extract(<<<'JS'
-            export default class extends Controller {
-                static targets = ['result'];
-
-                open() {
-                }
-            JS);
-
-        self::assertSame(
-            [['result', 'target'], ['open', 'action']],
-            array_map(static fn ($member): array => [$member->name, $member->kind->value], $declaration->members),
-        );
-    }
-
-    public function testIgnoresBracesInStringsTemplatesAndCommentsWhenFindingTheClassBoundary(): void
-    {
-        $declaration = $this->extract(<<<'JS'
-            export default class extends Controller {
-                open() {
-                    const string = "}";
-                    const template = `<div>${value}</div> }`;
-                    // }
-                    /* } */
-                }
-            }
-
-            class Helper {
-                helper() {
-                }
-            }
-            JS);
-
-        self::assertSame(['open'], array_map(static fn ($member): string => $member->name, $declaration->members));
-    }
-
-    #[DataProvider('regularExpressionProvider')]
-    public function testIgnoresRegularExpressionContentsWhenFindingTheClassBoundary(string $regularExpression): void
-    {
-        $declaration = $this->extract(<<<JS
-            export default class extends Controller {
-                open() {
-                    const pattern = {$regularExpression};
-                }
-
-                close() {
-                }
-            }
-            JS);
-
-        self::assertSame(['open', 'close'], array_map(static fn ($member): string => $member->name, $declaration->members));
-    }
-
-    public function testIgnoresMembersInsideCommentsAndStrings(): void
-    {
-        $declaration = $this->extract(<<<'JS'
-            export default class extends Controller {
-                static targets = [
-                    'result',
-                    /* 'commentedTarget', */
-                ];
-                static values = {
-                    query: String,
-                    label: "value, stringValue: Number",
-                    // commentedValue: Boolean,
-                };
-
-                open() {
-                    const example = `
-                        stringAction() {
-                        }
-                        static targets = ['stringTarget'];
-                    `;
-                }
-
-                // commentedAction() {
-                // }
-            }
-            JS);
-
-        self::assertSame(
-            [['result', 'target'], ['query', 'value'], ['label', 'value'], ['open', 'action']],
-            array_map(static fn ($member): array => [$member->name, $member->kind->value], $declaration->members),
-        );
-    }
-
-    public function testIgnoresControlStructuresInsideMethodBodies(): void
-    {
-        $declaration = $this->extract(<<<'JS'
-            export default class extends Controller {
-                open() {
-                    if (ready) {
-                    }
-                    for (const item of items) {
-                    }
-                    while (pending) {
-                    }
-                    switch (mode) {
-                    }
-                }
-            }
-            JS);
-
-        self::assertSame(['open'], array_map(static fn ($member): string => $member->name, $declaration->members));
-    }
-
-    public function testIgnoresMembersOfClassesNestedInsideTheControllerBody(): void
-    {
-        $declaration = $this->extract(<<<'JS'
-            export default class extends Controller {
-                open() {
-                    const helper = class { static targets = ['nested']; inner() {} };
-                }
-            }
-            JS);
-
-        self::assertSame(['open'], array_map(static fn ($member): string => $member->name, $declaration->members));
-    }
-
-    public function testIgnoresPropertiesAndAccessorsThatAreNotMethodDeclarations(): void
-    {
-        $declaration = $this->extract(<<<'JS'
-            export default class extends Controller {
-                handler = function () {
-                }
-
-                get computed() {
-                }
-
-                static helper() {
-                }
-
-                open() {
-                }
-            }
-            JS);
-
-        self::assertSame(['open'], array_map(static fn ($member): string => $member->name, $declaration->members));
-    }
-
-    #[DataProvider('lazyMarkerProvider')]
-    public function testDetectsTheLazyMarkerOnlyInComments(string $text, bool $expected): void
-    {
-        self::assertSame($expected, $this->extract($text)->lazy);
-    }
-
-    /** @return iterable<string, array{string, bool}> */
-    public static function lazyMarkerProvider(): iterable
-    {
-        yield 'block comment' => ["/* stimulusFetch: 'lazy' */\nexport default class extends Controller {}", true];
-        yield 'line comment' => ["// stimulusFetch: 'lazy'\nexport default class extends Controller {}", true];
-        yield 'inside a string' => ["const doc = \"/* stimulusFetch: 'lazy' */\";\nexport default class extends Controller {}", false];
-    }
-
-    public function testReturnsADeclarationForAnIncompleteClassHeader(): void
-    {
-        $declaration = $this->extract('export default class extends Controller');
-
-        self::assertSame([], $declaration->members);
-    }
-
     #[DataProvider('manualRegistrationProvider')]
     public function testDeclaresManuallyRegisteredControllers(string $text): void
     {
@@ -267,18 +106,6 @@ final class StimulusControllerExtractorTest extends TestCase
         yield 'inside an excluded directory' => ['file:///workspace/assets/vendor/controllers/feature_widget_controller.ts'];
     }
 
-    /** @return iterable<string, array{string}> */
-    public static function regularExpressionProvider(): iterable
-    {
-        yield 'closing brace' => ['/}/'];
-        yield 'quotes' => ['/[\'\"]/'];
-    }
-
-    private function extract(string $text): StimulusControllerDeclaration
-    {
-        return $this->extractDeclarations('file:///workspace/assets/controllers/example_controller.js', $text)[0];
-    }
-
     /** @return list<string> */
     private function extractNames(string $uri, string $text): array
     {
@@ -288,7 +115,7 @@ final class StimulusControllerExtractorTest extends TestCase
     /** @return list<StimulusControllerDeclaration> */
     private function extractDeclarations(string $uri, string $text): array
     {
-        $extractor = new StimulusControllerExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new StimulusControllerNameNormalizer());
+        $extractor = new StimulusControllerExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new StimulusControllerNameNormalizer(), new StimulusControllerSourceAnalyzer(new PositionConverter()));
 
         return $extractor->extract(new Project('/workspace', 'file:///workspace'), $uri, $text, (new JavaScriptTokenizer())->tokenize($text));
     }

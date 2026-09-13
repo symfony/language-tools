@@ -4,7 +4,11 @@
 
 - Recognize Stimulus controllers registered manually on a Stimulus application in asset scripts
 - Analyze Stimulus asset scripts through a JavaScript tokenizer instead of pattern matching on masked text
+- Derive Stimulus controller members from the source file instead of the runtime bridge, including installed Symfony UX packages
+- Recognize the bundled controller shapes Symfony UX packages ship, including re-exported class expressions and static properties assigned after the class body
+- Recognize Stimulus members inherited from a superclass declared in the same file
 - Stop reporting JavaScript control structures such as `if` and `for` as Stimulus controller actions
+- Report Stimulus values declared with a nested type definition, which were previously lost
 - Ignore Stimulus members declared by classes nested inside a controller method
 - Recognize the Stimulus lazy loading marker only in comments, not in string contents
 - Resolve Stimulus controller lookups whose element argument contains a comma

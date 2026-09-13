@@ -185,45 +185,17 @@ function symfonyLspBridgeStimulusUxControllers(string $projectRoot, string $cont
     return $controllers;
 }
 
+// Controller members and the lazy marker are source facts: the server analyzes
+// the referenced file so both indexes agree on one JavaScript implementation.
 function symfonyLspBridgeStimulusController(string $projectRoot, string $name, string $sourcePath, ?bool $lazy): array
 {
-    $contents = file_get_contents($sourcePath);
-    $contents = false === $contents ? '' : $contents;
-    $metadata = symfonyLspBridgeStimulusJavascriptMetadata($contents);
     $root = Symfony\Component\Filesystem\Path::canonicalize(realpath($projectRoot) ?: $projectRoot);
     $sourcePath = Symfony\Component\Filesystem\Path::canonicalize($sourcePath);
 
     return [
         'name' => $name,
         'sourcePath' => $sourcePath,
-        'lazy' => $lazy ?? 1 === preg_match('/\/\*!?\s*stimulusFetch:\s*[\'"]lazy[\'"]\s*\*\/|\/\/\s*stimulusFetch:\s*[\'"]lazy[\'"]/i', $contents),
+        'lazy' => $lazy,
         'vendor' => !Symfony\Component\Filesystem\Path::isBasePath($root, $sourcePath) || str_contains('/'.$sourcePath, '/vendor/'),
-        ...$metadata,
     ];
-}
-
-function symfonyLspBridgeStimulusJavascriptMetadata(string $contents): array
-{
-    preg_match_all('/^[ \t]*(?:async\s+)?([A-Za-z_$][A-Za-z0-9_$]*)\s*\([^)]*\)\s*(?::\s*[^\{\r\n]+)?\s*\{/m', $contents, $methodMatches);
-    $actions = array_values(array_diff(array_unique($methodMatches[1]), ['connect', 'constructor', 'disconnect', 'initialize']));
-    sort($actions);
-    $metadata = ['actions' => $actions];
-    foreach (['targets', 'outlets', 'classes'] as $property) {
-        $values = [];
-        if (preg_match('/\bstatic\s+'.preg_quote($property, '/').'\s*=\s*\[(.*?)\]/s', $contents, $match)) {
-            preg_match_all('/([\'"])([^\'"]+)\1/', $match[1], $valueMatches);
-            $values = array_values(array_unique($valueMatches[2]));
-            sort($values);
-        }
-        $metadata[$property] = $values;
-    }
-    $values = [];
-    if (preg_match('/\bstatic\s+values\s*=\s*\{(.*?)\}/s', $contents, $match)) {
-        preg_match_all('/(?:^|,)\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*:/m', $match[1], $valueMatches);
-        $values = array_values(array_unique($valueMatches[1]));
-        sort($values);
-    }
-    $metadata['values'] = $values;
-
-    return $metadata;
 }
